@@ -75,6 +75,23 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 │  accepted_at                     checked_out_at (timestamptz)         │
 │                                  UNIQUE(game_id, player_id, user_id)  │
 │                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                     ADMIN / AUDIT TABLES                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  stat_corrections                                                      │
+│  ────────────────                                                      │
+│  id (uuid, PK)                                                         │
+│  game_id (FK→games)                                                    │
+│  player_id (FK→players)                                                │
+│  stat_id (text)                                                        │
+│  corrected_value (int)                                                 │
+│  original_primary_value (int, nullable)                                │
+│  corrected_by (FK→profiles)  -- must be team owner/admin               │
+│  reason (text, nullable)                                               │
+│  created_at (timestamptz)                                              │
+│  UNIQUE(game_id, player_id, stat_id)                                   │
+│                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -311,24 +328,28 @@ CREATE POLICY "checkouts_create" ON player_checkouts
 
 The existing `game_stats` table already has `recorded_by` — no changes needed there. All stat records from all parents are kept.
 
-### 3.4 Resolution Logic (UI Layer Only)
+### 3.4 Resolution Logic
 
-When rendering the **Team View** (Game Summary, Season Stats, Leaderboard), the UI resolves which stat record to display for each player:
+The primary flag is **not just a UI hint** — it is the single source of truth for all computed totals: game scores, season accumulations, leaderboards, and player profiles. Wherever the app shows a stat total, it uses the resolved value derived from the primary recorder's data.
+
+**Resolution priority (highest to lowest):**
 
 ```
-For each (game, player):
-  1. Is there a player_checkout with is_primary = true?
-     → Yes: use that parent's game_stats as the displayed values
-     → No:  continue to step 2
-  2. Is there exactly one parent who submitted stats for this player?
-     → Yes: use their stats (no conflict)
-     → No:  continue to step 3
-  3. Multiple parents submitted, no checkout:
-     → Show averaged values with a "⚠ multiple sources" indicator
-     → Team admin can resolve by assigning a primary checkout after the fact
+For each (game, player, stat):
+  1. Admin override exists in stat_corrections?
+     → Yes: use the corrected value (highest authority)
+  2. Is there a player_checkout with is_primary = true
+     and that parent submitted stats?
+     → Yes: use the primary recorder's game_stats
+  3. Exactly one parent submitted stats (no checkout)?
+     → Yes: use their stats (unambiguous)
+  4. Multiple parents submitted, no checkout or primary:
+     → Average the values and flag as "⚠ needs review"
+     → These DO contribute to totals (best-effort) but are
+       surfaced in the admin review queue for resolution
 ```
 
-This resolution can be a Supabase RPC function:
+**Resolved stats RPC:**
 
 ```sql
 CREATE OR REPLACE FUNCTION get_game_stats_resolved(p_game_id uuid)
@@ -336,35 +357,165 @@ RETURNS TABLE (
   player_id uuid,
   stat_id text,
   value int,
+  source text,        -- 'correction' | 'primary' | 'sole' | 'averaged'
   recorded_by uuid,
-  is_primary boolean,
   recorder_count int
 ) AS $$
+  WITH corrections AS (
+    SELECT player_id, stat_id, corrected_value AS value,
+           corrected_by AS recorded_by, 'correction'::text AS source
+    FROM stat_corrections
+    WHERE game_id = p_game_id
+  ),
+  primary_stats AS (
+    SELECT gs.player_id, gs.stat_id, gs.value,
+           gs.recorded_by, 'primary'::text AS source
+    FROM game_stats gs
+    JOIN player_checkouts pc
+      ON pc.game_id = gs.game_id
+      AND pc.player_id = gs.player_id
+      AND pc.user_id = gs.recorded_by
+      AND pc.is_primary = true
+    WHERE gs.game_id = p_game_id
+  ),
+  sole_stats AS (
+    SELECT gs.player_id, gs.stat_id, gs.value,
+           gs.recorded_by, 'sole'::text AS source
+    FROM game_stats gs
+    WHERE gs.game_id = p_game_id
+    AND NOT EXISTS (
+      SELECT 1 FROM game_stats gs2
+      WHERE gs2.game_id = gs.game_id
+        AND gs2.player_id = gs.player_id
+        AND gs2.stat_id = gs.stat_id
+        AND gs2.recorded_by != gs.recorded_by
+    )
+  ),
+  averaged_stats AS (
+    SELECT gs.player_id, gs.stat_id,
+           ROUND(AVG(gs.value))::int AS value,
+           NULL::uuid AS recorded_by, 'averaged'::text AS source
+    FROM game_stats gs
+    WHERE gs.game_id = p_game_id
+    GROUP BY gs.player_id, gs.stat_id
+    HAVING COUNT(DISTINCT gs.recorded_by) > 1
+  ),
+  resolved AS (
+    -- Priority: corrections > primary > sole > averaged
+    SELECT DISTINCT ON (player_id, stat_id)
+      player_id, stat_id, value, source, recorded_by
+    FROM (
+      SELECT *, 1 AS priority FROM corrections
+      UNION ALL
+      SELECT *, 2 AS priority FROM primary_stats
+      UNION ALL
+      SELECT *, 3 AS priority FROM sole_stats
+      UNION ALL
+      SELECT *, 4 AS priority FROM averaged_stats
+    ) all_sources
+    ORDER BY player_id, stat_id, priority
+  )
   SELECT
-    gs.player_id,
-    gs.stat_id,
-    gs.value,
-    gs.recorded_by,
-    COALESCE(pc.is_primary, false) AS is_primary,
-    COUNT(*) OVER (PARTITION BY gs.player_id, gs.stat_id) AS recorder_count
-  FROM game_stats gs
-  LEFT JOIN player_checkouts pc
-    ON pc.game_id = gs.game_id
-    AND pc.player_id = gs.player_id
-    AND pc.user_id = gs.recorded_by
-    AND pc.is_primary = true
-  WHERE gs.game_id = p_game_id
-  ORDER BY
-    gs.player_id,
-    gs.stat_id,
-    pc.is_primary DESC NULLS LAST,  -- primary first
-    gs.created_at ASC;               -- then by submission time
+    r.player_id, r.stat_id, r.value, r.source, r.recorded_by,
+    (SELECT COUNT(DISTINCT gs.recorded_by)
+     FROM game_stats gs
+     WHERE gs.game_id = p_game_id
+       AND gs.player_id = r.player_id
+       AND gs.stat_id = r.stat_id
+    )::int AS recorder_count
+  FROM resolved r
+  ORDER BY r.player_id, r.stat_id;
 $$ LANGUAGE sql STABLE;
 ```
 
-The client calls this and filters: for each `(player_id, stat_id)`, take the first row (which is the primary if one exists).
+The `source` column tells the UI where each value came from, so it can render indicators (e.g., a pencil icon for corrections, a warning for averaged values).
 
-### 3.5 UI Flow
+### 3.5 Admin Stat Corrections
+
+Team admins (role = `owner` or `admin` in `team_members`) can review and correct stats after a game. Corrections are stored in a dedicated table — they never overwrite the original parent-submitted records.
+
+**Why a separate table?**
+- Full audit trail: you can always see what parents originally submitted
+- Admin corrections are clearly attributed (`corrected_by`)
+- Reason field captures why the change was made
+- Corrections take highest priority in resolution without destroying data
+
+```sql
+CREATE TABLE stat_corrections (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  player_id uuid NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  stat_id text NOT NULL,
+  corrected_value int NOT NULL,
+  original_primary_value int,  -- snapshot of what was there before
+  corrected_by uuid NOT NULL REFERENCES profiles(id),
+  reason text,                 -- e.g., "scorer miscounted 3-pointers"
+  created_at timestamptz NOT NULL DEFAULT now(),
+
+  UNIQUE(game_id, player_id, stat_id)  -- one correction per stat per player per game
+);
+
+CREATE INDEX idx_corrections_game ON stat_corrections(game_id);
+
+ALTER TABLE stat_corrections ENABLE ROW LEVEL SECURITY;
+
+-- Team members can view corrections for their teams
+CREATE POLICY "corrections_read" ON stat_corrections
+  FOR SELECT USING (
+    game_id IN (SELECT id FROM games WHERE team_id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    ))
+  );
+
+-- Only team admins/owners can create or update corrections
+CREATE POLICY "corrections_admin_write" ON stat_corrections
+  FOR INSERT WITH CHECK (
+    corrected_by = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM games g
+      JOIN team_members tm ON tm.team_id = g.team_id
+      WHERE g.id = game_id
+        AND tm.user_id = auth.uid()
+        AND tm.role IN ('owner', 'admin')
+    )
+  );
+
+CREATE POLICY "corrections_admin_update" ON stat_corrections
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM games g
+      JOIN team_members tm ON tm.team_id = g.team_id
+      WHERE g.id = game_id
+        AND tm.user_id = auth.uid()
+        AND tm.role IN ('owner', 'admin')
+    )
+  );
+```
+
+**Admin correction flow:**
+
+```
+1. Admin opens Game Summary for a finalized game
+2. Taps "Review Stats" → enters admin review mode
+3. Sees all submissions side-by-side per player:
+   ┌───────────────────────────────────────────────────────┐
+   │  #23 Michael Jordan — Scoring                        │
+   │                                                       │
+   │  Stat   Primary (Dad)   Secondary (Mom)   Official   │
+   │  FT     3               2                 [ 3 ]      │
+   │  2PT    5               5                 [ 5 ]      │
+   │  3PT    2               3                 [ 2 ]  ✏️  │
+   │                                                       │
+   │  ⚠ Discrepancy on 3PT: Dad=2, Mom=3                  │
+   └───────────────────────────────────────────────────────┘
+4. Admin taps the pencil on a stat → edits the "Official" value
+5. Enters reason: "Reviewed game film — was a 2-pointer, not a 3"
+6. Saves → stat_corrections record created
+7. All totals (game score, season stats, leaderboard) immediately
+   reflect the corrected value
+```
+
+### 3.6 UI Flow
 
 **Before the game — Checkout Screen:**
 ```
@@ -391,54 +542,72 @@ The client calls this and filters: for each `(player_id, stat_id)`, take the fir
 - Stats for non-checked-out players still work — just won't be primary
 
 **After the game — Team View:**
-- Default shows resolved stats (primary recorder per player)
-- Toggle to "All Submissions" to see every parent's data side by side
-- Admin can reassign primary after the fact if needed
+- Default shows resolved stats (primary recorder per player, or admin correction if present)
+- Toggle to "All Submissions" to see every parent's raw data side by side
+- Stats with admin corrections show a pencil icon indicating they've been reviewed
+- Averaged stats (no primary) show a warning icon and appear in the admin review queue
 
-### 3.6 Season Stats with Checkout
+**Admin Review (team owner/admin only):**
+- Accessible from Game Summary → "Review Stats"
+- Side-by-side comparison of all parent submissions per player
+- Discrepancies highlighted automatically
+- Admin can set the official value with a reason — creates a `stat_corrections` record
+- Can also reassign primary checkout to a different parent
+- Corrections immediately flow through to game totals, season stats, and leaderboards
 
-For season-long accumulation, the resolved view carries forward:
+### 3.7 Season Stats with Checkout + Corrections
+
+Game totals, season accumulations, leaderboards, and player profiles all use the same resolution chain: **corrections > primary checkout > sole recorder > averaged**. This is implemented as a single reusable function that the season view calls per game:
 
 ```sql
-CREATE VIEW season_player_stats_resolved AS
-SELECT
-  g.team_id,
-  gs.player_id,
-  gs.stat_id,
-  COUNT(DISTINCT g.id) AS games_played,
-  SUM(gs.value) AS total,
-  ROUND(AVG(gs.value), 1) AS per_game_avg,
-  MAX(gs.value) AS season_high
-FROM game_stats gs
-JOIN games g ON g.id = gs.game_id
-LEFT JOIN player_checkouts pc
-  ON pc.game_id = g.id
-  AND pc.player_id = gs.player_id
-  AND pc.user_id = gs.recorded_by
-  AND pc.is_primary = true
-WHERE g.status = 'final'
-  AND (
-    -- Use primary recorder's stats if a checkout exists
-    pc.id IS NOT NULL
-    -- Or use the only recorder if no checkout exists
-    OR NOT EXISTS (
-      SELECT 1 FROM player_checkouts pc2
-      WHERE pc2.game_id = g.id AND pc2.player_id = gs.player_id AND pc2.is_primary = true
-    )
+CREATE OR REPLACE FUNCTION get_season_stats_resolved(p_team_id uuid)
+RETURNS TABLE (
+  player_id uuid,
+  stat_id text,
+  games_played bigint,
+  total bigint,
+  per_game_avg numeric,
+  season_high int
+) AS $$
+  WITH game_resolved AS (
+    -- Reuse the same resolution logic from get_game_stats_resolved
+    -- across all finalized games for the team
+    SELECT g.id AS game_id, r.*
+    FROM games g,
+    LATERAL get_game_stats_resolved(g.id) r
+    WHERE g.team_id = p_team_id
+      AND g.status = 'final'
   )
-GROUP BY g.team_id, gs.player_id, gs.stat_id;
+  SELECT
+    player_id,
+    stat_id,
+    COUNT(DISTINCT game_id) AS games_played,
+    SUM(value) AS total,
+    ROUND(AVG(value), 1) AS per_game_avg,
+    MAX(value) AS season_high
+  FROM game_resolved
+  GROUP BY player_id, stat_id;
+$$ LANGUAGE sql STABLE;
 ```
 
-### 3.7 Edge Cases
+This means:
+- If an admin corrects a stat for a past game, season totals update immediately
+- If a primary checkout is reassigned, season totals recalculate from the new primary
+- No separate "recalculate season" step is ever needed — it's always derived
+
+### 3.8 Edge Cases
 
 | Scenario | Behavior |
 |---|---|
-| No one checks out any players | All submissions treated equally; if multiple, average shown with indicator |
+| No one checks out any players | All submissions treated equally; if multiple, average shown with indicator; flagged for admin review |
 | Two parents check out the same player | First checkout is `is_primary = true`; second is `is_primary = false`. Admin can swap. |
 | Parent checks out a player but doesn't submit stats | No stats for that player from that parent; system falls back to any other submissions |
 | Parent submits stats without checking out | Stats are stored; shown in "All Submissions" but not in primary view unless no checkout exists |
-| Admin reassigns primary after game | Update `is_primary` flag; resolved view immediately reflects the change |
+| Admin reassigns primary after game | Update `is_primary` flag; game totals and season stats immediately recalculate |
 | Parent tracks a player mid-game without prior checkout | Can create a checkout at any point; prior stats from that parent retroactively become primary for that game |
+| Admin corrects a stat | `stat_corrections` record created; overrides all parent submissions for that (game, player, stat); season totals update immediately |
+| Admin corrects a stat then changes mind | Admin updates or deletes the correction; resolution falls back to primary checkout or next in chain |
+| Discrepancy between two parents, no correction | Averaged value used in totals with warning; appears in admin review queue until resolved |
 
 ---
 
@@ -494,7 +663,7 @@ When a user with a connected SE account opens StatKeeper:
 
 ### 6.1 Computed Views
 
-Season stats use the **resolved** view from section 3.6, which respects player checkouts. The `season_player_stats_resolved` view automatically picks the primary recorder's stats per player per game, falling back to all submissions when no checkout exists.
+Season stats use `get_season_stats_resolved()` from section 3.7, which applies the full resolution chain (**corrections > primary checkout > sole recorder > averaged**) across all finalized games. This means admin corrections and primary reassignments are immediately reflected in season totals, leaderboards, and player profiles without any manual recalculation step.
 
 ### 6.2 Season Stats UI
 
@@ -538,18 +707,22 @@ Season stats use the **resolved** view from section 3.6, which respects player c
 - [ ] Game finalization flow (status → final)
 - [ ] Offline stat tracking with background sync
 
-### Phase 4: Season Stats + Multi-Parent Checkout
-> **Goal**: Accumulated stats, leaderboards, player checkout for multi-parent games.
+### Phase 4: Season Stats + Multi-Parent Checkout + Admin Review
+> **Goal**: Accumulated stats, leaderboards, player checkout, and admin stat corrections.
 
 - [ ] Player checkout UI (pre-game roster screen with claim toggles)
 - [ ] `player_checkouts` table and RLS policies
-- [ ] Resolved stats RPC (`get_game_stats_resolved`)
+- [ ] `stat_corrections` table and admin-only RLS policies
+- [ ] Resolved stats RPC (`get_game_stats_resolved`) with full priority chain
+- [ ] Season stats RPC (`get_season_stats_resolved`)
 - [ ] Team invite system (`team_members` with roles)
 - [ ] Game Summary: "Primary View" vs "All Submissions" toggle
 - [ ] Admin: reassign primary checkout after a game
-- [ ] Season stats resolved view (respects checkout primaries)
+- [ ] Admin: stat review page with side-by-side parent submissions
+- [ ] Admin: correct individual stats with reason (audit trail)
+- [ ] Admin: review queue for unresolved discrepancies (averaged stats)
 - [ ] Player profile page with season totals and game log
-- [ ] Team leaderboard page
+- [ ] Team leaderboard page (uses resolved totals)
 - [ ] Conflict indicator when multiple parents tracked same player without checkout
 
 ### Phase 5: Polish + Capacitor
@@ -603,14 +776,18 @@ src/
 │   ├── Teams.tsx             # Team list + SE import
 │   ├── PlayerProfile.tsx     # Individual season stats
 │   ├── Leaderboard.tsx       # Team stat leaderboard
-│   └── ConnectSE.tsx         # Sports Engine OAuth flow
+│   ├── ConnectSE.tsx         # Sports Engine OAuth flow
+│   ├── GameCheckout.tsx      # Pre-game player checkout screen
+│   └── AdminReview.tsx       # Post-game stat review + corrections
 supabase/
 ├── migrations/
 │   ├── 001_profiles.sql
 │   ├── 002_teams_players.sql
 │   ├── 003_games_stats.sql
 │   ├── 004_team_members.sql
-│   └── 005_views_indexes.sql
+│   ├── 005_player_checkouts.sql
+│   ├── 006_stat_corrections.sql
+│   └── 007_views_indexes_rpcs.sql
 └── functions/
     ├── se-auth-callback/
     ├── se-sync-teams/
