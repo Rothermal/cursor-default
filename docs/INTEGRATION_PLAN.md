@@ -65,23 +65,15 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 │                     COLLABORATION TABLES                                │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  team_members                                                          │
-│  ────────────                                                          │
-│  id (uuid, PK)                                                         │
-│  team_id (FK→teams)                                                    │
-│  user_id (FK→profiles)                                                 │
-│  role (owner|admin|scorer)                                             │
-│  invited_at                                                            │
-│  accepted_at                                                           │
-│                                                                         │
-│  stat_merge_log                                                        │
-│  ──────────────                                                        │
-│  id (uuid, PK)                                                         │
-│  game_id (FK→games)                                                    │
-│  merged_by (FK→profiles)                                               │
-│  source_recorder_ids (uuid[])                                          │
-│  merge_strategy (text)   -- 'average' | 'max' | 'manual'              │
-│  created_at                                                            │
+│  team_members                    player_checkouts                      │
+│  ────────────                    ─────────────────                      │
+│  id (uuid, PK)                   id (uuid, PK)                        │
+│  team_id (FK→teams)              game_id (FK→games)                   │
+│  user_id (FK→profiles)           player_id (FK→players)               │
+│  role (owner|admin|scorer)       user_id (FK→profiles)                │
+│  invited_at                      is_primary (bool, default true)      │
+│  accepted_at                     checked_out_at (timestamptz)         │
+│                                  UNIQUE(game_id, player_id, user_id)  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -251,55 +243,202 @@ Data is **upserted** using the `se_*_id` foreign keys as the match condition, so
 
 ---
 
-## 3. Multi-Parent / Merge Architecture
+## 3. Multi-Parent Stat Tracking
 
-### 3.1 Problem
+### 3.1 Core Principle
 
-Multiple parents on the same team may each track stats for the same game independently. Their counts may differ. The system needs to:
+The **team** is the source of truth, not any individual parent. Multiple parents on the same team can all track stats for the same game simultaneously. Every stat submission is stored in the database regardless of who recorded it — nothing is ever discarded. The UI decides which record to surface as the "official" view using a lightweight **player checkout** system.
 
-1. Keep each parent's raw data intact (`recorded_by` on `game_stats`)
-2. Provide a **merged view** that combines all recorders' data
-3. Support configurable merge strategies
+### 3.2 Player Checkout Model
 
-### 3.2 Merge Strategies
+Before a game starts, a parent "checks out" the players they intend to track. This is a soft claim — it tells the system "I'm the designated stat tracker for these players in this game." It is **not enforced in real time**; other parents can still submit stats for the same players. The checkout simply determines whose stats are displayed as the canonical view.
 
-| Strategy | How it works | Best for |
-|---|---|---|
-| **Average** | Average all recorders' values, round to nearest int | Most stats (reduces individual error) |
-| **Max** | Take the highest value across recorders | Scoring stats (less likely to over-count) |
-| **Sum** | Sum across recorders (for partitioned tracking) | When parents split tracking duties |
-| **Manual** | Admin picks the correct value per stat | Disputes or review after the game |
-| **Primary** | Designate one recorder as authoritative | One "official" scorekeeper |
+**How it works:**
 
-### 3.3 Merged View Query
-
-```sql
--- Season totals for a player, merged across recorders
-SELECT
-  p.first_name,
-  p.last_name,
-  gs.stat_id,
-  -- Per merge strategy:
-  ROUND(AVG(gs.value)) AS avg_value,
-  MAX(gs.value) AS max_value,
-  SUM(gs.value) AS sum_value,
-  COUNT(DISTINCT gs.recorded_by) AS recorder_count
-FROM game_stats gs
-JOIN players p ON p.id = gs.player_id
-JOIN games g ON g.id = gs.game_id
-WHERE g.team_id = $teamId
-  AND g.status = 'final'
-GROUP BY p.id, p.first_name, p.last_name, gs.stat_id;
+```
+1. Parent opens a game → sees the full roster
+2. Parent taps "Track" on one or more players
+   → Creates a player_checkout record (game_id, player_id, user_id)
+   → Those players highlight as "yours" in the Game Tracker
+3. Parent tracks stats normally for their checked-out players
+4. Other parents can also track the same players (no block)
+5. In the Team View, the checked-out parent's stats are shown as primary
+6. All other submissions remain in the DB as secondary records
 ```
 
-This can be exposed as a **Supabase Database View** or an **RPC function** so the client just calls `supabase.rpc('get_season_stats', { team_id })`.
+**Key rules:**
 
-### 3.4 UI Considerations
+| Rule | Detail |
+|---|---|
+| Not enforced | Any parent can submit stats for any player at any time |
+| Soft claim | Checkout is a UI hint, not a lock |
+| One primary per player per game | If two parents check out the same player, the first claim wins as primary; second becomes secondary (or team admin can reassign) |
+| Changeable | Admin can reassign checkout after the fact to correct the primary source |
+| Optional | If no one checks out a player, all submissions are weighted equally |
 
-- Each parent sees their own stats in the Game Tracker (current behavior)
-- The Game Summary page gets a toggle: **"My Stats"** vs **"Team View (Merged)"**
-- Conflict indicators: highlight stats where recorders disagree by >20%
-- Team admin can review and finalize game stats (lock after review)
+### 3.3 Database Design
+
+```sql
+-- New table: tracks which parent is the designated recorder per player per game
+CREATE TABLE player_checkouts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  player_id uuid NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES profiles(id),
+  is_primary boolean NOT NULL DEFAULT true,
+  checked_out_at timestamptz NOT NULL DEFAULT now(),
+
+  UNIQUE(game_id, player_id, user_id)
+);
+
+CREATE INDEX idx_checkouts_game ON player_checkouts(game_id);
+CREATE INDEX idx_checkouts_game_player ON player_checkouts(game_id, player_id);
+
+ALTER TABLE player_checkouts ENABLE ROW LEVEL SECURITY;
+
+-- Any team member can see checkouts for their team's games
+CREATE POLICY "checkouts_read" ON player_checkouts
+  FOR SELECT USING (
+    game_id IN (SELECT id FROM games WHERE team_id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    ))
+  );
+
+-- Users can create their own checkouts
+CREATE POLICY "checkouts_create" ON player_checkouts
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+```
+
+The existing `game_stats` table already has `recorded_by` — no changes needed there. All stat records from all parents are kept.
+
+### 3.4 Resolution Logic (UI Layer Only)
+
+When rendering the **Team View** (Game Summary, Season Stats, Leaderboard), the UI resolves which stat record to display for each player:
+
+```
+For each (game, player):
+  1. Is there a player_checkout with is_primary = true?
+     → Yes: use that parent's game_stats as the displayed values
+     → No:  continue to step 2
+  2. Is there exactly one parent who submitted stats for this player?
+     → Yes: use their stats (no conflict)
+     → No:  continue to step 3
+  3. Multiple parents submitted, no checkout:
+     → Show averaged values with a "⚠ multiple sources" indicator
+     → Team admin can resolve by assigning a primary checkout after the fact
+```
+
+This resolution can be a Supabase RPC function:
+
+```sql
+CREATE OR REPLACE FUNCTION get_game_stats_resolved(p_game_id uuid)
+RETURNS TABLE (
+  player_id uuid,
+  stat_id text,
+  value int,
+  recorded_by uuid,
+  is_primary boolean,
+  recorder_count int
+) AS $$
+  SELECT
+    gs.player_id,
+    gs.stat_id,
+    gs.value,
+    gs.recorded_by,
+    COALESCE(pc.is_primary, false) AS is_primary,
+    COUNT(*) OVER (PARTITION BY gs.player_id, gs.stat_id) AS recorder_count
+  FROM game_stats gs
+  LEFT JOIN player_checkouts pc
+    ON pc.game_id = gs.game_id
+    AND pc.player_id = gs.player_id
+    AND pc.user_id = gs.recorded_by
+    AND pc.is_primary = true
+  WHERE gs.game_id = p_game_id
+  ORDER BY
+    gs.player_id,
+    gs.stat_id,
+    pc.is_primary DESC NULLS LAST,  -- primary first
+    gs.created_at ASC;               -- then by submission time
+$$ LANGUAGE sql STABLE;
+```
+
+The client calls this and filters: for each `(player_id, stat_id)`, take the first row (which is the primary if one exists).
+
+### 3.5 UI Flow
+
+**Before the game — Checkout Screen:**
+```
+┌─────────────────────────────────────────┐
+│  Eagles vs Tigers — Feb 28             │
+│  Who are you tracking?                  │
+│                                         │
+│  [✓] #23 Michael Jordan    ← you       │
+│  [✓] #11 Steve Nash        ← you       │
+│  [ ] #33 Larry Bird        ← Mom (Jane)│
+│  [ ] #5  Magic Johnson     ← unclaimed │
+│                                         │
+│  [Start Tracking →]                     │
+└─────────────────────────────────────────┘
+```
+
+- Checked-out players show who claimed them
+- Unclaimed players are available for anyone
+- Already-claimed players show the other parent's name but can still be tapped (becomes secondary)
+
+**During the game — Game Tracker:**
+- Parent sees all players in the roster selector (as today)
+- Checked-out players are highlighted / pinned to the front
+- Stats for non-checked-out players still work — just won't be primary
+
+**After the game — Team View:**
+- Default shows resolved stats (primary recorder per player)
+- Toggle to "All Submissions" to see every parent's data side by side
+- Admin can reassign primary after the fact if needed
+
+### 3.6 Season Stats with Checkout
+
+For season-long accumulation, the resolved view carries forward:
+
+```sql
+CREATE VIEW season_player_stats_resolved AS
+SELECT
+  g.team_id,
+  gs.player_id,
+  gs.stat_id,
+  COUNT(DISTINCT g.id) AS games_played,
+  SUM(gs.value) AS total,
+  ROUND(AVG(gs.value), 1) AS per_game_avg,
+  MAX(gs.value) AS season_high
+FROM game_stats gs
+JOIN games g ON g.id = gs.game_id
+LEFT JOIN player_checkouts pc
+  ON pc.game_id = g.id
+  AND pc.player_id = gs.player_id
+  AND pc.user_id = gs.recorded_by
+  AND pc.is_primary = true
+WHERE g.status = 'final'
+  AND (
+    -- Use primary recorder's stats if a checkout exists
+    pc.id IS NOT NULL
+    -- Or use the only recorder if no checkout exists
+    OR NOT EXISTS (
+      SELECT 1 FROM player_checkouts pc2
+      WHERE pc2.game_id = g.id AND pc2.player_id = gs.player_id AND pc2.is_primary = true
+    )
+  )
+GROUP BY g.team_id, gs.player_id, gs.stat_id;
+```
+
+### 3.7 Edge Cases
+
+| Scenario | Behavior |
+|---|---|
+| No one checks out any players | All submissions treated equally; if multiple, average shown with indicator |
+| Two parents check out the same player | First checkout is `is_primary = true`; second is `is_primary = false`. Admin can swap. |
+| Parent checks out a player but doesn't submit stats | No stats for that player from that parent; system falls back to any other submissions |
+| Parent submits stats without checking out | Stats are stored; shown in "All Submissions" but not in primary view unless no checkout exists |
+| Admin reassigns primary after game | Update `is_primary` flag; resolved view immediately reflects the change |
+| Parent tracks a player mid-game without prior checkout | Can create a checkout at any point; prior stats from that parent retroactively become primary for that game |
 
 ---
 
@@ -326,17 +465,27 @@ When a user with a connected SE account opens StatKeeper:
 
 2. Show "Today's Games" section on home page
    → Card per game with opponent name, time, location
+   → Badge showing how many players are already checked out by others
 
 3. User taps a game card
+   → Checkout screen: full roster with checkboxes
+   → Players already claimed by other parents show their name
+   → User checks out the player(s) they want to track
+   → player_checkouts records created
+
+4. User taps "Start Tracking"
    → Game Tracker opens pre-populated with:
      - Team name and opponent (from games table)
      - Full roster (from players table, is_active = true)
+     - Checked-out players highlighted / pinned first
      - Sport-specific stat categories (from sport config)
 
-4. User tracks stats → saved to game_stats with recorded_by = auth.uid()
+5. User tracks stats → saved to game_stats with recorded_by = auth.uid()
+   → Other parents may be tracking simultaneously on their own devices
 
-5. After game: user taps "Finalize" → game.status = 'final'
+6. After game: user taps "Finalize" → game.status = 'final'
    → Stats contribute to season totals
+   → Resolved view uses checkout primary to determine canonical stats
 ```
 
 ---
@@ -345,21 +494,7 @@ When a user with a connected SE account opens StatKeeper:
 
 ### 6.1 Computed Views
 
-```sql
-CREATE VIEW season_player_stats AS
-SELECT
-  g.team_id,
-  gs.player_id,
-  gs.stat_id,
-  COUNT(DISTINCT g.id) AS games_played,
-  SUM(gs.value) AS total,
-  ROUND(AVG(gs.value), 1) AS per_game_avg,
-  MAX(gs.value) AS season_high
-FROM game_stats gs
-JOIN games g ON g.id = gs.game_id
-WHERE g.status = 'final'
-GROUP BY g.team_id, gs.player_id, gs.stat_id;
-```
+Season stats use the **resolved** view from section 3.6, which respects player checkouts. The `season_player_stats_resolved` view automatically picks the primary recorder's stats per player per game, falling back to all submissions when no checkout exists.
 
 ### 6.2 Season Stats UI
 
@@ -403,16 +538,19 @@ GROUP BY g.team_id, gs.player_id, gs.stat_id;
 - [ ] Game finalization flow (status → final)
 - [ ] Offline stat tracking with background sync
 
-### Phase 4: Season Stats + Multi-Parent Merge
-> **Goal**: Accumulated stats, leaderboards, and merged multi-recorder views.
+### Phase 4: Season Stats + Multi-Parent Checkout
+> **Goal**: Accumulated stats, leaderboards, player checkout for multi-parent games.
 
-- [ ] Season stats views/RPCs in Supabase
+- [ ] Player checkout UI (pre-game roster screen with claim toggles)
+- [ ] `player_checkouts` table and RLS policies
+- [ ] Resolved stats RPC (`get_game_stats_resolved`)
+- [ ] Team invite system (`team_members` with roles)
+- [ ] Game Summary: "Primary View" vs "All Submissions" toggle
+- [ ] Admin: reassign primary checkout after a game
+- [ ] Season stats resolved view (respects checkout primaries)
 - [ ] Player profile page with season totals and game log
 - [ ] Team leaderboard page
-- [ ] Multi-parent: team invite system (team_members)
-- [ ] Multi-parent: per-recorder stat views and merged team view
-- [ ] Merge strategy selector for team admins
-- [ ] Conflict highlighting when recorders disagree
+- [ ] Conflict indicator when multiple parents tracked same player without checkout
 
 ### Phase 5: Polish + Capacitor
 > **Goal**: Native app distribution and final UX polish.
