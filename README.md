@@ -95,6 +95,16 @@ src/
 
 ## Roadmap
 
+See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architecture and phased plan.
+
+| Phase | What | Status |
+|---|---|---|
+| 1 | **Supabase Foundation** — auth, cloud DB, RLS, migrate from localStorage | Planned |
+| 2 | **Sports Engine Connect** — OAuth2, import teams/rosters/schedules | Planned |
+| 3 | **Pre-Populated Games** — today's games auto-appear, cloud stat tracking | Planned |
+| 4 | **Season Stats + Multi-Parent** — leaderboards, merged views, team invites | Planned |
+| 5 | **Capacitor + Polish** — native Android/iOS builds, push notifications, exports | Planned |
+
 ### Near-Term
 
 - [ ] Per-sport stat refinements and additional stats
@@ -103,7 +113,7 @@ src/
 
 ### Mobile Native (Capacitor)
 
-The app is currently a PWA installable from the browser. For full App Store / Play Store distribution and access to native device APIs, the next step is wrapping the app with [Capacitor](https://capacitorjs.com/):
+The app is currently a PWA installable from the browser. For App Store / Play Store distribution and native device APIs, wrap with [Capacitor](https://capacitorjs.com/):
 
 ```bash
 pnpm add @capacitor/core @capacitor/cli
@@ -114,17 +124,14 @@ npx cap add ios
 npx cap sync
 ```
 
-Capacitor uses the same web codebase — no rewrite needed. It provides a native shell with access to device APIs (camera, push notifications, haptic feedback, etc.) while keeping the React app as the UI layer.
+Capacitor uses the same web codebase — no rewrite needed.
 
-### API Integration
+### Integrations
 
-Future plans include connecting to the [Sports Engine API](https://www.sportsengine.com/) and other data providers to:
+- **[Supabase](https://supabase.com/)** — PostgreSQL database, auth, Row Level Security, Edge Functions, real-time sync
+- **[Sports Engine API](https://help.sportsengine.com/en/articles/8225304-getting-started-with-api)** — OAuth2 + GraphQL for team/roster/schedule import
 
-- Pull team rosters and player data automatically
-- Sync game results to league platforms
-- Import schedules and tournament brackets
-
-Environment variables for API keys and database connectors should be placed in `.env` files (already gitignored).
+Environment variables for API keys and database connectors go in `.env` files (already gitignored).
 
 ## License
 
