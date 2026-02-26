@@ -35,11 +35,6 @@ export default function PlayerSetup() {
   const [saving, setSaving] = useState(false)
   const cloudRosterLoadedRef = useRef(false)
 
-  if (!sport || !state.gameInfo) {
-    navigate('/')
-    return null
-  }
-
   useEffect(() => {
     if (!isCloudRoster || !cloudTeamId || cloudRosterLoadedRef.current) return
     if (state.players.length > 0) {
@@ -181,6 +176,11 @@ export default function PlayerSetup() {
   }
 
   const canStart = state.players.length > 0
+
+  if (!sport || !state.gameInfo) {
+    navigate('/')
+    return null
+  }
 
   const handleStart = () => {
     if (!canStart) return

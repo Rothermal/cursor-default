@@ -15,6 +15,7 @@ export default function GameSetup() {
   const navigate = useNavigate()
   const { state, dispatch } = useGame()
   const { user, isConfigured } = useAuth()
+  const userId = user?.id ?? null
   const sport = state.sport
   const isCloudFlow = Boolean(isConfigured && user && supabase)
 
@@ -32,13 +33,8 @@ export default function GameSetup() {
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [teamsError, setTeamsError] = useState<string | null>(null)
 
-  if (!sport) {
-    navigate('/')
-    return null
-  }
-
   useEffect(() => {
-    if (!isCloudFlow) return
+    if (!sport || !isCloudFlow || !userId) return
 
     let isCancelled = false
     const loadTeams = async () => {
@@ -84,7 +80,7 @@ export default function GameSetup() {
     return () => {
       isCancelled = true
     }
-  }, [isCloudFlow, sport.id, state.cloudSync.teamId, state.gameInfo?.teamName])
+  }, [isCloudFlow, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
 
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
@@ -94,6 +90,11 @@ export default function GameSetup() {
     ? selectedTeam?.name ?? ''
     : teamName.trim()
   const canProceed = Boolean(resolvedTeamName && opponentName.trim())
+
+  if (!sport) {
+    navigate('/')
+    return null
+  }
 
   const handleNext = () => {
     if (!canProceed) return

@@ -21,6 +21,8 @@ interface PlayerRow {
 export default function Teams() {
   const navigate = useNavigate()
   const { user, isConfigured } = useAuth()
+  const userId = user?.id ?? null
+  const supabaseClient = supabase
 
   const [teams, setTeams] = useState<TeamRow[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
@@ -47,13 +49,13 @@ export default function Teams() {
   )
 
   useEffect(() => {
-    if (!isConfigured || !user || !supabase) return
+    if (!isConfigured || !userId || !supabaseClient) return
 
     let cancelled = false
     const loadTeams = async () => {
       setLoadingTeams(true)
       setError(null)
-      const { data, error: queryError } = await supabase
+      const { data, error: queryError } = await supabaseClient
         .from('teams')
         .select('id,name,sport,season')
         .order('created_at', { ascending: false })
@@ -78,10 +80,10 @@ export default function Teams() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, user?.id])
+  }, [isConfigured, supabaseClient, userId])
 
   useEffect(() => {
-    if (!selectedTeamId || !isConfigured || !user || !supabase) {
+    if (!selectedTeamId || !isConfigured || !userId || !supabaseClient) {
       setPlayers([])
       return
     }
@@ -90,7 +92,7 @@ export default function Teams() {
     const loadPlayers = async () => {
       setLoadingPlayers(true)
       setError(null)
-      const { data, error: queryError } = await supabase
+      const { data, error: queryError } = await supabaseClient
         .from('players')
         .select('id,first_name,last_name,jersey_number')
         .eq('team_id', selectedTeamId)
@@ -112,7 +114,7 @@ export default function Teams() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, selectedTeamId, user?.id])
+  }, [isConfigured, selectedTeamId, supabaseClient, userId])
 
   if (!isConfigured) {
     return (
@@ -131,14 +133,14 @@ export default function Teams() {
   }
 
   const handleCreateTeam = async () => {
-    if (!user || !supabase || !newTeamName.trim()) return
+    if (!userId || !supabaseClient || !newTeamName.trim()) return
     setError(null)
     setCreatingTeam(true)
 
-    const { data, error: createError } = await supabase
+    const { data, error: createError } = await supabaseClient
       .from('teams')
       .insert({
-        owner_id: user.id,
+        owner_id: userId,
         name: newTeamName.trim(),
         sport: newTeamSport,
         season: newTeamSeason.trim() || null,
@@ -162,11 +164,11 @@ export default function Teams() {
   }
 
   const handleAddPlayer = async () => {
-    if (!supabase || !selectedTeamId || !newPlayerFirst.trim()) return
+    if (!supabaseClient || !selectedTeamId || !newPlayerFirst.trim()) return
     setError(null)
     setSavingPlayer(true)
 
-    const { data, error: insertError } = await supabase
+    const { data, error: insertError } = await supabaseClient
       .from('players')
       .insert({
         team_id: selectedTeamId,
@@ -191,11 +193,11 @@ export default function Teams() {
   }
 
   const handleDeactivatePlayer = async (playerId: string) => {
-    if (!supabase) return
+    if (!supabaseClient) return
     setError(null)
     setDeletingPlayerId(playerId)
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseClient
       .from('players')
       .update({ is_active: false })
       .eq('id', playerId)
