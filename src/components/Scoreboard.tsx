@@ -15,13 +15,15 @@ export default function Scoreboard() {
   const syncLabel = (() => {
     switch (cloudSync.status) {
       case 'offline':
-        return 'Offline mode'
+        return 'Cloud Sync: offline'
       case 'syncing':
-        return 'Cloud syncing...'
+        return 'Cloud Sync: syncing...'
       case 'synced':
-        return cloudSync.lastSyncedAt ? 'Cloud saved' : 'Cloud connected'
+        return cloudSync.lastSyncedAt ? 'Cloud Sync: saved' : 'Cloud Sync: connected'
       case 'error':
-        return 'Cloud sync error'
+        return cloudSync.lastError?.includes("Could not find the table 'public.")
+          ? 'Cloud Sync: run migrations'
+          : 'Cloud Sync: error'
       case 'idle':
       default:
         return null

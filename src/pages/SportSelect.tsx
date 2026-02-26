@@ -14,13 +14,15 @@ export default function SportSelect() {
   const syncStatusLabel = (() => {
     switch (state.cloudSync.status) {
       case 'offline':
-        return 'Offline mode'
+        return 'Cloud Sync: offline'
       case 'syncing':
-        return 'Cloud syncing...'
+        return 'Cloud Sync: syncing...'
       case 'synced':
-        return 'Cloud saved'
+        return 'Cloud Sync: saved'
       case 'error':
-        return 'Cloud sync error'
+        return state.cloudSync.lastError?.includes("Could not find the table 'public.")
+          ? 'Cloud Sync: run migrations'
+          : 'Cloud Sync: error'
       default:
         return null
     }
