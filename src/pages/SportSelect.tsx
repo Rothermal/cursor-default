@@ -132,6 +132,20 @@ export default function SportSelect() {
 
         {isConfigured && user && (
           <div className="mt-8 text-center">
+            <div className="flex gap-2 justify-center mb-3">
+              <button
+                onClick={() => navigate('/games')}
+                className="btn-secondary py-2 px-3 text-xs"
+              >
+                Cloud Games
+              </button>
+              <button
+                onClick={() => navigate('/teams')}
+                className="btn-secondary py-2 px-3 text-xs"
+              >
+                Teams
+              </button>
+            </div>
             <p className="text-xs text-slate-400 mb-2">
               Signed in as {user.email}
             </p>

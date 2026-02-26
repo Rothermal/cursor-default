@@ -95,12 +95,20 @@ export default function Admin() {
             <p className="text-sm text-slate-500 mb-4">
               Create teams and manage player rosters saved to Supabase.
             </p>
-            <button
-              onClick={() => navigate('/teams')}
-              className="btn-primary w-full"
-            >
-              Manage Teams & Rosters →
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={() => navigate('/teams')}
+                className="btn-primary w-full"
+              >
+                Manage Teams & Rosters →
+              </button>
+              <button
+                onClick={() => navigate('/games')}
+                className="btn-secondary w-full"
+              >
+                View Cloud Games →
+              </button>
+            </div>
           </section>
         )}
 

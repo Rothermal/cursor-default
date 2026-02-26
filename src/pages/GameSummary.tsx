@@ -1,11 +1,17 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computePlayerScore, computeCategoryTotal } from '../config/sports'
+import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 
 export default function GameSummary() {
   const navigate = useNavigate()
   const { state, dispatch } = useGame()
+  const { user, isConfigured } = useAuth()
   const { sport, gameInfo, players, opponentScore } = state
+  const [finalizing, setFinalizing] = useState(false)
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
 
   if (!sport || !gameInfo) {
     navigate('/')
@@ -27,6 +33,30 @@ export default function GameSummary() {
   const handleNewGame = () => {
     dispatch({ type: 'RESET_GAME' })
     navigate('/')
+  }
+
+  const canFinalizeCloudGame = Boolean(isConfigured && user && supabase && state.cloudSync.gameId)
+  const handleFinalizeCloudGame = async () => {
+    if (!canFinalizeCloudGame || !state.cloudSync.gameId) return
+    setFinalizeError(null)
+    setFinalizing(true)
+
+    const { error } = await supabase!
+      .from('games')
+      .update({
+        status: 'final',
+        opponent_score: opponentScore,
+      })
+      .eq('id', state.cloudSync.gameId)
+
+    setFinalizing(false)
+    if (error) {
+      setFinalizeError(error.message)
+      return
+    }
+
+    dispatch({ type: 'RESET_GAME' })
+    navigate('/games')
   }
 
   return (
@@ -64,6 +94,12 @@ export default function GameSummary() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
+        {finalizeError && (
+          <div className="card bg-red-50 border-red-200 text-red-700 text-sm mb-4">
+            {finalizeError}
+          </div>
+        )}
+
         {sport.categories.map(category => (
           <div key={category.id} className="mb-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
@@ -150,6 +186,15 @@ export default function GameSummary() {
         ))}
 
         <div className="mt-8 space-y-3">
+          {canFinalizeCloudGame && (
+            <button
+              onClick={() => { void handleFinalizeCloudGame() }}
+              disabled={finalizing}
+              className="btn-primary w-full"
+            >
+              {finalizing ? 'Finalizing...' : 'Finalize Game & Save to History'}
+            </button>
+          )}
           <button
             onClick={() => navigate('/game')}
             className="btn-primary w-full"

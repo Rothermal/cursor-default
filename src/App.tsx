@@ -10,6 +10,7 @@ import GameTracker from './pages/GameTracker'
 import GameSummary from './pages/GameSummary'
 import Admin from './pages/Admin'
 import Teams from './pages/Teams'
+import Games from './pages/Games'
 
 function AppRoutes() {
   const { user, loading, isConfigured } = useAuth()
@@ -40,6 +41,7 @@ function AppRoutes() {
           <Route path="/summary" element={<GameSummary />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/teams" element={<Teams />} />
+          <Route path="/games" element={<Games />} />
         </Routes>
       </GameProvider>
     </SettingsProvider>
