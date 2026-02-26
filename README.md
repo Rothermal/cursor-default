@@ -162,13 +162,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Cloud teams + roster management UI (create teams, add/remove active players)
 - [x] Existing-team game setup with cloud roster preload
 - [x] Cloud game/stat snapshot sync with visible sync status in UI
-- [x] Cloud resume hydration for latest in-progress game on authenticated sign-in
+- [x] Cloud resume hydration with deterministic user-selected active-game preference
 - [x] Cloud game history page with finalize flow and final-game read-only summary behavior
 - [x] Integration plan with multi-parent checkout model and admin corrections
 
 ### What's Next
 
-- [ ] Complete cloud-first GameContext flows (history hydration + deterministic game selection beyond latest in-progress)
+- [ ] Complete cloud-first GameContext flows (cross-device active-game preference + broader history hydration policies)
 - [ ] Add offline write queue + reconnect/background sync
 - [ ] Team collaboration roles/invites and multi-parent workflows
 - [ ] Per-sport stat refinements and additional stats
