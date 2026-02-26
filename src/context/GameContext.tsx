@@ -27,6 +27,27 @@ import { sports } from '../config/sports'
 
 const STORAGE_KEY = 'statkeeper_game'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
+const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
+
+function getPendingSyncFlag(): boolean {
+  try {
+    return localStorage.getItem(PENDING_SYNC_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function setPendingSyncFlag(pending: boolean): void {
+  try {
+    if (pending) {
+      localStorage.setItem(PENDING_SYNC_KEY, '1')
+    } else {
+      localStorage.removeItem(PENDING_SYNC_KEY)
+    }
+  } catch {
+    // ignore
+  }
+}
 
 const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
   'offline',
@@ -526,6 +547,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (!canSyncState(stateRef.current, isConfigured, userId, isOnline)) {
       if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
         pendingSyncRef.current = true
+        setPendingSyncFlag(true)
       }
       return
     }
@@ -553,6 +575,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           })
           if (!isOnline && hasSyncPrereqs(snapshot, isConfigured, snapshotUserId)) {
             pendingSyncRef.current = true
+            setPendingSyncFlag(true)
           }
           break
         }
@@ -592,10 +615,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
         pendingSyncRef.current = false
+        setPendingSyncFlag(false)
       } while (queueAnotherSyncRef.current)
     } catch (error) {
       if (isLikelyNetworkError(error)) {
         pendingSyncRef.current = true
+        setPendingSyncFlag(true)
         dispatch({
           type: 'SET_CLOUD_SYNC_STATE',
           cloudSync: {
@@ -631,8 +656,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
       pendingSyncRef.current = true
+      setPendingSyncFlag(true)
     }
   }, [isConfigured, isOnline, syncFingerprint, userId])
+
+  // Restore durable pending-sync flag on load so we sync after reopen when user had been offline
+  useEffect(() => {
+    if (isConfigured && userId && isOnline && getPendingSyncFlag()) {
+      pendingSyncRef.current = true
+    }
+  }, [isConfigured, isOnline, userId])
 
   useEffect(() => {
     if (!isOnline || !pendingSyncRef.current) return
