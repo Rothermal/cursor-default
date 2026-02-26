@@ -86,6 +86,7 @@ export type GameAction =
   | { type: 'SET_SPORT'; sport: SportConfig }
   | { type: 'SET_GAME_INFO'; gameInfo: GameInfo }
   | { type: 'SET_PLAYERS'; players: Player[] }
+  | { type: 'HYDRATE_STATE'; state: GameState }
   | { type: 'ADD_PLAYER'; player: Player }
   | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'SET_ACTIVE_PLAYER'; playerId: string }

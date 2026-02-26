@@ -15,8 +15,9 @@ import type {
   CloudSyncStatus,
 } from '../types'
 import { useAuth } from './AuthContext'
-import { syncGameSnapshotToCloud } from '../lib/cloudSync'
+import { syncGameSnapshotToCloud, loadLatestCloudGame } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
+import { sports } from '../config/sports'
 
 const STORAGE_KEY = 'statkeeper_game'
 
@@ -81,6 +82,32 @@ function canSyncState(state: GameState, isConfigured: boolean, userId: string | 
   return Boolean(isConfigured && userId && supabase && state.sport && state.gameInfo)
 }
 
+function buildHydratedStateFromCloudGame(
+  cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>>
+): GameState | null {
+  if (!cloudGame) return null
+  const sport = sports.find(item => item.id === cloudGame.sportId)
+  if (!sport) return null
+
+  return {
+    sport,
+    gameInfo: cloudGame.gameInfo,
+    players: cloudGame.players,
+    activePlayerId: cloudGame.activePlayerId,
+    opponentScore: cloudGame.opponentScore,
+    actionLog: [],
+    cloudSync: {
+      ...createInitialCloudSyncState('synced'),
+      teamId: cloudGame.teamId,
+      gameId: cloudGame.gameId,
+      playerIdMap: cloudGame.playerIdMap,
+      lastSyncedAt: cloudGame.hydratedAt,
+      status: 'synced',
+      lastError: null,
+    },
+  }
+}
+
 function gameReducer(state: GameState, action: GameAction): GameState {
   const resetStatus: CloudSyncStatus = state.cloudSync.status === 'offline' ? 'offline' : 'idle'
 
@@ -113,6 +140,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         players: action.players,
         activePlayerId: action.players.length > 0 ? state.activePlayerId ?? action.players[0].id : null,
       }
+
+    case 'HYDRATE_STATE':
+      return action.state
 
     case 'REMOVE_PLAYER':
       // Keep local->remote player mapping aligned with the current roster.
@@ -294,6 +324,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const queueAnotherSyncRef = useRef(false)
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
+  const hydratedUserRef = useRef<string | null>(null)
 
   useEffect(() => {
     stateRef.current = state
@@ -305,18 +336,51 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (prevUserIdRef.current !== userId) {
-      dispatch({
-        type: 'SET_CLOUD_SYNC_STATE',
-        cloudSync: {
-          teamId: null,
-          gameId: null,
-          playerIdMap: {},
-          status: !isConfigured ? 'offline' : 'idle',
-          lastSyncedAt: null,
-          lastError: null,
-        },
-      })
+      const resetState = createInitialState(!isConfigured ? 'offline' : 'idle')
+      stateRef.current = resetState
+      dispatch({ type: 'HYDRATE_STATE', state: resetState })
+      hydratedUserRef.current = null
       prevUserIdRef.current = userId
+    }
+  }, [isConfigured, userId])
+
+  useEffect(() => {
+    if (!isConfigured || !userId || !supabase) return
+    if (hydratedUserRef.current === userId) return
+
+    let cancelled = false
+    const hydrateFromCloud = async () => {
+      if (stateRef.current.sport && stateRef.current.gameInfo) {
+        hydratedUserRef.current = userId
+        return
+      }
+
+      try {
+        const cloudGame = await loadLatestCloudGame(userId)
+        if (cancelled) return
+
+        hydratedUserRef.current = userId
+        const nextState = buildHydratedStateFromCloudGame(cloudGame)
+        if (!nextState) return
+
+        stateRef.current = nextState
+        dispatch({ type: 'HYDRATE_STATE', state: nextState })
+      } catch (error) {
+        if (cancelled) return
+        hydratedUserRef.current = userId
+        dispatch({
+          type: 'SET_CLOUD_SYNC_STATE',
+          cloudSync: {
+            status: 'error',
+            lastError: error instanceof Error ? error.message : 'Cloud load failed',
+          },
+        })
+      }
+    }
+
+    void hydrateFromCloud()
+    return () => {
+      cancelled = true
     }
   }, [isConfigured, userId])
 
