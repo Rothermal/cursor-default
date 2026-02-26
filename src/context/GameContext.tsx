@@ -80,7 +80,14 @@ function buildSyncFingerprint(state: GameState): string {
 }
 
 function canSyncState(state: GameState, isConfigured: boolean, userId: string | null): boolean {
-  return Boolean(isConfigured && userId && supabase && state.sport && state.gameInfo)
+  return Boolean(
+    isConfigured &&
+    userId &&
+    supabase &&
+    state.sport &&
+    state.gameInfo &&
+    state.cloudSync.gameStatus !== 'final'
+  )
 }
 
 function buildHydratedStateFromCloudGame(
