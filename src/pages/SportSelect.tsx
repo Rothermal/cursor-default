@@ -11,6 +11,20 @@ export default function SportSelect() {
   const { isSportEnabled } = useSettings()
 
   const enabledSports = sports.filter(s => isSportEnabled(s.id))
+  const syncStatusLabel = (() => {
+    switch (state.cloudSync.status) {
+      case 'offline':
+        return 'Offline mode'
+      case 'syncing':
+        return 'Cloud syncing...'
+      case 'synced':
+        return 'Cloud saved'
+      case 'error':
+        return 'Cloud sync error'
+      default:
+        return null
+    }
+  })()
 
   const handleSelect = (sportId: string) => {
     const sport = sports.find(s => s.id === sportId)
@@ -51,6 +65,9 @@ export default function SportSelect() {
                 <p className="text-sm text-blue-600">
                   {state.gameInfo?.teamName} vs {state.gameInfo?.opponentName}
                 </p>
+                {syncStatusLabel && (
+                  <p className="text-xs text-blue-500 mt-1">{syncStatusLabel}</p>
+                )}
               </div>
               <div className="flex gap-2">
                 <button

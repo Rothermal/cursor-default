@@ -3,7 +3,7 @@ import { computePlayerScore } from '../config/sports'
 
 export default function Scoreboard() {
   const { state, dispatch } = useGame()
-  const { sport, gameInfo, players, opponentScore } = state
+  const { sport, gameInfo, players, opponentScore, cloudSync } = state
 
   if (!sport || !gameInfo) return null
 
@@ -11,6 +11,22 @@ export default function Scoreboard() {
     (total, player) => total + computePlayerScore(sport, player.stats),
     0
   )
+
+  const syncLabel = (() => {
+    switch (cloudSync.status) {
+      case 'offline':
+        return 'Offline mode'
+      case 'syncing':
+        return 'Cloud syncing...'
+      case 'synced':
+        return cloudSync.lastSyncedAt ? 'Cloud saved' : 'Cloud connected'
+      case 'error':
+        return 'Cloud sync error'
+      case 'idle':
+      default:
+        return null
+    }
+  })()
 
   return (
     <div className={`bg-gradient-to-r ${sport.theme.gradient} text-white rounded-2xl p-4 shadow-lg`}>
@@ -53,6 +69,9 @@ export default function Scoreboard() {
 
       {gameInfo.tournamentName && (
         <p className="text-center text-xs opacity-60 mt-2">{gameInfo.tournamentName}</p>
+      )}
+      {syncLabel && (
+        <p className="text-center text-[11px] opacity-70 mt-1">{syncLabel}</p>
       )}
     </div>
   )

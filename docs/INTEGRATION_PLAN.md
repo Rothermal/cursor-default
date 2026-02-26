@@ -683,13 +683,15 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 > **Goal**: Users can register, create teams manually, and save games to the cloud.
 
 - [x] Set up Supabase project
-- [ ] Implement auth (sign up, sign in, sign out)
-- [ ] Create database schema (profiles, teams, players, games, game_stats, team_members)
-- [ ] Enable RLS policies
+- [x] Implement auth (sign up, sign in, sign out)
+- [x] Create database schema (profiles, teams, players, games, game_stats, team_members)
+- [x] Enable RLS policies
 - [ ] Persistent team management (create team, manage roster manually)
 - [ ] Cloud-backed game tracking (games + stats saved to Supabase)
 - [ ] Migrate local-only GameContext to Supabase-backed persistence
 - [ ] Add offline support: queue writes when offline, sync when reconnected
+
+Status note: game snapshot sync has started in-app for authenticated sessions (team/game/player/stat upserts), with full team management and offline queueing still pending.
 
 ### Phase 2: Cloud Stat Tracking + Game Management
 > **Goal**: Full game lifecycle in the cloud with pre-populated rosters.

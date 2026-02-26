@@ -63,6 +63,23 @@ export interface GameState {
   activePlayerId: string | null
   opponentScore: number
   actionLog: ActionLogEntry[]
+  cloudSync: CloudSyncState
+}
+
+export type CloudSyncStatus =
+  | 'offline'
+  | 'idle'
+  | 'syncing'
+  | 'synced'
+  | 'error'
+
+export interface CloudSyncState {
+  teamId: string | null
+  gameId: string | null
+  playerIdMap: Record<string, string>
+  status: CloudSyncStatus
+  lastSyncedAt: string | null
+  lastError: string | null
 }
 
 export type GameAction =
@@ -77,3 +94,4 @@ export type GameAction =
   | { type: 'DECREMENT_OPPONENT_SCORE' }
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
+  | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }

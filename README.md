@@ -13,8 +13,8 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Game Summary** — per-player and team totals in organized tables
 - **PWA** — installable on Android/iOS home screens, works offline with service worker caching
 - **Auth** — Supabase email/password authentication (optional; app works offline without it)
-- **Cloud Database** — Supabase PostgreSQL with Row Level Security (schema ready, wiring in progress)
-- **Persistent State** — game and settings saved to localStorage; cloud sync coming
+- **Cloud Database** — Supabase PostgreSQL with Row Level Security (migrations + in-app game snapshot sync for signed-in users)
+- **Persistent State** — game and settings saved locally with incremental cloud sync when Supabase is configured
 
 ### Supported Sports
 
@@ -151,8 +151,8 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] Run Supabase migrations and wire up cloud-backed team/roster management
-- [ ] Save games and stats to Supabase instead of localStorage
+- [ ] Complete cloud-backed team/roster management UI and editing flows
+- [ ] Finalize cloud game lifecycle (history/finalization) and reduce localStorage reliance
 - [ ] Game history — save and review past games
 - [ ] Per-sport stat refinements and additional stats
 
