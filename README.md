@@ -6,6 +6,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 
 - **Sport Selection** — configurable sports roster; enable/disable via the Settings page
 - **Game Setup** — enter team name, opponent, tournament/league, and date
+- **Cloud Team & Roster Management** — create teams and maintain active rosters in Supabase
 - **Player Management** — add players with name and jersey number; add more mid-game
 - **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category
 - **Live Scoreboard** — auto-computed team score from player stats; manual opponent score
@@ -111,6 +112,7 @@ src/
 │   ├── PlayerSetup.tsx    # Add/remove players
 │   ├── GameTracker.tsx    # Live stat tracking interface
 │   ├── GameSummary.tsx    # Post-game stat tables
+│   ├── Teams.tsx          # Cloud team + roster management
 │   └── Admin.tsx          # Settings — enable/disable sports
 ├── components/
 │   ├── Scoreboard.tsx     # Live score display
@@ -154,13 +156,17 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Supabase client integration with graceful offline fallback
 - [x] Auth UI (sign in / sign up / sign out)
 - [x] Database schema and RLS policies (migration SQL ready to run)
+- [x] Cloud teams + roster management UI (create teams, add/remove active players)
+- [x] Existing-team game setup with cloud roster preload
+- [x] Cloud game/stat snapshot sync with visible sync status in UI
 - [x] Integration plan with multi-parent checkout model and admin corrections
 
 ### What's Next
 
-- [ ] Complete cloud-backed team/roster management UI and editing flows
-- [ ] Finalize cloud game lifecycle (history/finalization) and reduce localStorage reliance
-- [ ] Game history — save and review past games
+- [ ] Finalize cloud game lifecycle (status transitions, finalization, and history views)
+- [ ] Migrate from local-first GameContext to cloud-first resume/reload flows
+- [ ] Add offline write queue + reconnect/background sync
+- [ ] Team collaboration roles/invites and multi-parent workflows
 - [ ] Per-sport stat refinements and additional stats
 
 ### Mobile Native (Capacitor)

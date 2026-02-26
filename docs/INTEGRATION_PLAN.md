@@ -686,12 +686,12 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 - [x] Implement auth (sign up, sign in, sign out)
 - [x] Create database schema (profiles, teams, players, games, game_stats, team_members)
 - [x] Enable RLS policies
-- [ ] Persistent team management (create team, manage roster manually)
-- [ ] Cloud-backed game tracking (games + stats saved to Supabase)
+- [x] Persistent team management (create team, manage roster manually)
+- [x] Cloud-backed game tracking (games + stats saved to Supabase)
 - [ ] Migrate local-only GameContext to Supabase-backed persistence
 - [ ] Add offline support: queue writes when offline, sync when reconnected
 
-Status note: game snapshot sync has started in-app for authenticated sessions (team/game/player/stat upserts), with full team management and offline queueing still pending.
+Status note: authenticated sessions now support cloud teams/rosters, existing-team game setup, roster preload, and game/stat snapshot sync. Remaining Phase 1 items are cloud-first state hydration and robust offline queueing/sync.
 If `001`-`003` were applied before the latest RLS fixes, also apply `004_team_members_rls_fix.sql`, `005_team_members_rls_recursion_cycle_fix.sql`, and `006_teams_insert_policy_fix.sql`.
 
 ### Phase 2: Cloud Stat Tracking + Game Management
