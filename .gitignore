@@ -10,3 +10,6 @@ dist
 .env.production
 .env.staging
 .env*.local
+
+# Embedded / local clone (do not commit)
+cursor-default/
