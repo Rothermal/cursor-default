@@ -20,9 +20,13 @@ export default function SportSelect() {
       case 'synced':
         return 'Cloud Sync: saved'
       case 'error':
-        return state.cloudSync.lastError?.includes("Could not find the table 'public.")
-          ? 'Cloud Sync: run migrations'
-          : 'Cloud Sync: error'
+        if (state.cloudSync.lastError?.includes("Could not find the table 'public.")) {
+          return 'Cloud Sync: run migrations'
+        }
+        if (state.cloudSync.lastError?.includes('infinite recursion detected in policy')) {
+          return 'Cloud Sync: apply 004 migration'
+        }
+        return 'Cloud Sync: error'
       default:
         return null
     }

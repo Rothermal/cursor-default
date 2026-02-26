@@ -59,21 +59,23 @@ create policy "teams_delete_owner" on public.teams
   for delete using (owner_id = auth.uid());
 
 -- Team members policies
+-- NOTE: avoid self-referencing subqueries against team_members here, which can
+-- cause RLS recursion errors.
 create policy "team_members_select" on public.team_members
   for select using (
-    team_id in (select team_id from public.team_members where user_id = auth.uid())
+    user_id = auth.uid()
+    or team_id in (select id from public.teams where owner_id = auth.uid())
   );
 
 create policy "team_members_insert_admin" on public.team_members
   for insert with check (
-    team_id in (select team_id from public.team_members
-                where user_id = auth.uid() and role in ('owner', 'admin'))
+    team_id in (select id from public.teams where owner_id = auth.uid())
   );
 
 create policy "team_members_delete_admin" on public.team_members
   for delete using (
-    team_id in (select team_id from public.team_members
-                where user_id = auth.uid() and role in ('owner', 'admin'))
+    user_id = auth.uid()
+    or team_id in (select id from public.teams where owner_id = auth.uid())
   );
 
 -- Players table

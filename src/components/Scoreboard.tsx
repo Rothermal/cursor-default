@@ -21,9 +21,13 @@ export default function Scoreboard() {
       case 'synced':
         return cloudSync.lastSyncedAt ? 'Cloud Sync: saved' : 'Cloud Sync: connected'
       case 'error':
-        return cloudSync.lastError?.includes("Could not find the table 'public.")
-          ? 'Cloud Sync: run migrations'
-          : 'Cloud Sync: error'
+        if (cloudSync.lastError?.includes("Could not find the table 'public.")) {
+          return 'Cloud Sync: run migrations'
+        }
+        if (cloudSync.lastError?.includes('infinite recursion detected in policy')) {
+          return 'Cloud Sync: apply 004 migration'
+        }
+        return 'Cloud Sync: error'
       case 'idle':
       default:
         return null

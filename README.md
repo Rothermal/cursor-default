@@ -66,7 +66,8 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/001_profiles.sql`
    - `supabase/migrations/002_teams_players.sql`
    - `supabase/migrations/003_games_stats.sql`
-   > If these migrations are not applied yet, the in-app scoreboard will show a cloud sync error status.
+   - `supabase/migrations/004_team_members_rls_fix.sql`
+   > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
 Without Supabase configured, the app runs in offline-only mode using localStorage.
@@ -121,7 +122,8 @@ supabase/
 └── migrations/            # SQL files to run in Supabase SQL Editor
     ├── 001_profiles.sql
     ├── 002_teams_players.sql
-    └── 003_games_stats.sql
+    ├── 003_games_stats.sql
+    └── 004_team_members_rls_fix.sql
 
 docs/
 └── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
