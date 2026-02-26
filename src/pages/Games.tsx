@@ -54,6 +54,7 @@ export default function Games() {
   const { user, isConfigured } = useAuth()
   const { dispatch } = useGame()
   const userId = user?.id ?? null
+  const supabaseClient = supabase
 
   const [games, setGames] = useState<GameRow[]>([])
   const [teamMap, setTeamMap] = useState<Record<string, TeamRow>>({})
@@ -62,14 +63,14 @@ export default function Games() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isConfigured || !userId || !supabase) return
+    if (!isConfigured || !userId || !supabaseClient) return
 
     let cancelled = false
     const loadGames = async () => {
       setLoading(true)
       setError(null)
 
-      const { data: gameRows, error: gamesError } = await supabase
+      const { data: gameRows, error: gamesError } = await supabaseClient
         .from('games')
         .select('id,team_id,opponent_name,opponent_score,game_date,status,created_at')
         .eq('created_by', userId)
@@ -92,7 +93,7 @@ export default function Games() {
         return
       }
 
-      const { data: teams, error: teamsError } = await supabase
+      const { data: teams, error: teamsError } = await supabaseClient
         .from('teams')
         .select('id,name,sport')
         .in('id', teamIds)
@@ -116,7 +117,7 @@ export default function Games() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, userId])
+  }, [isConfigured, supabaseClient, userId])
 
   const grouped = useMemo(() => {
     const finalGames = games.filter(game => game.status === 'final')
