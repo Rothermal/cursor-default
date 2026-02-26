@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useReducer,
+  useState,
   useEffect,
   useRef,
   useCallback,
@@ -85,7 +86,7 @@ function buildSyncFingerprint(state: GameState): string {
   })
 }
 
-function canSyncState(state: GameState, isConfigured: boolean, userId: string | null): boolean {
+function hasSyncPrereqs(state: GameState, isConfigured: boolean, userId: string | null): boolean {
   return Boolean(
     isConfigured &&
     userId &&
@@ -94,6 +95,27 @@ function canSyncState(state: GameState, isConfigured: boolean, userId: string | 
     state.gameInfo &&
     state.cloudSync.gameStatus !== 'final'
   )
+}
+
+function canSyncState(
+  state: GameState,
+  isConfigured: boolean,
+  userId: string | null,
+  isOnline: boolean
+): boolean {
+  return Boolean(isOnline && hasSyncPrereqs(state, isConfigured, userId))
+}
+
+function getInitialOnlineState(): boolean {
+  if (typeof navigator === 'undefined') {
+    return true
+  }
+  return navigator.onLine
+}
+
+function isLikelyNetworkError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /(network|offline|failed to fetch|fetch failed|timeout)/i.test(message)
 }
 
 function loadResumeTargets(): Record<string, string> {
@@ -368,9 +390,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const [state, dispatch] = useReducer(gameReducer, undefined, loadState)
+  const [isOnline, setIsOnline] = useState(getInitialOnlineState)
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
   const queueAnotherSyncRef = useRef(false)
+  const pendingSyncRef = useRef(false)
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
@@ -384,14 +408,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [state])
 
   useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  useEffect(() => {
     if (prevUserIdRef.current !== userId) {
-      const resetState = createInitialState(!isConfigured ? 'offline' : 'idle')
+      const resetState = createInitialState(!isConfigured || !isOnline ? 'offline' : 'idle')
       stateRef.current = resetState
+      pendingSyncRef.current = false
       dispatch({ type: 'HYDRATE_STATE', state: resetState })
       hydratedUserRef.current = null
       prevUserIdRef.current = userId
     }
-  }, [isConfigured, userId])
+  }, [isConfigured, isOnline, userId])
 
   useEffect(() => {
     if (!isConfigured || !userId || !supabase) return
@@ -455,7 +492,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [state.cloudSync.gameId, state.cloudSync.gameStatus, userId])
 
   useEffect(() => {
-    if (!isConfigured && state.cloudSync.status !== 'offline') {
+    if ((!isConfigured || !isOnline) && state.cloudSync.status !== 'offline') {
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
@@ -466,7 +503,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    if (isConfigured && state.cloudSync.status === 'offline') {
+    if (isConfigured && isOnline && state.cloudSync.status === 'offline') {
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
@@ -475,10 +512,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         },
       })
     }
-  }, [isConfigured, state.cloudSync.status])
+  }, [isConfigured, isOnline, state.cloudSync.status])
 
   const runCloudSync = useCallback(async () => {
-    if (!canSyncState(stateRef.current, isConfigured, userId)) {
+    if (!canSyncState(stateRef.current, isConfigured, userId, isOnline)) {
+      if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
+        pendingSyncRef.current = true
+      }
       return
     }
 
@@ -496,13 +536,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const snapshotFingerprint = buildSyncFingerprint(snapshot)
         const snapshotUserId = userId
 
-        if (!canSyncState(snapshot, isConfigured, snapshotUserId)) {
+        if (!canSyncState(snapshot, isConfigured, snapshotUserId, isOnline)) {
           dispatch({
             type: 'SET_CLOUD_SYNC_STATE',
             cloudSync: {
-              status: !isConfigured ? 'offline' : 'idle',
+              status: !isConfigured || !isOnline ? 'offline' : 'idle',
             },
           })
+          if (!isOnline && hasSyncPrereqs(snapshot, isConfigured, snapshotUserId)) {
+            pendingSyncRef.current = true
+          }
           break
         }
 
@@ -540,8 +583,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (snapshotUserId) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
+        pendingSyncRef.current = false
       } while (queueAnotherSyncRef.current)
     } catch (error) {
+      if (isLikelyNetworkError(error)) {
+        pendingSyncRef.current = true
+        dispatch({
+          type: 'SET_CLOUD_SYNC_STATE',
+          cloudSync: {
+            status: 'offline',
+            lastError: null,
+          },
+        })
+        return
+      }
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
@@ -552,10 +607,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
     } finally {
       syncInFlightRef.current = false
     }
-  }, [isConfigured, userId])
+  }, [isConfigured, isOnline, userId])
 
   const syncFingerprint = buildSyncFingerprint(state)
-  const shouldSync = canSyncState(state, isConfigured, userId)
+  const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
+
+  useEffect(() => {
+    if (!isOnline && hasSyncPrereqs(state, isConfigured, userId)) {
+      pendingSyncRef.current = true
+    }
+  }, [isConfigured, isOnline, syncFingerprint, userId])
+
+  useEffect(() => {
+    if (!isOnline || !pendingSyncRef.current) return
+    if (!canSyncState(stateRef.current, isConfigured, userId, isOnline)) return
+    void runCloudSync()
+  }, [isConfigured, isOnline, runCloudSync, userId])
 
   useEffect(() => {
     if (!shouldSync) return
