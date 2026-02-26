@@ -438,7 +438,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
     const hydrateFromCloud = async () => {
-      if (stateRef.current.sport && stateRef.current.gameInfo) {
+      // Cloud-first: only skip hydration when there is unsynced local progress
+      // (game in progress that has never been synced - no gameId yet).
+      const hasUnsyncedLocal =
+        stateRef.current.sport &&
+        stateRef.current.gameInfo &&
+        !stateRef.current.cloudSync.gameId
+      if (hasUnsyncedLocal) {
         hydratedUserRef.current = userId
         return
       }
