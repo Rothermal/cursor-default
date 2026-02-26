@@ -7,6 +7,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Sport Selection** — configurable sports roster; enable/disable via the Settings page
 - **Game Setup** — enter team name, opponent, tournament/league, and date
 - **Cloud Team & Roster Management** — create teams and maintain active rosters in Supabase
+- **Cloud Game Lifecycle** — resume in-progress games, finalize games, and review cloud game history
 - **Player Management** — add players with name and jersey number; add more mid-game
 - **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category
 - **Live Scoreboard** — auto-computed team score from player stats; manual opponent score
@@ -112,6 +113,7 @@ src/
 │   ├── PlayerSetup.tsx    # Add/remove players
 │   ├── GameTracker.tsx    # Live stat tracking interface
 │   ├── GameSummary.tsx    # Post-game stat tables
+│   ├── Games.tsx          # Cloud game history and resume/final flows
 │   ├── Teams.tsx          # Cloud team + roster management
 │   └── Admin.tsx          # Settings — enable/disable sports
 ├── components/
@@ -160,11 +162,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Existing-team game setup with cloud roster preload
 - [x] Cloud game/stat snapshot sync with visible sync status in UI
 - [x] Cloud resume hydration for latest in-progress game on authenticated sign-in
+- [x] Cloud game history page with finalize flow and final-game read-only summary behavior
 - [x] Integration plan with multi-parent checkout model and admin corrections
 
 ### What's Next
 
-- [ ] Finalize cloud game lifecycle (status transitions, finalization, and history views)
 - [ ] Complete cloud-first GameContext flows (history hydration + deterministic game selection beyond latest in-progress)
 - [ ] Add offline write queue + reconnect/background sync
 - [ ] Team collaboration roles/invites and multi-parent workflows
