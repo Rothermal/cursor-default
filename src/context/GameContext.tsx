@@ -613,7 +613,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
 
   useEffect(() => {
-    if (!isOnline && hasSyncPrereqs(state, isConfigured, userId)) {
+    if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
       pendingSyncRef.current = true
     }
   }, [isConfigured, isOnline, syncFingerprint, userId])
