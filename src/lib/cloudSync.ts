@@ -42,6 +42,13 @@ function isMissingLastOpenedColumnError(error: { message?: string } | null): boo
   return error.message.includes('last_opened_at') && error.message.includes('column')
 }
 
+export type LastOpenedPreferenceSupport = 'unknown' | 'supported' | 'missing'
+let lastOpenedPreferenceSupport: LastOpenedPreferenceSupport = 'unknown'
+
+export function getLastOpenedPreferenceSupport(): LastOpenedPreferenceSupport {
+  return lastOpenedPreferenceSupport
+}
+
 function parsePlayerName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) {
@@ -393,12 +400,15 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
     .maybeSingle()
 
   if (!advanced.error) {
+    lastOpenedPreferenceSupport = 'supported'
     return (advanced.data as CloudGameRow | null) ?? null
   }
 
   if (!isMissingLastOpenedColumnError(advanced.error)) {
     throw new Error(`Game load failed: ${advanced.error.message}`)
   }
+
+  lastOpenedPreferenceSupport = 'missing'
 
   const fallback = await supabase
     .from('games')
@@ -458,8 +468,14 @@ export async function touchCloudGameLastOpened(gameId: string): Promise<void> {
     .update({ last_opened_at: new Date().toISOString() })
     .eq('id', gameId)
 
-  if (!error) return
-  if (isMissingLastOpenedColumnError(error)) return
+  if (!error) {
+    lastOpenedPreferenceSupport = 'supported'
+    return
+  }
+  if (isMissingLastOpenedColumnError(error)) {
+    lastOpenedPreferenceSupport = 'missing'
+    return
+  }
 
   throw new Error(`Game touch failed: ${error.message}`)
 }
