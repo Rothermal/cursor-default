@@ -14,19 +14,19 @@ export default function GameTracker() {
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
 
+  // Flush cloud sync when leaving Game Tracker so latest stats are saved (must run before any early return)
+  useEffect(() => {
+    return () => {
+      flushCloudSync()
+    }
+  }, [flushCloudSync])
+
   if (!sport || !state.gameInfo || players.length === 0) {
     navigate('/')
     return null
   }
 
   const activePlayer = players.find(p => p.id === activePlayerId) || players[0]
-
-  // Flush cloud sync when leaving Game Tracker so latest stats are saved
-  useEffect(() => {
-    return () => {
-      flushCloudSync()
-    }
-  }, [flushCloudSync])
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })
