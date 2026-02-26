@@ -1,12 +1,14 @@
-# Integration Plan: Sports Engine + Supabase
+# Integration Plan: Supabase
 
-This document lays out the architecture, data model, and phased implementation plan for integrating StatKeeper with **Sports Engine** (team/roster/schedule data) and **Supabase** (cloud database, auth, real-time sync).
+This document lays out the architecture, data model, and phased implementation plan for integrating StatKeeper with **Supabase** (cloud database, auth, real-time sync).
+
+> **Note**: Sports Engine API integration was originally planned but is not currently available (developer API access required). The data model retains fields (`se_*` columns) for future SE integration if access becomes available. In the meantime, all team/roster/schedule data is entered manually through the app.
 
 ---
 
 ## Vision
 
-A parent opens StatKeeper, signs in, connects their Sports Engine account, and sees their kids' teams with full rosters and upcoming schedules. They tap today's game and the stat tracker is pre-populated with the correct players and opponent. After the game, stats are saved to the cloud and accumulate across the season. Multiple parents on the same team can each track stats independently, and a merge view combines everyone's data into one consistent team stat sheet.
+A parent opens StatKeeper, signs in, and manages their kids' teams with rosters and schedules. They create a game, the stat tracker loads the roster, and stats are tracked in real time. After the game, stats are saved to the cloud and accumulate across the season. Multiple parents on the same team can each track stats independently, and a checkout system determines whose stats are the official record.
 
 ---
 
@@ -150,7 +152,9 @@ CREATE INDEX idx_players_team ON players(team_id);
 
 ---
 
-## 2. Sports Engine Integration
+## 2. Sports Engine Integration (Deferred — API access not currently available)
+
+> **Status**: This section is retained for future reference. The data model includes `se_*` columns so no schema changes will be needed when SE access becomes available. Until then, all team/roster/schedule data is entered manually.
 
 ### 2.1 API Overview
 
@@ -613,31 +617,30 @@ This means:
 
 ## 4. Nickname / Relabeling System
 
-Players and teams synced from Sports Engine may have official names that differ from what the team uses casually.
+Players and teams can have a `nickname` field as a display override.
 
-| Field | Source | Override |
+| Field | Primary Name | Override |
 |---|---|---|
-| `teams.name` | From SE: "Spring 2026 U12 Boys Blue" | `teams.nickname`: "Blue Lightning" |
-| `players.first_name` / `last_name` | From SE profile | `players.nickname`: "JJ" |
+| `teams.name` | "Spring 2026 U12 Boys Blue" | `teams.nickname`: "Blue Lightning" |
+| `players.first_name` / `last_name` | "Michael Jordan" | `players.nickname`: "MJ" |
 
-**Display logic**: Show `nickname` if set, otherwise fall back to the official name. Sync from SE never overwrites the nickname field.
+**Display logic**: Show `nickname` if set, otherwise fall back to the primary name. If SE integration is added in the future, syncs will never overwrite the nickname field.
 
 ---
 
 ## 5. Pre-Populated Game Flow
 
-When a user with a connected SE account opens StatKeeper:
+When an authenticated user opens StatKeeper:
 
 ```
-1. Fetch today's games for their teams
-   → SELECT * FROM games WHERE team_id IN (user's teams) AND game_date = today
+1. Dashboard shows their teams
+   → Each team card shows upcoming/today's games
 
-2. Show "Today's Games" section on home page
-   → Card per game with opponent name, time, location
-   → Badge showing how many players are already checked out by others
+2. User creates a game (or taps an existing scheduled game)
+   → Enter opponent name, date, tournament (if creating)
+   → Roster loaded from team's players
 
-3. User taps a game card
-   → Checkout screen: full roster with checkboxes
+3. Checkout screen: full roster with checkboxes (multi-parent mode)
    → Players already claimed by other parents show their name
    → User checks out the player(s) they want to track
    → player_checkouts records created
@@ -676,38 +679,28 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 
 ## 7. Implementation Phases
 
-### Phase 1: Supabase Foundation
+### Phase 1: Supabase Foundation ← **CURRENT**
 > **Goal**: Users can register, create teams manually, and save games to the cloud.
 
-- [ ] Set up Supabase project
+- [x] Set up Supabase project
 - [ ] Implement auth (sign up, sign in, sign out)
 - [ ] Create database schema (profiles, teams, players, games, game_stats, team_members)
 - [ ] Enable RLS policies
+- [ ] Persistent team management (create team, manage roster manually)
+- [ ] Cloud-backed game tracking (games + stats saved to Supabase)
 - [ ] Migrate local-only GameContext to Supabase-backed persistence
 - [ ] Add offline support: queue writes when offline, sync when reconnected
 
-### Phase 2: Sports Engine Connect
-> **Goal**: Users can link their SE account and import teams/rosters/schedules.
+### Phase 2: Cloud Stat Tracking + Game Management
+> **Goal**: Full game lifecycle in the cloud with pre-populated rosters.
 
-- [ ] Register StatKeeper as an SE OAuth2 app
-- [ ] Build `se-auth-callback` Edge Function
-- [ ] Build `se-sync-teams` Edge Function
-- [ ] Build `se-sync-roster` Edge Function
-- [ ] Build `se-sync-schedule` Edge Function
-- [ ] Add "Connect Sports Engine" flow in Settings/Admin
-- [ ] Display synced teams, roster, and schedule in the app
-- [ ] Implement nickname/relabel UI
-
-### Phase 3: Pre-Populated Games + Cloud Stat Tracking
-> **Goal**: Today's games auto-appear; stats save to Supabase.
-
-- [ ] "Today's Games" section on home page
-- [ ] Tap-to-start flow that pre-populates Game Tracker from DB
+- [ ] Game creation from team roster
 - [ ] Save stat actions to `game_stats` in real time (with optimistic UI)
 - [ ] Game finalization flow (status → final)
+- [ ] Nickname/relabel UI for teams and players
 - [ ] Offline stat tracking with background sync
 
-### Phase 4: Season Stats + Multi-Parent Checkout + Admin Review
+### Phase 3: Season Stats + Multi-Parent Checkout + Admin Review
 > **Goal**: Accumulated stats, leaderboards, player checkout, and admin stat corrections.
 
 - [ ] Player checkout UI (pre-game roster screen with claim toggles)
@@ -725,7 +718,7 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 - [ ] Team leaderboard page (uses resolved totals)
 - [ ] Conflict indicator when multiple parents tracked same player without checkout
 
-### Phase 5: Polish + Capacitor
+### Phase 4: Polish + Capacitor
 > **Goal**: Native app distribution and final UX polish.
 
 - [ ] Capacitor integration (Android + iOS builds)
@@ -734,25 +727,30 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 - [ ] Trend charts and visualizations
 - [ ] Dark mode
 
+### Phase 5: Sports Engine Integration (Future — requires API access)
+> **Goal**: Import teams/rosters/schedules from Sports Engine.
+
+- [ ] Register StatKeeper as an SE OAuth2 app
+- [ ] Build Edge Functions for OAuth callback and data sync
+- [ ] Auto-import rosters and schedules
+- [ ] Schedule sync (daily cron)
+
+> This phase is blocked until Sports Engine developer API access is available. The data model already includes `se_*` columns so no schema changes will be needed.
+
 ---
 
 ## 8. Environment Variables Summary
 
 ```env
-# Supabase
+# Supabase (required)
+# In Cursor Cloud Agent secrets, these are stored as:
+#   DATABASE_URL     → maps to VITE_SUPABASE_URL
+#   DATABASE_ANON_KEY → maps to VITE_SUPABASE_ANON_KEY
 VITE_SUPABASE_URL=https://<project>.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon-key>
-
-# Sports Engine (server-side only — Edge Functions)
-SE_CLIENT_ID=<sports-engine-client-id>
-SE_CLIENT_SECRET=<sports-engine-client-secret>
-SE_REDIRECT_URI=https://<app-url>/auth/se/callback
-
-# Future
-DATABASE_URL=<if-direct-postgres-needed>
 ```
 
-**Note**: `SE_CLIENT_SECRET` must never be exposed to the browser. It lives only in Supabase Edge Function environment variables.
+The `VITE_` prefix is required by Vite to expose variables to the browser. The anon key is safe for client-side use because Row Level Security protects all data server-side.
 
 ---
 
@@ -761,9 +759,7 @@ DATABASE_URL=<if-direct-postgres-needed>
 ```
 src/
 ├── lib/
-│   ├── supabase.ts           # Supabase client init
-│   ├── sportsengine.ts       # SE API helper (calls Edge Functions)
-│   └── sync.ts               # Offline queue + sync logic
+│   └── supabase.ts           # Supabase client init
 ├── hooks/
 │   ├── useAuth.ts            # Auth state, sign in/out
 │   ├── useTeams.ts           # Fetch/manage teams
@@ -773,10 +769,9 @@ src/
 │   └── useSeasonStats.ts    # Aggregated season queries
 ├── pages/
 │   ├── Auth.tsx              # Sign in / sign up
-│   ├── Teams.tsx             # Team list + SE import
+│   ├── Teams.tsx             # Team list + manual management
 │   ├── PlayerProfile.tsx     # Individual season stats
 │   ├── Leaderboard.tsx       # Team stat leaderboard
-│   ├── ConnectSE.tsx         # Sports Engine OAuth flow
 │   ├── GameCheckout.tsx      # Pre-game player checkout screen
 │   └── AdminReview.tsx       # Post-game stat review + corrections
 supabase/
@@ -788,9 +783,4 @@ supabase/
 │   ├── 005_player_checkouts.sql
 │   ├── 006_stat_corrections.sql
 │   └── 007_views_indexes_rpcs.sql
-└── functions/
-    ├── se-auth-callback/
-    ├── se-sync-teams/
-    ├── se-sync-roster/
-    └── se-sync-schedule/
 ```
