@@ -1,6 +1,6 @@
--- Hotfix for team_members RLS recursion.
--- Older policy definitions queried team_members from within team_members
--- policies, which causes infinite recursion.
+-- Follow-up hotfix for team_members/teams RLS recursion cycle.
+-- Apply this if you already ran earlier 004 versions that still referenced
+-- public.teams inside team_members policies.
 
 drop policy if exists "team_members_select" on public.team_members;
 drop policy if exists "team_members_insert_admin" on public.team_members;

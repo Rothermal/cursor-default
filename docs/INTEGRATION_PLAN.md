@@ -692,7 +692,7 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 - [ ] Add offline support: queue writes when offline, sync when reconnected
 
 Status note: game snapshot sync has started in-app for authenticated sessions (team/game/player/stat upserts), with full team management and offline queueing still pending.
-If `001`-`003` were applied before the latest RLS fix, also apply `004_team_members_rls_fix.sql`.
+If `001`-`003` were applied before the latest RLS fixes, also apply `004_team_members_rls_fix.sql` and `005_team_members_rls_recursion_cycle_fix.sql`.
 
 ### Phase 2: Cloud Stat Tracking + Game Management
 > **Goal**: Full game lifecycle in the cloud with pre-populated rosters.
