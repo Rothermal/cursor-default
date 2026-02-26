@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useSettings } from '../context/SettingsContext'
+import { useAuth } from '../context/AuthContext'
 
 export default function Admin() {
   const navigate = useNavigate()
   const { isSportEnabled, toggleSport } = useSettings()
+  const { isConfigured, user } = useAuth()
 
   const enabledCount = sports.filter(s => isSportEnabled(s.id)).length
 
@@ -86,6 +88,21 @@ export default function Admin() {
             </p>
           )}
         </section>
+
+        {isConfigured && user && (
+          <section className="card mt-6">
+            <h2 className="text-lg font-semibold text-slate-700 mb-2">Cloud Teams</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Create teams and manage player rosters saved to Supabase.
+            </p>
+            <button
+              onClick={() => navigate('/teams')}
+              className="btn-primary w-full"
+            >
+              Manage Teams & Rosters →
+            </button>
+          </section>
+        )}
 
         <button
           onClick={() => navigate('/')}

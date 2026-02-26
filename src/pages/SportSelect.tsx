@@ -24,7 +24,7 @@ export default function SportSelect() {
           return 'Cloud Sync: run migrations'
         }
         if (state.cloudSync.lastError?.includes('infinite recursion detected in policy')) {
-          return 'Cloud Sync: apply 004 migration'
+          return 'Cloud Sync: apply 005 migration'
         }
         return 'Cloud Sync: error'
       default:

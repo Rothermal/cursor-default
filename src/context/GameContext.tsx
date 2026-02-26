@@ -107,6 +107,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'ADD_PLAYER':
       return { ...state, players: [...state.players, action.player] }
 
+    case 'SET_PLAYERS':
+      return {
+        ...state,
+        players: action.players,
+        activePlayerId: action.players.length > 0 ? state.activePlayerId ?? action.players[0].id : null,
+      }
+
     case 'REMOVE_PLAYER':
       // Keep local->remote player mapping aligned with the current roster.
       // Removed players are not automatically deleted in Supabase to preserve history.
