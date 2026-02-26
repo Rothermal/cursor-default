@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
@@ -7,7 +7,7 @@ import StatButton from '../components/StatButton'
 
 export default function GameTracker() {
   const navigate = useNavigate()
-  const { state, dispatch } = useGame()
+  const { state, dispatch, flushCloudSync } = useGame()
   const { sport, players, activePlayerId, actionLog } = state
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
@@ -20,6 +20,13 @@ export default function GameTracker() {
   }
 
   const activePlayer = players.find(p => p.id === activePlayerId) || players[0]
+
+  // Flush cloud sync when leaving Game Tracker so latest stats are saved
+  useEffect(() => {
+    return () => {
+      flushCloudSync()
+    }
+  }, [flushCloudSync])
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })

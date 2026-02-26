@@ -382,6 +382,8 @@ function loadState(): GameState {
 interface GameContextType {
   state: GameState
   dispatch: React.Dispatch<GameAction>
+  /** Trigger an immediate cloud sync (e.g. when leaving Game Tracker). */
+  flushCloudSync: () => void
 }
 
 const GameContext = createContext<GameContextType | null>(null)
@@ -609,6 +611,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, isOnline, userId])
 
+  const flushCloudSync = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+    void runCloudSync()
+  }, [runCloudSync])
+
   const syncFingerprint = buildSyncFingerprint(state)
   const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
 
@@ -633,7 +643,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     debounceTimerRef.current = window.setTimeout(() => {
       void runCloudSync()
-    }, 300)
+    }, 150)
 
     return () => {
       if (debounceTimerRef.current !== null) {
@@ -644,7 +654,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [runCloudSync, shouldSync, syncFingerprint])
 
   return (
-    <GameContext.Provider value={{ state, dispatch }}>
+    <GameContext.Provider value={{ state, dispatch, flushCloudSync }}>
       {children}
     </GameContext.Provider>
   )
