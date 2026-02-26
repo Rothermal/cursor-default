@@ -165,12 +165,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Cloud game/stat snapshot sync with visible sync status in UI
 - [x] Cloud resume hydration with deterministic active-game preference (cloud-backed via `last_opened_at` when `007` is applied)
 - [x] Cloud game history page with finalize flow and final-game read-only summary behavior
+- [x] Snapshot-based offline queue with reconnect-triggered cloud sync replay
 - [x] Integration plan with multi-parent checkout model and admin corrections
 
 ### What's Next
 
 - [ ] Complete cloud-first GameContext flows (broader history hydration policies)
-- [ ] Add offline write queue + reconnect/background sync
+- [ ] Expand offline queueing to durable/background sync beyond in-session snapshot replay
 - [ ] Team collaboration roles/invites and multi-parent workflows
 - [ ] Per-sport stat refinements and additional stats
 

@@ -689,9 +689,9 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 - [x] Persistent team management (create team, manage roster manually)
 - [x] Cloud-backed game tracking (games + stats saved to Supabase)
 - [ ] Migrate local-only GameContext to Supabase-backed persistence
-- [ ] Add offline support: queue writes when offline, sync when reconnected
+- [ ] Add offline support: durable queue writes when offline, sync in background/reconnect (initial in-session snapshot replay is now implemented)
 
-Status note: authenticated sessions now support cloud teams/rosters, existing-team game setup, roster preload, game/stat snapshot sync, deterministic active-game hydration on sign-in (cloud-backed by `games.last_opened_at`), and cloud game history/finalization. Remaining Phase 1 items are fuller cloud-first state management and robust offline queueing/sync.
+Status note: authenticated sessions now support cloud teams/rosters, existing-team game setup, roster preload, game/stat snapshot sync, deterministic active-game hydration on sign-in (cloud-backed by `games.last_opened_at`), cloud game history/finalization, and initial snapshot-based offline reconnect sync replay. Remaining Phase 1 items are fuller cloud-first state management and durable/background offline queueing.
 If `001`-`003` were applied before the latest RLS fixes, also apply `004_team_members_rls_fix.sql`, `005_team_members_rls_recursion_cycle_fix.sql`, and `006_teams_insert_policy_fix.sql`.
 To enable cross-device deterministic active-game preference, apply `007_games_last_opened_preference.sql` once (no rerun of `001`-`006` needed if they already succeeded).
 
