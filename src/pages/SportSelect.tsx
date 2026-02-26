@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
+import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import { sports } from '../config/sports'
 
 export default function SportSelect() {
   const navigate = useNavigate()
   const { state, dispatch } = useGame()
+  const { user, signOut, isConfigured } = useAuth()
   const { isSportEnabled } = useSettings()
 
   const enabledSports = sports.filter(s => isSportEnabled(s.id))
@@ -105,7 +107,21 @@ export default function SportSelect() {
           </div>
         )}
 
-        <p className="text-center text-xs text-slate-400 mt-8">
+        {isConfigured && user && (
+          <div className="mt-8 text-center">
+            <p className="text-xs text-slate-400 mb-2">
+              Signed in as {user.email}
+            </p>
+            <button
+              onClick={signOut}
+              className="text-xs text-slate-400 underline hover:text-slate-600"
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
+
+        <p className="text-center text-xs text-slate-400 mt-4">
           v0.1.0
         </p>
       </div>
