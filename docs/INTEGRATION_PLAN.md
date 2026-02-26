@@ -693,6 +693,7 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 
 Status note: authenticated sessions now support cloud teams/rosters, existing-team game setup, roster preload, game/stat snapshot sync, latest in-progress game hydration on sign-in, and cloud game history/finalization. Remaining Phase 1 items are fuller cloud-first state management and robust offline queueing/sync.
 If `001`-`003` were applied before the latest RLS fixes, also apply `004_team_members_rls_fix.sql`, `005_team_members_rls_recursion_cycle_fix.sql`, and `006_teams_insert_policy_fix.sql`.
+No additional migrations were introduced after `006`; if `001`-`006` already ran successfully, no rerun is required for the latest app-layer cloud resume/history work.
 
 ### Phase 2: Cloud Stat Tracking + Game Management
 > **Goal**: Full game lifecycle in the cloud with pre-populated rosters.

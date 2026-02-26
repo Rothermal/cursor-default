@@ -71,6 +71,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/004_team_members_rls_fix.sql`
    - `supabase/migrations/005_team_members_rls_recursion_cycle_fix.sql`
    - `supabase/migrations/006_teams_insert_policy_fix.sql`
+   > If you have already successfully applied `001` through `006`, you do **not** need to rerun them for cloud resume/history/finalization updates.
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
