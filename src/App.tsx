@@ -7,6 +7,7 @@ import SportSelect from './pages/SportSelect'
 import GameSetup from './pages/GameSetup'
 import PlayerSetup from './pages/PlayerSetup'
 import GameTracker from './pages/GameTracker'
+import GameCheckout from './pages/GameCheckout'
 import GameSummary from './pages/GameSummary'
 import Admin from './pages/Admin'
 import Teams from './pages/Teams'
@@ -37,6 +38,7 @@ function AppRoutes() {
           <Route path="/" element={<SportSelect />} />
           <Route path="/setup" element={<GameSetup />} />
           <Route path="/players" element={<PlayerSetup />} />
+          <Route path="/checkout" element={<GameCheckout />} />
           <Route path="/game" element={<GameTracker />} />
           <Route path="/summary" element={<GameSummary />} />
           <Route path="/admin" element={<Admin />} />

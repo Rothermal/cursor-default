@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computePlayerScore, computeCategoryTotal } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+
+/** Resolved stats by remote player id -> stat id -> value (for final cloud games) */
+type ResolvedStatsMap = Record<string, Record<string, number>>
 
 export default function GameSummary() {
   const navigate = useNavigate()
@@ -12,14 +15,53 @@ export default function GameSummary() {
   const { sport, gameInfo, players, opponentScore } = state
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const [resolvedStats, setResolvedStats] = useState<ResolvedStatsMap | null>(null)
+
+  const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
+  const gameId = state.cloudSync.gameId
+  const playerIdMap = state.cloudSync.playerIdMap
+
+  useEffect(() => {
+    const client = supabase
+    if (!isFinalCloudGame || !gameId || !client) return
+
+    let cancelled = false
+    const load = async () => {
+      const { data, error } = await client.rpc('get_game_stats_resolved', {
+        p_game_id: gameId,
+      })
+
+      if (cancelled) return
+      if (error) return
+
+      const byPlayer: ResolvedStatsMap = {}
+      for (const row of (data ?? []) as Array<{ player_id: string; stat_id: string; value: number }>) {
+        if (!byPlayer[row.player_id]) byPlayer[row.player_id] = {}
+        byPlayer[row.player_id][row.stat_id] = row.value
+      }
+      setResolvedStats(byPlayer)
+    }
+
+    void load()
+    return () => { cancelled = true }
+  }, [isFinalCloudGame, gameId])
 
   if (!sport || !gameInfo) {
     navigate('/')
     return null
   }
 
+  const getPlayerStats = (playerId: string): Record<string, number> => {
+    const remoteId = playerIdMap[playerId] ?? playerId
+    const player = players.find(p => p.id === playerId)
+    if (isFinalCloudGame && resolvedStats && resolvedStats[remoteId]) {
+      return resolvedStats[remoteId]
+    }
+    return player?.stats ?? {}
+  }
+
   const teamScore = players.reduce(
-    (total, player) => total + computePlayerScore(sport, player.stats),
+    (total, player) => total + computePlayerScore(sport, getPlayerStats(player.id)),
     0
   )
 
@@ -27,7 +69,10 @@ export default function GameSummary() {
 
   const teamTotals: Record<string, number> = {}
   for (const statId of allStatIds) {
-    teamTotals[statId] = players.reduce((sum, p) => sum + (p.stats[statId] || 0), 0)
+    teamTotals[statId] = players.reduce(
+      (sum, p) => sum + (getPlayerStats(p.id)[statId] || 0),
+      0
+    )
   }
 
   const handleNewGame = () => {
@@ -35,7 +80,6 @@ export default function GameSummary() {
     navigate('/')
   }
 
-  const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const canFinalizeCloudGame = Boolean(
     isConfigured && user && supabase && state.cloudSync.gameId && !isFinalCloudGame
   )
@@ -135,13 +179,14 @@ export default function GameSummary() {
                 </thead>
                 <tbody>
                   {players.map(player => {
+                    const stats = getPlayerStats(player.id)
                     const catTotal = category.showTotal
                       ? category.actions.some(a => a.pointValue)
                         ? category.actions.reduce(
-                            (sum, a) => sum + (player.stats[a.id] || 0) * (a.pointValue || 0),
+                            (sum, a) => sum + (stats[a.id] || 0) * (a.pointValue || 0),
                             0
                           )
-                        : computeCategoryTotal(category, player.stats)
+                        : computeCategoryTotal(category, stats)
                       : null
 
                     return (
@@ -152,7 +197,7 @@ export default function GameSummary() {
                         </td>
                         {category.actions.map(action => (
                           <td key={action.id} className="text-center py-2 px-2 tabular-nums">
-                            {player.stats[action.id] || 0}
+                            {stats[action.id] || 0}
                           </td>
                         ))}
                         {category.showTotal && (
