@@ -26,6 +26,22 @@ export interface HydratedCloudGame {
   hydratedAt: string
 }
 
+type CloudGameRow = {
+  id: string
+  team_id: string
+  opponent_name: string
+  tournament_name: string | null
+  game_date: string
+  opponent_score: number | null
+  status: string
+  created_at: string
+}
+
+function isMissingLastOpenedColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  return error.message.includes('last_opened_at') && error.message.includes('column')
+}
+
 function parsePlayerName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) {
@@ -264,6 +280,11 @@ export async function syncGameSnapshotToCloud({
 
   await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
 
+  // Best-effort metadata touch for deterministic resume selection across devices.
+  // If the optional migration adding games.last_opened_at is not applied yet,
+  // this call safely no-ops.
+  await touchCloudGameLastOpened(gameId).catch(() => {})
+
   return {
     teamId,
     gameId,
@@ -272,131 +293,15 @@ export async function syncGameSnapshotToCloud({
   }
 }
 
-export async function loadLatestCloudGame(userId: string): Promise<HydratedCloudGame | null> {
+async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): Promise<HydratedCloudGame> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
-  }
-
-  const { data: latestGame, error: gameError } = await supabase
-    .from('games')
-    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at')
-    .eq('created_by', userId)
-    .in('status', ['in_progress', 'scheduled'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (gameError) {
-    throw new Error(`Game load failed: ${gameError.message}`)
-  }
-
-  if (!latestGame) {
-    return null
   }
 
   const { data: teamRow, error: teamError } = await supabase
     .from('teams')
     .select('id,name,sport')
-    .eq('id', latestGame.team_id)
-    .maybeSingle()
-
-  if (teamError) {
-    throw new Error(`Team load failed: ${teamError.message}`)
-  }
-
-  if (!teamRow) {
-    throw new Error('Team missing for latest game')
-  }
-
-  const { data: statRows, error: statsError } = await supabase
-    .from('game_stats')
-    .select('player_id,stat_id,value')
-    .eq('game_id', latestGame.id)
-    .eq('recorded_by', userId)
-
-  if (statsError) {
-    throw new Error(`Stats load failed: ${statsError.message}`)
-  }
-
-  const statsByPlayer = new Map<string, Record<string, number>>()
-  for (const row of statRows ?? []) {
-    const playerId = row.player_id as string
-    const statMap = statsByPlayer.get(playerId) ?? {}
-    statMap[row.stat_id as string] = row.value as number
-    statsByPlayer.set(playerId, statMap)
-  }
-
-  const { data: playerRows, error: playersError } = await supabase
-    .from('players')
-    .select('id,first_name,last_name,jersey_number,is_active,created_at')
-    .eq('team_id', latestGame.team_id)
-    .order('created_at', { ascending: true })
-
-  if (playersError) {
-    throw new Error(`Players load failed: ${playersError.message}`)
-  }
-
-  const players: Player[] = (playerRows ?? [])
-    .filter(row => (row.is_active as boolean) || statsByPlayer.has(row.id as string))
-    .map(row => {
-      const playerId = row.id as string
-      const fullName = `${(row.first_name as string | null) ?? ''} ${(row.last_name as string | null) ?? ''}`.trim()
-      return {
-        id: playerId,
-        name: fullName || 'Player',
-        number: (row.jersey_number as string | null) ?? '',
-        stats: statsByPlayer.get(playerId) ?? {},
-      }
-    })
-
-  const playerIdMap = players.reduce<Record<string, string>>((map, player) => {
-    map[player.id] = player.id
-    return map
-  }, {})
-
-  return {
-    sportId: teamRow.sport as string,
-    status: latestGame.status as string,
-    gameInfo: {
-      teamName: teamRow.name as string,
-      opponentName: latestGame.opponent_name as string,
-      tournamentName: (latestGame.tournament_name as string | null) ?? '',
-      date: latestGame.game_date as string,
-    },
-    players,
-    activePlayerId: players[0]?.id ?? null,
-    opponentScore: (latestGame.opponent_score as number | null) ?? 0,
-    teamId: teamRow.id as string,
-    gameId: latestGame.id as string,
-    playerIdMap,
-    hydratedAt: new Date().toISOString(),
-  }
-}
-
-export async function loadCloudGameById(userId: string, gameId: string): Promise<HydratedCloudGame | null> {
-  if (!supabase) {
-    throw new Error('Supabase client not configured')
-  }
-
-  const { data: latestGame, error: gameError } = await supabase
-    .from('games')
-    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at')
-    .eq('created_by', userId)
-    .eq('id', gameId)
-    .maybeSingle()
-
-  if (gameError) {
-    throw new Error(`Game load failed: ${gameError.message}`)
-  }
-
-  if (!latestGame) {
-    return null
-  }
-
-  const { data: teamRow, error: teamError } = await supabase
-    .from('teams')
-    .select('id,name,sport')
-    .eq('id', latestGame.team_id)
+    .eq('id', gameRow.team_id)
     .maybeSingle()
 
   if (teamError) {
@@ -410,7 +315,7 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
   const { data: statRows, error: statsError } = await supabase
     .from('game_stats')
     .select('player_id,stat_id,value')
-    .eq('game_id', latestGame.id)
+    .eq('game_id', gameRow.id)
     .eq('recorded_by', userId)
 
   if (statsError) {
@@ -428,7 +333,7 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
   const { data: playerRows, error: playersError } = await supabase
     .from('players')
     .select('id,first_name,last_name,jersey_number,is_active,created_at')
-    .eq('team_id', latestGame.team_id)
+    .eq('team_id', gameRow.team_id)
     .order('created_at', { ascending: true })
 
   if (playersError) {
@@ -455,19 +360,106 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
 
   return {
     sportId: teamRow.sport as string,
-    status: latestGame.status as string,
+    status: gameRow.status,
     gameInfo: {
       teamName: teamRow.name as string,
-      opponentName: latestGame.opponent_name as string,
-      tournamentName: (latestGame.tournament_name as string | null) ?? '',
-      date: latestGame.game_date as string,
+      opponentName: gameRow.opponent_name,
+      tournamentName: gameRow.tournament_name ?? '',
+      date: gameRow.game_date,
     },
     players,
     activePlayerId: players[0]?.id ?? null,
-    opponentScore: (latestGame.opponent_score as number | null) ?? 0,
+    opponentScore: gameRow.opponent_score ?? 0,
     teamId: teamRow.id as string,
-    gameId: latestGame.id as string,
+    gameId: gameRow.id,
     playerIdMap,
     hydratedAt: new Date().toISOString(),
   }
+}
+
+async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  const advanced = await supabase
+    .from('games')
+    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at,last_opened_at')
+    .eq('created_by', userId)
+    .in('status', ['in_progress', 'scheduled'])
+    .order('last_opened_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!advanced.error) {
+    return (advanced.data as CloudGameRow | null) ?? null
+  }
+
+  if (!isMissingLastOpenedColumnError(advanced.error)) {
+    throw new Error(`Game load failed: ${advanced.error.message}`)
+  }
+
+  const fallback = await supabase
+    .from('games')
+    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at')
+    .eq('created_by', userId)
+    .in('status', ['in_progress', 'scheduled'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (fallback.error) {
+    throw new Error(`Game load failed: ${fallback.error.message}`)
+  }
+
+  return (fallback.data as CloudGameRow | null) ?? null
+}
+
+export async function loadLatestCloudGame(userId: string): Promise<HydratedCloudGame | null> {
+  const latestGame = await loadLatestGameRow(userId)
+  if (!latestGame) {
+    return null
+  }
+
+  return hydrateCloudGameFromRow(userId, latestGame)
+}
+
+export async function loadCloudGameById(userId: string, gameId: string): Promise<HydratedCloudGame | null> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  const { data: gameRow, error: gameError } = await supabase
+    .from('games')
+    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at')
+    .eq('created_by', userId)
+    .eq('id', gameId)
+    .maybeSingle()
+
+  if (gameError) {
+    throw new Error(`Game load failed: ${gameError.message}`)
+  }
+
+  if (!gameRow) {
+    return null
+  }
+
+  return hydrateCloudGameFromRow(userId, gameRow as CloudGameRow)
+}
+
+export async function touchCloudGameLastOpened(gameId: string): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  const { error } = await supabase
+    .from('games')
+    .update({ last_opened_at: new Date().toISOString() })
+    .eq('id', gameId)
+
+  if (!error) return
+  if (isMissingLastOpenedColumnError(error)) return
+
+  throw new Error(`Game touch failed: ${error.message}`)
 }

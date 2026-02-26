@@ -71,7 +71,8 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/004_team_members_rls_fix.sql`
    - `supabase/migrations/005_team_members_rls_recursion_cycle_fix.sql`
    - `supabase/migrations/006_teams_insert_policy_fix.sql`
-   > If you have already successfully applied `001` through `006`, you do **not** need to rerun them for cloud resume/history/finalization updates.
+   - `supabase/migrations/007_games_last_opened_preference.sql`
+   > If you already applied `001` through `006`, do **not** rerun them — only run `007` to enable cross-device deterministic active-game resume preference.
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -162,13 +163,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Cloud teams + roster management UI (create teams, add/remove active players)
 - [x] Existing-team game setup with cloud roster preload
 - [x] Cloud game/stat snapshot sync with visible sync status in UI
-- [x] Cloud resume hydration with deterministic user-selected active-game preference
+- [x] Cloud resume hydration with deterministic active-game preference (cloud-backed via `last_opened_at` when `007` is applied)
 - [x] Cloud game history page with finalize flow and final-game read-only summary behavior
 - [x] Integration plan with multi-parent checkout model and admin corrections
 
 ### What's Next
 
-- [ ] Complete cloud-first GameContext flows (cross-device active-game preference + broader history hydration policies)
+- [ ] Complete cloud-first GameContext flows (broader history hydration policies)
 - [ ] Add offline write queue + reconnect/background sync
 - [ ] Team collaboration roles/invites and multi-parent workflows
 - [ ] Per-sport stat refinements and additional stats

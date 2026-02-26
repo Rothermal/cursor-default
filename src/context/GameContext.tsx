@@ -15,12 +15,11 @@ import type {
   CloudSyncStatus,
 } from '../types'
 import { useAuth } from './AuthContext'
-import { syncGameSnapshotToCloud, loadLatestCloudGame, loadCloudGameById } from '../lib/cloudSync'
+import { syncGameSnapshotToCloud, loadLatestCloudGame } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
 import { sports } from '../config/sports'
 
 const STORAGE_KEY = 'statkeeper_game'
-const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
 
 const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
   'offline',
@@ -89,38 +88,6 @@ function canSyncState(state: GameState, isConfigured: boolean, userId: string | 
     state.gameInfo &&
     state.cloudSync.gameStatus !== 'final'
   )
-}
-
-function loadResumeTargets(): Record<string, string> {
-  try {
-    const saved = localStorage.getItem(CLOUD_RESUME_TARGETS_KEY)
-    if (!saved) return {}
-    const parsed = JSON.parse(saved) as unknown
-    if (!parsed || typeof parsed !== 'object') return {}
-    return parsed as Record<string, string>
-  } catch {
-    return {}
-  }
-}
-
-function getResumeTarget(userId: string): string | null {
-  const targets = loadResumeTargets()
-  const gameId = targets[userId]
-  return typeof gameId === 'string' && gameId.length > 0 ? gameId : null
-}
-
-function setResumeTarget(userId: string, gameId: string | null): void {
-  const targets = loadResumeTargets()
-  if (gameId) {
-    targets[userId] = gameId
-  } else {
-    delete targets[userId]
-  }
-  localStorage.setItem(CLOUD_RESUME_TARGETS_KEY, JSON.stringify(targets))
-}
-
-function canHydrateAsActiveGame(status: string): boolean {
-  return status === 'in_progress' || status === 'scheduled'
 }
 
 function buildHydratedStateFromCloudGame(
@@ -400,23 +367,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const preferredGameId = getResumeTarget(userId)
-        let cloudGame = preferredGameId ? await loadCloudGameById(userId, preferredGameId) : null
-        if (!cloudGame || !canHydrateAsActiveGame(cloudGame.status)) {
-          if (preferredGameId) {
-            setResumeTarget(userId, null)
-          }
-          cloudGame = await loadLatestCloudGame(userId)
-        }
+        const cloudGame = await loadLatestCloudGame(userId)
         if (cancelled) return
 
         hydratedUserRef.current = userId
         const nextState = buildHydratedStateFromCloudGame(cloudGame)
         if (!nextState) return
 
-        if (nextState.cloudSync.gameId && canHydrateAsActiveGame(nextState.cloudSync.gameStatus ?? '')) {
-          setResumeTarget(userId, nextState.cloudSync.gameId)
-        }
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
       } catch (error) {
@@ -437,13 +394,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [isConfigured, userId])
-
-  useEffect(() => {
-    if (!userId) return
-    if (!state.cloudSync.gameId) return
-    if (!canHydrateAsActiveGame(state.cloudSync.gameStatus ?? '')) return
-    setResumeTarget(userId, state.cloudSync.gameId)
-  }, [state.cloudSync.gameId, state.cloudSync.gameStatus, userId])
 
   useEffect(() => {
     if (!isConfigured && state.cloudSync.status !== 'offline') {
@@ -528,9 +478,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
             lastError: null,
           },
         })
-        if (snapshotUserId) {
-          setResumeTarget(snapshotUserId, synced.gameId)
-        }
       } while (queueAnotherSyncRef.current)
     } catch (error) {
       dispatch({

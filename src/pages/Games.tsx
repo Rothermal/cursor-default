@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
-import { loadCloudGameById } from '../lib/cloudSync'
+import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { sports } from '../config/sports'
 import type { GameState } from '../types'
 
@@ -149,6 +149,8 @@ export default function Games() {
     })
 
     if (!cloudGame) return
+    await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
+
     const sport = sports.find(item => item.id === cloudGame.sportId)
     if (!sport) {
       setError(`Unsupported sport: ${cloudGame.sportId}`)
