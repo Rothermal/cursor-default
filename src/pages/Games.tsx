@@ -166,6 +166,7 @@ export default function Games() {
       cloudSync: {
         teamId: cloudGame.teamId,
         gameId: cloudGame.gameId,
+        gameStatus: cloudGame.status,
         playerIdMap: cloudGame.playerIdMap,
         status: 'synced',
         lastSyncedAt: cloudGame.hydratedAt,

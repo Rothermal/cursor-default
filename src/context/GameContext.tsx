@@ -33,6 +33,7 @@ function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyn
   return {
     teamId: null,
     gameId: null,
+    gameStatus: null,
     playerIdMap: {},
     status,
     lastSyncedAt: null,
@@ -100,6 +101,7 @@ function buildHydratedStateFromCloudGame(
       ...createInitialCloudSyncState('synced'),
       teamId: cloudGame.teamId,
       gameId: cloudGame.gameId,
+      gameStatus: cloudGame.status,
       playerIdMap: cloudGame.playerIdMap,
       lastSyncedAt: cloudGame.hydratedAt,
       status: 'synced',
@@ -125,6 +127,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 ...state.cloudSync,
                 teamId: null,
                 gameId: null,
+                gameStatus: null,
                 playerIdMap: {},
                 lastSyncedAt: null,
               }
@@ -297,6 +300,7 @@ function loadState(): GameState {
           ...createInitialCloudSyncState(restoredStatus),
           ...(parsed.cloudSync ?? {}),
           playerIdMap: parsed.cloudSync?.playerIdMap ?? {},
+          gameStatus: parsed.cloudSync?.gameStatus ?? null,
           status: restoredStatus,
         },
       }
@@ -460,6 +464,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           cloudSync: {
             teamId: synced.teamId,
             gameId: synced.gameId,
+            gameStatus: 'in_progress',
             playerIdMap: synced.playerIdMap,
             status: 'synced',
             lastSyncedAt: synced.syncedAt,

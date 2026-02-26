@@ -103,6 +103,7 @@ export default function GameSetup() {
       cloudSync: {
         teamId: teamMode === 'existing' ? selectedTeamId || null : null,
         gameId: null,
+        gameStatus: null,
         playerIdMap: {},
         lastSyncedAt: null,
         lastError: null,

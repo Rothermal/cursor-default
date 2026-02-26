@@ -76,6 +76,7 @@ export type CloudSyncStatus =
 export interface CloudSyncState {
   teamId: string | null
   gameId: string | null
+  gameStatus: string | null
   playerIdMap: Record<string, string>
   status: CloudSyncStatus
   lastSyncedAt: string | null

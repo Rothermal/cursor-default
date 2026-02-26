@@ -35,7 +35,10 @@ export default function GameSummary() {
     navigate('/')
   }
 
-  const canFinalizeCloudGame = Boolean(isConfigured && user && supabase && state.cloudSync.gameId)
+  const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
+  const canFinalizeCloudGame = Boolean(
+    isConfigured && user && supabase && state.cloudSync.gameId && !isFinalCloudGame
+  )
   const handleFinalizeCloudGame = async () => {
     if (!canFinalizeCloudGame || !state.cloudSync.gameId) return
     setFinalizeError(null)
@@ -65,7 +68,7 @@ export default function GameSummary() {
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <button
-              onClick={() => navigate('/game')}
+              onClick={() => navigate(isFinalCloudGame ? '/games' : '/game')}
               className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                          active:scale-90 transition-transform"
             >
@@ -195,12 +198,21 @@ export default function GameSummary() {
               {finalizing ? 'Finalizing...' : 'Finalize Game & Save to History'}
             </button>
           )}
-          <button
-            onClick={() => navigate('/game')}
-            className="btn-primary w-full"
-          >
-            ← Back to Game
-          </button>
+          {isFinalCloudGame ? (
+            <button
+              onClick={() => navigate('/games')}
+              className="btn-secondary w-full"
+            >
+              ← Back to Cloud Games
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/game')}
+              className="btn-primary w-full"
+            >
+              ← Back to Game
+            </button>
+          )}
           <button
             onClick={handleNewGame}
             className="btn-secondary w-full"
