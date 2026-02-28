@@ -7,8 +7,10 @@ const supabaseKey =
 
 if (!supabaseUrl || !supabaseKey) {
   console.warn(
-    'Supabase credentials not found. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env. Running in offline-only mode.'
+    '[StatKeeper] Supabase credentials not found. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env. Running in offline-only mode.'
   )
+} else {
+  console.log('[StatKeeper] Supabase connected:', supabaseUrl, '| key length:', supabaseKey.length)
 }
 
 export const supabase = supabaseUrl && supabaseKey
