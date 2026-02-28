@@ -772,7 +772,11 @@ A backlog of ideas to iterate over:
    - **Team names**: Edit primary team name (and nickname) from the Teams page; keep history when editing (update historical game records). Also support editing **opponent** team names from both Game Setup and Games history.
    - **Player names**: Edit first name, last name, and jersey number from both the Teams roster and PlayerSetup; currently only nickname is editable.
    - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games).
-3. *(Add more as we go)*
+4. **Minutes played, game notes, missed shots** — Extend stat tracking:
+   - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
+   - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).
+   - **Missed shots**: Per-player single counter with +/- buttons; only for sports that track shots (e.g., basketball, hockey).
+5. *(Add more as we go)*
 
 ---
 
