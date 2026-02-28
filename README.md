@@ -6,8 +6,8 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 
 - **Sport Selection** — configurable sports roster; enable/disable via the Settings page
 - **Game Setup** — enter team name, opponent, tournament/league, and date
-- **Cloud Team & Roster Management** — create teams and maintain active rosters in Supabase
-- **Cloud Game Lifecycle** — resume in-progress games, finalize games, and review cloud game history
+- **Cloud Team & Roster Management** — create teams and maintain active rosters in Supabase; optional nickname/display names for teams and players
+- **Cloud Game Lifecycle** — resume in-progress games, finalize games, and review cloud game history; finalized games show **resolved stats** (checkout + admin corrections) in Game Summary
 - **Player Management** — add players with name and jersey number; add more mid-game
 - **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category
 - **Live Scoreboard** — auto-computed team score from player stats; manual opponent score
@@ -116,8 +116,9 @@ src/
 │   ├── SportSelect.tsx    # Home page — choose a sport
 │   ├── GameSetup.tsx      # Enter game info (teams, tournament, date)
 │   ├── PlayerSetup.tsx    # Add/remove players
+│   ├── GameCheckout.tsx   # Pre-game player checkout (cloud teams)
 │   ├── GameTracker.tsx    # Live stat tracking interface
-│   ├── GameSummary.tsx    # Post-game stat tables
+│   ├── GameSummary.tsx    # Post-game stat tables (resolved stats + admin corrections)
 │   ├── Games.tsx          # Cloud game history and resume/final flows
 │   ├── Teams.tsx          # Cloud team + roster management
 │   └── Admin.tsx          # Settings — enable/disable sports
@@ -175,11 +176,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Snapshot-based offline queue with reconnect-triggered cloud sync replay
 - [x] Integration plan with multi-parent checkout model and admin corrections
 - [x] Phase 3 DB: `player_checkouts`, `stat_corrections`, `get_game_stats_resolved`, `get_season_stats_resolved` (migrations 008–010)
+- [x] Player checkout flow (GameCheckout) for cloud teams and resolved Game Summary for finalized cloud games
+- [x] Admin stat corrections UI on Game Summary (finalized games, team owner/admin only) using stat_corrections and resolved RPCs
 
 ### What's Next
 
-- [ ] Player checkout UI (pre-game claim players) and Game Summary use of resolved stats RPC
-- [ ] Admin stat review/corrections UI and review queue for averaged stats
+- [ ] Season stats surfaces (player profiles, team leaderboards) using `get_season_stats_resolved()`
+- [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats and optional "All submissions" comparison view
 - [ ] Team collaboration invites and multi-parent workflows
 - [ ] Per-sport stat refinements and additional stats
 

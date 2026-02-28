@@ -97,6 +97,8 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+Migrations `008_player_checkouts.sql`, `009_stat_corrections.sql`, and `010_resolved_stats_rpcs.sql` implement these Phase 3 structures.
+
 ### 1.3 Row Level Security Policies
 
 ```sql
@@ -434,6 +436,8 @@ $$ LANGUAGE sql STABLE;
 
 The `source` column tells the UI where each value came from, so it can render indicators (e.g., a pencil icon for corrections, a warning for averaged values).
 
+**Current UI:** GameSummary now calls `get_game_stats_resolved` for finalized cloud games, so admins and parents always see the resolved values (after checkout + corrections).
+
 ### 3.5 Admin Stat Corrections
 
 Team admins (role = `owner` or `admin` in `team_members`) can review and correct stats after a game. Corrections are stored in a dedicated table — they never overwrite the original parent-submitted records.
@@ -496,30 +500,23 @@ CREATE POLICY "corrections_admin_update" ON stat_corrections
   );
 ```
 
-**Admin correction flow:**
+**Admin correction flow (current implementation):**
 
 ```
-1. Admin opens Game Summary for a finalized game
-2. Taps "Review Stats" → enters admin review mode
-3. Sees all submissions side-by-side per player:
-   ┌───────────────────────────────────────────────────────┐
-   │  #23 Michael Jordan — Scoring                        │
-   │                                                       │
-   │  Stat   Primary (Dad)   Secondary (Mom)   Official   │
-   │  FT     3               2                 [ 3 ]      │
-   │  2PT    5               5                 [ 5 ]      │
-   │  3PT    2               3                 [ 2 ]  ✏️  │
-   │                                                       │
-   │  ⚠ Discrepancy on 3PT: Dad=2, Mom=3                  │
-   └───────────────────────────────────────────────────────┘
-4. Admin taps the pencil on a stat → edits the "Official" value
-5. Enters reason: "Reviewed game film — was a 2-pointer, not a 3"
-6. Saves → stat_corrections record created
-7. All totals (game score, season stats, leaderboard) immediately
-   reflect the corrected value
+1. Admin opens Game Summary for a finalized game (team owner/admin only).
+2. Taps "Review / Correct stats" → enters admin review mode in Game Summary.
+3. The summary table shows resolved stats; in review mode each stat cell has a pencil icon.
+4. Admin taps the pencil on a stat → modal opens: current value (read-only), new value (number), optional reason.
+5. Saves → stat_corrections record created (upsert on game_id, player_id, stat_id).
+6. Resolved stats are refetched; game score and table immediately reflect the corrected value.
+7. Corrections flow through to future season/leaderboard views when those UIs call get_game_stats_resolved / get_season_stats_resolved.
 ```
+
+**Future enhancements:** Full side-by-side comparison of all parent submissions per player, explicit review queue for averaged/conflicting stats, and reassign-primary-checkout UI are still on the roadmap; the current implementation provides inline per-stat corrections from the existing summary table.
 
 ### 3.6 UI Flow
+
+**Implemented screens:** Checkout screen → `GameCheckout.tsx` (route `/checkout`). Game Tracker → `GameTracker.tsx`. Game Summary and admin review → `GameSummary.tsx` (review mode with per-stat corrections). Full "All submissions" comparison view is still on the roadmap.
 
 **Before the game — Checkout Screen:**
 ```
@@ -545,19 +542,10 @@ CREATE POLICY "corrections_admin_update" ON stat_corrections
 - Checked-out players are highlighted / pinned to the front
 - Stats for non-checked-out players still work — just won't be primary
 
-**After the game — Team View:**
-- Default shows resolved stats (primary recorder per player, or admin correction if present)
-- Toggle to "All Submissions" to see every parent's raw data side by side
-- Stats with admin corrections show a pencil icon indicating they've been reviewed
-- Averaged stats (no primary) show a warning icon and appear in the admin review queue
-
-**Admin Review (team owner/admin only):**
-- Accessible from Game Summary → "Review Stats"
-- Side-by-side comparison of all parent submissions per player
-- Discrepancies highlighted automatically
-- Admin can set the official value with a reason — creates a `stat_corrections` record
-- Can also reassign primary checkout to a different parent
-- Corrections immediately flow through to game totals, season stats, and leaderboards
+**After the game — Game Summary:**
+- Shows resolved stats (primary recorder per player, or admin correction if present) for finalized cloud games via `get_game_stats_resolved`.
+- Team owner/admin can tap "Review / Correct stats" to enter review mode; pencil icon on each stat opens a correction modal (new value + optional reason).
+- "All submissions" toggle and full side-by-side comparison are planned future enhancements.
 
 ### 3.7 Season Stats with Checkout + Corrections
 
@@ -598,6 +586,8 @@ This means:
 - If an admin corrects a stat for a past game, season totals update immediately
 - If a primary checkout is reassigned, season totals recalculate from the new primary
 - No separate "recalculate season" step is ever needed — it's always derived
+
+**Current UI:** Season stats UI (player profiles, team leaderboards) is planned to consume `get_season_stats_resolved`; the current implementation focuses on per-game resolution in Game Summary.
 
 ### 3.8 Edge Cases
 
@@ -688,10 +678,10 @@ Season stats use `get_season_stats_resolved()` from section 3.7, which applies t
 - [x] Enable RLS policies
 - [x] Persistent team management (create team, manage roster manually)
 - [x] Cloud-backed game tracking (games + stats saved to Supabase)
-- [ ] Migrate local-only GameContext to Supabase-backed persistence
-- [ ] Add offline support: durable queue writes when offline, sync in background/reconnect (initial in-session snapshot replay is now implemented)
+- [ ] Migrate local-only GameContext to Supabase-backed persistence (cloud-first hydration and sync-on-reconnect are implemented; fuller cloud-first state management remains)
+- [ ] Add offline support: durable queue writes when offline, sync in background/reconnect (in-session snapshot replay and persistent pending-sync flag on reconnect are implemented; background sync when tab closed remains)
 
-Status note: authenticated sessions now support cloud teams/rosters, existing-team game setup, roster preload, game/stat snapshot sync, deterministic active-game hydration on sign-in (cloud-backed by `games.last_opened_at`), cloud game history/finalization, and initial snapshot-based offline reconnect sync replay. Remaining Phase 1 items are fuller cloud-first state management and durable/background offline queueing.
+Status note: authenticated sessions now support cloud teams/rosters, existing-team game setup, roster preload, game/stat snapshot sync, deterministic active-game hydration on sign-in (cloud-backed by `games.last_opened_at`), cloud game history/finalization, snapshot-based offline reconnect sync replay, and a durable pending-sync flag so reopening the app after going offline triggers sync. Remaining Phase 1 items are fuller cloud-first state management and background offline queueing.
 If `001`-`003` were applied before the latest RLS fixes, also apply `004_team_members_rls_fix.sql`, `005_team_members_rls_recursion_cycle_fix.sql`, and `006_teams_insert_policy_fix.sql`.
 To enable cross-device deterministic active-game preference, apply `007_games_last_opened_preference.sql` once (no rerun of `001`-`006` needed if they already succeeded).
 
@@ -699,24 +689,25 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 > **Goal**: Full game lifecycle in the cloud with pre-populated rosters.
 
 - [x] Game creation from team roster
-- [ ] Save stat actions to `game_stats` in real time (with optimistic UI)
+- [x] Save stat actions to `game_stats` in real time (debounced snapshot sync + flush on leave Game Tracker)
 - [x] Game finalization flow (status → final)
-- [ ] Nickname/relabel UI for teams and players
-- [ ] Offline stat tracking with background sync
+- [x] Nickname/relabel UI for teams and players (Cloud Teams page: team and player display names)
+- [ ] Offline stat tracking with background sync (reconnect-triggered sync and durable pending-sync flag are implemented)
 
 ### Phase 3: Season Stats + Multi-Parent Checkout + Admin Review
 > **Goal**: Accumulated stats, leaderboards, player checkout, and admin stat corrections.
 
-- [ ] Player checkout UI (pre-game roster screen with claim toggles)
-- [ ] `player_checkouts` table and RLS policies
-- [ ] `stat_corrections` table and admin-only RLS policies
-- [ ] Resolved stats RPC (`get_game_stats_resolved`) with full priority chain
-- [ ] Season stats RPC (`get_season_stats_resolved`)
+- [x] Player checkout UI (pre-game roster screen with claim toggles) — `GameCheckout.tsx`, route `/checkout`
+- [x] `player_checkouts` table and RLS policies (migration 008)
+- [x] `stat_corrections` table and admin-only RLS policies (migration 009)
+- [x] Resolved stats RPC (`get_game_stats_resolved`) with full priority chain (migration 010)
+- [x] Season stats RPC (`get_season_stats_resolved`) (migration 010; UI not yet built)
+- [ ] Season stats UI (player profiles, team leaderboards) using `get_season_stats_resolved`
 - [ ] Team invite system (`team_members` with roles)
 - [ ] Game Summary: "Primary View" vs "All Submissions" toggle
 - [ ] Admin: reassign primary checkout after a game
 - [ ] Admin: stat review page with side-by-side parent submissions
-- [ ] Admin: correct individual stats with reason (audit trail)
+- [x] Admin: correct individual stats with reason (audit trail) — inline in Game Summary review mode
 - [ ] Admin: review queue for unresolved discrepancies (averaged stats)
 - [ ] Player profile page with season totals and game log
 - [ ] Team leaderboard page (uses resolved totals)
@@ -764,27 +755,28 @@ The `VITE_` prefix is required by Vite to expose variables to the browser. The a
 src/
 ├── lib/
 │   └── supabase.ts           # Supabase client init
-├── hooks/
-│   ├── useAuth.ts            # Auth state, sign in/out
-│   ├── useTeams.ts           # Fetch/manage teams
-│   ├── usePlayers.ts         # Fetch/manage roster
-│   ├── useGames.ts           # Fetch/manage games
-│   ├── useStats.ts           # Read/write game_stats
-│   └── useSeasonStats.ts    # Aggregated season queries
+├── context/
+│   ├── AuthContext.tsx       # Auth state
+│   ├── GameContext.tsx       # Game state + cloud sync
+│   └── SettingsContext.tsx   # App settings
 ├── pages/
 │   ├── Auth.tsx              # Sign in / sign up
-│   ├── Teams.tsx             # Team list + manual management
-│   ├── PlayerProfile.tsx     # Individual season stats
-│   ├── Leaderboard.tsx       # Team stat leaderboard
-│   ├── GameCheckout.tsx      # Pre-game player checkout screen
-│   └── AdminReview.tsx       # Post-game stat review + corrections
+│   ├── SportSelect.tsx       # Home — choose sport
+│   ├── GameSetup.tsx         # Game info (team, opponent, date)
+│   ├── PlayerSetup.tsx       # Add/remove players
+│   ├── GameCheckout.tsx      # Pre-game player checkout (route /checkout)
+│   ├── GameTracker.tsx      # Live stat tracking
+│   ├── GameSummary.tsx       # Post-game tables + resolved stats + admin corrections
+│   ├── Games.tsx             # Cloud game history, resume/finalize
+│   ├── Teams.tsx             # Cloud teams + roster + nicknames
+│   └── Admin.tsx             # Settings (sports toggles)
 supabase/
 ├── migrations/
-│   ├── 001_profiles.sql
-│   ├── 002_teams_players.sql
-│   ├── 003_games_stats.sql
-│   ├── 004_team_members.sql
-│   ├── 005_player_checkouts.sql
-│   ├── 006_stat_corrections.sql
-│   └── 007_views_indexes_rpcs.sql
+│   ├── 001_profiles.sql … 006_teams_insert_policy_fix.sql
+│   ├── 007_games_last_opened_preference.sql
+│   ├── 008_player_checkouts.sql
+│   ├── 009_stat_corrections.sql
+│   └── 010_resolved_stats_rpcs.sql
 ```
+
+Future: `PlayerProfile.tsx`, `Leaderboard.tsx` (season stats UI); `AdminReview.tsx` as standalone page optional — admin review currently lives in GameSummary.

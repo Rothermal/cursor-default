@@ -166,7 +166,7 @@ export default function GameSummary() {
           reason: correctReason.trim() || null,
           original_primary_value: correcting.currentValue,
         },
-        { onConflict: ['game_id', 'player_id', 'stat_id'] }
+        { onConflict: 'game_id,player_id,stat_id' }
       )
 
     setSavingCorrection(false)
