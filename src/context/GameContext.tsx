@@ -27,6 +27,27 @@ import { sports } from '../config/sports'
 
 const STORAGE_KEY = 'statkeeper_game'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
+const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
+
+function getPendingSyncFlag(): boolean {
+  try {
+    return localStorage.getItem(PENDING_SYNC_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function setPendingSyncFlag(pending: boolean): void {
+  try {
+    if (pending) {
+      localStorage.setItem(PENDING_SYNC_KEY, '1')
+    } else {
+      localStorage.removeItem(PENDING_SYNC_KEY)
+    }
+  } catch {
+    // ignore
+  }
+}
 
 const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
   'offline',
@@ -382,6 +403,8 @@ function loadState(): GameState {
 interface GameContextType {
   state: GameState
   dispatch: React.Dispatch<GameAction>
+  /** Trigger an immediate cloud sync (e.g. when leaving Game Tracker). */
+  flushCloudSync: () => void
 }
 
 const GameContext = createContext<GameContextType | null>(null)
@@ -436,7 +459,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
     const hydrateFromCloud = async () => {
-      if (stateRef.current.sport && stateRef.current.gameInfo) {
+      // Cloud-first: only skip hydration when there is unsynced local progress
+      // (game in progress that has never been synced - no gameId yet).
+      const hasUnsyncedLocal =
+        stateRef.current.sport &&
+        stateRef.current.gameInfo &&
+        !stateRef.current.cloudSync.gameId
+      if (hasUnsyncedLocal) {
         hydratedUserRef.current = userId
         return
       }
@@ -518,6 +547,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (!canSyncState(stateRef.current, isConfigured, userId, isOnline)) {
       if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
         pendingSyncRef.current = true
+        setPendingSyncFlag(true)
       }
       return
     }
@@ -545,6 +575,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           })
           if (!isOnline && hasSyncPrereqs(snapshot, isConfigured, snapshotUserId)) {
             pendingSyncRef.current = true
+            setPendingSyncFlag(true)
           }
           break
         }
@@ -584,10 +615,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
         pendingSyncRef.current = false
+        setPendingSyncFlag(false)
       } while (queueAnotherSyncRef.current)
     } catch (error) {
       if (isLikelyNetworkError(error)) {
         pendingSyncRef.current = true
+        setPendingSyncFlag(true)
         dispatch({
           type: 'SET_CLOUD_SYNC_STATE',
           cloudSync: {
@@ -609,14 +642,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, isOnline, userId])
 
+  const flushCloudSync = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+    void runCloudSync()
+  }, [runCloudSync])
+
   const syncFingerprint = buildSyncFingerprint(state)
   const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
 
   useEffect(() => {
     if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
       pendingSyncRef.current = true
+      setPendingSyncFlag(true)
     }
   }, [isConfigured, isOnline, syncFingerprint, userId])
+
+  // Restore durable pending-sync flag on load so we sync after reopen when user had been offline
+  useEffect(() => {
+    if (isConfigured && userId && isOnline && getPendingSyncFlag()) {
+      pendingSyncRef.current = true
+    }
+  }, [isConfigured, isOnline, userId])
 
   useEffect(() => {
     if (!isOnline || !pendingSyncRef.current) return
@@ -633,7 +682,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     debounceTimerRef.current = window.setTimeout(() => {
       void runCloudSync()
-    }, 300)
+    }, 150)
 
     return () => {
       if (debounceTimerRef.current !== null) {
@@ -644,7 +693,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [runCloudSync, shouldSync, syncFingerprint])
 
   return (
-    <GameContext.Provider value={{ state, dispatch }}>
+    <GameContext.Provider value={{ state, dispatch, flushCloudSync }}>
       {children}
     </GameContext.Provider>
   )

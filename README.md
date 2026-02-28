@@ -72,7 +72,10 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/005_team_members_rls_recursion_cycle_fix.sql`
    - `supabase/migrations/006_teams_insert_policy_fix.sql`
    - `supabase/migrations/007_games_last_opened_preference.sql`
-   > If you already applied `001` through `006`, do **not** rerun them — only run `007` to enable cross-device deterministic active-game resume preference.
+   - `supabase/migrations/008_player_checkouts.sql`
+   - `supabase/migrations/009_stat_corrections.sql`
+   - `supabase/migrations/010_resolved_stats_rpcs.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`010` for Phase 3 player checkout and resolved stats).
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -133,7 +136,11 @@ supabase/
     ├── 003_games_stats.sql
     ├── 004_team_members_rls_fix.sql
     ├── 005_team_members_rls_recursion_cycle_fix.sql
-    └── 006_teams_insert_policy_fix.sql
+    ├── 006_teams_insert_policy_fix.sql
+    ├── 007_games_last_opened_preference.sql
+    ├── 008_player_checkouts.sql
+    ├── 009_stat_corrections.sql
+    └── 010_resolved_stats_rpcs.sql
 
 docs/
 └── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
@@ -147,7 +154,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 |---|---|---|
 | 1 | **Supabase Foundation** — auth, cloud DB, RLS, migrations, auth UI | In Progress |
 | 2 | **Cloud Stat Tracking** — persistent teams/rosters, games saved to cloud | Planned |
-| 3 | **Season Stats + Multi-Parent** — player checkout, admin corrections, leaderboards | Planned |
+| 3 | **Season Stats + Multi-Parent** — player checkout, admin corrections, leaderboards | In Progress |
 | 4 | **Capacitor + Polish** — native Android/iOS builds, push notifications, exports | Planned |
 | 5 | **Sports Engine** — API integration (deferred; requires developer access) | Deferred |
 
@@ -167,12 +174,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Cloud game history page with finalize flow and final-game read-only summary behavior
 - [x] Snapshot-based offline queue with reconnect-triggered cloud sync replay
 - [x] Integration plan with multi-parent checkout model and admin corrections
+- [x] Phase 3 DB: `player_checkouts`, `stat_corrections`, `get_game_stats_resolved`, `get_season_stats_resolved` (migrations 008–010)
 
 ### What's Next
 
-- [ ] Complete cloud-first GameContext flows (broader history hydration policies)
-- [ ] Expand offline queueing to durable/background sync beyond in-session snapshot replay
-- [ ] Team collaboration roles/invites and multi-parent workflows
+- [ ] Player checkout UI (pre-game claim players) and Game Summary use of resolved stats RPC
+- [ ] Admin stat review/corrections UI and review queue for averaged stats
+- [ ] Team collaboration invites and multi-parent workflows
 - [ ] Per-sport stat refinements and additional stats
 
 ### Mobile Native (Capacitor)

@@ -187,7 +187,11 @@ export default function PlayerSetup() {
     if (!state.activePlayerId && state.players.length > 0) {
       dispatch({ type: 'SET_ACTIVE_PLAYER', playerId: state.players[0].id })
     }
-    navigate('/game')
+    if (state.cloudSync.teamId) {
+      navigate('/checkout')
+    } else {
+      navigate('/game')
+    }
   }
 
   return (

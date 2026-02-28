@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 interface TeamRow {
   id: string
   name: string
+  nickname: string | null
   sport: string
   season: string | null
 }
@@ -16,6 +17,18 @@ interface PlayerRow {
   first_name: string
   last_name: string | null
   jersey_number: string | null
+  nickname: string | null
+}
+
+function teamDisplayName(team: TeamRow): string {
+  const n = team.nickname?.trim()
+  return n ? n : team.name
+}
+
+function playerDisplayName(player: PlayerRow): string {
+  const n = player.nickname?.trim()
+  if (n) return n
+  return [player.first_name, player.last_name].filter(Boolean).join(' ').trim() || 'Player'
 }
 
 export default function Teams() {
@@ -43,6 +56,12 @@ export default function Teams() {
   const [newPlayerLast, setNewPlayerLast] = useState('')
   const [newPlayerNumber, setNewPlayerNumber] = useState('')
 
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
+  const [editingTeamNickname, setEditingTeamNickname] = useState('')
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
+  const [editingPlayerNickname, setEditingPlayerNickname] = useState('')
+  const [savingNickname, setSavingNickname] = useState(false)
+
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [teams, selectedTeamId]
@@ -57,7 +76,7 @@ export default function Teams() {
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('teams')
-        .select('id,name,sport,season')
+        .select('id,name,nickname,sport,season')
         .order('created_at', { ascending: false })
 
       if (cancelled) return
@@ -94,7 +113,7 @@ export default function Teams() {
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('players')
-        .select('id,first_name,last_name,jersey_number')
+        .select('id,first_name,last_name,jersey_number,nickname')
         .eq('team_id', selectedTeamId)
         .eq('is_active', true)
         .order('created_at', { ascending: true })
@@ -145,7 +164,7 @@ export default function Teams() {
         sport: newTeamSport,
         season: newTeamSeason.trim() || null,
       })
-      .select('id,name,sport,season')
+      .select('id,name,nickname,sport,season')
       .single()
 
     setCreatingTeam(false)
@@ -154,7 +173,7 @@ export default function Teams() {
       return
     }
 
-    const createdTeam = data as TeamRow
+    const createdTeam = { ...data, nickname: (data as TeamRow).nickname ?? null } as TeamRow
     setTeams(prev => [createdTeam, ...prev])
     setSelectedTeamId(createdTeam.id)
     setNewTeamName('')
@@ -177,7 +196,7 @@ export default function Teams() {
         jersey_number: newPlayerNumber.trim() || null,
         is_active: true,
       })
-      .select('id,first_name,last_name,jersey_number')
+      .select('id,first_name,last_name,jersey_number,nickname')
       .single()
 
     setSavingPlayer(false)
@@ -186,7 +205,7 @@ export default function Teams() {
       return
     }
 
-    setPlayers(prev => [...prev, data as PlayerRow])
+    setPlayers(prev => [...prev, { ...data, nickname: (data as PlayerRow).nickname ?? null } as PlayerRow])
     setNewPlayerFirst('')
     setNewPlayerLast('')
     setNewPlayerNumber('')
@@ -209,6 +228,66 @@ export default function Teams() {
     }
 
     setPlayers(prev => prev.filter(player => player.id !== playerId))
+  }
+
+  const startEditTeamNickname = (team: TeamRow) => {
+    setEditingTeamId(team.id)
+    setEditingTeamNickname(team.nickname?.trim() ?? '')
+  }
+
+  const cancelEditTeamNickname = () => {
+    setEditingTeamId(null)
+    setEditingTeamNickname('')
+  }
+
+  const handleSaveTeamNickname = async () => {
+    if (!supabaseClient || !editingTeamId) return
+    setError(null)
+    setSavingNickname(true)
+    const value = editingTeamNickname.trim() || null
+    const { error: updateError } = await supabaseClient
+      .from('teams')
+      .update({ nickname: value })
+      .eq('id', editingTeamId)
+    setSavingNickname(false)
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    setTeams(prev =>
+      prev.map(t => (t.id === editingTeamId ? { ...t, nickname: value } : t))
+    )
+    cancelEditTeamNickname()
+  }
+
+  const startEditPlayerNickname = (player: PlayerRow) => {
+    setEditingPlayerId(player.id)
+    setEditingPlayerNickname(player.nickname?.trim() ?? '')
+  }
+
+  const cancelEditPlayerNickname = () => {
+    setEditingPlayerId(null)
+    setEditingPlayerNickname('')
+  }
+
+  const handleSavePlayerNickname = async () => {
+    if (!supabaseClient || !editingPlayerId) return
+    setError(null)
+    setSavingNickname(true)
+    const value = editingPlayerNickname.trim() || null
+    const { error: updateError } = await supabaseClient
+      .from('players')
+      .update({ nickname: value })
+      .eq('id', editingPlayerId)
+    setSavingNickname(false)
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    setPlayers(prev =>
+      prev.map(p => (p.id === editingPlayerId ? { ...p, nickname: value } : p))
+    )
+    cancelEditPlayerNickname()
   }
 
   return (
@@ -287,24 +366,75 @@ export default function Teams() {
             <div className="space-y-2">
               {teams.map(team => {
                 const sport = sports.find(item => item.id === team.sport)
+                const isEditing = editingTeamId === team.id
                 return (
-                  <button
+                  <div
                     key={team.id}
-                    type="button"
-                    onClick={() => setSelectedTeamId(team.id)}
-                    className={`w-full text-left rounded-xl border px-3 py-2 transition-colors ${
+                    className={`rounded-xl border px-3 py-2 transition-colors ${
                       team.id === selectedTeamId
                         ? 'border-blue-300 bg-blue-50'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                        : 'border-slate-200 bg-white'
                     }`}
                   >
-                    <p className="font-medium text-slate-700">
-                      {sport?.icon ?? '🏟️'} {team.name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {sport?.name ?? team.sport}{team.season ? ` • ${team.season}` : ''}
-                    </p>
-                  </button>
+                    {isEditing ? (
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          value={editingTeamNickname}
+                          onChange={e => setEditingTeamNickname(e.target.value)}
+                          placeholder={`Display name (optional, default: ${team.name})`}
+                          className="input-field text-sm"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { void handleSaveTeamNickname() }}
+                            disabled={savingNickname}
+                            className="btn-primary flex-1 text-sm py-1"
+                          >
+                            {savingNickname ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditTeamNickname}
+                            className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTeamId(team.id)}
+                          className="flex-1 text-left"
+                        >
+                          <p className="font-medium text-slate-700">
+                            {sport?.icon ?? '🏟️'} {teamDisplayName(team)}
+                            {team.nickname?.trim() && (
+                              <span className="text-slate-400 font-normal text-xs ml-1">
+                                ({team.name})
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {sport?.name ?? team.sport}{team.season ? ` • ${team.season}` : ''}
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); startEditTeamNickname(team) }}
+                          className="text-slate-400 hover:text-slate-600 p-1 shrink-0"
+                          title="Edit display name"
+                          aria-label="Edit display name"
+                        >
+                          ✏️
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )
               })}
             </div>
@@ -315,7 +445,7 @@ export default function Teams() {
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-700">Roster</h2>
             <span className="text-xs text-slate-400">
-              {selectedTeam ? selectedTeam.name : 'Select a team'}
+              {selectedTeam ? teamDisplayName(selectedTeam) : 'Select a team'}
             </span>
           </div>
 
@@ -359,23 +489,77 @@ export default function Teams() {
                 <p className="text-sm text-slate-500">No active players yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {players.map(player => (
-                    <div key={player.id} className="flex items-center justify-between border border-slate-100 rounded-xl px-3 py-2">
-                      <div>
-                        <p className="font-medium text-slate-700">
-                          #{player.jersey_number || '—'} {player.first_name} {player.last_name || ''}
-                        </p>
+                  {players.map(player => {
+                    const isEditing = editingPlayerId === player.id
+                    return (
+                      <div key={player.id} className="border border-slate-100 rounded-xl px-3 py-2">
+                        {isEditing ? (
+                          <div className="flex flex-col gap-2">
+                            <input
+                              type="text"
+                              value={editingPlayerNickname}
+                              onChange={e => setEditingPlayerNickname(e.target.value)}
+                              placeholder={`Display name (optional)`}
+                              className="input-field text-sm"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => { void handleSavePlayerNickname() }}
+                                disabled={savingNickname}
+                                className="btn-primary flex-1 text-sm py-1"
+                              >
+                                {savingNickname ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditPlayerNickname}
+                                className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-slate-500 shrink-0">
+                                #{player.jersey_number || '—'}
+                              </span>
+                              <p className="font-medium text-slate-700 truncate">
+                                {playerDisplayName(player)}
+                                {player.nickname?.trim() && (
+                                  <span className="text-slate-400 font-normal text-xs ml-1">
+                                    ({[player.first_name, player.last_name].filter(Boolean).join(' ')})
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => startEditPlayerNickname(player)}
+                                className="text-slate-400 hover:text-slate-600 p-1"
+                                title="Edit display name"
+                                aria-label="Edit display name"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { void handleDeactivatePlayer(player.id) }}
+                                disabled={deletingPlayerId === player.id}
+                                className="text-xs text-red-600 underline disabled:opacity-40"
+                              >
+                                {deletingPlayerId === player.id ? 'Removing...' : 'Remove'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => { void handleDeactivatePlayer(player.id) }}
-                        disabled={deletingPlayerId === player.id}
-                        className="text-xs text-red-600 underline disabled:opacity-40"
-                      >
-                        {deletingPlayerId === player.id ? 'Removing...' : 'Remove'}
-                      </button>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </>
