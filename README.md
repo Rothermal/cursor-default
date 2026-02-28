@@ -81,6 +81,19 @@ The dev server starts at `http://localhost:5173`.
 
 Without Supabase configured, the app runs in offline-only mode using localStorage.
 
+### GitHub Pages Deployment
+
+StatKeeper is deployed to **GitHub Pages** via GitHub Actions. Each push to the `stattracker` branch triggers an automatic build and deploy.
+
+| Item | Value |
+|------|-------|
+| **Live URL** | [https://rothermal.github.io/cursor-default/](https://rothermal.github.io/cursor-default/) |
+| **Status** | Deployed |
+| **Trigger** | Push to `stattracker` branch |
+| **Build** | `pnpm build` with Supabase env vars from GitHub Actions secrets |
+
+Supabase credentials (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) must be set as [GitHub repository secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) for cloud features to work in production. See [`GITHUB_PAGES_DEPLOY.md`](GITHUB_PAGES_DEPLOY.md) for setup steps.
+
 ### Other Commands
 
 ```bash
@@ -185,6 +198,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats and optional "All submissions" comparison view
 - [ ] Team collaboration invites and multi-parent workflows
 - [ ] Per-sport stat refinements and additional stats
+
+### Future Enhancements
+
+A backlog of ideas to iterate over:
+
+1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats).
+2. *(Add more as we go)*
 
 ### Mobile Native (Capacitor)
 

@@ -734,13 +734,27 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 
 ---
 
-## 8. Environment Variables Summary
+## 8. GitHub Pages Deployment
+
+| Item | Value |
+|------|-------|
+| **Live URL** | [https://rothermal.github.io/cursor-default/](https://rothermal.github.io/cursor-default/) |
+| **Status** | Deployed |
+| **Trigger** | Push to `stattracker` branch |
+| **Workflow** | `.github/workflows/deploy.yml` |
+| **Build** | `pnpm build` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from GitHub Actions secrets |
+
+Supabase credentials must be set as [GitHub repository secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) for cloud features (auth, teams, games, sync) to work in production. See [`GITHUB_PAGES_DEPLOY.md`](../GITHUB_PAGES_DEPLOY.md) for setup steps.
+
+---
+
+## 9. Environment Variables Summary
 
 ```env
 # Supabase (required)
-# In Cursor Cloud Agent secrets, these are stored as:
-#   DATABASE_URL     → maps to VITE_SUPABASE_URL
-#   DATABASE_ANON_KEY → maps to VITE_SUPABASE_ANON_KEY
+# In GitHub Actions secrets:
+#   VITE_SUPABASE_URL
+#   VITE_SUPABASE_ANON_KEY
 VITE_SUPABASE_URL=https://<project>.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon-key>
 ```
@@ -749,7 +763,16 @@ The `VITE_` prefix is required by Vite to expose variables to the browser. The a
 
 ---
 
-## 9. File Structure (Projected)
+## 10. Future Enhancements
+
+A backlog of ideas to iterate over:
+
+1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats).
+2. *(Add more as we go)*
+
+---
+
+## 11. File Structure (Projected)
 
 ```
 src/
