@@ -783,7 +783,13 @@ A backlog of ideas to iterate over:
 
 ---
 
-## 11. File Structure (Projected)
+## 11. Known Issues
+
+1. **Completed game appears as both final and in progress** — When a game is completed from the summary, in cloud saves it appears as both a completed game and as an in-progress game. When a game is closed and saved, the in-progress game should end.
+
+---
+
+## 12. File Structure (Projected)
 
 ```
 src/
