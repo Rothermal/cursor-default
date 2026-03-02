@@ -134,7 +134,9 @@ src/
 │   ├── GameTracker.tsx    # Live stat tracking interface
 │   ├── GameSummary.tsx    # Post-game stat tables (resolved stats + admin corrections)
 │   ├── Games.tsx          # Cloud game history and resume/final flows
-│   ├── Teams.tsx          # Cloud team + roster management
+│   ├── Teams.tsx          # Cloud team + roster management + invites
+│   ├── Leaderboard.tsx    # Season leaderboard (sortable by stat)
+│   ├── PlayerProfile.tsx  # Player season totals and game log
 │   └── Admin.tsx          # Settings — enable/disable sports
 ├── components/
 │   ├── Scoreboard.tsx     # Live score display
@@ -159,8 +161,13 @@ supabase/
     └── 011_team_invites.sql
 
 docs/
-└── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+└── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
+
+### Testing
+
+See [`docs/REGRESSION_TESTING.md`](docs/REGRESSION_TESTING.md) for step-by-step regression test scripts (offline mode, auth, teams, games, checkout, corrections, season stats, invites, PWA, deploy).
 
 ## Roadmap
 
@@ -194,10 +201,10 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Player checkout flow (GameCheckout) for cloud teams and resolved Game Summary for finalized cloud games
 - [x] Admin stat corrections UI on Game Summary (finalized games, team owner/admin only) using stat_corrections and resolved RPCs
 - [x] Team invite system — invite by email, accept/decline, roles (owner/admin/scorer), member list
+- [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
 
 ### What's Next
 
-- [ ] Season stats surfaces (player profiles, team leaderboards) using `get_season_stats_resolved()`
 - [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats and optional "All submissions" comparison view
 - [ ] Team collaboration invites: multi-parent workflows, invite links
 - [ ] Per-sport stat refinements and additional stats
@@ -225,6 +232,10 @@ A backlog of ideas to iterate over:
 ### Known Issues
 
 1. **Completed game appears as both final and in progress** — When a game is completed from the summary, in cloud saves it appears as both a completed game and as an in-progress game. When a game is closed and saved, the in-progress game should end.
+
+### Performance updates
+
+1. **RLS policy re-evaluates per row** — Supabase warns: Table `public.profiles` has a row level security policy `profiles_select_own` that re-evaluates `current_setting()` or `auth.<function>()` for each row, which hurts query performance at scale. Fix: replace `auth.uid()` (and similar) with `(select auth.uid())` in the policy so the result is cached per statement. See [Call functions with select](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select).
 
 ### Mobile Native (Capacitor)
 

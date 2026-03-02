@@ -701,16 +701,16 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] `player_checkouts` table and RLS policies (migration 008)
 - [x] `stat_corrections` table and admin-only RLS policies (migration 009)
 - [x] Resolved stats RPC (`get_game_stats_resolved`) with full priority chain (migration 010)
-- [x] Season stats RPC (`get_season_stats_resolved`) (migration 010; UI not yet built)
-- [ ] Season stats UI (player profiles, team leaderboards) using `get_season_stats_resolved`
+- [x] Season stats RPC (`get_season_stats_resolved`) (migration 010)
+- [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
 - [x] Team invite system — invite by email (owner/admin), accept/decline, roles, member list (migration 011)
 - [ ] Game Summary: "Primary View" vs "All Submissions" toggle
 - [ ] Admin: reassign primary checkout after a game
 - [ ] Admin: stat review page with side-by-side parent submissions
 - [x] Admin: correct individual stats with reason (audit trail) — inline in Game Summary review mode
 - [ ] Admin: review queue for unresolved discrepancies (averaged stats)
-- [ ] Player profile page with season totals and game log
-- [ ] Team leaderboard page (uses resolved totals)
+- [x] Player profile page with season totals and game log
+- [x] Team leaderboard page (uses resolved totals)
 - [ ] Conflict indicator when multiple parents tracked same player without checkout
 
 ### Phase 4: Polish + Capacitor
@@ -791,7 +791,19 @@ A backlog of ideas to iterate over:
 
 ---
 
-## 12. File Structure (Projected)
+## 12. Performance updates
+
+1. **RLS policy re-evaluates per row** — Supabase warns: Table `public.profiles` has a row level security policy `profiles_select_own` that re-evaluates `current_setting()` or `auth.<function>()` for each row, which hurts query performance at scale. Fix: replace `auth.uid()` (and similar) with `(select auth.uid())` in the policy so the result is cached per statement. See [Call functions with select](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select).
+
+---
+
+## 13. Regression testing
+
+High-level test scripts for all features (offline, auth, teams, games, checkout, corrections, season stats, invites, PWA, deploy) are in [`docs/REGRESSION_TESTING.md`](REGRESSION_TESTING.md).
+
+---
+
+## 14. File Structure (Projected)
 
 ```
 src/
@@ -810,7 +822,9 @@ src/
 │   ├── GameTracker.tsx      # Live stat tracking
 │   ├── GameSummary.tsx       # Post-game tables + resolved stats + admin corrections
 │   ├── Games.tsx             # Cloud game history, resume/finalize
-│   ├── Teams.tsx             # Cloud teams + roster + nicknames
+│   ├── Teams.tsx             # Cloud teams + roster + invites
+│   ├── Leaderboard.tsx       # Season leaderboard
+│   ├── PlayerProfile.tsx     # Player season totals + game log
 │   └── Admin.tsx             # Settings (sports toggles)
 supabase/
 ├── migrations/
@@ -818,7 +832,8 @@ supabase/
 │   ├── 007_games_last_opened_preference.sql
 │   ├── 008_player_checkouts.sql
 │   ├── 009_stat_corrections.sql
-│   └── 010_resolved_stats_rpcs.sql
+│   ├── 010_resolved_stats_rpcs.sql
+│   └── 011_team_invites.sql
 ```
 
 Future: `PlayerProfile.tsx`, `Leaderboard.tsx` (season stats UI); `AdminReview.tsx` as standalone page optional — admin review currently lives in GameSummary.
