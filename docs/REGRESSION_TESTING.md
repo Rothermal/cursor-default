@@ -123,10 +123,12 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | Step | Action | Expected |
 |------|--------|----------|
 | 8.1 | Open finalized game → Summary | Resolved stats per player (from checkouts/corrections) |
-| 8.2 | As owner/admin: enable review/correct (if UI present) | Correction controls visible |
-| 8.3 | Correct a stat (value + reason) → Save | Value updates; reason stored |
-| 8.4 | Reload Summary | Corrected value and reason shown |
-| 8.5 | As scorer (non-admin): open same game | No correction controls (or read-only) |
+| 8.2 | Toggle "Primary" / "All submissions" (finalized cloud games only) | Primary: resolved values; All submissions: per-recorder values (e.g. "12 (Mom), 14 (Dad)") |
+| 8.3 | In Primary view: if a stat had multiple recorders or was averaged | Warning icon (⚠️) with tooltip "Multiple recorders – review" on that cell |
+| 8.4 | As owner/admin: enable Review / Correct stats | Correction controls visible; tap pencil on stat to correct |
+| 8.5 | Correct a stat (value + reason) → Save | Value updates; reason stored |
+| 8.6 | Reload Summary | Corrected value and reason shown |
+| 8.7 | As scorer (non-admin): open same game | No correction controls (or read-only) |
 
 ---
 

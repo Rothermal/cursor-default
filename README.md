@@ -76,7 +76,9 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/009_stat_corrections.sql`
    - `supabase/migrations/010_resolved_stats_rpcs.sql`
    - `supabase/migrations/011_team_invites.sql`
-   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`011` for Phase 3 player checkout, resolved stats, and team invites).
+   - `supabase/migrations/012_team_members_rls_recursion_fix.sql`
+   - `supabase/migrations/013_rls_auth_uid_cached.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`013` for Phase 3, RLS recursion fix, and RLS performance).
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -158,10 +160,13 @@ supabase/
     ├── 008_player_checkouts.sql
     ├── 009_stat_corrections.sql
     ├── 010_resolved_stats_rpcs.sql
-    └── 011_team_invites.sql
+    ├── 011_team_invites.sql
+    ├── 012_team_members_rls_recursion_fix.sql
+    └── 013_rls_auth_uid_cached.sql
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
 └── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
 
@@ -202,10 +207,12 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Admin stat corrections UI on Game Summary (finalized games, team owner/admin only) using stat_corrections and resolved RPCs
 - [x] Team invite system — invite by email, accept/decline, roles (owner/admin/scorer), member list
 - [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
+- [x] Game Summary: Primary vs All Submissions toggle and conflict indicator (averaged / multi-recorder) for finalized cloud games
 
 ### What's Next
 
-- [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats and optional "All submissions" comparison view
+- [ ] Admin: reassign primary checkout after a game
+- [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats
 - [ ] Team collaboration invites: multi-parent workflows, invite links
 - [ ] Per-sport stat refinements and additional stats
 

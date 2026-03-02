@@ -1,12 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useGame } from '../context/GameContext'
+import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
 import { computePlayerScore, computeCategoryTotal } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
-/** Resolved stats by remote player id -> stat id -> value (for final cloud games) */
-type ResolvedStatsMap = Record<string, Record<string, number>>
+/** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
+type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
+
+/** Resolved stats by remote player id -> stat id -> entry (for final cloud games) */
+type ResolvedStatsMap = Record<string, Record<string, ResolvedEntry>>
+
+/** One recorder's submission for a (player, stat) in All Submissions view */
+type SubmissionEntry = { recorded_by: string; display_name: string; value: number }
+
+/** All submissions: player id -> stat id -> list of submissions (Part 2) */
+type AllSubmissionsMap = Record<string, Record<string, SubmissionEntry[]>>
 
 export default function GameSummary() {
   const navigate = useNavigate()
@@ -30,6 +39,8 @@ export default function GameSummary() {
   const [correctError, setCorrectError] = useState<string | null>(null)
   const [savingCorrection, setSavingCorrection] = useState(false)
   const [resolvedKey, setResolvedKey] = useState(0)
+  const [viewMode, setViewMode] = useState<'primary' | 'all'>('primary')
+  const [allSubmissions, setAllSubmissions] = useState<AllSubmissionsMap | null>(null)
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const gameId = state.cloudSync.gameId
@@ -46,9 +57,19 @@ export default function GameSummary() {
     if (error) return null
 
     const byPlayer: ResolvedStatsMap = {}
-    for (const row of (data ?? []) as Array<{ player_id: string; stat_id: string; value: number }>) {
+    for (const row of (data ?? []) as Array<{
+      player_id: string
+      stat_id: string
+      value: number
+      source?: string
+      recorder_count?: number
+    }>) {
       if (!byPlayer[row.player_id]) byPlayer[row.player_id] = {}
-      byPlayer[row.player_id][row.stat_id] = row.value
+      byPlayer[row.player_id][row.stat_id] = {
+        value: row.value,
+        source: row.source ?? undefined,
+        recorder_count: row.recorder_count ?? undefined,
+      }
     }
     return byPlayer
   }, [gameId])
@@ -66,6 +87,50 @@ export default function GameSummary() {
     void load()
     return () => { cancelled = true }
   }, [isFinalCloudGame, gameId, resolvedKey, loadResolved])
+
+  const loadAllSubmissions = useCallback(async () => {
+    const client = supabase
+    if (!gameId || !client) return null
+
+    const { data: statsRows, error: statsError } = await client
+      .from('game_stats')
+      .select('player_id, stat_id, recorded_by, value')
+      .eq('game_id', gameId)
+
+    if (statsError || !statsRows?.length) return {}
+
+    const recorderIds = [...new Set((statsRows as Array<{ recorded_by: string }>).map(r => r.recorded_by))]
+    const { data: profilesRows } = await client
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', recorderIds)
+
+    const nameByUserId: Record<string, string> = {}
+    for (const p of (profilesRows ?? []) as Array<{ id: string; display_name: string | null }>) {
+      nameByUserId[p.id] = p.display_name?.trim() || 'Unknown'
+    }
+
+    const byPlayer: AllSubmissionsMap = {}
+    for (const row of statsRows as Array<{ player_id: string; stat_id: string; recorded_by: string; value: number }>) {
+      if (!byPlayer[row.player_id]) byPlayer[row.player_id] = {}
+      if (!byPlayer[row.player_id][row.stat_id]) byPlayer[row.player_id][row.stat_id] = []
+      byPlayer[row.player_id][row.stat_id].push({
+        recorded_by: row.recorded_by,
+        display_name: nameByUserId[row.recorded_by] ?? 'Unknown',
+        value: row.value,
+      })
+    }
+    return byPlayer
+  }, [gameId])
+
+  useEffect(() => {
+    if (!isFinalCloudGame || !gameId || viewMode !== 'all') return
+    let cancelled = false
+    loadAllSubmissions().then(data => {
+      if (!cancelled) setAllSubmissions(data)
+    })
+    return () => { cancelled = true }
+  }, [isFinalCloudGame, gameId, viewMode, loadAllSubmissions])
 
   useEffect(() => {
     const client = supabase
@@ -98,9 +163,28 @@ export default function GameSummary() {
     const remoteId = playerIdMap[playerId] ?? playerId
     const player = players.find(p => p.id === playerId)
     if (isFinalCloudGame && resolvedStats && resolvedStats[remoteId]) {
-      return resolvedStats[remoteId]
+      const entries = resolvedStats[remoteId]
+      return Object.fromEntries(
+        Object.entries(entries).map(([statId, entry]) => [statId, entry.value])
+      )
     }
     return player?.stats ?? {}
+  }
+
+  /** Metadata for conflict indicator (Part 1): averaged or multiple recorders */
+  const getResolvedMeta = (playerId: string, statId: string): { source?: string; recorder_count?: number } | null => {
+    if (!isFinalCloudGame || !resolvedStats) return null
+    const remoteId = playerIdMap[playerId] ?? playerId
+    const entry = resolvedStats[remoteId]?.[statId]
+    if (!entry?.source && entry?.recorder_count == null) return null
+    return { source: entry.source, recorder_count: entry.recorder_count }
+  }
+
+  /** Submissions for one (player, stat) in All Submissions view */
+  const getCellSubmissions = (playerId: string, statId: string): SubmissionEntry[] => {
+    if (viewMode !== 'all' || !allSubmissions) return []
+    const remoteId = playerIdMap[playerId] ?? playerId
+    return allSubmissions[remoteId]?.[statId] ?? []
   }
 
   const teamScore = players.reduce(
@@ -200,6 +284,13 @@ export default function GameSummary() {
       return
     }
 
+    // Clear persisted game so this game no longer appears as in progress (fixes
+    // "completed game appears as both final and in progress").
+    try {
+      localStorage.removeItem(GAME_STORAGE_KEY)
+    } catch {
+      // ignore
+    }
     dispatch({ type: 'RESET_GAME' })
     navigate('/games')
   }
@@ -245,17 +336,41 @@ export default function GameSummary() {
           </div>
         )}
 
-        {isFinalCloudGame && isTeamAdmin && (
-          <div className="mb-4 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setReviewMode(!reviewMode)}
-              className={reviewMode ? 'btn-primary py-2' : 'btn-secondary py-2'}
-            >
-              {reviewMode ? 'Done reviewing' : 'Review / Correct stats'}
-            </button>
-            {reviewMode && (
-              <span className="text-xs text-slate-500">Tap a stat to correct it</span>
+        {isFinalCloudGame && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode('primary')}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  viewMode === 'primary' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Primary
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('all')}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  viewMode === 'all' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                All submissions
+              </button>
+            </div>
+            {isTeamAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setReviewMode(!reviewMode)}
+                  className={reviewMode ? 'btn-primary py-2' : 'btn-secondary py-2'}
+                >
+                  {reviewMode ? 'Done reviewing' : 'Review / Correct stats'}
+                </button>
+                {reviewMode && (
+                  <span className="text-xs text-slate-500">Tap a stat to correct it</span>
+                )}
+              </>
             )}
           </div>
         )}
@@ -308,32 +423,64 @@ export default function GameSummary() {
                           <span className="text-slate-400 mr-1">#{player.number || '?'}</span>
                           <span className="font-medium">{player.name}</span>
                         </td>
-                        {category.actions.map(action => (
-                          <td key={action.id} className="text-center py-2 px-2 tabular-nums">
-                            <span className="inline-flex items-center gap-1">
-                              {stats[action.id] || 0}
-                              {reviewMode && isFinalCloudGame && isTeamAdmin && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleOpenCorrect(
-                                      player.id,
-                                      player.name,
-                                      action.id,
-                                      action.shortLabel,
-                                      stats[action.id] || 0
-                                    )
-                                  }
-                                  className="text-slate-400 hover:text-blue-600 p-0.5"
-                                  title="Correct this stat"
-                                  aria-label="Correct stat"
-                                >
-                                  ✏️
-                                </button>
-                              )}
-                            </span>
-                          </td>
-                        ))}
+                        {category.actions.map(action => {
+                          const meta = getResolvedMeta(player.id, action.id)
+                          const needsReview = meta && (meta.source === 'averaged' || (meta.recorder_count ?? 0) > 1)
+                          const submissions = getCellSubmissions(player.id, action.id)
+
+                          return (
+                            <td key={action.id} className="text-center py-2 px-2 tabular-nums">
+                              <span className="inline-flex flex-wrap items-center justify-center gap-1">
+                                {viewMode === 'primary' ? (
+                                  <>
+                                    {stats[action.id] || 0}
+                                    {isFinalCloudGame && needsReview && (
+                                      <span
+                                        className="text-amber-600"
+                                        title="Multiple recorders – review"
+                                        aria-label="Multiple recorders"
+                                      >
+                                        ⚠️
+                                      </span>
+                                    )}
+                                    {reviewMode && isFinalCloudGame && isTeamAdmin && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleOpenCorrect(
+                                            player.id,
+                                            player.name,
+                                            action.id,
+                                            action.shortLabel,
+                                            stats[action.id] || 0
+                                          )
+                                        }
+                                        className="text-slate-400 hover:text-blue-600 p-0.5"
+                                        title="Correct this stat"
+                                        aria-label="Correct stat"
+                                      >
+                                        ✏️
+                                      </button>
+                                    )}
+                                  </>
+                                ) : (
+                                  submissions.length > 0 ? (
+                                    <span className="text-xs">
+                                      {submissions.map((s, i) => (
+                                        <span key={s.recorded_by}>
+                                          {i > 0 && ', '}
+                                          {s.value} ({s.display_name})
+                                        </span>
+                                      ))}
+                                    </span>
+                                  ) : (
+                                    '—'
+                                  )
+                                )}
+                              </span>
+                            </td>
+                          )
+                        })}
                         {category.showTotal && (
                           <td className="text-center py-2 px-2 font-bold tabular-nums">
                             {catTotal}

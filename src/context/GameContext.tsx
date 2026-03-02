@@ -25,7 +25,9 @@ import {
 import { supabase } from '../lib/supabase'
 import { sports } from '../config/sports'
 
-const STORAGE_KEY = 'statkeeper_game'
+/** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
+export const GAME_STORAGE_KEY = 'statkeeper_game'
+const STORAGE_KEY = GAME_STORAGE_KEY
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
 const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 
@@ -376,6 +378,10 @@ function loadState(): GameState {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
+      // Don't restore a game that was already finalized (fixes existing stale "in progress" state).
+      if (parsed.cloudSync?.gameStatus === 'final') {
+        return createInitialState()
+      }
       const fallbackStatus = normalizeCloudStatus(parsed.cloudSync?.status, 'idle')
       const restoredStatus = fallbackStatus === 'syncing' ? 'idle' : fallbackStatus
 
