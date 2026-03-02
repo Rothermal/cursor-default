@@ -17,6 +17,12 @@ type SubmissionEntry = { recorded_by: string; display_name: string; value: numbe
 /** All submissions: player id -> stat id -> list of submissions (Part 2) */
 type AllSubmissionsMap = Record<string, Record<string, SubmissionEntry[]>>
 
+/** Checkout option for Primary recorder dropdown (Part 3) */
+type CheckoutOption = { user_id: string; display_name: string; is_primary: boolean }
+
+/** Checkouts per player (remote player id -> options) for reassign primary */
+type CheckoutsByPlayerMap = Record<string, CheckoutOption[]>
+
 export default function GameSummary() {
   const navigate = useNavigate()
   const { state, dispatch } = useGame()
@@ -41,6 +47,8 @@ export default function GameSummary() {
   const [resolvedKey, setResolvedKey] = useState(0)
   const [viewMode, setViewMode] = useState<'primary' | 'all'>('primary')
   const [allSubmissions, setAllSubmissions] = useState<AllSubmissionsMap | null>(null)
+  const [checkoutsByPlayer, setCheckoutsByPlayer] = useState<CheckoutsByPlayerMap | null>(null)
+  const [settingPrimaryFor, setSettingPrimaryFor] = useState<string | null>(null)
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const gameId = state.cloudSync.gameId
@@ -131,6 +139,63 @@ export default function GameSummary() {
     })
     return () => { cancelled = true }
   }, [isFinalCloudGame, gameId, viewMode, loadAllSubmissions])
+
+  const loadCheckouts = useCallback(async () => {
+    const client = supabase
+    if (!gameId || !client) return null
+
+    const { data: rows, error } = await client
+      .from('player_checkouts')
+      .select('player_id, user_id, is_primary')
+      .eq('game_id', gameId)
+
+    if (error || !rows?.length) return {}
+
+    const userIds = [...new Set((rows as Array<{ user_id: string }>).map(r => r.user_id))]
+    const { data: profilesRows } = await client
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', userIds)
+
+    const nameByUserId: Record<string, string> = {}
+    for (const p of (profilesRows ?? []) as Array<{ id: string; display_name: string | null }>) {
+      nameByUserId[p.id] = p.display_name?.trim() || 'Unknown'
+    }
+
+    const byPlayer: CheckoutsByPlayerMap = {}
+    for (const row of rows as Array<{ player_id: string; user_id: string; is_primary: boolean }>) {
+      if (!byPlayer[row.player_id]) byPlayer[row.player_id] = []
+      byPlayer[row.player_id].push({
+        user_id: row.user_id,
+        display_name: nameByUserId[row.user_id] ?? 'Unknown',
+        is_primary: row.is_primary,
+      })
+    }
+    return byPlayer
+  }, [gameId])
+
+  useEffect(() => {
+    if (!isFinalCloudGame || !gameId || !isTeamAdmin) return
+    let cancelled = false
+    loadCheckouts().then(data => {
+      if (!cancelled) setCheckoutsByPlayer(data ?? null)
+    })
+    return () => { cancelled = true }
+  }, [isFinalCloudGame, gameId, isTeamAdmin, resolvedKey, loadCheckouts])
+
+  const handleSetPrimaryRecorder = async (remotePlayerId: string, userId: string) => {
+    if (!gameId || !supabase) return
+    setSettingPrimaryFor(remotePlayerId)
+    const { error } = await supabase.rpc('set_primary_recorder', {
+      p_game_id: gameId,
+      p_player_id: remotePlayerId,
+      p_user_id: userId,
+    })
+    setSettingPrimaryFor(null)
+    if (error) return
+    setResolvedKey(k => k + 1)
+    loadCheckouts().then(data => setCheckoutsByPlayer(data ?? null))
+  }
 
   useEffect(() => {
     const client = supabase
@@ -333,6 +398,52 @@ export default function GameSummary() {
         {finalizeError && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm mb-4">
             {finalizeError}
+          </div>
+        )}
+
+        {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && checkoutsByPlayer && Object.keys(checkoutsByPlayer).length > 0 && (
+          <div className="card mb-4">
+            <h3 className="text-sm font-semibold text-slate-600 mb-2">Primary recorder</h3>
+            <p className="text-xs text-slate-500 mb-3">Whose stats count as official for each player. Change to fix discrepancies.</p>
+            <div className="space-y-2">
+              {players.map(player => {
+                const remoteId = playerIdMap[player.id] ?? player.id
+                const options = checkoutsByPlayer[remoteId] ?? []
+                const primaryOption = options.find(o => o.is_primary)
+
+                return (
+                  <div key={player.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="font-medium text-slate-700 truncate">
+                      #{player.number || '?'} {player.name}
+                    </span>
+                    {options.length === 0 ? (
+                      <span className="text-slate-400 text-xs">No checkouts</span>
+                    ) : options.length === 1 ? (
+                      <span className="text-slate-600">{options[0].display_name}</span>
+                    ) : (
+                      <select
+                        value={primaryOption?.user_id ?? options[0]?.user_id ?? ''}
+                        onChange={e => {
+                          const uid = e.target.value
+                          if (uid) void handleSetPrimaryRecorder(remoteId, uid)
+                        }}
+                        disabled={settingPrimaryFor === remoteId}
+                        className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-700 text-sm min-w-0 max-w-[140px]"
+                      >
+                        {options.map(opt => (
+                          <option key={opt.user_id} value={opt.user_id}>
+                            {opt.display_name}{opt.is_primary ? ' ✓' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {settingPrimaryFor && (
+              <p className="text-xs text-slate-500 mt-2">Updating…</p>
+            )}
           </div>
         )}
 

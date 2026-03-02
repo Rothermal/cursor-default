@@ -705,7 +705,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
 - [x] Team invite system — invite by email (owner/admin), accept/decline, roles, member list (migration 011)
 - [x] Game Summary: "Primary View" vs "All Submissions" toggle (design: [DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md](DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md))
-- [ ] Admin: reassign primary checkout after a game
+- [x] Admin: reassign primary checkout after a game (Game Summary "Primary recorder" section; RPC `set_primary_recorder`, migration 014)
 - [ ] Admin: stat review page with side-by-side parent submissions
 - [x] Admin: correct individual stats with reason (audit trail) — inline in Game Summary review mode
 - [ ] Admin: review queue for unresolved discrepancies (averaged stats)

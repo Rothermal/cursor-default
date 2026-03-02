@@ -129,6 +129,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 8.5 | Correct a stat (value + reason) → Save | Value updates; reason stored |
 | 8.6 | Reload Summary | Corrected value and reason shown |
 | 8.7 | As scorer (non-admin): open same game | No correction controls (or read-only) |
+| 8.8 | As owner/admin: Primary view → "Primary recorder" section | Dropdown per player listing who checked out; select different recorder → resolved stats and season totals update after refetch |
 
 ---
 
