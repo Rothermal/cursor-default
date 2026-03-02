@@ -703,7 +703,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Resolved stats RPC (`get_game_stats_resolved`) with full priority chain (migration 010)
 - [x] Season stats RPC (`get_season_stats_resolved`) (migration 010; UI not yet built)
 - [ ] Season stats UI (player profiles, team leaderboards) using `get_season_stats_resolved`
-- [ ] Team invite system (`team_members` with roles)
+- [x] Team invite system — invite by email (owner/admin), accept/decline, roles, member list (migration 011)
 - [ ] Game Summary: "Primary View" vs "All Submissions" toggle
 - [ ] Admin: reassign primary checkout after a game
 - [ ] Admin: stat review page with side-by-side parent submissions
@@ -779,7 +779,9 @@ A backlog of ideas to iterate over:
 5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding.
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. *(Add more as we go)*
+8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
+9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions).
+10. *(Add more as we go)*
 
 ---
 

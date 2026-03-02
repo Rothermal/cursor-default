@@ -75,7 +75,8 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/008_player_checkouts.sql`
    - `supabase/migrations/009_stat_corrections.sql`
    - `supabase/migrations/010_resolved_stats_rpcs.sql`
-   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`010` for Phase 3 player checkout and resolved stats).
+   - `supabase/migrations/011_team_invites.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`011` for Phase 3 player checkout, resolved stats, and team invites).
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -154,7 +155,8 @@ supabase/
     ├── 007_games_last_opened_preference.sql
     ├── 008_player_checkouts.sql
     ├── 009_stat_corrections.sql
-    └── 010_resolved_stats_rpcs.sql
+    ├── 010_resolved_stats_rpcs.sql
+    └── 011_team_invites.sql
 
 docs/
 └── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
@@ -191,12 +193,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Phase 3 DB: `player_checkouts`, `stat_corrections`, `get_game_stats_resolved`, `get_season_stats_resolved` (migrations 008–010)
 - [x] Player checkout flow (GameCheckout) for cloud teams and resolved Game Summary for finalized cloud games
 - [x] Admin stat corrections UI on Game Summary (finalized games, team owner/admin only) using stat_corrections and resolved RPCs
+- [x] Team invite system — invite by email, accept/decline, roles (owner/admin/scorer), member list
 
 ### What's Next
 
 - [ ] Season stats surfaces (player profiles, team leaderboards) using `get_season_stats_resolved()`
 - [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats and optional "All submissions" comparison view
-- [ ] Team collaboration invites and multi-parent workflows
+- [ ] Team collaboration invites: multi-parent workflows, invite links
 - [ ] Per-sport stat refinements and additional stats
 
 ### Future Enhancements
@@ -215,7 +218,9 @@ A backlog of ideas to iterate over:
 5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding.
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. *(Add more as we go)*
+8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
+9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions).
+10. *(Add more as we go)*
 
 ### Known Issues
 
