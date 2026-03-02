@@ -444,9 +444,20 @@ export default function Teams() {
         <section className="card space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-700">Roster</h2>
-            <span className="text-xs text-slate-400">
-              {selectedTeam ? teamDisplayName(selectedTeam) : 'Select a team'}
-            </span>
+            <div className="flex items-center gap-2">
+              {selectedTeam && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/leaderboard?teamId=${selectedTeam.id}`)}
+                  className="text-xs text-blue-600 font-medium hover:underline"
+                >
+                  Season Stats
+                </button>
+              )}
+              <span className="text-xs text-slate-400">
+                {selectedTeam ? teamDisplayName(selectedTeam) : 'Select a team'}
+              </span>
+            </div>
           </div>
 
           {selectedTeam ? (
