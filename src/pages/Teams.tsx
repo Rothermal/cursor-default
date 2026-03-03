@@ -313,6 +313,8 @@ export default function Teams() {
         setSelectedTeamId(next[0]?.id ?? '')
         return next
       })
+    } else {
+      setTeams(prev => prev.filter(t => t.id !== teamId))
     }
   }
 

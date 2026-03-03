@@ -194,7 +194,6 @@ export default function GameSummary() {
     setSettingPrimaryFor(null)
     if (error) return
     setResolvedKey(k => k + 1)
-    loadCheckouts().then(data => setCheckoutsByPlayer(data ?? null))
   }
 
   useEffect(() => {
