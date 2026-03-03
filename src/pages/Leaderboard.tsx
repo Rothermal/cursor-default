@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { sports } from '../config/sports'
-import { computePlayerScore } from '../config/sports'
+import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
