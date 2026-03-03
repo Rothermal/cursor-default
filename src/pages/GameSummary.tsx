@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
 import { computePlayerScore, computeCategoryTotal } from '../config/sports'
@@ -219,6 +219,42 @@ export default function GameSummary() {
     return () => { cancelled = true }
   }, [isFinalCloudGame, teamId, user])
 
+  /** Stats needing review: averaged or multiple recorders (Part 4). Must be before early return (hooks rule). */
+  const reviewItems = useMemo(() => {
+    if (!sport || !isFinalCloudGame || !resolvedStats) return []
+    const items: Array<{
+      playerId: string
+      playerName: string
+      statId: string
+      statLabel: string
+      value: number
+      source: string
+      recorder_count: number
+    }> = []
+    const getStatLabel = (statId: string) =>
+      sport.categories.flatMap(c => c.actions).find(a => a.id === statId)?.shortLabel ?? statId
+    for (const player of players) {
+      const remoteId = playerIdMap[player.id] ?? player.id
+      const entries = resolvedStats[remoteId]
+      if (!entries) continue
+      for (const [statId, entry] of Object.entries(entries)) {
+        const needsReview =
+          entry.source === 'averaged' || (entry.recorder_count ?? 0) > 1
+        if (!needsReview) continue
+        items.push({
+          playerId: player.id,
+          playerName: player.name,
+          statId,
+          statLabel: getStatLabel(statId),
+          value: entry.value,
+          source: entry.source ?? 'unknown',
+          recorder_count: entry.recorder_count ?? 0,
+        })
+      }
+    }
+    return items
+  }, [sport, isFinalCloudGame, resolvedStats, players, playerIdMap])
+
   if (!sport || !gameInfo) {
     navigate('/')
     return null
@@ -401,8 +437,57 @@ export default function GameSummary() {
           </div>
         )}
 
+        {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && reviewItems.length > 0 && (
+          <div className="card mb-4 border-amber-200 bg-amber-50/50">
+            <h3 className="text-sm font-semibold text-amber-800 mb-1">Stats needing review</h3>
+            <p className="text-xs text-amber-700/80 mb-3">Multiple recorders or averaged values. Correct the stat or set primary recorder below.</p>
+            <ul className="space-y-2">
+              {reviewItems.map(item => (
+                <li key={`${item.playerId}-${item.statId}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-700">
+                    {item.playerName} — {item.statLabel}: {item.value}
+                    {item.source === 'averaged' && (
+                      <span className="text-amber-600 ml-1">(averaged)</span>
+                    )}
+                    {item.source !== 'averaged' && item.recorder_count > 1 && (
+                      <span className="text-amber-600 ml-1">({item.recorder_count} recorders)</span>
+                    )}
+                  </span>
+                  <span className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleOpenCorrect(
+                          item.playerId,
+                          item.playerName,
+                          item.statId,
+                          item.statLabel,
+                          item.value
+                        )
+                      }
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700 underline"
+                    >
+                      Correct
+                    </button>
+                    <a
+                      href="#primary-recorder-section"
+                      className="text-xs font-medium text-slate-600 hover:text-slate-700 underline"
+                      onClick={e => {
+                        e.preventDefault()
+                        document.getElementById('primary-recorder-section')?.scrollIntoView({ behavior: 'smooth' })
+                      }}
+                    >
+                      Set primary recorder
+                    </a>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && checkoutsByPlayer && Object.keys(checkoutsByPlayer).length > 0 && (
-          <div className="card mb-4">
+          <div id="primary-recorder-section" className="card mb-4">
             <h3 className="text-sm font-semibold text-slate-600 mb-2">Primary recorder</h3>
             <p className="text-xs text-slate-500 mb-3">Whose stats count as official for each player. Change to fix discrepancies.</p>
             <div className="space-y-2">

@@ -211,10 +211,10 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
 - [x] Game Summary: Primary vs All Submissions toggle and conflict indicator (averaged / multi-recorder) for finalized cloud games
 - [x] Admin: reassign primary recorder per player on Game Summary (finalized games; RPC `set_primary_recorder`)
+- [x] Admin: "Stats needing review" section for averaged / multi-recorder stats (Correct and Set primary recorder links)
 
 ### What's Next
 
-- [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats
 - [ ] Team collaboration invites: multi-parent workflows, invite links
 - [ ] Per-sport stat refinements and additional stats
 

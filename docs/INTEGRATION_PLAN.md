@@ -708,7 +708,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Admin: reassign primary checkout after a game (Game Summary "Primary recorder" section; RPC `set_primary_recorder`, migration 014)
 - [ ] Admin: stat review page with side-by-side parent submissions
 - [x] Admin: correct individual stats with reason (audit trail) — inline in Game Summary review mode
-- [ ] Admin: review queue for unresolved discrepancies (averaged stats)
+- [x] Admin: review queue for unresolved discrepancies (averaged stats) — "Stats needing review" section on Game Summary with Correct / Set primary recorder links
 - [x] Player profile page with season totals and game log
 - [x] Team leaderboard page (uses resolved totals)
 - [x] Conflict indicator when multiple parents tracked same player without checkout

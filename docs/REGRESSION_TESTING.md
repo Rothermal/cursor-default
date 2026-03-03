@@ -130,6 +130,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 8.6 | Reload Summary | Corrected value and reason shown |
 | 8.7 | As scorer (non-admin): open same game | No correction controls (or read-only) |
 | 8.8 | As owner/admin: Primary view → "Primary recorder" section | Dropdown per player listing who checked out; select different recorder → resolved stats and season totals update after refetch |
+| 8.9 | When any stat is averaged or has multiple recorders | "Stats needing review" section appears (amber card) with list; each row has Correct and "Set primary recorder" (scrolls to Primary recorder section) |
 
 ---
 
