@@ -701,17 +701,18 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] `player_checkouts` table and RLS policies (migration 008)
 - [x] `stat_corrections` table and admin-only RLS policies (migration 009)
 - [x] Resolved stats RPC (`get_game_stats_resolved`) with full priority chain (migration 010)
-- [x] Season stats RPC (`get_season_stats_resolved`) (migration 010; UI not yet built)
-- [ ] Season stats UI (player profiles, team leaderboards) using `get_season_stats_resolved`
-- [ ] Team invite system (`team_members` with roles)
-- [ ] Game Summary: "Primary View" vs "All Submissions" toggle
-- [ ] Admin: reassign primary checkout after a game
+- [x] Season stats RPC (`get_season_stats_resolved`) (migration 010)
+- [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
+- [x] Team invite system — invite by email (owner/admin), accept/decline, roles, member list (migration 011)
+- [x] Game Summary: "Primary View" vs "All Submissions" toggle (design: [DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md](DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md))
+- [x] Admin: reassign primary checkout after a game (Game Summary "Primary recorder" section; RPC `set_primary_recorder`, migration 014)
 - [ ] Admin: stat review page with side-by-side parent submissions
 - [x] Admin: correct individual stats with reason (audit trail) — inline in Game Summary review mode
-- [ ] Admin: review queue for unresolved discrepancies (averaged stats)
-- [ ] Player profile page with season totals and game log
-- [ ] Team leaderboard page (uses resolved totals)
-- [ ] Conflict indicator when multiple parents tracked same player without checkout
+- [x] Admin: review queue for unresolved discrepancies (averaged stats) — "Stats needing review" section on Game Summary with Correct / Set primary recorder links
+- [x] Player profile page with season totals and game log
+- [x] Team leaderboard page (uses resolved totals)
+- [x] Conflict indicator when multiple parents tracked same player without checkout
+- [ ] Invite links: shareable URL to join team (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 
 ### Phase 4: Polish + Capacitor
 > **Goal**: Native app distribution and final UX polish.
@@ -771,7 +772,7 @@ A backlog of ideas to iterate over:
 2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud.
    - **Team names**: Edit primary team name (and nickname) from the Teams page; keep history when editing (update historical game records). Also support editing **opponent** team names from both Game Setup and Games history.
    - **Player names**: Edit first name, last name, and jersey number from both the Teams roster and PlayerSetup; currently only nickname is editable.
-   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games).
+   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games). Design: [DESIGN_TOURNAMENTS.md](DESIGN_TOURNAMENTS.md).
 4. **Minutes played, game notes, missed shots** — Extend stat tracking:
    - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
    - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).
@@ -779,7 +780,9 @@ A backlog of ideas to iterate over:
 5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding.
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. *(Add more as we go)*
+8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
+9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions).
+10. *(Add more as we go)*
 
 ---
 
@@ -789,7 +792,19 @@ A backlog of ideas to iterate over:
 
 ---
 
-## 12. File Structure (Projected)
+## 12. Performance updates
+
+1. **RLS policy re-evaluates per row** — Supabase warns: Table `public.profiles` has a row level security policy `profiles_select_own` that re-evaluates `current_setting()` or `auth.<function>()` for each row, which hurts query performance at scale. Fix: replace `auth.uid()` (and similar) with `(select auth.uid())` in the policy so the result is cached per statement. See [Call functions with select](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select).
+
+---
+
+## 13. Regression testing
+
+High-level test scripts for all features (offline, auth, teams, games, checkout, corrections, season stats, invites, PWA, deploy) are in [`docs/REGRESSION_TESTING.md`](REGRESSION_TESTING.md).
+
+---
+
+## 14. File Structure (Projected)
 
 ```
 src/
@@ -808,7 +823,9 @@ src/
 │   ├── GameTracker.tsx      # Live stat tracking
 │   ├── GameSummary.tsx       # Post-game tables + resolved stats + admin corrections
 │   ├── Games.tsx             # Cloud game history, resume/finalize
-│   ├── Teams.tsx             # Cloud teams + roster + nicknames
+│   ├── Teams.tsx             # Cloud teams + roster + invites
+│   ├── Leaderboard.tsx       # Season leaderboard
+│   ├── PlayerProfile.tsx     # Player season totals + game log
 │   └── Admin.tsx             # Settings (sports toggles)
 supabase/
 ├── migrations/
@@ -816,7 +833,8 @@ supabase/
 │   ├── 007_games_last_opened_preference.sql
 │   ├── 008_player_checkouts.sql
 │   ├── 009_stat_corrections.sql
-│   └── 010_resolved_stats_rpcs.sql
+│   ├── 010_resolved_stats_rpcs.sql
+│   └── 011_team_invites.sql
 ```
 
 Future: `PlayerProfile.tsx`, `Leaderboard.tsx` (season stats UI); `AdminReview.tsx` as standalone page optional — admin review currently lives in GameSummary.

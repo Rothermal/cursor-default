@@ -25,7 +25,8 @@ import {
 import { supabase } from '../lib/supabase'
 import { sports } from '../config/sports'
 
-const STORAGE_KEY = 'statkeeper_game'
+/** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
+export const GAME_STORAGE_KEY = 'statkeeper_game'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
 const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 
@@ -76,6 +77,7 @@ function createInitialState(status: CloudSyncStatus = 'idle'): GameState {
     players: [],
     activePlayerId: null,
     opponentScore: 0,
+    homeScoreAdjustment: 0,
     actionLog: [],
     cloudSync: createInitialCloudSyncState(status),
   }
@@ -98,6 +100,7 @@ function buildSyncFingerprint(state: GameState): string {
     sportId: state.sport?.id ?? null,
     gameInfo: state.gameInfo,
     opponentScore: state.opponentScore,
+    homeScoreAdjustment: state.homeScoreAdjustment,
     players: state.players.map(player => ({
       id: player.id,
       name: player.name,
@@ -184,6 +187,7 @@ function buildHydratedStateFromCloudGame(
     players: cloudGame.players,
     activePlayerId: cloudGame.activePlayerId,
     opponentScore: cloudGame.opponentScore,
+    homeScoreAdjustment: cloudGame.homeScoreAdjustment,
     actionLog: [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
@@ -329,6 +333,35 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
 
+    case 'INCREMENT_HOME_SCORE': {
+      const logEntry: ActionLogEntry = {
+        id: generateId(),
+        timestamp: Date.now(),
+        type: 'home_score_up',
+        previousValue: state.homeScoreAdjustment,
+      }
+      return {
+        ...state,
+        homeScoreAdjustment: state.homeScoreAdjustment + 1,
+        actionLog: [...state.actionLog, logEntry],
+      }
+    }
+
+    case 'DECREMENT_HOME_SCORE': {
+      if (state.homeScoreAdjustment <= 0) return state
+      const logEntry: ActionLogEntry = {
+        id: generateId(),
+        timestamp: Date.now(),
+        type: 'home_score_down',
+        previousValue: state.homeScoreAdjustment,
+      }
+      return {
+        ...state,
+        homeScoreAdjustment: state.homeScoreAdjustment - 1,
+        actionLog: [...state.actionLog, logEntry],
+      }
+    }
+
     case 'UNDO': {
       if (state.actionLog.length === 0) return state
       const lastAction = state.actionLog[state.actionLog.length - 1]
@@ -349,6 +382,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         case 'opponent_score_up':
         case 'opponent_score_down':
           newState = { ...newState, opponentScore: lastAction.previousValue }
+          break
+        case 'home_score_up':
+        case 'home_score_down':
+          newState = { ...newState, homeScoreAdjustment: lastAction.previousValue }
           break
       }
       return newState
@@ -373,18 +410,23 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
 function loadState(): GameState {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
+      // Don't restore a game that was already finalized (fixes existing stale "in progress" state).
+      if (parsed.cloudSync?.gameStatus === 'final') {
+        return createInitialState()
+      }
       const fallbackStatus = normalizeCloudStatus(parsed.cloudSync?.status, 'idle')
       const restoredStatus = fallbackStatus === 'syncing' ? 'idle' : fallbackStatus
 
-      return {
-        ...createInitialState(restoredStatus),
-        ...parsed,
-        players: Array.isArray(parsed.players) ? parsed.players : [],
-        actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
-        cloudSync: {
+  return {
+    ...createInitialState(restoredStatus),
+    ...parsed,
+    homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
+    players: Array.isArray(parsed.players) ? parsed.players : [],
+    actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
+    cloudSync: {
           ...createInitialCloudSyncState(restoredStatus),
           ...(parsed.cloudSync ?? {}),
           playerIdMap: parsed.cloudSync?.playerIdMap ?? {},
@@ -427,7 +469,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [state])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
   }, [state])
 
   useEffect(() => {

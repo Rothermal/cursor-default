@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { teamDisplayName, playerDisplayName } from '../lib/display'
 
 interface TeamRow {
   id: string
@@ -20,15 +21,14 @@ interface PlayerRow {
   nickname: string | null
 }
 
-function teamDisplayName(team: TeamRow): string {
-  const n = team.nickname?.trim()
-  return n ? n : team.name
-}
-
-function playerDisplayName(player: PlayerRow): string {
-  const n = player.nickname?.trim()
-  if (n) return n
-  return [player.first_name, player.last_name].filter(Boolean).join(' ').trim() || 'Player'
+interface TeamMemberRow {
+  id: string
+  team_id?: string
+  user_id: string
+  role: string
+  accepted_at: string | null
+  display_name: string | null
+  email: string | null
 }
 
 export default function Teams() {
@@ -61,6 +61,17 @@ export default function Teams() {
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
   const [editingPlayerNickname, setEditingPlayerNickname] = useState('')
   const [savingNickname, setSavingNickname] = useState(false)
+
+  const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([])
+  const [pendingInvitesList, setPendingInvitesList] = useState<Array<{ id: string; team_id: string }>>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'scorer' | 'admin'>('scorer')
+  const [inviting, setInviting] = useState(false)
+  const [lookupResult, setLookupResult] = useState<{ id: string; display_name: string } | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [acceptingTeamId, setAcceptingTeamId] = useState<string | null>(null)
+  const [decliningTeamId, setDecliningTeamId] = useState<string | null>(null)
 
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
@@ -134,6 +145,184 @@ export default function Teams() {
       cancelled = true
     }
   }, [isConfigured, selectedTeamId, supabaseClient, userId])
+
+  const myRole = useMemo(
+    () => teamMembers.find(m => m.user_id === userId)?.role ?? null,
+    [teamMembers, userId]
+  )
+  const canManageMembers = myRole === 'owner' || myRole === 'admin'
+
+  useEffect(() => {
+    if (!supabaseClient || !userId) {
+      setPendingInvitesList([])
+      return
+    }
+    let cancelled = false
+    const load = async () => {
+      const { data } = await supabaseClient
+        .from('team_members')
+        .select('id, team_id')
+        .eq('user_id', userId)
+        .is('accepted_at', null)
+      if (cancelled) return
+      setPendingInvitesList((data ?? []) as Array<{ id: string; team_id: string }>)
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [supabaseClient, userId])
+
+  useEffect(() => {
+    if (!selectedTeamId || !supabaseClient || !userId) {
+      setTeamMembers([])
+      return
+    }
+
+    let cancelled = false
+    const loadMembers = async () => {
+      setLoadingMembers(true)
+      setError(null)
+      setLookupResult(null)
+
+      const { data, error: rpcError } = await supabaseClient.rpc('get_team_members_with_profiles', {
+        p_team_id: selectedTeamId,
+      })
+
+      if (cancelled) return
+      if (rpcError) {
+        setError(rpcError.message)
+        setLoadingMembers(false)
+        return
+      }
+
+      const rows = (data ?? []) as Array<TeamMemberRow & { team_id?: string }>
+      setTeamMembers(rows.map(r => ({ ...r, team_id: r.team_id ?? selectedTeamId })))
+      setLoadingMembers(false)
+    }
+
+    void loadMembers()
+    return () => { cancelled = true }
+  }, [selectedTeamId, supabaseClient, userId])
+
+  const handleLookupInvitee = async () => {
+    if (!supabaseClient || !selectedTeamId || !inviteEmail.trim()) return
+    setError(null)
+    setLookupResult(null)
+    const { data, error: rpcError } = await supabaseClient.rpc('lookup_user_by_email', {
+      p_team_id: selectedTeamId,
+      p_email: inviteEmail.trim(),
+    })
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    const rows = (data ?? []) as { id: string; display_name: string }[]
+    if (rows.length === 0) {
+      setError('No user found with that email.')
+      return
+    }
+    setLookupResult(rows[0])
+  }
+
+  const handleInvite = async () => {
+    if (!supabaseClient || !selectedTeamId || !lookupResult) return
+    setError(null)
+    setInviting(true)
+    const { error: rpcError } = await supabaseClient.rpc('invite_team_member', {
+      p_team_id: selectedTeamId,
+      p_user_id: lookupResult.id,
+      p_role: inviteRole,
+    })
+    setInviting(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    setInviteEmail('')
+    setLookupResult(null)
+    setInviteRole('scorer')
+    const { data } = await supabaseClient.rpc('get_team_members_with_profiles', {
+      p_team_id: selectedTeamId,
+    })
+    const rows = (data ?? []) as Array<TeamMemberRow & { team_id?: string }>
+    setTeamMembers(rows.map(r => ({ ...r, team_id: r.team_id ?? selectedTeamId })))
+  }
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!supabaseClient) return
+    setError(null)
+    setRemovingMemberId(memberId)
+    const { error: delError } = await supabaseClient
+      .from('team_members')
+      .delete()
+      .eq('id', memberId)
+    setRemovingMemberId(null)
+    if (delError) {
+      setError(delError.message)
+      return
+    }
+    setTeamMembers(prev => prev.filter(m => m.id !== memberId))
+  }
+
+  const handleAcceptInvite = async (teamId: string) => {
+    if (!supabaseClient) return
+    setError(null)
+    setAcceptingTeamId(teamId)
+    const pending = pendingInvitesList.find(p => p.team_id === teamId)
+    if (!pending) {
+      setAcceptingTeamId(null)
+      return
+    }
+    const { error: updError } = await supabaseClient
+      .from('team_members')
+      .update({ accepted_at: new Date().toISOString() })
+      .eq('id', pending.id)
+    setAcceptingTeamId(null)
+    if (updError) {
+      setError(updError.message)
+      return
+    }
+    setPendingInvitesList(prev => prev.filter(p => p.id !== pending.id))
+    if (selectedTeamId === teamId) {
+      const { data } = await supabaseClient.rpc('get_team_members_with_profiles', {
+        p_team_id: teamId,
+      })
+      const rows = (data ?? []) as Array<TeamMemberRow & { team_id?: string }>
+      setTeamMembers(rows.map(r => ({ ...r, team_id: r.team_id ?? teamId })))
+    }
+  }
+
+  const handleDeclineInvite = async (teamId: string) => {
+    if (!supabaseClient) return
+    setError(null)
+    setDecliningTeamId(teamId)
+    const pending = pendingInvitesList.find(p => p.team_id === teamId)
+    if (!pending) {
+      setDecliningTeamId(null)
+      return
+    }
+    const { error: delError } = await supabaseClient.from('team_members').delete().eq('id', pending.id)
+    setDecliningTeamId(null)
+    if (delError) {
+      setError(delError.message)
+      return
+    }
+    setPendingInvitesList(prev => prev.filter(p => p.id !== pending.id))
+    if (selectedTeamId === teamId) {
+      setTeams(prev => {
+        const next = prev.filter(t => t.id !== teamId)
+        setSelectedTeamId(next[0]?.id ?? '')
+        return next
+      })
+    } else {
+      setTeams(prev => prev.filter(t => t.id !== teamId))
+    }
+  }
+
+  function memberDisplayName(m: TeamMemberRow): string {
+    if (m.display_name?.trim()) return m.display_name.trim()
+    if (m.email) return m.email
+    return 'Unknown'
+  }
 
   if (!isConfigured) {
     return (
@@ -309,6 +498,38 @@ export default function Teams() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
+        {pendingInvitesList.length > 0 && (
+          <div className="card bg-blue-50 border-blue-200 space-y-2">
+            <p className="font-semibold text-blue-800">Pending invites</p>
+            {pendingInvitesList.map(inv => {
+              const team = teams.find(t => t.id === inv.team_id)
+              return (
+                <div key={inv.id} className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-blue-700">{team ? teamDisplayName(team) : 'Team'}</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAcceptInvite(inv.team_id)}
+                      disabled={acceptingTeamId === inv.team_id}
+                      className="btn-primary py-1 px-3 text-xs"
+                    >
+                      {acceptingTeamId === inv.team_id ? 'Accepting...' : 'Accept'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeclineInvite(inv.team_id)}
+                      disabled={decliningTeamId === inv.team_id}
+                      className="border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-600"
+                    >
+                      {decliningTeamId === inv.team_id ? 'Declining...' : 'Decline'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         {error && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
             {error}
@@ -444,9 +665,20 @@ export default function Teams() {
         <section className="card space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-700">Roster</h2>
-            <span className="text-xs text-slate-400">
-              {selectedTeam ? teamDisplayName(selectedTeam) : 'Select a team'}
-            </span>
+            <div className="flex items-center gap-2">
+              {selectedTeam && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/leaderboard?teamId=${selectedTeam.id}`)}
+                  className="text-xs text-blue-600 font-medium hover:underline"
+                >
+                  Season Stats
+                </button>
+              )}
+              <span className="text-xs text-slate-400">
+                {selectedTeam ? teamDisplayName(selectedTeam) : 'Select a team'}
+              </span>
+            </div>
           </div>
 
           {selectedTeam ? (
@@ -567,6 +799,97 @@ export default function Teams() {
             <p className="text-sm text-slate-500">Select a team to manage its roster.</p>
           )}
         </section>
+
+        {selectedTeam && (
+          <section className="card space-y-3">
+            <h2 className="font-semibold text-slate-700">Team Members</h2>
+            {loadingMembers ? (
+              <p className="text-sm text-slate-500 animate-pulse">Loading...</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {teamMembers.map(m => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-700">
+                          {memberDisplayName(m)}
+                          {m.user_id === userId && (
+                            <span className="text-slate-400 font-normal text-xs ml-1">(you)</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {m.role}
+                          {m.accepted_at ? ' · Accepted' : ' · Pending'}
+                        </p>
+                      </div>
+                      {canManageMembers && m.user_id !== userId && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(m.id)}
+                          disabled={removingMemberId === m.id}
+                          className="text-xs text-red-600 underline disabled:opacity-40"
+                        >
+                          {removingMemberId === m.id ? 'Removing...' : 'Remove'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {canManageMembers && (
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <p className="text-sm font-medium text-slate-600">Invite by email</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={e => { setInviteEmail(e.target.value); setLookupResult(null) }}
+                        placeholder="Email address"
+                        className="input-field flex-1 text-sm py-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleLookupInvitee()}
+                        disabled={!inviteEmail.trim()}
+                        className="btn-secondary py-2 px-3 text-sm"
+                      >
+                        Lookup
+                      </button>
+                    </div>
+                    {lookupResult && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-2">
+                        <p className="text-sm text-slate-700">
+                          Invite <strong>{lookupResult.display_name || inviteEmail}</strong> as
+                        </p>
+                        <div className="flex gap-2 items-center">
+                          <select
+                            value={inviteRole}
+                            onChange={e => setInviteRole(e.target.value as 'scorer' | 'admin')}
+                            className="input-field text-sm py-2 w-auto"
+                          >
+                            <option value="scorer">Scorer</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => void handleInvite()}
+                            disabled={inviting}
+                            className="btn-primary py-2 px-4 text-sm"
+                          >
+                            {inviting ? 'Sending...' : 'Send Invite'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        )}
       </div>
     </div>
   )

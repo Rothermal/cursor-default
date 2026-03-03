@@ -50,7 +50,7 @@ export interface Player {
 export interface ActionLogEntry {
   id: string
   timestamp: number
-  type: 'increment' | 'decrement' | 'opponent_score_up' | 'opponent_score_down'
+  type: 'increment' | 'decrement' | 'opponent_score_up' | 'opponent_score_down' | 'home_score_up' | 'home_score_down'
   playerId?: string
   statId?: string
   previousValue: number
@@ -62,6 +62,8 @@ export interface GameState {
   players: Player[]
   activePlayerId: string | null
   opponentScore: number
+  /** Additive adjustment to home score (computed from player stats). Displayed home = computed + this. */
+  homeScoreAdjustment: number
   actionLog: ActionLogEntry[]
   cloudSync: CloudSyncState
 }
@@ -95,6 +97,8 @@ export type GameAction =
   | { type: 'DECREMENT_STAT'; playerId: string; statId: string }
   | { type: 'INCREMENT_OPPONENT_SCORE' }
   | { type: 'DECREMENT_OPPONENT_SCORE' }
+  | { type: 'INCREMENT_HOME_SCORE' }
+  | { type: 'DECREMENT_HOME_SCORE' }
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }

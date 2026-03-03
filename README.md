@@ -75,7 +75,12 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/008_player_checkouts.sql`
    - `supabase/migrations/009_stat_corrections.sql`
    - `supabase/migrations/010_resolved_stats_rpcs.sql`
-   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`010` for Phase 3 player checkout and resolved stats).
+   - `supabase/migrations/011_team_invites.sql`
+   - `supabase/migrations/012_team_members_rls_recursion_fix.sql`
+   - `supabase/migrations/013_rls_auth_uid_cached.sql`
+   - `supabase/migrations/014_set_primary_recorder.sql`
+   - `supabase/migrations/015_home_score_adjustment.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`015` for Phase 3, RLS fixes, reassign primary, and home score adjustment).
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -133,7 +138,9 @@ src/
 │   ├── GameTracker.tsx    # Live stat tracking interface
 │   ├── GameSummary.tsx    # Post-game stat tables (resolved stats + admin corrections)
 │   ├── Games.tsx          # Cloud game history and resume/final flows
-│   ├── Teams.tsx          # Cloud team + roster management
+│   ├── Teams.tsx          # Cloud team + roster management + invites
+│   ├── Leaderboard.tsx    # Season leaderboard (sortable by stat)
+│   ├── PlayerProfile.tsx  # Player season totals and game log
 │   └── Admin.tsx          # Settings — enable/disable sports
 ├── components/
 │   ├── Scoreboard.tsx     # Live score display
@@ -154,11 +161,24 @@ supabase/
     ├── 007_games_last_opened_preference.sql
     ├── 008_player_checkouts.sql
     ├── 009_stat_corrections.sql
-    └── 010_resolved_stats_rpcs.sql
+    ├── 010_resolved_stats_rpcs.sql
+    ├── 011_team_invites.sql
+    ├── 012_team_members_rls_recursion_fix.sql
+    ├── 013_rls_auth_uid_cached.sql
+    ├── 014_set_primary_recorder.sql
+    └── 015_home_score_adjustment.sql
 
 docs/
-└── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
+├── DESIGN_MULTI_PARENT_INVITE_LINKS.md  # Design: Invite links and multi-parent collaboration
+├── DESIGN_TOURNAMENTS.md  # Design: Tournaments table, game link, UI and tournament-scoped views
+└── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
+
+### Testing
+
+See [`docs/REGRESSION_TESTING.md`](docs/REGRESSION_TESTING.md) for step-by-step regression test scripts (offline mode, auth, teams, games, checkout, corrections, season stats, invites, PWA, deploy).
 
 ## Roadmap
 
@@ -191,23 +211,26 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Phase 3 DB: `player_checkouts`, `stat_corrections`, `get_game_stats_resolved`, `get_season_stats_resolved` (migrations 008–010)
 - [x] Player checkout flow (GameCheckout) for cloud teams and resolved Game Summary for finalized cloud games
 - [x] Admin stat corrections UI on Game Summary (finalized games, team owner/admin only) using stat_corrections and resolved RPCs
+- [x] Team invite system — invite by email, accept/decline, roles (owner/admin/scorer), member list
+- [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
+- [x] Game Summary: Primary vs All Submissions toggle and conflict indicator (averaged / multi-recorder) for finalized cloud games
+- [x] Admin: reassign primary recorder per player on Game Summary (finalized games; RPC `set_primary_recorder`)
+- [x] Admin: "Stats needing review" section for averaged / multi-recorder stats (Correct and Set primary recorder links)
 
 ### What's Next
 
-- [ ] Season stats surfaces (player profiles, team leaderboards) using `get_season_stats_resolved()`
-- [ ] Deeper admin review tooling: explicit review queue for averaged/conflicting stats and optional "All submissions" comparison view
-- [ ] Team collaboration invites and multi-parent workflows
+- [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats
 
 ### Future Enhancements
 
 A backlog of ideas to iterate over:
 
-1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats).
+1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats). *Implemented: home score = computed from player stats + editable adjustment (+/− buttons on Scoreboard); adjustment persisted and synced (migration 015).*
 2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud.
    - **Team names**: Edit primary team name (and nickname) from the Teams page; keep history when editing (update historical game records). Also support editing **opponent** team names from both Game Setup and Games history.
    - **Player names**: Edit first name, last name, and jersey number from both the Teams roster and PlayerSetup; currently only nickname is editable.
-   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games).
+   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games). Design: [DESIGN_TOURNAMENTS.md](docs/DESIGN_TOURNAMENTS.md).
 4. **Minutes played, game notes, missed shots** — Extend stat tracking:
    - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
    - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).
@@ -215,11 +238,17 @@ A backlog of ideas to iterate over:
 5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding.
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. *(Add more as we go)*
+8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
+9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions).
+10. *(Add more as we go)*
 
 ### Known Issues
 
 1. **Completed game appears as both final and in progress** — When a game is completed from the summary, in cloud saves it appears as both a completed game and as an in-progress game. When a game is closed and saved, the in-progress game should end.
+
+### Performance updates
+
+1. **RLS policy re-evaluates per row** — Supabase warns: Table `public.profiles` has a row level security policy `profiles_select_own` that re-evaluates `current_setting()` or `auth.<function>()` for each row, which hurts query performance at scale. Fix: replace `auth.uid()` (and similar) with `(select auth.uid())` in the policy so the result is cached per statement. See [Call functions with select](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select).
 
 ### Mobile Native (Capacitor)
 
