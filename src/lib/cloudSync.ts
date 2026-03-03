@@ -322,11 +322,28 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     throw new Error('Team missing for requested game')
   }
 
-  const { data: statRows, error: statsError } = await supabase
-    .from('game_stats')
-    .select('player_id,stat_id,value')
-    .eq('game_id', gameRow.id)
-    .eq('recorded_by', userId)
+  // Load stats differently depending on game status:
+  // - For final games, use resolved stats so viewers see official values
+  // - For non-final games, load only the current user's submissions
+  let statRows:
+    | Array<{ player_id: string; stat_id: string; value: number }>
+    | null = null
+  let statsError: { message?: string } | null = null
+  if (gameRow.status === 'final') {
+    const { data, error } = await supabase.rpc('get_game_stats_resolved', {
+      p_game_id: gameRow.id,
+    })
+    statRows = (data as Array<{ player_id: string; stat_id: string; value: number }> | null) ?? null
+    statsError = error
+  } else {
+    const { data, error } = await supabase
+      .from('game_stats')
+      .select('player_id,stat_id,value')
+      .eq('game_id', gameRow.id)
+      .eq('recorded_by', userId)
+    statRows = (data as Array<{ player_id: string; stat_id: string; value: number }> | null) ?? null
+    statsError = error
+  }
 
   if (statsError) {
     throw new Error(`Stats load failed: ${statsError.message}`)
