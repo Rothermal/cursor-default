@@ -49,6 +49,7 @@ export default function GameSummary() {
   const [allSubmissions, setAllSubmissions] = useState<AllSubmissionsMap | null>(null)
   const [checkoutsByPlayer, setCheckoutsByPlayer] = useState<CheckoutsByPlayerMap | null>(null)
   const [settingPrimaryFor, setSettingPrimaryFor] = useState<string | null>(null)
+  const [primaryError, setPrimaryError] = useState<string | null>(null)
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const gameId = state.cloudSync.gameId
@@ -186,13 +187,17 @@ export default function GameSummary() {
   const handleSetPrimaryRecorder = async (remotePlayerId: string, userId: string) => {
     if (!gameId || !supabase) return
     setSettingPrimaryFor(remotePlayerId)
+    setPrimaryError(null)
     const { error } = await supabase.rpc('set_primary_recorder', {
       p_game_id: gameId,
       p_player_id: remotePlayerId,
       p_user_id: userId,
     })
     setSettingPrimaryFor(null)
-    if (error) return
+    if (error) {
+      setPrimaryError(error.message)
+      return
+    }
     setResolvedKey(k => k + 1)
   }
 
@@ -491,7 +496,13 @@ export default function GameSummary() {
         )}
 
         {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && checkoutsByPlayer && Object.keys(checkoutsByPlayer).length > 0 && (
-          <div id="primary-recorder-section" className="card mb-4">
+          <>
+            {primaryError && (
+              <div className="card bg-red-50 border-red-200 text-red-700 text-sm mb-4">
+                {primaryError}
+              </div>
+            )}
+            <div id="primary-recorder-section" className="card mb-4">
             <h3 className="text-sm font-semibold text-slate-600 mb-2">Primary recorder</h3>
             <p className="text-xs text-slate-500 mb-3">Whose stats count as official for each player. Change to fix discrepancies.</p>
             <div className="space-y-2">
@@ -533,7 +544,8 @@ export default function GameSummary() {
             {settingPrimaryFor && (
               <p className="text-xs text-slate-500 mt-2">Updating…</p>
             )}
-          </div>
+            </div>
+          </>
         )}
 
         {isFinalCloudGame && (
