@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import type { GameState } from '../types'
+import { playerDisplayName } from '../lib/display'
 
 interface TeamRow {
   id: string
@@ -35,12 +36,6 @@ interface GameLogRow {
   id: string
   game_date: string
   opponent_name: string
-}
-
-function playerDisplayName(player: PlayerRow): string {
-  const n = player.nickname?.trim()
-  if (n) return n
-  return [player.first_name, player.last_name].filter(Boolean).join(' ').trim() || 'Player'
 }
 
 function getStatShortLabel(sportId: string, statId: string): string {

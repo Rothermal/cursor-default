@@ -4,6 +4,7 @@ import { sports } from '../config/sports'
 import { computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { teamDisplayName, playerDisplayName } from '../lib/display'
 
 interface TeamRow {
   id: string
@@ -28,17 +29,6 @@ interface SeasonStatRow {
   total: number
   per_game_avg: number
   season_high: number
-}
-
-function teamDisplayName(team: TeamRow): string {
-  const n = team.nickname?.trim()
-  return n ? n : team.name
-}
-
-function playerDisplayName(player: PlayerRow): string {
-  const n = player.nickname?.trim()
-  if (n) return n
-  return [player.first_name, player.last_name].filter(Boolean).join(' ').trim() || 'Player'
 }
 
 export default function Leaderboard() {
