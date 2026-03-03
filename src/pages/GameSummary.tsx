@@ -239,7 +239,10 @@ export default function GameSummary() {
       if (!entries) continue
       for (const [statId, entry] of Object.entries(entries)) {
         const needsReview =
-          entry.source === 'averaged' || (entry.recorder_count ?? 0) > 1
+          entry.source === 'averaged' ||
+          (((entry.recorder_count ?? 0) > 1) &&
+            entry.source !== 'correction' &&
+            entry.source !== 'primary')
         if (!needsReview) continue
         items.push({
           playerId: player.id,
@@ -623,7 +626,12 @@ export default function GameSummary() {
                         </td>
                         {category.actions.map(action => {
                           const meta = getResolvedMeta(player.id, action.id)
-                          const needsReview = meta && (meta.source === 'averaged' || (meta.recorder_count ?? 0) > 1)
+                          const needsReview =
+                            !!meta &&
+                            (meta.source === 'averaged' ||
+                              (((meta.recorder_count ?? 0) > 1) &&
+                                meta.source !== 'correction' &&
+                                meta.source !== 'primary'))
                           const submissions = getCellSubmissions(player.id, action.id)
 
                           return (
