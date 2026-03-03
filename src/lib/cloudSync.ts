@@ -447,7 +447,6 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
   const { data: gameRow, error: gameError } = await supabase
     .from('games')
     .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,home_score_adjustment,status,created_at')
-    .eq('created_by', userId)
     .eq('id', gameId)
     .maybeSingle()
 

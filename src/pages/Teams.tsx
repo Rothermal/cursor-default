@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { teamDisplayName, playerDisplayName } from '../lib/display'
 
 interface TeamRow {
   id: string
@@ -28,17 +29,6 @@ interface TeamMemberRow {
   accepted_at: string | null
   display_name: string | null
   email: string | null
-}
-
-function teamDisplayName(team: TeamRow): string {
-  const n = team.nickname?.trim()
-  return n ? n : team.name
-}
-
-function playerDisplayName(player: PlayerRow): string {
-  const n = player.nickname?.trim()
-  if (n) return n
-  return [player.first_name, player.last_name].filter(Boolean).join(' ').trim() || 'Player'
 }
 
 export default function Teams() {
@@ -180,11 +170,6 @@ export default function Teams() {
     void load()
     return () => { cancelled = true }
   }, [supabaseClient, userId])
-
-  const pendingInvites = useMemo(
-    () => pendingInvitesList,
-    [pendingInvitesList]
-  )
 
   useEffect(() => {
     if (!selectedTeamId || !supabaseClient || !userId) {
@@ -511,10 +496,10 @@ export default function Teams() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
-        {pendingInvites.length > 0 && (
+        {pendingInvitesList.length > 0 && (
           <div className="card bg-blue-50 border-blue-200 space-y-2">
             <p className="font-semibold text-blue-800">Pending invites</p>
-            {pendingInvites.map(inv => {
+            {pendingInvitesList.map(inv => {
               const team = teams.find(t => t.id === inv.team_id)
               return (
                 <div key={inv.id} className="flex items-center justify-between gap-2">
