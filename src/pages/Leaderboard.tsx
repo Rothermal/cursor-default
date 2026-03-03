@@ -173,6 +173,11 @@ export default function Leaderboard() {
     return opts
   }, [sport])
 
+  useEffect(() => {
+    // Reset sort selection when switching teams/sports to a valid default
+    setSortBy('score')
+  }, [selectedTeamId])
+
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
