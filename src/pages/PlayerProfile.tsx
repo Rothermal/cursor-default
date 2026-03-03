@@ -239,7 +239,7 @@ export default function PlayerProfile() {
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate(`/leaderboard`)}
+            onClick={() => navigate(`/leaderboard?teamId=${teamId}`)}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >
