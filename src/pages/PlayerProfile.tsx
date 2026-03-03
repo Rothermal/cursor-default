@@ -232,7 +232,10 @@ export default function PlayerProfile() {
     )
   }
 
-  const gamesPlayed = seasonStats[0]?.games_played ?? 0
+  const gamesPlayed = seasonStats.reduce(
+    (max, row) => (row.games_played > max ? row.games_played : max),
+    0
+  )
 
   return (
     <div className="min-h-screen flex flex-col">

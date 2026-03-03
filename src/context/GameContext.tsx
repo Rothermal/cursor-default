@@ -27,7 +27,6 @@ import { sports } from '../config/sports'
 
 /** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
 export const GAME_STORAGE_KEY = 'statkeeper_game'
-const STORAGE_KEY = GAME_STORAGE_KEY
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
 const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 
@@ -411,7 +410,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
 function loadState(): GameState {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
       // Don't restore a game that was already finalized (fixes existing stale "in progress" state).
@@ -470,7 +469,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [state])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
   }, [state])
 
   useEffect(() => {
