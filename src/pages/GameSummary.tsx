@@ -379,7 +379,7 @@ export default function GameSummary() {
     setFinalizeError(null)
     setFinalizing(true)
 
-    const { error } = await supabase!
+    const initial = await supabase!
       .from('games')
       .update({
         status: 'final',
@@ -388,9 +388,26 @@ export default function GameSummary() {
       })
       .eq('id', state.cloudSync.gameId)
 
+    // Fallback for deployments missing migration 015 (no home_score_adjustment column).
+    let finalizeError = initial.error
+    if (
+      finalizeError &&
+      finalizeError.message?.includes('home_score_adjustment') &&
+      finalizeError.message?.includes('column')
+    ) {
+      const retry = await supabase!
+        .from('games')
+        .update({
+          status: 'final',
+          opponent_score: opponentScore,
+        })
+        .eq('id', state.cloudSync.gameId)
+      finalizeError = retry.error ?? null
+    }
+
     setFinalizing(false)
-    if (error) {
-      setFinalizeError(error.message)
+    if (finalizeError) {
+      setFinalizeError(finalizeError.message ?? 'Failed to finalize game')
       return
     }
 
