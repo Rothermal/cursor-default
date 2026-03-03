@@ -27,7 +27,7 @@ export default function GameSummary() {
   const navigate = useNavigate()
   const { state, dispatch } = useGame()
   const { user, isConfigured } = useAuth()
-  const { sport, gameInfo, players, opponentScore } = state
+  const { sport, gameInfo, players, opponentScore, homeScoreAdjustment } = state
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
   const [resolvedStats, setResolvedStats] = useState<ResolvedStatsMap | null>(null)
@@ -288,10 +288,11 @@ export default function GameSummary() {
     return allSubmissions[remoteId]?.[statId] ?? []
   }
 
-  const teamScore = players.reduce(
+  const computedTeamScore = players.reduce(
     (total, player) => total + computePlayerScore(sport, getPlayerStats(player.id)),
     0
   )
+  const teamScore = computedTeamScore + homeScoreAdjustment
 
   const allStatIds = sport.categories.flatMap(c => c.actions.map(a => a.id))
 
@@ -376,6 +377,7 @@ export default function GameSummary() {
       .update({
         status: 'final',
         opponent_score: opponentScore,
+        home_score_adjustment: homeScoreAdjustment,
       })
       .eq('id', state.cloudSync.gameId)
 

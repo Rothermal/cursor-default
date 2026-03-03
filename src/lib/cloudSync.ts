@@ -20,6 +20,7 @@ export interface HydratedCloudGame {
   players: Player[]
   activePlayerId: string | null
   opponentScore: number
+  homeScoreAdjustment: number
   teamId: string
   gameId: string
   playerIdMap: Record<string, string>
@@ -33,6 +34,7 @@ type CloudGameRow = {
   tournament_name: string | null
   game_date: string
   opponent_score: number | null
+  home_score_adjustment?: number | null
   status: string
   created_at: string
 }
@@ -123,6 +125,7 @@ async function ensureGame(state: GameState, userId: string, teamId: string): Pro
     team_id: teamId,
     opponent_name: state.gameInfo!.opponentName,
     opponent_score: state.opponentScore,
+    home_score_adjustment: state.homeScoreAdjustment,
     tournament_name: state.gameInfo!.tournamentName || null,
     game_date: state.gameInfo!.date,
     status: 'in_progress',
@@ -377,6 +380,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     players,
     activePlayerId: players[0]?.id ?? null,
     opponentScore: gameRow.opponent_score ?? 0,
+    homeScoreAdjustment: gameRow.home_score_adjustment ?? 0,
     teamId: teamRow.id as string,
     gameId: gameRow.id,
     playerIdMap,
@@ -391,7 +395,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   const advanced = await supabase
     .from('games')
-    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at,last_opened_at')
+    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,home_score_adjustment,status,created_at,last_opened_at')
     .eq('created_by', userId)
     .in('status', ['in_progress', 'scheduled'])
     .order('last_opened_at', { ascending: false })
@@ -412,7 +416,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   const fallback = await supabase
     .from('games')
-    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at')
+    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,home_score_adjustment,status,created_at')
     .eq('created_by', userId)
     .in('status', ['in_progress', 'scheduled'])
     .order('created_at', { ascending: false })
@@ -442,7 +446,7 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
 
   const { data: gameRow, error: gameError } = await supabase
     .from('games')
-    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at')
+    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,home_score_adjustment,status,created_at')
     .eq('created_by', userId)
     .eq('id', gameId)
     .maybeSingle()

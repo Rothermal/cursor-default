@@ -79,7 +79,8 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/012_team_members_rls_recursion_fix.sql`
    - `supabase/migrations/013_rls_auth_uid_cached.sql`
    - `supabase/migrations/014_set_primary_recorder.sql`
-   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`014` for Phase 3, RLS fixes, and reassign primary).
+   - `supabase/migrations/015_home_score_adjustment.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`015` for Phase 3, RLS fixes, reassign primary, and home score adjustment).
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -164,11 +165,14 @@ supabase/
     ├── 011_team_invites.sql
     ├── 012_team_members_rls_recursion_fix.sql
     ├── 013_rls_auth_uid_cached.sql
-    └── 014_set_primary_recorder.sql
+    ├── 014_set_primary_recorder.sql
+    └── 015_home_score_adjustment.sql
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
 ├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
+├── DESIGN_MULTI_PARENT_INVITE_LINKS.md  # Design: Invite links and multi-parent collaboration
+├── DESIGN_TOURNAMENTS.md  # Design: Tournaments table, game link, UI and tournament-scoped views
 └── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
 
@@ -215,18 +219,18 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] Team collaboration invites: multi-parent workflows, invite links
+- [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats
 
 ### Future Enhancements
 
 A backlog of ideas to iterate over:
 
-1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats).
+1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats). *Implemented: home score = computed from player stats + editable adjustment (+/− buttons on Scoreboard); adjustment persisted and synced (migration 015).*
 2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud.
    - **Team names**: Edit primary team name (and nickname) from the Teams page; keep history when editing (update historical game records). Also support editing **opponent** team names from both Game Setup and Games history.
    - **Player names**: Edit first name, last name, and jersey number from both the Teams roster and PlayerSetup; currently only nickname is editable.
-   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games).
+   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games). Design: [DESIGN_TOURNAMENTS.md](docs/DESIGN_TOURNAMENTS.md).
 4. **Minutes played, game notes, missed shots** — Extend stat tracking:
    - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
    - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).

@@ -79,6 +79,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 5.4 | Select player A; tap 2PT twice, FT once | Player A: 2PT=2, FT=1; home score reflects point value |
 | 5.5 | Select player B; tap AST, REB | Player B stats increment; home score unchanged for non-scoring stats |
 | 5.6 | Increment opponent score | Opponent score +1 |
+| 5.6a | On Scoreboard: tap + or − under home team score | Home score increases or decreases by 1 (stays ≥ computed from stats); Undo restores |
 | 5.7 | Undo last action | Previous value restored |
 | 5.8 | Game Summary | Tables show per-player and team totals; categories correct |
 | 5.9 | New Game (from home with active game) | Reset; can start new game |

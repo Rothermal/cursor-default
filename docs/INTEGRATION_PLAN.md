@@ -712,6 +712,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Player profile page with season totals and game log
 - [x] Team leaderboard page (uses resolved totals)
 - [x] Conflict indicator when multiple parents tracked same player without checkout
+- [ ] Invite links: shareable URL to join team (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 
 ### Phase 4: Polish + Capacitor
 > **Goal**: Native app distribution and final UX polish.
@@ -771,7 +772,7 @@ A backlog of ideas to iterate over:
 2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud.
    - **Team names**: Edit primary team name (and nickname) from the Teams page; keep history when editing (update historical game records). Also support editing **opponent** team names from both Game Setup and Games history.
    - **Player names**: Edit first name, last name, and jersey number from both the Teams roster and PlayerSetup; currently only nickname is editable.
-   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games).
+   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games). Design: [DESIGN_TOURNAMENTS.md](DESIGN_TOURNAMENTS.md).
 4. **Minutes played, game notes, missed shots** — Extend stat tracking:
    - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
    - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).

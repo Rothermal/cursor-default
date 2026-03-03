@@ -3,14 +3,15 @@ import { computePlayerScore } from '../config/sports'
 
 export default function Scoreboard() {
   const { state, dispatch } = useGame()
-  const { sport, gameInfo, players, opponentScore, cloudSync } = state
+  const { sport, gameInfo, players, opponentScore, homeScoreAdjustment, cloudSync } = state
 
   if (!sport || !gameInfo) return null
 
-  const teamScore = players.reduce(
+  const computedTeamScore = players.reduce(
     (total, player) => total + computePlayerScore(sport, player.stats),
     0
   )
+  const teamScore = computedTeamScore + homeScoreAdjustment
 
   const syncLabel = (() => {
     switch (cloudSync.status) {
@@ -42,6 +43,20 @@ export default function Scoreboard() {
             {gameInfo.teamName}
           </p>
           <p className="text-4xl font-bold tabular-nums">{teamScore}</p>
+          <div className="flex justify-center gap-2 mt-1">
+            <button
+              onClick={() => dispatch({ type: 'DECREMENT_HOME_SCORE' })}
+              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
+            >
+              −
+            </button>
+            <button
+              onClick={() => dispatch({ type: 'INCREMENT_HOME_SCORE' })}
+              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <div className="px-4">

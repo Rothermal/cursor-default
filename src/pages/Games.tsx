@@ -164,6 +164,7 @@ export default function Games() {
       players: cloudGame.players,
       activePlayerId: cloudGame.activePlayerId,
       opponentScore: cloudGame.opponentScore,
+      homeScoreAdjustment: cloudGame.homeScoreAdjustment,
       actionLog: [],
       cloudSync: {
         teamId: cloudGame.teamId,
