@@ -44,6 +44,11 @@ function isMissingLastOpenedColumnError(error: { message?: string } | null): boo
   return error.message.includes('last_opened_at') && error.message.includes('column')
 }
 
+function isMissingHomeScoreAdjustmentColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  return error.message.includes('home_score_adjustment') && error.message.includes('column')
+}
+
 export type LastOpenedPreferenceSupport = 'unknown' | 'supported' | 'missing'
 let lastOpenedPreferenceSupport: LastOpenedPreferenceSupport = 'unknown'
 
@@ -139,7 +144,25 @@ async function ensureGame(state: GameState, userId: string, teamId: string): Pro
       .eq('id', state.cloudSync.gameId)
 
     if (updateError) {
-      throw new Error(`Game update failed: ${updateError.message}`)
+      if (isMissingHomeScoreAdjustmentColumnError(updateError)) {
+        const { error: retryError } = await supabase
+          .from('games')
+          .update({
+            team_id: teamId,
+            opponent_name: state.gameInfo!.opponentName,
+            opponent_score: state.opponentScore,
+            tournament_name: state.gameInfo!.tournamentName || null,
+            game_date: state.gameInfo!.date,
+            status: 'in_progress',
+            created_by: userId,
+          })
+          .eq('id', state.cloudSync.gameId)
+        if (retryError) {
+          throw new Error(`Game update failed: ${retryError.message}`)
+        }
+      } else {
+        throw new Error(`Game update failed: ${updateError.message}`)
+      }
     }
 
     return state.cloudSync.gameId
@@ -152,6 +175,25 @@ async function ensureGame(state: GameState, userId: string, teamId: string): Pro
     .single()
 
   if (createError || !createdGame) {
+    if (createError && isMissingHomeScoreAdjustmentColumnError(createError)) {
+      const { data: createdGameFallback, error: retryError } = await supabase
+        .from('games')
+        .insert({
+          team_id: teamId,
+          opponent_name: state.gameInfo!.opponentName,
+          opponent_score: state.opponentScore,
+          tournament_name: state.gameInfo!.tournamentName || null,
+          game_date: state.gameInfo!.date,
+          status: 'in_progress',
+          created_by: userId,
+        })
+        .select('id')
+        .single()
+      if (retryError || !createdGameFallback) {
+        throw new Error(`Game creation failed: ${retryError?.message ?? 'unknown error'}`)
+      }
+      return createdGameFallback.id as string
+    }
     throw new Error(`Game creation failed: ${createError?.message ?? 'unknown error'}`)
   }
 
@@ -425,26 +467,62 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
     return (advanced.data as CloudGameRow | null) ?? null
   }
 
-  if (!isMissingLastOpenedColumnError(advanced.error)) {
+  // Determine which optional columns are missing and retry accordingly.
+  const missingLastOpened = isMissingLastOpenedColumnError(advanced.error)
+  const missingHomeAdjust = isMissingHomeScoreAdjustmentColumnError(advanced.error)
+
+  if (!missingLastOpened && !missingHomeAdjust) {
     throw new Error(`Game load failed: ${advanced.error.message}`)
   }
 
-  lastOpenedPreferenceSupport = 'missing'
+  if (missingLastOpened) {
+    lastOpenedPreferenceSupport = 'missing'
+  }
 
-  const fallback = await supabase
+  // Build select list dynamically based on missing columns
+  const baseColumns =
+    'id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at'
+  const includeHomeAdjust = !missingHomeAdjust
+  const includeLastOpened = !missingLastOpened
+  const selectColumns =
+    baseColumns +
+    (includeHomeAdjust ? ',home_score_adjustment' : '') +
+    (includeLastOpened ? ',last_opened_at' : '')
+
+  const retry = await supabase
     .from('games')
-    .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,home_score_adjustment,status,created_at')
+    .select(selectColumns)
     .eq('created_by', userId)
     .in('status', ['in_progress', 'scheduled'])
+    .order(includeLastOpened ? 'last_opened_at' : 'created_at', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (fallback.error) {
-    throw new Error(`Game load failed: ${fallback.error.message}`)
+  if (!retry.error) {
+    return (retry.data as CloudGameRow | null) ?? null
   }
 
-  return (fallback.data as CloudGameRow | null) ?? null
+  // As a final fallback, drop both optional columns if one more error is still about them.
+  const retryMissingLastOpened = isMissingLastOpenedColumnError(retry.error)
+  const retryMissingHomeAdjust = isMissingHomeScoreAdjustmentColumnError(retry.error)
+  if (retryMissingLastOpened || retryMissingHomeAdjust) {
+    const finalRetry = await supabase
+      .from('games')
+      .select(baseColumns)
+      .eq('created_by', userId)
+      .in('status', ['in_progress', 'scheduled'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (finalRetry.error) {
+      throw new Error(`Game load failed: ${finalRetry.error.message}`)
+    }
+    return (finalRetry.data as CloudGameRow | null) ?? null
+  }
+
+  throw new Error(`Game load failed: ${retry.error.message}`)
 }
 
 export async function loadLatestCloudGame(userId: string): Promise<HydratedCloudGame | null> {
@@ -468,6 +546,20 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
     .maybeSingle()
 
   if (gameError) {
+    if (isMissingHomeScoreAdjustmentColumnError(gameError)) {
+      const { data: gameRowFallback, error: gameErrorFallback } = await supabase
+        .from('games')
+        .select('id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at')
+        .eq('id', gameId)
+        .maybeSingle()
+      if (gameErrorFallback) {
+        throw new Error(`Game load failed: ${gameErrorFallback.message}`)
+      }
+      if (!gameRowFallback) {
+        return null
+      }
+      return hydrateCloudGameFromRow(userId, gameRowFallback as CloudGameRow)
+    }
     throw new Error(`Game load failed: ${gameError.message}`)
   }
 
