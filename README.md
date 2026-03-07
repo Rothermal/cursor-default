@@ -6,13 +6,17 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 
 - **Sport Selection** — configurable sports roster; enable/disable via the Settings page
 - **Game Setup** — enter team name, opponent, tournament/league, and date
-- **Cloud Team & Roster Management** — create teams and maintain active rosters in Supabase; optional nickname/display names for teams and players
+- **Cloud Team & Roster Management** — create teams and maintain active rosters in Supabase; optional nickname/display names for teams and players; edit team names, player names, and jersey numbers inline
 - **Cloud Game Lifecycle** — resume in-progress games, finalize games, and review cloud game history; finalized games show **resolved stats** (checkout + admin corrections) in Game Summary
+- **Tournaments** — first-class tournament entities scoped to teams; games reference tournaments via FK; tournament picker in Game Setup (select existing or create new)
 - **Player Management** — add players with name and jersey number; add more mid-game
-- **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category
-- **Live Scoreboard** — auto-computed team score from player stats; manual opponent score
+- **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category; missed-shot tracking with made/attempted display
+- **Minutes Played** — per-player minute counter for sports that track playing time (basketball, hockey, soccer, football)
+- **Game Notes** — free-text notes field in Game Tracker and Game Summary; synced to cloud
+- **Live Scoreboard** — auto-computed team score from player stats + editable home score adjustment; manual opponent score
 - **Undo Support** — undo any stat action instantly
-- **Game Summary** — per-player and team totals in organized tables
+- **Game Summary** — per-player and team totals in organized tables; M/A (%) columns for shooting stats
+- **Delete Entities** — delete teams, players, games, and tournaments with confirmation prompts; centralized Data Management in Settings
 - **PWA** — installable on Android/iOS home screens, works offline with service worker caching
 - **Auth** — Supabase email/password authentication (optional; app works offline without it)
 - **Cloud Database** — Supabase PostgreSQL with Row Level Security (migrations + in-app game snapshot sync for signed-in users)
@@ -22,7 +26,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 
 | Sport | Status | Stats |
 |---|---|---|
-| Basketball | Enabled by default | FT, 2PT, 3PT, Rebounds (OFF/DEF), Assists, Steals, Blocks, Turnovers, Fouls |
+| Basketball | Enabled by default | FT, 2PT, 3PT (with missed/attempted), Rebounds (OFF/DEF), Assists, Steals, Blocks, Turnovers, Fouls, Minutes |
 | Baseball | Configured (disabled) | Hits (1B–HR), Walks, Strikeouts, Runs, RBIs, Stolen Bases, Fielding |
 | Football | Configured (disabled) | Passing, Rushing, Receiving, Defense, Kicking |
 | Hockey | Configured (disabled) | Goals, Assists, Shots, Hits, Blocks, Penalties, Goaltending |
@@ -124,7 +128,9 @@ pnpm remove sharp
 ```
 src/
 ├── lib/
-│   └── supabase.ts        # Supabase client init (graceful fallback if not configured)
+│   ├── supabase.ts        # Supabase client init (graceful fallback if not configured)
+│   ├── cloudSync.ts       # Cloud game snapshot sync, hydration, and resume logic
+│   └── display.ts         # Shared display name helpers (teams, players)
 ├── config/
 │   └── sports.ts          # Sport definitions (stats, categories, scoring rules)
 ├── context/
@@ -139,11 +145,11 @@ src/
 │   ├── GameCheckout.tsx   # Pre-game player checkout (cloud teams)
 │   ├── GameTracker.tsx    # Live stat tracking interface
 │   ├── GameSummary.tsx    # Post-game stat tables (resolved stats + admin corrections)
-│   ├── Games.tsx          # Cloud game history and resume/final flows
-│   ├── Teams.tsx          # Cloud team + roster management + invites
+│   ├── Games.tsx          # Cloud game history, resume/final flows, delete games
+│   ├── Teams.tsx          # Cloud team + roster management + invites + delete
 │   ├── Leaderboard.tsx    # Season leaderboard (sortable by stat)
 │   ├── PlayerProfile.tsx  # Player season totals and game log
-│   └── Admin.tsx          # Settings — enable/disable sports
+│   └── Admin.tsx          # Settings — sports, cloud links, data management (delete)
 ├── components/
 │   ├── ConfirmDialog.tsx  # Reusable confirmation modal (delete prompts)
 │   ├── Scoreboard.tsx     # Live score display
@@ -170,7 +176,8 @@ supabase/
     ├── 013_rls_auth_uid_cached.sql
     ├── 014_set_primary_recorder.sql
     ├── 015_home_score_adjustment.sql
-    └── 016_tournaments.sql
+    ├── 016_tournaments.sql
+    └── 017_game_notes.sql
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
@@ -190,9 +197,9 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | **Supabase Foundation** — auth, cloud DB, RLS, migrations, auth UI | In Progress |
-| 2 | **Cloud Stat Tracking** — persistent teams/rosters, games saved to cloud | Planned |
-| 3 | **Season Stats + Multi-Parent** — player checkout, admin corrections, leaderboards | In Progress |
+| 1 | **Supabase Foundation** — auth, cloud DB, RLS, migrations, auth UI | Done |
+| 2 | **Cloud Stat Tracking** — persistent teams/rosters, games saved to cloud | Done |
+| 3 | **Season Stats + Multi-Parent** — player checkout, admin corrections, leaderboards | Done |
 | 4 | **Capacitor + Polish** — native Android/iOS builds, push notifications, exports | Planned |
 | 5 | **Sports Engine** — API integration (deferred; requires developer access) | Deferred |
 
@@ -220,30 +227,34 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Game Summary: Primary vs All Submissions toggle and conflict indicator (averaged / multi-recorder) for finalized cloud games
 - [x] Admin: reassign primary recorder per player on Game Summary (finalized games; RPC `set_primary_recorder`)
 - [x] Admin: "Stats needing review" section for averaged / multi-recorder stats (Correct and Set primary recorder links)
+- [x] Manual home score adjustment — editable +/− on Scoreboard; persisted and cloud-synced (migration 015)
+- [x] Editable team names (name + nickname) from Teams page; editable player names (first, last, jersey, nickname) from Teams roster
+- [x] Editable opponent name from Games history (inline edit per game card)
+- [x] Tournaments as first-class entities — `tournaments` table (migration 016), team-scoped, tournament picker in Game Setup, games reference `tournament_id`
+- [x] Missed shots for basketball — attempt buttons on scoring cards; [−][A][+] UI; M/A (%) columns in Game Summary
+- [x] Minutes played — per-player minute counter for basketball (stat `min`; layout: Playmaking category)
+- [x] Game notes — free-text notes in Game Tracker and Game Summary; synced to cloud (migration 017)
+- [x] Delete editable entities — delete teams, players (hard delete), games, tournaments with confirmation dialogs; centralized Data Management section in Settings; cascading deletes via Supabase FK constraints
+- [x] Graceful fallbacks for optional DB columns (`home_score_adjustment`, `tournament_id`, `notes`, `last_opened_at`) — app works with any subset of migrations applied
+- [x] Bug fixes: leaderboard sorting/navigation, game stats review display, team list cleanup, finalize fallback, RLS policy caching (migration 013)
 
 ### What's Next
 
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
-- [ ] Per-sport stat refinements and additional stats
+- [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 
 ### Future Enhancements
 
 A backlog of ideas to iterate over:
 
 1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats). *Implemented: home score = computed from player stats + editable adjustment (+/− buttons on Scoreboard); adjustment persisted and synced (migration 015).*
-2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud.
-   - **Team names**: Edit primary team name (and nickname) from the Teams page; keep history when editing (update historical game records). Also support editing **opponent** team names from both Game Setup and Games history.
-   - **Player names**: Edit first name, last name, and jersey number from both the Teams roster and PlayerSetup; currently only nickname is editable.
-   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games). Design: [DESIGN_TOURNAMENTS.md](docs/DESIGN_TOURNAMENTS.md).
-4. **Minutes played, game notes, missed shots** — Extend stat tracking:
-   - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
-   - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).
-   - **Missed shots**: Per-player single counter with +/- buttons; only for sports that track shots (e.g., basketball, hockey).
+2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud. *Implemented: team name + nickname editable from Teams page; player first/last name, jersey number, nickname editable from Teams roster; opponent name editable from Games history (inline edit). Tournaments as first-class entity — `tournaments` table (migration 016) with team-scoped picker in Game Setup; games reference `tournament_id`. Design: [DESIGN_TOURNAMENTS.md](docs/DESIGN_TOURNAMENTS.md).*
+4. **Minutes played, game notes, missed shots** — Extend stat tracking. *Implemented: minutes played as per-player counter in basketball (stat `min`, Playmaking category); game notes with free-text field in Game Tracker and Game Summary, synced to cloud (migration 017); missed shots for basketball with [−][A][+] attempt buttons and M/A (%) columns in Game Summary.*
 5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding. *Implemented: delete teams, players (hard delete), games, and tournaments from the Teams page, Games page, Game Setup tournament picker, and a centralized Data Management section in Settings (Admin). All deletes show a confirmation dialog. Cascading deletes handled by Supabase FK constraints (`ON DELETE CASCADE`).*
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
 8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
-9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions).
+9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions). *Partially addressed by enhancement #5 (delete games individually from Games page and Data Management in Settings). Bulk actions and archive not yet implemented.*
 10. *(Add more as we go)*
 
 ### Known Issues
