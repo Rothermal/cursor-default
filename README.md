@@ -81,7 +81,8 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/014_set_primary_recorder.sql`
    - `supabase/migrations/015_home_score_adjustment.sql`
    - `supabase/migrations/016_tournaments.sql`
-   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`016` for Phase 3, RLS fixes, reassign primary, home score adjustment, and tournaments).
+   - `supabase/migrations/017_game_notes.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`017` for Phase 3, RLS fixes, reassign primary, home score adjustment, tournaments, and game notes).
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 

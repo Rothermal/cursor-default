@@ -44,23 +44,21 @@ export const sports: SportConfig[] = [
         id: 'playmaking',
         name: 'Playmaking',
         color: 'emerald',
+        columns: 2,
+        hideHeader: true,
         actions: [
           { id: 'ast', label: 'Assists', shortLabel: 'AST' },
           { id: 'stl', label: 'Steals', shortLabel: 'STL' },
-        ],
-      },
-      {
-        id: 'defense',
-        name: 'Defense',
-        color: 'violet',
-        actions: [
-          { id: 'blk', label: 'Blocks', shortLabel: 'BLK' },
+          { id: 'blk', label: 'Blocks', shortLabel: 'BLK', color: 'violet' },
+          { id: 'min', label: 'Minutes', shortLabel: 'MIN', color: 'teal' },
         ],
       },
       {
         id: 'other',
         name: 'Other',
         color: 'slate',
+        columns: 2,
+        hideHeader: true,
         actions: [
           { id: 'to', label: 'Turnovers', shortLabel: 'TO' },
           { id: 'pf', label: 'Fouls', shortLabel: 'PF' },

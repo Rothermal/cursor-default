@@ -19,6 +19,8 @@ export interface StatCategory {
   totalLabel?: string
   /** Override the auto grid-column count for the action grid in Game Tracker. */
   columns?: number
+  /** When true, suppress the section header in Game Tracker (card labels serve as identifiers). */
+  hideHeader?: boolean
 }
 
 export type StatColor = 'amber' | 'sky' | 'emerald' | 'violet' | 'rose' | 'slate' | 'orange' | 'red' | 'blue' | 'green' | 'indigo' | 'teal' | 'cyan' | 'pink'
@@ -73,6 +75,8 @@ export interface GameState {
   opponentScore: number
   /** Additive adjustment to home score (computed from player stats). Displayed home = computed + this. */
   homeScoreAdjustment: number
+  /** Free-text game notes entered during or after the game. */
+  notes: string
   actionLog: ActionLogEntry[]
   cloudSync: CloudSyncState
 }
@@ -108,6 +112,7 @@ export type GameAction =
   | { type: 'DECREMENT_OPPONENT_SCORE' }
   | { type: 'INCREMENT_HOME_SCORE' }
   | { type: 'DECREMENT_HOME_SCORE' }
+  | { type: 'SET_NOTES'; notes: string }
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }

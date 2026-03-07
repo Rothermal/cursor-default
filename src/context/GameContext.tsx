@@ -78,6 +78,7 @@ function createInitialState(status: CloudSyncStatus = 'idle'): GameState {
     activePlayerId: null,
     opponentScore: 0,
     homeScoreAdjustment: 0,
+    notes: '',
     actionLog: [],
     cloudSync: createInitialCloudSyncState(status),
   }
@@ -101,6 +102,7 @@ function buildSyncFingerprint(state: GameState): string {
     gameInfo: state.gameInfo,
     opponentScore: state.opponentScore,
     homeScoreAdjustment: state.homeScoreAdjustment,
+    notes: state.notes,
     players: state.players.map(player => ({
       id: player.id,
       name: player.name,
@@ -188,6 +190,7 @@ function buildHydratedStateFromCloudGame(
     activePlayerId: cloudGame.activePlayerId,
     opponentScore: cloudGame.opponentScore,
     homeScoreAdjustment: cloudGame.homeScoreAdjustment,
+    notes: cloudGame.notes,
     actionLog: [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
@@ -347,6 +350,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
 
+    case 'SET_NOTES':
+      return { ...state, notes: action.notes }
+
     case 'DECREMENT_HOME_SCORE': {
       if (state.homeScoreAdjustment <= 0) return state
       const logEntry: ActionLogEntry = {
@@ -424,6 +430,7 @@ function loadState(): GameState {
     ...createInitialState(restoredStatus),
     ...parsed,
     homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
+    notes: typeof parsed.notes === 'string' ? parsed.notes : '',
     players: Array.isArray(parsed.players) ? parsed.players : [],
     actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
     cloudSync: {

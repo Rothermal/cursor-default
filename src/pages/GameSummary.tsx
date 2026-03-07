@@ -806,6 +806,17 @@ export default function GameSummary() {
           )
         })}
 
+        {state.notes && (
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              Game Notes
+            </h3>
+            <div className="card bg-slate-50 text-sm text-slate-700 whitespace-pre-wrap">
+              {state.notes}
+            </div>
+          </div>
+        )}
+
         <div className="mt-8 space-y-3">
           {canFinalizeCloudGame && (
             <button
