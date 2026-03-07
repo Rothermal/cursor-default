@@ -60,6 +60,7 @@ const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
 
 function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyncState {
   return {
+    seasonId: null,
     teamId: null,
     gameId: null,
     gameStatus: null,
@@ -194,6 +195,7 @@ function buildHydratedStateFromCloudGame(
     actionLog: [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
+      seasonId: cloudGame.seasonId ?? null,
       teamId: cloudGame.teamId,
       gameId: cloudGame.gameId,
       gameStatus: cloudGame.status,
@@ -651,6 +653,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch({
           type: 'SET_CLOUD_SYNC_STATE',
           cloudSync: {
+            seasonId: synced.seasonId,
             teamId: synced.teamId,
             gameId: synced.gameId,
             gameStatus: 'in_progress',

@@ -89,6 +89,7 @@ export type CloudSyncStatus =
   | 'error'
 
 export interface CloudSyncState {
+  seasonId: string | null
   teamId: string | null
   gameId: string | null
   gameStatus: string | null
