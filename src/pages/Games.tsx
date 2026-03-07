@@ -62,6 +62,10 @@ export default function Games() {
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [editingGameId, setEditingGameId] = useState<string | null>(null)
+  const [editingOpponentName, setEditingOpponentName] = useState('')
+  const [savingOpponentName, setSavingOpponentName] = useState(false)
+
   useEffect(() => {
     if (!isConfigured || !userId || !supabaseClient) return
 
@@ -182,6 +186,36 @@ export default function Games() {
     navigate(cloudGame.status === 'final' ? '/summary' : '/game')
   }
 
+  const startEditOpponentName = (game: GameRow) => {
+    setEditingGameId(game.id)
+    setEditingOpponentName(game.opponent_name)
+  }
+
+  const cancelEditOpponentName = () => {
+    setEditingGameId(null)
+    setEditingOpponentName('')
+  }
+
+  const handleSaveOpponentName = async () => {
+    if (!supabaseClient || !editingGameId || !editingOpponentName.trim()) return
+    setError(null)
+    setSavingOpponentName(true)
+    const name = editingOpponentName.trim()
+    const { error: updateError } = await supabaseClient
+      .from('games')
+      .update({ opponent_name: name })
+      .eq('id', editingGameId)
+    setSavingOpponentName(false)
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    setGames(prev =>
+      prev.map(g => (g.id === editingGameId ? { ...g, opponent_name: name } : g))
+    )
+    cancelEditOpponentName()
+  }
+
   const renderGameCard = (game: GameRow) => {
     const team = teamMap[game.team_id]
     const sport = sports.find(item => item.id === team?.sport)
@@ -195,9 +229,44 @@ export default function Games() {
             {statusLabel(game.status)}
           </span>
         </div>
-        <p className="text-sm text-slate-600">
-          vs {game.opponent_name}
-        </p>
+        {editingGameId === game.id ? (
+          <div className="flex gap-2 items-center mt-1">
+            <span className="text-sm text-slate-500 shrink-0">vs</span>
+            <input
+              type="text"
+              value={editingOpponentName}
+              onChange={e => setEditingOpponentName(e.target.value)}
+              className="input-field flex-1 text-sm py-1"
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') void handleSaveOpponentName(); if (e.key === 'Escape') cancelEditOpponentName() }}
+            />
+            <button
+              onClick={() => { void handleSaveOpponentName() }}
+              disabled={savingOpponentName || !editingOpponentName.trim()}
+              className="btn-primary py-1 px-3 text-sm shrink-0"
+            >
+              {savingOpponentName ? '...' : 'Save'}
+            </button>
+            <button
+              onClick={cancelEditOpponentName}
+              className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600 shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 mt-1">
+            <p className="text-sm text-slate-600">vs {game.opponent_name}</p>
+            <button
+              onClick={() => startEditOpponentName(game)}
+              className="text-slate-300 hover:text-slate-500 transition-colors p-0.5"
+              title="Edit opponent name"
+              aria-label="Edit opponent name"
+            >
+              ✏️
+            </button>
+          </div>
+        )}
         <p className="text-xs text-slate-400 mt-1">
           {game.game_date}
         </p>

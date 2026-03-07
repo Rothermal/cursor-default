@@ -57,8 +57,12 @@ export default function Teams() {
   const [newPlayerNumber, setNewPlayerNumber] = useState('')
 
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
+  const [editingTeamName, setEditingTeamName] = useState('')
   const [editingTeamNickname, setEditingTeamNickname] = useState('')
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
+  const [editingPlayerFirst, setEditingPlayerFirst] = useState('')
+  const [editingPlayerLast, setEditingPlayerLast] = useState('')
+  const [editingPlayerNumber, setEditingPlayerNumber] = useState('')
   const [editingPlayerNickname, setEditingPlayerNickname] = useState('')
   const [savingNickname, setSavingNickname] = useState(false)
 
@@ -419,24 +423,27 @@ export default function Teams() {
     setPlayers(prev => prev.filter(player => player.id !== playerId))
   }
 
-  const startEditTeamNickname = (team: TeamRow) => {
+  const startEditTeam = (team: TeamRow) => {
     setEditingTeamId(team.id)
+    setEditingTeamName(team.name)
     setEditingTeamNickname(team.nickname?.trim() ?? '')
   }
 
-  const cancelEditTeamNickname = () => {
+  const cancelEditTeam = () => {
     setEditingTeamId(null)
+    setEditingTeamName('')
     setEditingTeamNickname('')
   }
 
-  const handleSaveTeamNickname = async () => {
-    if (!supabaseClient || !editingTeamId) return
+  const handleSaveTeam = async () => {
+    if (!supabaseClient || !editingTeamId || !editingTeamName.trim()) return
     setError(null)
     setSavingNickname(true)
-    const value = editingTeamNickname.trim() || null
+    const name = editingTeamName.trim()
+    const nickname = editingTeamNickname.trim() || null
     const { error: updateError } = await supabaseClient
       .from('teams')
-      .update({ nickname: value })
+      .update({ name, nickname })
       .eq('id', editingTeamId)
     setSavingNickname(false)
     if (updateError) {
@@ -444,29 +451,38 @@ export default function Teams() {
       return
     }
     setTeams(prev =>
-      prev.map(t => (t.id === editingTeamId ? { ...t, nickname: value } : t))
+      prev.map(t => (t.id === editingTeamId ? { ...t, name, nickname } : t))
     )
-    cancelEditTeamNickname()
+    cancelEditTeam()
   }
 
-  const startEditPlayerNickname = (player: PlayerRow) => {
+  const startEditPlayer = (player: PlayerRow) => {
     setEditingPlayerId(player.id)
+    setEditingPlayerFirst(player.first_name)
+    setEditingPlayerLast(player.last_name?.trim() ?? '')
+    setEditingPlayerNumber(player.jersey_number?.trim() ?? '')
     setEditingPlayerNickname(player.nickname?.trim() ?? '')
   }
 
-  const cancelEditPlayerNickname = () => {
+  const cancelEditPlayer = () => {
     setEditingPlayerId(null)
+    setEditingPlayerFirst('')
+    setEditingPlayerLast('')
+    setEditingPlayerNumber('')
     setEditingPlayerNickname('')
   }
 
-  const handleSavePlayerNickname = async () => {
-    if (!supabaseClient || !editingPlayerId) return
+  const handleSavePlayer = async () => {
+    if (!supabaseClient || !editingPlayerId || !editingPlayerFirst.trim()) return
     setError(null)
     setSavingNickname(true)
-    const value = editingPlayerNickname.trim() || null
+    const first_name = editingPlayerFirst.trim()
+    const last_name = editingPlayerLast.trim() || null
+    const jersey_number = editingPlayerNumber.trim() || null
+    const nickname = editingPlayerNickname.trim() || null
     const { error: updateError } = await supabaseClient
       .from('players')
-      .update({ nickname: value })
+      .update({ first_name, last_name, jersey_number, nickname })
       .eq('id', editingPlayerId)
     setSavingNickname(false)
     if (updateError) {
@@ -474,9 +490,13 @@ export default function Teams() {
       return
     }
     setPlayers(prev =>
-      prev.map(p => (p.id === editingPlayerId ? { ...p, nickname: value } : p))
+      prev.map(p =>
+        p.id === editingPlayerId
+          ? { ...p, first_name, last_name, jersey_number, nickname }
+          : p
+      )
     )
-    cancelEditPlayerNickname()
+    cancelEditPlayer()
   }
 
   return (
@@ -599,26 +619,39 @@ export default function Teams() {
                   >
                     {isEditing ? (
                       <div className="flex flex-col gap-2">
-                        <input
-                          type="text"
-                          value={editingTeamNickname}
-                          onChange={e => setEditingTeamNickname(e.target.value)}
-                          placeholder={`Display name (optional, default: ${team.name})`}
-                          className="input-field text-sm"
-                          autoFocus
-                        />
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Team name *</label>
+                          <input
+                            type="text"
+                            value={editingTeamName}
+                            onChange={e => setEditingTeamName(e.target.value)}
+                            placeholder="Team name"
+                            className="input-field text-sm"
+                            autoFocus
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Display name (optional)</label>
+                          <input
+                            type="text"
+                            value={editingTeamNickname}
+                            onChange={e => setEditingTeamNickname(e.target.value)}
+                            placeholder="Short nickname override"
+                            className="input-field text-sm"
+                          />
+                        </div>
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => { void handleSaveTeamNickname() }}
-                            disabled={savingNickname}
+                            onClick={() => { void handleSaveTeam() }}
+                            disabled={savingNickname || !editingTeamName.trim()}
                             className="btn-primary flex-1 text-sm py-1"
                           >
                             {savingNickname ? 'Saving...' : 'Save'}
                           </button>
                           <button
                             type="button"
-                            onClick={cancelEditTeamNickname}
+                            onClick={cancelEditTeam}
                             className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600"
                           >
                             Cancel
@@ -646,10 +679,10 @@ export default function Teams() {
                         </button>
                         <button
                           type="button"
-                          onClick={e => { e.stopPropagation(); startEditTeamNickname(team) }}
+                          onClick={e => { e.stopPropagation(); startEditTeam(team) }}
                           className="text-slate-400 hover:text-slate-600 p-1 shrink-0"
-                          title="Edit display name"
-                          aria-label="Edit display name"
+                          title="Edit team name"
+                          aria-label="Edit team name"
                         >
                           ✏️
                         </button>
@@ -727,26 +760,49 @@ export default function Teams() {
                       <div key={player.id} className="border border-slate-100 rounded-xl px-3 py-2">
                         {isEditing ? (
                           <div className="flex flex-col gap-2">
+                            <div className="grid grid-cols-12 gap-2">
+                              <input
+                                type="text"
+                                value={editingPlayerNumber}
+                                onChange={e => setEditingPlayerNumber(e.target.value)}
+                                placeholder="#"
+                                className="input-field col-span-2 text-center text-sm"
+                                autoFocus
+                              />
+                              <input
+                                type="text"
+                                value={editingPlayerFirst}
+                                onChange={e => setEditingPlayerFirst(e.target.value)}
+                                placeholder="First name *"
+                                className="input-field col-span-5 text-sm"
+                              />
+                              <input
+                                type="text"
+                                value={editingPlayerLast}
+                                onChange={e => setEditingPlayerLast(e.target.value)}
+                                placeholder="Last name"
+                                className="input-field col-span-5 text-sm"
+                              />
+                            </div>
                             <input
                               type="text"
                               value={editingPlayerNickname}
                               onChange={e => setEditingPlayerNickname(e.target.value)}
-                              placeholder={`Display name (optional)`}
+                              placeholder="Display name (optional)"
                               className="input-field text-sm"
-                              autoFocus
                             />
                             <div className="flex gap-2">
                               <button
                                 type="button"
-                                onClick={() => { void handleSavePlayerNickname() }}
-                                disabled={savingNickname}
+                                onClick={() => { void handleSavePlayer() }}
+                                disabled={savingNickname || !editingPlayerFirst.trim()}
                                 className="btn-primary flex-1 text-sm py-1"
                               >
                                 {savingNickname ? 'Saving...' : 'Save'}
                               </button>
                               <button
                                 type="button"
-                                onClick={cancelEditPlayerNickname}
+                                onClick={cancelEditPlayer}
                                 className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600"
                               >
                                 Cancel
@@ -771,10 +827,10 @@ export default function Teams() {
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
-                                onClick={() => startEditPlayerNickname(player)}
+                                onClick={() => startEditPlayer(player)}
                                 className="text-slate-400 hover:text-slate-600 p-1"
-                                title="Edit display name"
-                                aria-label="Edit display name"
+                                title="Edit player"
+                                aria-label="Edit player"
                               >
                                 ✏️
                               </button>

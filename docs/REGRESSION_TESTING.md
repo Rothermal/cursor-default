@@ -59,8 +59,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.1 | Home → Teams | Cloud Teams page; Create Team form |
 | 4.2 | Create team (name, sport, season) | Team appears in list; selected |
 | 4.3 | Add players (number, first, last) | Players appear in Roster |
-| 4.4 | Edit team nickname (pencil) | Save; display name updates |
-| 4.5 | Edit player nickname | Save; display name updates |
+| 4.4 | Edit team name (pencil) → change primary name → Save | Team name updates in list; reflected in Game Setup dropdown and Games page |
+| 4.4b | Edit team nickname (pencil) → set or clear display name → Save | If set: display name shown in list with primary name in parens; if cleared: primary name shown directly |
+| 4.5 | Edit player (pencil) → change first name, last name, jersey number → Save | Player row updates with new values; reflected in cloud roster |
+| 4.5b | Edit player nickname | Display name updates; primary name shown in parentheses if nickname set |
 | 4.6 | Remove player | Player removed from roster (soft deactivate) |
 | 4.7 | Season Stats link (when team selected) | Navigate to Leaderboard with that team pre-selected |
 | 4.8 | Reload → Teams | Same teams and roster (from Supabase) |
@@ -101,6 +103,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 6.7 | Game Summary → Finalize Game (if available) | Game status → Final |
 | 6.8 | Cloud Games → open finalized game | View Summary (read-only) |
 | 6.9 | Second device/session: sign in → Cloud Games | Same game list; resume same game if in progress |
+| 6.10 | Cloud Games → tap ✏️ next to opponent name on any game card | Inline input appears; type new name → Save | Opponent name updates on card; persists after reload |
+| 6.11 | Cloud Games → Edit opponent name → press Escape or ✕ | Edit cancelled; original name restored |
 
 ---
 
