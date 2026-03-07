@@ -145,6 +145,7 @@ src/
 │   ├── PlayerProfile.tsx  # Player season totals and game log
 │   └── Admin.tsx          # Settings — enable/disable sports
 ├── components/
+│   ├── ConfirmDialog.tsx  # Reusable confirmation modal (delete prompts)
 │   ├── Scoreboard.tsx     # Live score display
 │   └── StatButton.tsx     # Reusable stat increment/decrement button
 ├── types.ts               # TypeScript interfaces
@@ -238,7 +239,7 @@ A backlog of ideas to iterate over:
    - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
    - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).
    - **Missed shots**: Per-player single counter with +/- buttons; only for sports that track shots (e.g., basketball, hockey).
-5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding.
+5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding. *Implemented: delete teams, players (hard delete), games, and tournaments from the Teams page, Games page, Game Setup tournament picker, and a centralized Data Management section in Settings (Admin). All deletes show a confirmation dialog. Cascading deletes handled by Supabase FK constraints (`ON DELETE CASCADE`).*
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
 8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
