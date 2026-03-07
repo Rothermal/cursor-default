@@ -302,10 +302,13 @@ ALTER TABLE public.players DROP COLUMN IF EXISTS position;
 ALTER TABLE public.players DROP COLUMN IF EXISTS is_active;
 
 -- --------------------------------------------------------------------------
--- 10. Display views for Supabase admin browsing
+-- 10. Display views for Supabase admin browsing (SECURITY INVOKER)
 -- --------------------------------------------------------------------------
+-- All views use security_invoker = true so they run with the caller's
+-- privileges and RLS applies correctly (not the view owner's).
 
-CREATE OR REPLACE VIEW public.seasons_display AS
+DROP VIEW IF EXISTS public.seasons_display;
+CREATE VIEW public.seasons_display WITH (security_invoker = true) AS
 SELECT
   s.id,
   s.name AS season_name,
@@ -318,7 +321,8 @@ SELECT
 FROM public.seasons s
 LEFT JOIN public.profiles p ON p.id = s.owner_id;
 
-CREATE OR REPLACE VIEW public.teams_display AS
+DROP VIEW IF EXISTS public.teams_display;
+CREATE VIEW public.teams_display WITH (security_invoker = true) AS
 SELECT
   t.id,
   t.season_id,
@@ -333,7 +337,8 @@ FROM public.teams t
 LEFT JOIN public.seasons s ON s.id = t.season_id
 LEFT JOIN public.profiles p ON p.id = t.owner_id;
 
-CREATE OR REPLACE VIEW public.players_display AS
+DROP VIEW IF EXISTS public.players_display;
+CREATE VIEW public.players_display WITH (security_invoker = true) AS
 SELECT
   pl.id,
   pl.first_name,
@@ -346,7 +351,8 @@ SELECT
 FROM public.players pl
 LEFT JOIN public.profiles p ON p.id = pl.created_by;
 
-CREATE OR REPLACE VIEW public.team_players_display AS
+DROP VIEW IF EXISTS public.team_players_display;
+CREATE VIEW public.team_players_display WITH (security_invoker = true) AS
 SELECT
   tp.id,
   tp.team_id,
@@ -363,7 +369,8 @@ JOIN public.teams t ON t.id = tp.team_id
 LEFT JOIN public.seasons s ON s.id = t.season_id
 JOIN public.players pl ON pl.id = tp.player_id;
 
-CREATE OR REPLACE VIEW public.player_guardians_display AS
+DROP VIEW IF EXISTS public.player_guardians_display;
+CREATE VIEW public.player_guardians_display WITH (security_invoker = true) AS
 SELECT
   pg.id,
   pg.player_id,
@@ -376,7 +383,8 @@ FROM public.player_guardians pg
 JOIN public.players pl ON pl.id = pg.player_id
 LEFT JOIN public.profiles p ON p.id = pg.user_id;
 
-CREATE OR REPLACE VIEW public.games_display AS
+DROP VIEW IF EXISTS public.games_display;
+CREATE VIEW public.games_display WITH (security_invoker = true) AS
 SELECT
   g.id,
   g.team_id,
@@ -399,7 +407,8 @@ LEFT JOIN public.seasons s ON s.id = t.season_id
 LEFT JOIN public.tournaments tour ON tour.id = g.tournament_id
 LEFT JOIN public.profiles p ON p.id = g.created_by;
 
-CREATE OR REPLACE VIEW public.game_stats_display AS
+DROP VIEW IF EXISTS public.game_stats_display;
+CREATE VIEW public.game_stats_display WITH (security_invoker = true) AS
 SELECT
   gs.id,
   gs.game_id,
@@ -419,7 +428,8 @@ LEFT JOIN public.teams t ON t.id = g.team_id
 JOIN public.players pl ON pl.id = gs.player_id
 LEFT JOIN public.profiles p ON p.id = gs.recorded_by;
 
-CREATE OR REPLACE VIEW public.tournaments_display AS
+DROP VIEW IF EXISTS public.tournaments_display;
+CREATE VIEW public.tournaments_display WITH (security_invoker = true) AS
 SELECT
   tour.id,
   tour.team_id,
@@ -432,7 +442,8 @@ FROM public.tournaments tour
 JOIN public.teams t ON t.id = tour.team_id
 LEFT JOIN public.seasons s ON s.id = t.season_id;
 
-CREATE OR REPLACE VIEW public.team_members_display AS
+DROP VIEW IF EXISTS public.team_members_display;
+CREATE VIEW public.team_members_display WITH (security_invoker = true) AS
 SELECT
   tm.id,
   tm.team_id,
