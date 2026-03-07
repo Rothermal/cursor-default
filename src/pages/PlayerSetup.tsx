@@ -48,11 +48,11 @@ export default function PlayerSetup() {
       setRosterLoading(true)
       setRosterError(null)
       const { data, error } = await supabase!
-        .from('players')
-        .select('id,first_name,last_name,jersey_number')
+        .from('team_players')
+        .select('player_id, jersey_number, players!inner(id, first_name, last_name)')
         .eq('team_id', cloudTeamId)
         .eq('is_active', true)
-        .order('created_at', { ascending: true })
+        .order('joined_at', { ascending: true })
 
       if (cancelled) return
       if (error) {
@@ -61,10 +61,11 @@ export default function PlayerSetup() {
         return
       }
 
-      const loadedPlayers = (data ?? []).map(row => ({
-        id: row.id as string,
-        name: `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim(),
-        number: (row.jersey_number as string | null) ?? '',
+      type RosterRow = { player_id: string; jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null } }
+      const loadedPlayers = ((data ?? []) as unknown as RosterRow[]).map(row => ({
+        id: row.player_id,
+        name: `${row.players.first_name ?? ''} ${row.players.last_name ?? ''}`.trim(),
+        number: row.jersey_number ?? '',
         stats: {},
       }))
 
@@ -100,28 +101,48 @@ export default function PlayerSetup() {
 
     setRosterError(null)
     let playerId = generateLocalId()
-    if (isCloudRoster && cloudTeamId) {
+    if (isCloudRoster && cloudTeamId && user) {
       setSaving(true)
       const { firstName, lastName } = splitName(name)
-      const { data, error } = await supabase!
+
+      const { data: playerData, error: playerError } = await supabase!
         .from('players')
         .insert({
-          team_id: cloudTeamId,
           first_name: firstName,
           last_name: lastName || null,
-          jersey_number: number.trim() || null,
-          is_active: true,
+          created_by: user.id,
         })
         .select('id')
         .single()
 
-      setSaving(false)
-      if (error || !data) {
-        setRosterError(error?.message ?? 'Could not save player')
+      if (playerError || !playerData) {
+        setSaving(false)
+        setRosterError(playerError?.message ?? 'Could not save player')
         return
       }
 
-      playerId = data.id as string
+      playerId = playerData.id as string
+
+      const { error: rosterError } = await supabase!
+        .from('team_players')
+        .upsert(
+          { team_id: cloudTeamId, player_id: playerId, jersey_number: number.trim() || null, is_active: true },
+          { onConflict: 'team_id,player_id' }
+        )
+
+      setSaving(false)
+      if (rosterError) {
+        setRosterError(rosterError.message)
+        return
+      }
+
+      await supabase!
+        .from('player_guardians')
+        .upsert(
+          { player_id: playerId, user_id: user.id, relationship: 'parent' },
+          { onConflict: 'player_id,user_id' }
+        )
+
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
@@ -152,13 +173,14 @@ export default function PlayerSetup() {
 
   const handleRemovePlayer = async (playerId: string) => {
     setRosterError(null)
-    if (isCloudRoster) {
+    if (isCloudRoster && cloudTeamId) {
       const remotePlayerId = state.cloudSync.playerIdMap[playerId] ?? playerId
       setSaving(true)
       const { error } = await supabase!
-        .from('players')
+        .from('team_players')
         .update({ is_active: false })
-        .eq('id', remotePlayerId)
+        .eq('team_id', cloudTeamId)
+        .eq('player_id', remotePlayerId)
       setSaving(false)
       if (error) {
         setRosterError(error.message)
