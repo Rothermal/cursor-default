@@ -43,6 +43,13 @@ Stats
 │     └── Team Season Summary (/team-stats?teamId=)
 │           Aggregated team totals for a season
 │           Per-game team stat lines
+│           Tournament list with W/L and placement
+│
+├── Tournament Stats (/tournament-stats?tournamentId=&teamId=)
+│     W/L record and placement (user-entered: 1st, 2nd, etc.)
+│     Tournament-scoped team totals
+│     Tournament leaderboard (per-player)
+│     Game list within the tournament
 │
 └── Game Stats
       ├── Player Game Stats (within Game Summary)
@@ -321,6 +328,13 @@ $$ LANGUAGE sql STABLE SECURITY INVOKER;
 │                                              │
 │  ──────────────────────────────────────────  │
 │                                              │
+│  Tournaments                                 │
+│                                              │
+│  🏆 Spring Invitational        4-1  🥈 2nd   │
+│  🏆 March Madness Qualifier    3-0  🥇 1st   │
+│                                              │
+│  ──────────────────────────────────────────  │
+│                                              │
 │  Game-by-Game                                │
 │                                              │
 │  Mar 5 vs Tigers           W 62-54           │
@@ -337,6 +351,7 @@ $$ LANGUAGE sql STABLE SECURITY INVOKER;
 - **Win/Loss record:** Computed client-side from games where `status = 'final'`. Compare team score (sum of player scoring stats + home_score_adjustment) vs opponent_score.
 - **Team season totals:** Sum all players' resolved stats across all finalized games. Can reuse `get_season_stats_resolved` and aggregate across players.
 - **Per-opponent breakdown:** Group finalized games by `opponent_name`, compute W/L and total PTS/OPP.
+- **Tournament list:** Query `tournaments` for the team; compute per-tournament W/L from games where `tournament_id` matches; show `tournaments.placement` (if set). Each row links to Tournament Stats page.
 - **Game-by-game:** List of finalized games with team totals per game.
 
 #### New RPC (optional)
@@ -375,7 +390,115 @@ $$ LANGUAGE sql STABLE SECURITY INVOKER;
 
 ---
 
-### 3.5 Game Summary — Player vs Team Split (UPDATED)
+### 3.5 Tournament Stats — NEW PAGE
+
+**Route:** `/tournament-stats?tournamentId=&teamId=`
+
+**Purpose:** W/L record and placement for a specific tournament. Shows how the team performed within that tournament, independent of the broader season.
+
+#### Layout
+
+```
+┌──────────────────────────────────────────────┐
+│  ← Tournament Stats                         │
+│  🏆 Spring Invitational                      │
+│  Rebels b7c gray · Spring League 2026        │
+├──────────────────────────────────────────────┤
+│                                              │
+│  Record & Placement                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐    │
+│  │ 4 W      │ │ 1 L      │ │ 🥈 2nd   │    │
+│  │ .800     │ │ 5 games  │ │ Placement │    │
+│  └──────────┘ └──────────┘ └──────────┘    │
+│                                              │
+│  Tournament Team Totals                      │
+│  ┌────────┐ ┌────────┐ ┌────────┐           │
+│  │ PTS    │ │ REB    │ │ AST    │           │
+│  │ 310    │ │ 135    │ │ 58     │           │
+│  │ 62.0/g │ │ 27.0/g │ │ 11.6/g │           │
+│  └────────┘ └────────┘ └────────┘           │
+│                                              │
+│  ──────────────────────────────────────────  │
+│                                              │
+│  Tournament Leaderboard                      │
+│  1. #23 Michael Jordan   82 PTS  5 GP        │
+│  2. #11 Steve Nash       71 PTS  5 GP        │
+│  3. #33 Larry Bird       63 PTS  4 GP        │
+│                                              │
+│  ──────────────────────────────────────────  │
+│                                              │
+│  Games                                       │
+│                                              │
+│  Mar 8 vs Tigers (Final)       W 62-54       │
+│  Mar 8 vs Bears (Semi)         W 58-50       │
+│  Mar 7 vs Lions (Pool)         W 55-48       │
+│  Mar 7 vs Hawks (Pool)         L 49-52       │
+│  Mar 7 vs Wolves (Pool)        W 64-51       │
+│                                              │
+└──────────────────────────────────────────────┘
+```
+
+#### Placement
+
+Placement (1st, 2nd, 3rd, etc.) is **user-entered**, not auto-computed. Tournaments have varied bracket formats that can't be reliably inferred from game results alone.
+
+**Schema change:** Add `placement` column to `tournaments` table:
+
+```sql
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS placement int;
+```
+
+- Nullable. NULL = no placement recorded yet.
+- The user sets placement from the Tournament Stats page or from a tournament management section.
+- Display: medal emoji for top 3 (🥇 1st, 🥈 2nd, 🥉 3rd), plain ordinal for 4th+.
+
+#### Data Sources
+
+- **W/L record:** Filter games by `tournament_id`, compute team score vs opponent score for each finalized game (same logic as Team Season Summary).
+- **Tournament team totals:** Sum all players' resolved stats across tournament games.
+- **Tournament leaderboard:** Per-player totals scoped to tournament games, ranked by score.
+- **Placement:** `tournaments.placement` column.
+
+#### RPC
+
+```sql
+CREATE OR REPLACE FUNCTION get_tournament_stats_resolved(p_tournament_id uuid)
+RETURNS TABLE (
+  player_id uuid,
+  stat_id text,
+  games_played bigint,
+  total bigint,
+  per_game_avg numeric,
+  tournament_high int
+) AS $$
+  WITH game_resolved AS (
+    SELECT g.id AS game_id, r.player_id, r.stat_id, r.value
+    FROM games g
+    CROSS JOIN LATERAL get_game_stats_resolved(g.id) r
+    WHERE g.tournament_id = p_tournament_id
+      AND g.status = 'final'
+  )
+  SELECT
+    player_id,
+    stat_id,
+    COUNT(DISTINCT game_id) AS games_played,
+    SUM(value) AS total,
+    ROUND(AVG(value), 1) AS per_game_avg,
+    MAX(value)::int AS tournament_high
+  FROM game_resolved
+  GROUP BY player_id, stat_id;
+$$ LANGUAGE sql STABLE SECURITY INVOKER;
+```
+
+#### Entry Points
+
+- Team Season Summary → tournament list with "View" links
+- Games page → tournament filter → "Tournament Stats" link
+- Game Setup → tournament dropdown → secondary action
+
+---
+
+### 3.6 Game Summary — Player vs Team Split (UPDATED)
 
 **Route:** `/summary` (existing)
 
@@ -427,6 +550,7 @@ Home (SportSelect)
   │     │     ├── Career Stats (/career)
   │     │     └── View Game → Game Summary (/summary)
   │     └── Team Season Summary (/team-stats)
+  │           └── Tournament Stats (/tournament-stats)
   │
   ├── Game Tracker (/game) → Game Summary (/summary)
   │     └── Players / Team tab toggle
@@ -441,6 +565,7 @@ New navigation links to add:
 | Leaderboard | Team Season Summary | "Team Stats →" button |
 | Player Profile | Career Stats | "Career →" button in header |
 | Teams page (roster) | Career Stats | Career link per player |
+| Team Season Summary | Tournament Stats | Tournament row in tournament list |
 | Game Summary | (existing) Players/Team toggle | Tab buttons |
 | Home (SportSelect) | Leaderboard | Existing "Season Stats" link |
 
@@ -454,6 +579,7 @@ New navigation links to add:
 | `/player` | Player Season Profile | Updated |
 | `/career` | Career Stats | **New** |
 | `/team-stats` | Team Season Summary | **New** |
+| `/tournament-stats` | Tournament Stats | **New** |
 | `/summary` | Game Summary | Updated |
 
 ---
@@ -465,6 +591,7 @@ New navigation links to add:
 | `get_career_stats_resolved` | Career stats grouped by season/team | `p_player_id` |
 | `get_player_game_log` | Per-game stat lines for one player on a team | `p_player_id`, `p_team_id` |
 | `get_team_game_log` | Per-game team totals for a team's season | `p_team_id` |
+| `get_tournament_stats_resolved` | Per-player stats scoped to a tournament | `p_tournament_id` |
 
 Existing RPCs unchanged:
 - `get_game_stats_resolved(p_game_id)` — per-game resolved stats
@@ -476,14 +603,15 @@ Existing RPCs unchanged:
 
 | Phase | What | Depends On |
 |-------|------|------------|
-| **1. RPCs** | Create `get_career_stats_resolved`, `get_player_game_log`, `get_team_game_log` migration | Seasons schema (DESIGN_SEASONS_DATA_MODEL Phase 1) |
+| **1. RPCs** | Create `get_career_stats_resolved`, `get_player_game_log`, `get_team_game_log`, `get_tournament_stats_resolved` migration; add `tournaments.placement` column | Seasons schema (DESIGN_SEASONS_DATA_MODEL Phase 1) |
 | **2. Season Scoping** | Add season selector to Leaderboard; filter teams by season | Seasons schema |
 | **3. Player Profile Update** | Inline game stat lines in game log; "Career →" link; season context label | Phase 1 RPCs |
-| **4. Career Stats Page** | New `/career` route and page; career totals + per-season breakdown | Phase 1 RPCs |
-| **5. Team Season Summary** | New `/team-stats` route and page; W/L record, team totals, game-by-game | Phase 1 RPCs |
-| **6. Game Summary Split** | Players/Team tab toggle on Game Summary | No dependencies |
+| **4. Career Stats Page** | New `/career` route and page; career totals + per-season breakdown; sport selector | Phase 1 RPCs |
+| **5. Team Season Summary** | New `/team-stats` route and page; W/L record, team totals, game-by-game, tournament list with W/L and placement | Phase 1 RPCs |
+| **6. Tournament Stats Page** | New `/tournament-stats` route and page; tournament W/L, placement badge, tournament leaderboard, game list | Phase 1 RPCs, Phase 5 |
+| **7. Game Summary Split** | Players/Team tab toggle on Game Summary | No dependencies |
 
-Phase 6 (Game Summary split) has no backend dependencies and can be done in parallel with other phases.
+Phase 7 (Game Summary split) has no backend dependencies and can be done in parallel with other phases.
 
 ---
 
@@ -500,6 +628,7 @@ Consistent stat display patterns across all pages:
 | Shooting | `M/A (pct%)` | `12/15 (80%)` |
 | Win/Loss | `W` or `L` + scores | `W 62-54` |
 | Plus/minus | signed number | `+8` |
+| Placement | medal emoji for top 3, ordinal for 4th+ | `🥇 1st`, `🥈 2nd`, `🥉 3rd`, `4th` |
 | Compact stat line | `stat value` joined by ` · ` | `18 PTS · 6 REB · 3 AST` |
 
 ### Key Stats for Compact Lines
@@ -514,15 +643,15 @@ This could be configured per sport in `sports.ts` as a new `SportConfig.keyStats
 
 ---
 
-## 9. Open Questions
+## 9. Resolved Decisions
 
-1. **Career stats across sports.** If a player plays basketball in one season and soccer in another, the career page needs to handle multi-sport display. Recommendation: group by sport, show separate stat grids per sport section. Or keep it simple and show one sport at a time with a sport selector.
+1. **Career stats across sports** — **Sport selector.** When a player has stats in multiple sports, the career page shows a sport picker at the top. One sport at a time; each sport gets its own stat grid and per-season breakdown.
 
-2. **Performance of `LATERAL` joins.** The career and game-log RPCs use `CROSS JOIN LATERAL get_game_stats_resolved(g.id)` which calls the resolved RPC once per game. For a player with 100+ games, this could be slow. Monitor and optimize with materialized views or a dedicated stats cache table if needed.
+2. **Performance of `LATERAL` joins** — **Monitor and optimize.** Start with the RPC approach. If performance degrades at scale (100+ games per player), introduce a materialized stats cache or pre-computed career_stats table.
 
-3. **Offline career stats.** Career stats require cloud data (multiple seasons/teams). In offline mode, career stats page should show a "cloud required" message. Season stats for the current local game can still work offline.
+3. **Offline career stats** — **"Cloud required" message.** Career stats page shows a clear message that cloud is needed. Season/game stats for the current local game continue to work offline.
 
-4. **Team Season Summary — W/L computation.** Win/loss requires knowing the team's score per game. For resolved stats, the team score = sum of all player scoring stats + `home_score_adjustment`. This computation already exists in Game Summary (`computePlayerScore`). Reuse it.
+4. **Team Season Summary — W/L computation.** Reuse existing `computePlayerScore` logic. Team score = sum of all player scoring stats + `home_score_adjustment` per game.
 
 ---
 
