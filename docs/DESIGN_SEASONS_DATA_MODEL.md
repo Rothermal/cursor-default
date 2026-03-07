@@ -50,11 +50,19 @@ profiles ──┐
             │           ├── tournaments (team_id, name)
             │           └── team_members (team_id, user_id, role)
             │
-            ├── players (owner_id, first_name, last_name, nickname)
-            │     └── team_players ──→ (links back to teams)
+            ├── players (created_by, first_name, last_name, nickname)
+            │     ├── team_players ──→ (links back to teams)
+            │     └── player_guardians (player_id, user_id) ──→ (links to profiles)
             │
             └── game_stats (game_id, player_id, recorded_by, stat_id, value)
 ```
+
+**Key relationships:**
+- A **season** owns teams. A **team** exists for exactly one season.
+- A **player** is a person record, created by one user but shared across teams/seasons.
+- **`player_guardians`** links players to their parents/guardians. Any guardian can manage the player, add them to future teams, and track their stats. The season owner might create all the players, then parents claim their kids as guardians.
+- **`team_players`** links players to teams (roster). A player can be on many teams across many seasons.
+- **Stat tracking stays fluid** — any team member can track stats for any player on the team (existing `game_stats.recorded_by` + `player_checkouts` system). Guardianship is about player management, not stat tracking lockout.
 
 ### 3.2 New Table: `seasons`
 
@@ -77,7 +85,7 @@ profiles ──┐
 |--------|--------|-------|
 | `season_id` | **ADD** uuid FK → seasons | NOT NULL, ON DELETE CASCADE |
 | `season` | **DROP** text | Replaced by `season_id → seasons.name` |
-| `sport` | **DROP** | Inherited from `seasons.sport` (or keep for denormalized convenience — see open questions) |
+| `sport` | **DROP** text | Inherited from `seasons.sport` — no denormalization needed since teams always load in a season context |
 
 Teams become children of seasons. Deleting a season cascades to all its teams (and through existing FKs, to games, tournaments, stats, etc.).
 
@@ -89,9 +97,11 @@ Teams become children of seasons. Deleting a season cascades to all its teams (a
 | `jersey_number` | **MOVE** → `team_players` | Jersey number is per-team |
 | `position` | **MOVE** → `team_players` | Position can change per team |
 | `is_active` | **MOVE** → `team_players` | Active status is per-team |
-| `owner_id` | **ADD** uuid FK → profiles | NOT NULL, ON DELETE CASCADE — who created this player record |
+| `created_by` | **ADD** uuid FK → profiles | NOT NULL — who created this player record (not exclusive ownership) |
 
 Players become standalone "person" records. A player's identity (name, nickname) is stable; their team membership, jersey number, and active status are tracked per-team in the junction table.
+
+`created_by` tracks who initially created the player record, but does **not** imply exclusive ownership. Guardians (via `player_guardians`) can also manage the player. This supports the common scenario where a season owner/coach creates all the players, and then individual parents claim their own kids as guardians.
 
 ### 3.5 New Table: `team_players` (Junction)
 
@@ -109,7 +119,32 @@ Players become standalone "person" records. A player's identity (name, nickname)
 - When a player "moves teams," they get a new row in `team_players` for the new team. The old row stays (historical record).
 - `is_active` can be set to false to remove a player from the active roster without losing the link.
 
-### 3.6 Unchanged Tables
+### 3.6 New Table: `player_guardians` (Junction)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `player_id` | uuid FK → players | NOT NULL, ON DELETE CASCADE |
+| `user_id` | uuid FK → profiles | NOT NULL, ON DELETE CASCADE |
+| `relationship` | text | NOT NULL DEFAULT 'parent' — e.g., 'parent', 'guardian', 'self' |
+| `created_at` | timestamptz | NOT NULL DEFAULT now() |
+
+- UNIQUE(`player_id`, `user_id`) — a user is linked to a player at most once.
+- Links a player to their parent(s)/guardian(s). Any guardian can:
+  - Edit the player's name/nickname
+  - See the player in their "player pool" when building rosters for new teams
+  - Add the player to teams they manage
+- The player's `created_by` user is implicitly a guardian (auto-inserted on player creation).
+- **Does NOT affect stat tracking.** Any team member can track stats for any player on the team — that's handled by `game_stats.recorded_by` and `player_checkouts`. Guardianship is about player identity management and roster building, not stat access.
+
+**Typical flow:**
+1. Coach/season owner creates a team and adds all players → `created_by` = coach for all players
+2. Coach shares the team via invites (`team_members`) → parents join as scorers/admins
+3. A parent "claims" their child → `player_guardians` row created (parent → player)
+4. Next season, that parent creates a new team and can find their child in their player pool (via guardianship)
+5. Both the original creator and the guardian can edit the player's name if needed
+
+### 3.7 Unchanged Tables
 
 | Table | Notes |
 |-------|-------|
@@ -125,17 +160,18 @@ Players become standalone "person" records. A player's identity (name, nickname)
 ## 4. Cascade Rules
 
 ```
-seasons  →  teams       (ON DELETE CASCADE)
-teams    →  team_players (ON DELETE CASCADE)
-teams    →  games        (ON DELETE CASCADE) — existing
-teams    →  tournaments  (ON DELETE CASCADE) — existing
-teams    →  team_members (ON DELETE CASCADE) — existing
-players  →  team_players (ON DELETE CASCADE)
-players  →  game_stats   (ON DELETE CASCADE) — existing
-games    →  game_stats   (ON DELETE CASCADE) — existing
+seasons  →  teams              (ON DELETE CASCADE)
+teams    →  team_players       (ON DELETE CASCADE)
+teams    →  games              (ON DELETE CASCADE) — existing
+teams    →  tournaments        (ON DELETE CASCADE) — existing
+teams    →  team_members       (ON DELETE CASCADE) — existing
+players  →  team_players       (ON DELETE CASCADE)
+players  →  player_guardians   (ON DELETE CASCADE)
+players  →  game_stats         (ON DELETE CASCADE) — existing
+games    →  game_stats         (ON DELETE CASCADE) — existing
 ```
 
-Deleting a season wipes everything under it. Deleting a player removes them from all rosters and their stats. This matches existing behavior — just adds the new season and junction layers.
+Deleting a season wipes everything under it. Deleting a player removes them from all rosters, guardian links, and their stats. This matches existing behavior — just adds the new season, junction, and guardian layers.
 
 ---
 
@@ -165,13 +201,16 @@ CREATE POLICY "seasons_delete" ON seasons
   FOR DELETE USING (owner_id = (SELECT auth.uid()));
 ```
 
-### 5.2 Players (modified — now owner-based instead of team-based)
+### 5.2 Players (modified — creator + guardian + team-member visibility)
 
 ```sql
--- Players visible to their owner and to members of any team the player is on
+-- Players visible to: creator, guardians, or members of any team the player is on
 CREATE POLICY "players_select" ON players
   FOR SELECT USING (
-    owner_id = (SELECT auth.uid())
+    created_by = (SELECT auth.uid())
+    OR id IN (
+      SELECT player_id FROM player_guardians WHERE user_id = (SELECT auth.uid())
+    )
     OR id IN (
       SELECT tp.player_id FROM team_players tp
       JOIN team_members tm ON tm.team_id = tp.team_id
@@ -179,17 +218,53 @@ CREATE POLICY "players_select" ON players
     )
   );
 
+-- Anyone can create a player (they become the created_by)
 CREATE POLICY "players_insert" ON players
-  FOR INSERT WITH CHECK (owner_id = (SELECT auth.uid()));
+  FOR INSERT WITH CHECK (created_by = (SELECT auth.uid()));
 
+-- Creator or any guardian can edit the player's name/nickname
 CREATE POLICY "players_update" ON players
-  FOR UPDATE USING (owner_id = (SELECT auth.uid()));
+  FOR UPDATE USING (
+    created_by = (SELECT auth.uid())
+    OR id IN (
+      SELECT player_id FROM player_guardians WHERE user_id = (SELECT auth.uid())
+    )
+  );
 
+-- Only the creator can hard-delete a player
 CREATE POLICY "players_delete" ON players
-  FOR DELETE USING (owner_id = (SELECT auth.uid()));
+  FOR DELETE USING (created_by = (SELECT auth.uid()));
 ```
 
-### 5.3 Team Players (junction)
+### 5.3 Player Guardians
+
+```sql
+-- Guardians can see their own guardian links; team admins can see guardians for players on their team
+CREATE POLICY "player_guardians_select" ON player_guardians
+  FOR SELECT USING (
+    user_id = (SELECT auth.uid())
+    OR player_id IN (
+      SELECT tp.player_id FROM team_players tp
+      JOIN team_members tm ON tm.team_id = tp.team_id
+      WHERE tm.user_id = (SELECT auth.uid())
+    )
+  );
+
+-- A user can claim guardianship of a player they can see
+CREATE POLICY "player_guardians_insert" ON player_guardians
+  FOR INSERT WITH CHECK (user_id = (SELECT auth.uid()));
+
+-- A guardian can remove their own guardianship; player creator can remove any guardian
+CREATE POLICY "player_guardians_delete" ON player_guardians
+  FOR DELETE USING (
+    user_id = (SELECT auth.uid())
+    OR player_id IN (
+      SELECT id FROM players WHERE created_by = (SELECT auth.uid())
+    )
+  );
+```
+
+### 5.4 Team Players (junction)
 
 ```sql
 -- Team members can view their team's roster
@@ -299,11 +374,25 @@ SELECT
   pl.last_name,
   pl.first_name || ' ' || COALESCE(pl.last_name, '') AS full_name,
   pl.nickname,
-  pl.owner_id,
-  p.display_name AS owner_name,
+  pl.created_by,
+  p.display_name AS created_by_name,
   pl.created_at
 FROM players pl
-LEFT JOIN profiles p ON p.id = pl.owner_id;
+LEFT JOIN profiles p ON p.id = pl.created_by;
+
+-- Human-readable player_guardians view
+CREATE OR REPLACE VIEW player_guardians_display AS
+SELECT
+  pg.id,
+  pg.player_id,
+  pl.first_name || ' ' || COALESCE(pl.last_name, '') AS player_name,
+  pg.user_id,
+  p.display_name AS guardian_name,
+  pg.relationship,
+  pg.created_at
+FROM player_guardians pg
+JOIN players pl ON pl.id = pg.player_id
+LEFT JOIN profiles p ON p.id = pg.user_id;
 
 -- Human-readable game_stats view
 CREATE OR REPLACE VIEW game_stats_display AS
@@ -420,7 +509,7 @@ The existing RPCs (`get_game_stats_resolved`, `get_season_stats_resolved`) work 
 | Function | Current | After |
 |----------|---------|-------|
 | `ensureTeam()` | Looks up/creates team by (owner_id, name, sport) | Needs `season_id` to create a team. Game setup flow must resolve season first. |
-| `ensurePlayerId()` | Looks up/creates player by (team_id, first_name, last_name, jersey_number) | Look up player by (owner_id, first_name, last_name). Create `team_players` junction row for team assignment. Jersey number moves to junction. |
+| `ensurePlayerId()` | Looks up/creates player by (team_id, first_name, last_name, jersey_number) | Look up player by (created_by, first_name, last_name) OR via `player_guardians`. Create `team_players` junction row for team assignment. Jersey number moves to junction. Auto-create `player_guardians` row for the creating user. |
 | `syncGameSnapshotToCloud()` | Calls ensureTeam → ensureGame → ensurePlayers → upsertStats | Same flow, but ensureTeam now requires season context. |
 
 ### 8.2 Game Setup Flow
@@ -445,16 +534,18 @@ Single migration (next number, e.g., `018_seasons_and_roster_junction.sql`):
 1. Create `seasons` table with RLS
 2. Add `teams.season_id` nullable FK (temporarily nullable for migration)
 3. Create `team_players` junction table with RLS
-4. Migrate existing data:
+4. Create `player_guardians` junction table with RLS
+5. Migrate existing data:
    - For each distinct `(owner_id, season, sport)` in `teams`, create a `seasons` row
    - Set `teams.season_id` from the created seasons
    - For each `players` row, create a `team_players` row with the player's current `team_id`, `jersey_number`, `position`, `is_active`
-   - Set `players.owner_id` from their team's `owner_id`
-5. Make `teams.season_id` NOT NULL
-6. Drop `teams.season` text column
-7. Drop `players.team_id`, `players.jersey_number`, `players.position`, `players.is_active` columns
-8. Add `players.owner_id` NOT NULL
-9. Create display views
+   - Set `players.created_by` from their team's `owner_id`
+   - Create a `player_guardians` row linking each player to their `created_by` user (relationship = 'parent')
+6. Make `teams.season_id` NOT NULL
+7. Drop `teams.season` text column, `teams.sport` column
+8. Drop `players.team_id`, `players.jersey_number`, `players.position`, `players.is_active` columns
+9. Add `players.created_by` NOT NULL
+10. Create display views (including `player_guardians_display`)
 
 ### 9.2 Rollback Consideration
 
@@ -466,30 +557,27 @@ The migration is destructive (drops columns). Before running, recommend a Supaba
 
 | Phase | What | Depends On |
 |-------|------|------------|
-| **1. Schema** | Migration: `seasons` table, `team_players` junction, alter `teams` and `players`, display views, RLS | — |
+| **1. Schema** | Migration: `seasons`, `team_players`, `player_guardians` tables; alter `teams` and `players`; display views; RLS | — |
 | **2. Season UI** | Season CRUD in Settings/Admin; season selector in Game Setup; season display on Teams page | Phase 1 |
-| **3. Roster Refactor** | Update Teams page to use `team_players` junction; player add/remove goes through junction; support adding existing players from other teams | Phase 1 |
-| **4. Cloud Sync** | Update `cloudSync.ts` to handle season context, junction-based player lookup | Phase 1, 2 |
-| **5. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | Phase 1, 3 (separate design doc) |
-| **6. Player Transfer** | UI to add an existing player to a new team (pick from player pool); player search/autocomplete | Phase 3 |
+| **3. Roster Refactor** | Update Teams page to use `team_players` junction; player add/remove goes through junction; support adding existing players from other teams/seasons via player pool | Phase 1 |
+| **4. Guardian Claim** | UI for parents to claim guardianship of a player on their team; "My Players" pool visible when building future rosters (players you created + players you're a guardian of) | Phase 1, 3 |
+| **5. Cloud Sync** | Update `cloudSync.ts` to handle season context, junction-based player lookup, auto-create guardian link on player creation | Phase 1, 2 |
+| **6. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | Phase 1, 3 (separate design doc) |
+| **7. Player Transfer** | UI to add an existing player to a new team (pick from player pool); player search/autocomplete | Phase 3, 4 |
 
 ---
 
-## 11. Open Questions
+## 11. Resolved Decisions
 
-1. **Keep `teams.sport` or inherit from season?** Keeping `sport` on teams is denormalized but convenient (avoids JOINing to seasons for every sport lookup). Recommendation: drop from `teams`, inherit from `seasons`. The team is always in the context of a season anyway.
+1. **`teams.sport`** — **Drop it.** Inherit from `seasons.sport`. Teams always load in a season context; no need for denormalization.
 
-2. **Player ownership model.** With `players.owner_id`, only the owner can edit a player's name. But what if two parents both use the app and both add "Johnny Smith" — do they share a player record? For now, players are per-owner (each parent maintains their own player pool). Merging/sharing players could come later.
+2. **Player ownership model** — **`created_by` + `player_guardians` junction.** The `created_by` field tracks who created the player record but does not imply exclusive ownership. A `player_guardians` junction table links players to their parents/guardians. Any guardian (or creator) can edit the player's name and add them to future teams. This supports the scenario where a coach creates all the players, then individual parents claim their kids. Stat tracking remains fully fluid — any team member can track any player on the team regardless of guardianship.
 
-3. **Season selector UX.** Where does the user pick/create a season? Options:
-   - (a) A new "Seasons" page linked from Settings/Admin
-   - (b) Inline in Game Setup (like the current team selector)
-   - (c) Both — manage in Settings, pick in Game Setup
-   - Recommendation: **(c)** — CRUD in Settings, picker in Game Setup.
+3. **Season selector UX** — **Both places.** Season CRUD in Settings/Admin; season picker in Game Setup (like the existing team selector). Users manage seasons in one place, pick them in another.
 
-4. **team_members scope.** Currently `team_members` ties collaborators (other parents) to a team. Since teams are per-season, does a collaborator need to be re-invited each season? Or should we have `season_members` too? Recommendation: keep per-team for now — re-inviting per season is acceptable and simpler.
+4. **Team member re-invites** — **Re-invite per season is fine.** `team_members` stays per-team. When a new season starts and a new team is created, collaborators are re-invited. Simple and acceptable for now; season-level collaboration could come later.
 
-5. **Existing game_stats FK.** `game_stats.player_id` currently references `players.id` directly. After the migration, `players` no longer has `team_id`, but `game_stats` still works because the game's `team_id` provides the team context. The junction table is only needed for roster management, not stat lookups.
+5. **Existing game_stats FK** — **No change needed.** `game_stats.player_id` references `players.id` directly. After the migration, `players` no longer has `team_id`, but `game_stats` still works because the game's `team_id` provides the team context. The junction table is only needed for roster management, not stat lookups.
 
 ---
 
