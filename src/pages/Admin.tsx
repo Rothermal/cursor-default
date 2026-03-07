@@ -8,12 +8,17 @@ import { supabase } from '../lib/supabase'
 import { teamDisplayName } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
 
+interface AdminSeasonInfo {
+  name: string
+  sport: string
+}
+
 interface AdminTeamRow {
   id: string
   name: string
   nickname: string | null
-  sport: string
-  season: string | null
+  season_id: string
+  seasons: AdminSeasonInfo
 }
 
 interface AdminGameRow {
@@ -32,7 +37,7 @@ interface AdminTournamentRow {
 
 interface AdminPlayerRow {
   id: string
-  team_id: string
+  player_id: string
   first_name: string
   last_name: string | null
   jersey_number: string | null
@@ -72,11 +77,15 @@ export default function Admin() {
       setAdminError(null)
       const { data: teams, error: tErr } = await supabaseClient
         .from('teams')
-        .select('id,name,nickname,sport,season')
+        .select('id,name,nickname,season_id,seasons!inner(name,sport)')
         .order('created_at', { ascending: false })
       if (cancelled) return
       if (tErr) { setAdminError(tErr.message); setLoadingAdmin(false); return }
-      const loaded = (teams ?? []) as AdminTeamRow[]
+      type RawTeamRow = { id: string; name: string; nickname: string | null; season_id: string; seasons: AdminSeasonInfo | AdminSeasonInfo[] }
+      const loaded = ((teams ?? []) as unknown as RawTeamRow[]).map(t => ({
+        ...t,
+        seasons: Array.isArray(t.seasons) ? t.seasons[0] : t.seasons,
+      })) as AdminTeamRow[]
       setAdminTeams(loaded)
       setSelectedAdminTeamId(prev => {
         if (prev && loaded.some(t => t.id === prev)) return prev
@@ -102,13 +111,25 @@ export default function Admin() {
           .eq('team_id', selectedAdminTeamId).order('created_at', { ascending: false }),
         supabaseClient.from('tournaments').select('id,team_id,name')
           .eq('team_id', selectedAdminTeamId).order('name', { ascending: true }),
-        supabaseClient.from('players').select('id,team_id,first_name,last_name,jersey_number,is_active')
-          .eq('team_id', selectedAdminTeamId).order('created_at', { ascending: true }),
+        supabaseClient.from('team_players').select('id,player_id,jersey_number,is_active,players!inner(id,first_name,last_name)')
+          .eq('team_id', selectedAdminTeamId).order('joined_at', { ascending: true }),
       ])
       if (cancelled) return
       setAdminGames((gamesRes.data ?? []) as AdminGameRow[])
       setAdminTournaments((tournamentsRes.data ?? []) as AdminTournamentRow[])
-      setAdminPlayers((playersRes.data ?? []) as AdminPlayerRow[])
+      setAdminPlayers(
+        ((playersRes.data ?? []) as unknown as Array<{
+          id: string; player_id: string; jersey_number: string | null; is_active: boolean;
+          players: { id: string; first_name: string; last_name: string | null }
+        }>).map(r => ({
+          id: r.id,
+          player_id: r.player_id,
+          first_name: r.players.first_name,
+          last_name: r.players.last_name,
+          jersey_number: r.jersey_number,
+          is_active: r.is_active,
+        }))
+      )
     }
     void load()
     return () => { cancelled = true }
@@ -156,7 +177,7 @@ export default function Admin() {
     if (!supabaseClient) return
     setAdminError(null)
     setDeletingId(player.id)
-    const { error } = await supabaseClient.from('players').delete().eq('id', player.id)
+    const { error } = await supabaseClient.from('players').delete().eq('id', player.player_id)
     setDeletingId(null)
     if (error) { setAdminError(error.message); return }
     setAdminPlayers(prev => prev.filter(p => p.id !== player.id))
@@ -300,10 +321,10 @@ export default function Admin() {
                         className="input-field"
                       >
                         {adminTeams.map(t => {
-                          const sport = sports.find(s => s.id === t.sport)
+                          const sport = sports.find(s => s.id === t.seasons.sport)
                           return (
                             <option key={t.id} value={t.id}>
-                              {sport?.icon ?? '🏟️'} {teamDisplayName(t)}{t.season ? ` (${t.season})` : ''}
+                              {sport?.icon ?? '🏟️'} {teamDisplayName(t)}{t.seasons.name ? ` (${t.seasons.name})` : ''}
                             </option>
                           )
                         })}

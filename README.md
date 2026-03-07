@@ -86,7 +86,9 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/015_home_score_adjustment.sql`
    - `supabase/migrations/016_tournaments.sql`
    - `supabase/migrations/017_game_notes.sql`
-   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`017` for Phase 3, RLS fixes, reassign primary, home score adjustment, tournaments, and game notes).
+   - `supabase/migrations/018_seasons_and_roster_junction.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
+   > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -177,7 +179,8 @@ supabase/
     ├── 014_set_primary_recorder.sql
     ├── 015_home_score_adjustment.sql
     ├── 016_tournaments.sql
-    └── 017_game_notes.sql
+    ├── 017_game_notes.sql
+    └── 018_seasons_and_roster_junction.sql
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
