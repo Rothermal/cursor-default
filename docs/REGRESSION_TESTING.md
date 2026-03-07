@@ -59,11 +59,44 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.1 | Home → Teams | Cloud Teams page; Create Team form |
 | 4.2 | Create team (name, sport, season) | Team appears in list; selected |
 | 4.3 | Add players (number, first, last) | Players appear in Roster |
-| 4.4 | Edit team nickname (pencil) | Save; display name updates |
-| 4.5 | Edit player nickname | Save; display name updates |
+| 4.4 | Edit team name (pencil) → change primary name → Save | Team name updates in list; reflected in Game Setup dropdown and Games page |
+| 4.4b | Edit team nickname (pencil) → set or clear display name → Save | If set: display name shown in list with primary name in parens; if cleared: primary name shown directly |
+| 4.5 | Edit player (pencil) → change first name, last name, jersey number → Save | Player row updates with new values; reflected in cloud roster |
+| 4.5b | Edit player nickname | Display name updates; primary name shown in parentheses if nickname set |
 | 4.6 | Remove player | Player removed from roster (soft deactivate) |
 | 4.7 | Season Stats link (when team selected) | Navigate to Leaderboard with that team pre-selected |
 | 4.8 | Reload → Teams | Same teams and roster (from Supabase) |
+
+---
+
+## 4b. Tournaments (cloud teams)
+
+**Precondition:** Signed in; existing cloud team; migration 016 applied.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4b.1 | Game Setup → select existing team | Tournament dropdown appears (replaces free-text); options: "No tournament", any existing tournaments, "+ Add new tournament…" |
+| 4b.2 | Select an existing tournament → Next | Game info includes tournament name; Scoreboard subtitle shows tournament |
+| 4b.3 | Select "+ Add new tournament…" → type name → Next | Tournament created in Supabase; game linked via `tournament_id`; name shown in Scoreboard |
+| 4b.4 | Leave dropdown at "No tournament" → Next | No tournament linked; Scoreboard shows no subtitle |
+| 4b.5 | Cloud Games page | Game cards show 🏆 tournament name when set |
+| 4b.6 | Reload app → resume game | Tournament name and ID preserved (loaded from cloud) |
+| 4b.7 | New team / offline flow: Game Setup | Tournament field remains free-text (no dropdown) |
+
+---
+
+## 4c. Missed shots (basketball)
+
+**Precondition:** Basketball selected (enabled). Works in both offline and cloud modes.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4c.1 | Start a basketball game → Game Tracker → Scoring section | Six buttons in 2-column grid: FT / FT Miss, 2PT / 2PT Miss, 3PT / 3PT Miss. Made buttons are amber; Miss buttons are slate/gray |
+| 4c.2 | Tap 2PT (+) twice → tap 2 Miss (+) once | 2PT shows 2, 2 Miss shows 1; scoreboard shows 4 pts (only makes score) |
+| 4c.3 | Tap Undo | Last miss action reversed; 2 Miss back to 0 |
+| 4c.4 | Navigate to Game Summary | Scoring table shows "FT M/A", "2PT M/A", "3PT M/A" columns — each cell displays made/total (e.g. "2/3") and percentage (67%) |
+| 4c.5 | Team totals row | Same M/A format with team-level percentage |
+| 4c.6 | Miss buttons do not affect home team score | Scoreboard points unchanged when Miss is tapped |
 
 ---
 
@@ -101,6 +134,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 6.7 | Game Summary → Finalize Game (if available) | Game status → Final |
 | 6.8 | Cloud Games → open finalized game | View Summary (read-only) |
 | 6.9 | Second device/session: sign in → Cloud Games | Same game list; resume same game if in progress |
+| 6.10 | Cloud Games → tap ✏️ next to opponent name on any game card | Inline input appears; type new name → Save | Opponent name updates on card; persists after reload |
+| 6.11 | Cloud Games → Edit opponent name → press Escape or ✕ | Edit cancelled; original name restored |
 
 ---
 

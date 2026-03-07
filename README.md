@@ -80,7 +80,8 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/013_rls_auth_uid_cached.sql`
    - `supabase/migrations/014_set_primary_recorder.sql`
    - `supabase/migrations/015_home_score_adjustment.sql`
-   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`015` for Phase 3, RLS fixes, reassign primary, and home score adjustment).
+   - `supabase/migrations/016_tournaments.sql`
+   > If you already applied earlier migrations, run only the new ones (e.g. only `008`–`016` for Phase 3, RLS fixes, reassign primary, home score adjustment, and tournaments).
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
 4. Restart the dev server — the auth page will appear
 
@@ -166,7 +167,8 @@ supabase/
     ├── 012_team_members_rls_recursion_fix.sql
     ├── 013_rls_auth_uid_cached.sql
     ├── 014_set_primary_recorder.sql
-    └── 015_home_score_adjustment.sql
+    ├── 015_home_score_adjustment.sql
+    └── 016_tournaments.sql
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap

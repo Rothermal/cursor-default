@@ -3,6 +3,11 @@ export interface StatAction {
   label: string
   shortLabel: string
   pointValue?: number
+  /** Per-action color override (falls back to the category color). */
+  color?: StatColor
+  /** Set on miss/attempt actions: the id of the corresponding made stat.
+   *  Used in Game Summary to merge made+miss into a single M/A column. */
+  madeStatId?: string
 }
 
 export interface StatCategory {
@@ -12,6 +17,8 @@ export interface StatCategory {
   actions: StatAction[]
   showTotal?: boolean
   totalLabel?: string
+  /** Override the auto grid-column count for the action grid in Game Tracker. */
+  columns?: number
 }
 
 export type StatColor = 'amber' | 'sky' | 'emerald' | 'violet' | 'rose' | 'slate' | 'orange' | 'red' | 'blue' | 'green' | 'indigo' | 'teal' | 'cyan' | 'pink'
@@ -37,6 +44,8 @@ export interface GameInfo {
   teamName: string
   opponentName: string
   tournamentName: string
+  /** Supabase tournaments.id — set when user picks an existing or newly-created tournament. */
+  tournamentId?: string | null
   date: string
 }
 

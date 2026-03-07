@@ -604,149 +604,207 @@ export default function GameSummary() {
           </div>
         )}
 
-        {sport.categories.map(category => (
-          <div key={category.id} className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              {category.name}
-              {category.showTotal && (
-                <span className="text-slate-400 ml-2 normal-case">
-                  — {category.totalLabel}
-                </span>
-              )}
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 pr-3 font-semibold text-slate-600">Player</th>
-                    {category.actions.map(action => (
-                      <th
-                        key={action.id}
-                        className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[40px]"
-                      >
-                        {action.shortLabel}
-                      </th>
-                    ))}
-                    {category.showTotal && (
-                      <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[50px]">
-                        TOT
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {players.map(player => {
-                    const stats = getPlayerStats(player.id)
-                    const catTotal = category.showTotal
-                      ? category.actions.some(a => a.pointValue)
-                        ? category.actions.reduce(
-                            (sum, a) => sum + (stats[a.id] || 0) * (a.pointValue || 0),
-                            0
-                          )
-                        : computeCategoryTotal(category, stats)
-                      : null
+        {sport.categories.map(category => {
+          // Map madeStatId → miss action for this category (used in Primary view)
+          const missActionMap: Record<string, typeof category.actions[0]> = {}
+          for (const action of category.actions) {
+            if (action.madeStatId) missActionMap[action.madeStatId] = action
+          }
 
-                    return (
-                      <tr key={player.id} className="border-b border-slate-100">
-                        <td className="py-2 pr-3 whitespace-nowrap">
-                          <span className="text-slate-400 mr-1">#{player.number || '?'}</span>
-                          <span className="font-medium">{player.name}</span>
-                        </td>
-                        {category.actions.map(action => {
-                          const meta = getResolvedMeta(player.id, action.id)
-                          const needsReview =
-                            !!meta &&
-                            (meta.source === 'averaged' ||
-                              (((meta.recorder_count ?? 0) > 1) &&
-                                meta.source !== 'correction' &&
-                                meta.source !== 'primary'))
-                          const submissions = getCellSubmissions(player.id, action.id)
+          // Primary view: merge made+miss columns; All Submissions: show all separately
+          const visibleActions = viewMode === 'primary'
+            ? category.actions.filter(a => !a.madeStatId)
+            : category.actions
 
-                          return (
-                            <td key={action.id} className="text-center py-2 px-2 tabular-nums">
-                              <span className="inline-flex flex-wrap items-center justify-center gap-1">
-                                {viewMode === 'primary' ? (
-                                  <>
-                                    {stats[action.id] || 0}
-                                    {isFinalCloudGame && needsReview && (
-                                      <span
-                                        className="text-amber-600"
-                                        title="Multiple recorders – review"
-                                        aria-label="Multiple recorders"
-                                      >
-                                        ⚠️
-                                      </span>
-                                    )}
-                                    {reviewMode && isFinalCloudGame && isTeamAdmin && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleOpenCorrect(
-                                            player.id,
-                                            player.name,
-                                            action.id,
-                                            action.shortLabel,
-                                            stats[action.id] || 0
-                                          )
-                                        }
-                                        className="text-slate-400 hover:text-blue-600 p-0.5"
-                                        title="Correct this stat"
-                                        aria-label="Correct stat"
-                                      >
-                                        ✏️
-                                      </button>
-                                    )}
-                                  </>
-                                ) : (
-                                  submissions.length > 0 ? (
-                                    <span className="text-xs">
-                                      {submissions.map((s, i) => (
-                                        <span key={s.recorded_by}>
-                                          {i > 0 && ', '}
-                                          {s.value} ({s.display_name})
-                                        </span>
-                                      ))}
-                                    </span>
-                                  ) : (
-                                    '—'
-                                  )
-                                )}
-                              </span>
-                            </td>
-                          )
-                        })}
-                        {category.showTotal && (
-                          <td className="text-center py-2 px-2 font-bold tabular-nums">
-                            {catTotal}
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })}
-                  <tr className="bg-slate-50 font-semibold">
-                    <td className="py-2 pr-3">Team</td>
-                    {category.actions.map(action => (
-                      <td key={action.id} className="text-center py-2 px-2 tabular-nums">
-                        {teamTotals[action.id] || 0}
-                      </td>
-                    ))}
-                    {category.showTotal && (
-                      <td className="text-center py-2 px-2 font-bold tabular-nums">
-                        {category.actions.some(a => a.pointValue)
+          const renderMadeCell = (
+            action: typeof category.actions[0],
+            made: number,
+            missVal: number,
+            extra?: React.ReactNode
+          ) => {
+            const miss = missActionMap[action.id]
+            if (!miss) return <>{made}{extra}</>
+            const total = made + missVal
+            const pct = total > 0 ? Math.round((made / total) * 100) : null
+            return (
+              <>
+                <span>{made}/{total}</span>
+                {pct !== null && (
+                  <span className="text-slate-400 ml-1 text-xs">({pct}%)</span>
+                )}
+                {extra}
+              </>
+            )
+          }
+
+          return (
+            <div key={category.id} className="mb-6">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                {category.name}
+                {category.showTotal && (
+                  <span className="text-slate-400 ml-2 normal-case">
+                    — {category.totalLabel}
+                  </span>
+                )}
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-2 pr-3 font-semibold text-slate-600">Player</th>
+                      {visibleActions.map(action => {
+                        const hasMiss = !!missActionMap[action.id]
+                        return (
+                          <th
+                            key={action.id}
+                            className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[48px]"
+                          >
+                            {hasMiss ? `${action.shortLabel} M/A` : action.shortLabel}
+                          </th>
+                        )
+                      })}
+                      {category.showTotal && (
+                        <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[50px]">
+                          TOT
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map(player => {
+                      const stats = getPlayerStats(player.id)
+                      const catTotal = category.showTotal
+                        ? category.actions.some(a => a.pointValue)
                           ? category.actions.reduce(
-                              (sum, a) => sum + (teamTotals[a.id] || 0) * (a.pointValue || 0),
+                              (sum, a) => sum + (stats[a.id] || 0) * (a.pointValue || 0),
                               0
                             )
-                          : computeCategoryTotal(category, teamTotals)
-                        }
-                      </td>
-                    )}
-                  </tr>
-                </tbody>
-              </table>
+                          : computeCategoryTotal(category, stats)
+                        : null
+
+                      return (
+                        <tr key={player.id} className="border-b border-slate-100">
+                          <td className="py-2 pr-3 whitespace-nowrap">
+                            <span className="text-slate-400 mr-1">#{player.number || '?'}</span>
+                            <span className="font-medium">{player.name}</span>
+                          </td>
+                          {visibleActions.map(action => {
+                            const meta = getResolvedMeta(player.id, action.id)
+                            const needsReview =
+                              !!meta &&
+                              (meta.source === 'averaged' ||
+                                (((meta.recorder_count ?? 0) > 1) &&
+                                  meta.source !== 'correction' &&
+                                  meta.source !== 'primary'))
+                            const submissions = getCellSubmissions(player.id, action.id)
+                            const missAction = missActionMap[action.id]
+
+                            return (
+                              <td key={action.id} className="text-center py-2 px-2 tabular-nums">
+                                <span className="inline-flex flex-wrap items-center justify-center gap-1">
+                                  {viewMode === 'primary' ? (
+                                    renderMadeCell(
+                                      action,
+                                      stats[action.id] || 0,
+                                      missAction ? (stats[missAction.id] || 0) : 0,
+                                      <>
+                                        {isFinalCloudGame && needsReview && (
+                                          <span
+                                            className="text-amber-600"
+                                            title="Multiple recorders – review"
+                                            aria-label="Multiple recorders"
+                                          >
+                                            ⚠️
+                                          </span>
+                                        )}
+                                        {reviewMode && isFinalCloudGame && isTeamAdmin && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleOpenCorrect(
+                                                player.id,
+                                                player.name,
+                                                action.id,
+                                                action.shortLabel,
+                                                stats[action.id] || 0
+                                              )
+                                            }
+                                            className="text-slate-400 hover:text-blue-600 p-0.5"
+                                            title="Correct this stat"
+                                            aria-label="Correct stat"
+                                          >
+                                            ✏️
+                                          </button>
+                                        )}
+                                      </>
+                                    )
+                                  ) : (
+                                    submissions.length > 0 ? (
+                                      <span className="text-xs">
+                                        {submissions.map((s, i) => (
+                                          <span key={s.recorded_by}>
+                                            {i > 0 && ', '}
+                                            {s.value} ({s.display_name})
+                                          </span>
+                                        ))}
+                                      </span>
+                                    ) : (
+                                      '—'
+                                    )
+                                  )}
+                                </span>
+                              </td>
+                            )
+                          })}
+                          {category.showTotal && (
+                            <td className="text-center py-2 px-2 font-bold tabular-nums">
+                              {catTotal}
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })}
+                    <tr className="bg-slate-50 font-semibold">
+                      <td className="py-2 pr-3">Team</td>
+                      {visibleActions.map(action => {
+                        const missAction = missActionMap[action.id]
+                        const made = teamTotals[action.id] || 0
+                        const missVal = missAction ? (teamTotals[missAction.id] || 0) : 0
+                        return (
+                          <td key={action.id} className="text-center py-2 px-2 tabular-nums">
+                            {missAction ? (
+                              <>
+                                {made}/{made + missVal}
+                                {(made + missVal) > 0 && (
+                                  <span className="text-slate-400 ml-1 text-xs">
+                                    ({Math.round((made / (made + missVal)) * 100)}%)
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              made
+                            )}
+                          </td>
+                        )
+                      })}
+                      {category.showTotal && (
+                        <td className="text-center py-2 px-2 font-bold tabular-nums">
+                          {category.actions.some(a => a.pointValue)
+                            ? category.actions.reduce(
+                                (sum, a) => sum + (teamTotals[a.id] || 0) * (a.pointValue || 0),
+                                0
+                              )
+                            : computeCategoryTotal(category, teamTotals)
+                          }
+                        </td>
+                      )}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         <div className="mt-8 space-y-3">
           {canFinalizeCloudGame && (
