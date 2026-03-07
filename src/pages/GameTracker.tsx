@@ -8,11 +8,12 @@ import StatButton from '../components/StatButton'
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync } = useGame()
-  const { sport, players, activePlayerId, actionLog } = state
+  const { sport, players, activePlayerId, actionLog, notes } = state
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
+  const [localNotes, setLocalNotes] = useState(notes)
 
   // Flush cloud sync when leaving Game Tracker so latest stats are saved (must run before any early return)
   useEffect(() => {
@@ -20,6 +21,11 @@ export default function GameTracker() {
       flushCloudSync()
     }
   }, [flushCloudSync])
+
+  // Keep local notes in sync if state is hydrated externally (e.g. cloud resume)
+  useEffect(() => {
+    setLocalNotes(notes)
+  }, [notes])
 
   if (!sport || !state.gameInfo || players.length === 0) {
     navigate('/')
@@ -178,16 +184,25 @@ export default function GameTracker() {
 
             return (
               <div key={category.id}>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-                    {category.name}
-                  </h3>
-                  {displayTotal !== null && (
+                {!category.hideHeader && (
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+                      {category.name}
+                    </h3>
+                    {displayTotal !== null && (
+                      <span className="text-sm font-bold text-slate-700">
+                        {category.totalLabel}: {displayTotal}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {category.hideHeader && displayTotal !== null && (
+                  <div className="flex justify-end mb-2">
                     <span className="text-sm font-bold text-slate-700">
                       {category.totalLabel}: {displayTotal}
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className={`grid gap-2 ${
                   category.columns === 2 ? 'grid-cols-2' :
                   visibleActions.length === 1 ? 'grid-cols-1' :
@@ -233,6 +248,22 @@ export default function GameTracker() {
               </div>
             )
           })}
+          {/* Game notes */}
+          <div className="mt-2">
+            <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              Game Notes
+            </label>
+            <textarea
+              value={localNotes}
+              onChange={e => setLocalNotes(e.target.value)}
+              onBlur={() => dispatch({ type: 'SET_NOTES', notes: localNotes })}
+              placeholder="Add notes about the game…"
+              rows={3}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
+                         placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300
+                         resize-none"
+            />
+          </div>
         </div>
       </div>
 
