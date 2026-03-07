@@ -69,6 +69,22 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 4b. Tournaments (cloud teams)
+
+**Precondition:** Signed in; existing cloud team; migration 016 applied.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4b.1 | Game Setup → select existing team | Tournament dropdown appears (replaces free-text); options: "No tournament", any existing tournaments, "+ Add new tournament…" |
+| 4b.2 | Select an existing tournament → Next | Game info includes tournament name; Scoreboard subtitle shows tournament |
+| 4b.3 | Select "+ Add new tournament…" → type name → Next | Tournament created in Supabase; game linked via `tournament_id`; name shown in Scoreboard |
+| 4b.4 | Leave dropdown at "No tournament" → Next | No tournament linked; Scoreboard shows no subtitle |
+| 4b.5 | Cloud Games page | Game cards show 🏆 tournament name when set |
+| 4b.6 | Reload app → resume game | Tournament name and ID preserved (loaded from cloud) |
+| 4b.7 | New team / offline flow: Game Setup | Tournament field remains free-text (no dropdown) |
+
+---
+
 ## 5. Game flow (local state)
 
 **Precondition:** Any mode (offline or signed in).

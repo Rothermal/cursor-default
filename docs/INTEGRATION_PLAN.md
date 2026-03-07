@@ -834,7 +834,9 @@ supabase/
 │   ├── 008_player_checkouts.sql
 │   ├── 009_stat_corrections.sql
 │   ├── 010_resolved_stats_rpcs.sql
-│   └── 011_team_invites.sql
+│   ├── 011_team_invites.sql
+│   ├── 015_home_score_adjustment.sql
+│   └── 016_tournaments.sql
 ```
 
 Future: `PlayerProfile.tsx`, `Leaderboard.tsx` (season stats UI); `AdminReview.tsx` as standalone page optional — admin review currently lives in GameSummary.

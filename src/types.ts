@@ -37,6 +37,8 @@ export interface GameInfo {
   teamName: string
   opponentName: string
   tournamentName: string
+  /** Supabase tournaments.id — set when user picks an existing or newly-created tournament. */
+  tournamentId?: string | null
   date: string
 }
 

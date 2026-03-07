@@ -12,6 +12,7 @@ interface GameRow {
   team_id: string
   opponent_name: string
   opponent_score: number
+  tournament_name: string | null
   game_date: string
   status: string
   created_at: string
@@ -76,7 +77,7 @@ export default function Games() {
 
       const { data: gameRows, error: gamesError } = await supabaseClient
         .from('games')
-        .select('id,team_id,opponent_name,opponent_score,game_date,status,created_at')
+        .select('id,team_id,opponent_name,opponent_score,tournament_name,game_date,status,created_at')
         .eq('created_by', userId)
         .order('created_at', { ascending: false })
 
@@ -266,6 +267,9 @@ export default function Games() {
               ✏️
             </button>
           </div>
+        )}
+        {game.tournament_name && (
+          <p className="text-xs text-slate-400 mt-0.5">🏆 {game.tournament_name}</p>
         )}
         <p className="text-xs text-slate-400 mt-1">
           {game.game_date}
