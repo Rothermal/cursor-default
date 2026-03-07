@@ -12,7 +12,7 @@
 -- ============================================================================
 
 -- --------------------------------------------------------------------------
--- 1. seasons table
+-- 1. seasons table + teams.season_id column
 -- --------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.seasons (
@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS public.seasons (
 );
 
 CREATE INDEX IF NOT EXISTS idx_seasons_owner ON public.seasons(owner_id);
+
+-- Add season_id to teams BEFORE creating seasons RLS policies (policies reference this column)
+ALTER TABLE public.teams
+  ADD COLUMN IF NOT EXISTS season_id uuid REFERENCES public.seasons(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_teams_season ON public.teams(season_id);
 
 ALTER TABLE public.seasons ENABLE ROW LEVEL SECURITY;
 
@@ -47,15 +53,6 @@ CREATE POLICY "seasons_update" ON public.seasons
 
 CREATE POLICY "seasons_delete" ON public.seasons
   FOR DELETE USING (owner_id = (SELECT auth.uid()));
-
--- --------------------------------------------------------------------------
--- 2. Add season_id to teams (nullable initially for data migration)
--- --------------------------------------------------------------------------
-
-ALTER TABLE public.teams
-  ADD COLUMN IF NOT EXISTS season_id uuid REFERENCES public.seasons(id) ON DELETE CASCADE;
-
-CREATE INDEX IF NOT EXISTS idx_teams_season ON public.teams(season_id);
 
 -- --------------------------------------------------------------------------
 -- 3. team_players junction table
@@ -109,7 +106,14 @@ CREATE POLICY "team_players_delete" ON public.team_players
   );
 
 -- --------------------------------------------------------------------------
--- 4. player_guardians junction table
+-- 4. Add created_by to players (before player_guardians policies that reference it)
+-- --------------------------------------------------------------------------
+
+ALTER TABLE public.players
+  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+-- --------------------------------------------------------------------------
+-- 5. player_guardians junction table
 -- --------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.player_guardians (
@@ -146,13 +150,6 @@ CREATE POLICY "player_guardians_delete" ON public.player_guardians
       SELECT id FROM public.players WHERE created_by = (SELECT auth.uid())
     )
   );
-
--- --------------------------------------------------------------------------
--- 5. Add created_by to players (nullable initially for data migration)
--- --------------------------------------------------------------------------
-
-ALTER TABLE public.players
-  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 -- --------------------------------------------------------------------------
 -- 6. Add placement to tournaments
