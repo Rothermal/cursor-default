@@ -154,6 +154,14 @@ export default function GameTracker() {
       <div className="flex-1 overflow-y-auto px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
           {sport.categories.map(category => {
+            // Build miss-action lookup: madeStatId → miss StatAction
+            const missMap: Record<string, typeof category.actions[0]> = {}
+            for (const a of category.actions) {
+              if (a.madeStatId) missMap[a.madeStatId] = a
+            }
+            // Only render made/standalone actions; miss actions are embedded into their card
+            const visibleActions = category.actions.filter(a => !a.madeStatId)
+
             const catTotal = computeCategoryTotal(category, activePlayer.stats)
             let displayTotal: number | null = null
 
@@ -182,34 +190,45 @@ export default function GameTracker() {
                 </div>
                 <div className={`grid gap-2 ${
                   category.columns === 2 ? 'grid-cols-2' :
-                  category.actions.length === 1 ? 'grid-cols-1' :
-                  category.actions.length === 2 ? 'grid-cols-2' :
+                  visibleActions.length === 1 ? 'grid-cols-1' :
+                  visibleActions.length === 2 ? 'grid-cols-2' :
                   'grid-cols-3'
                 }`}>
-                  {category.actions.map(action => (
-                    <StatButton
-                      key={action.id}
-                      label={action.label}
-                      shortLabel={action.shortLabel}
-                      value={activePlayer.stats[action.id] || 0}
-                      color={action.color ?? category.color}
-                      pointValue={action.pointValue}
-                      onIncrement={() =>
-                        dispatch({
-                          type: 'INCREMENT_STAT',
-                          playerId: activePlayer.id,
-                          statId: action.id,
-                        })
-                      }
-                      onDecrement={() =>
-                        dispatch({
-                          type: 'DECREMENT_STAT',
-                          playerId: activePlayer.id,
-                          statId: action.id,
-                        })
-                      }
-                    />
-                  ))}
+                  {visibleActions.map(action => {
+                    const missAction = missMap[action.id]
+                    return (
+                      <StatButton
+                        key={action.id}
+                        label={action.label}
+                        shortLabel={action.shortLabel}
+                        value={activePlayer.stats[action.id] || 0}
+                        color={action.color ?? category.color}
+                        pointValue={action.pointValue}
+                        onIncrement={() =>
+                          dispatch({
+                            type: 'INCREMENT_STAT',
+                            playerId: activePlayer.id,
+                            statId: action.id,
+                          })
+                        }
+                        onDecrement={() =>
+                          dispatch({
+                            type: 'DECREMENT_STAT',
+                            playerId: activePlayer.id,
+                            statId: action.id,
+                          })
+                        }
+                        onAttempt={missAction ? () =>
+                          dispatch({
+                            type: 'INCREMENT_STAT',
+                            playerId: activePlayer.id,
+                            statId: missAction.id,
+                          }) : undefined
+                        }
+                        attemptCount={missAction ? (activePlayer.stats[missAction.id] || 0) : undefined}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             )

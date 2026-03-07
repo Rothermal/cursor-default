@@ -26,6 +26,10 @@ interface StatButtonProps {
   pointValue?: number
   onIncrement: () => void
   onDecrement: () => void
+  /** If provided, renders a middle "A" (attempt/miss) button between − and +. */
+  onAttempt?: () => void
+  /** Number of misses logged; combined with value to display made/total in badge. */
+  attemptCount?: number
 }
 
 export default function StatButton({
@@ -36,14 +40,25 @@ export default function StatButton({
   pointValue,
   onIncrement,
   onDecrement,
+  onAttempt,
+  attemptCount = 0,
 }: StatButtonProps) {
   const [flash, setFlash] = useState(false)
+  const [attemptFlash, setAttemptFlash] = useState(false)
   const styles = colorStyles[color] || colorStyles.slate
+  const hasAttempt = Boolean(onAttempt)
+  const totalAttempts = value + attemptCount
 
   const handleIncrement = () => {
     onIncrement()
     setFlash(true)
     setTimeout(() => setFlash(false), 150)
+  }
+
+  const handleAttempt = () => {
+    onAttempt?.()
+    setAttemptFlash(true)
+    setTimeout(() => setAttemptFlash(false), 150)
   }
 
   return (
@@ -61,9 +76,9 @@ export default function StatButton({
           {pointValue ? <span className="opacity-60 ml-1">(+{pointValue})</span> : null}
         </span>
         <span
-          className={`${styles.badge} text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center`}
+          className={`${styles.badge} text-white text-xs font-bold rounded-full px-1.5 min-w-[1.5rem] h-6 flex items-center justify-center`}
         >
-          {value}
+          {hasAttempt ? `${value}/${totalAttempts}` : value}
         </span>
       </div>
       <div className="flex gap-1.5">
@@ -75,9 +90,20 @@ export default function StatButton({
         >
           −
         </button>
+        {hasAttempt && (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleAttempt() }}
+            className={`flex-1 h-10 rounded-lg text-white text-sm font-bold
+                        active:scale-95 transition-transform shadow-sm
+                        ${attemptFlash ? 'bg-slate-600' : 'bg-slate-500'}`}
+            title="Record missed attempt"
+          >
+            A
+          </button>
+        )}
         <button
           onClick={handleIncrement}
-          className={`flex-[2] h-10 rounded-lg ${styles.badge} text-white text-lg font-bold
+          className={`${hasAttempt ? 'flex-1' : 'flex-[2]'} h-10 rounded-lg ${styles.badge} text-white text-lg font-bold
                       active:scale-95 transition-transform shadow-sm`}
         >
           +

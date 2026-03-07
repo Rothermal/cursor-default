@@ -18,7 +18,6 @@ export const sports: SportConfig[] = [
         id: 'scoring',
         name: 'Scoring',
         color: 'amber',
-        columns: 2,
         actions: [
           { id: 'ft',      label: 'Free Throw',  shortLabel: 'FT',      pointValue: 1 },
           { id: 'ft_miss', label: 'FT Miss',      shortLabel: 'FT Miss', color: 'slate', madeStatId: 'ft' },
