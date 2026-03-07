@@ -181,6 +181,7 @@ export default function GameTracker() {
                   )}
                 </div>
                 <div className={`grid gap-2 ${
+                  category.columns === 2 ? 'grid-cols-2' :
                   category.actions.length === 1 ? 'grid-cols-1' :
                   category.actions.length === 2 ? 'grid-cols-2' :
                   'grid-cols-3'
@@ -191,7 +192,7 @@ export default function GameTracker() {
                       label={action.label}
                       shortLabel={action.shortLabel}
                       value={activePlayer.stats[action.id] || 0}
-                      color={category.color}
+                      color={action.color ?? category.color}
                       pointValue={action.pointValue}
                       onIncrement={() =>
                         dispatch({

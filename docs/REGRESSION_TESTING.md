@@ -85,6 +85,21 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 4c. Missed shots (basketball)
+
+**Precondition:** Basketball selected (enabled). Works in both offline and cloud modes.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4c.1 | Start a basketball game → Game Tracker → Scoring section | Six buttons in 2-column grid: FT / FT Miss, 2PT / 2PT Miss, 3PT / 3PT Miss. Made buttons are amber; Miss buttons are slate/gray |
+| 4c.2 | Tap 2PT (+) twice → tap 2 Miss (+) once | 2PT shows 2, 2 Miss shows 1; scoreboard shows 4 pts (only makes score) |
+| 4c.3 | Tap Undo | Last miss action reversed; 2 Miss back to 0 |
+| 4c.4 | Navigate to Game Summary | Scoring table shows "FT M/A", "2PT M/A", "3PT M/A" columns — each cell displays made/total (e.g. "2/3") and percentage (67%) |
+| 4c.5 | Team totals row | Same M/A format with team-level percentage |
+| 4c.6 | Miss buttons do not affect home team score | Scoreboard points unchanged when Miss is tapped |
+
+---
+
 ## 5. Game flow (local state)
 
 **Precondition:** Any mode (offline or signed in).
