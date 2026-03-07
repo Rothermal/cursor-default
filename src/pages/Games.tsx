@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { sports } from '../config/sports'
 import type { GameState } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface GameRow {
   id: string
@@ -53,7 +54,7 @@ function statusBadge(status: string): string {
 export default function Games() {
   const navigate = useNavigate()
   const { user, isConfigured } = useAuth()
-  const { dispatch } = useGame()
+  const { state, dispatch } = useGame()
   const userId = user?.id ?? null
   const supabaseClient = supabase
 
@@ -66,6 +67,8 @@ export default function Games() {
   const [editingGameId, setEditingGameId] = useState<string | null>(null)
   const [editingOpponentName, setEditingOpponentName] = useState('')
   const [savingOpponentName, setSavingOpponentName] = useState(false)
+  const [confirmDeleteGame, setConfirmDeleteGame] = useState<GameRow | null>(null)
+  const [deletingGameId, setDeletingGameId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isConfigured || !userId || !supabaseClient) return
@@ -218,6 +221,29 @@ export default function Games() {
     cancelEditOpponentName()
   }
 
+  const handleDeleteGame = async (game: GameRow) => {
+    if (!supabaseClient) return
+    setError(null)
+    setDeletingGameId(game.id)
+
+    const { error: deleteError } = await supabaseClient
+      .from('games')
+      .delete()
+      .eq('id', game.id)
+
+    setDeletingGameId(null)
+    if (deleteError) {
+      setError(deleteError.message)
+      return
+    }
+
+    if (state.cloudSync.gameId === game.id) {
+      dispatch({ type: 'RESET_GAME' })
+    }
+
+    setGames(prev => prev.filter(g => g.id !== game.id))
+  }
+
   const renderGameCard = (game: GameRow) => {
     const team = teamMap[game.team_id]
     const sport = sports.find(item => item.id === team?.sport)
@@ -275,13 +301,25 @@ export default function Games() {
         <p className="text-xs text-slate-400 mt-1">
           {game.game_date}
         </p>
-        <button
-          onClick={() => { void handleOpenGame(game.id) }}
-          disabled={loadingGameId === game.id}
-          className="btn-primary w-full mt-3 py-2"
-        >
-          {loadingGameId === game.id ? 'Loading...' : game.status === 'final' ? 'View Summary' : 'Resume Game'}
-        </button>
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={() => { void handleOpenGame(game.id) }}
+            disabled={loadingGameId === game.id}
+            className="btn-primary flex-1 py-2"
+          >
+            {loadingGameId === game.id ? 'Loading...' : game.status === 'final' ? 'View Summary' : 'Resume Game'}
+          </button>
+          <button
+            onClick={() => setConfirmDeleteGame(game)}
+            disabled={deletingGameId === game.id}
+            className="border border-red-200 text-red-600 rounded-xl px-3 py-2 text-sm font-semibold
+                       hover:bg-red-50 active:scale-95 transition-all disabled:opacity-40"
+            title="Delete game"
+            aria-label="Delete game"
+          >
+            {deletingGameId === game.id ? '...' : '🗑️'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -343,6 +381,22 @@ export default function Games() {
             )}
           </>
         )}
+
+        <ConfirmDialog
+          open={confirmDeleteGame !== null}
+          title="Delete Game"
+          message={
+            confirmDeleteGame
+              ? `Permanently delete the game vs ${confirmDeleteGame.opponent_name} (${confirmDeleteGame.game_date})? All stats for this game will be lost. This cannot be undone.`
+              : ''
+          }
+          confirmLabel="Yes, Delete"
+          onConfirm={() => {
+            if (confirmDeleteGame) void handleDeleteGame(confirmDeleteGame)
+            setConfirmDeleteGame(null)
+          }}
+          onCancel={() => setConfirmDeleteGame(null)}
+        />
       </div>
     </div>
   )

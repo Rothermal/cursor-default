@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
+import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface TeamRow {
   id: string
@@ -34,6 +36,7 @@ interface TeamMemberRow {
 export default function Teams() {
   const navigate = useNavigate()
   const { user, isConfigured } = useAuth()
+  const { state: gameState, dispatch: gameDispatch } = useGame()
   const userId = user?.id ?? null
   const supabaseClient = supabase
 
@@ -46,7 +49,11 @@ export default function Teams() {
   const [creatingTeam, setCreatingTeam] = useState(false)
   const [savingPlayer, setSavingPlayer] = useState(false)
   const [deletingPlayerId, setDeletingPlayerId] = useState<string | null>(null)
+  const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const [confirmDeleteTeam, setConfirmDeleteTeam] = useState<TeamRow | null>(null)
+  const [confirmDeletePlayer, setConfirmDeletePlayer] = useState<PlayerRow | null>(null)
 
   const [newTeamName, setNewTeamName] = useState('')
   const [newTeamSport, setNewTeamSport] = useState('basketball')
@@ -423,6 +430,55 @@ export default function Teams() {
     setPlayers(prev => prev.filter(player => player.id !== playerId))
   }
 
+  const handleDeleteTeam = async (team: TeamRow) => {
+    if (!supabaseClient) return
+    setError(null)
+    setDeletingTeamId(team.id)
+
+    const { error: deleteError } = await supabaseClient
+      .from('teams')
+      .delete()
+      .eq('id', team.id)
+
+    setDeletingTeamId(null)
+    if (deleteError) {
+      setError(deleteError.message)
+      return
+    }
+
+    if (gameState.cloudSync.teamId === team.id) {
+      gameDispatch({ type: 'RESET_GAME' })
+    }
+
+    setTeams(prev => {
+      const next = prev.filter(t => t.id !== team.id)
+      if (selectedTeamId === team.id) {
+        setSelectedTeamId(next[0]?.id ?? '')
+        setPlayers([])
+      }
+      return next
+    })
+  }
+
+  const handleDeletePlayer = async (player: PlayerRow) => {
+    if (!supabaseClient) return
+    setError(null)
+    setDeletingPlayerId(player.id)
+
+    const { error: deleteError } = await supabaseClient
+      .from('players')
+      .delete()
+      .eq('id', player.id)
+
+    setDeletingPlayerId(null)
+    if (deleteError) {
+      setError(deleteError.message)
+      return
+    }
+
+    setPlayers(prev => prev.filter(p => p.id !== player.id))
+  }
+
   const startEditTeam = (team: TeamRow) => {
     setEditingTeamId(team.id)
     setEditingTeamName(team.name)
@@ -677,15 +733,27 @@ export default function Teams() {
                             {sport?.name ?? team.sport}{team.season ? ` • ${team.season}` : ''}
                           </p>
                         </button>
-                        <button
-                          type="button"
-                          onClick={e => { e.stopPropagation(); startEditTeam(team) }}
-                          className="text-slate-400 hover:text-slate-600 p-1 shrink-0"
-                          title="Edit team name"
-                          aria-label="Edit team name"
-                        >
-                          ✏️
-                        </button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); startEditTeam(team) }}
+                            className="text-slate-400 hover:text-slate-600 p-1"
+                            title="Edit team name"
+                            aria-label="Edit team name"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); setConfirmDeleteTeam(team) }}
+                            disabled={deletingTeamId === team.id}
+                            className="text-slate-400 hover:text-red-500 p-1"
+                            title="Delete team"
+                            aria-label="Delete team"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -838,9 +906,19 @@ export default function Teams() {
                                 type="button"
                                 onClick={() => { void handleDeactivatePlayer(player.id) }}
                                 disabled={deletingPlayerId === player.id}
-                                className="text-xs text-red-600 underline disabled:opacity-40"
+                                className="text-xs text-slate-500 underline disabled:opacity-40"
                               >
                                 {deletingPlayerId === player.id ? 'Removing...' : 'Remove'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeletePlayer(player)}
+                                disabled={deletingPlayerId === player.id}
+                                className="text-slate-400 hover:text-red-500 p-1"
+                                title="Delete player permanently"
+                                aria-label="Delete player permanently"
+                              >
+                                🗑️
                               </button>
                             </div>
                           </div>
@@ -855,6 +933,38 @@ export default function Teams() {
             <p className="text-sm text-slate-500">Select a team to manage its roster.</p>
           )}
         </section>
+
+        <ConfirmDialog
+          open={confirmDeleteTeam !== null}
+          title="Delete Team"
+          message={
+            confirmDeleteTeam
+              ? `Permanently delete "${teamDisplayName(confirmDeleteTeam)}" and all its players, games, stats, and tournaments? This cannot be undone.`
+              : ''
+          }
+          confirmLabel="Yes, Delete"
+          onConfirm={() => {
+            if (confirmDeleteTeam) void handleDeleteTeam(confirmDeleteTeam)
+            setConfirmDeleteTeam(null)
+          }}
+          onCancel={() => setConfirmDeleteTeam(null)}
+        />
+
+        <ConfirmDialog
+          open={confirmDeletePlayer !== null}
+          title="Delete Player"
+          message={
+            confirmDeletePlayer
+              ? `Permanently delete "${playerDisplayName(confirmDeletePlayer)}" and all their game stats? This cannot be undone. To keep history, use "Remove" instead.`
+              : ''
+          }
+          confirmLabel="Yes, Delete"
+          onConfirm={() => {
+            if (confirmDeletePlayer) void handleDeletePlayer(confirmDeletePlayer)
+            setConfirmDeletePlayer(null)
+          }}
+          onCancel={() => setConfirmDeletePlayer(null)}
+        />
 
         {selectedTeam && (
           <section className="card space-y-3">

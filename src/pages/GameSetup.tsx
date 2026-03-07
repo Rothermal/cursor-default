@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface CloudTeam {
   id: string
@@ -46,6 +47,8 @@ export default function GameSetup() {
   const [newTournamentName, setNewTournamentName] = useState('')
   const [loadingTournaments, setLoadingTournaments] = useState(false)
   const [creatingTournament, setCreatingTournament] = useState(false)
+  const [confirmDeleteTournament, setConfirmDeleteTournament] = useState<TournamentOption | null>(null)
+  const [deletingTournamentId, setDeletingTournamentId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -130,6 +133,21 @@ export default function GameSetup() {
     void loadTournaments()
     return () => { cancelled = true }
   }, [isCloudFlow, teamMode, selectedTeamId, existingTournamentId])
+
+  const handleDeleteTournament = async (tournament: TournamentOption) => {
+    if (!supabase) return
+    setDeletingTournamentId(tournament.id)
+    const { error } = await supabase
+      .from('tournaments')
+      .delete()
+      .eq('id', tournament.id)
+    setDeletingTournamentId(null)
+    if (error) return
+    setTournaments(prev => prev.filter(t => t.id !== tournament.id))
+    if (selectedTournamentId === tournament.id) {
+      setSelectedTournamentId('')
+    }
+  }
 
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
@@ -341,20 +359,35 @@ export default function GameSetup() {
                 {loadingTournaments ? (
                   <p className="text-xs text-slate-400 animate-pulse">Loading tournaments...</p>
                 ) : (
-                  <select
-                    value={selectedTournamentId}
-                    onChange={e => {
-                      setSelectedTournamentId(e.target.value)
-                      if (e.target.value !== '__new__') setNewTournamentName('')
-                    }}
-                    className="input-field"
-                  >
-                    <option value="">No tournament</option>
-                    {tournaments.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                    <option value="__new__">+ Add new tournament…</option>
-                  </select>
+                  <>
+                    <select
+                      value={selectedTournamentId}
+                      onChange={e => {
+                        setSelectedTournamentId(e.target.value)
+                        if (e.target.value !== '__new__') setNewTournamentName('')
+                      }}
+                      className="input-field"
+                    >
+                      <option value="">No tournament</option>
+                      {tournaments.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                      <option value="__new__">+ Add new tournament…</option>
+                    </select>
+                    {selectedTournamentId && selectedTournamentId !== '__new__' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const t = tournaments.find(item => item.id === selectedTournamentId)
+                          if (t) setConfirmDeleteTournament(t)
+                        }}
+                        disabled={deletingTournamentId === selectedTournamentId}
+                        className="text-xs text-red-600 underline disabled:opacity-40"
+                      >
+                        {deletingTournamentId === selectedTournamentId ? 'Deleting...' : 'Delete this tournament'}
+                      </button>
+                    )}
+                  </>
                 )}
                 {selectedTournamentId === '__new__' && (
                   <input
@@ -366,6 +399,22 @@ export default function GameSetup() {
                     autoFocus
                   />
                 )}
+
+                <ConfirmDialog
+                  open={confirmDeleteTournament !== null}
+                  title="Delete Tournament"
+                  message={
+                    confirmDeleteTournament
+                      ? `Delete "${confirmDeleteTournament.name}"? Games linked to this tournament will keep their data but lose the tournament association.`
+                      : ''
+                  }
+                  confirmLabel="Yes, Delete"
+                  onConfirm={() => {
+                    if (confirmDeleteTournament) void handleDeleteTournament(confirmDeleteTournament)
+                    setConfirmDeleteTournament(null)
+                  }}
+                  onCancel={() => setConfirmDeleteTournament(null)}
+                />
               </div>
             ) : (
               <input
