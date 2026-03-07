@@ -12,7 +12,12 @@ interface TeamRow {
   id: string
   name: string
   nickname: string | null
-  sport: string
+  season_id: string
+  seasons: {
+    id: string
+    name: string
+    sport: string
+  }
 }
 
 interface PlayerRow {
@@ -68,8 +73,8 @@ export default function PlayerProfile() {
   const [error, setError] = useState<string | null>(null)
 
   const sport = useMemo(
-    () => sports.find(s => s.id === team?.sport) ?? null,
-    [team?.sport]
+    () => sports.find(s => s.id === team?.seasons?.sport) ?? null,
+    [team?.seasons?.sport]
   )
 
   useEffect(() => {
@@ -84,8 +89,13 @@ export default function PlayerProfile() {
       setError(null)
 
       const [teamRes, playerRes, statsRes, gameStatsRes] = await Promise.all([
-        supabaseClient.from('teams').select('id,name,nickname,sport').eq('id', teamId).single(),
-        supabaseClient.from('players').select('id,first_name,last_name,jersey_number,nickname').eq('id', playerId).single(),
+        supabaseClient.from('teams').select('id,name,nickname,season_id,seasons!inner(id,name,sport)').eq('id', teamId).single(),
+        supabaseClient
+          .from('team_players')
+          .select('jersey_number,players!inner(id,first_name,last_name,nickname)')
+          .eq('team_id', teamId)
+          .eq('player_id', playerId)
+          .single(),
         supabaseClient.rpc('get_season_stats_resolved', { p_team_id: teamId }),
         supabaseClient.from('game_stats').select('game_id').eq('player_id', playerId),
       ])
@@ -108,8 +118,15 @@ export default function PlayerProfile() {
         return
       }
 
-      setTeam(teamRes.data as TeamRow)
-      setPlayer(playerRes.data as PlayerRow)
+      setTeam(teamRes.data as unknown as TeamRow)
+      const tp = playerRes.data as unknown as { jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null; nickname: string | null } }
+      setPlayer({
+        id: tp.players.id,
+        first_name: tp.players.first_name,
+        last_name: tp.players.last_name,
+        jersey_number: tp.jersey_number,
+        nickname: tp.players.nickname,
+      } as PlayerRow)
       setSeasonStats((statsRes.data ?? []).filter((r: SeasonStatRow) => r.player_id === playerId) as SeasonStatRow[])
 
       const gameIds = [...new Set(((gameStatsRes.data ?? []) as { game_id: string }[]).map(r => r.game_id))]
@@ -168,6 +185,7 @@ export default function PlayerProfile() {
       notes: cloudGame.notes,
       actionLog: [],
       cloudSync: {
+        seasonId: cloudGame.seasonId ?? null,
         teamId: cloudGame.teamId,
         gameId: cloudGame.gameId,
         gameStatus: cloudGame.status,
@@ -277,7 +295,7 @@ export default function PlayerProfile() {
                   className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
                 >
                   <p className="text-xs text-slate-500 uppercase tracking-wide">
-                    {getStatShortLabel(team.sport, row.stat_id)}
+                    {getStatShortLabel(team.seasons.sport, row.stat_id)}
                   </p>
                   <p className="font-semibold text-slate-800">{row.total}</p>
                   <p className="text-xs text-slate-400">

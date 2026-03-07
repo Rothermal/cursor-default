@@ -11,8 +11,12 @@ interface TeamRow {
   id: string
   name: string
   nickname: string | null
-  sport: string
-  season: string | null
+  season_id: string
+  seasons: {
+    id: string
+    name: string
+    sport: string
+  }
 }
 
 interface PlayerRow {
@@ -98,7 +102,7 @@ export default function Teams() {
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('teams')
-        .select('id,name,nickname,sport,season')
+        .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
         .order('created_at', { ascending: false })
 
       if (cancelled) return
@@ -108,7 +112,7 @@ export default function Teams() {
         return
       }
 
-      const loadedTeams = (data ?? []) as TeamRow[]
+      const loadedTeams = (data ?? []) as unknown as TeamRow[]
       setTeams(loadedTeams)
       setSelectedTeamId(prev => {
         if (prev && loadedTeams.some(team => team.id === prev)) return prev
@@ -134,11 +138,11 @@ export default function Teams() {
       setLoadingPlayers(true)
       setError(null)
       const { data, error: queryError } = await supabaseClient
-        .from('players')
-        .select('id,first_name,last_name,jersey_number,nickname')
+        .from('team_players')
+        .select('jersey_number,players!inner(id,first_name,last_name,nickname)')
         .eq('team_id', selectedTeamId)
         .eq('is_active', true)
-        .order('created_at', { ascending: true })
+        .order('joined_at', { ascending: true })
 
       if (cancelled) return
       if (queryError) {
@@ -147,7 +151,14 @@ export default function Teams() {
         return
       }
 
-      setPlayers((data ?? []) as PlayerRow[])
+      type TeamPlayerJoin = { jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null; nickname: string | null } }
+      setPlayers(((data ?? []) as unknown as TeamPlayerJoin[]).map(row => ({
+        id: row.players.id,
+        first_name: row.players.first_name,
+        last_name: row.players.last_name,
+        jersey_number: row.jersey_number,
+        nickname: row.players.nickname,
+      })))
       setLoadingPlayers(false)
     }
 
@@ -356,15 +367,30 @@ export default function Teams() {
     setError(null)
     setCreatingTeam(true)
 
+    const { data: seasonData, error: seasonError } = await supabaseClient
+      .from('seasons')
+      .insert({
+        owner_id: userId,
+        name: newTeamSeason.trim() || `${newTeamName.trim()} Season`,
+        sport: newTeamSport,
+      })
+      .select('id,name,sport')
+      .single()
+
+    if (seasonError || !seasonData) {
+      setError(seasonError?.message ?? 'Could not create season')
+      setCreatingTeam(false)
+      return
+    }
+
     const { data, error: createError } = await supabaseClient
       .from('teams')
       .insert({
         owner_id: userId,
         name: newTeamName.trim(),
-        sport: newTeamSport,
-        season: newTeamSeason.trim() || null,
+        season_id: seasonData.id,
       })
-      .select('id,name,nickname,sport,season')
+      .select('id,name,nickname,season_id')
       .single()
 
     setCreatingTeam(false)
@@ -373,7 +399,17 @@ export default function Teams() {
       return
     }
 
-    const createdTeam = { ...data, nickname: (data as TeamRow).nickname ?? null } as TeamRow
+    const createdTeam: TeamRow = {
+      id: data.id as string,
+      name: data.name as string,
+      nickname: (data.nickname as string | null) ?? null,
+      season_id: seasonData.id as string,
+      seasons: {
+        id: seasonData.id as string,
+        name: seasonData.name as string,
+        sport: seasonData.sport as string,
+      },
+    }
     setTeams(prev => [createdTeam, ...prev])
     setSelectedTeamId(createdTeam.id)
     setNewTeamName('')
@@ -383,43 +419,64 @@ export default function Teams() {
   }
 
   const handleAddPlayer = async () => {
-    if (!supabaseClient || !selectedTeamId || !newPlayerFirst.trim()) return
+    if (!supabaseClient || !selectedTeamId || !newPlayerFirst.trim() || !userId) return
     setError(null)
     setSavingPlayer(true)
 
-    const { data, error: insertError } = await supabaseClient
+    const { data: playerData, error: insertError } = await supabaseClient
       .from('players')
       .insert({
-        team_id: selectedTeamId,
+        created_by: userId,
         first_name: newPlayerFirst.trim(),
         last_name: newPlayerLast.trim() || null,
-        jersey_number: newPlayerNumber.trim() || null,
-        is_active: true,
       })
-      .select('id,first_name,last_name,jersey_number,nickname')
+      .select('id,first_name,last_name,nickname')
       .single()
 
-    setSavingPlayer(false)
-    if (insertError || !data) {
+    if (insertError || !playerData) {
       setError(insertError?.message ?? 'Could not add player')
+      setSavingPlayer(false)
       return
     }
 
-    setPlayers(prev => [...prev, { ...data, nickname: (data as PlayerRow).nickname ?? null } as PlayerRow])
+    const jerseyNumber = newPlayerNumber.trim() || null
+    const { error: junctionError } = await supabaseClient
+      .from('team_players')
+      .insert({
+        team_id: selectedTeamId,
+        player_id: playerData.id,
+        jersey_number: jerseyNumber,
+        is_active: true,
+      })
+
+    setSavingPlayer(false)
+    if (junctionError) {
+      setError(junctionError.message)
+      return
+    }
+
+    setPlayers(prev => [...prev, {
+      id: playerData.id as string,
+      first_name: playerData.first_name as string,
+      last_name: (playerData.last_name as string | null) ?? null,
+      jersey_number: jerseyNumber,
+      nickname: (playerData.nickname as string | null) ?? null,
+    }])
     setNewPlayerFirst('')
     setNewPlayerLast('')
     setNewPlayerNumber('')
   }
 
   const handleDeactivatePlayer = async (playerId: string) => {
-    if (!supabaseClient) return
+    if (!supabaseClient || !selectedTeamId) return
     setError(null)
     setDeletingPlayerId(playerId)
 
     const { error: updateError } = await supabaseClient
-      .from('players')
+      .from('team_players')
       .update({ is_active: false })
-      .eq('id', playerId)
+      .eq('team_id', selectedTeamId)
+      .eq('player_id', playerId)
 
     setDeletingPlayerId(null)
     if (updateError) {
@@ -529,18 +586,26 @@ export default function Teams() {
   }
 
   const handleSavePlayer = async () => {
-    if (!supabaseClient || !editingPlayerId || !editingPlayerFirst.trim()) return
+    if (!supabaseClient || !editingPlayerId || !editingPlayerFirst.trim() || !selectedTeamId) return
     setError(null)
     setSavingNickname(true)
     const first_name = editingPlayerFirst.trim()
     const last_name = editingPlayerLast.trim() || null
     const jersey_number = editingPlayerNumber.trim() || null
     const nickname = editingPlayerNickname.trim() || null
-    const { error: updateError } = await supabaseClient
-      .from('players')
-      .update({ first_name, last_name, jersey_number, nickname })
-      .eq('id', editingPlayerId)
+    const [playerRes, junctionRes] = await Promise.all([
+      supabaseClient
+        .from('players')
+        .update({ first_name, last_name, nickname })
+        .eq('id', editingPlayerId),
+      supabaseClient
+        .from('team_players')
+        .update({ jersey_number })
+        .eq('team_id', selectedTeamId)
+        .eq('player_id', editingPlayerId),
+    ])
     setSavingNickname(false)
+    const updateError = playerRes.error || junctionRes.error
     if (updateError) {
       setError(updateError.message)
       return
@@ -662,7 +727,7 @@ export default function Teams() {
           ) : (
             <div className="space-y-2">
               {teams.map(team => {
-                const sport = sports.find(item => item.id === team.sport)
+                const sport = sports.find(item => item.id === team.seasons.sport)
                 const isEditing = editingTeamId === team.id
                 return (
                   <div
@@ -730,7 +795,7 @@ export default function Teams() {
                             )}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {sport?.name ?? team.sport}{team.season ? ` • ${team.season}` : ''}
+                            {sport?.name ?? team.seasons.sport}{team.seasons.name ? ` • ${team.seasons.name}` : ''}
                           </p>
                         </button>
                         <div className="flex items-center gap-0.5 shrink-0">

@@ -9,8 +9,12 @@ interface TeamRow {
   id: string
   name: string
   nickname: string | null
-  sport: string
-  season: string | null
+  season_id: string
+  seasons: {
+    id: string
+    name: string
+    sport: string
+  }
 }
 
 interface PlayerRow {
@@ -53,8 +57,8 @@ export default function Leaderboard() {
   )
 
   const sport = useMemo(
-    () => sports.find(s => s.id === selectedTeam?.sport) ?? null,
-    [selectedTeam?.sport]
+    () => sports.find(s => s.id === selectedTeam?.seasons?.sport) ?? null,
+    [selectedTeam?.seasons?.sport]
   )
 
   useEffect(() => {
@@ -66,7 +70,7 @@ export default function Leaderboard() {
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('teams')
-        .select('id,name,nickname,sport,season')
+        .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
         .order('created_at', { ascending: false })
 
       if (cancelled) return
@@ -76,7 +80,7 @@ export default function Leaderboard() {
         return
       }
 
-      const loadedTeams = (data ?? []) as TeamRow[]
+      const loadedTeams = (data ?? []) as unknown as TeamRow[]
       setTeams(loadedTeams)
       setSelectedTeamId(prev => {
         if (teamIdFromUrl && loadedTeams.some(t => t.id === teamIdFromUrl)) return teamIdFromUrl
@@ -104,11 +108,11 @@ export default function Leaderboard() {
 
       const [playersRes, statsRes] = await Promise.all([
         supabaseClient
-          .from('players')
-          .select('id,first_name,last_name,jersey_number,nickname')
+          .from('team_players')
+          .select('jersey_number,players!inner(id,first_name,last_name,nickname)')
           .eq('team_id', selectedTeamId)
           .eq('is_active', true)
-          .order('created_at', { ascending: true }),
+          .order('joined_at', { ascending: true }),
         supabaseClient.rpc('get_season_stats_resolved', { p_team_id: selectedTeamId }),
       ])
 
@@ -125,7 +129,14 @@ export default function Leaderboard() {
         return
       }
 
-      setPlayers((playersRes.data ?? []) as PlayerRow[])
+      type TeamPlayerJoin = { jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null; nickname: string | null } }
+      setPlayers(((playersRes.data ?? []) as unknown as TeamPlayerJoin[]).map(row => ({
+        id: row.players.id,
+        first_name: row.players.first_name,
+        last_name: row.players.last_name,
+        jersey_number: row.jersey_number,
+        nickname: row.players.nickname,
+      })))
       setSeasonStats((statsRes.data ?? []) as SeasonStatRow[])
       setLoadingStats(false)
     }
@@ -227,7 +238,7 @@ export default function Leaderboard() {
           ) : (
             <div className="space-y-2">
               {teams.map(team => {
-                const s = sports.find(item => item.id === team.sport)
+                const s = sports.find(item => item.id === team.seasons.sport)
                 return (
                   <button
                     key={team.id}
@@ -243,7 +254,7 @@ export default function Leaderboard() {
                       {s?.icon ?? '🏟️'} {teamDisplayName(team)}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {s?.name ?? team.sport}{team.season ? ` • ${team.season}` : ''}
+                      {s?.name ?? team.seasons.sport}{team.seasons.name ? ` • ${team.seasons.name}` : ''}
                     </p>
                   </button>
                 )

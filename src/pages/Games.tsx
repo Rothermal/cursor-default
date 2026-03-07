@@ -176,6 +176,7 @@ export default function Games() {
       notes: cloudGame.notes,
       actionLog: [],
       cloudSync: {
+        seasonId: cloudGame.seasonId ?? null,
         teamId: cloudGame.teamId,
         gameId: cloudGame.gameId,
         gameStatus: cloudGame.status,

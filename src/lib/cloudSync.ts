@@ -7,6 +7,7 @@ interface SyncGameSnapshotInput {
 }
 
 export interface SyncGameSnapshotResult {
+  seasonId: string
   teamId: string
   gameId: string
   playerIdMap: Record<string, string>
@@ -22,6 +23,7 @@ export interface HydratedCloudGame {
   opponentScore: number
   homeScoreAdjustment: number
   notes: string
+  seasonId: string | null
   teamId: string
   gameId: string
   playerIdMap: Record<string, string>
@@ -93,7 +95,53 @@ function getSeasonFromDate(dateIso: string): string {
   return date.getFullYear().toString()
 }
 
-async function ensureTeam(state: GameState, userId: string): Promise<string> {
+async function ensureSeason(state: GameState, userId: string): Promise<string> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  if (state.cloudSync.seasonId) {
+    return state.cloudSync.seasonId
+  }
+
+  const seasonName = getSeasonFromDate(state.gameInfo!.date)
+  const sportId = state.sport!.id
+
+  const { data: existing, error: lookupError } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('owner_id', userId)
+    .eq('name', seasonName)
+    .eq('sport', sportId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (lookupError) {
+    throw new Error(`Season lookup failed: ${lookupError.message}`)
+  }
+
+  if (existing && existing.length > 0) {
+    return existing[0].id as string
+  }
+
+  const { data: created, error: createError } = await supabase
+    .from('seasons')
+    .insert({
+      owner_id: userId,
+      name: seasonName,
+      sport: sportId,
+    })
+    .select('id')
+    .single()
+
+  if (createError || !created) {
+    throw new Error(`Season creation failed: ${createError?.message ?? 'unknown error'}`)
+  }
+
+  return created.id as string
+}
+
+async function ensureTeam(state: GameState, userId: string, seasonId: string): Promise<string> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
   }
@@ -107,7 +155,7 @@ async function ensureTeam(state: GameState, userId: string): Promise<string> {
     .select('id')
     .eq('owner_id', userId)
     .eq('name', state.gameInfo!.teamName)
-    .eq('sport', state.sport!.id)
+    .eq('season_id', seasonId)
     .order('created_at', { ascending: false })
     .limit(1)
 
@@ -124,8 +172,7 @@ async function ensureTeam(state: GameState, userId: string): Promise<string> {
     .insert({
       owner_id: userId,
       name: state.gameInfo!.teamName,
-      sport: state.sport!.id,
-      season: getSeasonFromDate(state.gameInfo!.date),
+      season_id: seasonId,
     })
     .select('id')
     .single()
@@ -211,6 +258,7 @@ async function ensureGame(state: GameState, userId: string, teamId: string): Pro
 async function ensurePlayerId(
   player: Player,
   teamId: string,
+  userId: string,
   existingRemoteId: string | undefined
 ): Promise<string> {
   if (!supabase) {
@@ -220,55 +268,89 @@ async function ensurePlayerId(
   const { firstName, lastName } = parsePlayerName(player.name)
   const jerseyNumber = player.number.trim()
 
-  const playerPayload = {
-    team_id: teamId,
-    first_name: firstName,
-    last_name: lastName,
-    jersey_number: jerseyNumber,
-    is_active: true,
-  }
-
   if (existingRemoteId) {
     const { error: updateError } = await supabase
       .from('players')
-      .update(playerPayload)
+      .update({ first_name: firstName, last_name: lastName, nickname: null })
       .eq('id', existingRemoteId)
 
     if (updateError) {
       throw new Error(`Player update failed: ${updateError.message}`)
     }
 
+    await supabase
+      .from('team_players')
+      .upsert(
+        { team_id: teamId, player_id: existingRemoteId, jersey_number: jerseyNumber, is_active: true },
+        { onConflict: 'team_id,player_id' }
+      )
+
     return existingRemoteId
   }
 
-  const { data: existingPlayers, error: lookupError } = await supabase
+  const { data: existingOnTeam, error: junctionLookupError } = await supabase
+    .from('team_players')
+    .select('player_id, players!inner(id, first_name, last_name)')
+    .eq('team_id', teamId)
+    .eq('players.first_name', firstName)
+    .eq('players.last_name', lastName)
+    .limit(1)
+
+  if (!junctionLookupError && existingOnTeam && existingOnTeam.length > 0) {
+    const playerId = (existingOnTeam[0] as { player_id: string }).player_id
+    await supabase
+      .from('team_players')
+      .update({ jersey_number: jerseyNumber, is_active: true })
+      .eq('team_id', teamId)
+      .eq('player_id', playerId)
+    return playerId
+  }
+
+  const { data: ownedPlayers, error: lookupError } = await supabase
     .from('players')
     .select('id')
-    .eq('team_id', teamId)
+    .eq('created_by', userId)
     .eq('first_name', firstName)
     .eq('last_name', lastName)
-    .eq('jersey_number', jerseyNumber)
     .limit(1)
 
   if (lookupError) {
     throw new Error(`Player lookup failed: ${lookupError.message}`)
   }
 
-  if (existingPlayers && existingPlayers.length > 0) {
-    return existingPlayers[0].id as string
+  let playerId: string
+
+  if (ownedPlayers && ownedPlayers.length > 0) {
+    playerId = ownedPlayers[0].id as string
+  } else {
+    const { data: createdPlayer, error: createError } = await supabase
+      .from('players')
+      .insert({ first_name: firstName, last_name: lastName, created_by: userId })
+      .select('id')
+      .single()
+
+    if (createError || !createdPlayer) {
+      throw new Error(`Player creation failed: ${createError?.message ?? 'unknown error'}`)
+    }
+
+    playerId = createdPlayer.id as string
+
+    await supabase
+      .from('player_guardians')
+      .upsert(
+        { player_id: playerId, user_id: userId, relationship: 'parent' },
+        { onConflict: 'player_id,user_id' }
+      )
   }
 
-  const { data: createdPlayer, error: createError } = await supabase
-    .from('players')
-    .insert(playerPayload)
-    .select('id')
-    .single()
+  await supabase
+    .from('team_players')
+    .upsert(
+      { team_id: teamId, player_id: playerId, jersey_number: jerseyNumber, is_active: true },
+      { onConflict: 'team_id,player_id' }
+    )
 
-  if (createError || !createdPlayer) {
-    throw new Error(`Player creation failed: ${createError?.message ?? 'unknown error'}`)
-  }
-
-  return createdPlayer.id as string
+  return playerId
 }
 
 async function upsertGameStats(
@@ -329,12 +411,13 @@ export async function syncGameSnapshotToCloud({
     throw new Error('Game is not initialized')
   }
 
-  const teamId = await ensureTeam(state, userId)
+  const seasonId = await ensureSeason(state, userId)
+  const teamId = await ensureTeam(state, userId, seasonId)
   const gameId = await ensureGame(state, userId, teamId)
 
   const nextPlayerIdMap: Record<string, string> = {}
   for (const player of state.players) {
-    const remotePlayerId = await ensurePlayerId(player, teamId, state.cloudSync.playerIdMap[player.id])
+    const remotePlayerId = await ensurePlayerId(player, teamId, userId, state.cloudSync.playerIdMap[player.id])
     nextPlayerIdMap[player.id] = remotePlayerId
   }
 
@@ -346,6 +429,7 @@ export async function syncGameSnapshotToCloud({
   await touchCloudGameLastOpened(gameId).catch(() => {})
 
   return {
+    seasonId,
     teamId,
     gameId,
     playerIdMap: nextPlayerIdMap,
@@ -360,7 +444,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
 
   const { data: teamRow, error: teamError } = await supabase
     .from('teams')
-    .select('id,name,sport')
+    .select('id,name,season_id')
     .eq('id', gameRow.team_id)
     .maybeSingle()
 
@@ -372,9 +456,17 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     throw new Error('Team missing for requested game')
   }
 
-  // Load stats differently depending on game status:
-  // - For final games, use resolved stats so viewers see official values
-  // - For non-final games, load only the current user's submissions
+  let sportId = ''
+  const seasonId = (teamRow.season_id as string | null) ?? null
+  if (seasonId) {
+    const { data: seasonRow } = await supabase
+      .from('seasons')
+      .select('sport')
+      .eq('id', seasonId)
+      .maybeSingle()
+    sportId = (seasonRow?.sport as string | null) ?? ''
+  }
+
   let statRows:
     | Array<{ player_id: string; stat_id: string; value: number }>
     | null = null
@@ -407,25 +499,33 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     statsByPlayer.set(playerId, statMap)
   }
 
-  const { data: playerRows, error: playersError } = await supabase
-    .from('players')
-    .select('id,first_name,last_name,jersey_number,is_active,created_at')
+  const { data: rosterRows, error: rosterError } = await supabase
+    .from('team_players')
+    .select('player_id, jersey_number, is_active, players!inner(id, first_name, last_name, created_at)')
     .eq('team_id', gameRow.team_id)
-    .order('created_at', { ascending: true })
+    .order('joined_at', { ascending: true })
 
-  if (playersError) {
-    throw new Error(`Players load failed: ${playersError.message}`)
+  if (rosterError) {
+    throw new Error(`Roster load failed: ${rosterError.message}`)
   }
 
-  const players: Player[] = (playerRows ?? [])
-    .filter(row => (row.is_active as boolean) || statsByPlayer.has(row.id as string))
+  type RosterRow = {
+    player_id: string
+    jersey_number: string | null
+    is_active: boolean
+    players: { id: string; first_name: string; last_name: string | null; created_at: string }
+  }
+
+  const players: Player[] = ((rosterRows ?? []) as unknown as RosterRow[])
+    .filter(row => row.is_active || statsByPlayer.has(row.player_id))
     .map(row => {
-      const playerId = row.id as string
-      const fullName = `${(row.first_name as string | null) ?? ''} ${(row.last_name as string | null) ?? ''}`.trim()
+      const playerId = row.player_id
+      const p = row.players
+      const fullName = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim()
       return {
         id: playerId,
         name: fullName || 'Player',
-        number: (row.jersey_number as string | null) ?? '',
+        number: row.jersey_number ?? '',
         stats: statsByPlayer.get(playerId) ?? {},
       }
     })
@@ -436,7 +536,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
   }, {})
 
   return {
-    sportId: teamRow.sport as string,
+    sportId,
     status: gameRow.status,
     gameInfo: {
       teamName: teamRow.name as string,
@@ -450,6 +550,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     opponentScore: gameRow.opponent_score ?? 0,
     homeScoreAdjustment: gameRow.home_score_adjustment ?? 0,
     notes: gameRow.notes ?? '',
+    seasonId,
     teamId: teamRow.id as string,
     gameId: gameRow.id,
     playerIdMap,

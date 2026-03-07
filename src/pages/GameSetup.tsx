@@ -8,8 +8,12 @@ import ConfirmDialog from '../components/ConfirmDialog'
 interface CloudTeam {
   id: string
   name: string
-  sport: string
-  season: string | null
+  season_id: string
+  seasons: {
+    id: string
+    name: string
+    sport: string
+  }
 }
 
 interface TournamentOption {
@@ -36,6 +40,7 @@ export default function GameSetup() {
   )
   const [teams, setTeams] = useState<CloudTeam[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState(state.cloudSync.teamId || '')
+  const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [teamsError, setTeamsError] = useState<string | null>(null)
 
@@ -59,8 +64,8 @@ export default function GameSetup() {
       setTeamsError(null)
       const { data, error } = await supabase!
         .from('teams')
-        .select('id,name,sport,season')
-        .eq('sport', sport.id)
+        .select('id,name,season_id,seasons!inner(id,name,sport)')
+        .eq('seasons.sport', sport.id)
         .order('created_at', { ascending: false })
 
       if (isCancelled) return
@@ -70,7 +75,7 @@ export default function GameSetup() {
         return
       }
 
-      const loadedTeams = (data ?? []) as CloudTeam[]
+      const loadedTeams = (data ?? []) as unknown as CloudTeam[]
       setTeams(loadedTeams)
       if (loadedTeams.length === 0) {
         setTeamMode('new')
@@ -153,6 +158,19 @@ export default function GameSetup() {
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [teams, selectedTeamId]
   )
+  const availableSeasons = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const t of teams) {
+      if (t.seasons && !map.has(t.seasons.id)) {
+        map.set(t.seasons.id, t.seasons.name)
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
+  }, [teams])
+  const filteredTeams = useMemo(
+    () => seasonFilter ? teams.filter(t => t.season_id === seasonFilter) : teams,
+    [teams, seasonFilter]
+  )
   const resolvedTeamName = teamMode === 'existing'
     ? selectedTeam?.name ?? ''
     : teamName.trim()
@@ -198,6 +216,7 @@ export default function GameSetup() {
     dispatch({
       type: 'SET_CLOUD_SYNC_STATE',
       cloudSync: {
+        seasonId: teamMode === 'existing' && selectedTeam ? selectedTeam.season_id : null,
         teamId: teamMode === 'existing' ? selectedTeamId || null : null,
         gameId: null,
         gameStatus: null,
@@ -284,7 +303,32 @@ export default function GameSetup() {
               {loadingTeams ? (
                 <p className="text-sm text-slate-500 animate-pulse">Loading teams...</p>
               ) : teamMode === 'existing' && teams.length > 0 ? (
-                <div>
+                <div className="space-y-2">
+                  {availableSeasons.length > 1 && (
+                    <>
+                      <label className="block text-sm font-medium text-slate-600 mb-1">
+                        Season
+                      </label>
+                      <select
+                        value={seasonFilter}
+                        onChange={e => {
+                          const nextFilter = e.target.value
+                          setSeasonFilter(nextFilter)
+                          const filtered = nextFilter ? teams.filter(t => t.season_id === nextFilter) : teams
+                          if (filtered.length > 0 && !filtered.some(t => t.id === selectedTeamId)) {
+                            setSelectedTeamId(filtered[0].id)
+                            setTeamName(filtered[0].name)
+                          }
+                        }}
+                        className="input-field"
+                      >
+                        <option value="">All seasons</option>
+                        {availableSeasons.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                   <label className="block text-sm font-medium text-slate-600 mb-1">
                     Select Team *
                   </label>
@@ -298,9 +342,9 @@ export default function GameSetup() {
                     }}
                     className="input-field"
                   >
-                    {teams.map(team => (
+                    {filteredTeams.map(team => (
                       <option key={team.id} value={team.id}>
-                        {team.name}{team.season ? ` (${team.season})` : ''}
+                        {team.name}{team.seasons?.name ? ` (${team.seasons.name})` : ''}
                       </option>
                     ))}
                   </select>
