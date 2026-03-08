@@ -2,7 +2,7 @@
 
 Redesign the data model to make **Season** a first-class entity at the top of the hierarchy, decouple players from teams via a junction table, and add Supabase admin display views for human-readable FK browsing.
 
-**Companion doc (TODO):** `DESIGN_STAT_TRACKING_UI.md` — stat page redesign covering career stats, season stats, game stats (player and team splits).
+**Companion doc:** [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) — stat page redesign covering career stats, season stats, game stats (player and team splits).
 
 ---
 
@@ -464,7 +464,7 @@ These views are for **admin browsing only** — the app continues to query base 
 
 ## 7. Stat Tracking Scope Changes
 
-> **Full UI design in separate doc:** `DESIGN_STAT_TRACKING_UI.md` (TODO)
+> **Full UI design:** [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md)
 
 ### 7.1 Stat View Categories
 
@@ -555,15 +555,15 @@ The migration is destructive (drops columns). Before running, recommend a Supaba
 
 ## 10. Implementation Phases
 
-| Phase | What | Depends On |
-|-------|------|------------|
-| **1. Schema** | Migration: `seasons`, `team_players`, `player_guardians` tables; alter `teams` and `players`; display views; RLS | — |
-| **2. Season UI** | Season CRUD in Settings/Admin; season selector in Game Setup; season display on Teams page | Phase 1 |
-| **3. Roster Refactor** | Update Teams page to use `team_players` junction; player add/remove goes through junction; support adding existing players from other teams/seasons via player pool | Phase 1 |
-| **4. Guardian Claim** | UI for parents to claim guardianship of a player on their team; "My Players" pool visible when building future rosters (players you created + players you're a guardian of) | Phase 1, 3 |
-| **5. Cloud Sync** | Update `cloudSync.ts` to handle season context, junction-based player lookup, auto-create guardian link on player creation | Phase 1, 2 |
-| **6. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | Phase 1, 3 (separate design doc) |
-| **7. Player Transfer** | UI to add an existing player to a new team (pick from player pool); player search/autocomplete | Phase 3, 4 |
+| Phase | What | Status |
+|-------|------|--------|
+| **1. Schema** | Migration 018: `seasons`, `team_players`, `player_guardians` tables; alter `teams` and `players`; display views; RLS | **Done** |
+| **2. Season UI** | Season CRUD in Settings/Admin; season selector in Game Setup; season picker on team creation | **Done** |
+| **3. Roster Refactor** | Teams page uses `team_players` junction; "Add Existing" player pool mode; PlayerSetup updated | **Done** |
+| **4. Guardian Claim** | "Claim" button on roster players; guardian status indicator; auto-guardian on player creation | **Done** |
+| **5. Cloud Sync** | `cloudSync.ts` handles season context, junction-based player lookup, auto-create guardian link | **Done** |
+| **6. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | Planned (see [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md)) |
+| **7. Player Transfer** | UI to add an existing player to a new team; player search/autocomplete | Planned |
 
 ---
 

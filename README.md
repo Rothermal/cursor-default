@@ -5,18 +5,22 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 ## Features
 
 - **Sport Selection** — configurable sports roster; enable/disable via the Settings page
-- **Game Setup** — enter team name, opponent, tournament/league, and date
-- **Cloud Team & Roster Management** — create teams and maintain active rosters in Supabase; optional nickname/display names for teams and players; edit team names, player names, and jersey numbers inline
+- **Seasons** — first-class entity at the top of the hierarchy; teams, games, and tournaments belong to a season; season CRUD in Settings; season picker on team creation and game setup
+- **Game Setup** — select season, pick/create team, enter opponent, tournament/league, and date
+- **Cloud Team & Roster Management** — create teams within seasons; manage rosters via `team_players` junction (players can span multiple teams/seasons); edit team names, player names, and jersey numbers inline
+- **Player Pool** — players are persistent person records; add existing players from your pool (players you created or are guardian of) to new teams without re-entering names
+- **Guardian System** — parents can claim guardianship of players on their team; guardians can edit player info and find players in their pool for future rosters
 - **Cloud Game Lifecycle** — resume in-progress games, finalize games, and review cloud game history; finalized games show **resolved stats** (checkout + admin corrections) in Game Summary
-- **Tournaments** — first-class tournament entities scoped to teams; games reference tournaments via FK; tournament picker in Game Setup (select existing or create new)
-- **Player Management** — add players with name and jersey number; add more mid-game
+- **Tournaments** — first-class tournament entities scoped to teams; games reference tournaments via FK; tournament picker in Game Setup (select existing or create new); placement tracking (1st, 2nd, 3rd)
+- **Player Management** — add new or existing players with name and jersey number; add more mid-game
 - **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category; missed-shot tracking with made/attempted display
 - **Minutes Played** — per-player minute counter for sports that track playing time (basketball, hockey, soccer, football)
 - **Game Notes** — free-text notes field in Game Tracker and Game Summary; synced to cloud
 - **Live Scoreboard** — auto-computed team score from player stats + editable home score adjustment; manual opponent score
 - **Undo Support** — undo any stat action instantly
 - **Game Summary** — per-player and team totals in organized tables; M/A (%) columns for shooting stats
-- **Delete Entities** — delete teams, players, games, and tournaments with confirmation prompts; centralized Data Management in Settings
+- **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; centralized Data Management in Settings
+- **Supabase Admin Views** — human-readable SQL views for all tables (JOINs FK UUIDs to names) in the Supabase table browser
 - **PWA** — installable on Android/iOS home screens, works offline with service worker caching
 - **Auth** — Supabase email/password authentication (optional; app works offline without it)
 - **Cloud Database** — Supabase PostgreSQL with Row Level Security (migrations + in-app game snapshot sync for signed-in users)
@@ -151,7 +155,7 @@ src/
 │   ├── Teams.tsx          # Cloud team + roster management + invites + delete
 │   ├── Leaderboard.tsx    # Season leaderboard (sortable by stat)
 │   ├── PlayerProfile.tsx  # Player season totals and game log
-│   └── Admin.tsx          # Settings — sports, cloud links, data management (delete)
+│   └── Admin.tsx          # Settings — sports, seasons CRUD, cloud links, data management
 ├── components/
 │   ├── ConfirmDialog.tsx  # Reusable confirmation modal (delete prompts)
 │   ├── Scoreboard.tsx     # Live score display
@@ -184,6 +188,8 @@ supabase/
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+├── DESIGN_SEASONS_DATA_MODEL.md  # Design: Seasons entity, roster junction, player guardians
+├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game/tournament stat views
 ├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
 ├── DESIGN_MULTI_PARENT_INVITE_LINKS.md  # Design: Invite links and multi-parent collaboration
 ├── DESIGN_TOURNAMENTS.md  # Design: Tournaments table, game link, UI and tournament-scoped views
@@ -240,11 +246,20 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Delete editable entities — delete teams, players (hard delete), games, tournaments with confirmation dialogs; centralized Data Management section in Settings; cascading deletes via Supabase FK constraints
 - [x] Graceful fallbacks for optional DB columns (`home_score_adjustment`, `tournament_id`, `notes`, `last_opened_at`) — app works with any subset of migrations applied
 - [x] Bug fixes: leaderboard sorting/navigation, game stats review display, team list cleanup, finalize fallback, RLS policy caching (migration 013)
+- [x] Seasons as first-class entity — `seasons` table (migration 018); teams belong to a season; season CRUD in Settings (create, edit, delete with cascade); season picker on team creation; season filter in Game Setup
+- [x] Roster junction table — `team_players` replaces `players.team_id`; players can be on multiple teams across seasons; jersey number and active status are per-team
+- [x] Player guardians — `player_guardians` junction; parents claim guardianship of players; guardians can edit player info and find players in their pool
+- [x] Player pool — "Add Existing" mode on roster: pick from players you created or are guardian of; no duplicate player records when moving between teams/seasons
+- [x] Supabase admin display views — 9 human-readable SQL views (`_display` suffix) with `security_invoker = true` for safe FK browsing in Supabase table browser
+- [x] Tournament placement — `tournaments.placement` column for finish position (1st, 2nd, 3rd, etc.)
 
 ### What's Next
 
+- [ ] Stat view redesign: career stats page, tournament stats page, team season summary, inline game stat lines on player profile (design: [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md))
+- [ ] Game Summary Players/Team tab toggle
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
+- [ ] Player transfer UI: search/autocomplete for adding existing players to new teams
 
 ### Future Enhancements
 
@@ -256,7 +271,7 @@ A backlog of ideas to iterate over:
 5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding. *Implemented: delete teams, players (hard delete), games, and tournaments from the Teams page, Games page, Game Setup tournament picker, and a centralized Data Management section in Settings (Admin). All deletes show a confirmation dialog. Cascading deletes handled by Supabase FK constraints (`ON DELETE CASCADE`).*
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
+8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard). *Implemented: `seasons` table as top-level entity (migration 018); teams belong to a season via `season_id` FK; games inherit season through their team; season filter in Game Setup; season CRUD in Settings. Design: [DESIGN_SEASONS_DATA_MODEL.md](docs/DESIGN_SEASONS_DATA_MODEL.md).*
 9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions). *Partially addressed by enhancement #5 (delete games individually from Games page and Data Management in Settings). Bulk actions and archive not yet implemented.*
 10. *(Add more as we go)*
 

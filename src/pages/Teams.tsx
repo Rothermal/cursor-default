@@ -37,6 +37,19 @@ interface TeamMemberRow {
   email: string | null
 }
 
+interface SeasonRow {
+  id: string
+  name: string
+  sport: string
+}
+
+interface PoolPlayer {
+  id: string
+  first_name: string
+  last_name: string | null
+  nickname: string | null
+}
+
 export default function Teams() {
   const navigate = useNavigate()
   const { user, isConfigured } = useAuth()
@@ -87,6 +100,19 @@ export default function Teams() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
   const [acceptingTeamId, setAcceptingTeamId] = useState<string | null>(null)
   const [decliningTeamId, setDecliningTeamId] = useState<string | null>(null)
+
+  const [existingSeasons, setExistingSeasons] = useState<SeasonRow[]>([])
+  const [seasonMode, setSeasonMode] = useState<'new' | 'existing'>('new')
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('')
+
+  const [playerPool, setPlayerPool] = useState<PoolPlayer[]>([])
+  const [playerAddMode, setPlayerAddMode] = useState<'new' | 'existing'>('new')
+  const [selectedExistingPlayerId, setSelectedExistingPlayerId] = useState<string>('')
+  const [existingPlayerNumber, setExistingPlayerNumber] = useState('')
+  const [addingExistingPlayer, setAddingExistingPlayer] = useState(false)
+
+  const [guardianMap, setGuardianMap] = useState<Record<string, boolean>>({})
+  const [claimingPlayerId, setClaimingPlayerId] = useState<string | null>(null)
 
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
@@ -224,6 +250,82 @@ export default function Teams() {
     void loadMembers()
     return () => { cancelled = true }
   }, [selectedTeamId, supabaseClient, userId])
+
+  useEffect(() => {
+    if (!isConfigured || !userId || !supabaseClient) return
+    let cancelled = false
+    const loadSeasons = async () => {
+      const { data } = await supabaseClient
+        .from('seasons')
+        .select('id,name,sport')
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: false })
+      if (cancelled) return
+      setExistingSeasons((data ?? []) as SeasonRow[])
+    }
+    void loadSeasons()
+    return () => { cancelled = true }
+  }, [isConfigured, supabaseClient, userId])
+
+  useEffect(() => {
+    if (!isConfigured || !userId || !supabaseClient) {
+      setPlayerPool([])
+      return
+    }
+    let cancelled = false
+    const loadPool = async () => {
+      const { data: createdPlayers } = await supabaseClient
+        .from('players')
+        .select('id,first_name,last_name,nickname')
+        .eq('created_by', userId)
+      const { data: guardedLinks } = await supabaseClient
+        .from('player_guardians')
+        .select('player_id')
+        .eq('user_id', userId)
+      if (cancelled) return
+      const pool = [...((createdPlayers ?? []) as PoolPlayer[])]
+      const createdIds = new Set(pool.map(p => p.id))
+      const guardedIds = ((guardedLinks ?? []) as { player_id: string }[])
+        .map(g => g.player_id)
+        .filter(id => !createdIds.has(id))
+      if (guardedIds.length > 0) {
+        const { data: guardedPlayers } = await supabaseClient
+          .from('players')
+          .select('id,first_name,last_name,nickname')
+          .in('id', guardedIds)
+        if (!cancelled && guardedPlayers) {
+          pool.push(...(guardedPlayers as PoolPlayer[]))
+        }
+      }
+      if (!cancelled) setPlayerPool(pool)
+    }
+    void loadPool()
+    return () => { cancelled = true }
+  }, [isConfigured, supabaseClient, userId])
+
+  useEffect(() => {
+    if (!selectedTeamId || !userId || !supabaseClient || players.length === 0) {
+      setGuardianMap({})
+      return
+    }
+    let cancelled = false
+    const loadGuardians = async () => {
+      const playerIds = players.map(p => p.id)
+      const { data } = await supabaseClient
+        .from('player_guardians')
+        .select('player_id')
+        .eq('user_id', userId)
+        .in('player_id', playerIds)
+      if (cancelled) return
+      const map: Record<string, boolean> = {}
+      for (const row of (data ?? []) as { player_id: string }[]) {
+        map[row.player_id] = true
+      }
+      setGuardianMap(map)
+    }
+    void loadGuardians()
+    return () => { cancelled = true }
+  }, [selectedTeamId, supabaseClient, userId, players])
 
   const handleLookupInvitee = async () => {
     if (!supabaseClient || !selectedTeamId || !inviteEmail.trim()) return
@@ -367,20 +469,34 @@ export default function Teams() {
     setError(null)
     setCreatingTeam(true)
 
-    const { data: seasonData, error: seasonError } = await supabaseClient
-      .from('seasons')
-      .insert({
-        owner_id: userId,
-        name: newTeamSeason.trim() || `${newTeamName.trim()} Season`,
-        sport: newTeamSport,
-      })
-      .select('id,name,sport')
-      .single()
+    let seasonData: SeasonRow
 
-    if (seasonError || !seasonData) {
-      setError(seasonError?.message ?? 'Could not create season')
-      setCreatingTeam(false)
-      return
+    if (seasonMode === 'existing' && selectedSeasonId) {
+      const found = existingSeasons.find(s => s.id === selectedSeasonId)
+      if (!found) {
+        setError('Selected season not found')
+        setCreatingTeam(false)
+        return
+      }
+      seasonData = found
+    } else {
+      const { data: newSeason, error: seasonError } = await supabaseClient
+        .from('seasons')
+        .insert({
+          owner_id: userId,
+          name: newTeamSeason.trim() || `${newTeamName.trim()} Season`,
+          sport: newTeamSport,
+        })
+        .select('id,name,sport')
+        .single()
+
+      if (seasonError || !newSeason) {
+        setError(seasonError?.message ?? 'Could not create season')
+        setCreatingTeam(false)
+        return
+      }
+      seasonData = newSeason as SeasonRow
+      setExistingSeasons(prev => [seasonData, ...prev])
     }
 
     const { data, error: createError } = await supabaseClient
@@ -465,6 +581,67 @@ export default function Teams() {
     setNewPlayerFirst('')
     setNewPlayerLast('')
     setNewPlayerNumber('')
+  }
+
+  const handleAddExistingPlayer = async () => {
+    if (!supabaseClient || !selectedTeamId || !selectedExistingPlayerId || !userId) return
+    setError(null)
+    setAddingExistingPlayer(true)
+
+    const jerseyNumber = existingPlayerNumber.trim() || null
+    const { error: junctionError } = await supabaseClient
+      .from('team_players')
+      .insert({
+        team_id: selectedTeamId,
+        player_id: selectedExistingPlayerId,
+        jersey_number: jerseyNumber,
+        is_active: true,
+      })
+
+    setAddingExistingPlayer(false)
+    if (junctionError) {
+      setError(junctionError.message)
+      return
+    }
+
+    const poolPlayer = playerPool.find(p => p.id === selectedExistingPlayerId)
+    if (poolPlayer) {
+      setPlayers(prev => [...prev, {
+        id: poolPlayer.id,
+        first_name: poolPlayer.first_name,
+        last_name: poolPlayer.last_name,
+        jersey_number: jerseyNumber,
+        nickname: poolPlayer.nickname,
+      }])
+    }
+    setSelectedExistingPlayerId('')
+    setExistingPlayerNumber('')
+  }
+
+  const handleClaimGuardian = async (playerId: string) => {
+    if (!supabaseClient || !userId) return
+    setError(null)
+    setClaimingPlayerId(playerId)
+
+    const { error: insertError } = await supabaseClient
+      .from('player_guardians')
+      .insert({
+        player_id: playerId,
+        user_id: userId,
+        relationship: 'parent',
+      })
+
+    setClaimingPlayerId(null)
+    if (insertError) {
+      if (insertError.code === '23505') {
+        setGuardianMap(prev => ({ ...prev, [playerId]: true }))
+        return
+      }
+      setError(insertError.message)
+      return
+    }
+
+    setGuardianMap(prev => ({ ...prev, [playerId]: true }))
   }
 
   const handleDeactivatePlayer = async (playerId: string) => {
@@ -686,30 +863,55 @@ export default function Teams() {
             placeholder="Team name"
             className="input-field"
           />
-          <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Season</label>
             <select
-              value={newTeamSport}
-              onChange={e => setNewTeamSport(e.target.value)}
+              value={seasonMode === 'existing' ? selectedSeasonId : '__new__'}
+              onChange={e => {
+                if (e.target.value === '__new__') {
+                  setSeasonMode('new')
+                  setSelectedSeasonId('')
+                } else {
+                  setSeasonMode('existing')
+                  setSelectedSeasonId(e.target.value)
+                }
+              }}
               className="input-field"
             >
-              {sports.map(sport => (
-                <option key={sport.id} value={sport.id}>
-                  {sport.icon} {sport.name}
+              <option value="__new__">Create new season...</option>
+              {existingSeasons.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.sport})
                 </option>
               ))}
             </select>
-            <input
-              type="text"
-              value={newTeamSeason}
-              onChange={e => setNewTeamSeason(e.target.value)}
-              placeholder="Season"
-              className="input-field"
-            />
           </div>
+          {seasonMode === 'new' && (
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={newTeamSport}
+                onChange={e => setNewTeamSport(e.target.value)}
+                className="input-field"
+              >
+                {sports.map(sport => (
+                  <option key={sport.id} value={sport.id}>
+                    {sport.icon} {sport.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={newTeamSeason}
+                onChange={e => setNewTeamSeason(e.target.value)}
+                placeholder="Season name"
+                className="input-field"
+              />
+            </div>
+          )}
           <button
             type="button"
             onClick={() => { void handleCreateTeam() }}
-            disabled={!newTeamName.trim() || creatingTeam}
+            disabled={!newTeamName.trim() || creatingTeam || (seasonMode === 'existing' && !selectedSeasonId)}
             className="btn-primary w-full"
           >
             {creatingTeam ? 'Creating...' : 'Create Team'}
@@ -849,37 +1051,101 @@ export default function Teams() {
 
           {selectedTeam ? (
             <>
-              <div className="grid grid-cols-12 gap-2">
-                <input
-                  type="text"
-                  value={newPlayerNumber}
-                  onChange={e => setNewPlayerNumber(e.target.value)}
-                  placeholder="#"
-                  className="input-field col-span-2 text-center"
-                />
-                <input
-                  type="text"
-                  value={newPlayerFirst}
-                  onChange={e => setNewPlayerFirst(e.target.value)}
-                  placeholder="First name"
-                  className="input-field col-span-5"
-                />
-                <input
-                  type="text"
-                  value={newPlayerLast}
-                  onChange={e => setNewPlayerLast(e.target.value)}
-                  placeholder="Last name"
-                  className="input-field col-span-5"
-                />
+              <div className="flex gap-1 mb-1">
+                <button
+                  type="button"
+                  onClick={() => setPlayerAddMode('new')}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${
+                    playerAddMode === 'new'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  New Player
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlayerAddMode('existing')}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${
+                    playerAddMode === 'existing'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  Add Existing
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => { void handleAddPlayer() }}
-                disabled={!newPlayerFirst.trim() || savingPlayer}
-                className="btn-primary w-full"
-              >
-                {savingPlayer ? 'Saving...' : 'Add Player'}
-              </button>
+
+              {playerAddMode === 'new' ? (
+                <>
+                  <div className="grid grid-cols-12 gap-2">
+                    <input
+                      type="text"
+                      value={newPlayerNumber}
+                      onChange={e => setNewPlayerNumber(e.target.value)}
+                      placeholder="#"
+                      className="input-field col-span-2 text-center"
+                    />
+                    <input
+                      type="text"
+                      value={newPlayerFirst}
+                      onChange={e => setNewPlayerFirst(e.target.value)}
+                      placeholder="First name"
+                      className="input-field col-span-5"
+                    />
+                    <input
+                      type="text"
+                      value={newPlayerLast}
+                      onChange={e => setNewPlayerLast(e.target.value)}
+                      placeholder="Last name"
+                      className="input-field col-span-5"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { void handleAddPlayer() }}
+                    disabled={!newPlayerFirst.trim() || savingPlayer}
+                    className="btn-primary w-full"
+                  >
+                    {savingPlayer ? 'Saving...' : 'Add Player'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-12 gap-2">
+                    <input
+                      type="text"
+                      value={existingPlayerNumber}
+                      onChange={e => setExistingPlayerNumber(e.target.value)}
+                      placeholder="#"
+                      className="input-field col-span-2 text-center"
+                    />
+                    <select
+                      value={selectedExistingPlayerId}
+                      onChange={e => setSelectedExistingPlayerId(e.target.value)}
+                      className="input-field col-span-10"
+                    >
+                      <option value="">Select a player...</option>
+                      {playerPool
+                        .filter(pp => !players.some(rp => rp.id === pp.id))
+                        .map(pp => (
+                          <option key={pp.id} value={pp.id}>
+                            {[pp.first_name, pp.last_name].filter(Boolean).join(' ')}
+                            {pp.nickname ? ` (${pp.nickname})` : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { void handleAddExistingPlayer() }}
+                    disabled={!selectedExistingPlayerId || addingExistingPlayer}
+                    className="btn-primary w-full"
+                  >
+                    {addingExistingPlayer ? 'Adding...' : 'Add to Roster'}
+                  </button>
+                </>
+              )}
 
               {loadingPlayers ? (
                 <p className="text-sm text-slate-500 animate-pulse">Loading roster...</p>
@@ -985,6 +1251,21 @@ export default function Teams() {
                               >
                                 🗑️
                               </button>
+                              {guardianMap[player.id] ? (
+                                <span className="text-xs text-green-600 ml-1" title="You are a guardian">
+                                  Guardian ✓
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => { void handleClaimGuardian(player.id) }}
+                                  disabled={claimingPlayerId === player.id}
+                                  className="text-xs text-blue-600 underline ml-1 disabled:opacity-40"
+                                  title="Claim guardianship"
+                                >
+                                  {claimingPlayerId === player.id ? 'Claiming...' : 'Claim'}
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}

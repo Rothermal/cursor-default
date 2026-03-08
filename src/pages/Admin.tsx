@@ -44,6 +44,14 @@ interface AdminPlayerRow {
   is_active: boolean
 }
 
+interface AdminSeasonRow {
+  id: string
+  name: string
+  sport: string
+  start_date: string | null
+  end_date: string | null
+}
+
 export default function Admin() {
   const navigate = useNavigate()
   const { isSportEnabled, toggleSport } = useSettings()
@@ -68,6 +76,21 @@ export default function Admin() {
   const [confirmDeleteTournament, setConfirmDeleteTournament] = useState<AdminTournamentRow | null>(null)
   const [confirmDeletePlayer, setConfirmDeletePlayer] = useState<AdminPlayerRow | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const [showSeasons, setShowSeasons] = useState(false)
+  const [seasonsList, setSeasonsList] = useState<AdminSeasonRow[]>([])
+  const [loadingSeasons, setLoadingSeasons] = useState(false)
+  const [seasonsError, setSeasonsError] = useState<string | null>(null)
+  const [newSeasonName, setNewSeasonName] = useState('')
+  const [newSeasonSport, setNewSeasonSport] = useState(sports[0]?.id ?? '')
+  const [newSeasonStartDate, setNewSeasonStartDate] = useState('')
+  const [newSeasonEndDate, setNewSeasonEndDate] = useState('')
+  const [creatingSeason, setCreatingSeason] = useState(false)
+  const [editingSeasonId, setEditingSeasonId] = useState<string | null>(null)
+  const [editSeasonName, setEditSeasonName] = useState('')
+  const [editSeasonStartDate, setEditSeasonStartDate] = useState('')
+  const [editSeasonEndDate, setEditSeasonEndDate] = useState('')
+  const [confirmDeleteSeason, setConfirmDeleteSeason] = useState<AdminSeasonRow | null>(null)
 
   useEffect(() => {
     if (!showDataMgmt || !isConfigured || !userId || !supabaseClient) return
@@ -183,6 +206,69 @@ export default function Admin() {
     setAdminPlayers(prev => prev.filter(p => p.id !== player.id))
   }
 
+  const loadSeasons = async () => {
+    if (!supabaseClient) return
+    setLoadingSeasons(true)
+    setSeasonsError(null)
+    const { data, error } = await supabaseClient
+      .from('seasons')
+      .select('id,name,sport,start_date,end_date')
+      .order('created_at', { ascending: false })
+    setLoadingSeasons(false)
+    if (error) { setSeasonsError(error.message); return }
+    setSeasonsList((data ?? []) as AdminSeasonRow[])
+  }
+
+  useEffect(() => {
+    if (!showSeasons || !isConfigured || !userId || !supabaseClient) return
+    void loadSeasons()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSeasons, isConfigured, userId, supabaseClient])
+
+  const handleCreateSeason = async () => {
+    if (!supabaseClient || !newSeasonName.trim()) return
+    setCreatingSeason(true)
+    setSeasonsError(null)
+    const { error } = await supabaseClient.from('seasons').insert({
+      owner_id: userId,
+      name: newSeasonName.trim(),
+      sport: newSeasonSport,
+      start_date: newSeasonStartDate || null,
+      end_date: newSeasonEndDate || null,
+    })
+    setCreatingSeason(false)
+    if (error) { setSeasonsError(error.message); return }
+    setNewSeasonName('')
+    setNewSeasonStartDate('')
+    setNewSeasonEndDate('')
+    void loadSeasons()
+  }
+
+  const handleSaveSeasonEdit = async (season: AdminSeasonRow) => {
+    if (!supabaseClient || !editSeasonName.trim()) return
+    setSeasonsError(null)
+    setDeletingId(season.id)
+    const { error } = await supabaseClient.from('seasons').update({
+      name: editSeasonName.trim(),
+      start_date: editSeasonStartDate || null,
+      end_date: editSeasonEndDate || null,
+    }).eq('id', season.id)
+    setDeletingId(null)
+    if (error) { setSeasonsError(error.message); return }
+    setEditingSeasonId(null)
+    void loadSeasons()
+  }
+
+  const handleDeleteSeason = async (season: AdminSeasonRow) => {
+    if (!supabaseClient) return
+    setSeasonsError(null)
+    setDeletingId(season.id)
+    const { error } = await supabaseClient.from('seasons').delete().eq('id', season.id)
+    setDeletingId(null)
+    if (error) { setSeasonsError(error.message); return }
+    setSeasonsList(prev => prev.filter(s => s.id !== season.id))
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
@@ -282,6 +368,201 @@ export default function Admin() {
                 View Cloud Games →
               </button>
             </div>
+          </section>
+        )}
+
+        {isConfigured && user && (
+          <section className="mt-6">
+            <button
+              type="button"
+              onClick={() => setShowSeasons(!showSeasons)}
+              className="card w-full text-left"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-700">Seasons</h2>
+                  <p className="text-sm text-slate-500">Create & manage seasons</p>
+                </div>
+                <span className="text-slate-400 text-lg">{showSeasons ? '▲' : '▼'}</span>
+              </div>
+            </button>
+
+            {showSeasons && (
+              <div className="mt-3 space-y-3">
+                {seasonsError && (
+                  <div className="card bg-red-50 border-red-200 text-red-700 text-sm">{seasonsError}</div>
+                )}
+
+                <div className="card space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-700">New Season</h3>
+                  <input
+                    type="text"
+                    placeholder="Season name"
+                    value={newSeasonName}
+                    onChange={e => setNewSeasonName(e.target.value)}
+                    className="input-field"
+                  />
+                  <select
+                    value={newSeasonSport}
+                    onChange={e => setNewSeasonSport(e.target.value)}
+                    className="input-field"
+                  >
+                    {sports.map(s => (
+                      <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
+                    ))}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Start date</label>
+                      <input
+                        type="date"
+                        value={newSeasonStartDate}
+                        onChange={e => setNewSeasonStartDate(e.target.value)}
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">End date</label>
+                      <input
+                        type="date"
+                        value={newSeasonEndDate}
+                        onChange={e => setNewSeasonEndDate(e.target.value)}
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateSeason()}
+                    disabled={!newSeasonName.trim() || creatingSeason}
+                    className="btn-primary w-full"
+                  >
+                    {creatingSeason ? 'Creating…' : 'Create Season'}
+                  </button>
+                </div>
+
+                {loadingSeasons ? (
+                  <p className="text-sm text-slate-500 animate-pulse card">Loading…</p>
+                ) : seasonsList.length === 0 ? (
+                  <p className="text-sm text-slate-500 card">No seasons yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {seasonsList.map(season => {
+                      const sportCfg = sports.find(s => s.id === season.sport)
+                      const isEditing = editingSeasonId === season.id
+
+                      if (isEditing) {
+                        return (
+                          <div key={season.id} className="card space-y-2">
+                            <input
+                              type="text"
+                              value={editSeasonName}
+                              onChange={e => setEditSeasonName(e.target.value)}
+                              className="input-field"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-xs text-slate-500 mb-1">Start date</label>
+                                <input
+                                  type="date"
+                                  value={editSeasonStartDate}
+                                  onChange={e => setEditSeasonStartDate(e.target.value)}
+                                  className="input-field"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-500 mb-1">End date</label>
+                                <input
+                                  type="date"
+                                  value={editSeasonEndDate}
+                                  onChange={e => setEditSeasonEndDate(e.target.value)}
+                                  className="input-field"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveSeasonEdit(season)}
+                                disabled={!editSeasonName.trim() || deletingId === season.id}
+                                className="btn-primary flex-1"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSeasonId(null)}
+                                className="btn-secondary flex-1"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <div key={season.id} className="card flex items-center justify-between py-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{sportCfg?.icon ?? '🏟️'}</span>
+                              <span className="font-medium text-slate-700 truncate">{season.name}</span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {sportCfg?.name ?? season.sport}
+                              {(season.start_date || season.end_date) && ' · '}
+                              {season.start_date ?? ''}
+                              {season.start_date && season.end_date && ' → '}
+                              {season.end_date ?? ''}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSeasonId(season.id)
+                                setEditSeasonName(season.name)
+                                setEditSeasonStartDate(season.start_date ?? '')
+                                setEditSeasonEndDate(season.end_date ?? '')
+                              }}
+                              className="text-slate-400 hover:text-blue-500 p-1"
+                              title="Edit season"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteSeason(season)}
+                              disabled={deletingId === season.id}
+                              className="text-slate-400 hover:text-red-500 p-1"
+                              title="Delete season"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <ConfirmDialog
+              open={confirmDeleteSeason !== null}
+              title="Delete Season"
+              message={
+                confirmDeleteSeason
+                  ? `Permanently delete "${confirmDeleteSeason.name}" and ALL its teams, games, and stats? This cannot be undone.`
+                  : ''
+              }
+              confirmLabel="Yes, Delete"
+              onConfirm={() => {
+                if (confirmDeleteSeason) void handleDeleteSeason(confirmDeleteSeason)
+                setConfirmDeleteSeason(null)
+              }}
+              onCancel={() => setConfirmDeleteSeason(null)}
+            />
           </section>
         )}
 
