@@ -193,6 +193,7 @@ docs/
 ├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
 ├── DESIGN_MULTI_PARENT_INVITE_LINKS.md  # Design: Invite links and multi-parent collaboration
 ├── DESIGN_TOURNAMENTS.md  # Design: Tournaments table, game link, UI and tournament-scoped views
+├── DATA_INTEGRITY_AND_CREATION_PLAN.md  # Plan: DB/app enforcement, season/team creation alignment
 └── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
 
@@ -273,7 +274,8 @@ A backlog of ideas to iterate over:
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
 8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard). *Implemented: `seasons` table as top-level entity (migration 018); teams belong to a season via `season_id` FK; games inherit season through their team; season filter in Game Setup; season CRUD in Settings. Design: [DESIGN_SEASONS_DATA_MODEL.md](docs/DESIGN_SEASONS_DATA_MODEL.md).*
 9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions). *Partially addressed by enhancement #5 (delete games individually from Games page and Data Management in Settings). Bulk actions and archive not yet implemented.*
-10. *(Add more as we go)*
+10. **Data integrity & creation order** — Stronger Supabase constraints and aligned app flows so season/team/tournament/game data stays consistent after migrations: unique team per season, optional `games.season_id` + trigger, check that `games.tournament_id` matches `games.team_id`, partial unique active jersey numbers per team, `seasons.sport` check against known IDs, and reconciling `cloudSync` season creation with the Teams UI (avoid duplicate seasons from the game-date-year shortcut). Full phased plan: [docs/DATA_INTEGRITY_AND_CREATION_PLAN.md](docs/DATA_INTEGRITY_AND_CREATION_PLAN.md).
+11. *(Add more as we go)*
 
 ### Known Issues
 
