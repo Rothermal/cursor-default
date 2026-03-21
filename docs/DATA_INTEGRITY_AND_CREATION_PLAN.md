@@ -2,7 +2,7 @@
 
 This document captures a planned set of database and application changes to reduce drift after schema evolution (especially migration 018: seasons, `team_players`, `players.created_by`), align team/season creation across UI paths, and enforce clearer rules for required fields and insert order.
 
-**Status:** Planning / not fully implemented. Safe to commit as a roadmap if work is paused.
+**Status:** Partially implemented (see migration `019`, `cloudSync`, Game Setup, Teams UI). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before applying `019` in production if you have legacy rows.
 
 ---
 
@@ -118,17 +118,20 @@ Implement in dependency order; each step may require Phase A cleanup first.
 
 ## 5. Completion checklist
 
-- [ ] Phase A audit queries run; problematic rows fixed or documented as exceptions.
-- [ ] Migration `019` (or next number) applied in dev/staging; production after backup.
-- [ ] `cloudSync` / Game Setup / Teams behavior matches documented season rules.
-- [ ] README migration list + INTEGRATION_PLAN updated.
-- [ ] Regression tests extended; `pnpm build` / `pnpm lint` clean.
+- [ ] Phase A audit queries run (`supabase/scripts/audit_data_integrity_pre_019.sql`); problematic rows fixed or documented as exceptions.
+- [ ] Migration `019_data_integrity_constraints.sql` applied in dev/staging; production after backup.
+- [x] `cloudSync` prefers matching owner team+season by name+sport before year-based season; `ensureTeam` handles unique-name conflicts; `ensureGame` includes optional `season_id` with column fallback.
+- [x] Game Setup: tournament name required when “+ Add new tournament”; optional season picker for **New team** cloud path; Teams: required season name when creating new season.
+- [x] README migration list updated; INTEGRATION_PLAN + regression doc nudged.
+- [ ] Full regression pass in app against a DB with `019` applied.
 
 ---
 
 ## 6. References
 
 - Migration: `supabase/migrations/018_seasons_and_roster_junction.sql`
+- Migration: `supabase/migrations/019_data_integrity_constraints.sql`
+- Pre-migration audit: `supabase/scripts/audit_data_integrity_pre_019.sql`
 - Cloud sync: `src/lib/cloudSync.ts` (`ensureSeason`, `ensureTeam`, `ensureGame`, `ensurePlayerId`)
 - Team creation: `src/pages/Teams.tsx`
 - Game setup: `src/pages/GameSetup.tsx`

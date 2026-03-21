@@ -243,4 +243,18 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a script fails on cloud features, confirm all migrations through 011 are applied in Supabase SQL Editor.
+- **Migrations:** If a script fails on cloud features, confirm migrations through **019** are applied in Supabase SQL Editor when using seasons, `team_players`, and data-integrity constraints (`019_data_integrity_constraints.sql`). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if upgrading an existing project.
+
+---
+
+## 13. Data integrity (after migration 019)
+
+**Precondition:** Migration `019` applied; no duplicate-team or duplicate-jersey violations in DB.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 13.1 | Teams → create new season **without** season name → Create Team | Button disabled or error: season name required |
+| 13.2 | Teams → create team in a season, then create **another** team same name same season | Error: duplicate team name in season |
+| 13.3 | Teams → roster: two active players with same non-empty jersey number | Second add fails with friendly error |
+| 13.4 | Game Setup → existing team → tournament **+ Add new** → leave name empty → Next | Error: enter tournament name |
+| 13.5 | Game Setup → New Team (cloud) → pick **Season for new team** matching an existing season → complete game → sync | Cloud team attaches to that season (not only year-from-date) |

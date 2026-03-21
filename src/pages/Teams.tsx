@@ -480,11 +480,16 @@ export default function Teams() {
       }
       seasonData = found
     } else {
+      if (!newTeamSeason.trim()) {
+        setError('Season name is required')
+        setCreatingTeam(false)
+        return
+      }
       const { data: newSeason, error: seasonError } = await supabaseClient
         .from('seasons')
         .insert({
           owner_id: userId,
-          name: newTeamSeason.trim() || `${newTeamName.trim()} Season`,
+          name: newTeamSeason.trim(),
           sport: newTeamSport,
         })
         .select('id,name,sport')
@@ -511,7 +516,11 @@ export default function Teams() {
 
     setCreatingTeam(false)
     if (createError || !data) {
-      setError(createError?.message ?? 'Could not create team')
+      if (createError?.code === '23505') {
+        setError('A team with this name already exists in this season.')
+      } else {
+        setError(createError?.message ?? 'Could not create team')
+      }
       return
     }
 
@@ -567,7 +576,11 @@ export default function Teams() {
 
     setSavingPlayer(false)
     if (junctionError) {
-      setError(junctionError.message)
+      if (junctionError.code === '23505') {
+        setError('That jersey number is already used on this team.')
+      } else {
+        setError(junctionError.message)
+      }
       return
     }
 
@@ -600,7 +613,11 @@ export default function Teams() {
 
     setAddingExistingPlayer(false)
     if (junctionError) {
-      setError(junctionError.message)
+      if (junctionError.code === '23505') {
+        setError('That jersey number is already used on this team.')
+      } else {
+        setError(junctionError.message)
+      }
       return
     }
 
@@ -903,15 +920,21 @@ export default function Teams() {
                 type="text"
                 value={newTeamSeason}
                 onChange={e => setNewTeamSeason(e.target.value)}
-                placeholder="Season name"
+                placeholder="Season name (required)"
                 className="input-field"
+                required
               />
             </div>
           )}
           <button
             type="button"
             onClick={() => { void handleCreateTeam() }}
-            disabled={!newTeamName.trim() || creatingTeam || (seasonMode === 'existing' && !selectedSeasonId)}
+            disabled={
+              !newTeamName.trim()
+              || creatingTeam
+              || (seasonMode === 'existing' && !selectedSeasonId)
+              || (seasonMode === 'new' && !newTeamSeason.trim())
+            }
             className="btn-primary w-full"
           >
             {creatingTeam ? 'Creating...' : 'Create Team'}

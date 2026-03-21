@@ -55,6 +55,12 @@ export default function GameSetup() {
   const [confirmDeleteTournament, setConfirmDeleteTournament] = useState<TournamentOption | null>(null)
   const [deletingTournamentId, setDeletingTournamentId] = useState<string | null>(null)
 
+  /** When creating a new cloud team from setup, optional season to attach (else sync uses year-from-date). */
+  const [seasonsForNewTeam, setSeasonsForNewTeam] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingSeasonsForNewTeam, setLoadingSeasonsForNewTeam] = useState(false)
+  const [selectedNewTeamSeasonId, setSelectedNewTeamSeasonId] = useState('')
+  const [setupError, setSetupError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
 
@@ -103,6 +109,30 @@ export default function GameSetup() {
       isCancelled = true
     }
   }, [isCloudFlow, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
+
+  useEffect(() => {
+    if (!isCloudFlow || !userId || !sport || !supabase) return
+    const client = supabase
+    let cancelled = false
+    const load = async () => {
+      setLoadingSeasonsForNewTeam(true)
+      const { data, error } = await client
+        .from('seasons')
+        .select('id,name')
+        .eq('owner_id', userId)
+        .eq('sport', sport.id)
+        .order('created_at', { ascending: false })
+      if (cancelled) return
+      if (!error) {
+        setSeasonsForNewTeam((data ?? []) as Array<{ id: string; name: string }>)
+      }
+      setLoadingSeasonsForNewTeam(false)
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [isCloudFlow, userId, sport])
 
   // Stable snapshot of the current tournament selection (avoids effect dep on full gameInfo object)
   const existingTournamentId = state.gameInfo?.tournamentId ?? null
@@ -183,6 +213,7 @@ export default function GameSetup() {
 
   const handleNext = async () => {
     if (!canProceed) return
+    setSetupError(null)
 
     // Resolve tournament: existing selection, create new, or free-text
     let resolvedTournamentId: string | null = null
@@ -192,7 +223,11 @@ export default function GameSetup() {
       if (selectedTournamentId === '__new__') {
         // Create (or find) tournament in Supabase
         const trimmed = newTournamentName.trim()
-        if (trimmed && supabase) {
+        if (!trimmed) {
+          setSetupError('Enter a tournament name or choose another option.')
+          return
+        }
+        if (supabase) {
           setCreatingTournament(true)
           const { data, error } = await supabase
             .from('tournaments')
@@ -200,7 +235,11 @@ export default function GameSetup() {
             .select('id')
             .single()
           setCreatingTournament(false)
-          if (!error && data) {
+          if (error) {
+            setSetupError(error.message)
+            return
+          }
+          if (data) {
             resolvedTournamentId = data.id as string
             resolvedTournamentName = trimmed
           }
@@ -213,10 +252,17 @@ export default function GameSetup() {
       // selectedTournamentId === '' means no tournament — both stay null/empty
     }
 
+    const resolvedSeasonIdForSync =
+      teamMode === 'existing' && selectedTeam
+        ? selectedTeam.season_id
+        : teamMode === 'new' && selectedNewTeamSeasonId
+          ? selectedNewTeamSeasonId
+          : null
+
     dispatch({
       type: 'SET_CLOUD_SYNC_STATE',
       cloudSync: {
-        seasonId: teamMode === 'existing' && selectedTeam ? selectedTeam.season_id : null,
+        seasonId: resolvedSeasonIdForSync,
         teamId: teamMode === 'existing' ? selectedTeamId || null : null,
         gameId: null,
         gameStatus: null,
@@ -274,6 +320,11 @@ export default function GameSetup() {
               {teamsError && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
                   {teamsError}
+                </p>
+              )}
+              {setupError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                  {setupError}
                 </p>
               )}
 
@@ -350,7 +401,7 @@ export default function GameSetup() {
                   </select>
                 </div>
               ) : (
-                <div>
+                <div className="space-y-2">
                   <label className="block text-sm font-medium text-slate-600 mb-1">
                     Your Team Name *
                   </label>
@@ -362,6 +413,28 @@ export default function GameSetup() {
                     className="input-field"
                     autoFocus
                   />
+                  {loadingSeasonsForNewTeam ? (
+                    <p className="text-xs text-slate-400 animate-pulse">Loading seasons...</p>
+                  ) : seasonsForNewTeam.length > 0 ? (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-600 mb-1">
+                        Season for new team
+                      </label>
+                      <select
+                        value={selectedNewTeamSeasonId}
+                        onChange={e => setSelectedNewTeamSeasonId(e.target.value)}
+                        className="input-field"
+                      >
+                        <option value="">Auto (use year from game date)</option>
+                        {seasonsForNewTeam.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Pick an existing season to match Teams you already created, or leave on Auto.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
