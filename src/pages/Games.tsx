@@ -22,7 +22,7 @@ interface GameRow {
 interface TeamRow {
   id: string
   name: string
-  sport: string
+  seasons: { sport: string }
 }
 
 function statusLabel(status: string): string {
@@ -103,7 +103,7 @@ export default function Games() {
 
       const { data: teams, error: teamsError } = await supabaseClient
         .from('teams')
-        .select('id,name,sport')
+        .select('id,name,seasons!inner(sport)')
         .in('id', teamIds)
 
       if (cancelled) return
@@ -113,8 +113,14 @@ export default function Games() {
         return
       }
 
-      const nextTeamMap = ((teams ?? []) as TeamRow[]).reduce<Record<string, TeamRow>>((map, team) => {
-        map[team.id] = team
+      type RawTeam = TeamRow & { seasons?: TeamRow['seasons'] | TeamRow['seasons'][] }
+      const nextTeamMap = ((teams ?? []) as unknown as RawTeam[]).reduce<Record<string, TeamRow>>((map, row) => {
+        const seasons = Array.isArray(row.seasons) ? row.seasons[0] : row.seasons
+        map[row.id] = {
+          id: row.id,
+          name: row.name,
+          seasons: seasons ?? { sport: '' },
+        }
         return map
       }, {})
       setTeamMap(nextTeamMap)
@@ -247,7 +253,7 @@ export default function Games() {
 
   const renderGameCard = (game: GameRow) => {
     const team = teamMap[game.team_id]
-    const sport = sports.find(item => item.id === team?.sport)
+    const sport = sports.find(item => item.id === team?.seasons?.sport)
     return (
       <div key={game.id} className="card">
         <div className="flex items-center justify-between mb-2">

@@ -2,7 +2,9 @@
 
 This document captures a planned set of database and application changes to reduce drift after schema evolution (especially migration 018: seasons, `team_players`, `players.created_by`), align team/season creation across UI paths, and enforce clearer rules for required fields and insert order.
 
-**Status:** Partially implemented (see migration `019`, `cloudSync`, Game Setup, Teams UI). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before applying `019` in production if you have legacy rows.
+**Status:** Database Phase A audit and migration **`019` are applied** on the production-ready database. App changes (`cloudSync`, Game Setup, Teams) are in the codebase. **Next:** run a full app regression (see checklist §5 and [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md), including §13).
+
+For **new** environments or clones, still run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if you are importing legacy data that might violate constraints.
 
 ---
 
@@ -53,9 +55,9 @@ Use this for documentation, RPCs, wizards, and manual Supabase fixes (respect FK
 
 ## 3. Proposed work (phased)
 
-### Phase A — Data audit & cleanup (Supabase / one-off SQL)
+### Phase A — Data audit & cleanup (Supabase / one-off SQL) — **Done**
 
-Before adding strict constraints, run checks and fix rows that would violate new rules.
+Checks were run and rows fixed before `019` on the primary database. For other databases, run `supabase/scripts/audit_data_integrity_pre_019.sql` first if data may violate the rules below.
 
 | Check | Action |
 |-------|--------|
@@ -67,9 +69,9 @@ Before adding strict constraints, run checks and fix rows that would violate new
 
 Deliverable: short SQL notebook or commented script in repo (e.g. `supabase/scripts/` — optional) documenting queries used.
 
-### Phase B — Database enforcement (new migration, e.g. `019`)
+### Phase B — Database enforcement (migration `019`) — **Done**
 
-Implement in dependency order; each step may require Phase A cleanup first.
+Applied on the primary database. New environments: apply `019_data_integrity_constraints.sql` after Phase A (if needed).
 
 | Change | Rationale |
 |--------|-----------|
@@ -118,12 +120,12 @@ Implement in dependency order; each step may require Phase A cleanup first.
 
 ## 5. Completion checklist
 
-- [ ] Phase A audit queries run (`supabase/scripts/audit_data_integrity_pre_019.sql`); problematic rows fixed or documented as exceptions.
-- [ ] Migration `019_data_integrity_constraints.sql` applied in dev/staging; production after backup.
+- [x] Phase A audit queries run (`supabase/scripts/audit_data_integrity_pre_019.sql`); problematic rows fixed or documented as exceptions.
+- [x] Migration `019_data_integrity_constraints.sql` applied (audit + constraints on the live DB).
 - [x] `cloudSync` prefers matching owner team+season by name+sport before year-based season; `ensureTeam` handles unique-name conflicts; `ensureGame` includes optional `season_id` with column fallback.
 - [x] Game Setup: tournament name required when “+ Add new tournament”; optional season picker for **New team** cloud path; Teams: required season name when creating new season.
 - [x] README migration list updated; INTEGRATION_PLAN + regression doc nudged.
-- [ ] Full regression pass in app against a DB with `019` applied.
+- [ ] Full app regression pass ([`REGRESSION_TESTING.md`](REGRESSION_TESTING.md), including §13) — **DB is ready;** run when convenient.
 
 ---
 
