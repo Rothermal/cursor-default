@@ -19,9 +19,11 @@ Design for elevating tournaments from a free-text field to a first-class entity:
 
 ## 2. Current state
 
-**Database ([003_games_stats.sql](supabase/migrations/003_games_stats.sql)):**
+**Database:** See migrations `016` (`tournaments` table), `023` (`tournaments.url` — optional external link). `games` has optional `tournament_id` FK and legacy `tournament_name`.
 
-- `games` has `tournament_name text` (nullable). No `tournament_id`. No `tournaments` table.
+**Historical note — before `016` ([003_games_stats.sql](supabase/migrations/003_games_stats.sql)):**
+
+- `games` had `tournament_name text` only; no `tournament_id` or `tournaments` table.
 
 **App:**
 

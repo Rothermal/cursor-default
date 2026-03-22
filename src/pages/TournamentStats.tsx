@@ -19,6 +19,7 @@ interface TournamentRow {
   name: string
   placement: number | null
   team_id: string
+  url: string | null
 }
 
 interface GameMeta {
@@ -106,7 +107,7 @@ export default function TournamentStats() {
       setError(null)
 
       const [tourRes, teamRes, gamesRes, statsRpc, rosterRes] = await Promise.all([
-        supabaseClient.from('tournaments').select('id,name,placement,team_id').eq('id', tournamentId).single(),
+        supabaseClient.from('tournaments').select('id,name,placement,team_id,url').eq('id', tournamentId).single(),
         supabaseClient
           .from('teams')
           .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
@@ -412,6 +413,16 @@ export default function TournamentStats() {
             <p className="text-sm opacity-80 truncate">
               {sport?.icon} {teamDisplayName(team)} · {team.seasons.name}
             </p>
+            {tournament.url && (
+              <a
+                href={tournament.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-white/90 underline mt-1 inline-block truncate max-w-full"
+              >
+                Tournament link ↗
+              </a>
+            )}
           </div>
         </div>
       </header>

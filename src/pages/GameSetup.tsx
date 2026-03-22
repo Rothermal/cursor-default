@@ -19,6 +19,7 @@ interface CloudTeam {
 interface TournamentOption {
   id: string
   name: string
+  url: string | null
 }
 
 export default function GameSetup() {
@@ -50,6 +51,7 @@ export default function GameSetup() {
     state.gameInfo?.tournamentId ?? ''
   )
   const [newTournamentName, setNewTournamentName] = useState('')
+  const [newTournamentUrl, setNewTournamentUrl] = useState('')
   const [loadingTournaments, setLoadingTournaments] = useState(false)
   const [creatingTournament, setCreatingTournament] = useState(false)
   const [confirmDeleteTournament, setConfirmDeleteTournament] = useState<TournamentOption | null>(null)
@@ -149,7 +151,7 @@ export default function GameSetup() {
       setLoadingTournaments(true)
       const { data, error } = await supabase!
         .from('tournaments')
-        .select('id,name')
+        .select('id,name,url')
         .eq('team_id', selectedTeamId)
         .order('name', { ascending: true })
 
@@ -229,9 +231,17 @@ export default function GameSetup() {
         }
         if (supabase) {
           setCreatingTournament(true)
+          const urlTrimmed = newTournamentUrl.trim()
           const { data, error } = await supabase
             .from('tournaments')
-            .upsert({ team_id: selectedTeamId, name: trimmed }, { onConflict: 'team_id,name' })
+            .upsert(
+              {
+                team_id: selectedTeamId,
+                name: trimmed,
+                url: urlTrimmed === '' ? null : urlTrimmed,
+              },
+              { onConflict: 'team_id,name' }
+            )
             .select('id')
             .single()
           setCreatingTournament(false)
@@ -481,7 +491,10 @@ export default function GameSetup() {
                       value={selectedTournamentId}
                       onChange={e => {
                         setSelectedTournamentId(e.target.value)
-                        if (e.target.value !== '__new__') setNewTournamentName('')
+                        if (e.target.value !== '__new__') {
+                          setNewTournamentName('')
+                          setNewTournamentUrl('')
+                        }
                       }}
                       className="input-field"
                     >
@@ -507,14 +520,25 @@ export default function GameSetup() {
                   </>
                 )}
                 {selectedTournamentId === '__new__' && (
-                  <input
-                    type="text"
-                    value={newTournamentName}
-                    onChange={e => setNewTournamentName(e.target.value)}
-                    placeholder="Tournament name"
-                    className="input-field"
-                    autoFocus
-                  />
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={newTournamentName}
+                      onChange={e => setNewTournamentName(e.target.value)}
+                      placeholder="Tournament name"
+                      className="input-field"
+                      autoFocus
+                    />
+                    <input
+                      type="url"
+                      inputMode="url"
+                      value={newTournamentUrl}
+                      onChange={e => setNewTournamentUrl(e.target.value)}
+                      placeholder="Tournament URL (optional)"
+                      className="input-field"
+                      autoComplete="off"
+                    />
+                  </div>
                 )}
 
                 <ConfirmDialog
