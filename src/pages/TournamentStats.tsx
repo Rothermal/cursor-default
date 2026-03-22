@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -71,7 +71,7 @@ export default function TournamentStats() {
   const tournamentId = searchParams.get('tournamentId')
   const teamId = searchParams.get('teamId')
 
-  const { isConfigured } = useAuth()
+  const { isConfigured, user } = useAuth()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -84,6 +84,10 @@ export default function TournamentStats() {
   const [losses, setLosses] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [canEditPlacement, setCanEditPlacement] = useState(false)
+  const [placementDraft, setPlacementDraft] = useState<string>('')
+  const [savingPlacement, setSavingPlacement] = useState(false)
+  const [placementError, setPlacementError] = useState<string | null>(null)
 
   const sport = useMemo(
     () => (team ? sports.find(s => s.id === team.seasons.sport) ?? null : null),
@@ -244,6 +248,37 @@ export default function TournamentStats() {
     }
   }, [tournamentId, teamId, isConfigured, supabaseClient])
 
+  useEffect(() => {
+    if (!teamId || !user?.id || !supabaseClient) {
+      setCanEditPlacement(false)
+      return
+    }
+    let cancelled = false
+    const loadRole = async () => {
+      const { data } = await supabaseClient
+        .from('team_members')
+        .select('role')
+        .eq('team_id', teamId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (cancelled) return
+      const role = (data as { role?: string } | null)?.role
+      setCanEditPlacement(role === 'owner' || role === 'admin')
+    }
+    void loadRole()
+    return () => {
+      cancelled = true
+    }
+  }, [teamId, user?.id, supabaseClient])
+
+  useEffect(() => {
+    if (tournament?.placement != null) {
+      setPlacementDraft(String(tournament.placement))
+    } else {
+      setPlacementDraft('')
+    }
+  }, [tournament?.placement, tournament?.id])
+
   const playerStatMap = useMemo(() => {
     const m: Record<string, Record<string, number>> = {}
     for (const r of statRows) {
@@ -291,6 +326,32 @@ export default function TournamentStats() {
   }
 
   const gpTournament = games.length
+
+  const handleSavePlacement = async () => {
+    if (!supabaseClient || !tournamentId || !canEditPlacement) return
+    setPlacementError(null)
+    const trimmed = placementDraft.trim()
+    let value: number | null = null
+    if (trimmed !== '') {
+      const n = parseInt(trimmed, 10)
+      if (Number.isNaN(n) || n < 1) {
+        setPlacementError('Enter a positive whole number (1 = 1st), or leave blank to clear.')
+        return
+      }
+      value = n
+    }
+    setSavingPlacement(true)
+    const { error: upErr } = await supabaseClient
+      .from('tournaments')
+      .update({ placement: value })
+      .eq('id', tournamentId)
+    setSavingPlacement(false)
+    if (upErr) {
+      setPlacementError(upErr.message)
+      return
+    }
+    setTournament(prev => (prev ? { ...prev, placement: value } : prev))
+  }
 
   if (!tournamentId || !teamId) {
     return (
@@ -383,6 +444,43 @@ export default function TournamentStats() {
           )}
         </section>
 
+        {canEditPlacement && tournament && (
+          <section className="card space-y-2">
+            <h2 className="font-semibold text-slate-700">Placement</h2>
+            <p className="text-xs text-slate-500">
+              Set finish place for this tournament (1 = 1st, 2 = 2nd, …). Leave blank to clear.
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex-1 min-w-[100px]">
+                <label htmlFor="tournament-placement" className="text-xs text-slate-500 block mb-1">
+                  Place
+                </label>
+                <input
+                  id="tournament-placement"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={placementDraft}
+                  onChange={e => setPlacementDraft(e.target.value)}
+                  placeholder="e.g. 2"
+                  className="input-field"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => { void handleSavePlacement() }}
+                disabled={savingPlacement}
+                className="btn-primary py-2 px-4"
+              >
+                {savingPlacement ? 'Saving…' : 'Save placement'}
+              </button>
+            </div>
+            {placementError && (
+              <p className="text-xs text-red-600">{placementError}</p>
+            )}
+          </section>
+        )}
+
         {sport && Object.keys(tournamentTotalsByStat).length > 0 && (
           <section className="card space-y-3">
             <h2 className="font-semibold text-slate-700">Tournament totals</h2>
@@ -410,31 +508,43 @@ export default function TournamentStats() {
           ) : (
             <div className="space-y-2">
               {leaderboardRows.map((row, idx) => (
-                <button
+                <div
                   key={row.player.id}
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      `/player?teamId=${teamId}&playerId=${row.player.id}&seasonId=${team.season_id}`
-                    )
-                  }
-                  className="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2
-                             hover:border-blue-200 hover:bg-blue-50/40 transition-colors"
+                  className="flex items-stretch gap-1 rounded-xl border border-slate-200 bg-white overflow-hidden
+                             hover:border-blue-200 transition-colors"
                 >
-                  <div className="flex justify-between gap-2">
-                    <span className="text-slate-500 w-6 shrink-0">{idx + 1}.</span>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-slate-500 text-sm">#{row.player.jersey_number || '—'} </span>
-                      <span className="font-medium text-slate-800">{playerDisplayName(row.player)}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/player?teamId=${teamId}&playerId=${row.player.id}&seasonId=${team.season_id}`
+                      )
+                    }
+                    className="flex-1 text-left px-3 py-2 hover:bg-blue-50/40 min-w-0"
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="text-slate-500 w-6 shrink-0">{idx + 1}.</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-slate-500 text-sm">#{row.player.jersey_number || '—'} </span>
+                        <span className="font-medium text-slate-800">{playerDisplayName(row.player)}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-semibold text-slate-800">
+                          {row.score} {sport?.scoreLabel}
+                        </p>
+                        <p className="text-xs text-slate-500">{row.gp} GP</p>
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-semibold text-slate-800">
-                        {row.score} {sport?.scoreLabel}
-                      </p>
-                      <p className="text-xs text-slate-500">{row.gp} GP</p>
-                    </div>
-                  </div>
-                </button>
+                  </button>
+                  {team && (
+                    <Link
+                      to={`/career?playerId=${encodeURIComponent(row.player.id)}&sport=${encodeURIComponent(team.seasons.sport)}`}
+                      className="shrink-0 flex items-center px-2.5 text-xs font-semibold text-blue-600 bg-slate-50 border-l border-slate-100 hover:bg-blue-50"
+                    >
+                      Career
+                    </Link>
+                  )}
+                </div>
               ))}
             </div>
           )}

@@ -191,6 +191,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 9.11 | Team stats → tournament row **Stats →** | Opens tournament stats; W/L and leaderboard when games have `tournament_id` |
 | 9.12 | Game Summary → **Team** tab | Only team totals tables + score card; **Players** shows full grid |
 | 9.13 | Team stats → **By opponent** | Table lists opponents with W-L-T and PF-PA when multiple finals exist |
+| 9.14 | Leaderboard: tap **Career** on a row (not the main row) | Opens `/career` with that `playerId` and the season’s sport |
+| 9.15 | Tournament stats (as owner/admin): **Placement** → enter place (e.g. 2) → **Save placement** | Record card shows placement (e.g. 2nd); blank + save clears placement |
 
 ---
 
