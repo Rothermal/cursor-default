@@ -135,6 +135,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 6.8 | Cloud Games → open finalized game | View Summary (read-only) |
 | 6.9 | Second device/session: sign in → Cloud Games | Same game list; resume same game if in progress |
 | 6.10 | Cloud Games → tap ✏️ next to opponent name on any game card | Inline input appears; type new name → Save | Opponent name updates on card; persists after reload |
+| 6.11 | Cloud Games → **Final** game card | Shows home–away score (from resolved stats + adjustment) when RPC succeeds |
+| 6.12 | Cloud Games → game with `tournament_id` | **Tournament stats** link next to tournament name opens `/tournament-stats` |
 | 6.11 | Cloud Games → Edit opponent name → press Escape or ✕ | Edit cancelled; original name restored |
 
 ---
@@ -188,6 +190,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 9.10 | Teams → roster **Career** on a player | Same as 9.9 |
 | 9.11 | Team stats → tournament row **Stats →** | Opens tournament stats; W/L and leaderboard when games have `tournament_id` |
 | 9.12 | Game Summary → **Team** tab | Only team totals tables + score card; **Players** shows full grid |
+| 9.13 | Team stats → **By opponent** | Table lists opponents with W-L-T and PF-PA when multiple finals exist |
 
 ---
 

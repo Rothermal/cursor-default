@@ -9,20 +9,25 @@ function statShortLabel(sport: SportConfig, statId: string): string {
   return statId
 }
 
-/** Compact "12 PTS · 4 REB · 3 AST" for one game's resolved stat map. */
+function scoreLineLabel(sport: SportConfig): string {
+  if (sport.scoreLabel === 'Points') return 'PTS'
+  return sport.scoreLabel
+}
+
+/** Compact per-game line for game logs (sport-aware). */
 export function formatCompactGameStatLine(sport: SportConfig, stats: Record<string, number>): string {
   const parts: string[] = []
   const score = computePlayerScore(sport, stats)
-  const scoreLabel = sport.scoreLabel === 'Points' ? 'PTS' : sport.scoreLabel
-  parts.push(`${score} ${scoreLabel}`)
+  parts.push(`${score} ${scoreLineLabel(sport)}`)
 
   if (sport.id === 'basketball') {
     const reb = (stats.oreb ?? 0) + (stats.dreb ?? 0)
     if (reb > 0) parts.push(`${reb} REB`)
   }
 
-  const keys = sport.keyStatIds?.length ? sport.keyStatIds : ['ast', 'stl', 'blk']
+  const keys = sport.keyStatIds?.length ? sport.keyStatIds : []
   for (const id of keys) {
+    if (sport.id === 'basketball' && (id === 'oreb' || id === 'dreb')) continue
     const v = stats[id] ?? 0
     if (v > 0) parts.push(`${v} ${statShortLabel(sport, id)}`)
   }

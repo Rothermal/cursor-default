@@ -13,7 +13,7 @@ Redesign the stat viewing pages to support **career stats**, **season-scoped sta
 | Team Season Summary `/team-stats` | Done (MVP: record, totals, game list) |
 | Tournament stats page + `get_tournament_stats_resolved` RPC | Done (`021_tournament_stats_rpc.sql`, `/tournament-stats`) |
 | Game Summary Players / Team tab | Done (toggle on summary) |
-| `SportConfig.keyStats` + shared compact line helper | Partial (`keyStatIds` + `statDisplay.ts`; basketball only) |
+| `SportConfig.keyStats` + shared compact line helper | Done (`keyStatIds` on all sports + `statDisplay.ts`) |
 
 Detailed checklist: [STAT_TRACKING_UI_PROGRESS.md](STAT_TRACKING_UI_PROGRESS.md).
 

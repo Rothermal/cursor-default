@@ -212,6 +212,27 @@ export default function TeamStats() {
     return { lines, wins, losses, total: games.length }
   }, [games, logRows, useRpc, sport])
 
+  const opponentBreakdown = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; wins: number; losses: number; ties: number; pf: number; pa: number; gp: number }
+    >()
+    for (const row of gameLines.lines) {
+      const name = row.game.opponent_name.trim() || 'Unknown'
+      if (!map.has(name)) {
+        map.set(name, { name, wins: 0, losses: 0, ties: 0, pf: 0, pa: 0, gp: 0 })
+      }
+      const o = map.get(name)!
+      o.gp += 1
+      o.pf += row.homeScore
+      o.pa += row.game.opponent_score
+      if (row.homeScore === row.game.opponent_score) o.ties += 1
+      else if (row.won) o.wins += 1
+      else o.losses += 1
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [gameLines.lines])
+
   if (!teamId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
@@ -329,6 +350,57 @@ export default function TeamStats() {
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {opponentBreakdown.length > 0 && (
+          <section className="card space-y-3">
+            <h2 className="font-semibold text-slate-700">By opponent</h2>
+            <p className="text-xs text-slate-500">
+              Combined results when you played the same opponent more than once.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left">
+                    <th className="py-2 pr-2 font-semibold text-slate-600">Opponent</th>
+                    <th className="py-2 px-1 font-semibold text-slate-600 text-center">W-L-T</th>
+                    <th className="py-2 pl-2 font-semibold text-slate-600 text-right">PF-PA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {opponentBreakdown.map(row => {
+                    const decided = row.wins + row.losses
+                    const plusMinus = row.pf - row.pa
+                    return (
+                      <tr key={row.name} className="border-b border-slate-100">
+                        <td className="py-2 pr-2 font-medium text-slate-800 max-w-[140px] truncate">
+                          {row.name}
+                        </td>
+                        <td className="py-2 px-1 text-center tabular-nums text-slate-700">
+                          {row.wins}-{row.losses}-{row.ties}
+                          {decided > 0 && (
+                            <span className="text-slate-400 text-xs block">
+                              {((row.wins / decided) * 100).toFixed(0)}%
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 pl-2 text-right tabular-nums">
+                          <span className="text-slate-800">
+                            {row.pf}-{row.pa}
+                          </span>
+                          <span
+                            className={`text-xs ml-1 ${plusMinus > 0 ? 'text-emerald-600' : plusMinus < 0 ? 'text-rose-600' : 'text-slate-400'}`}
+                          >
+                            ({plusMinus > 0 ? '+' : ''}{plusMinus})
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
