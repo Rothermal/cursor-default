@@ -46,6 +46,8 @@ export default function GameSummary() {
   const [savingCorrection, setSavingCorrection] = useState(false)
   const [resolvedKey, setResolvedKey] = useState(0)
   const [viewMode, setViewMode] = useState<'primary' | 'all'>('primary')
+  /** Players vs Team layout for stat tables (design: Game Summary split). */
+  const [summaryTab, setSummaryTab] = useState<'players' | 'team'>('players')
   const [allSubmissions, setAllSubmissions] = useState<AllSubmissionsMap | null>(null)
   const [checkoutsByPlayer, setCheckoutsByPlayer] = useState<CheckoutsByPlayerMap | null>(null)
   const [settingPrimaryFor, setSettingPrimaryFor] = useState<string | null>(null)
@@ -565,8 +567,29 @@ export default function GameSummary() {
           </>
         )}
 
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setSummaryTab('players')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                summaryTab === 'players' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Players
+            </button>
+            <button
+              type="button"
+              onClick={() => setSummaryTab('team')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                summaryTab === 'team' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Team
+            </button>
+          </div>
         {isFinalCloudGame && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <>
             <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
               <button
                 type="button"
@@ -601,10 +624,33 @@ export default function GameSummary() {
                 )}
               </>
             )}
+          </>
+        )}
+        </div>
+
+        {summaryTab === 'team' && (
+          <div className="card mb-6 border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-600 mb-3">Team vs opponent</h3>
+            <div className="flex items-center justify-center gap-6 mb-4">
+              <div className="text-center">
+                <p className="text-xs text-slate-500">{gameInfo.teamName}</p>
+                <p className="text-2xl font-bold text-slate-800">{teamScore}</p>
+              </div>
+              <span className="text-slate-400">vs</span>
+              <div className="text-center">
+                <p className="text-xs text-slate-500">{gameInfo.opponentName}</p>
+                <p className="text-2xl font-bold text-slate-800">{opponentScore}</p>
+              </div>
+            </div>
+            {homeScoreAdjustment !== 0 && (
+              <p className="text-xs text-slate-500 text-center mb-2">
+                Score adjustment: {homeScoreAdjustment >= 0 ? '+' : ''}{homeScoreAdjustment}
+              </p>
+            )}
           </div>
         )}
 
-        {sport.categories.map(category => {
+        {summaryTab === 'players' && sport.categories.map(category => {
           // Map madeStatId → miss action for this category (used in Primary view)
           const missActionMap: Record<string, typeof category.actions[0]> = {}
           for (const action of category.actions) {
@@ -805,6 +851,90 @@ export default function GameSummary() {
             </div>
           )
         })}
+
+        {summaryTab === 'team' &&
+          sport.categories.map(category => {
+            const missActionMap: Record<string, typeof category.actions[0]> = {}
+            for (const action of category.actions) {
+              if (action.madeStatId) missActionMap[action.madeStatId] = action
+            }
+            const visibleActions =
+              viewMode === 'primary'
+                ? category.actions.filter(a => !a.madeStatId)
+                : category.actions
+
+            return (
+              <div key={`team-${category.id}`} className="mb-6">
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  {category.name}
+                  {category.showTotal && (
+                    <span className="text-slate-400 ml-2 normal-case">— {category.totalLabel}</span>
+                  )}
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="text-left py-2 pr-3 font-semibold text-slate-600">Team</th>
+                        {visibleActions.map(action => {
+                          const hasMiss = !!missActionMap[action.id]
+                          return (
+                            <th
+                              key={action.id}
+                              className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[48px]"
+                            >
+                              {hasMiss ? `${action.shortLabel} M/A` : action.shortLabel}
+                            </th>
+                          )
+                        })}
+                        {category.showTotal && (
+                          <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[50px]">
+                            TOT
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="bg-slate-50 font-semibold border-b border-slate-100">
+                        <td className="py-2 pr-3">Totals</td>
+                        {visibleActions.map(action => {
+                          const missAction = missActionMap[action.id]
+                          const made = teamTotals[action.id] || 0
+                          const missVal = missAction ? teamTotals[missAction.id] || 0 : 0
+                          return (
+                            <td key={action.id} className="text-center py-2 px-2 tabular-nums">
+                              {missAction ? (
+                                <>
+                                  {made}/{made + missVal}
+                                  {made + missVal > 0 && (
+                                    <span className="text-slate-400 ml-1 text-xs">
+                                      ({Math.round((made / (made + missVal)) * 100)}%)
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                made
+                              )}
+                            </td>
+                          )
+                        })}
+                        {category.showTotal && (
+                          <td className="text-center py-2 px-2 font-bold tabular-nums">
+                            {category.actions.some(a => a.pointValue)
+                              ? category.actions.reduce(
+                                  (sum, a) => sum + (teamTotals[a.id] || 0) * (a.pointValue || 0),
+                                  0
+                                )
+                              : computeCategoryTotal(category, teamTotals)}
+                          </td>
+                        )}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
 
         {state.notes && (
           <div className="mb-6">

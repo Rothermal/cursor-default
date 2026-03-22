@@ -16,6 +16,7 @@ import Leaderboard from './pages/Leaderboard'
 import PlayerProfile from './pages/PlayerProfile'
 import CareerStats from './pages/CareerStats'
 import TeamStats from './pages/TeamStats'
+import TournamentStats from './pages/TournamentStats'
 
 function AppRoutes() {
   const { user, loading, isConfigured } = useAuth()
@@ -52,6 +53,7 @@ function AppRoutes() {
           <Route path="/player" element={<PlayerProfile />} />
           <Route path="/career" element={<CareerStats />} />
           <Route path="/team-stats" element={<TeamStats />} />
+          <Route path="/tournament-stats" element={<TournamentStats />} />
         </Routes>
       </GameProvider>
     </SettingsProvider>
