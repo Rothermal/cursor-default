@@ -7,11 +7,11 @@ Redesign the stat viewing pages to support **career stats**, **season-scoped sta
 | Item | Status |
 |------|--------|
 | Migration `020_stat_tracking_ui_rpcs.sql` (`get_player_game_log`, `get_career_stats_resolved`, `get_team_game_log`) | Done in repo — apply in Supabase |
-| Leaderboard season selector + `seasonId` URL + GP + Team Stats link | Done |
+| Leaderboard season selector + `seasonId` URL + GP + Team Stats link + **Career** link per row | Done |
 | Player Profile season label + Career link + inline game log (RPC + fallback) | Done |
 | Career page `/career` | Done |
 | Team Season Summary `/team-stats` | Done (MVP: record, totals, game list) |
-| Tournament stats page + `get_tournament_stats_resolved` RPC | Done (`021_tournament_stats_rpc.sql`, `/tournament-stats`) |
+| Tournament stats page + `get_tournament_stats_resolved` RPC | Done (`021_tournament_stats_rpc.sql`, `/tournament-stats`; owner/admin can edit `placement`; **Career** links on tournament leaderboard) |
 | Game Summary Players / Team tab | Done (toggle on summary) |
 | `SportConfig.keyStats` + shared compact line helper | Done (`keyStatIds` on all sports + `statDisplay.ts`) |
 

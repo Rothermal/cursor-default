@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -399,42 +399,51 @@ export default function Leaderboard() {
             ) : (
               <div className="space-y-2">
                 {leaderboardRows.map((row, idx) => (
-                  <button
+                  <div
                     key={row.player.id}
-                    type="button"
-                    onClick={() =>
-                      navigate(
-                        `/player?teamId=${selectedTeamId}&playerId=${row.player.id}&seasonId=${selectedSeasonId}`
-                      )
-                    }
-                    className="w-full text-left rounded-xl border border-slate-200 bg-white
-                               px-3 py-2 hover:border-blue-200 hover:bg-blue-50/50 transition-colors
-                               active:scale-[0.99]"
+                    className="flex items-stretch gap-1 rounded-xl border border-slate-200 bg-white overflow-hidden
+                               hover:border-blue-200 transition-colors"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-slate-400 shrink-0 w-6">
-                          {idx + 1}.
-                        </span>
-                        <span className="text-slate-500 shrink-0">
-                          #{row.player.jersey_number || '—'}
-                        </span>
-                        <p className="font-medium text-slate-700 truncate">
-                          {playerDisplayName(row.player)}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end shrink-0 text-right">
-                        {sport?.scoreLabel && (
-                          <span className="font-semibold text-slate-800">
-                            {row.score} {sport.scoreLabel}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/player?teamId=${selectedTeamId}&playerId=${row.player.id}&seasonId=${selectedSeasonId}`
+                        )
+                      }
+                      className="flex-1 text-left px-3 py-2 hover:bg-blue-50/50 active:scale-[0.99] min-w-0"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-slate-400 shrink-0 w-6">
+                            {idx + 1}.
                           </span>
-                        )}
-                        <span className="text-xs text-slate-500">
-                          {row.gamesPlayed} GP
-                        </span>
+                          <span className="text-slate-500 shrink-0">
+                            #{row.player.jersey_number || '—'}
+                          </span>
+                          <p className="font-medium text-slate-700 truncate">
+                            {playerDisplayName(row.player)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end shrink-0 text-right">
+                          {sport?.scoreLabel && (
+                            <span className="font-semibold text-slate-800">
+                              {row.score} {sport.scoreLabel}
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-500">
+                            {row.gamesPlayed} GP
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                    <Link
+                      to={`/career?playerId=${encodeURIComponent(row.player.id)}&sport=${encodeURIComponent(selectedTeam.seasons.sport)}`}
+                      className="shrink-0 flex items-center px-2.5 text-xs font-semibold text-blue-600 bg-slate-50 border-l border-slate-100 hover:bg-blue-50"
+                    >
+                      Career
+                    </Link>
+                  </div>
                 ))}
               </div>
             )}
