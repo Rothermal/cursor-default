@@ -94,6 +94,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/019_data_integrity_constraints.sql`
    - `supabase/migrations/020_stat_tracking_ui_rpcs.sql` — career / player game log / team game log RPCs ([DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md))
    - `supabase/migrations/021_tournament_stats_rpc.sql` — `get_tournament_stats_resolved`
+   - `supabase/migrations/022_games_is_exhibition_generated.sql` — optional generated `games.is_exhibition` (`tournament_id IS NULL`); see `supabase/scripts/normalize_exhibition_games.sql` for legacy row cleanup
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -195,7 +196,12 @@ supabase/
     ├── 018_seasons_and_roster_junction.sql
     ├── 019_data_integrity_constraints.sql
     ├── 020_stat_tracking_ui_rpcs.sql
-    └── 021_tournament_stats_rpc.sql
+    ├── 021_tournament_stats_rpc.sql
+    └── 022_games_is_exhibition_generated.sql
+
+supabase/scripts/
+├── audit_data_integrity_pre_019.sql
+└── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap

@@ -42,7 +42,9 @@ Home (unchanged)
                                      → Games list     [CRUD games; all statuses]
 ```
 
-**Exhibition:** Games for the selected **team** with **no structured tournament** (`games.tournament_id IS NULL`). List includes **all game statuses** (scheduled, active, final, etc.).
+**Exhibition:** Games for the selected **team** with **no structured tournament** — **`games.tournament_id IS NULL`**. That is the canonical rule: legacy free-text `tournament_name` without a `tournaments` row still counts as exhibition until you **link** the row (`tournament_id`) or **clear** `tournament_name` for a cleaner list. List includes **all game statuses** (scheduled, in progress, final).
+
+**Data normalization:** Run [`supabase/scripts/normalize_exhibition_games.sql`](../supabase/scripts/normalize_exhibition_games.sql) in Supabase (identify → optional link by name → optional clear). Optional migration **`022_games_is_exhibition_generated.sql`** adds a stored generated `is_exhibition` column (`tournament_id IS NULL`) for simpler queries.
 
 **Authentication:** User must be **signed in before** entering this flow (see §10). **Offline/local** still participates in the same conceptual tree (see §10).
 
@@ -83,7 +85,7 @@ Home (unchanged)
 - **View default:** Primary action opens the game (tracker, checkout, or summary as appropriate).
 - **Edit:** Allowed; for **finalized** games, require an explicit confirmation (e.g. “This game is finalized — editing may affect records. Continue?”) before applying changes.
 
-**Open (minor):** Legacy rows with only `tournament_name` text and null `tournament_id` — whether to surface under Exhibition or a one-time migration. Track as **D3** in §11 until decided.
+**Legacy `tournament_name`:** Rows with **`tournament_id IS NULL`** are **exhibition**, including legacy free-text names. Prefer a one-time DB pass: optionally **set `tournament_id`** when `btrim(tournament_name)` matches `tournaments(team_id, name)`, else **clear `tournament_name`** if you want exhibition rows to show only the UI “Exhibition” label. See `supabase/scripts/normalize_exhibition_games.sql`.
 
 ---
 
@@ -118,7 +120,7 @@ Home (unchanged)
 | B.3 | Tournament list scope? | **Per team.** |
 | B.4 | Placement editing? | **Both** tournaments list and tournament stats page. |
 | B.5 | Show empty tournaments? | **Yes.** |
-| C.6 | Legacy `tournament_name` only? | **Not answered** — see D3. |
+| C.6 | Legacy `tournament_name` without `tournament_id`? | **Exhibition.** Normalize via script: link by matching tournament name per team, or clear `tournament_name`. |
 | C.7 | Exhibition statuses? | **All statuses.** |
 | D.8 | Delete game? | **Hard delete** with warning. |
 | D.9 | Edit finalized games? | **Yes**, with **explicit confirmation** before save. |
@@ -134,10 +136,10 @@ Home (unchanged)
 |----|--------|----------|
 | D1 | Season hub | **Team picker (option A)** — tournaments and exhibition are per selected team. |
 | D2 | Tournaments scope | **Per team.** |
-| D3 | Legacy `tournament_name` | **TBD** — exhibition query vs data cleanup. |
+| D3 | Legacy `tournament_name` | **Resolved:** exhibition = `tournament_id IS NULL`. Script + optional migration `022` for `is_exhibition`. |
 | D4 | Replace `/games` | **TBD** — redirect into new games list vs keep alias route. |
 | D5 | Permissions beyond today | **Future doc:** [DESIGN_USER_PERMISSIONS_AND_ROLES.md](DESIGN_USER_PERMISSIONS_AND_ROLES.md). |
 
 ---
 
-*Document version: 0.2 (decisions recorded)*
+*Document version: 0.3 (exhibition data rule + normalization)*
