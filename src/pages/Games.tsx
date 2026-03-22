@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
-import { sports } from '../config/sports'
+import { sports, computePlayerScore } from '../config/sports'
 import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { teamDisplayName } from '../lib/display'
 
 interface GameRow {
   id: string
@@ -14,6 +15,8 @@ interface GameRow {
   opponent_name: string
   opponent_score: number
   tournament_name: string | null
+  tournament_id: string | null
+  home_score_adjustment: number | null
   game_date: string
   status: string
   created_at: string
@@ -22,6 +25,8 @@ interface GameRow {
 interface TeamRow {
   id: string
   name: string
+  nickname: string | null
+  season_id: string
   seasons: { sport: string }
 }
 
@@ -60,6 +65,7 @@ export default function Games() {
 
   const [games, setGames] = useState<GameRow[]>([])
   const [teamMap, setTeamMap] = useState<Record<string, TeamRow>>({})
+  const [finalScoreLines, setFinalScoreLines] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +86,9 @@ export default function Games() {
 
       const { data: gameRows, error: gamesError } = await supabaseClient
         .from('games')
-        .select('id,team_id,opponent_name,opponent_score,tournament_name,game_date,status,created_at')
+        .select(
+          'id,team_id,opponent_name,opponent_score,tournament_name,tournament_id,home_score_adjustment,game_date,status,created_at'
+        )
         .eq('created_by', userId)
         .order('created_at', { ascending: false })
 
@@ -103,7 +111,7 @@ export default function Games() {
 
       const { data: teams, error: teamsError } = await supabaseClient
         .from('teams')
-        .select('id,name,seasons!inner(sport)')
+        .select('id,name,nickname,season_id,seasons!inner(sport)')
         .in('id', teamIds)
 
       if (cancelled) return
@@ -119,6 +127,8 @@ export default function Games() {
         map[row.id] = {
           id: row.id,
           name: row.name,
+          nickname: row.nickname ?? null,
+          season_id: row.season_id,
           seasons: seasons ?? { sport: '' },
         }
         return map
@@ -132,6 +142,45 @@ export default function Games() {
       cancelled = true
     }
   }, [isConfigured, supabaseClient, userId])
+
+  useEffect(() => {
+    if (!supabaseClient) return
+    const finals = games.filter(g => g.status === 'final')
+    if (finals.length === 0) {
+      setFinalScoreLines({})
+      return
+    }
+
+    let cancelled = false
+    const loadScores = async () => {
+      const next: Record<string, string> = {}
+      for (const g of finals) {
+        const team = teamMap[g.team_id]
+        const sport = sports.find(s => s.id === team?.seasons?.sport)
+        if (!sport) continue
+
+        const { data, error: rpcError } = await supabaseClient.rpc('get_game_stats_resolved', {
+          p_game_id: g.id,
+        })
+        if (cancelled || rpcError) continue
+
+        const byStat: Record<string, number> = {}
+        for (const row of (data ?? []) as { stat_id: string; value: number }[]) {
+          byStat[row.stat_id] = (byStat[row.stat_id] ?? 0) + Number(row.value)
+        }
+        const base = computePlayerScore(sport, byStat)
+        const adj = g.home_score_adjustment ?? 0
+        const home = base + adj
+        next[g.id] = `${home}–${g.opponent_score}`
+      }
+      if (!cancelled) setFinalScoreLines(next)
+    }
+
+    void loadScores()
+    return () => {
+      cancelled = true
+    }
+  }, [games, teamMap, supabaseClient])
 
   const grouped = useMemo(() => {
     const finalGames = games.filter(game => game.status === 'final')
@@ -254,11 +303,13 @@ export default function Games() {
   const renderGameCard = (game: GameRow) => {
     const team = teamMap[game.team_id]
     const sport = sports.find(item => item.id === team?.seasons?.sport)
+    const scoreHint = game.status === 'final' ? finalScoreLines[game.id] : null
+
     return (
       <div key={game.id} className="card">
         <div className="flex items-center justify-between mb-2">
           <p className="font-semibold text-slate-700">
-            {sport?.icon ?? '🏟️'} {team?.name ?? 'Unknown Team'}
+            {sport?.icon ?? '🏟️'} {team ? teamDisplayName(team) : 'Unknown Team'}
           </p>
           <span className={`text-[11px] px-2 py-1 rounded-full font-semibold ${statusBadge(game.status)}`}>
             {statusLabel(game.status)}
@@ -273,7 +324,10 @@ export default function Games() {
               onChange={e => setEditingOpponentName(e.target.value)}
               className="input-field flex-1 text-sm py-1"
               autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') void handleSaveOpponentName(); if (e.key === 'Escape') cancelEditOpponentName() }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void handleSaveOpponentName()
+                if (e.key === 'Escape') cancelEditOpponentName()
+              }}
             />
             <button
               onClick={() => { void handleSaveOpponentName() }}
@@ -290,8 +344,11 @@ export default function Games() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1 mt-1">
+          <div className="flex items-center gap-1 mt-1 flex-wrap">
             <p className="text-sm text-slate-600">vs {game.opponent_name}</p>
+            {scoreHint && (
+              <span className="text-sm font-semibold text-slate-800 tabular-nums">{scoreHint}</span>
+            )}
             <button
               onClick={() => startEditOpponentName(game)}
               className="text-slate-300 hover:text-slate-500 transition-colors p-0.5"
@@ -303,7 +360,17 @@ export default function Games() {
           </div>
         )}
         {game.tournament_name && (
-          <p className="text-xs text-slate-400 mt-0.5">🏆 {game.tournament_name}</p>
+          <div className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
+            <span>🏆 {game.tournament_name}</span>
+            {game.tournament_id && team && (
+              <Link
+                to={`/tournament-stats?tournamentId=${encodeURIComponent(game.tournament_id)}&teamId=${encodeURIComponent(game.team_id)}`}
+                className="text-blue-600 font-semibold underline"
+              >
+                Tournament stats
+              </Link>
+            )}
+          </div>
         )}
         <p className="text-xs text-slate-400 mt-1">
           {game.game_date}

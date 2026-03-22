@@ -80,6 +80,7 @@ export const sports: SportConfig[] = [
       gradient: 'from-red-600 to-red-500',
     },
     scoreLabel: 'Runs',
+    keyStatIds: ['r', 'rbi', 'hr', 'sb'],
     categories: [
       {
         id: 'hitting',
@@ -140,6 +141,7 @@ export const sports: SportConfig[] = [
       gradient: 'from-green-700 to-green-600',
     },
     scoreLabel: 'Points',
+    keyStatIds: ['pass_td', 'rush_td', 'rec_td', 'fg'],
     categories: [
       {
         id: 'passing',
@@ -206,6 +208,7 @@ export const sports: SportConfig[] = [
       gradient: 'from-blue-600 to-cyan-500',
     },
     scoreLabel: 'Goals',
+    keyStatIds: ['goal', 'h_ast', 'shot'],
     categories: [
       {
         id: 'offense',
@@ -263,6 +266,7 @@ export const sports: SportConfig[] = [
       gradient: 'from-emerald-600 to-teal-500',
     },
     scoreLabel: 'Goals',
+    keyStatIds: ['s_goal', 's_ast', 's_shot'],
     categories: [
       {
         id: 'attack',

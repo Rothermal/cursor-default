@@ -16,14 +16,22 @@ Parent plan: [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) · Seasons
 
 - [x] **Tournament stats** page `/tournament-stats` + migration **021** `get_tournament_stats_resolved` (fallback aggregates per game if RPC missing)
 - [x] **Game Summary** Players / Team tab (team tab = score card + team totals tables only)
-- [ ] **`keyStatIds`** for sports other than basketball (optional)
-- [ ] Team season summary: per-opponent table (optional)
+- [x] **`keyStatIds`** for baseball, football, hockey, soccer + `statDisplay` uses only configured keys (no bogus basketball ids)
+- [x] Team season summary: **By opponent** table (aggregated W-L-T, PF-PA, +/-)
+- [x] **Cloud Games** list: `teamDisplayName`, final score line via `get_game_stats_resolved`, **Tournament stats** link when `tournament_id` set
 
 ## Latest slice (021 + UI)
 
 - `021_tournament_stats_rpc.sql`
 - `TournamentStats.tsx`, route, Team stats → **Stats →** per tournament
 - `GameSummary.tsx`: **Players** / **Team** toggle (alongside cloud Primary/All when applicable)
+
+## Slice: polish (keyStatIds, team by-opponent, games list)
+
+- `sports.ts`: `keyStatIds` for all sports
+- `statDisplay.ts`: score label helper; only iterate `keyStatIds` when set
+- `TeamStats.tsx`: **By opponent** section
+- `Games.tsx`: nickname + season in team query, score on final cards, tournament deep link
 
 ## Apply in Supabase
 
