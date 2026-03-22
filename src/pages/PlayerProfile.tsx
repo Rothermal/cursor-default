@@ -6,7 +6,8 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import type { GameState } from '../types'
-import { playerDisplayName } from '../lib/display'
+import { playerDisplayName, teamDisplayName } from '../lib/display'
+import { formatCompactGameStatLine } from '../lib/statDisplay'
 
 interface TeamRow {
   id: string
@@ -43,6 +44,14 @@ interface GameLogRow {
   opponent_name: string
 }
 
+interface GameLogLineRow {
+  game_id: string
+  game_date: string
+  opponent_name: string
+  stat_id: string
+  value: number
+}
+
 function getStatShortLabel(sportId: string, statId: string): string {
   const sport = sports.find(s => s.id === sportId)
   if (!sport) return statId
@@ -53,11 +62,16 @@ function getStatShortLabel(sportId: string, statId: string): string {
   return statId
 }
 
+function isMissingRpcError(msg: string): boolean {
+  return msg.includes('does not exist') || msg.includes('function')
+}
+
 export default function PlayerProfile() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
   const playerId = searchParams.get('playerId')
+  const seasonIdFromUrl = searchParams.get('seasonId')
 
   const { user, isConfigured } = useAuth()
   const { dispatch } = useGame()
@@ -67,6 +81,7 @@ export default function PlayerProfile() {
   const [player, setPlayer] = useState<PlayerRow | null>(null)
   const [seasonStats, setSeasonStats] = useState<SeasonStatRow[]>([])
   const [gameLog, setGameLog] = useState<GameLogRow[]>([])
+  const [gameLogLines, setGameLogLines] = useState<GameLogLineRow[]>([])
 
   const [loading, setLoading] = useState(true)
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null)
@@ -76,6 +91,15 @@ export default function PlayerProfile() {
     () => sports.find(s => s.id === team?.seasons?.sport) ?? null,
     [team?.seasons?.sport]
   )
+
+  const statsByGame = useMemo(() => {
+    const m = new Map<string, Record<string, number>>()
+    for (const row of gameLogLines) {
+      if (!m.has(row.game_id)) m.set(row.game_id, {})
+      m.get(row.game_id)![row.stat_id] = row.value
+    }
+    return m
+  }, [gameLogLines])
 
   useEffect(() => {
     if (!teamId || !playerId || !isConfigured || !supabaseClient) {
@@ -88,7 +112,7 @@ export default function PlayerProfile() {
       setLoading(true)
       setError(null)
 
-      const [teamRes, playerRes, statsRes, gameStatsRes] = await Promise.all([
+      const [teamRes, playerRes, statsRes, logRpcRes, gameStatsRes] = await Promise.all([
         supabaseClient.from('teams').select('id,name,nickname,season_id,seasons!inner(id,name,sport)').eq('id', teamId).single(),
         supabaseClient
           .from('team_players')
@@ -97,6 +121,10 @@ export default function PlayerProfile() {
           .eq('player_id', playerId)
           .single(),
         supabaseClient.rpc('get_season_stats_resolved', { p_team_id: teamId }),
+        supabaseClient.rpc('get_player_game_log', {
+          p_player_id: playerId,
+          p_team_id: teamId,
+        }),
         supabaseClient.from('game_stats').select('game_id').eq('player_id', playerId),
       ])
 
@@ -129,6 +157,16 @@ export default function PlayerProfile() {
       } as PlayerRow)
       setSeasonStats((statsRes.data ?? []).filter((r: SeasonStatRow) => r.player_id === playerId) as SeasonStatRow[])
 
+      if (!logRpcRes.error) {
+        setGameLogLines((logRpcRes.data ?? []) as GameLogLineRow[])
+      } else if (isMissingRpcError(logRpcRes.error.message)) {
+        setGameLogLines([])
+      } else {
+        setError(logRpcRes.error.message)
+        setLoading(false)
+        return
+      }
+
       const gameIds = [...new Set(((gameStatsRes.data ?? []) as { game_id: string }[]).map(r => r.game_id))]
       if (gameIds.length === 0) {
         setGameLog([])
@@ -150,11 +188,34 @@ export default function PlayerProfile() {
       } else {
         setGameLog((gamesRes.data ?? []) as GameLogRow[])
       }
+
+      if (logRpcRes.error && isMissingRpcError(logRpcRes.error.message) && gamesRes.data?.length) {
+        const lines: GameLogLineRow[] = []
+        for (const g of gamesRes.data as GameLogRow[]) {
+          const res = await supabaseClient.rpc('get_game_stats_resolved', { p_game_id: g.id })
+          if (res.error) continue
+          for (const row of (res.data ?? []) as { player_id: string; stat_id: string; value: number }[]) {
+            if (row.player_id === playerId) {
+              lines.push({
+                game_id: g.id,
+                game_date: g.game_date,
+                opponent_name: g.opponent_name,
+                stat_id: row.stat_id,
+                value: row.value,
+              })
+            }
+          }
+        }
+        if (!cancelled) setGameLogLines(lines)
+      }
+
       setLoading(false)
     }
 
     void load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [teamId, playerId, isConfigured, supabaseClient])
 
   const handleViewGame = async (gameId: string) => {
@@ -200,6 +261,10 @@ export default function PlayerProfile() {
     setLoadingGameId(null)
     navigate('/summary')
   }
+
+  const leaderboardHref = team
+    ? `/leaderboard?teamId=${team.id}&seasonId=${team.season_id}`
+    : '/leaderboard'
 
   if (!teamId || !playerId) {
     return (
@@ -256,23 +321,37 @@ export default function PlayerProfile() {
     0
   )
 
+  const careerQuery = seasonIdFromUrl
+    ? `playerId=${encodeURIComponent(playerId)}&sport=${encodeURIComponent(team.seasons.sport)}`
+    : `playerId=${encodeURIComponent(playerId)}&sport=${encodeURIComponent(team.seasons.sport)}`
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate(`/leaderboard?teamId=${teamId}`)}
+            onClick={() => navigate(leaderboardHref)}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
           </button>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-lg font-bold">Player Profile</h1>
             <p className="text-sm opacity-80">
               #{player.jersey_number || '—'} {playerDisplayName(player)}
             </p>
+            <p className="text-xs opacity-70 truncate">
+              {teamDisplayName(team)} · {team.seasons.name}
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/career?${careerQuery}`)}
+            className="shrink-0 text-xs font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-2 py-1.5"
+          >
+            Career →
+          </button>
         </div>
       </header>
 
@@ -318,26 +397,38 @@ export default function PlayerProfile() {
             <p className="text-sm text-slate-500">No games yet.</p>
           ) : (
             <div className="space-y-2">
-              {gameLog.map(game => (
-                <div
-                  key={game.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-200
-                             bg-white px-3 py-2"
-                >
-                  <div>
-                    <p className="font-medium text-slate-700">{game.game_date}</p>
-                    <p className="text-sm text-slate-500">vs {game.opponent_name}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleViewGame(game.id)}
-                    disabled={loadingGameId === game.id}
-                    className="btn-primary py-2 px-4 text-sm"
+              {gameLog.map(game => {
+                const statMap = statsByGame.get(game.id) ?? {}
+                const line =
+                  sport && Object.keys(statMap).length > 0
+                    ? formatCompactGameStatLine(sport, statMap)
+                    : null
+                return (
+                  <div
+                    key={game.id}
+                    className="flex flex-col gap-1 rounded-xl border border-slate-200
+                               bg-white px-3 py-2"
                   >
-                    {loadingGameId === game.id ? 'Loading...' : 'View'}
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-700">{game.game_date}</p>
+                        <p className="text-sm text-slate-500">vs {game.opponent_name}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleViewGame(game.id)}
+                        disabled={loadingGameId === game.id}
+                        className="btn-primary py-2 px-4 text-sm shrink-0"
+                      >
+                        {loadingGameId === game.id ? 'Loading...' : 'View'}
+                      </button>
+                    </div>
+                    {line && (
+                      <p className="text-xs text-slate-500 pl-0.5">{line}</p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>

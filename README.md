@@ -92,6 +92,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/017_game_notes.sql`
    - `supabase/migrations/018_seasons_and_roster_junction.sql`
    - `supabase/migrations/019_data_integrity_constraints.sql`
+   - `supabase/migrations/020_stat_tracking_ui_rpcs.sql` — career / player game log / team game log RPCs ([DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md))
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -138,7 +139,8 @@ src/
 ├── lib/
 │   ├── supabase.ts        # Supabase client init (graceful fallback if not configured)
 │   ├── cloudSync.ts       # Cloud game snapshot sync, hydration, and resume logic
-│   └── display.ts         # Shared display name helpers (teams, players)
+│   ├── display.ts         # Shared display name helpers (teams, players)
+│   └── statDisplay.ts     # Compact stat lines for game logs (sport-aware)
 ├── config/
 │   └── sports.ts          # Sport definitions (stats, categories, scoring rules)
 ├── context/
@@ -155,8 +157,10 @@ src/
 │   ├── GameSummary.tsx    # Post-game stat tables (resolved stats + admin corrections)
 │   ├── Games.tsx          # Cloud game history, resume/final flows, delete games
 │   ├── Teams.tsx          # Cloud team + roster management + invites + delete
-│   ├── Leaderboard.tsx    # Season leaderboard (sortable by stat)
-│   ├── PlayerProfile.tsx  # Player season totals and game log
+│   ├── Leaderboard.tsx    # Season leaderboard (season + team scope, sortable)
+│   ├── PlayerProfile.tsx  # Player season totals, game log with inline stats, career link
+│   ├── CareerStats.tsx    # Career stats (/career)
+│   ├── TeamStats.tsx      # Team season summary (/team-stats)
 │   └── Admin.tsx          # Settings — sports, seasons CRUD, cloud links, data management
 ├── components/
 │   ├── ConfirmDialog.tsx  # Reusable confirmation modal (delete prompts)
@@ -187,12 +191,14 @@ supabase/
     ├── 016_tournaments.sql
     ├── 017_game_notes.sql
     ├── 018_seasons_and_roster_junction.sql
-    └── 019_data_integrity_constraints.sql
+    ├── 019_data_integrity_constraints.sql
+    └── 020_stat_tracking_ui_rpcs.sql
 
 docs/
 ├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
 ├── DESIGN_SEASONS_DATA_MODEL.md  # Design: Seasons entity, roster junction, player guardians
 ├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game/tournament stat views
+├── STAT_TRACKING_UI_PROGRESS.md  # Checklist: Phase 6 stat UI implementation
 ├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
 ├── DESIGN_MULTI_PARENT_INVITE_LINKS.md  # Design: Invite links and multi-parent collaboration
 ├── DESIGN_TOURNAMENTS.md  # Design: Tournaments table, game link, UI and tournament-scoped views

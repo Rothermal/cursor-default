@@ -562,7 +562,7 @@ The migration is destructive (drops columns). Before running, recommend a Supaba
 | **3. Roster Refactor** | Teams page uses `team_players` junction; "Add Existing" player pool mode; PlayerSetup updated | **Done** |
 | **4. Guardian Claim** | "Claim" button on roster players; guardian status indicator; auto-guardian on player creation | **Done** |
 | **5. Cloud Sync** | `cloudSync.ts` handles season context, junction-based player lookup, auto-create guardian link | **Done** |
-| **6. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | Planned (see [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md)) |
+| **6. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | **In progress** — branch `cursor/stat-tracking-ui-phase6`; migration `020_stat_tracking_ui_rpcs.sql`; see [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) §Progress |
 | **7. Player Transfer** | UI to add an existing player to a new team; player search/autocomplete | Planned |
 
 ---

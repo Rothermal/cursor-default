@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
@@ -15,6 +15,11 @@ interface TeamRow {
     name: string
     sport: string
   }
+}
+
+interface SeasonOption {
+  id: string
+  name: string
 }
 
 interface PlayerRow {
@@ -34,14 +39,27 @@ interface SeasonStatRow {
   season_high: number
 }
 
+function uniqueSeasonsFromTeams(teams: TeamRow[]): SeasonOption[] {
+  const map = new Map<string, string>()
+  for (const t of teams) {
+    if (!map.has(t.season_id)) map.set(t.season_id, t.seasons.name)
+  }
+  return Array.from(map.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
 export default function Leaderboard() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const teamIdFromUrl = searchParams.get('teamId')
+  const seasonIdFromUrl = searchParams.get('seasonId')
+
   const { user, isConfigured } = useAuth()
   const supabaseClient = supabase
 
   const [teams, setTeams] = useState<TeamRow[]>([])
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('')
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
   const [players, setPlayers] = useState<PlayerRow[]>([])
   const [seasonStats, setSeasonStats] = useState<SeasonStatRow[]>([])
@@ -51,6 +69,13 @@ export default function Leaderboard() {
   const [loadingStats, setLoadingStats] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const seasonOptions = useMemo(() => uniqueSeasonsFromTeams(teams), [teams])
+
+  const filteredTeams = useMemo(
+    () => (selectedSeasonId ? teams.filter(t => t.season_id === selectedSeasonId) : teams),
+    [teams, selectedSeasonId]
+  )
+
   const selectedTeam = useMemo(
     () => teams.find(t => t.id === selectedTeamId) ?? null,
     [teams, selectedTeamId]
@@ -59,6 +84,16 @@ export default function Leaderboard() {
   const sport = useMemo(
     () => sports.find(s => s.id === selectedTeam?.seasons?.sport) ?? null,
     [selectedTeam?.seasons?.sport]
+  )
+
+  const pushLeaderboardParams = useCallback(
+    (seasonId: string, teamId: string) => {
+      const next = new URLSearchParams()
+      if (seasonId) next.set('seasonId', seasonId)
+      if (teamId) next.set('teamId', teamId)
+      setSearchParams(next, { replace: true })
+    },
+    [setSearchParams]
   )
 
   useEffect(() => {
@@ -82,17 +117,35 @@ export default function Leaderboard() {
 
       const loadedTeams = (data ?? []) as unknown as TeamRow[]
       setTeams(loadedTeams)
-      setSelectedTeamId(prev => {
-        if (teamIdFromUrl && loadedTeams.some(t => t.id === teamIdFromUrl)) return teamIdFromUrl
-        if (prev && loadedTeams.some(t => t.id === prev)) return prev
-        return loadedTeams[0]?.id ?? ''
-      })
+
+      const seasons = uniqueSeasonsFromTeams(loadedTeams)
+      const seasonFromTeam =
+        teamIdFromUrl && loadedTeams.find(t => t.id === teamIdFromUrl)?.season_id
+      const nextSeasonId =
+        (seasonIdFromUrl && seasons.some(s => s.id === seasonIdFromUrl) ? seasonIdFromUrl : null) ??
+        (seasonFromTeam && seasons.some(s => s.id === seasonFromTeam) ? seasonFromTeam : null) ??
+        seasons[0]?.id ??
+        ''
+
+      const inSeason = loadedTeams.filter(t => t.season_id === nextSeasonId)
+      const nextTeamId =
+        (teamIdFromUrl && inSeason.some(t => t.id === teamIdFromUrl) ? teamIdFromUrl : null) ??
+        inSeason[0]?.id ??
+        ''
+
+      setSelectedSeasonId(nextSeasonId)
+      setSelectedTeamId(nextTeamId)
       setLoadingTeams(false)
+      if (nextSeasonId && nextTeamId) {
+        pushLeaderboardParams(nextSeasonId, nextTeamId)
+      }
     }
 
     void loadTeams()
-    return () => { cancelled = true }
-  }, [isConfigured, supabaseClient, user, teamIdFromUrl])
+    return () => {
+      cancelled = true
+    }
+  }, [isConfigured, supabaseClient, user, teamIdFromUrl, seasonIdFromUrl, pushLeaderboardParams])
 
   useEffect(() => {
     if (!selectedTeamId || !supabaseClient) {
@@ -142,7 +195,9 @@ export default function Leaderboard() {
     }
 
     void load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [selectedTeamId, supabaseClient])
 
   const playerStatsMap = useMemo(() => {
@@ -154,12 +209,21 @@ export default function Leaderboard() {
     return map
   }, [seasonStats])
 
+  const gamesPlayedByPlayer = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const row of seasonStats) {
+      const g = row.games_played
+      if (!m[row.player_id] || g > m[row.player_id]) m[row.player_id] = g
+    }
+    return m
+  }, [seasonStats])
+
   const leaderboardRows = useMemo(() => {
     return players
       .map(player => {
         const stats = playerStatsMap[player.id] ?? {}
         const score = sport ? computePlayerScore(sport, stats) : 0
-        return { player, stats, score }
+        return { player, stats, score, gamesPlayed: gamesPlayedByPlayer[player.id] ?? 0 }
       })
       .filter(row => Object.keys(row.stats).length > 0)
       .sort((a, b) => {
@@ -168,7 +232,7 @@ export default function Leaderboard() {
         const bVal = b.stats[sortBy] ?? 0
         return bVal - aVal
       })
-  }, [players, playerStatsMap, sport, sortBy])
+  }, [players, playerStatsMap, sport, sortBy, gamesPlayedByPlayer])
 
   const sortOptions = useMemo(() => {
     if (!sport) return [{ id: 'score', label: 'Score' }]
@@ -184,9 +248,21 @@ export default function Leaderboard() {
   }, [sport])
 
   useEffect(() => {
-    // Reset sort selection when switching teams/sports to a valid default
     setSortBy('score')
   }, [selectedTeamId])
+
+  const handleSeasonChange = (nextSeasonId: string) => {
+    setSelectedSeasonId(nextSeasonId)
+    const nextList = teams.filter(t => t.season_id === nextSeasonId)
+    const nextTeamId = nextList[0]?.id ?? ''
+    setSelectedTeamId(nextTeamId)
+    if (nextSeasonId && nextTeamId) pushLeaderboardParams(nextSeasonId, nextTeamId)
+  }
+
+  const handleSelectTeam = (teamId: string) => {
+    setSelectedTeamId(teamId)
+    if (selectedSeasonId && teamId) pushLeaderboardParams(selectedSeasonId, teamId)
+  }
 
   if (!isConfigured) {
     return (
@@ -230,20 +306,52 @@ export default function Leaderboard() {
         )}
 
         <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Team</h2>
+          <h2 className="font-semibold text-slate-700">Season</h2>
           {loadingTeams ? (
-            <p className="text-sm text-slate-500 animate-pulse">Loading teams...</p>
-          ) : teams.length === 0 ? (
+            <p className="text-sm text-slate-500 animate-pulse">Loading...</p>
+          ) : seasonOptions.length === 0 ? (
             <p className="text-sm text-slate-500">No teams yet.</p>
           ) : (
+            <select
+              value={selectedSeasonId}
+              onChange={e => handleSeasonChange(e.target.value)}
+              className="input-field"
+            >
+              {seasonOptions.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </section>
+
+        <section className="card space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold text-slate-700">Team</h2>
+            {selectedTeamId && (
+              <button
+                type="button"
+                onClick={() => navigate(`/team-stats?teamId=${selectedTeamId}`)}
+                className="text-sm font-semibold text-blue-600 underline"
+              >
+                Team stats →
+              </button>
+            )}
+          </div>
+          {loadingTeams ? (
+            <p className="text-sm text-slate-500 animate-pulse">Loading teams...</p>
+          ) : filteredTeams.length === 0 ? (
+            <p className="text-sm text-slate-500">No teams in this season.</p>
+          ) : (
             <div className="space-y-2">
-              {teams.map(team => {
+              {filteredTeams.map(team => {
                 const s = sports.find(item => item.id === team.seasons.sport)
                 return (
                   <button
                     key={team.id}
                     type="button"
-                    onClick={() => setSelectedTeamId(team.id)}
+                    onClick={() => handleSelectTeam(team.id)}
                     className={`w-full text-left rounded-xl border px-3 py-2 transition-colors ${
                       team.id === selectedTeamId
                         ? 'border-blue-300 bg-blue-50'
@@ -254,7 +362,7 @@ export default function Leaderboard() {
                       {s?.icon ?? '🏟️'} {teamDisplayName(team)}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {s?.name ?? team.seasons.sport}{team.seasons.name ? ` • ${team.seasons.name}` : ''}
+                      {s?.name ?? team.seasons.sport}
                     </p>
                   </button>
                 )
@@ -295,13 +403,15 @@ export default function Leaderboard() {
                     key={row.player.id}
                     type="button"
                     onClick={() =>
-                      navigate(`/player?teamId=${selectedTeamId}&playerId=${row.player.id}`)
+                      navigate(
+                        `/player?teamId=${selectedTeamId}&playerId=${row.player.id}&seasonId=${selectedSeasonId}`
+                      )
                     }
                     className="w-full text-left rounded-xl border border-slate-200 bg-white
                                px-3 py-2 hover:border-blue-200 hover:bg-blue-50/50 transition-colors
                                active:scale-[0.99]"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-slate-400 shrink-0 w-6">
                           {idx + 1}.
@@ -313,13 +423,15 @@ export default function Leaderboard() {
                           {playerDisplayName(row.player)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex flex-col items-end shrink-0 text-right">
                         {sport?.scoreLabel && (
                           <span className="font-semibold text-slate-800">
                             {row.score} {sport.scoreLabel}
                           </span>
                         )}
-                        <span className="text-slate-400">›</span>
+                        <span className="text-xs text-slate-500">
+                          {row.gamesPlayed} GP
+                        </span>
                       </div>
                     </div>
                   </button>
