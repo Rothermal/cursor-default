@@ -40,6 +40,8 @@ export interface SportConfig {
   theme: SportTheme
   categories: StatCategory[]
   scoreLabel: string
+  /** Stat ids for compact per-game lines (e.g. game log). Optional; falls back to score + common stats. */
+  keyStatIds?: string[]
 }
 
 export interface GameInfo {

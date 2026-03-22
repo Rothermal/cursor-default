@@ -13,6 +13,7 @@ export const sports: SportConfig[] = [
       gradient: 'from-orange-500 to-amber-500',
     },
     scoreLabel: 'Points',
+    keyStatIds: ['ast', 'stl', 'blk'],
     categories: [
       {
         id: 'scoring',

@@ -1247,6 +1247,19 @@ export default function Teams() {
                               </p>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
+                              {selectedTeam && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    navigate(
+                                      `/career?playerId=${encodeURIComponent(player.id)}&sport=${encodeURIComponent(selectedTeam.seasons.sport)}`
+                                    )
+                                  }
+                                  className="text-xs font-semibold text-blue-600 px-1.5 py-0.5"
+                                >
+                                  Career
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => startEditPlayer(player)}

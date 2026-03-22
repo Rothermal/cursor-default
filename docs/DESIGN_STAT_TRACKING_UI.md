@@ -2,6 +2,21 @@
 
 Redesign the stat viewing pages to support **career stats**, **season-scoped stats**, and **game stats split into player and team views**. Builds on the seasons data model from [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md).
 
+### Progress (live)
+
+| Item | Status |
+|------|--------|
+| Migration `020_stat_tracking_ui_rpcs.sql` (`get_player_game_log`, `get_career_stats_resolved`, `get_team_game_log`) | Done in repo — apply in Supabase |
+| Leaderboard season selector + `seasonId` URL + GP + Team Stats link | Done |
+| Player Profile season label + Career link + inline game log (RPC + fallback) | Done |
+| Career page `/career` | Done |
+| Team Season Summary `/team-stats` | Done (MVP: record, totals, game list) |
+| Tournament stats page + `get_tournament_stats_resolved` RPC | Not started |
+| Game Summary Players / Team tab | Not started |
+| `SportConfig.keyStats` + shared compact line helper | Partial (`keyStatIds` + `statDisplay.ts`; basketball only) |
+
+Detailed checklist: [STAT_TRACKING_UI_PROGRESS.md](STAT_TRACKING_UI_PROGRESS.md).
+
 ---
 
 ## 1. Current State

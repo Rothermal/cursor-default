@@ -182,6 +182,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 9.4 | Game Log section | List of finalized games for that player |
 | 9.5 | View (on a game) | Loads game and navigates to Summary |
 | 9.6 | Leaderboard: change "Sort by" | Order updates (e.g. by Assists) |
+| 9.7 | Leaderboard: change **Season** dropdown | Team list filters; URL updates `seasonId` |
+| 9.8 | Leaderboard: **Team stats →** | Opens `/team-stats` with W/L and game list |
+| 9.9 | Player Profile: **Career →** | Opens `/career` with totals; migration **020** applied for RPC |
+| 9.10 | Teams → roster **Career** on a player | Same as 9.9 |
 
 ---
 
