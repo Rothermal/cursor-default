@@ -205,6 +205,8 @@ docs/
 ├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
 ├── DESIGN_MULTI_PARENT_INVITE_LINKS.md  # Design: Invite links and multi-parent collaboration
 ├── DESIGN_TOURNAMENTS.md  # Design: Tournaments table, game link, UI and tournament-scoped views
+├── DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md  # Design: Sport → seasons → team → tournaments/exhibition → games
+├── DESIGN_USER_PERMISSIONS_AND_ROLES.md  # Placeholder: granular permissions (R → CRUD), personas TBD
 ├── DATA_INTEGRITY_AND_CREATION_PLAN.md  # Plan: DB/app enforcement, season/team creation alignment
 └── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
