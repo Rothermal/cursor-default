@@ -99,6 +99,8 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 
 Migrations `008_player_checkouts.sql`, `009_stat_corrections.sql`, and `010_resolved_stats_rpcs.sql` implement these Phase 3 structures.
 
+**Post–018 / 019 data model notes:** Migration `019_data_integrity_constraints.sql` adds `games.season_id` (denormalized from `teams.season_id`, kept in sync by trigger), validates `games.tournament_id` against `tournaments.team_id` via trigger, constrains `seasons.sport` to known app ids, unique `(season_id, name)` on teams, and a partial unique index on active non-empty jersey numbers per team. See [`DATA_INTEGRITY_AND_CREATION_PLAN.md`](DATA_INTEGRITY_AND_CREATION_PLAN.md) and `supabase/scripts/audit_data_integrity_pre_019.sql` before applying on existing databases.
+
 ### 1.3 Row Level Security Policies
 
 ```sql
