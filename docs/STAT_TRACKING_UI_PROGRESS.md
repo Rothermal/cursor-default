@@ -14,10 +14,16 @@ Parent plan: [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) · Seasons
 
 ## Not done yet
 
-- [ ] **Tournament stats** page + `get_tournament_stats_resolved` RPC
-- [ ] **Game Summary** Players / Team tab toggle
+- [x] **Tournament stats** page `/tournament-stats` + migration **021** `get_tournament_stats_resolved` (fallback aggregates per game if RPC missing)
+- [x] **Game Summary** Players / Team tab (team tab = score card + team totals tables only)
 - [ ] **`keyStatIds`** for sports other than basketball (optional)
-- [ ] Team season summary: per-opponent table, richer tournament W/L (optional)
+- [ ] Team season summary: per-opponent table (optional)
+
+## Latest slice (021 + UI)
+
+- `021_tournament_stats_rpc.sql`
+- `TournamentStats.tsx`, route, Team stats → **Stats →** per tournament
+- `GameSummary.tsx`: **Players** / **Team** toggle (alongside cloud Primary/All when applicable)
 
 ## Apply in Supabase
 

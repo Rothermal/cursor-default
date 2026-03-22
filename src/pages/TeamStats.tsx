@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -309,15 +309,23 @@ export default function TeamStats() {
         {tournaments.length > 0 && (
           <section className="card space-y-2">
             <h2 className="font-semibold text-slate-700">Tournaments</h2>
-            <ul className="space-y-1 text-sm">
+            <ul className="space-y-2 text-sm">
               {tournaments.map(t => (
-                <li key={t.id} className="flex justify-between gap-2">
-                  <span>🏆 {t.name}</span>
-                  {t.placement != null && (
-                    <span className="text-slate-500">
-                      {t.placement === 1 ? '🥇 1st' : t.placement === 2 ? '🥈 2nd' : t.placement === 3 ? '🥉 3rd' : `#${t.placement}`}
-                    </span>
-                  )}
+                <li key={t.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">🏆 {t.name}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {t.placement != null && (
+                      <span className="text-slate-500 text-xs">
+                        {t.placement === 1 ? '🥇 1st' : t.placement === 2 ? '🥈 2nd' : t.placement === 3 ? '🥉 3rd' : `#${t.placement}`}
+                      </span>
+                    )}
+                    <Link
+                      to={`/tournament-stats?tournamentId=${encodeURIComponent(t.id)}&teamId=${encodeURIComponent(team.id)}`}
+                      className="text-xs font-semibold text-blue-600 underline"
+                    >
+                      Stats →
+                    </Link>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -341,9 +349,15 @@ export default function TeamStats() {
                       <p className="text-sm text-slate-600">vs {game.opponent_name}</p>
                     </div>
                     <span
-                      className={`text-sm font-semibold shrink-0 ${won ? 'text-emerald-700' : 'text-rose-700'}`}
+                      className={`text-sm font-semibold shrink-0 ${
+                        homeScore === game.opponent_score
+                          ? 'text-slate-600'
+                          : won
+                            ? 'text-emerald-700'
+                            : 'text-rose-700'
+                      }`}
                     >
-                      {won ? 'W' : 'L'} {homeScore}-{game.opponent_score}
+                      {homeScore === game.opponent_score ? 'T' : won ? 'W' : 'L'} {homeScore}-{game.opponent_score}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">{compact}</p>

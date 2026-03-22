@@ -11,8 +11,8 @@ Redesign the stat viewing pages to support **career stats**, **season-scoped sta
 | Player Profile season label + Career link + inline game log (RPC + fallback) | Done |
 | Career page `/career` | Done |
 | Team Season Summary `/team-stats` | Done (MVP: record, totals, game list) |
-| Tournament stats page + `get_tournament_stats_resolved` RPC | Not started |
-| Game Summary Players / Team tab | Not started |
+| Tournament stats page + `get_tournament_stats_resolved` RPC | Done (`021_tournament_stats_rpc.sql`, `/tournament-stats`) |
+| Game Summary Players / Team tab | Done (toggle on summary) |
 | `SportConfig.keyStats` + shared compact line helper | Partial (`keyStatIds` + `statDisplay.ts`; basketball only) |
 
 Detailed checklist: [STAT_TRACKING_UI_PROGRESS.md](STAT_TRACKING_UI_PROGRESS.md).
@@ -623,8 +623,8 @@ Existing RPCs unchanged:
 | **3. Player Profile Update** | Inline game stat lines in game log; "Career →" link; season context label | Phase 1 RPCs |
 | **4. Career Stats Page** | New `/career` route and page; career totals + per-season breakdown; sport selector | Phase 1 RPCs |
 | **5. Team Season Summary** | New `/team-stats` route and page; W/L record, team totals, game-by-game, tournament list with W/L and placement | Phase 1 RPCs |
-| **6. Tournament Stats Page** | New `/tournament-stats` route and page; tournament W/L, placement badge, tournament leaderboard, game list | Phase 1 RPCs, Phase 5 |
-| **7. Game Summary Split** | Players/Team tab toggle on Game Summary | No dependencies |
+| **6. Tournament Stats Page** | New `/tournament-stats` route and page; tournament W/L, placement badge, tournament leaderboard, game list | **Done** (migration `021` + page; link from Team stats) |
+| **7. Game Summary Split** | Players/Team tab toggle on Game Summary | **Done** (no backend deps) |
 
 Phase 7 (Game Summary split) has no backend dependencies and can be done in parallel with other phases.
 

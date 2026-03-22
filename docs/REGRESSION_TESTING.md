@@ -186,6 +186,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 9.8 | Leaderboard: **Team stats →** | Opens `/team-stats` with W/L and game list |
 | 9.9 | Player Profile: **Career →** | Opens `/career` with totals; migration **020** applied for RPC |
 | 9.10 | Teams → roster **Career** on a player | Same as 9.9 |
+| 9.11 | Team stats → tournament row **Stats →** | Opens tournament stats; W/L and leaderboard when games have `tournament_id` |
+| 9.12 | Game Summary → **Team** tab | Only team totals tables + score card; **Players** shows full grid |
 
 ---
 
