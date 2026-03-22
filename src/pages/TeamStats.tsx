@@ -37,6 +37,7 @@ interface TournamentRow {
   id: string
   name: string
   placement: number | null
+  url: string | null
 }
 
 function isMissingRpcError(msg: string): boolean {
@@ -87,7 +88,7 @@ export default function TeamStats() {
           .eq('team_id', teamId)
           .eq('status', 'final')
           .order('game_date', { ascending: false }),
-        supabaseClient.from('tournaments').select('id,name,placement').eq('team_id', teamId),
+        supabaseClient.from('tournaments').select('id,name,placement,url').eq('team_id', teamId),
         supabaseClient.rpc('get_team_game_log', { p_team_id: teamId }),
       ])
 
@@ -339,6 +340,16 @@ export default function TeamStats() {
                       <span className="text-slate-500 text-xs">
                         {t.placement === 1 ? '🥇 1st' : t.placement === 2 ? '🥈 2nd' : t.placement === 3 ? '🥉 3rd' : `#${t.placement}`}
                       </span>
+                    )}
+                    {t.url && (
+                      <a
+                        href={t.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-slate-600 underline"
+                      >
+                        Link ↗
+                      </a>
                     )}
                     <Link
                       to={`/tournament-stats?tournamentId=${encodeURIComponent(t.id)}&teamId=${encodeURIComponent(team.id)}`}
