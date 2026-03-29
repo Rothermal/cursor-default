@@ -52,6 +52,8 @@ export default function GameSetup() {
   )
   const [newTournamentName, setNewTournamentName] = useState('')
   const [newTournamentUrl, setNewTournamentUrl] = useState('')
+  /** Draft URL when an existing tournament is selected (saved on Next if changed). */
+  const [existingTournamentUrlDraft, setExistingTournamentUrlDraft] = useState('')
   const [loadingTournaments, setLoadingTournaments] = useState(false)
   const [creatingTournament, setCreatingTournament] = useState(false)
   const [confirmDeleteTournament, setConfirmDeleteTournament] = useState<TournamentOption | null>(null)
@@ -171,6 +173,16 @@ export default function GameSetup() {
     return () => { cancelled = true }
   }, [isCloudFlow, teamMode, selectedTeamId, existingTournamentId])
 
+  // Keep URL draft in sync when user picks a different existing tournament
+  useEffect(() => {
+    if (selectedTournamentId === '' || selectedTournamentId === '__new__') {
+      setExistingTournamentUrlDraft('')
+      return
+    }
+    const t = tournaments.find(x => x.id === selectedTournamentId)
+    setExistingTournamentUrlDraft(t?.url?.trim() ? t.url : '')
+  }, [selectedTournamentId, tournaments])
+
   const handleDeleteTournament = async (tournament: TournamentOption) => {
     if (!supabase) return
     setDeletingTournamentId(tournament.id)
@@ -258,6 +270,27 @@ export default function GameSetup() {
         const found = tournaments.find(t => t.id === selectedTournamentId)
         resolvedTournamentId = selectedTournamentId
         resolvedTournamentName = found?.name ?? ''
+        if (supabase) {
+          const canonical = (found?.url ?? '').trim()
+          const draft = existingTournamentUrlDraft.trim()
+          if (draft !== canonical) {
+            setCreatingTournament(true)
+            const { error: urlErr } = await supabase
+              .from('tournaments')
+              .update({ url: draft === '' ? null : draft })
+              .eq('id', selectedTournamentId)
+            setCreatingTournament(false)
+            if (urlErr) {
+              setSetupError(urlErr.message)
+              return
+            }
+            setTournaments(prev =>
+              prev.map(row =>
+                row.id === selectedTournamentId ? { ...row, url: draft === '' ? null : draft } : row
+              )
+            )
+          }
+        }
       }
       // selectedTournamentId === '' means no tournament — both stay null/empty
     }
@@ -505,17 +538,40 @@ export default function GameSetup() {
                       <option value="__new__">+ Add new tournament…</option>
                     </select>
                     {selectedTournamentId && selectedTournamentId !== '__new__' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const t = tournaments.find(item => item.id === selectedTournamentId)
-                          if (t) setConfirmDeleteTournament(t)
-                        }}
-                        disabled={deletingTournamentId === selectedTournamentId}
-                        className="text-xs text-red-600 underline disabled:opacity-40"
-                      >
-                        {deletingTournamentId === selectedTournamentId ? 'Deleting...' : 'Delete this tournament'}
-                      </button>
+                      <>
+                        <div>
+                          <label
+                            htmlFor="existing-tournament-url"
+                            className="block text-xs font-medium text-slate-500 mb-1"
+                          >
+                            Tournament URL (optional)
+                          </label>
+                          <input
+                            id="existing-tournament-url"
+                            type="url"
+                            inputMode="url"
+                            value={existingTournamentUrlDraft}
+                            onChange={e => setExistingTournamentUrlDraft(e.target.value)}
+                            placeholder="https://…"
+                            className="input-field"
+                            autoComplete="off"
+                          />
+                          <p className="text-xs text-slate-400 mt-1">
+                            Saved when you continue to add players.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const t = tournaments.find(item => item.id === selectedTournamentId)
+                            if (t) setConfirmDeleteTournament(t)
+                          }}
+                          disabled={deletingTournamentId === selectedTournamentId}
+                          className="text-xs text-red-600 underline disabled:opacity-40"
+                        >
+                          {deletingTournamentId === selectedTournamentId ? 'Deleting...' : 'Delete this tournament'}
+                        </button>
+                      </>
                     )}
                   </>
                 )}
@@ -586,7 +642,9 @@ export default function GameSetup() {
           disabled={!canProceed || creatingTournament}
           className="btn-primary w-full mt-8"
         >
-          {creatingTournament ? 'Creating tournament...' : 'Next: Add Players →'}
+          {creatingTournament
+            ? 'Saving tournament...'
+            : 'Next: Add Players →'}
         </button>
       </div>
     </div>
