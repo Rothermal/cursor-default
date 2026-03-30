@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { sports, computePlayerScore } from '../config/sports'
+import { sports, computePlayerScore, computeCategoryTotal } from '../config/sports'
+import type { StatAction, StatCategory } from '../types'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { playerDisplayName } from '../lib/display'
@@ -160,6 +161,14 @@ export default function CareerStats() {
     })
   }, [filteredRows, sportConfig])
 
+  const statsRecord = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const [k, v] of Object.entries(careerTotals)) {
+      m[k] = v.total
+    }
+    return m
+  }, [careerTotals])
+
   if (!playerId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
@@ -206,13 +215,163 @@ export default function CareerStats() {
     )
   }
 
-  const shortLabel = (statId: string) => {
-    if (!sportConfig) return statId
-    for (const cat of sportConfig.categories) {
-      const a = cat.actions.find(x => x.id === statId)
-      if (a) return a.shortLabel
+  const gp = careerGamesApprox.gameSum
+
+  const renderCareerCategoryTable = (category: StatCategory) => {
+    const missByMadeId: Record<string, StatAction> = {}
+    for (const action of category.actions) {
+      if (action.madeStatId) missByMadeId[action.madeStatId] = action
     }
-    return statId
+    const visibleActions = category.actions.filter(a => !a.madeStatId)
+
+    const catTotal =
+      category.showTotal
+        ? category.actions.some(a => a.pointValue)
+          ? category.actions.reduce(
+              (sum, a) => sum + (statsRecord[a.id] || 0) * (a.pointValue || 0),
+              0
+            )
+          : computeCategoryTotal(category, statsRecord)
+        : null
+
+    const cellTotals = (action: StatAction) => {
+      const miss = missByMadeId[action.id]
+      const made = statsRecord[action.id] || 0
+      if (miss) {
+        const missVal = statsRecord[miss.id] || 0
+        const att = made + missVal
+        const pct = att > 0 ? Math.round((made / att) * 100) : null
+        return (
+          <>
+            <span>
+              {made}/{att}
+              {pct !== null && <span className="text-slate-400 ml-1">({pct}%)</span>}
+            </span>
+          </>
+        )
+      }
+      return <>{made}</>
+    }
+
+    const cellPerGame = (action: StatAction) => {
+      if (gp <= 0) return <>—</>
+      const miss = missByMadeId[action.id]
+      const made = statsRecord[action.id] || 0
+      if (miss) {
+        const missVal = statsRecord[miss.id] || 0
+        const att = made + missVal
+        return (
+          <>
+            {(made / gp).toFixed(1)}/{(att / gp).toFixed(1)}
+            <span className="text-slate-400"> /g</span>
+          </>
+        )
+      }
+      return (
+        <>
+          {(made / gp).toFixed(1)}
+          <span className="text-slate-400">/g</span>
+        </>
+      )
+    }
+
+    const cellHigh = (action: StatAction) => {
+      const h = careerTotals[action.id]?.high
+      if (h === undefined || h <= 0) return <>—</>
+      return <>{h}</>
+    }
+
+    return (
+      <div key={category.id} className="mb-6 last:mb-0">
+        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+          {category.name}
+          {category.showTotal && (
+            <span className="text-slate-400 ml-2 normal-case">
+              — {category.totalLabel}
+            </span>
+          )}
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="text-left py-2 pr-2 font-semibold text-slate-600 w-24" />
+                {visibleActions.map(action => {
+                  const hasMiss = !!missByMadeId[action.id]
+                  return (
+                    <th
+                      key={action.id}
+                      className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[56px]"
+                    >
+                      {hasMiss ? `${action.shortLabel} M/A` : action.shortLabel}
+                    </th>
+                  )
+                })}
+                {category.showTotal && catTotal !== null && (
+                  <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[52px]">TOT</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-slate-100">
+                <td className="py-2 pr-2 text-slate-500 text-xs font-medium whitespace-nowrap align-top">
+                  Total
+                </td>
+                {visibleActions.map(action => (
+                  <td key={action.id} className="text-center py-2 px-2 align-top">
+                    {cellTotals(action)}
+                  </td>
+                ))}
+                {category.showTotal && catTotal !== null && (
+                  <td className="text-center py-2 px-2 font-semibold text-slate-800 align-top">{catTotal}</td>
+                )}
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="py-1.5 pr-2 text-slate-400 text-xs font-medium whitespace-nowrap align-top">
+                  Per game
+                </td>
+                {visibleActions.map(action => (
+                  <td
+                    key={`${action.id}-pg`}
+                    className="text-center py-1.5 px-2 text-xs text-slate-500 align-top"
+                  >
+                    {cellPerGame(action)}
+                  </td>
+                ))}
+                {category.showTotal && catTotal !== null && (
+                  <td className="text-center py-1.5 px-2 text-xs text-slate-500 align-top">
+                    {gp > 0 ? (
+                      <>
+                        {(catTotal / gp).toFixed(1)}
+                        <span className="text-slate-400">/g</span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                )}
+              </tr>
+              <tr>
+                <td className="py-1.5 pr-2 text-slate-400 text-xs font-medium whitespace-nowrap align-top">
+                  Best game
+                </td>
+                {visibleActions.map(action => (
+                  <td
+                    key={`${action.id}-hi`}
+                    className="text-center py-1.5 px-2 text-xs text-slate-500 align-top"
+                  >
+                    {cellHigh(action)}
+                  </td>
+                ))}
+                {category.showTotal && (
+                  <td className="text-center py-1.5 px-2 text-xs text-slate-400 align-top">—</td>
+                )}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -268,36 +427,25 @@ export default function CareerStats() {
           <p className="text-sm text-slate-500">No finalized career stats yet for this sport.</p>
         ) : (
           <>
-            <section className="card space-y-3">
+            <section className="card space-y-2">
               <h2 className="font-semibold text-slate-700">Career totals</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {Object.entries(careerTotals).map(([statId, agg]) => (
-                  <div key={statId} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                    <p className="text-xs text-slate-500 uppercase">{shortLabel(statId)}</p>
-                    <p className="font-semibold text-slate-800">{agg.total}</p>
-                    <p className="text-xs text-slate-400">
-                      {careerGamesApprox.gameSum > 0
-                        ? `${(agg.total / careerGamesApprox.gameSum).toFixed(1)}/g · `
-                        : ''}
-                      high {agg.high}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              {sportConfig && (
-                <p className="text-xs text-slate-500">
-                  {computePlayerScore(
-                    sportConfig,
-                    Object.fromEntries(Object.entries(careerTotals).map(([k, v]) => [k, v.total]))
-                  )}{' '}
-                  {sportConfig.scoreLabel} (scoring actions)
-                </p>
-              )}
               <p className="text-xs text-slate-500">
-                ~{careerGamesApprox.gameSum} game{careerGamesApprox.gameSum !== 1 ? 's' : ''} across{' '}
-                {careerGamesApprox.stintCount} season/team
-                {careerGamesApprox.stintCount !== 1 ? 's' : ''}
+                Mirrors game summary: M/A + % for shooting; per-game uses total GP (sum across season/team stints).{' '}
+                <strong>Best game</strong> is the max of each stint’s season high (not a separate career-wide game
+                query).
               </p>
+              {sportConfig && (
+                <>
+                  {sportConfig.categories.map(cat => renderCareerCategoryTable(cat))}
+                  <p className="text-xs text-slate-500 pt-2 border-t border-slate-100">
+                    <span className="font-medium text-slate-600">
+                      {computePlayerScore(sportConfig, statsRecord)} {sportConfig.scoreLabel}
+                    </span>{' '}
+                    (scoring actions) · ~{careerGamesApprox.gameSum} GP across {careerGamesApprox.stintCount} season
+                    / team{careerGamesApprox.stintCount !== 1 ? 's' : ''}
+                  </p>
+                </>
+              )}
             </section>
 
             <section className="card space-y-3">

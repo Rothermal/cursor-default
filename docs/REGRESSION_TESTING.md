@@ -218,6 +218,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 9.13 | Team stats → **By opponent** | Table lists opponents with W-L-T and PF-PA when multiple finals exist |
 | 9.14 | Leaderboard: tap **Career** on a row (not the main row) | Opens `/career` with that `playerId` and the season’s sport |
 | 9.15 | Tournament stats (as owner/admin): **Placement** → enter place (e.g. 2) → **Save placement** | Record card shows placement (e.g. 2nd); blank + save clears placement |
+| 9.16 | `/career` (basketball, player with FT/2PT/3PT stats) | **Career totals** uses category tables like game summary: **FT M/A** (or 2PT/3PT) shows made/attempts + %; **Per game** row; **Best game** row |
 
 ---
 
