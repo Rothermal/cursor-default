@@ -7,6 +7,8 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
+import MergePlayerWizard from '../components/MergePlayerWizard'
+import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 
 interface AdminSeasonInfo {
   name: string
@@ -52,6 +54,14 @@ interface AdminSeasonRow {
   end_date: string | null
 }
 
+interface MergeAuditListRow {
+  id: string
+  merged_at: string
+  duplicate_player_id: string
+  survivor_player_id: string
+  merged_by: string | null
+}
+
 export default function Admin() {
   const navigate = useNavigate()
   const { isSportEnabled, toggleSport } = useSettings()
@@ -92,6 +102,14 @@ export default function Admin() {
   const [editSeasonEndDate, setEditSeasonEndDate] = useState('')
   const [confirmDeleteSeason, setConfirmDeleteSeason] = useState<AdminSeasonRow | null>(null)
 
+  const [showMergeTools, setShowMergeTools] = useState(false)
+  const [mergeWizardOpen, setMergeWizardOpen] = useState(false)
+  const [mergeCandidates, setMergeCandidates] = useState<MergePlayerCandidate[]>([])
+  const [mergeAuditRefresh, setMergeAuditRefresh] = useState(0)
+  const [mergeAuditRows, setMergeAuditRows] = useState<MergeAuditListRow[]>([])
+  const [loadingMergeAudit, setLoadingMergeAudit] = useState(false)
+  const [mergeAuditError, setMergeAuditError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!showDataMgmt || !isConfigured || !userId || !supabaseClient) return
     let cancelled = false
@@ -119,6 +137,48 @@ export default function Admin() {
     void load()
     return () => { cancelled = true }
   }, [showDataMgmt, isConfigured, userId, supabaseClient])
+
+  useEffect(() => {
+    if (!showMergeTools || !isConfigured || !userId || !supabaseClient) return
+    let cancelled = false
+    const load = async () => {
+      const { candidates } = await fetchMergePlayerScope(supabaseClient, userId)
+      if (cancelled) return
+      setMergeCandidates(candidates)
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [showMergeTools, isConfigured, userId, supabaseClient, mergeAuditRefresh])
+
+  useEffect(() => {
+    if (!showMergeTools || !isConfigured || !userId || !supabaseClient) return
+    let cancelled = false
+    const loadAudit = async () => {
+      setLoadingMergeAudit(true)
+      setMergeAuditError(null)
+      const { data, error } = await supabaseClient
+        .from('player_merge_audit')
+        .select('id,merged_at,duplicate_player_id,survivor_player_id,merged_by')
+        .order('merged_at', { ascending: false })
+        .limit(25)
+      if (cancelled) return
+      if (error) {
+        if (error.message.includes('does not exist') || error.code === '42P01') {
+          setMergeAuditError('Run migration 025 (or ensure player_merge_audit exists) to see merge history.')
+        } else if (error.code === '42501' || error.message.toLowerCase().includes('policy')) {
+          setMergeAuditError('Cannot read merge history (RLS). Apply migration 025_player_merge_audit_select_policy.sql.')
+        } else {
+          setMergeAuditError(error.message)
+        }
+        setMergeAuditRows([])
+      } else {
+        setMergeAuditRows((data ?? []) as MergeAuditListRow[])
+      }
+      setLoadingMergeAudit(false)
+    }
+    void loadAudit()
+    return () => { cancelled = true }
+  }, [showMergeTools, isConfigured, userId, supabaseClient, mergeAuditRefresh])
 
   useEffect(() => {
     if (!showDataMgmt || !selectedAdminTeamId || !supabaseClient) {
@@ -563,6 +623,92 @@ export default function Admin() {
               }}
               onCancel={() => setConfirmDeleteSeason(null)}
             />
+          </section>
+        )}
+
+        {isConfigured && user && (
+          <section className="mt-6">
+            <button
+              type="button"
+              onClick={() => setShowMergeTools(!showMergeTools)}
+              className="card w-full text-left border-amber-100 bg-amber-50/40"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-700">Player merge (advanced)</h2>
+                  <p className="text-sm text-slate-500">
+                    Combine duplicate player profiles (same flow as Teams). View merges you performed.
+                  </p>
+                </div>
+                <span className="text-slate-400 text-lg">{showMergeTools ? '▲' : '▼'}</span>
+              </div>
+            </button>
+
+            {showMergeTools && (
+              <div className="mt-3 space-y-4">
+                <p className="text-sm text-slate-600 card">
+                  You must be owner or admin on every team both players are on. Irreversible — use test data when
+                  learning the flow.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMergeWizardOpen(true)}
+                  disabled={mergeCandidates.length < 2}
+                  className="btn-primary w-full disabled:opacity-50"
+                >
+                  Open merge wizard
+                </button>
+                {mergeCandidates.length < 2 && (
+                  <p className="text-xs text-slate-500 px-1">
+                    Need at least two players on teams where you are owner or admin. Add teams under Teams or become
+                    admin on another team.
+                  </p>
+                )}
+
+                <div className="card space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Your recent merges</h3>
+                  {loadingMergeAudit ? (
+                    <p className="text-sm text-slate-500 animate-pulse">Loading history…</p>
+                  ) : mergeAuditError ? (
+                    <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                      {mergeAuditError}
+                    </p>
+                  ) : mergeAuditRows.length === 0 ? (
+                    <p className="text-sm text-slate-500">No merge records yet (or none you performed).</p>
+                  ) : (
+                    <ul className="space-y-2 text-sm max-h-64 overflow-y-auto">
+                      {mergeAuditRows.map(row => (
+                        <li
+                          key={row.id}
+                          className="border border-slate-100 rounded-lg px-3 py-2 flex flex-col gap-0.5"
+                        >
+                          <span className="text-xs text-slate-400">
+                            {new Date(row.merged_at).toLocaleString()}
+                          </span>
+                          <span className="text-slate-700">
+                            Kept <code className="text-xs bg-slate-100 px-1 rounded">{row.survivor_player_id.slice(0, 8)}…</code>
+                            {' · '}
+                            removed{' '}
+                            <code className="text-xs bg-slate-100 px-1 rounded">{row.duplicate_player_id.slice(0, 8)}…</code>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {mergeWizardOpen && supabaseClient && userId && (
+              <MergePlayerWizard
+                supabase={supabaseClient}
+                candidates={mergeCandidates}
+                onClose={() => setMergeWizardOpen(false)}
+                onMerged={() => {
+                  setMergeAuditRefresh(k => k + 1)
+                }}
+              />
+            )}
           </section>
         )}
 

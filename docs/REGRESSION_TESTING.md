@@ -85,8 +85,12 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4a.8 | Type **MERGE** (all caps) → **Merge players** | Success: modal closes; duplicate gone from candidate pool / roster lists after refresh |
 | 4a.9 | Teams → roster / Leaderboard / Player profile for **survivor** | Stats and games that belonged to duplicate now attribute to survivor (where applicable) |
 | 4a.10 | (Optional) Supabase Table Editor → `player_merge_audit` | New row with `duplicate_player_id`, `survivor_player_id`, `merged_by`, `resolutions` json |
+| 4a.11 | Settings (Admin) → expand **Player merge (advanced)** | Section opens; **Your recent merges** loads or shows migration **025** hint if RLS blocks reads |
+| 4a.12 | **Open merge wizard** from Admin (with ≥2 candidates) | Same modal as Teams; complete a test merge → row appears under **Your recent merges** (after **025** applied) |
 
 **Negative / edge:** If another user edits roster or stats between **Load conflicts** and **Merge players**, execute may error (resolution counts mismatch); run **Load conflicts** again from the pick step.
+
+**Migrations:** Merge UI works with **024** only; **Admin → recent merges** needs **025** (`player_merge_audit` readable for own `merged_by`).
 
 ---
 

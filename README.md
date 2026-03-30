@@ -97,6 +97,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/022_games_is_exhibition_generated.sql` — optional generated `games.is_exhibition` (`tournament_id IS NULL`); see `supabase/scripts/normalize_exhibition_games.sql` for legacy row cleanup
    - `supabase/migrations/023_tournaments_url.sql` — optional `tournaments.url` (bracket/registration link); set or edit from Game Setup when creating or selecting a tournament
    - `supabase/migrations/024_player_merge_rpcs.sql` — `merge_players_preview` / `merge_players_execute` + `player_merge_audit` ([DESIGN_PLAYER_MERGE.md](docs/DESIGN_PLAYER_MERGE.md))
+   - `supabase/migrations/025_player_merge_audit_select_policy.sql` — users can `SELECT` their own `player_merge_audit` rows (Admin merge history)
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -201,7 +202,8 @@ supabase/
     ├── 021_tournament_stats_rpc.sql
     ├── 022_games_is_exhibition_generated.sql
     ├── 023_tournaments_url.sql
-    └── 024_player_merge_rpcs.sql
+    ├── 024_player_merge_rpcs.sql
+    └── 025_player_merge_audit_select_policy.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
