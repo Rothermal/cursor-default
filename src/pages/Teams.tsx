@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
+import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 
 interface TeamRow {
   id: string
@@ -114,6 +115,12 @@ export default function Teams() {
   const [guardianMap, setGuardianMap] = useState<Record<string, boolean>>({})
   const [claimingPlayerId, setClaimingPlayerId] = useState<string | null>(null)
 
+  const [mergeWizardOpen, setMergeWizardOpen] = useState(false)
+  const [mergeCandidates, setMergeCandidates] = useState<MergePlayerOption[]>([])
+  const [mergeEligibleTeamIds, setMergeEligibleTeamIds] = useState<string[]>([])
+  const [mergeScopeRefresh, setMergeScopeRefresh] = useState(0)
+  const [rosterTick, setRosterTick] = useState(0)
+
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [teams, selectedTeamId]
@@ -154,6 +161,67 @@ export default function Teams() {
   }, [isConfigured, supabaseClient, userId])
 
   useEffect(() => {
+    if (!isConfigured || !userId || !supabaseClient) {
+      setMergeEligibleTeamIds([])
+      setMergeCandidates([])
+      return
+    }
+    let cancelled = false
+    const loadMergeScope = async () => {
+      const adminTeamIds = new Set<string>()
+      const { data: memRows } = await supabaseClient
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId)
+        .in('role', ['owner', 'admin'])
+      for (const row of (memRows ?? []) as { team_id: string }[]) {
+        adminTeamIds.add(row.team_id)
+      }
+      const { data: ownedRows } = await supabaseClient.from('teams').select('id').eq('owner_id', userId)
+      for (const row of (ownedRows ?? []) as { id: string }[]) {
+        adminTeamIds.add(row.id)
+      }
+      const ids = [...adminTeamIds]
+      if (cancelled) return
+      setMergeEligibleTeamIds(ids)
+      if (ids.length === 0) {
+        setMergeCandidates([])
+        return
+      }
+      const { data: tpRows, error: tpErr } = await supabaseClient
+        .from('team_players')
+        .select('player_id, players!inner(id,first_name,last_name,nickname)')
+        .in('team_id', ids)
+      if (cancelled) return
+      if (tpErr) {
+        setMergeCandidates([])
+        return
+      }
+      type TpJoin = {
+        player_id: string
+        players: { id: string; first_name: string; last_name: string | null; nickname: string | null }
+      }
+      const byId = new Map<string, MergePlayerOption>()
+      for (const row of (tpRows ?? []) as unknown as TpJoin[]) {
+        const p = row.players
+        if (!byId.has(p.id)) {
+          byId.set(p.id, {
+            id: p.id,
+            first_name: p.first_name,
+            last_name: p.last_name,
+            nickname: p.nickname,
+          })
+        }
+      }
+      setMergeCandidates([...byId.values()])
+    }
+    void loadMergeScope()
+    return () => {
+      cancelled = true
+    }
+  }, [isConfigured, supabaseClient, userId, mergeScopeRefresh])
+
+  useEffect(() => {
     if (!selectedTeamId || !isConfigured || !userId || !supabaseClient) {
       setPlayers([])
       return
@@ -192,13 +260,17 @@ export default function Teams() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, selectedTeamId, supabaseClient, userId])
+  }, [isConfigured, selectedTeamId, supabaseClient, userId, rosterTick])
 
   const myRole = useMemo(
     () => teamMembers.find(m => m.user_id === userId)?.role ?? null,
     [teamMembers, userId]
   )
   const canManageMembers = myRole === 'owner' || myRole === 'admin'
+  const canOpenMergeWizard =
+    Boolean(supabaseClient && userId) &&
+    mergeCandidates.length >= 2 &&
+    Boolean(selectedTeamId && mergeEligibleTeamIds.includes(selectedTeamId))
 
   useEffect(() => {
     if (!supabaseClient || !userId) {
@@ -1058,13 +1130,24 @@ export default function Teams() {
             <h2 className="font-semibold text-slate-700">Roster</h2>
             <div className="flex items-center gap-2">
               {selectedTeam && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/leaderboard?teamId=${selectedTeam.id}`)}
-                  className="text-xs text-blue-600 font-medium hover:underline"
-                >
-                  Season Stats
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/leaderboard?teamId=${selectedTeam.id}`)}
+                    className="text-xs text-blue-600 font-medium hover:underline"
+                  >
+                    Season Stats
+                  </button>
+                  {canManageMembers && canOpenMergeWizard && (
+                    <button
+                      type="button"
+                      onClick={() => setMergeWizardOpen(true)}
+                      className="text-xs text-amber-700 font-medium hover:underline"
+                    >
+                      Merge players
+                    </button>
+                  )}
+                </>
               )}
               <span className="text-xs text-slate-400">
                 {selectedTeam ? teamDisplayName(selectedTeam) : 'Select a team'}
@@ -1439,6 +1522,18 @@ export default function Teams() {
           </section>
         )}
       </div>
+
+      {mergeWizardOpen && supabaseClient && (
+        <MergePlayerWizard
+          supabase={supabaseClient}
+          candidates={mergeCandidates}
+          onClose={() => setMergeWizardOpen(false)}
+          onMerged={() => {
+            setMergeScopeRefresh(k => k + 1)
+            setRosterTick(k => k + 1)
+          }}
+        />
+      )}
     </div>
   )
 }
