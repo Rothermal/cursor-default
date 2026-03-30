@@ -216,6 +216,7 @@ docs/
 ├── DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md  # Design: Sport → seasons → team → tournaments/exhibition → games
 ├── DESIGN_USER_PERMISSIONS_AND_ROLES.md  # Placeholder: granular permissions (R → CRUD), personas TBD
 ├── DATA_INTEGRITY_AND_CREATION_PLAN.md  # Plan: DB/app enforcement, season/team creation alignment
+├── DESIGN_PLAYER_MERGE.md  # Plan: merge duplicate players (RPC, conflicts, UI)
 └── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
 
