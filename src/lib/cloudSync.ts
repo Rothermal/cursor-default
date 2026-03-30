@@ -12,6 +12,8 @@ export interface SyncGameSnapshotResult {
   gameId: string
   playerIdMap: Record<string, string>
   syncedAt: string
+  /** True when the cloud row is already final — no writes were performed (avoids clobbering scores). */
+  skippedFinalGame?: boolean
 }
 
 export interface HydratedCloudGame {
@@ -244,7 +246,7 @@ async function ensureGame(
     throw new Error('Supabase client not configured')
   }
 
-  const gamePayload = {
+  const gameInsertPayload = {
     team_id: teamId,
     ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
     opponent_name: state.gameInfo!.opponentName,
@@ -258,8 +260,21 @@ async function ensureGame(
     created_by: userId,
   }
 
+  /** Updates must not set status — stale clients could reopen a final game id and revert it to in_progress. */
+  const gameUpdatePayload = {
+    team_id: teamId,
+    ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
+    opponent_name: state.gameInfo!.opponentName,
+    opponent_score: state.opponentScore,
+    home_score_adjustment: state.homeScoreAdjustment,
+    tournament_name: state.gameInfo!.tournamentName || null,
+    tournament_id: state.gameInfo!.tournamentId || null,
+    notes: state.notes || null,
+    game_date: state.gameInfo!.date,
+  }
+
   // Fallback payload without optional columns that may not exist yet (pre-migration)
-  function buildFallbackPayload(
+  function buildInsertFallbackPayload(
     omitHomeAdj: boolean,
     omitTournamentId: boolean,
     omitNotes: boolean,
@@ -277,6 +292,25 @@ async function ensureGame(
       game_date: state.gameInfo!.date,
       status: 'in_progress',
       created_by: userId,
+    }
+  }
+
+  function buildUpdateFallbackPayload(
+    omitHomeAdj: boolean,
+    omitTournamentId: boolean,
+    omitNotes: boolean,
+    omitSeasonId: boolean
+  ) {
+    return {
+      team_id: teamId,
+      ...(omitSeasonId || !seasonIdForGame ? {} : { season_id: seasonIdForGame }),
+      opponent_name: state.gameInfo!.opponentName,
+      opponent_score: state.opponentScore,
+      ...(omitHomeAdj ? {} : { home_score_adjustment: state.homeScoreAdjustment }),
+      tournament_name: state.gameInfo!.tournamentName || null,
+      ...(omitTournamentId ? {} : { tournament_id: state.gameInfo!.tournamentId || null }),
+      ...(omitNotes ? {} : { notes: state.notes || null }),
+      game_date: state.gameInfo!.date,
     }
   }
 
@@ -305,19 +339,21 @@ async function ensureGame(
       throw new Error(`Game ${op} failed: ${error.message}`)
     }
 
-    ;({ error, data } = await run(
-      buildFallbackPayload(missingHomeAdj, missingTournamentId, missingNotes, missingSeasonId)
-    ))
+    const fb =
+      op === 'update'
+        ? buildUpdateFallbackPayload(missingHomeAdj, missingTournamentId, missingNotes, missingSeasonId)
+        : buildInsertFallbackPayload(missingHomeAdj, missingTournamentId, missingNotes, missingSeasonId)
+    ;({ error, data } = await run(fb))
     if (error) throw new Error(`Game ${op} failed: ${error.message}`)
     return op === 'update' ? gameId! : (data!.id as string)
   }
 
   if (state.cloudSync.gameId) {
-    await upsertWithFallback('update', gamePayload, state.cloudSync.gameId)
+    await upsertWithFallback('update', gameUpdatePayload, state.cloudSync.gameId)
     return state.cloudSync.gameId
   }
 
-  return upsertWithFallback('insert', gamePayload)
+  return upsertWithFallback('insert', gameInsertPayload)
 }
 
 async function ensurePlayerId(
@@ -474,6 +510,29 @@ export async function syncGameSnapshotToCloud({
 
   if (!state.sport || !state.gameInfo) {
     throw new Error('Game is not initialized')
+  }
+
+  if (state.cloudSync.gameId) {
+    const { data: gameRow, error: statusError } = await supabase
+      .from('games')
+      .select('status')
+      .eq('id', state.cloudSync.gameId)
+      .maybeSingle()
+
+    if (statusError) {
+      throw new Error(`Could not verify game before sync: ${statusError.message}`)
+    }
+
+    if (gameRow?.status === 'final') {
+      return {
+        seasonId: state.cloudSync.seasonId ?? '',
+        teamId: state.cloudSync.teamId ?? '',
+        gameId: state.cloudSync.gameId,
+        playerIdMap: state.cloudSync.playerIdMap,
+        syncedAt: new Date().toISOString(),
+        skippedFinalGame: true,
+      }
+    }
   }
 
   const seasonId = await ensureSeason(state, userId)

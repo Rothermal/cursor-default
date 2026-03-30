@@ -656,7 +656,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             seasonId: synced.seasonId,
             teamId: synced.teamId,
             gameId: synced.gameId,
-            gameStatus: 'in_progress',
+            gameStatus: synced.skippedFinalGame ? 'final' : 'in_progress',
             playerIdMap: synced.playerIdMap,
             status: 'synced',
             lastSyncedAt: synced.syncedAt,
