@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
+import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 
 interface TeamRow {
   id: string
@@ -168,52 +169,10 @@ export default function Teams() {
     }
     let cancelled = false
     const loadMergeScope = async () => {
-      const adminTeamIds = new Set<string>()
-      const { data: memRows } = await supabaseClient
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', userId)
-        .in('role', ['owner', 'admin'])
-      for (const row of (memRows ?? []) as { team_id: string }[]) {
-        adminTeamIds.add(row.team_id)
-      }
-      const { data: ownedRows } = await supabaseClient.from('teams').select('id').eq('owner_id', userId)
-      for (const row of (ownedRows ?? []) as { id: string }[]) {
-        adminTeamIds.add(row.id)
-      }
-      const ids = [...adminTeamIds]
+      const { teamIds, candidates } = await fetchMergePlayerScope(supabaseClient, userId)
       if (cancelled) return
-      setMergeEligibleTeamIds(ids)
-      if (ids.length === 0) {
-        setMergeCandidates([])
-        return
-      }
-      const { data: tpRows, error: tpErr } = await supabaseClient
-        .from('team_players')
-        .select('player_id, players!inner(id,first_name,last_name,nickname)')
-        .in('team_id', ids)
-      if (cancelled) return
-      if (tpErr) {
-        setMergeCandidates([])
-        return
-      }
-      type TpJoin = {
-        player_id: string
-        players: { id: string; first_name: string; last_name: string | null; nickname: string | null }
-      }
-      const byId = new Map<string, MergePlayerOption>()
-      for (const row of (tpRows ?? []) as unknown as TpJoin[]) {
-        const p = row.players
-        if (!byId.has(p.id)) {
-          byId.set(p.id, {
-            id: p.id,
-            first_name: p.first_name,
-            last_name: p.last_name,
-            nickname: p.nickname,
-          })
-        }
-      }
-      setMergeCandidates([...byId.values()])
+      setMergeEligibleTeamIds(teamIds)
+      setMergeCandidates(candidates as MergePlayerOption[])
     }
     void loadMergeScope()
     return () => {

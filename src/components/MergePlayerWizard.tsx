@@ -1,13 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { playerDisplayName } from '../lib/display'
+import type { MergePlayerCandidate } from '../lib/mergePlayerScope'
 
-export interface MergePlayerOption {
-  id: string
-  first_name: string
-  last_name: string | null
-  nickname: string | null
-}
+export type MergePlayerOption = MergePlayerCandidate
 
 interface PreviewGameStat {
   game_id: string
