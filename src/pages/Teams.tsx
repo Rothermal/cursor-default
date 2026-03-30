@@ -4,7 +4,7 @@ import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
-import { teamDisplayName, playerDisplayName } from '../lib/display'
+import { teamDisplayName, playerDisplayName, playerRosterSelectLabel } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -1195,8 +1195,7 @@ export default function Teams() {
                         .filter(pp => !players.some(rp => rp.id === pp.id))
                         .map(pp => (
                           <option key={pp.id} value={pp.id}>
-                            {[pp.first_name, pp.last_name].filter(Boolean).join(' ')}
-                            {pp.nickname ? ` (${pp.nickname})` : ''}
+                            {playerRosterSelectLabel(pp)}
                           </option>
                         ))}
                     </select>
