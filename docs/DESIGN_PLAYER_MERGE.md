@@ -190,9 +190,9 @@ RLS: restrictive; inserts only from `merge_players_execute` or service role.
 
 | Phase | Deliverable |
 |-------|-------------|
-| **1** | Migration: `player_merge_audit`, `merge_players_preview`, `merge_players_execute` |
+| **1** | Migration **`024_player_merge_rpcs.sql`**: `player_merge_audit`, `merge_players_can_merge`, `merge_players_preview`, `merge_players_execute` — **done in repo** (apply in Supabase) |
 | **2** | Teams UI: wizard, conflict screens, typed confirm, error handling |
-| **3** | `REGRESSION_TESTING.md` + README |
+| **3** | `REGRESSION_TESTING.md` + README migration bullet for `024` |
 | **4** | Optional: Admin-only mirror, analytics on audit table |
 
 ---
