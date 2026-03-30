@@ -8,6 +8,8 @@ import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import type { GameState } from '../types'
 import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
+import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
+import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 
 interface TeamRow {
   id: string
@@ -52,16 +54,6 @@ interface GameLogLineRow {
   value: number
 }
 
-function getStatShortLabel(sportId: string, statId: string): string {
-  const sport = sports.find(s => s.id === sportId)
-  if (!sport) return statId
-  for (const cat of sport.categories) {
-    const action = cat.actions.find(a => a.id === statId)
-    if (action) return action.shortLabel
-  }
-  return statId
-}
-
 function isMissingRpcError(msg: string): boolean {
   return msg.includes('does not exist') || msg.includes('function')
 }
@@ -86,11 +78,22 @@ export default function PlayerProfile() {
   const [loading, setLoading] = useState(true)
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [profileHighGames, setProfileHighGames] = useState<StatHighGameMap>({})
+  const [profileResolvedByGame, setProfileResolvedByGame] = useState<Record<string, Record<string, number>>>({})
+  const [loadingProfileHighs, setLoadingProfileHighs] = useState(false)
 
   const sport = useMemo(
     () => sports.find(s => s.id === team?.seasons?.sport) ?? null,
     [team?.seasons?.sport]
   )
+
+  const seasonStatsRecord = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const r of seasonStats) {
+      m[r.stat_id] = r.total
+    }
+    return m
+  }, [seasonStats])
 
   const statsByGame = useMemo(() => {
     const m = new Map<string, Record<string, number>>()
@@ -170,6 +173,9 @@ export default function PlayerProfile() {
       const gameIds = [...new Set(((gameStatsRes.data ?? []) as { game_id: string }[]).map(r => r.game_id))]
       if (gameIds.length === 0) {
         setGameLog([])
+        setProfileHighGames({})
+        setProfileResolvedByGame({})
+        setLoadingProfileHighs(false)
         setLoading(false)
         return
       }
@@ -207,6 +213,36 @@ export default function PlayerProfile() {
           }
         }
         if (!cancelled) setGameLogLines(lines)
+      }
+
+      setLoadingProfileHighs(true)
+      const hgRes = await supabaseClient.rpc('get_player_stat_high_games_for_team', {
+        p_player_id: playerId,
+        p_team_id: teamId,
+      })
+      if (!cancelled) {
+        if (hgRes.error) {
+          setProfileHighGames({})
+          setProfileResolvedByGame({})
+        } else {
+          const highs: StatHighGameMap = {}
+          const highGameIds: string[] = []
+          for (const row of (hgRes.data ?? []) as Array<{ stat_id: string; game_id: string; value: number }>) {
+            highs[row.stat_id] = { game_id: row.game_id, value: row.value }
+            if (!highGameIds.includes(row.game_id)) highGameIds.push(row.game_id)
+          }
+          setProfileHighGames(highs)
+          const results = await Promise.all(
+            highGameIds.map(gid => supabaseClient.rpc('get_game_stats_resolved', { p_game_id: gid }))
+          )
+          if (!cancelled) {
+            const rowsByGame = results.map(
+              r => (r.data ?? []) as Array<{ player_id: string; stat_id: string; value: number }>
+            )
+            setProfileResolvedByGame(buildResolvedByGameForPlayer(highGameIds, playerId, rowsByGame))
+          }
+        }
+        setLoadingProfileHighs(false)
       }
 
       setLoading(false)
@@ -362,34 +398,31 @@ export default function PlayerProfile() {
           </div>
         )}
 
-        <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Season Totals</h2>
-          {seasonStats.length === 0 ? (
+        {sport && seasonStats.length > 0 ? (
+          <PlayerStatSummaryTables
+            sport={sport}
+            statsRecord={seasonStatsRecord}
+            gamesPlayed={gamesPlayed}
+            highGames={profileHighGames}
+            resolvedByGame={profileResolvedByGame}
+            onOpenGame={gid => { void handleViewGame(gid) }}
+            loadingHigh={loadingProfileHighs}
+            title="Season totals"
+            description="Same layout as game summary. Tap Best game to open that final (migration 026)."
+            footer={
+              gamesPlayed > 0 ? (
+                <span>
+                  {gamesPlayed} game{gamesPlayed !== 1 ? 's' : ''} played
+                </span>
+              ) : null
+            }
+          />
+        ) : (
+          <section className="card space-y-3">
+            <h2 className="font-semibold text-slate-700">Season totals</h2>
             <p className="text-sm text-slate-500">No finalized games yet.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {seasonStats.map(row => (
-                <div
-                  key={row.stat_id}
-                  className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
-                >
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">
-                    {getStatShortLabel(team.seasons.sport, row.stat_id)}
-                  </p>
-                  <p className="font-semibold text-slate-800">{row.total}</p>
-                  <p className="text-xs text-slate-400">
-                    {row.per_game_avg.toFixed(1)}/game · high {row.season_high}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-          {gamesPlayed > 0 && (
-            <p className="text-xs text-slate-500">
-              {gamesPlayed} game{gamesPlayed !== 1 ? 's' : ''} played
-            </p>
-          )}
-        </section>
+          </section>
+        )}
 
         <section className="card space-y-3">
           <h2 className="font-semibold text-slate-700">Game Log</h2>

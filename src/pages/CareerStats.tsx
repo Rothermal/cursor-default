@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { sports, computePlayerScore, computeCategoryTotal } from '../config/sports'
-import type { StatAction, StatCategory } from '../types'
+import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
+import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
+import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { playerDisplayName } from '../lib/display'
+import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
+import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
+import type { GameState } from '../types'
 
 interface CareerRow {
   season_id: string
@@ -32,14 +36,24 @@ export default function CareerStats() {
   const playerId = searchParams.get('playerId')
   const sportParam = searchParams.get('sport')
 
-  const { isConfigured } = useAuth()
+  const { isConfigured, user } = useAuth()
+  const { dispatch } = useGame()
   const supabaseClient = supabase
+  const userId = user?.id ?? null
 
   const [player, setPlayer] = useState<PlayerMeta | null>(null)
   const [rows, setRows] = useState<CareerRow[]>([])
   const [selectedSport, setSelectedSport] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [careerHighGames, setCareerHighGames] = useState<StatHighGameMap>({})
+  const [careerResolvedByGame, setCareerResolvedByGame] = useState<Record<string, Record<string, number>>>({})
+  const [loadingCareerHighs, setLoadingCareerHighs] = useState(false)
+
+  const [segmentHighs, setSegmentHighs] = useState<Record<string, StatHighGameMap>>({})
+  const [segmentResolved, setSegmentResolved] = useState<Record<string, Record<string, Record<string, number>>>>({})
+  const [loadingSegmentKey, setLoadingSegmentKey] = useState<string | null>(null)
 
   const sportsInData = useMemo(() => {
     const set = new Set(rows.map(r => r.sport))
@@ -116,16 +130,13 @@ export default function CareerStats() {
   )
 
   const careerTotals = useMemo(() => {
-    const byStat: Record<string, { total: number; high: number }> = {}
+    const byStat: Record<string, number> = {}
     for (const r of filteredRows) {
-      if (!byStat[r.stat_id]) byStat[r.stat_id] = { total: 0, high: 0 }
-      byStat[r.stat_id].total += Number(r.total)
-      byStat[r.stat_id].high = Math.max(byStat[r.stat_id].high, r.season_high)
+      byStat[r.stat_id] = (byStat[r.stat_id] ?? 0) + Number(r.total)
     }
     return byStat
   }, [filteredRows])
 
-  /** Sum of games_played per season+team stint (same value on each stat row in a stint). */
   const careerGamesApprox = useMemo(() => {
     const byStint = new Map<string, number>()
     for (const r of filteredRows) {
@@ -152,22 +163,142 @@ export default function CareerStats() {
       const gp = Math.max(...statRows.map(x => x.games_played), 0)
       return {
         key,
+        teamId: first.team_id,
         seasonName: first.season_name,
         teamName: first.team_name,
         gamesPlayed: gp,
         score,
         statRows,
+        statsRecord: stats,
       }
     })
   }, [filteredRows, sportConfig])
 
-  const statsRecord = useMemo(() => {
-    const m: Record<string, number> = {}
-    for (const [k, v] of Object.entries(careerTotals)) {
-      m[k] = v.total
+  const statsRecord = careerTotals
+
+  useEffect(() => {
+    if (!playerId || !supabaseClient || !sportConfig || filteredRows.length === 0) {
+      setCareerHighGames({})
+      setCareerResolvedByGame({})
+      return
     }
-    return m
-  }, [careerTotals])
+    let cancelled = false
+    const load = async () => {
+      setLoadingCareerHighs(true)
+      const { data, error: rpcErr } = await supabaseClient.rpc('get_player_stat_high_games', {
+        p_player_id: playerId,
+      })
+      if (cancelled) return
+      if (rpcErr) {
+        setCareerHighGames({})
+        setCareerResolvedByGame({})
+        setLoadingCareerHighs(false)
+        return
+      }
+      const highs: StatHighGameMap = {}
+      const gameIds: string[] = []
+      for (const row of (data ?? []) as Array<{ stat_id: string; game_id: string; value: number }>) {
+        highs[row.stat_id] = { game_id: row.game_id, value: row.value }
+        if (!gameIds.includes(row.game_id)) gameIds.push(row.game_id)
+      }
+      setCareerHighGames(highs)
+      const results = await Promise.all(
+        gameIds.map(gid =>
+          supabaseClient.rpc('get_game_stats_resolved', { p_game_id: gid })
+        )
+      )
+      if (cancelled) return
+      const rowsByGame = results.map(r => (r.data ?? []) as Array<{ player_id: string; stat_id: string; value: number }>)
+      setCareerResolvedByGame(buildResolvedByGameForPlayer(gameIds, playerId, rowsByGame))
+      setLoadingCareerHighs(false)
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [playerId, supabaseClient, sportConfig, filteredRows.length])
+
+  useEffect(() => {
+    if (!playerId || !supabaseClient || !sportConfig || segments.length === 0) {
+      setSegmentHighs({})
+      setSegmentResolved({})
+      return
+    }
+    let cancelled = false
+    const loadAll = async () => {
+      const nextHighs: Record<string, StatHighGameMap> = {}
+      const nextRes: Record<string, Record<string, Record<string, number>>> = {}
+      for (const seg of segments) {
+        if (cancelled) return
+        setLoadingSegmentKey(seg.key)
+        const { data, error: rpcErr } = await supabaseClient.rpc('get_player_stat_high_games_for_team', {
+          p_player_id: playerId,
+          p_team_id: seg.teamId,
+        })
+        if (cancelled) return
+        if (rpcErr) {
+          nextHighs[seg.key] = {}
+          nextRes[seg.key] = {}
+          continue
+        }
+        const highs: StatHighGameMap = {}
+        const gameIds: string[] = []
+        for (const row of (data ?? []) as Array<{ stat_id: string; game_id: string; value: number }>) {
+          highs[row.stat_id] = { game_id: row.game_id, value: row.value }
+          if (!gameIds.includes(row.game_id)) gameIds.push(row.game_id)
+        }
+        nextHighs[seg.key] = highs
+        const results = await Promise.all(
+          gameIds.map(gid =>
+            supabaseClient.rpc('get_game_stats_resolved', { p_game_id: gid })
+          )
+        )
+        if (cancelled) return
+        const rowsByGame = results.map(r => (r.data ?? []) as Array<{ player_id: string; stat_id: string; value: number }>)
+        nextRes[seg.key] = buildResolvedByGameForPlayer(gameIds, playerId, rowsByGame)
+      }
+      if (cancelled) return
+      setSegmentHighs(nextHighs)
+      setSegmentResolved(nextRes)
+      setLoadingSegmentKey(null)
+    }
+    void loadAll()
+    return () => {
+      cancelled = true
+    }
+  }, [playerId, supabaseClient, sportConfig, segments])
+
+  const openGameSummary = useCallback(
+    async (gameId: string) => {
+      if (!userId || !sportConfig || !supabaseClient) return
+      const cloudGame = await loadCloudGameById(userId, gameId).catch(() => null)
+      if (!cloudGame) return
+      await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
+      const nextState: GameState = {
+        sport: sportConfig,
+        gameInfo: cloudGame.gameInfo,
+        players: cloudGame.players,
+        activePlayerId: cloudGame.activePlayerId,
+        opponentScore: cloudGame.opponentScore,
+        homeScoreAdjustment: cloudGame.homeScoreAdjustment,
+        notes: cloudGame.notes,
+        actionLog: [],
+        cloudSync: {
+          seasonId: cloudGame.seasonId ?? null,
+          teamId: cloudGame.teamId,
+          gameId: cloudGame.gameId,
+          gameStatus: cloudGame.status,
+          playerIdMap: cloudGame.playerIdMap,
+          status: 'synced',
+          lastSyncedAt: cloudGame.hydratedAt,
+          lastError: null,
+        },
+      }
+      dispatch({ type: 'HYDRATE_STATE', state: nextState })
+      navigate('/summary')
+    },
+    [userId, sportConfig, supabaseClient, dispatch, navigate]
+  )
 
   if (!playerId) {
     return (
@@ -211,165 +342,6 @@ export default function CareerStats() {
         <button type="button" onClick={() => navigate(-1)} className="btn-primary">
           Back
         </button>
-      </div>
-    )
-  }
-
-  const gp = careerGamesApprox.gameSum
-
-  const renderCareerCategoryTable = (category: StatCategory) => {
-    const missByMadeId: Record<string, StatAction> = {}
-    for (const action of category.actions) {
-      if (action.madeStatId) missByMadeId[action.madeStatId] = action
-    }
-    const visibleActions = category.actions.filter(a => !a.madeStatId)
-
-    const catTotal =
-      category.showTotal
-        ? category.actions.some(a => a.pointValue)
-          ? category.actions.reduce(
-              (sum, a) => sum + (statsRecord[a.id] || 0) * (a.pointValue || 0),
-              0
-            )
-          : computeCategoryTotal(category, statsRecord)
-        : null
-
-    const cellTotals = (action: StatAction) => {
-      const miss = missByMadeId[action.id]
-      const made = statsRecord[action.id] || 0
-      if (miss) {
-        const missVal = statsRecord[miss.id] || 0
-        const att = made + missVal
-        const pct = att > 0 ? Math.round((made / att) * 100) : null
-        return (
-          <>
-            <span>
-              {made}/{att}
-              {pct !== null && <span className="text-slate-400 ml-1">({pct}%)</span>}
-            </span>
-          </>
-        )
-      }
-      return <>{made}</>
-    }
-
-    const cellPerGame = (action: StatAction) => {
-      if (gp <= 0) return <>—</>
-      const miss = missByMadeId[action.id]
-      const made = statsRecord[action.id] || 0
-      if (miss) {
-        const missVal = statsRecord[miss.id] || 0
-        const att = made + missVal
-        return (
-          <>
-            {(made / gp).toFixed(1)}/{(att / gp).toFixed(1)}
-            <span className="text-slate-400"> /g</span>
-          </>
-        )
-      }
-      return (
-        <>
-          {(made / gp).toFixed(1)}
-          <span className="text-slate-400">/g</span>
-        </>
-      )
-    }
-
-    const cellHigh = (action: StatAction) => {
-      const h = careerTotals[action.id]?.high
-      if (h === undefined || h <= 0) return <>—</>
-      return <>{h}</>
-    }
-
-    return (
-      <div key={category.id} className="mb-6 last:mb-0">
-        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-          {category.name}
-          {category.showTotal && (
-            <span className="text-slate-400 ml-2 normal-case">
-              — {category.totalLabel}
-            </span>
-          )}
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-2 pr-2 font-semibold text-slate-600 w-24" />
-                {visibleActions.map(action => {
-                  const hasMiss = !!missByMadeId[action.id]
-                  return (
-                    <th
-                      key={action.id}
-                      className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[56px]"
-                    >
-                      {hasMiss ? `${action.shortLabel} M/A` : action.shortLabel}
-                    </th>
-                  )
-                })}
-                {category.showTotal && catTotal !== null && (
-                  <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[52px]">TOT</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-slate-100">
-                <td className="py-2 pr-2 text-slate-500 text-xs font-medium whitespace-nowrap align-top">
-                  Total
-                </td>
-                {visibleActions.map(action => (
-                  <td key={action.id} className="text-center py-2 px-2 align-top">
-                    {cellTotals(action)}
-                  </td>
-                ))}
-                {category.showTotal && catTotal !== null && (
-                  <td className="text-center py-2 px-2 font-semibold text-slate-800 align-top">{catTotal}</td>
-                )}
-              </tr>
-              <tr className="border-b border-slate-100">
-                <td className="py-1.5 pr-2 text-slate-400 text-xs font-medium whitespace-nowrap align-top">
-                  Per game
-                </td>
-                {visibleActions.map(action => (
-                  <td
-                    key={`${action.id}-pg`}
-                    className="text-center py-1.5 px-2 text-xs text-slate-500 align-top"
-                  >
-                    {cellPerGame(action)}
-                  </td>
-                ))}
-                {category.showTotal && catTotal !== null && (
-                  <td className="text-center py-1.5 px-2 text-xs text-slate-500 align-top">
-                    {gp > 0 ? (
-                      <>
-                        {(catTotal / gp).toFixed(1)}
-                        <span className="text-slate-400">/g</span>
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                )}
-              </tr>
-              <tr>
-                <td className="py-1.5 pr-2 text-slate-400 text-xs font-medium whitespace-nowrap align-top">
-                  Best game
-                </td>
-                {visibleActions.map(action => (
-                  <td
-                    key={`${action.id}-hi`}
-                    className="text-center py-1.5 px-2 text-xs text-slate-500 align-top"
-                  >
-                    {cellHigh(action)}
-                  </td>
-                ))}
-                {category.showTotal && (
-                  <td className="text-center py-1.5 px-2 text-xs text-slate-400 align-top">—</td>
-                )}
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     )
   }
@@ -427,45 +399,62 @@ export default function CareerStats() {
           <p className="text-sm text-slate-500">No finalized career stats yet for this sport.</p>
         ) : (
           <>
-            <section className="card space-y-2">
-              <h2 className="font-semibold text-slate-700">Career totals</h2>
-              <p className="text-xs text-slate-500">
-                Mirrors game summary: M/A + % for shooting; per-game uses total GP (sum across season/team stints).{' '}
-                <strong>Best game</strong> is the max of each stint’s season high (not a separate career-wide game
-                query).
-              </p>
-              {sportConfig && (
-                <>
-                  {sportConfig.categories.map(cat => renderCareerCategoryTable(cat))}
-                  <p className="text-xs text-slate-500 pt-2 border-t border-slate-100">
+            {sportConfig && (
+              <PlayerStatSummaryTables
+                sport={sportConfig}
+                statsRecord={statsRecord}
+                gamesPlayed={careerGamesApprox.gameSum}
+                highGames={careerHighGames}
+                resolvedByGame={careerResolvedByGame}
+                onOpenGame={openGameSummary}
+                loadingHigh={loadingCareerHighs}
+                title="Career totals"
+                description="Same layout as game summary. Per-game uses sum of GP per season/team stint. Tap Best game to open that game’s summary (migration 026 for links)."
+                footer={
+                  <>
                     <span className="font-medium text-slate-600">
                       {computePlayerScore(sportConfig, statsRecord)} {sportConfig.scoreLabel}
                     </span>{' '}
                     (scoring actions) · ~{careerGamesApprox.gameSum} GP across {careerGamesApprox.stintCount} season
                     / team{careerGamesApprox.stintCount !== 1 ? 's' : ''}
-                  </p>
-                </>
-              )}
-            </section>
+                  </>
+                }
+              />
+            )}
 
             <section className="card space-y-3">
               <h2 className="font-semibold text-slate-700">By season</h2>
-              <div className="space-y-3">
-                {segments.map(seg => (
-                  <div key={seg.key} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                    <p className="font-medium text-slate-800">{seg.seasonName}</p>
-                    <p className="text-sm text-slate-500">{seg.teamName}</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {seg.gamesPlayed} GP
-                      {sportConfig && (
-                        <>
-                          {' · '}
-                          {seg.score} {sportConfig.scoreLabel}
-                        </>
-                      )}
-                    </p>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {segments.map(seg =>
+                  sportConfig ? (
+                    <div key={seg.key} className="rounded-xl border border-slate-200 bg-white px-3 py-3 space-y-2">
+                      <div>
+                        <p className="font-medium text-slate-800">{seg.seasonName}</p>
+                        <p className="text-sm text-slate-500">{seg.teamName}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {seg.gamesPlayed} GP
+                          {sportConfig && (
+                            <>
+                              {' · '}
+                              {seg.score} {sportConfig.scoreLabel}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <PlayerStatSummaryTables
+                        sport={sportConfig}
+                        statsRecord={seg.statsRecord}
+                        gamesPlayed={seg.gamesPlayed}
+                        highGames={segmentHighs[seg.key] ?? {}}
+                        resolvedByGame={segmentResolved[seg.key] ?? {}}
+                        onOpenGame={openGameSummary}
+                        loadingHigh={loadingSegmentKey === seg.key}
+                        title="Season totals"
+                        description="Best game uses only games for this team."
+                      />
+                    </div>
+                  ) : null
+                )}
               </div>
             </section>
           </>
