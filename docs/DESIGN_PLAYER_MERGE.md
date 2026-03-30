@@ -144,11 +144,13 @@ CREATE TABLE public.player_merge_audit (
 
 RLS: restrictive; inserts only from `merge_players_execute` or service role.
 
-### 4.3 App UI (`/teams` recommended)
+### 4.3 App UI (`/teams`)
 
-**Audience:** owner/admin only (hide merge entry otherwise).
+**Implemented:** Roster header link **Merge players** (visible when you are **owner/admin** on the **selected** team, migration **024** is applied, and there are **≥2** distinct players on teams where you are owner/admin — used as the merge candidate pool). Modal: `src/components/MergePlayerWizard.tsx`.
 
-**Cross-team:** survivor and duplicate need **not** be on the current team’s roster for selection — load candidates from **all players** the user could already add via pool logic **or** expand to “any player on a team where I’m owner/admin” (implementation detail: query `team_players` joined to `team_members` where `user_id = auth.uid()` and `role in ('owner','admin')`, distinct `player_id`).
+**Audience:** owner/admin only (same as roster management).
+
+**Cross-team:** survivor and duplicate are chosen from **all** players on teams where you are owner/admin (not limited to the current team’s active roster).
 
 **Wizard steps:**
 
@@ -159,7 +161,7 @@ RLS: restrictive; inserts only from `merge_players_execute` or service role.
 5. **Resolve `stat_corrections`** — for each item, show both corrections; options: accept survivor’s / accept duplicate’s / **discard both**.
 6. **Resolve `team_players`** — for each team with both, show both jersey/active (and position); controls to set final jersey, active toggle, position.
 7. **If no conflicts** in a section, skip that step.
-8. **Typed confirmation** — e.g. type survivor’s full name or “MERGE” (product copy TBD).
+8. **Typed confirmation** — user must type **`MERGE`** (all caps).
 9. **Submit** — `merge_players_execute` with built `p_resolutions`.
 
 **Empty preview conflicts:** still run execute path for guardian/checkout/non-conflicting updates + name backfill + delete duplicate (or a slim RPC variant).
@@ -191,7 +193,7 @@ RLS: restrictive; inserts only from `merge_players_execute` or service role.
 | Phase | Deliverable |
 |-------|-------------|
 | **1** | Migration **`024_player_merge_rpcs.sql`**: `player_merge_audit`, `merge_players_can_merge`, `merge_players_preview`, `merge_players_execute` — **done in repo** (apply in Supabase) |
-| **2** | Teams UI: wizard, conflict screens, typed confirm, error handling |
+| **2** | Teams UI: wizard, conflict screens, typed confirm, error handling — **done** (`MergePlayerWizard` + Roster **Merge players** on `/teams` when owner/admin on selected team and ≥2 eligible players) |
 | **3** | `REGRESSION_TESTING.md` + README migration bullet for `024` |
 | **4** | Optional: Admin-only mirror, analytics on audit table |
 
