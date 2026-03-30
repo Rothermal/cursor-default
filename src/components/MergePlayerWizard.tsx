@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { playerDisplayName } from '../lib/display'
+import { playerRosterSelectLabel } from '../lib/display'
 import type { MergePlayerCandidate } from '../lib/mergePlayerScope'
 
 export type MergePlayerOption = MergePlayerCandidate
@@ -151,7 +151,7 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
   const candidateOptions = useMemo(
     () =>
       [...candidates].sort((a, b) =>
-        playerDisplayName(a).localeCompare(playerDisplayName(b), undefined, { sensitivity: 'base' })
+        playerRosterSelectLabel(a).localeCompare(playerRosterSelectLabel(b), undefined, { sensitivity: 'base' })
       ),
     [candidates]
   )
@@ -212,7 +212,7 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
                   <option value="">Select…</option>
                   {candidateOptions.map(p => (
                     <option key={p.id} value={p.id}>
-                      {playerDisplayName(p)}
+                      {playerRosterSelectLabel(p)}
                     </option>
                   ))}
                 </select>
@@ -229,7 +229,7 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
                     .filter(p => p.id !== survivorId)
                     .map(p => (
                       <option key={p.id} value={p.id}>
-                        {playerDisplayName(p)}
+                        {playerRosterSelectLabel(p)}
                       </option>
                     ))}
                 </select>
@@ -251,8 +251,8 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
           {step === 'resolve' && preview && (
             <div className="space-y-6">
               <p className="text-sm text-slate-600">
-                Keep: <strong>{survivor ? playerDisplayName(survivor) : '—'}</strong> · Remove:{' '}
-                <strong>{duplicate ? playerDisplayName(duplicate) : '—'}</strong>
+                Keep: <strong>{survivor ? playerRosterSelectLabel(survivor) : '—'}</strong> · Remove:{' '}
+                <strong>{duplicate ? playerRosterSelectLabel(duplicate) : '—'}</strong>
               </p>
 
               {preview.game_stats.length > 0 && (
@@ -452,8 +452,8 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
           {step === 'confirm' && preview && survivor && duplicate && (
             <div className="space-y-4">
               <p className="text-sm text-slate-600">
-                Final check: <strong>{playerDisplayName(survivor)}</strong> remains;{' '}
-                <strong>{playerDisplayName(duplicate)}</strong> will be deleted.
+                Final check: <strong>{playerRosterSelectLabel(survivor)}</strong> remains;{' '}
+                <strong>{playerRosterSelectLabel(duplicate)}</strong> will be deleted.
               </p>
               {survivorFullName && (
                 <p className="text-xs text-slate-500">
