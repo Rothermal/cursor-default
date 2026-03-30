@@ -69,6 +69,27 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 4a. Merge duplicate players (migration 024)
+
+**Precondition:** Signed in; migration **`024_player_merge_rpcs.sql`** applied (`merge_players_preview`, `merge_players_execute`). Two **distinct** `players` rows you intend to merge, each on at least one roster for a team where you are **owner** or **admin** (so you pass RPC authorization for all teams involved).
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4a.1 | As **scorer-only** (not owner/admin): Teams → select a team | **Merge players** link next to Season Stats is **not** shown |
+| 4a.2 | As **owner** or **admin**: Teams → select that team; ensure ≥2 players exist across teams you admin | **Merge players** (amber) appears in Roster header |
+| 4a.3 | Tap **Merge players** → read intro → **Continue** | Pick survivor / duplicate step |
+| 4a.4 | Choose **survivor** (keep) and **duplicate** (remove) → **Load conflicts** | Either conflict sections appear, or message that there are no overlapping stat/roster conflicts |
+| 4a.5 | If **game_stats** conflicts: pick **keep survivor** vs **keep duplicate** row for each | Radios work; one choice per conflict |
+| 4a.6 | If **stat_corrections** conflicts: pick survivor / duplicate / **discard both** per row | Choices stick |
+| 4a.7 | If **team_players** conflicts (same team on both profiles): set jersey, **Active**, position → **Continue to confirm** | Confirm step shows summary |
+| 4a.8 | Type **MERGE** (all caps) → **Merge players** | Success: modal closes; duplicate gone from candidate pool / roster lists after refresh |
+| 4a.9 | Teams → roster / Leaderboard / Player profile for **survivor** | Stats and games that belonged to duplicate now attribute to survivor (where applicable) |
+| 4a.10 | (Optional) Supabase Table Editor → `player_merge_audit` | New row with `duplicate_player_id`, `survivor_player_id`, `merged_by`, `resolutions` json |
+
+**Negative / edge:** If another user edits roster or stats between **Load conflicts** and **Merge players**, execute may error (resolution counts mismatch); run **Load conflicts** again from the pick step.
+
+---
+
 ## 4b. Tournaments (cloud teams)
 
 **Precondition:** Signed in; existing cloud team; migration 016 applied.
@@ -245,6 +266,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 1. **Offline:** Sport → Setup → 2 players → Game → tap stats → Summary.  
 2. **Cloud:** Sign in → Teams → create team + 2 players → Cloud Games → new game from that team → record stats → Summary → Finalize.  
+2b. **Merge (024):** Teams as owner/admin → **Merge players** → complete wizard with **MERGE** confirm (use test duplicates only).  
 3. **Season:** Season Stats → pick team → open a player → View a game from Game Log.  
 4. **Invite:** Owner invites by email → Invitee accepts in Teams → both see same team.
 
@@ -254,7 +276,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a script fails on cloud features, confirm migrations through **019** are applied in Supabase SQL Editor when using seasons, `team_players`, and data-integrity constraints (`019_data_integrity_constraints.sql`). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if upgrading an existing project.
+- **Migrations:** If a script fails on cloud features, confirm migrations through **019** are applied in Supabase SQL Editor when using seasons, `team_players`, and data-integrity constraints (`019_data_integrity_constraints.sql`). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if upgrading an existing project. For **player merge** (Teams → Merge players), apply **`024_player_merge_rpcs.sql`** ([DESIGN_PLAYER_MERGE.md](DESIGN_PLAYER_MERGE.md)).
 
 ---
 
