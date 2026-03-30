@@ -98,6 +98,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/023_tournaments_url.sql` — optional `tournaments.url` (bracket/registration link); set or edit from Game Setup when creating or selecting a tournament
    - `supabase/migrations/024_player_merge_rpcs.sql` — `merge_players_preview` / `merge_players_execute` + `player_merge_audit` ([DESIGN_PLAYER_MERGE.md](docs/DESIGN_PLAYER_MERGE.md))
    - `supabase/migrations/025_player_merge_audit_select_policy.sql` — users can `SELECT` their own `player_merge_audit` rows (Admin merge history)
+   - `supabase/migrations/026_player_stat_high_games.sql` — `get_player_stat_high_games` / `get_player_stat_high_games_for_team` for career & season “Best game” links to game summary
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -105,6 +106,8 @@ The dev server starts at `http://localhost:5173`.
 4. Restart the dev server — the auth page will appear
 
 Without Supabase configured, the app runs in offline-only mode using localStorage.
+
+**Career / season stat display (product):** On **Career totals**, **per-game** divides by the **sum of `games_played` per season/team stint** from `get_career_stats_resolved` (same as before the summary-style UI). That can double-count if the same calendar game were ever counted in two stints; we accept this until a distinct-game GP is defined. **Best game** uses migration **026** RPCs over **resolved** finalized stats; tap opens that game’s Summary (hydrate from cloud).
 
 ### GitHub Pages Deployment
 
@@ -203,7 +206,8 @@ supabase/
     ├── 022_games_is_exhibition_generated.sql
     ├── 023_tournaments_url.sql
     ├── 024_player_merge_rpcs.sql
-    └── 025_player_merge_audit_select_policy.sql
+    ├── 025_player_merge_audit_select_policy.sql
+    └── 026_player_stat_high_games.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
