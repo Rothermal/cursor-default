@@ -82,6 +82,8 @@ function createInitialState(status: CloudSyncStatus = 'idle'): GameState {
     notes: '',
     actionLog: [],
     cloudSync: createInitialCloudSyncState(status),
+    currentPeriod: 1,
+    teamStatsConfig: null,
   }
 }
 
@@ -192,6 +194,8 @@ function buildHydratedStateFromCloudGame(
     opponentScore: cloudGame.opponentScore,
     homeScoreAdjustment: cloudGame.homeScoreAdjustment,
     notes: cloudGame.notes,
+    currentPeriod: 1,
+    teamStatsConfig: null,
     actionLog: [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
@@ -411,6 +415,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         },
       }
 
+    case 'SET_PERIOD': {
+      const next =
+        Number.isFinite(action.period) && action.period >= 1 ? Math.floor(action.period) : 1
+      return { ...state, currentPeriod: next }
+    }
+
+    case 'SET_TEAM_STATS_CONFIG':
+      return { ...state, teamStatsConfig: action.config }
+
     default:
       return state
   }
@@ -433,6 +446,11 @@ function loadState(): GameState {
     ...parsed,
     homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
     notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+    currentPeriod:
+      typeof parsed.currentPeriod === 'number' && parsed.currentPeriod >= 1
+        ? Math.floor(parsed.currentPeriod)
+        : 1,
+    teamStatsConfig: parsed.teamStatsConfig ?? null,
     players: Array.isArray(parsed.players) ? parsed.players : [],
     actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
     cloudSync: {

@@ -8,6 +8,8 @@ export interface StatAction {
   /** Set on miss/attempt actions: the id of the corresponding made stat.
    *  Used in Game Summary to merge made+miss into a single M/A column. */
   madeStatId?: string
+  /** Team stats: actual stat id becomes `${id}_p${currentPeriod}` in GameTracker. */
+  periodScoped?: boolean
 }
 
 export interface StatCategory {
@@ -39,9 +41,13 @@ export interface SportConfig {
   icon: string
   theme: SportTheme
   categories: StatCategory[]
+  /** Team pseudo-player stat categories (optional per sport). */
+  teamCategories?: StatCategory[]
   scoreLabel: string
   /** Stat ids for compact per-game lines (e.g. game log). Optional; falls back to score + common stats. */
   keyStatIds?: string[]
+  /** Compact keys when summarizing team-level stats. */
+  teamKeyStatIds?: string[]
 }
 
 export interface GameInfo {
@@ -58,6 +64,9 @@ export interface Player {
   name: string
   number: string
   stats: Record<string, number>
+  /** True for home/opponent team pseudo-players (team-level stat tracking). */
+  isTeamPlayer?: boolean
+  teamSide?: 'home' | 'opponent'
 }
 
 export interface ActionLogEntry {
@@ -68,6 +77,20 @@ export interface ActionLogEntry {
   statId?: string
   previousValue: number
 }
+
+/** Resolved basketball team-stat rules (season defaults merged in). */
+export interface BasketballTeamStatsConfig {
+  periodsPerGame: number
+  periodLabels: string[]
+  bonusThreshold: number
+  doubleBonusThreshold: number
+  hasOneAndOne: boolean
+  overtimeLabel: string
+  overtimeFoulsReset: boolean
+}
+
+/** Union placeholder for future per-sport team config shapes. */
+export type TeamStatsConfig = BasketballTeamStatsConfig
 
 export interface GameState {
   sport: SportConfig | null
@@ -81,6 +104,10 @@ export interface GameState {
   notes: string
   actionLog: ActionLogEntry[]
   cloudSync: CloudSyncState
+  /** 1-based period index for period-scoped team stats (e.g. half 1 vs 2). */
+  currentPeriod: number
+  /** Season team-stat rules; null until loaded from season or derived from defaults. */
+  teamStatsConfig: TeamStatsConfig | null
 }
 
 export type CloudSyncStatus =
@@ -119,3 +146,5 @@ export type GameAction =
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }
+  | { type: 'SET_PERIOD'; period: number }
+  | { type: 'SET_TEAM_STATS_CONFIG'; config: TeamStatsConfig | null }
