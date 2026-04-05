@@ -8,6 +8,7 @@ Track stats at the **team** level (fouls, timeouts, turnovers, etc.) alongside e
 - [DESIGN_TEAM_STATS_BASKETBALL.md](DESIGN_TEAM_STATS_BASKETBALL.md) — basketball-specific team stat categories, foul/bonus rules, half tracking
 - [DESIGN_TEAM_STATS_SEASON_CONFIG.md](DESIGN_TEAM_STATS_SEASON_CONFIG.md) — season-level configuration for team stat rules (timeout limits, bonus thresholds, etc.)
 - [DESIGN_TEAM_STATS_DATA_MODEL.md](DESIGN_TEAM_STATS_DATA_MODEL.md) — database schema changes, cloud sync, migration plan
+- [DESIGN_TEAM_STATS_IMPLEMENTATION.md](DESIGN_TEAM_STATS_IMPLEMENTATION.md) — step-by-step implementation plan, work units, parallel agent strategy, test breakpoints
 - [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md) — existing seasons/teams data model
 - [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) — overall architecture and phase plan
 
