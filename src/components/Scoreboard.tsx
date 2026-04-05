@@ -1,17 +1,14 @@
 import { useGame } from '../context/GameContext'
-import { computePlayerScore } from '../config/sports'
+import { getDisplayedHomeScore } from '../lib/gameScore'
 
 export default function Scoreboard() {
   const { state, dispatch } = useGame()
-  const { sport, gameInfo, players, opponentScore, homeScoreAdjustment, cloudSync } = state
+  const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, cloudSync } =
+    state
 
   if (!sport || !gameInfo) return null
 
-  const computedTeamScore = players.reduce(
-    (total, player) => total + computePlayerScore(sport, player.stats),
-    0
-  )
-  const teamScore = computedTeamScore + homeScoreAdjustment
+  const teamScore = getDisplayedHomeScore(sport, players, homeTeamScore, homeScoreAdjustment)
 
   const syncLabel = (() => {
     switch (cloudSync.status) {

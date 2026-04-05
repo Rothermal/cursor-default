@@ -72,10 +72,21 @@ export interface Player {
 export interface ActionLogEntry {
   id: string
   timestamp: number
-  type: 'increment' | 'decrement' | 'opponent_score_up' | 'opponent_score_down' | 'home_score_up' | 'home_score_down'
+  type:
+    | 'increment'
+    | 'decrement'
+    | 'opponent_score_up'
+    | 'opponent_score_down'
+    | 'home_score_up'
+    | 'home_score_down'
+    | 'home_team_score_up'
+    | 'home_team_score_down'
   playerId?: string
   statId?: string
   previousValue: number
+  /** For home_team_score_* undo: snapshot before the change. */
+  previousHomeTeamScore?: number | null
+  previousHomeScoreAdjustment?: number
 }
 
 /** Resolved basketball team-stat rules (season defaults merged in). */
@@ -98,7 +109,14 @@ export interface GameState {
   players: Player[]
   activePlayerId: string | null
   opponentScore: number
-  /** Additive adjustment to home score (computed from player stats). Displayed home = computed + this. */
+  /**
+   * Standalone scoreboard home total (not derived from player scoring stats).
+   * When null, displayed home score uses legacy: sum of player scoring stats + homeScoreAdjustment.
+   */
+  homeTeamScore: number | null
+  /**
+   * Legacy additive tweak when homeTeamScore is null; ignored when homeTeamScore is set.
+   */
   homeScoreAdjustment: number
   /** Free-text game notes entered during or after the game. */
   notes: string

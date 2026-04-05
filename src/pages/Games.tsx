@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
-import { sports, computePlayerScore } from '../config/sports'
+import { sports } from '../config/sports'
+import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { teamDisplayName } from '../lib/display'
@@ -16,6 +17,7 @@ interface GameRow {
   opponent_score: number
   tournament_name: string | null
   tournament_id: string | null
+  home_team_score: number | null
   home_score_adjustment: number | null
   game_date: string
   status: string
@@ -87,7 +89,7 @@ export default function Games() {
       const { data: gameRows, error: gamesError } = await supabaseClient
         .from('games')
         .select(
-          'id,team_id,opponent_name,opponent_score,tournament_name,tournament_id,home_score_adjustment,game_date,status,created_at'
+          'id,team_id,opponent_name,opponent_score,tournament_name,tournament_id,home_team_score,home_score_adjustment,game_date,status,created_at'
         )
         .eq('created_by', userId)
         .order('created_at', { ascending: false })
@@ -168,9 +170,7 @@ export default function Games() {
         for (const row of (data ?? []) as { stat_id: string; value: number }[]) {
           byStat[row.stat_id] = (byStat[row.stat_id] ?? 0) + Number(row.value)
         }
-        const base = computePlayerScore(sport, byStat)
-        const adj = g.home_score_adjustment ?? 0
-        const home = base + adj
+        const home = resolveFinalHomeScoreFromGameRow(sport, byStat, g)
         next[g.id] = `${home}–${g.opponent_score}`
       }
       if (!cancelled) setFinalScoreLines(next)
@@ -227,6 +227,7 @@ export default function Games() {
       players: cloudGame.players,
       activePlayerId: cloudGame.activePlayerId,
       opponentScore: cloudGame.opponentScore,
+      homeTeamScore: cloudGame.homeTeamScore,
       homeScoreAdjustment: cloudGame.homeScoreAdjustment,
       notes: cloudGame.notes,
       currentPeriod: 1,

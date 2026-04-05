@@ -23,6 +23,8 @@ export interface HydratedCloudGame {
   players: Player[]
   activePlayerId: string | null
   opponentScore: number
+  /** Null = legacy scoring from stats + home_score_adjustment. */
+  homeTeamScore: number | null
   homeScoreAdjustment: number
   notes: string
   seasonId: string | null
@@ -41,6 +43,7 @@ type CloudGameRow = {
   season_id?: string | null
   game_date: string
   opponent_score: number | null
+  home_team_score?: number | null
   home_score_adjustment?: number | null
   notes?: string | null
   status: string
@@ -55,6 +58,11 @@ function isMissingLastOpenedColumnError(error: { message?: string } | null): boo
 function isMissingHomeScoreAdjustmentColumnError(error: { message?: string } | null): boolean {
   if (!error?.message) return false
   return error.message.includes('home_score_adjustment') && error.message.includes('column')
+}
+
+function isMissingHomeTeamScoreColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  return error.message.includes('home_team_score') && error.message.includes('column')
 }
 
 function isMissingTournamentIdColumnError(error: { message?: string } | null): boolean {
@@ -251,6 +259,7 @@ async function ensureGame(
     ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
     opponent_name: state.gameInfo!.opponentName,
     opponent_score: state.opponentScore,
+    home_team_score: state.homeTeamScore,
     home_score_adjustment: state.homeScoreAdjustment,
     tournament_name: state.gameInfo!.tournamentName || null,
     tournament_id: state.gameInfo!.tournamentId || null,
@@ -266,6 +275,7 @@ async function ensureGame(
     ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
     opponent_name: state.gameInfo!.opponentName,
     opponent_score: state.opponentScore,
+    home_team_score: state.homeTeamScore,
     home_score_adjustment: state.homeScoreAdjustment,
     tournament_name: state.gameInfo!.tournamentName || null,
     tournament_id: state.gameInfo!.tournamentId || null,
@@ -275,6 +285,7 @@ async function ensureGame(
 
   // Fallback payload without optional columns that may not exist yet (pre-migration)
   function buildInsertFallbackPayload(
+    omitHomeTeamScore: boolean,
     omitHomeAdj: boolean,
     omitTournamentId: boolean,
     omitNotes: boolean,
@@ -285,6 +296,7 @@ async function ensureGame(
       ...(omitSeasonId || !seasonIdForGame ? {} : { season_id: seasonIdForGame }),
       opponent_name: state.gameInfo!.opponentName,
       opponent_score: state.opponentScore,
+      ...(omitHomeTeamScore ? {} : { home_team_score: state.homeTeamScore }),
       ...(omitHomeAdj ? {} : { home_score_adjustment: state.homeScoreAdjustment }),
       tournament_name: state.gameInfo!.tournamentName || null,
       ...(omitTournamentId ? {} : { tournament_id: state.gameInfo!.tournamentId || null }),
@@ -296,6 +308,7 @@ async function ensureGame(
   }
 
   function buildUpdateFallbackPayload(
+    omitHomeTeamScore: boolean,
     omitHomeAdj: boolean,
     omitTournamentId: boolean,
     omitNotes: boolean,
@@ -306,6 +319,7 @@ async function ensureGame(
       ...(omitSeasonId || !seasonIdForGame ? {} : { season_id: seasonIdForGame }),
       opponent_name: state.gameInfo!.opponentName,
       opponent_score: state.opponentScore,
+      ...(omitHomeTeamScore ? {} : { home_team_score: state.homeTeamScore }),
       ...(omitHomeAdj ? {} : { home_score_adjustment: state.homeScoreAdjustment }),
       tournament_name: state.gameInfo!.tournamentName || null,
       ...(omitTournamentId ? {} : { tournament_id: state.gameInfo!.tournamentId || null }),
@@ -331,18 +345,37 @@ async function ensureGame(
     let { error, data } = await run(payload)
     if (!error) return op === 'update' ? gameId! : (data!.id as string)
 
+    const missingHomeTeamScore = isMissingHomeTeamScoreColumnError(error)
     const missingHomeAdj = isMissingHomeScoreAdjustmentColumnError(error)
     const missingTournamentId = isMissingTournamentIdColumnError(error)
     const missingNotes = isMissingNotesColumnError(error)
     const missingSeasonId = isMissingSeasonIdColumnError(error)
-    if (!missingHomeAdj && !missingTournamentId && !missingNotes && !missingSeasonId) {
+    if (
+      !missingHomeTeamScore &&
+      !missingHomeAdj &&
+      !missingTournamentId &&
+      !missingNotes &&
+      !missingSeasonId
+    ) {
       throw new Error(`Game ${op} failed: ${error.message}`)
     }
 
     const fb =
       op === 'update'
-        ? buildUpdateFallbackPayload(missingHomeAdj, missingTournamentId, missingNotes, missingSeasonId)
-        : buildInsertFallbackPayload(missingHomeAdj, missingTournamentId, missingNotes, missingSeasonId)
+        ? buildUpdateFallbackPayload(
+            missingHomeTeamScore,
+            missingHomeAdj,
+            missingTournamentId,
+            missingNotes,
+            missingSeasonId
+          )
+        : buildInsertFallbackPayload(
+            missingHomeTeamScore,
+            missingHomeAdj,
+            missingTournamentId,
+            missingNotes,
+            missingSeasonId
+          )
     ;({ error, data } = await run(fb))
     if (error) throw new Error(`Game ${op} failed: ${error.message}`)
     return op === 'update' ? gameId! : (data!.id as string)
@@ -675,6 +708,8 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     players,
     activePlayerId: players[0]?.id ?? null,
     opponentScore: gameRow.opponent_score ?? 0,
+    homeTeamScore:
+      typeof gameRow.home_team_score === 'number' ? gameRow.home_team_score : null,
     homeScoreAdjustment: gameRow.home_score_adjustment ?? 0,
     notes: gameRow.notes ?? '',
     seasonId,
@@ -691,7 +726,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
   }
 
   // All optional columns (may not exist before their respective migrations)
-  const allOptional = 'home_score_adjustment,tournament_id,notes,last_opened_at,season_id'
+  const allOptional = 'home_team_score,home_score_adjustment,tournament_id,notes,last_opened_at,season_id'
   const baseColumns =
     'id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at'
 
@@ -712,12 +747,20 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   // Detect which optional columns are missing and rebuild the select list.
   const missingLastOpened = isMissingLastOpenedColumnError(advanced.error)
+  const missingHomeTeamScore = isMissingHomeTeamScoreColumnError(advanced.error)
   const missingHomeAdjust = isMissingHomeScoreAdjustmentColumnError(advanced.error)
   const missingTournamentId = isMissingTournamentIdColumnError(advanced.error)
   const missingNotes = isMissingNotesColumnError(advanced.error)
   const missingSeasonId = isMissingSeasonIdColumnError(advanced.error)
 
-  if (!missingLastOpened && !missingHomeAdjust && !missingTournamentId && !missingNotes && !missingSeasonId) {
+  if (
+    !missingLastOpened &&
+    !missingHomeTeamScore &&
+    !missingHomeAdjust &&
+    !missingTournamentId &&
+    !missingNotes &&
+    !missingSeasonId
+  ) {
     throw new Error(`Game load failed: ${advanced.error.message}`)
   }
 
@@ -725,6 +768,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   const selectColumns =
     baseColumns +
+    (!missingHomeTeamScore ? ',home_team_score' : '') +
     (!missingHomeAdjust ? ',home_score_adjustment' : '') +
     (!missingTournamentId ? ',tournament_id' : '') +
     (!missingNotes ? ',notes' : '') +
@@ -748,6 +792,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
   // Final fallback: base columns only (no optional columns at all).
   const isStillOptionalMissing =
     isMissingLastOpenedColumnError(retry.error) ||
+    isMissingHomeTeamScoreColumnError(retry.error) ||
     isMissingHomeScoreAdjustmentColumnError(retry.error) ||
     isMissingTournamentIdColumnError(retry.error) ||
     isMissingNotesColumnError(retry.error) ||
@@ -790,20 +835,28 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
 
   const { data: gameRow, error: gameError } = await supabase
     .from('games')
-    .select(`${baseById},home_score_adjustment,tournament_id,notes,season_id`)
+    .select(`${baseById},home_team_score,home_score_adjustment,tournament_id,notes,season_id`)
     .eq('id', gameId)
     .maybeSingle()
 
   if (gameError) {
+    const missingHomeTeamScore = isMissingHomeTeamScoreColumnError(gameError)
     const missingHomeAdj = isMissingHomeScoreAdjustmentColumnError(gameError)
     const missingTournamentId = isMissingTournamentIdColumnError(gameError)
     const missingNotes = isMissingNotesColumnError(gameError)
     const missingSeasonId = isMissingSeasonIdColumnError(gameError)
-    if (!missingHomeAdj && !missingTournamentId && !missingNotes && !missingSeasonId) {
+    if (
+      !missingHomeTeamScore &&
+      !missingHomeAdj &&
+      !missingTournamentId &&
+      !missingNotes &&
+      !missingSeasonId
+    ) {
       throw new Error(`Game load failed: ${gameError.message}`)
     }
     const fallbackSelect =
       baseById +
+      (!missingHomeTeamScore ? ',home_team_score' : '') +
       (!missingHomeAdj ? ',home_score_adjustment' : '') +
       (!missingTournamentId ? ',tournament_id' : '') +
       (!missingNotes ? ',notes' : '') +

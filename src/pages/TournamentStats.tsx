@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { sports, computePlayerScore } from '../config/sports'
+import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
@@ -27,6 +28,7 @@ interface GameMeta {
   game_date: string
   opponent_name: string
   opponent_score: number
+  home_team_score: number | null
   home_score_adjustment: number | null
 }
 
@@ -115,7 +117,7 @@ export default function TournamentStats() {
           .single(),
         supabaseClient
           .from('games')
-          .select('id,game_date,opponent_name,opponent_score,home_score_adjustment')
+          .select('id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment')
           .eq('team_id', teamId)
           .eq('tournament_id', tournamentId)
           .eq('status', 'final')
@@ -219,9 +221,7 @@ export default function TournamentStats() {
               byStat[row.stat_id] = (byStat[row.stat_id] ?? 0) + Number(row.value)
             }
           }
-          const base = computePlayerScore(sportCfg, byStat)
-          const adj = g.home_score_adjustment ?? 0
-          const homeScore = base + adj
+          const homeScore = resolveFinalHomeScoreFromGameRow(sportCfg, byStat, g)
           const opp = g.opponent_score
           const decided = homeScore !== opp
           const won = homeScore > opp

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
-import { computePlayerScore, computeCategoryTotal } from '../config/sports'
+import { computeCategoryTotal } from '../config/sports'
+import { getDisplayedHomeScore } from '../lib/gameScore'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -27,7 +28,7 @@ export default function GameSummary() {
   const navigate = useNavigate()
   const { state, dispatch } = useGame()
   const { user, isConfigured } = useAuth()
-  const { sport, gameInfo, players, opponentScore, homeScoreAdjustment } = state
+  const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment } = state
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
   const [resolvedStats, setResolvedStats] = useState<ResolvedStatsMap | null>(null)
@@ -297,11 +298,12 @@ export default function GameSummary() {
     return allSubmissions[remoteId]?.[statId] ?? []
   }
 
-  const computedTeamScore = players.reduce(
-    (total, player) => total + computePlayerScore(sport, getPlayerStats(player.id)),
-    0
+  const teamScore = getDisplayedHomeScore(
+    sport,
+    players.map(p => ({ stats: getPlayerStats(p.id) })),
+    homeTeamScore,
+    homeScoreAdjustment
   )
-  const teamScore = computedTeamScore + homeScoreAdjustment
 
   const allStatIds = sport.categories.flatMap(c => c.actions.map(a => a.id))
 
@@ -386,12 +388,27 @@ export default function GameSummary() {
       .update({
         status: 'final',
         opponent_score: opponentScore,
+        home_team_score: homeTeamScore,
         home_score_adjustment: homeScoreAdjustment,
       })
       .eq('id', state.cloudSync.gameId)
 
-    // Fallback for deployments missing migration 015 (no home_score_adjustment column).
     let finalizeError = initial.error
+    if (
+      finalizeError &&
+      finalizeError.message?.includes('home_team_score') &&
+      finalizeError.message?.includes('column')
+    ) {
+      const retry = await supabase!
+        .from('games')
+        .update({
+          status: 'final',
+          opponent_score: opponentScore,
+          home_score_adjustment: homeScoreAdjustment,
+        })
+        .eq('id', state.cloudSync.gameId)
+      finalizeError = retry.error ?? null
+    }
     if (
       finalizeError &&
       finalizeError.message?.includes('home_score_adjustment') &&
@@ -642,7 +659,12 @@ export default function GameSummary() {
                 <p className="text-2xl font-bold text-slate-800">{opponentScore}</p>
               </div>
             </div>
-            {homeScoreAdjustment !== 0 && (
+            {homeTeamScore != null && (
+              <p className="text-xs text-slate-500 text-center mb-2">
+                Scoreboard total (not from player stats)
+              </p>
+            )}
+            {homeTeamScore == null && homeScoreAdjustment !== 0 && (
               <p className="text-xs text-slate-500 text-center mb-2">
                 Score adjustment: {homeScoreAdjustment >= 0 ? '+' : ''}{homeScoreAdjustment}
               </p>
