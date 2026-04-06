@@ -1,6 +1,10 @@
 import type { Player } from '../types'
 
-const LOCAL_TEAM_PLAYER_IDS = new Set(['__team_home__', '__team_opp__'])
+/** Local deterministic ids for team pseudo-players (cloud maps these in WU-10). */
+export const TEAM_PLAYER_HOME_ID = '__team_home__' as const
+export const TEAM_PLAYER_OPP_ID = '__team_opp__' as const
+
+const LOCAL_TEAM_PLAYER_IDS = new Set<string>([TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID])
 
 /** True for home/opponent team pseudo-players (team-level stats, not roster individuals). */
 export function isTeamPseudoPlayer(player: Pick<Player, 'id' | 'isTeamPlayer'>): boolean {

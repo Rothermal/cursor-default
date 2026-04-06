@@ -1,14 +1,40 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
+import type { Player, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
+import {
+  isTeamPseudoPlayer,
+  TEAM_PLAYER_HOME_ID,
+  TEAM_PLAYER_OPP_ID,
+} from '../lib/teamPlayers'
+
+function sortTeamPlayersFirst(players: Player[]): Player[] {
+  const teams = players.filter(isTeamPseudoPlayer)
+  const home = teams.find(p => p.id === TEAM_PLAYER_HOME_ID || p.teamSide === 'home')
+  const opp = teams.find(p => p.id === TEAM_PLAYER_OPP_ID || p.teamSide === 'opponent')
+  const restTeam = teams.filter(p => p !== home && p !== opp)
+  const individuals = players.filter(p => !isTeamPseudoPlayer(p))
+  const orderedTeams = [home, opp, ...restTeam].filter(Boolean) as Player[]
+  return [...orderedTeams, ...individuals]
+}
+
+function findStatShortLabel(categories: StatCategory[] | undefined, statId: string | undefined): string {
+  if (!statId) return ''
+  for (const cat of categories ?? []) {
+    for (const action of cat.actions) {
+      if (action.id === statId) return action.shortLabel
+    }
+  }
+  return statId
+}
 
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync } = useGame()
-  const { sport, players, activePlayerId, actionLog, notes } = state
+  const { sport, players, activePlayerId, actionLog, notes, gameInfo } = state
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [newName, setNewName] = useState('')
@@ -27,7 +53,44 @@ export default function GameTracker() {
     setLocalNotes(notes)
   }, [notes])
 
-  if (!sport || !state.gameInfo || players.length === 0) {
+  // WU-3: inject team pseudo-players when sport has teamCategories
+  useEffect(() => {
+    if (!sport?.teamCategories?.length || !gameInfo) return
+
+    const hasHome = players.some(p => p.id === TEAM_PLAYER_HOME_ID)
+    const hasOpp = players.some(p => p.id === TEAM_PLAYER_OPP_ID)
+    if (hasHome && hasOpp) return
+
+    const homeTeamPlayer: Player = {
+      id: TEAM_PLAYER_HOME_ID,
+      name: gameInfo.teamName,
+      number: '★',
+      stats: {},
+      isTeamPlayer: true,
+      teamSide: 'home',
+    }
+    const oppTeamPlayer: Player = {
+      id: TEAM_PLAYER_OPP_ID,
+      name: gameInfo.opponentName,
+      number: '★',
+      stats: {},
+      isTeamPlayer: true,
+      teamSide: 'opponent',
+    }
+
+    const withoutPlaceholders = players.filter(
+      p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
+    )
+    dispatch({
+      type: 'SET_PLAYERS',
+      players: [homeTeamPlayer, oppTeamPlayer, ...withoutPlaceholders],
+    })
+  }, [sport, gameInfo, players, dispatch])
+
+  const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
+  const teamSelectorCount = selectorPlayers.filter(isTeamPseudoPlayer).length
+
+  if (!sport || !gameInfo || players.length === 0) {
     navigate('/')
     return null
   }
@@ -43,19 +106,20 @@ export default function GameTracker() {
     if (!lastAction) return null
     if (lastAction.type === 'opponent_score_up') return 'Opp +1'
     if (lastAction.type === 'opponent_score_down') return 'Opp -1'
+    if (lastAction.type === 'home_score_up' || lastAction.type === 'home_team_score_up') return 'Home +1'
+    if (lastAction.type === 'home_score_down' || lastAction.type === 'home_team_score_down') return 'Home -1'
     const player = players.find(p => p.id === lastAction.playerId)
     if (!player) return null
     const statId = lastAction.statId
-    let statLabel = statId || ''
-    for (const cat of sport.categories) {
-      for (const action of cat.actions) {
-        if (action.id === statId) {
-          statLabel = action.shortLabel
-          break
-        }
-      }
-    }
+    let statLabel =
+      findStatShortLabel(sport.categories, statId) ||
+      findStatShortLabel(sport.teamCategories, statId)
+    if (!statLabel && statId) statLabel = statId
     const direction = lastAction.type === 'increment' ? '+' : '-'
+    if (player.isTeamPlayer) {
+      const prefix = player.name.trim().split(/\s+/)[0] || 'Team'
+      return `${prefix} ${statLabel} ${direction}`
+    }
     return `#${player.number || '?'} ${statLabel} ${direction}`
   })()
 
@@ -98,24 +162,46 @@ export default function GameTracker() {
 
       {/* Player selector */}
       <div className="px-3 py-2 max-w-lg mx-auto w-full">
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {players.map(player => (
-            <button
-              key={player.id}
-              onClick={() => dispatch({ type: 'SET_ACTIVE_PLAYER', playerId: player.id })}
-              className={`
-                flex-shrink-0 px-3 py-2 rounded-xl text-sm font-semibold
-                transition-all duration-150 active:scale-95
-                ${player.id === activePlayer.id
-                  ? `${sport.theme.bg} text-white shadow-md`
-                  : 'bg-white text-slate-600 border border-slate-200'
-                }
-              `}
-            >
-              <span className="opacity-70">#{player.number || '?'}</span>{' '}
-              {player.name.split(' ')[0]}
-            </button>
-          ))}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-stretch">
+          {selectorPlayers.map((player, index) => {
+            const isTeam = isTeamPseudoPlayer(player)
+            const showDivider = isTeam && index === teamSelectorCount - 1 && teamSelectorCount > 0
+            const isActive = player.id === activePlayer.id
+
+            return (
+              <div key={player.id} className="flex flex-shrink-0 items-stretch gap-2">
+                <button
+                  onClick={() => dispatch({ type: 'SET_ACTIVE_PLAYER', playerId: player.id })}
+                  title={player.name}
+                  className={`
+                    flex-shrink-0 px-3 py-2 rounded-xl text-sm font-semibold max-w-[10.5rem]
+                    transition-all duration-150 active:scale-95 text-left
+                    ${isTeam
+                      ? isActive
+                        ? `bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-md ring-2 ring-white/30`
+                        : `bg-gradient-to-br from-slate-100 to-slate-200/90 text-slate-800 border border-slate-300/80 shadow-sm`
+                      : isActive
+                        ? `${sport.theme.bg} text-white shadow-md`
+                        : 'bg-white text-slate-600 border border-slate-200'
+                    }
+                  `}
+                >
+                  <span className={isTeam ? 'opacity-90' : 'opacity-70'}>
+                    {isTeam ? '★' : `#${player.number || '?'}`}
+                  </span>{' '}
+                  <span className="line-clamp-2 break-words">
+                    {isTeam ? player.name : player.name.split(' ')[0]}
+                  </span>
+                </button>
+                {showDivider && (
+                  <div
+                    className="w-px self-stretch min-h-[2.5rem] bg-slate-300 shrink-0"
+                    aria-hidden
+                  />
+                )}
+              </div>
+            )
+          })}
           <button
             onClick={() => setShowAddPlayer(!showAddPlayer)}
             className="flex-shrink-0 w-10 h-10 rounded-xl bg-white border-2 border-dashed
