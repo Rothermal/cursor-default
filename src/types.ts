@@ -98,6 +98,10 @@ export interface BasketballTeamStatsConfig {
   hasOneAndOne: boolean
   overtimeLabel: string
   overtimeFoulsReset: boolean
+  /** Max team timeouts per regulation period; null = unlimited. */
+  timeoutsPerPeriod: number | null
+  /** Max per OT period; null = same as timeoutsPerPeriod. */
+  timeoutsPerOvertime: number | null
 }
 
 /** Union placeholder for future per-sport team config shapes. */

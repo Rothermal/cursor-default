@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
-import type { Player, StatCategory } from '../types'
+import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
+import type { BasketballTeamStatsConfig, Player, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
+import PeriodToggle from '../components/team-stats/PeriodToggle'
 import {
   isTeamPseudoPlayer,
   TEAM_PLAYER_HOME_ID,
@@ -21,39 +23,117 @@ function sortTeamPlayersFirst(players: Player[]): Player[] {
   return [...orderedTeams, ...individuals]
 }
 
+function baseStatId(statId: string): string {
+  return statId.replace(/_p\d+$/, '')
+}
+
 function findStatShortLabel(categories: StatCategory[] | undefined, statId: string | undefined): string {
   if (!statId) return ''
+  const base = baseStatId(statId)
   for (const cat of categories ?? []) {
     for (const action of cat.actions) {
-      if (action.id === statId) return action.shortLabel
+      if (action.id === base) return action.shortLabel
     }
   }
   return statId
 }
 
+function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
+  if (!categories) return false
+  return categories.some(cat => cat.actions.some(a => a.periodScoped))
+}
+
+function sumPeriodScopedStats(stats: Record<string, number>, baseId: string): number {
+  const prefix = `${baseId}_p`
+  let sum = 0
+  for (const [key, val] of Object.entries(stats)) {
+    if (key.startsWith(prefix)) sum += val
+  }
+  return sum
+}
+
+function actualStatId(action: StatAction, currentPeriod: number): string {
+  return action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id
+}
+
+/** Max timeouts for this period index (1-based); undefined = unlimited. */
+function timeoutCapForPeriod(
+  rules: BasketballTeamStatsConfig | null,
+  periodIndex: number
+): number | undefined {
+  if (!rules) return undefined
+  const capReg = rules.timeoutsPerPeriod
+  const capOt = rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
+  const isOt = periodIndex > rules.periodsPerGame
+  const cap = isOt ? capOt : capReg
+  if (cap == null) return undefined
+  return cap
+}
+
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync } = useGame()
-  const { sport, players, activePlayerId, actionLog, notes, gameInfo } = state
+  const { sport, players, activePlayerId, actionLog, notes, gameInfo, currentPeriod, teamStatsConfig } =
+    state
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [localNotes, setLocalNotes] = useState(notes)
 
-  // Flush cloud sync when leaving Game Tracker so latest stats are saved (must run before any early return)
+  const teamRules = useMemo(
+    () => (sport ? resolveTeamStatsConfig(sport, teamStatsConfig) : null),
+    [sport, teamStatsConfig]
+  )
+
+  const basePeriodCount = teamRules?.periodsPerGame ?? 2
+  const [periodButtonCount, setPeriodButtonCount] = useState(basePeriodCount)
+
+  useEffect(() => {
+    setPeriodButtonCount(basePeriodCount)
+  }, [basePeriodCount, sport?.id])
+
+  useEffect(() => {
+    if (currentPeriod > periodButtonCount) {
+      setPeriodButtonCount(currentPeriod)
+    }
+  }, [currentPeriod, periodButtonCount])
+
+  const periodSegmentLabels = useMemo(() => {
+    const labels = teamRules?.periodLabels ?? []
+    const ot = teamRules?.overtimeLabel ?? 'OT'
+    const out: string[] = []
+    for (let i = 0; i < periodButtonCount; i++) {
+      if (i < labels.length) {
+        out.push(labels[i]!)
+      } else {
+        out.push(ot)
+      }
+    }
+    return out
+  }, [periodButtonCount, teamRules])
+
+  const addOvertimeLabel = useMemo(() => {
+    const ot = teamRules?.overtimeLabel ?? 'OT'
+    return `+ ${ot}`
+  }, [teamRules])
+
+  const handleAddOvertime = useCallback(() => {
+    const nextCount = periodButtonCount + 1
+    setPeriodButtonCount(nextCount)
+    dispatch({ type: 'SET_PERIOD', period: nextCount })
+  }, [dispatch, periodButtonCount])
+
   useEffect(() => {
     return () => {
       flushCloudSync()
     }
   }, [flushCloudSync])
 
-  // Keep local notes in sync if state is hydrated externally (e.g. cloud resume)
   useEffect(() => {
     setLocalNotes(notes)
   }, [notes])
 
-  // WU-3: inject team pseudo-players when sport has teamCategories
   useEffect(() => {
     if (!sport?.teamCategories?.length || !gameInfo) return
 
@@ -96,6 +176,11 @@ export default function GameTracker() {
   }
 
   const activePlayer = players.find(p => p.id === activePlayerId) || players[0]
+  const showTeamStatGrid = Boolean(activePlayer.isTeamPlayer && sport.teamCategories?.length)
+  const showPeriodToggle =
+    showTeamStatGrid && hasPeriodScopedActions(sport.teamCategories)
+
+  const gridCategories = showTeamStatGrid ? sport.teamCategories! : sport.categories
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })
@@ -140,7 +225,6 @@ export default function GameTracker() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Header */}
       <div className="px-3 pt-3 pb-2 max-w-lg mx-auto w-full">
         <div className="flex items-center justify-between mb-3">
           <button
@@ -160,7 +244,6 @@ export default function GameTracker() {
         <Scoreboard />
       </div>
 
-      {/* Player selector */}
       <div className="px-3 py-2 max-w-lg mx-auto w-full">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-stretch">
           {selectorPlayers.map((player, index) => {
@@ -242,29 +325,45 @@ export default function GameTracker() {
         )}
       </div>
 
-      {/* Stats grid */}
+      {showPeriodToggle && teamRules && (
+        <div className="px-3 max-w-lg mx-auto w-full">
+          <PeriodToggle
+            periods={periodButtonCount}
+            periodLabels={periodSegmentLabels}
+            currentPeriod={currentPeriod}
+            onPeriodChange={p => dispatch({ type: 'SET_PERIOD', period: p })}
+            onAddOvertime={handleAddOvertime}
+            sportTheme={sport.theme}
+            addOvertimeLabel={addOvertimeLabel}
+          />
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
-          {sport.categories.map(category => {
-            // Build miss-action lookup: madeStatId → miss StatAction
+          {gridCategories.map(category => {
             const missMap: Record<string, typeof category.actions[0]> = {}
             for (const a of category.actions) {
               if (a.madeStatId) missMap[a.madeStatId] = a
             }
-            // Only render made/standalone actions; miss actions are embedded into their card
             const visibleActions = category.actions.filter(a => !a.madeStatId)
 
-            const catTotal = computeCategoryTotal(category, activePlayer.stats)
             let displayTotal: number | null = null
-
             if (category.showTotal) {
-              if (category.actions.some(a => a.pointValue)) {
+              if (showTeamStatGrid) {
+                let sum = 0
+                for (const a of visibleActions) {
+                  const sid = actualStatId(a, currentPeriod)
+                  sum += activePlayer.stats[sid] || 0
+                }
+                displayTotal = sum
+              } else if (category.actions.some(a => a.pointValue)) {
                 displayTotal = category.actions.reduce(
-                  (sum, a) => sum + (activePlayer.stats[a.id] || 0) * (a.pointValue || 0),
+                  (s, a) => s + (activePlayer.stats[a.id] || 0) * (a.pointValue || 0),
                   0
                 )
               } else {
-                displayTotal = catTotal
+                displayTotal = computeCategoryTotal(category, activePlayer.stats)
               }
             }
 
@@ -297,26 +396,48 @@ export default function GameTracker() {
                 }`}>
                   {visibleActions.map(action => {
                     const missAction = missMap[action.id]
+                    const scopedId = actualStatId(action, currentPeriod)
+                    const periodTotal =
+                      action.periodScoped
+                        ? sumPeriodScopedStats(activePlayer.stats, action.id)
+                        : null
+                    const timeoutCap =
+                      showTeamStatGrid && action.id === 'team_to_used' && action.periodScoped
+                        ? timeoutCapForPeriod(teamRules, currentPeriod)
+                        : undefined
+                    const currentVal = activePlayer.stats[scopedId] || 0
+
+                    const subtitleParts: string[] = []
+                    if (action.periodScoped && periodTotal !== null) {
+                      subtitleParts.push(`Total: ${periodTotal}`)
+                    }
+                    if (timeoutCap !== undefined) {
+                      subtitleParts.push(`${currentVal}/${timeoutCap} this period`)
+                    }
+                    const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined
+
                     return (
                       <StatButton
-                        key={action.id}
+                        key={action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id}
                         label={action.label}
                         shortLabel={action.shortLabel}
-                        value={activePlayer.stats[action.id] || 0}
+                        value={currentVal}
                         color={action.color ?? category.color}
                         pointValue={action.pointValue}
+                        subtitle={subtitle}
+                        maxValue={timeoutCap}
                         onIncrement={() =>
                           dispatch({
                             type: 'INCREMENT_STAT',
                             playerId: activePlayer.id,
-                            statId: action.id,
+                            statId: scopedId,
                           })
                         }
                         onDecrement={() =>
                           dispatch({
                             type: 'DECREMENT_STAT',
                             playerId: activePlayer.id,
-                            statId: action.id,
+                            statId: scopedId,
                           })
                         }
                         onAttempt={missAction ? () =>
@@ -334,7 +455,6 @@ export default function GameTracker() {
               </div>
             )
           })}
-          {/* Game notes */}
           <div className="mt-2">
             <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Game Notes
@@ -353,7 +473,6 @@ export default function GameTracker() {
         </div>
       </div>
 
-      {/* Undo bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="text-xs text-slate-400">
