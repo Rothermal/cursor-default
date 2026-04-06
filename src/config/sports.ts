@@ -90,7 +90,7 @@ export const sports: SportConfig[] = [
         columns: 2,
         hideHeader: true,
         actions: [
-          { id: 'team_to_used', label: 'Timeout', shortLabel: 'TO' },
+          { id: 'team_to_used', label: 'Timeout', shortLabel: 'TO', periodScoped: true },
           { id: 'team_tech', label: 'Technical', shortLabel: 'TECH' },
           { id: 'team_turnover', label: 'Turnover', shortLabel: 'TTO' },
         ],
