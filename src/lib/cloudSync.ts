@@ -400,6 +400,20 @@ async function ensurePlayerId(
   }
 
   const { firstName, lastName } = parsePlayerName(player.name)
+
+  if (player.isTeamPlayer === true) {
+    if (!existingRemoteId) {
+      throw new Error('Team pseudo-player missing cloud player id (team stats sync not wired yet)')
+    }
+    const { error: updateError } = await supabase
+      .from('players')
+      .update({ first_name: firstName, last_name: lastName, nickname: null })
+      .eq('id', existingRemoteId)
+    if (updateError) {
+      throw new Error(`Player update failed: ${updateError.message}`)
+    }
+    return existingRemoteId
+  }
   const jerseyNumber = player.number.trim()
 
   if (existingRemoteId) {
@@ -574,6 +588,11 @@ export async function syncGameSnapshotToCloud({
 
   const nextPlayerIdMap: Record<string, string> = {}
   for (const player of state.players) {
+    if (player.isTeamPlayer === true) {
+      const mapped = state.cloudSync.playerIdMap[player.id]
+      if (mapped) nextPlayerIdMap[player.id] = mapped
+      continue
+    }
     const remotePlayerId = await ensurePlayerId(player, teamId, userId, state.cloudSync.playerIdMap[player.id])
     nextPlayerIdMap[player.id] = remotePlayerId
   }

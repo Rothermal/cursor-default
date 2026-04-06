@@ -10,6 +10,7 @@ export interface MergePlayerCandidate {
 /**
  * Teams where the user is owner (teams.owner_id) or team_members owner/admin.
  * Distinct players on those teams (for merge wizard candidate list).
+ * Excludes `players.is_team_placeholder` when that column exists (migration 028).
  */
 export async function fetchMergePlayerScope(
   supabase: SupabaseClient,
@@ -32,20 +33,44 @@ export async function fetchMergePlayerScope(
   if (teamIds.length === 0) {
     return { teamIds: [], candidates: [] }
   }
-  const { data: tpRows, error: tpErr } = await supabase
-    .from('team_players')
-    .select('player_id, players!inner(id,first_name,last_name,nickname)')
-    .in('team_id', teamIds)
-  if (tpErr) {
-    return { teamIds, candidates: [] }
+  const selectWithFlag =
+    'player_id, players!inner(id,first_name,last_name,nickname,is_team_placeholder)'
+  const selectLegacy = 'player_id, players!inner(id,first_name,last_name,nickname)'
+
+  let tpRows: unknown[] | null = null
+  {
+    const first = await supabase.from('team_players').select(selectWithFlag).in('team_id', teamIds)
+    if (
+      first.error &&
+      first.error.message?.includes('is_team_placeholder') &&
+      first.error.message?.includes('column')
+    ) {
+      const second = await supabase.from('team_players').select(selectLegacy).in('team_id', teamIds)
+      if (second.error) {
+        return { teamIds, candidates: [] }
+      }
+      tpRows = second.data ?? []
+    } else if (first.error) {
+      return { teamIds, candidates: [] }
+    } else {
+      tpRows = first.data ?? []
+    }
   }
+
   type TpJoin = {
     player_id: string
-    players: { id: string; first_name: string; last_name: string | null; nickname: string | null }
+    players: {
+      id: string
+      first_name: string
+      last_name: string | null
+      nickname: string | null
+      is_team_placeholder?: boolean | null
+    }
   }
   const byId = new Map<string, MergePlayerCandidate>()
   for (const row of (tpRows ?? []) as unknown as TpJoin[]) {
     const p = row.players
+    if (p.is_team_placeholder === true) continue
     if (!byId.has(p.id)) {
       byId.set(p.id, {
         id: p.id,
