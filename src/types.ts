@@ -8,6 +8,8 @@ export interface StatAction {
   /** Set on miss/attempt actions: the id of the corresponding made stat.
    *  Used in Game Summary to merge made+miss into a single M/A column. */
   madeStatId?: string
+  /** Team stats: actual stat id becomes `${id}_p${currentPeriod}` in GameTracker. */
+  periodScoped?: boolean
 }
 
 export interface StatCategory {
@@ -39,9 +41,13 @@ export interface SportConfig {
   icon: string
   theme: SportTheme
   categories: StatCategory[]
+  /** Team pseudo-player stat categories (optional per sport). */
+  teamCategories?: StatCategory[]
   scoreLabel: string
   /** Stat ids for compact per-game lines (e.g. game log). Optional; falls back to score + common stats. */
   keyStatIds?: string[]
+  /** Compact keys when summarizing team-level stats. */
+  teamKeyStatIds?: string[]
 }
 
 export interface GameInfo {
@@ -58,16 +64,44 @@ export interface Player {
   name: string
   number: string
   stats: Record<string, number>
+  /** True for home/opponent team pseudo-players (team-level stat tracking). */
+  isTeamPlayer?: boolean
+  teamSide?: 'home' | 'opponent'
 }
 
 export interface ActionLogEntry {
   id: string
   timestamp: number
-  type: 'increment' | 'decrement' | 'opponent_score_up' | 'opponent_score_down' | 'home_score_up' | 'home_score_down'
+  type:
+    | 'increment'
+    | 'decrement'
+    | 'opponent_score_up'
+    | 'opponent_score_down'
+    | 'home_score_up'
+    | 'home_score_down'
+    | 'home_team_score_up'
+    | 'home_team_score_down'
   playerId?: string
   statId?: string
   previousValue: number
+  /** For home_team_score_* undo: snapshot before the change. */
+  previousHomeTeamScore?: number | null
+  previousHomeScoreAdjustment?: number
 }
+
+/** Resolved basketball team-stat rules (season defaults merged in). */
+export interface BasketballTeamStatsConfig {
+  periodsPerGame: number
+  periodLabels: string[]
+  bonusThreshold: number
+  doubleBonusThreshold: number
+  hasOneAndOne: boolean
+  overtimeLabel: string
+  overtimeFoulsReset: boolean
+}
+
+/** Union placeholder for future per-sport team config shapes. */
+export type TeamStatsConfig = BasketballTeamStatsConfig
 
 export interface GameState {
   sport: SportConfig | null
@@ -75,12 +109,23 @@ export interface GameState {
   players: Player[]
   activePlayerId: string | null
   opponentScore: number
-  /** Additive adjustment to home score (computed from player stats). Displayed home = computed + this. */
+  /**
+   * Standalone scoreboard home total (not derived from player scoring stats).
+   * When null, displayed home score uses legacy: sum of player scoring stats + homeScoreAdjustment.
+   */
+  homeTeamScore: number | null
+  /**
+   * Legacy additive tweak when homeTeamScore is null; ignored when homeTeamScore is set.
+   */
   homeScoreAdjustment: number
   /** Free-text game notes entered during or after the game. */
   notes: string
   actionLog: ActionLogEntry[]
   cloudSync: CloudSyncState
+  /** 1-based period index for period-scoped team stats (e.g. half 1 vs 2). */
+  currentPeriod: number
+  /** Season team-stat rules; null until loaded from season or derived from defaults. */
+  teamStatsConfig: TeamStatsConfig | null
 }
 
 export type CloudSyncStatus =
@@ -119,3 +164,5 @@ export type GameAction =
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }
+  | { type: 'SET_PERIOD'; period: number }
+  | { type: 'SET_TEAM_STATS_CONFIG'; config: TeamStatsConfig | null }

@@ -24,6 +24,7 @@ import {
 } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
 import { sports } from '../config/sports'
+import { getDisplayedHomeScore } from '../lib/gameScore'
 
 /** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
 export const GAME_STORAGE_KEY = 'statkeeper_game'
@@ -78,10 +79,13 @@ function createInitialState(status: CloudSyncStatus = 'idle'): GameState {
     players: [],
     activePlayerId: null,
     opponentScore: 0,
+    homeTeamScore: null,
     homeScoreAdjustment: 0,
     notes: '',
     actionLog: [],
     cloudSync: createInitialCloudSyncState(status),
+    currentPeriod: 1,
+    teamStatsConfig: null,
   }
 }
 
@@ -102,6 +106,7 @@ function buildSyncFingerprint(state: GameState): string {
     sportId: state.sport?.id ?? null,
     gameInfo: state.gameInfo,
     opponentScore: state.opponentScore,
+    homeTeamScore: state.homeTeamScore,
     homeScoreAdjustment: state.homeScoreAdjustment,
     notes: state.notes,
     players: state.players.map(player => ({
@@ -190,8 +195,11 @@ function buildHydratedStateFromCloudGame(
     players: cloudGame.players,
     activePlayerId: cloudGame.activePlayerId,
     opponentScore: cloudGame.opponentScore,
+    homeTeamScore: cloudGame.homeTeamScore,
     homeScoreAdjustment: cloudGame.homeScoreAdjustment,
     notes: cloudGame.notes,
+    currentPeriod: 1,
+    teamStatsConfig: null,
     actionLog: [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
@@ -339,15 +347,36 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'INCREMENT_HOME_SCORE': {
+      if (state.homeTeamScore != null) {
+        const prev = state.homeTeamScore
+        const logEntry: ActionLogEntry = {
+          id: generateId(),
+          timestamp: Date.now(),
+          type: 'home_team_score_up',
+          previousValue: prev,
+          previousHomeTeamScore: prev,
+        }
+        return {
+          ...state,
+          homeTeamScore: prev + 1,
+          actionLog: [...state.actionLog, logEntry],
+        }
+      }
+      const sport = state.sport
+      if (!sport) return state
+      const baseline = getDisplayedHomeScore(sport, state.players, null, state.homeScoreAdjustment)
       const logEntry: ActionLogEntry = {
         id: generateId(),
         timestamp: Date.now(),
-        type: 'home_score_up',
-        previousValue: state.homeScoreAdjustment,
+        type: 'home_team_score_up',
+        previousValue: baseline,
+        previousHomeTeamScore: null,
+        previousHomeScoreAdjustment: state.homeScoreAdjustment,
       }
       return {
         ...state,
-        homeScoreAdjustment: state.homeScoreAdjustment + 1,
+        homeTeamScore: baseline + 1,
+        homeScoreAdjustment: 0,
         actionLog: [...state.actionLog, logEntry],
       }
     }
@@ -356,16 +385,38 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, notes: action.notes }
 
     case 'DECREMENT_HOME_SCORE': {
-      if (state.homeScoreAdjustment <= 0) return state
+      if (state.homeTeamScore != null) {
+        if (state.homeTeamScore <= 0) return state
+        const prev = state.homeTeamScore
+        const logEntry: ActionLogEntry = {
+          id: generateId(),
+          timestamp: Date.now(),
+          type: 'home_team_score_down',
+          previousValue: prev,
+          previousHomeTeamScore: prev,
+        }
+        return {
+          ...state,
+          homeTeamScore: prev - 1,
+          actionLog: [...state.actionLog, logEntry],
+        }
+      }
+      const sport = state.sport
+      if (!sport) return state
+      const baseline = getDisplayedHomeScore(sport, state.players, null, state.homeScoreAdjustment)
+      if (baseline <= 0) return state
       const logEntry: ActionLogEntry = {
         id: generateId(),
         timestamp: Date.now(),
-        type: 'home_score_down',
-        previousValue: state.homeScoreAdjustment,
+        type: 'home_team_score_down',
+        previousValue: baseline,
+        previousHomeTeamScore: null,
+        previousHomeScoreAdjustment: state.homeScoreAdjustment,
       }
       return {
         ...state,
-        homeScoreAdjustment: state.homeScoreAdjustment - 1,
+        homeTeamScore: Math.max(0, baseline - 1),
+        homeScoreAdjustment: 0,
         actionLog: [...state.actionLog, logEntry],
       }
     }
@@ -395,6 +446,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         case 'home_score_down':
           newState = { ...newState, homeScoreAdjustment: lastAction.previousValue }
           break
+        case 'home_team_score_up':
+        case 'home_team_score_down':
+          if (lastAction.previousHomeTeamScore == null) {
+            newState = {
+              ...newState,
+              homeTeamScore: null,
+              homeScoreAdjustment: lastAction.previousHomeScoreAdjustment ?? 0,
+            }
+          } else {
+            newState = { ...newState, homeTeamScore: lastAction.previousHomeTeamScore }
+          }
+          break
       }
       return newState
     }
@@ -410,6 +473,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ...action.cloudSync,
         },
       }
+
+    case 'SET_PERIOD': {
+      const next =
+        Number.isFinite(action.period) && action.period >= 1 ? Math.floor(action.period) : 1
+      return { ...state, currentPeriod: next }
+    }
+
+    case 'SET_TEAM_STATS_CONFIG':
+      return { ...state, teamStatsConfig: action.config }
 
     default:
       return state
@@ -431,8 +503,14 @@ function loadState(): GameState {
   return {
     ...createInitialState(restoredStatus),
     ...parsed,
+    homeTeamScore: typeof parsed.homeTeamScore === 'number' ? parsed.homeTeamScore : null,
     homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
     notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+    currentPeriod:
+      typeof parsed.currentPeriod === 'number' && parsed.currentPeriod >= 1
+        ? Math.floor(parsed.currentPeriod)
+        : 1,
+    teamStatsConfig: parsed.teamStatsConfig ?? null,
     players: Array.isArray(parsed.players) ? parsed.players : [],
     actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
     cloudSync: {

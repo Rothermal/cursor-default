@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { sports, computePlayerScore } from '../config/sports'
+import { sports } from '../config/sports'
+import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName } from '../lib/display'
@@ -19,6 +20,7 @@ interface GameMeta {
   game_date: string
   opponent_name: string
   opponent_score: number
+  home_team_score: number | null
   home_score_adjustment: number | null
   tournament_id: string | null
 }
@@ -28,6 +30,7 @@ interface TeamLogRow {
   game_date: string
   opponent_name: string
   opponent_score: number
+  home_team_score: number | null
   home_score_adjustment: number
   stat_id: string
   team_total: number
@@ -84,7 +87,9 @@ export default function TeamStats() {
           .single(),
         supabaseClient
           .from('games')
-          .select('id,game_date,opponent_name,opponent_score,home_score_adjustment,tournament_id')
+          .select(
+            'id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,tournament_id'
+          )
           .eq('team_id', teamId)
           .eq('status', 'final')
           .order('game_date', { ascending: false }),
@@ -122,6 +127,7 @@ export default function TeamStats() {
               game_date: g.game_date,
               opponent_name: g.opponent_name,
               opponent_score: g.opponent_score,
+              home_team_score: g.home_team_score ?? null,
               home_score_adjustment: adj,
               stat_id: statId,
               team_total,
@@ -164,6 +170,7 @@ export default function TeamStats() {
               game_date: row.game_date,
               opponent_name: row.opponent_name,
               opponent_score: row.opponent_score,
+              home_team_score: row.home_team_score,
               home_score_adjustment: row.home_score_adjustment,
               tournament_id: null,
             },
@@ -195,9 +202,13 @@ export default function TeamStats() {
     for (const g of games) {
       const entry = byGame.get(g.id)
       const stats = entry?.stats ?? {}
-      const base = sport ? computePlayerScore(sport, stats) : 0
-      const homeAdj = entry?.homeAdj ?? g.home_score_adjustment ?? 0
-      const homeScore = base + homeAdj
+      const meta = entry?.meta ?? g
+      const homeScore = sport
+        ? resolveFinalHomeScoreFromGameRow(sport, stats, {
+            home_team_score: meta.home_team_score,
+            home_score_adjustment: entry?.homeAdj ?? meta.home_score_adjustment ?? 0,
+          })
+        : 0
       const won = homeScore > g.opponent_score
       if (homeScore !== g.opponent_score) {
         if (won) wins++

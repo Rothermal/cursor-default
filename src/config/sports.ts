@@ -66,6 +66,36 @@ export const sports: SportConfig[] = [
         ],
       },
     ],
+    teamKeyStatIds: ['team_foul', 'team_to_used', 'team_tech'],
+    teamCategories: [
+      {
+        id: 'team_fouls',
+        name: 'Fouls',
+        color: 'rose',
+        actions: [
+          {
+            id: 'team_foul',
+            label: 'Team Foul',
+            shortLabel: 'TF',
+            periodScoped: true,
+          },
+        ],
+        showTotal: true,
+        totalLabel: 'Period Fouls',
+      },
+      {
+        id: 'team_misc',
+        name: 'Team',
+        color: 'slate',
+        columns: 2,
+        hideHeader: true,
+        actions: [
+          { id: 'team_to_used', label: 'Timeout', shortLabel: 'TO' },
+          { id: 'team_tech', label: 'Technical', shortLabel: 'TECH' },
+          { id: 'team_turnover', label: 'Turnover', shortLabel: 'TTO' },
+        ],
+      },
+    ],
   },
 
   {

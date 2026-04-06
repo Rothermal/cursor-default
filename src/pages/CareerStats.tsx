@@ -280,8 +280,11 @@ export default function CareerStats() {
         players: cloudGame.players,
         activePlayerId: cloudGame.activePlayerId,
         opponentScore: cloudGame.opponentScore,
+        homeTeamScore: cloudGame.homeTeamScore,
         homeScoreAdjustment: cloudGame.homeScoreAdjustment,
         notes: cloudGame.notes,
+        currentPeriod: 1,
+        teamStatsConfig: null,
         actionLog: [],
         cloudSync: {
           seasonId: cloudGame.seasonId ?? null,
