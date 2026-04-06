@@ -10,6 +10,7 @@ export interface MergePlayerCandidate {
 /**
  * Teams where the user is owner (teams.owner_id) or team_members owner/admin.
  * Distinct players on those teams (for merge wizard candidate list).
+ * Team stat placeholder rows are not linked via `team_players`, so they never appear here.
  */
 export async function fetchMergePlayerScope(
   supabase: SupabaseClient,

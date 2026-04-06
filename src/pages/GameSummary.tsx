@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
+import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -59,9 +60,18 @@ export default function GameSummary() {
   const teamId = state.cloudSync.teamId
   const playerIdMap = state.cloudSync.playerIdMap
 
+  const summaryPlayers = useMemo(
+    () => players.filter(p => !isTeamPseudoPlayer(p)),
+    [players]
+  )
+
   const loadResolved = useCallback(async () => {
     const client = supabase
     if (!gameId || !client) return null
+
+    const skipRemote = new Set(
+      state.players.filter(isTeamPseudoPlayer).map(p => playerIdMap[p.id] ?? p.id)
+    )
 
     const { data, error } = await client.rpc('get_game_stats_resolved', {
       p_game_id: gameId,
@@ -76,6 +86,7 @@ export default function GameSummary() {
       source?: string
       recorder_count?: number
     }>) {
+      if (skipRemote.has(row.player_id)) continue
       if (!byPlayer[row.player_id]) byPlayer[row.player_id] = {}
       byPlayer[row.player_id][row.stat_id] = {
         value: row.value,
@@ -84,7 +95,7 @@ export default function GameSummary() {
       }
     }
     return byPlayer
-  }, [gameId])
+  }, [gameId, state.players, playerIdMap])
 
   useEffect(() => {
     if (!isFinalCloudGame || !gameId || !supabase) return
@@ -103,6 +114,10 @@ export default function GameSummary() {
   const loadAllSubmissions = useCallback(async () => {
     const client = supabase
     if (!gameId || !client) return null
+
+    const skipRemote = new Set(
+      state.players.filter(isTeamPseudoPlayer).map(p => playerIdMap[p.id] ?? p.id)
+    )
 
     const { data: statsRows, error: statsError } = await client
       .from('game_stats')
@@ -124,6 +139,7 @@ export default function GameSummary() {
 
     const byPlayer: AllSubmissionsMap = {}
     for (const row of statsRows as Array<{ player_id: string; stat_id: string; recorded_by: string; value: number }>) {
+      if (skipRemote.has(row.player_id)) continue
       if (!byPlayer[row.player_id]) byPlayer[row.player_id] = {}
       if (!byPlayer[row.player_id][row.stat_id]) byPlayer[row.player_id][row.stat_id] = []
       byPlayer[row.player_id][row.stat_id].push({
@@ -133,7 +149,7 @@ export default function GameSummary() {
       })
     }
     return byPlayer
-  }, [gameId])
+  }, [gameId, state.players, playerIdMap])
 
   useEffect(() => {
     if (!isFinalCloudGame || !gameId || viewMode !== 'all') return
@@ -147,6 +163,10 @@ export default function GameSummary() {
   const loadCheckouts = useCallback(async () => {
     const client = supabase
     if (!gameId || !client) return null
+
+    const skipRemote = new Set(
+      state.players.filter(isTeamPseudoPlayer).map(p => playerIdMap[p.id] ?? p.id)
+    )
 
     const { data: rows, error } = await client
       .from('player_checkouts')
@@ -168,6 +188,7 @@ export default function GameSummary() {
 
     const byPlayer: CheckoutsByPlayerMap = {}
     for (const row of rows as Array<{ player_id: string; user_id: string; is_primary: boolean }>) {
+      if (skipRemote.has(row.player_id)) continue
       if (!byPlayer[row.player_id]) byPlayer[row.player_id] = []
       byPlayer[row.player_id].push({
         user_id: row.user_id,
@@ -176,7 +197,7 @@ export default function GameSummary() {
       })
     }
     return byPlayer
-  }, [gameId])
+  }, [gameId, state.players, playerIdMap])
 
   useEffect(() => {
     if (!isFinalCloudGame || !gameId || !isTeamAdmin) return
@@ -240,7 +261,7 @@ export default function GameSummary() {
     }> = []
     const getStatLabel = (statId: string) =>
       sport.categories.flatMap(c => c.actions).find(a => a.id === statId)?.shortLabel ?? statId
-    for (const player of players) {
+    for (const player of summaryPlayers) {
       const remoteId = playerIdMap[player.id] ?? player.id
       const entries = resolvedStats[remoteId]
       if (!entries) continue
@@ -263,7 +284,7 @@ export default function GameSummary() {
       }
     }
     return items
-  }, [sport, isFinalCloudGame, resolvedStats, players, playerIdMap])
+  }, [sport, isFinalCloudGame, resolvedStats, summaryPlayers, playerIdMap])
 
   if (!sport || !gameInfo) {
     navigate('/')
@@ -300,7 +321,7 @@ export default function GameSummary() {
 
   const teamScore = getDisplayedHomeScore(
     sport,
-    players.map(p => ({ stats: getPlayerStats(p.id) })),
+    summaryPlayers.map(p => ({ stats: getPlayerStats(p.id) })),
     homeTeamScore,
     homeScoreAdjustment
   )
@@ -309,7 +330,7 @@ export default function GameSummary() {
 
   const teamTotals: Record<string, number> = {}
   for (const statId of allStatIds) {
-    teamTotals[statId] = players.reduce(
+    teamTotals[statId] = summaryPlayers.reduce(
       (sum, p) => sum + (getPlayerStats(p.id)[statId] || 0),
       0
     )
@@ -542,7 +563,7 @@ export default function GameSummary() {
             <h3 className="text-sm font-semibold text-slate-600 mb-2">Primary recorder</h3>
             <p className="text-xs text-slate-500 mb-3">Whose stats count as official for each player. Change to fix discrepancies.</p>
             <div className="space-y-2">
-              {players.map(player => {
+              {summaryPlayers.map(player => {
                 const remoteId = playerIdMap[player.id] ?? player.id
                 const options = checkoutsByPlayer[remoteId] ?? []
                 const primaryOption = options.find(o => o.is_primary)
@@ -739,7 +760,7 @@ export default function GameSummary() {
                     </tr>
                   </thead>
                   <tbody>
-                    {players.map(player => {
+                    {summaryPlayers.map(player => {
                       const stats = getPlayerStats(player.id)
                       const catTotal = category.showTotal
                         ? category.actions.some(a => a.pointValue)

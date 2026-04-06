@@ -1,5 +1,6 @@
 import { useGame } from '../context/GameContext'
 import { getDisplayedHomeScore } from '../lib/gameScore'
+import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 
 export default function Scoreboard() {
   const { state, dispatch } = useGame()
@@ -8,7 +9,8 @@ export default function Scoreboard() {
 
   if (!sport || !gameInfo) return null
 
-  const teamScore = getDisplayedHomeScore(sport, players, homeTeamScore, homeScoreAdjustment)
+  const rosterPlayers = players.filter(p => !isTeamPseudoPlayer(p))
+  const teamScore = getDisplayedHomeScore(sport, rosterPlayers, homeTeamScore, homeScoreAdjustment)
 
   const syncLabel = (() => {
     switch (cloudSync.status) {
