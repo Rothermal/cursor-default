@@ -24,6 +24,8 @@ interface StatButtonProps {
   value: number
   color: StatColor
   pointValue?: number
+  /** Optional line under the header row (e.g. game total for period-scoped team stats). */
+  subtitle?: string
   onIncrement: () => void
   onDecrement: () => void
   /** If provided, renders a middle "A" (attempt/miss) button between − and +. */
@@ -38,6 +40,7 @@ export default function StatButton({
   value,
   color,
   pointValue,
+  subtitle,
   onIncrement,
   onDecrement,
   onAttempt,
@@ -81,6 +84,9 @@ export default function StatButton({
           {hasAttempt ? `${value}/${totalAttempts}` : value}
         </span>
       </div>
+      {subtitle ? (
+        <p className="text-[11px] text-slate-500 mb-2 leading-tight">{subtitle}</p>
+      ) : null}
       <div className="flex gap-1.5">
         <button
           onClick={(e) => { e.stopPropagation(); onDecrement() }}
