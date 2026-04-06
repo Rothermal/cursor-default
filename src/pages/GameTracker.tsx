@@ -7,6 +7,7 @@ import type { BasketballTeamStatsConfig, Player, StatAction, StatCategory } from
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
+import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import {
   isTeamPseudoPlayer,
   TEAM_PLAYER_HOME_ID,
@@ -182,6 +183,14 @@ export default function GameTracker() {
 
   const gridCategories = showTeamStatGrid ? sport.teamCategories! : sport.categories
 
+  const teamFoulCountThisPeriod =
+    showTeamStatGrid && sport.id === 'basketball' && teamRules
+      ? activePlayer.stats[`team_foul_p${currentPeriod}`] ?? 0
+      : 0
+
+  const showBonusBanner =
+    showTeamStatGrid && sport.id === 'basketball' && teamRules !== null
+
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })
   }
@@ -335,6 +344,17 @@ export default function GameTracker() {
             onAddOvertime={handleAddOvertime}
             sportTheme={sport.theme}
             addOvertimeLabel={addOvertimeLabel}
+          />
+        </div>
+      )}
+
+      {showBonusBanner && teamRules && (
+        <div className="px-3 max-w-lg mx-auto w-full">
+          <BasketballBonusIndicator
+            foulCount={teamFoulCountThisPeriod}
+            bonusThreshold={teamRules.bonusThreshold}
+            doubleBonusThreshold={teamRules.doubleBonusThreshold}
+            hasOneAndOne={teamRules.hasOneAndOne}
           />
         </div>
       )}
