@@ -9,6 +9,8 @@ export const BASKETBALL_TEAM_STATS_DEFAULTS: BasketballTeamStatsConfig = {
   hasOneAndOne: true,
   overtimeLabel: 'OT',
   overtimeFoulsReset: true,
+  timeoutsPerPeriod: null,
+  timeoutsPerOvertime: null,
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -66,5 +68,13 @@ export function resolveTeamStatsConfig(
       typeof seasonConfig.overtimeFoulsReset === 'boolean'
         ? seasonConfig.overtimeFoulsReset
         : base.overtimeFoulsReset,
+    timeoutsPerPeriod:
+      typeof seasonConfig.timeoutsPerPeriod === 'number' && seasonConfig.timeoutsPerPeriod >= 0
+        ? Math.floor(seasonConfig.timeoutsPerPeriod)
+        : base.timeoutsPerPeriod,
+    timeoutsPerOvertime:
+      typeof seasonConfig.timeoutsPerOvertime === 'number' && seasonConfig.timeoutsPerOvertime >= 0
+        ? Math.floor(seasonConfig.timeoutsPerOvertime)
+        : base.timeoutsPerOvertime,
   }
 }

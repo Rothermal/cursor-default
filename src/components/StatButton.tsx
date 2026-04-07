@@ -26,6 +26,8 @@ interface StatButtonProps {
   pointValue?: number
   /** Optional line under the header row (e.g. game total for period-scoped team stats). */
   subtitle?: string
+  /** When set, + is disabled at this count (inclusive). */
+  maxValue?: number
   onIncrement: () => void
   onDecrement: () => void
   /** If provided, renders a middle "A" (attempt/miss) button between − and +. */
@@ -41,6 +43,7 @@ export default function StatButton({
   color,
   pointValue,
   subtitle,
+  maxValue,
   onIncrement,
   onDecrement,
   onAttempt,
@@ -109,8 +112,9 @@ export default function StatButton({
         )}
         <button
           onClick={handleIncrement}
+          disabled={maxValue !== undefined && value >= maxValue}
           className={`${hasAttempt ? 'flex-1' : 'flex-[2]'} h-10 rounded-lg ${styles.badge} text-white text-lg font-bold
-                      active:scale-95 transition-transform shadow-sm`}
+                      active:scale-95 transition-transform shadow-sm disabled:opacity-30 disabled:pointer-events-none`}
         >
           +
         </button>

@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
-import type { Player, StatAction, StatCategory } from '../types'
+import type { BasketballTeamStatsConfig, Player, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
+import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import {
   isTeamPseudoPlayer,
   TEAM_PLAYER_HOME_ID,
@@ -58,6 +59,20 @@ function actualStatId(action: StatAction, currentPeriod: number): string {
   return action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id
 }
 
+/** Max timeouts for this period index (1-based); undefined = unlimited. */
+function timeoutCapForPeriod(
+  rules: BasketballTeamStatsConfig | null,
+  periodIndex: number
+): number | undefined {
+  if (!rules) return undefined
+  const capReg = rules.timeoutsPerPeriod
+  const capOt = rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
+  const isOt = periodIndex > rules.periodsPerGame
+  const cap = isOt ? capOt : capReg
+  if (cap == null) return undefined
+  return cap
+}
+
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync } = useGame()
@@ -94,10 +109,8 @@ export default function GameTracker() {
     for (let i = 0; i < periodButtonCount; i++) {
       if (i < labels.length) {
         out.push(labels[i]!)
-      } else if (labels.length > 0) {
-        out.push(`${ot} ${i - labels.length + 1}`)
       } else {
-        out.push(`Period ${i + 1}`)
+        out.push(ot)
       }
     }
     return out
@@ -121,12 +134,10 @@ export default function GameTracker() {
     }
   }, [flushCloudSync])
 
-  // Keep local notes in sync if state is hydrated externally (e.g. cloud resume)
   useEffect(() => {
     setLocalNotes(notes)
   }, [notes])
 
-  // WU-3: inject team pseudo-players when sport has teamCategories
   useEffect(() => {
     if (!sport?.teamCategories?.length || !gameInfo) return
 
@@ -175,6 +186,14 @@ export default function GameTracker() {
 
   const gridCategories = showTeamStatGrid ? sport.teamCategories! : sport.categories
 
+  const teamFoulCountThisPeriod =
+    showTeamStatGrid && sport.id === 'basketball' && teamRules
+      ? activePlayer.stats[`team_foul_p${currentPeriod}`] ?? 0
+      : 0
+
+  const showBonusBanner =
+    showTeamStatGrid && sport.id === 'basketball' && teamRules !== null
+
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })
   }
@@ -218,7 +237,6 @@ export default function GameTracker() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Header */}
       <div className="px-3 pt-3 pb-2 max-w-lg mx-auto w-full">
         <div className="flex items-center justify-between mb-3">
           <button
@@ -238,7 +256,6 @@ export default function GameTracker() {
         <Scoreboard />
       </div>
 
-      {/* Player selector */}
       <div className="px-3 py-2 max-w-lg mx-auto w-full">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-stretch">
           {selectorPlayers.map((player, index) => {
@@ -334,7 +351,17 @@ export default function GameTracker() {
         </div>
       )}
 
-      {/* Stats grid */}
+      {showBonusBanner && teamRules && (
+        <div className="px-3 max-w-lg mx-auto w-full">
+          <BasketballBonusIndicator
+            foulCount={teamFoulCountThisPeriod}
+            bonusThreshold={teamRules.bonusThreshold}
+            doubleBonusThreshold={teamRules.doubleBonusThreshold}
+            hasOneAndOne={teamRules.hasOneAndOne}
+          />
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
           {gridCategories.map(category => {
@@ -397,20 +424,31 @@ export default function GameTracker() {
                       action.periodScoped
                         ? sumPeriodScopedStats(activePlayer.stats, action.id)
                         : null
-                    const subtitle =
-                      action.periodScoped && periodTotal !== null
-                        ? `Total: ${periodTotal}`
+                    const timeoutCap =
+                      showTeamStatGrid && action.id === 'team_to_used' && action.periodScoped
+                        ? timeoutCapForPeriod(teamRules, currentPeriod)
                         : undefined
+                    const currentVal = activePlayer.stats[scopedId] || 0
+
+                    const subtitleParts: string[] = []
+                    if (action.periodScoped && periodTotal !== null) {
+                      subtitleParts.push(`Total: ${periodTotal}`)
+                    }
+                    if (timeoutCap !== undefined) {
+                      subtitleParts.push(`${currentVal}/${timeoutCap} this period`)
+                    }
+                    const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined
 
                     return (
                       <StatButton
                         key={action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id}
                         label={action.label}
                         shortLabel={action.shortLabel}
-                        value={activePlayer.stats[scopedId] || 0}
+                        value={currentVal}
                         color={action.color ?? category.color}
                         pointValue={action.pointValue}
                         subtitle={subtitle}
+                        maxValue={timeoutCap}
                         onIncrement={() =>
                           dispatch({
                             type: 'INCREMENT_STAT',
@@ -440,7 +478,6 @@ export default function GameTracker() {
               </div>
             )
           })}
-          {/* Game notes */}
           <div className="mt-2">
             <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Game Notes
@@ -459,7 +496,6 @@ export default function GameTracker() {
         </div>
       </div>
 
-      {/* Undo bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="text-xs text-slate-400">
