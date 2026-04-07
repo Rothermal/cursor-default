@@ -128,8 +128,11 @@ export interface GameState {
   cloudSync: CloudSyncState
   /** 1-based period index for period-scoped team stats (e.g. half 1 vs 2). */
   currentPeriod: number
-  /** Season team-stat rules; null until loaded from season or derived from defaults. */
-  teamStatsConfig: TeamStatsConfig | null
+  /**
+   * Raw `seasons.team_stats_config` JSON for the active cloud season (merged at game time via resolveTeamStatsConfig).
+   * Null when no season or empty config.
+   */
+  teamStatsConfig: Record<string, unknown> | null
 }
 
 export type CloudSyncStatus =
@@ -169,4 +172,4 @@ export type GameAction =
   | { type: 'RESET_GAME' }
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }
   | { type: 'SET_PERIOD'; period: number }
-  | { type: 'SET_TEAM_STATS_CONFIG'; config: TeamStatsConfig | null }
+  | { type: 'SET_TEAM_STATS_CONFIG'; config: Record<string, unknown> | null }
