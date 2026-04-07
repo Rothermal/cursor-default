@@ -5,6 +5,10 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import ConfirmDialog from '../components/ConfirmDialog'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 interface CloudTeam {
   id: string
   name: string
@@ -13,6 +17,7 @@ interface CloudTeam {
     id: string
     name: string
     sport: string
+    team_stats_config?: unknown
   }
 }
 
@@ -60,7 +65,9 @@ export default function GameSetup() {
   const [deletingTournamentId, setDeletingTournamentId] = useState<string | null>(null)
 
   /** When creating a new cloud team from setup, optional season to attach (else sync uses year-from-date). */
-  const [seasonsForNewTeam, setSeasonsForNewTeam] = useState<Array<{ id: string; name: string }>>([])
+  const [seasonsForNewTeam, setSeasonsForNewTeam] = useState<
+    Array<{ id: string; name: string; team_stats_config?: unknown }>
+  >([])
   const [loadingSeasonsForNewTeam, setLoadingSeasonsForNewTeam] = useState(false)
   const [selectedNewTeamSeasonId, setSelectedNewTeamSeasonId] = useState('')
   const [setupError, setSetupError] = useState<string | null>(null)
@@ -74,7 +81,7 @@ export default function GameSetup() {
       setTeamsError(null)
       const { data, error } = await supabase!
         .from('teams')
-        .select('id,name,season_id,seasons!inner(id,name,sport)')
+        .select('id,name,season_id,seasons!inner(id,name,sport,team_stats_config)')
         .eq('seasons.sport', sport.id)
         .order('created_at', { ascending: false })
 
@@ -122,13 +129,15 @@ export default function GameSetup() {
       setLoadingSeasonsForNewTeam(true)
       const { data, error } = await client
         .from('seasons')
-        .select('id,name')
+        .select('id,name,team_stats_config')
         .eq('owner_id', userId)
         .eq('sport', sport.id)
         .order('created_at', { ascending: false })
       if (cancelled) return
       if (!error) {
-        setSeasonsForNewTeam((data ?? []) as Array<{ id: string; name: string }>)
+        setSeasonsForNewTeam(
+          (data ?? []) as Array<{ id: string; name: string; team_stats_config?: unknown }>
+        )
       }
       setLoadingSeasonsForNewTeam(false)
     }
@@ -137,6 +146,39 @@ export default function GameSetup() {
       cancelled = true
     }
   }, [isCloudFlow, userId, sport])
+
+  const selectedTeam = useMemo(
+    () => teams.find(team => team.id === selectedTeamId) ?? null,
+    [teams, selectedTeamId]
+  )
+  const selectedNewTeamSeasonRow = useMemo(
+    () => seasonsForNewTeam.find(s => s.id === selectedNewTeamSeasonId) ?? null,
+    [seasonsForNewTeam, selectedNewTeamSeasonId]
+  )
+
+  // Push raw `seasons.team_stats_config` into game state for resolveTeamStatsConfig (e.g. GameTracker).
+  useEffect(() => {
+    if (!isCloudFlow) {
+      dispatch({ type: 'SET_TEAM_STATS_CONFIG', config: null })
+      return
+    }
+    let raw: unknown = null
+    if (teamMode === 'existing' && selectedTeam?.seasons) {
+      raw = selectedTeam.seasons.team_stats_config
+    } else if (teamMode === 'new' && selectedNewTeamSeasonId) {
+      raw = selectedNewTeamSeasonRow?.team_stats_config
+    }
+    const next =
+      raw != null && isRecord(raw) && Object.keys(raw).length > 0 ? raw : null
+    dispatch({ type: 'SET_TEAM_STATS_CONFIG', config: next })
+  }, [
+    dispatch,
+    isCloudFlow,
+    teamMode,
+    selectedTeam,
+    selectedNewTeamSeasonId,
+    selectedNewTeamSeasonRow,
+  ])
 
   // Stable snapshot of the current tournament selection (avoids effect dep on full gameInfo object)
   const existingTournamentId = state.gameInfo?.tournamentId ?? null
@@ -198,10 +240,6 @@ export default function GameSetup() {
     }
   }
 
-  const selectedTeam = useMemo(
-    () => teams.find(team => team.id === selectedTeamId) ?? null,
-    [teams, selectedTeamId]
-  )
   const availableSeasons = useMemo(() => {
     const map = new Map<string, string>()
     for (const t of teams) {
