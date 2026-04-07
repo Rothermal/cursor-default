@@ -24,6 +24,7 @@ function sortTeamPlayersFirst(players: Player[]): Player[] {
   return [...orderedTeams, ...individuals]
 }
 
+/** Strip `_pN` suffix for config lookup (undo log stores scoped ids). */
 function baseStatId(statId: string): string {
   return statId.replace(/_p\d+$/, '')
 }
@@ -44,6 +45,7 @@ function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean
   return categories.some(cat => cat.actions.some(a => a.periodScoped))
 }
 
+/** Sum stats for `baseId_p1`, `baseId_p2`, ... */
 function sumPeriodScopedStats(stats: Record<string, number>, baseId: string): number {
   const prefix = `${baseId}_p`
   let sum = 0
@@ -125,6 +127,7 @@ export default function GameTracker() {
     dispatch({ type: 'SET_PERIOD', period: nextCount })
   }, [dispatch, periodButtonCount])
 
+  // Flush cloud sync when leaving Game Tracker so latest stats are saved (must run before any early return)
   useEffect(() => {
     return () => {
       flushCloudSync()

@@ -1,12 +1,14 @@
 import type { SportTheme } from '../../types'
 
 export interface PeriodToggleProps {
+  /** Total number of selectable periods (base halves/quarters + any OT added). */
   periods: number
   periodLabels: string[]
   currentPeriod: number
   onPeriodChange: (period: number) => void
   onAddOvertime: () => void
   sportTheme: SportTheme
+  /** Label for the add-OT control (e.g. "+ OT"). */
   addOvertimeLabel: string
 }
 
