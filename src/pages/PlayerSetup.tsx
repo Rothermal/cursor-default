@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 
 function generateLocalId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -35,9 +36,43 @@ export default function PlayerSetup() {
   const [saving, setSaving] = useState(false)
   const cloudRosterLoadedRef = useRef(false)
 
+  /** Team pseudo-players for checkout + tracker when the sport defines team categories. */
+  useEffect(() => {
+    if (!sport?.teamCategories?.length || !state.gameInfo) return
+    const hasHome = state.players.some(p => p.id === TEAM_PLAYER_HOME_ID)
+    const hasOpp = state.players.some(p => p.id === TEAM_PLAYER_OPP_ID)
+    if (hasHome && hasOpp) return
+    const homeTeamPlayer = {
+      id: TEAM_PLAYER_HOME_ID,
+      name: state.gameInfo.teamName,
+      number: '★',
+      stats: {},
+      isTeamPlayer: true as const,
+      teamSide: 'home' as const,
+    }
+    const oppTeamPlayer = {
+      id: TEAM_PLAYER_OPP_ID,
+      name: state.gameInfo.opponentName,
+      number: '★',
+      stats: {},
+      isTeamPlayer: true as const,
+      teamSide: 'opponent' as const,
+    }
+    const without = state.players.filter(
+      p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
+    )
+    dispatch({
+      type: 'SET_PLAYERS',
+      players: [homeTeamPlayer, oppTeamPlayer, ...without],
+    })
+  }, [sport, state.gameInfo, state.players, dispatch])
+
   useEffect(() => {
     if (!isCloudRoster || !cloudTeamId || cloudRosterLoadedRef.current) return
-    if (state.players.length > 0) {
+    const hasRosterRows = state.players.some(
+      p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
+    )
+    if (hasRosterRows) {
       cloudRosterLoadedRef.current = true
       setRosterLoading(false)
       return
@@ -62,12 +97,38 @@ export default function PlayerSetup() {
       }
 
       type RosterRow = { player_id: string; jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null } }
-      const loadedPlayers = ((data ?? []) as unknown as RosterRow[]).map(row => ({
+      let loadedPlayers = ((data ?? []) as unknown as RosterRow[]).map(row => ({
         id: row.player_id,
         name: `${row.players.first_name ?? ''} ${row.players.last_name ?? ''}`.trim(),
         number: row.jersey_number ?? '',
         stats: {},
       }))
+
+      if (sport?.teamCategories?.length && state.gameInfo) {
+        const homeTeamPlayer = {
+          id: TEAM_PLAYER_HOME_ID,
+          name: state.gameInfo.teamName,
+          number: '★',
+          stats: {},
+          isTeamPlayer: true as const,
+          teamSide: 'home' as const,
+        }
+        const oppTeamPlayer = {
+          id: TEAM_PLAYER_OPP_ID,
+          name: state.gameInfo.opponentName,
+          number: '★',
+          stats: {},
+          isTeamPlayer: true as const,
+          teamSide: 'opponent' as const,
+        }
+        loadedPlayers = [
+          homeTeamPlayer,
+          oppTeamPlayer,
+          ...loadedPlayers.filter(
+            p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
+          ),
+        ]
+      }
 
       const idMap = loadedPlayers.reduce<Record<string, string>>((map, player) => {
         map[player.id] = player.id
@@ -94,7 +155,16 @@ export default function PlayerSetup() {
     return () => {
       cancelled = true
     }
-  }, [cloudTeamId, dispatch, isCloudRoster, state.activePlayerId, state.players.length])
+    // Intentionally omit state.players: we only need initial cloud roster fetch when list is empty of roster rows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [
+    cloudTeamId,
+    dispatch,
+    isCloudRoster,
+    sport?.teamCategories?.length,
+    state.activePlayerId,
+    state.gameInfo,
+  ])
 
   const handleAddPlayer = async () => {
     if (!name.trim()) return
