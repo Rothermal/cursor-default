@@ -151,3 +151,23 @@ export function resolveTeamStatsConfig(
         : base.timeoutsPerOvertime,
   }
 }
+
+/** Serialize resolved basketball team rules for `seasons.team_stats_config` (jsonb). */
+export function seasonTeamStatsConfigToJson(config: TeamStatsConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    periodsPerGame: config.periodsPerGame,
+    periodLabels: config.periodLabels,
+    bonusThreshold: config.bonusThreshold,
+    doubleBonusThreshold: config.doubleBonusThreshold,
+    hasOneAndOne: config.hasOneAndOne,
+    overtimeLabel: config.overtimeLabel,
+    overtimeFoulsReset: config.overtimeFoulsReset,
+  }
+  if (config.timeoutsPerPeriod != null) {
+    out.timeoutsPerPeriod = config.timeoutsPerPeriod
+  }
+  if (config.timeoutsPerOvertime != null) {
+    out.timeoutsPerOvertime = config.timeoutsPerOvertime
+  }
+  return out
+}
