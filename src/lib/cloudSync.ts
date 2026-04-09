@@ -1,5 +1,6 @@
 import type { GameInfo, GameState, Player } from '../types'
 import { supabase } from './supabase'
+import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
 
 interface SyncGameSnapshotInput {
   state: GameState
@@ -50,6 +51,8 @@ type CloudGameRow = {
   notes?: string | null
   status: string
   created_at: string
+  home_team_player_id?: string | null
+  opp_team_player_id?: string | null
 }
 
 function isMissingLastOpenedColumnError(error: { message?: string } | null): boolean {
@@ -88,6 +91,21 @@ function isMissingSeasonIdColumnError(error: { message?: string } | null): boole
 function isMissingTeamStatsConfigColumnError(error: { message?: string } | null): boolean {
   if (!error?.message) return false
   return error.message.includes('team_stats_config') && error.message.includes('column')
+}
+
+function isMissingGameTeamPlaceholderColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  const m = error.message
+  if (!m.includes('column')) return false
+  return (
+    m.includes('home_team_player_id') ||
+    m.includes('opp_team_player_id')
+  )
+}
+
+function isMissingIsTeamPlaceholderColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  return error.message.includes('is_team_placeholder') && error.message.includes('column')
 }
 
 function parseSeasonTeamStatsConfig(raw: unknown): Record<string, unknown> | null {
@@ -403,6 +421,89 @@ async function ensureGame(
   return upsertWithFallback('insert', gameInsertPayload)
 }
 
+/**
+ * Cloud `players` row for team stat tracking only (no `team_players` row).
+ * Reuses existing id from `playerIdMap` or `games.*_team_player_id` when present.
+ */
+async function ensureTeamPlaceholderPlayer(
+  player: Player,
+  userId: string,
+  existingRemoteId: string | undefined
+): Promise<string> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  const { firstName, lastName } = parsePlayerName(player.name)
+
+  if (existingRemoteId) {
+    const { error: updateError } = await supabase
+      .from('players')
+      .update({ first_name: firstName, last_name: lastName || null, nickname: null })
+      .eq('id', existingRemoteId)
+    if (updateError) {
+      throw new Error(`Team placeholder update failed: ${updateError.message}`)
+    }
+    return existingRemoteId
+  }
+
+  const fullInsert = {
+    first_name: firstName,
+    last_name: lastName || null,
+    nickname: null as string | null,
+    created_by: userId,
+    is_team_placeholder: true,
+  }
+  const { data: created, error: createErr } = await supabase
+    .from('players')
+    .insert(fullInsert)
+    .select('id')
+    .single()
+
+  if (!createErr && created) {
+    return created.id as string
+  }
+
+  if (createErr && isMissingIsTeamPlaceholderColumnError(createErr)) {
+    const { data: fb, error: fbErr } = await supabase
+      .from('players')
+      .insert({
+        first_name: firstName,
+        last_name: lastName || null,
+        nickname: null,
+        created_by: userId,
+      })
+      .select('id')
+      .single()
+    if (fbErr || !fb) {
+      throw new Error(`Team placeholder create failed: ${fbErr?.message ?? 'unknown'}`)
+    }
+    return fb.id as string
+  }
+
+  throw new Error(`Team placeholder create failed: ${createErr?.message ?? 'unknown error'}`)
+}
+
+async function linkGameTeamPlaceholderIds(
+  gameId: string,
+  homePlayerId: string | undefined,
+  oppPlayerId: string | undefined
+): Promise<void> {
+  if (!supabase) return
+  if (!homePlayerId && !oppPlayerId) return
+
+  const payload: Record<string, string> = {}
+  if (homePlayerId) payload.home_team_player_id = homePlayerId
+  if (oppPlayerId) payload.opp_team_player_id = oppPlayerId
+
+  const { error } = await supabase.from('games').update(payload).eq('id', gameId)
+  if (!error) return
+  if (isMissingGameTeamPlaceholderColumnError(error)) {
+    return
+  }
+  throw new Error(`Game team placeholder link failed: ${error.message}`)
+}
+
 async function ensurePlayerId(
   player: Player,
   teamId: string,
@@ -415,18 +516,8 @@ async function ensurePlayerId(
 
   const { firstName, lastName } = parsePlayerName(player.name)
 
-  if (player.isTeamPlayer === true) {
-    if (!existingRemoteId) {
-      throw new Error('Team pseudo-player missing cloud player id (team stats sync not wired yet)')
-    }
-    const { error: updateError } = await supabase
-      .from('players')
-      .update({ first_name: firstName, last_name: lastName, nickname: null })
-      .eq('id', existingRemoteId)
-    if (updateError) {
-      throw new Error(`Player update failed: ${updateError.message}`)
-    }
-    return existingRemoteId
+  if (isTeamPseudoPlayer(player)) {
+    return ensureTeamPlaceholderPlayer(player, userId, existingRemoteId)
   }
   const jerseyNumber = player.number.trim()
 
@@ -602,16 +693,22 @@ export async function syncGameSnapshotToCloud({
 
   const nextPlayerIdMap: Record<string, string> = {}
   for (const player of state.players) {
-    if (player.isTeamPlayer === true) {
-      const mapped = state.cloudSync.playerIdMap[player.id]
-      if (mapped) nextPlayerIdMap[player.id] = mapped
-      continue
-    }
-    const remotePlayerId = await ensurePlayerId(player, teamId, userId, state.cloudSync.playerIdMap[player.id])
+    const remotePlayerId = await ensurePlayerId(
+      player,
+      teamId,
+      userId,
+      state.cloudSync.playerIdMap[player.id]
+    )
     nextPlayerIdMap[player.id] = remotePlayerId
   }
 
   await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
+
+  await linkGameTeamPlaceholderIds(
+    gameId,
+    nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
+    nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
+  )
 
   // Best-effort metadata touch for deterministic resume selection across devices.
   // If the optional migration adding games.last_opened_at is not applied yet,
@@ -705,6 +802,23 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     statsByPlayer.set(playerId, statMap)
   }
 
+  const homeCloudId = gameRow.home_team_player_id ?? null
+  const oppCloudId = gameRow.opp_team_player_id ?? null
+
+  const placeholderIds = [homeCloudId, oppCloudId].filter((x): x is string => Boolean(x))
+  const placeholderNameById = new Map<string, { first_name: string; last_name: string | null }>()
+  if (placeholderIds.length > 0) {
+    const { data: phRows, error: phErr } = await supabase
+      .from('players')
+      .select('id,first_name,last_name')
+      .in('id', placeholderIds)
+    if (!phErr && phRows) {
+      for (const row of phRows as Array<{ id: string; first_name: string; last_name: string | null }>) {
+        placeholderNameById.set(row.id, { first_name: row.first_name, last_name: row.last_name })
+      }
+    }
+  }
+
   const { data: rosterRows, error: rosterError } = await supabase
     .from('team_players')
     .select('player_id, jersey_number, is_active, players!inner(id, first_name, last_name, created_at)')
@@ -722,8 +836,13 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     players: { id: string; first_name: string; last_name: string | null; created_at: string }
   }
 
-  const players: Player[] = ((rosterRows ?? []) as unknown as RosterRow[])
+  const rosterPlayers: Player[] = ((rosterRows ?? []) as unknown as RosterRow[])
     .filter(row => row.is_active || statsByPlayer.has(row.player_id))
+    .filter(
+      row =>
+        (homeCloudId ? row.player_id !== homeCloudId : true) &&
+        (oppCloudId ? row.player_id !== oppCloudId : true)
+    )
     .map(row => {
       const playerId = row.player_id
       const p = row.players
@@ -736,10 +855,50 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
       }
     })
 
-  const playerIdMap = players.reduce<Record<string, string>>((map, player) => {
-    map[player.id] = player.id
-    return map
-  }, {})
+  const teamPlayers: Player[] = []
+  if (homeCloudId) {
+    const meta = placeholderNameById.get(homeCloudId)
+    const fromDb = meta
+      ? `${meta.first_name ?? ''} ${meta.last_name ?? ''}`.trim()
+      : ''
+    teamPlayers.push({
+      id: TEAM_PLAYER_HOME_ID,
+      name: fromDb || teamRow.name || 'Home',
+      number: '★',
+      stats: statsByPlayer.get(homeCloudId) ?? {},
+      isTeamPlayer: true,
+      teamSide: 'home',
+    })
+  }
+  if (oppCloudId) {
+    const meta = placeholderNameById.get(oppCloudId)
+    const fromDb = meta
+      ? `${meta.first_name ?? ''} ${meta.last_name ?? ''}`.trim()
+      : ''
+    teamPlayers.push({
+      id: TEAM_PLAYER_OPP_ID,
+      name: fromDb || gameRow.opponent_name || 'Opponent',
+      number: '★',
+      stats: statsByPlayer.get(oppCloudId) ?? {},
+      isTeamPlayer: true,
+      teamSide: 'opponent',
+    })
+  }
+
+  const players: Player[] = [...teamPlayers, ...rosterPlayers]
+
+  const playerIdMap: Record<string, string> = {}
+  for (const p of rosterPlayers) {
+    playerIdMap[p.id] = p.id
+  }
+  if (homeCloudId) {
+    playerIdMap[TEAM_PLAYER_HOME_ID] = homeCloudId
+  }
+  if (oppCloudId) {
+    playerIdMap[TEAM_PLAYER_OPP_ID] = oppCloudId
+  }
+
+  const activePlayerId = rosterPlayers[0]?.id ?? teamPlayers[0]?.id ?? null
 
   return {
     sportId,
@@ -752,7 +911,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
       date: gameRow.game_date,
     },
     players,
-    activePlayerId: players[0]?.id ?? null,
+    activePlayerId,
     opponentScore: gameRow.opponent_score ?? 0,
     homeTeamScore:
       typeof gameRow.home_team_score === 'number' ? gameRow.home_team_score : null,
@@ -773,7 +932,8 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
   }
 
   // All optional columns (may not exist before their respective migrations)
-  const allOptional = 'home_team_score,home_score_adjustment,tournament_id,notes,last_opened_at,season_id'
+  const allOptional =
+    'home_team_score,home_score_adjustment,tournament_id,notes,last_opened_at,season_id,home_team_player_id,opp_team_player_id'
   const baseColumns =
     'id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at'
 
@@ -799,6 +959,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
   const missingTournamentId = isMissingTournamentIdColumnError(advanced.error)
   const missingNotes = isMissingNotesColumnError(advanced.error)
   const missingSeasonId = isMissingSeasonIdColumnError(advanced.error)
+  const missingTeamPlaceholders = isMissingGameTeamPlaceholderColumnError(advanced.error)
 
   if (
     !missingLastOpened &&
@@ -806,7 +967,8 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
     !missingHomeAdjust &&
     !missingTournamentId &&
     !missingNotes &&
-    !missingSeasonId
+    !missingSeasonId &&
+    !missingTeamPlaceholders
   ) {
     throw new Error(`Game load failed: ${advanced.error.message}`)
   }
@@ -820,7 +982,8 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
     (!missingTournamentId ? ',tournament_id' : '') +
     (!missingNotes ? ',notes' : '') +
     (!missingLastOpened ? ',last_opened_at' : '') +
-    (!missingSeasonId ? ',season_id' : '')
+    (!missingSeasonId ? ',season_id' : '') +
+    (!missingTeamPlaceholders ? ',home_team_player_id,opp_team_player_id' : '')
 
   const retry = await supabase
     .from('games')
@@ -843,7 +1006,8 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
     isMissingHomeScoreAdjustmentColumnError(retry.error) ||
     isMissingTournamentIdColumnError(retry.error) ||
     isMissingNotesColumnError(retry.error) ||
-    isMissingSeasonIdColumnError(retry.error)
+    isMissingSeasonIdColumnError(retry.error) ||
+    isMissingGameTeamPlaceholderColumnError(retry.error)
 
   if (isStillOptionalMissing) {
     const finalRetry = await supabase
@@ -882,7 +1046,9 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
 
   const { data: gameRow, error: gameError } = await supabase
     .from('games')
-    .select(`${baseById},home_team_score,home_score_adjustment,tournament_id,notes,season_id`)
+    .select(
+      `${baseById},home_team_score,home_score_adjustment,tournament_id,notes,season_id,home_team_player_id,opp_team_player_id`
+    )
     .eq('id', gameId)
     .maybeSingle()
 
@@ -892,12 +1058,14 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
     const missingTournamentId = isMissingTournamentIdColumnError(gameError)
     const missingNotes = isMissingNotesColumnError(gameError)
     const missingSeasonId = isMissingSeasonIdColumnError(gameError)
+    const missingTeamPh = isMissingGameTeamPlaceholderColumnError(gameError)
     if (
       !missingHomeTeamScore &&
       !missingHomeAdj &&
       !missingTournamentId &&
       !missingNotes &&
-      !missingSeasonId
+      !missingSeasonId &&
+      !missingTeamPh
     ) {
       throw new Error(`Game load failed: ${gameError.message}`)
     }
@@ -907,7 +1075,8 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
       (!missingHomeAdj ? ',home_score_adjustment' : '') +
       (!missingTournamentId ? ',tournament_id' : '') +
       (!missingNotes ? ',notes' : '') +
-      (!missingSeasonId ? ',season_id' : '')
+      (!missingSeasonId ? ',season_id' : '') +
+      (!missingTeamPh ? ',home_team_player_id,opp_team_player_id' : '')
     const { data: gameRowFallback, error: gameErrorFallback } = await supabase
       .from('games')
       .select(fallbackSelect)
