@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
-import { isTeamPseudoPlayer } from '../lib/teamPlayers'
+import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
+import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
+import { hasTrackedTeamSide } from '../lib/teamStatsSummary'
+import TeamStatSummary from '../components/team-stats/TeamStatSummary'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -48,8 +51,12 @@ export default function GameSummary() {
   const [savingCorrection, setSavingCorrection] = useState(false)
   const [resolvedKey, setResolvedKey] = useState(0)
   const [viewMode, setViewMode] = useState<'primary' | 'all'>('primary')
-  /** Players vs Team layout for stat tables (design: Game Summary split). */
-  const [summaryTab, setSummaryTab] = useState<'players' | 'team'>('players')
+  /** Players vs scores vs team-level stat summary (fouls, timeouts). */
+  const [summaryTab, setSummaryTab] = useState<'players' | 'team' | 'team_stats'>('players')
+  /** Final games: overlay from get_game_team_stats (resolved placeholder stats). */
+  const [teamTrackedStatsByRemoteId, setTeamTrackedStatsByRemoteId] = useState<
+    Record<string, Record<string, number>> | null
+  >(null)
   const [allSubmissions, setAllSubmissions] = useState<AllSubmissionsMap | null>(null)
   const [checkoutsByPlayer, setCheckoutsByPlayer] = useState<CheckoutsByPlayerMap | null>(null)
   const [settingPrimaryFor, setSettingPrimaryFor] = useState<string | null>(null)
@@ -64,6 +71,156 @@ export default function GameSummary() {
     () => players.filter(p => !isTeamPseudoPlayer(p)),
     [players]
   )
+
+  const homeTeamPseudo = useMemo(
+    () =>
+      players.find(
+        p => p.id === TEAM_PLAYER_HOME_ID || (p.isTeamPlayer && p.teamSide === 'home')
+      ),
+    [players]
+  )
+  const oppTeamPseudo = useMemo(
+    () =>
+      players.find(
+        p => p.id === TEAM_PLAYER_OPP_ID || (p.isTeamPlayer && p.teamSide === 'opponent')
+      ),
+    [players]
+  )
+
+  const teamStatHomeStats = useMemo(() => {
+    const local = homeTeamPseudo?.stats ?? {}
+    const remote = playerIdMap[TEAM_PLAYER_HOME_ID]
+    if (isFinalCloudGame && remote && teamTrackedStatsByRemoteId?.[remote]) {
+      return teamTrackedStatsByRemoteId[remote]
+    }
+    if (isFinalCloudGame && remote && resolvedStats?.[remote]) {
+      return Object.fromEntries(
+        Object.entries(resolvedStats[remote]).map(([k, e]) => [k, e.value])
+      )
+    }
+    return local
+  }, [
+    homeTeamPseudo?.stats,
+    isFinalCloudGame,
+    playerIdMap,
+    resolvedStats,
+    teamTrackedStatsByRemoteId,
+  ])
+
+  const teamStatOppStats = useMemo(() => {
+    const local = oppTeamPseudo?.stats ?? {}
+    const remote = playerIdMap[TEAM_PLAYER_OPP_ID]
+    if (isFinalCloudGame && remote && teamTrackedStatsByRemoteId?.[remote]) {
+      return teamTrackedStatsByRemoteId[remote]
+    }
+    if (isFinalCloudGame && remote && resolvedStats?.[remote]) {
+      return Object.fromEntries(
+        Object.entries(resolvedStats[remote]).map(([k, e]) => [k, e.value])
+      )
+    }
+    return local
+  }, [
+    oppTeamPseudo?.stats,
+    isFinalCloudGame,
+    playerIdMap,
+    resolvedStats,
+    teamTrackedStatsByRemoteId,
+  ])
+
+  const showTeamStatsTab = Boolean(
+    sport?.teamCategories?.length &&
+      (hasTrackedTeamSide(teamStatHomeStats, sport) || hasTrackedTeamSide(teamStatOppStats, sport))
+  )
+
+  useEffect(() => {
+    if (!showTeamStatsTab && summaryTab === 'team_stats') {
+      setSummaryTab('players')
+    }
+  }, [showTeamStatsTab, summaryTab])
+
+  const teamStatsSummaryEl = useMemo(() => {
+    if (!sport || !gameInfo || !showTeamStatsTab || summaryTab !== 'team_stats') return null
+    const foulBase = sport.teamFoulBaseStatId
+    if (!foulBase) return null
+    const cfg = resolveTeamStatsConfig(sport, state.teamStatsConfig)
+    if (!cfg) return null
+    const homeP =
+      homeTeamPseudo != null
+        ? { ...homeTeamPseudo, stats: teamStatHomeStats }
+        : {
+            id: TEAM_PLAYER_HOME_ID,
+            name: gameInfo.teamName,
+            number: '★',
+            stats: teamStatHomeStats,
+            isTeamPlayer: true as const,
+            teamSide: 'home' as const,
+          }
+    const oppP =
+      oppTeamPseudo != null
+        ? { ...oppTeamPseudo, stats: teamStatOppStats }
+        : {
+            id: TEAM_PLAYER_OPP_ID,
+            name: gameInfo.opponentName,
+            number: '★',
+            stats: teamStatOppStats,
+            isTeamPlayer: true as const,
+            teamSide: 'opponent' as const,
+          }
+    return (
+      <TeamStatSummary
+        homeTeamPlayer={homeP}
+        oppTeamPlayer={oppP}
+        homeTeamName={gameInfo.teamName}
+        oppTeamName={gameInfo.opponentName}
+        config={cfg}
+        sport={sport}
+        foulBaseStatId={foulBase}
+      />
+    )
+  }, [
+    sport,
+    gameInfo,
+    showTeamStatsTab,
+    summaryTab,
+    state.teamStatsConfig,
+    homeTeamPseudo,
+    oppTeamPseudo,
+    teamStatHomeStats,
+    teamStatOppStats,
+  ])
+
+  useEffect(() => {
+    const client = supabase
+    if (!isFinalCloudGame || !gameId || !client) {
+      setTeamTrackedStatsByRemoteId(null)
+      return
+    }
+    let cancelled = false
+    const load = async () => {
+      const { data, error } = await client.rpc('get_game_team_stats', {
+        p_game_id: gameId,
+      })
+      if (cancelled) return
+      if (error) {
+        setTeamTrackedStatsByRemoteId(null)
+        return
+      }
+      const byPlayer: Record<string, Record<string, number>> = {}
+      for (const row of (data ?? []) as Array<{
+        player_id: string
+        stat_id: string
+        value: number
+      }>) {
+        if (!byPlayer[row.player_id]) byPlayer[row.player_id] = {}
+        byPlayer[row.player_id][row.stat_id] = row.value
+      }
+      setTeamTrackedStatsByRemoteId(byPlayer)
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [isFinalCloudGame, gameId, resolvedKey])
 
   const loadResolved = useCallback(async () => {
     const client = supabase
@@ -606,7 +763,7 @@ export default function GameSummary() {
         )}
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 flex-wrap">
             <button
               type="button"
               onClick={() => setSummaryTab('players')}
@@ -623,10 +780,21 @@ export default function GameSummary() {
                 summaryTab === 'team' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              Team
+              Scores
             </button>
+            {showTeamStatsTab && (
+              <button
+                type="button"
+                onClick={() => setSummaryTab('team_stats')}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  summaryTab === 'team_stats' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Team stats
+              </button>
+            )}
           </div>
-        {isFinalCloudGame && (
+        {isFinalCloudGame && summaryTab === 'players' && (
           <>
             <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
               <button
@@ -665,6 +833,8 @@ export default function GameSummary() {
           </>
         )}
         </div>
+
+        {teamStatsSummaryEl}
 
         {summaryTab === 'team' && (
           <div className="card mb-6 border-slate-200">
