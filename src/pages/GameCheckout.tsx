@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 
 interface CheckoutRow {
   player_id: string
@@ -12,7 +13,7 @@ interface CheckoutRow {
 
 export default function GameCheckout() {
   const navigate = useNavigate()
-  const { state, flushCloudSync } = useGame()
+  const { state, dispatch, flushCloudSync } = useGame()
   const { user, isConfigured } = useAuth()
   const gameId = state.cloudSync.gameId
   const playerIdMap = state.cloudSync.playerIdMap
@@ -25,6 +26,39 @@ export default function GameCheckout() {
   const [toggling, setToggling] = useState<string | null>(null)
 
   const myId = user?.id ?? null
+
+  const teamCheckoutPlayers = players.filter(isTeamPseudoPlayer)
+  const rosterCheckoutPlayers = players.filter(p => !isTeamPseudoPlayer(p))
+
+  useLayoutEffect(() => {
+    if (!sport?.teamCategories?.length || !gameInfo) return
+    const hasHome = players.some(p => p.id === TEAM_PLAYER_HOME_ID)
+    const hasOpp = players.some(p => p.id === TEAM_PLAYER_OPP_ID)
+    if (hasHome && hasOpp) return
+    const homeTeamPlayer = {
+      id: TEAM_PLAYER_HOME_ID,
+      name: gameInfo.teamName,
+      number: '★',
+      stats: {},
+      isTeamPlayer: true as const,
+      teamSide: 'home' as const,
+    }
+    const oppTeamPlayer = {
+      id: TEAM_PLAYER_OPP_ID,
+      name: gameInfo.opponentName,
+      number: '★',
+      stats: {},
+      isTeamPlayer: true as const,
+      teamSide: 'opponent' as const,
+    }
+    const without = players.filter(
+      p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
+    )
+    dispatch({
+      type: 'SET_PLAYERS',
+      players: [homeTeamPlayer, oppTeamPlayer, ...without],
+    })
+  }, [sport, gameInfo, players, dispatch])
 
   // If we have no gameId yet (first time), trigger sync so game is created
   useEffect(() => {
@@ -177,7 +211,67 @@ export default function GameCheckout() {
           <div className="card text-slate-500 animate-pulse">Loading...</div>
         ) : (
           <div className="space-y-2 mb-6">
-            {players.map(player => {
+            {teamCheckoutPlayers.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-0.5">
+                  Team stats
+                </p>
+                {teamCheckoutPlayers.map(player => {
+                  const remoteId = playerIdMap[player.id] ?? player.id
+                  const mine = isCheckedOutByMe(remoteId)
+                  const other = claimedByOther(remoteId)
+
+                  return (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => { void handleToggle(player.id) }}
+                      disabled={toggling === player.id}
+                      className={`card w-full flex items-center justify-between py-3 text-left transition-colors
+                        border-2 border-dashed border-slate-300/90
+                        bg-gradient-to-br from-slate-50 to-slate-100/70
+                        ${mine ? 'ring-2 ring-blue-400 bg-blue-50/80' : 'hover:from-slate-100 hover:to-slate-100'}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className="shrink-0 w-10 h-10 rounded-full border-2 border-dashed border-slate-400
+                                     bg-white text-slate-600 flex items-center justify-center text-lg leading-none"
+                          aria-hidden
+                        >
+                          ★
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">
+                            {player.name}
+                            <span className="font-normal text-slate-500"> (Team Stats)</span>
+                          </p>
+                          {other && (
+                            <p className="text-xs text-slate-500">Primary: {other}</p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-2xl shrink-0">{mine ? '✓' : '○'}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {teamCheckoutPlayers.length > 0 && rosterCheckoutPlayers.length > 0 && (
+              <div
+                className="flex items-center gap-3 py-2"
+                role="separator"
+                aria-label="Roster players"
+              >
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Roster
+                </span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+            )}
+
+            {rosterCheckoutPlayers.map(player => {
               const remoteId = playerIdMap[player.id] ?? player.id
               const mine = isCheckedOutByMe(remoteId)
               const other = claimedByOther(remoteId)
