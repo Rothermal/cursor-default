@@ -13,6 +13,76 @@ export const BASKETBALL_TEAM_STATS_DEFAULTS: BasketballTeamStatsConfig = {
   timeoutsPerOvertime: null,
 }
 
+export interface BasketballTeamStatsPreset {
+  id: string
+  label: string
+  /** Partial override merged on top of {@link BASKETBALL_TEAM_STATS_DEFAULTS}. */
+  config: Partial<BasketballTeamStatsConfig>
+}
+
+/**
+ * Named rulesets for season UI (WU-8) and docs. Values are approximate; leagues vary.
+ * "NFHS" entry matches {@link BASKETBALL_TEAM_STATS_DEFAULTS}.
+ */
+export const BASKETBALL_PRESETS: BasketballTeamStatsPreset[] = [
+  { id: 'nfhs', label: 'NFHS (halves)', config: {} },
+  /** Same numeric rules as NFHS for typical NCAA mens play; separate id for season UI labeling. */
+  { id: 'ncaa', label: 'NCAA (halves)', config: {} },
+  {
+    id: 'nba',
+    label: 'NBA (quarters)',
+    config: {
+      periodsPerGame: 4,
+      bonusThreshold: 5,
+      doubleBonusThreshold: 5,
+      hasOneAndOne: false,
+      overtimeFoulsReset: true,
+      timeoutsPerPeriod: null,
+      timeoutsPerOvertime: null,
+    },
+  },
+  {
+    id: 'fiba',
+    label: 'FIBA (quarters)',
+    config: {
+      periodsPerGame: 4,
+      bonusThreshold: 5,
+      doubleBonusThreshold: 5,
+      hasOneAndOne: false,
+      overtimeFoulsReset: true,
+    },
+  },
+  {
+    id: 'youth_halves',
+    label: 'Youth / rec (halves)',
+    config: {
+      periodsPerGame: 2,
+      bonusThreshold: 6,
+      doubleBonusThreshold: 9,
+      hasOneAndOne: true,
+    },
+  },
+  {
+    id: 'youth_quarters',
+    label: 'Youth / rec (quarters)',
+    config: {
+      periodsPerGame: 4,
+      bonusThreshold: 4,
+      doubleBonusThreshold: 7,
+      hasOneAndOne: true,
+    },
+  },
+]
+
+/** Regulation period button labels when the season does not define `periodLabels`. */
+export function getDefaultPeriodLabels(periodsPerGame: number): string[] {
+  const n = Math.max(1, Math.floor(periodsPerGame))
+  if (n === 2) {
+    return ['1st Half', '2nd Half']
+  }
+  return Array.from({ length: n }, (_, i) => `Q${i + 1}`)
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -44,6 +114,9 @@ export function resolveTeamStatsConfig(
     if (labels.length === periodsPerGame) {
       periodLabels = labels
     }
+  }
+  if (periodLabels.length !== periodsPerGame) {
+    periodLabels = getDefaultPeriodLabels(periodsPerGame)
   }
 
   return {

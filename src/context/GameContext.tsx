@@ -109,6 +109,7 @@ function buildSyncFingerprint(state: GameState): string {
     homeTeamScore: state.homeTeamScore,
     homeScoreAdjustment: state.homeScoreAdjustment,
     notes: state.notes,
+    teamStatsConfig: state.teamStatsConfig,
     players: state.players.map(player => ({
       id: player.id,
       name: player.name,
@@ -199,7 +200,7 @@ function buildHydratedStateFromCloudGame(
     homeScoreAdjustment: cloudGame.homeScoreAdjustment,
     notes: cloudGame.notes,
     currentPeriod: 1,
-    teamStatsConfig: null,
+    teamStatsConfig: cloudGame.teamStatsConfig,
     actionLog: [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),

@@ -28,6 +28,8 @@ export interface HydratedCloudGame {
   homeScoreAdjustment: number
   notes: string
   seasonId: string | null
+  /** Raw `seasons.team_stats_config` when the column exists; null otherwise. */
+  teamStatsConfig: Record<string, unknown> | null
   teamId: string
   gameId: string
   playerIdMap: Record<string, string>
@@ -81,6 +83,18 @@ function isMissingNotesColumnError(error: { message?: string } | null): boolean 
 function isMissingSeasonIdColumnError(error: { message?: string } | null): boolean {
   if (!error?.message) return false
   return error.message.includes('season_id') && error.message.includes('column')
+}
+
+function isMissingTeamStatsConfigColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  return error.message.includes('team_stats_config') && error.message.includes('column')
+}
+
+function parseSeasonTeamStatsConfig(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null
+  if (typeof raw !== 'object' || Array.isArray(raw)) return null
+  const rec = raw as Record<string, unknown>
+  return Object.keys(rec).length > 0 ? rec : null
 }
 
 export type LastOpenedPreferenceSupport = 'unknown' | 'supported' | 'missing'
@@ -633,17 +647,30 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
   }
 
   let sportId = ''
+  let teamStatsConfig: Record<string, unknown> | null = null
   const seasonId =
     (gameRow.season_id as string | null | undefined) ??
     (teamRow.season_id as string | null) ??
     null
   if (seasonId) {
-    const { data: seasonRow } = await supabase
+    const { data: seasonRow, error: seasonErr } = await supabase
       .from('seasons')
-      .select('sport')
+      .select('sport,team_stats_config')
       .eq('id', seasonId)
       .maybeSingle()
-    sportId = (seasonRow?.sport as string | null) ?? ''
+    if (seasonErr && isMissingTeamStatsConfigColumnError(seasonErr)) {
+      const { data: fallbackSeason } = await supabase
+        .from('seasons')
+        .select('sport')
+        .eq('id', seasonId)
+        .maybeSingle()
+      sportId = (fallbackSeason?.sport as string | null) ?? ''
+    } else if (seasonErr) {
+      throw new Error(`Season load failed: ${seasonErr.message}`)
+    } else {
+      sportId = (seasonRow?.sport as string | null) ?? ''
+      teamStatsConfig = parseSeasonTeamStatsConfig(seasonRow?.team_stats_config)
+    }
   }
 
   let statRows:
@@ -732,6 +759,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     homeScoreAdjustment: gameRow.home_score_adjustment ?? 0,
     notes: gameRow.notes ?? '',
     seasonId,
+    teamStatsConfig,
     teamId: teamRow.id as string,
     gameId: gameRow.id,
     playerIdMap,
