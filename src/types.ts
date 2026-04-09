@@ -48,6 +48,11 @@ export interface SportConfig {
   keyStatIds?: string[]
   /** Compact keys when summarizing team-level stats. */
   teamKeyStatIds?: string[]
+  /**
+   * Base stat id for period-scoped team fouls (suffix `_pN` in tracker). Used for bonus banner counts.
+   * Basketball sets `team_foul`.
+   */
+  teamFoulBaseStatId?: string
 }
 
 export interface GameInfo {
