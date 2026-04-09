@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
+import type { BasketballTeamStatsConfig } from '../types'
+import {
+  BASKETBALL_TEAM_STATS_DEFAULTS,
+  resolveTeamStatsConfig,
+  seasonTeamStatsConfigToJson,
+} from '../config/teamStatsDefaults'
+import SeasonTeamStatsEditor from '../components/SeasonTeamStatsEditor'
 import { useSettings } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -52,6 +59,12 @@ interface AdminSeasonRow {
   sport: string
   start_date: string | null
   end_date: string | null
+  team_stats_config?: unknown
+}
+
+function isMissingTeamStatsConfigColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  return error.message.includes('team_stats_config') && error.message.includes('column')
 }
 
 interface MergeAuditListRow {
@@ -101,6 +114,12 @@ export default function Admin() {
   const [editSeasonStartDate, setEditSeasonStartDate] = useState('')
   const [editSeasonEndDate, setEditSeasonEndDate] = useState('')
   const [confirmDeleteSeason, setConfirmDeleteSeason] = useState<AdminSeasonRow | null>(null)
+  const [seasonsTeamStatsColumnMissing, setSeasonsTeamStatsColumnMissing] = useState(false)
+  const [teamStatsSeasonId, setTeamStatsSeasonId] = useState<string | null>(null)
+  const [teamStatsDraft, setTeamStatsDraft] = useState<BasketballTeamStatsConfig | null>(null)
+  const [savingTeamStatsId, setSavingTeamStatsId] = useState<string | null>(null)
+
+  const basketballSport = sports.find(s => s.id === 'basketball') ?? null
 
   const [showMergeTools, setShowMergeTools] = useState(false)
   const [mergeWizardOpen, setMergeWizardOpen] = useState(false)
@@ -270,13 +289,31 @@ export default function Admin() {
     if (!supabaseClient) return
     setLoadingSeasons(true)
     setSeasonsError(null)
-    const { data, error } = await supabaseClient
+    const withConfig = await supabaseClient
       .from('seasons')
-      .select('id,name,sport,start_date,end_date')
+      .select('id,name,sport,start_date,end_date,team_stats_config')
       .order('created_at', { ascending: false })
+    if (withConfig.error && isMissingTeamStatsConfigColumnError(withConfig.error)) {
+      setSeasonsTeamStatsColumnMissing(true)
+      const { data, error } = await supabaseClient
+        .from('seasons')
+        .select('id,name,sport,start_date,end_date')
+        .order('created_at', { ascending: false })
+      setLoadingSeasons(false)
+      if (error) {
+        setSeasonsError(error.message)
+        return
+      }
+      setSeasonsList((data ?? []) as AdminSeasonRow[])
+      return
+    }
     setLoadingSeasons(false)
-    if (error) { setSeasonsError(error.message); return }
-    setSeasonsList((data ?? []) as AdminSeasonRow[])
+    if (withConfig.error) {
+      setSeasonsError(withConfig.error.message)
+      return
+    }
+    setSeasonsTeamStatsColumnMissing(false)
+    setSeasonsList((withConfig.data ?? []) as AdminSeasonRow[])
   }
 
   useEffect(() => {
@@ -327,6 +364,45 @@ export default function Admin() {
     setDeletingId(null)
     if (error) { setSeasonsError(error.message); return }
     setSeasonsList(prev => prev.filter(s => s.id !== season.id))
+    if (teamStatsSeasonId === season.id) {
+      setTeamStatsSeasonId(null)
+      setTeamStatsDraft(null)
+    }
+  }
+
+  const openTeamStatsEditor = (season: AdminSeasonRow) => {
+    if (!basketballSport) return
+    const resolved = resolveTeamStatsConfig(basketballSport, season.team_stats_config)
+    setTeamStatsDraft(resolved ?? { ...BASKETBALL_TEAM_STATS_DEFAULTS })
+    setTeamStatsSeasonId(season.id)
+  }
+
+  const handleSaveTeamStatsConfig = async () => {
+    if (!supabaseClient || !teamStatsSeasonId || !teamStatsDraft) return
+    setSeasonsError(null)
+    setSavingTeamStatsId(teamStatsSeasonId)
+    const json = seasonTeamStatsConfigToJson(teamStatsDraft)
+    const { error } = await supabaseClient
+      .from('seasons')
+      .update({ team_stats_config: json })
+      .eq('id', teamStatsSeasonId)
+    setSavingTeamStatsId(null)
+    if (error) {
+      if (isMissingTeamStatsConfigColumnError(error)) {
+        setSeasonsError(
+          'Database is missing seasons.team_stats_config. Apply Supabase migration 030 (team stats schema).'
+        )
+      } else {
+        setSeasonsError(error.message)
+      }
+      return
+    }
+    if (gameState.cloudSync.seasonId === teamStatsSeasonId) {
+      gameDispatch({ type: 'SET_TEAM_STATS_CONFIG', config: json })
+    }
+    setTeamStatsSeasonId(null)
+    setTeamStatsDraft(null)
+    void loadSeasons()
   }
 
   return (
@@ -507,9 +583,18 @@ export default function Admin() {
                   <p className="text-sm text-slate-500 card">No seasons yet.</p>
                 ) : (
                   <div className="space-y-2">
+                    {seasonsTeamStatsColumnMissing && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        Team stat rules need migration 030 (
+                        <code className="text-[10px]">seasons.team_stats_config</code>). Season list still
+                        loads without it.
+                      </p>
+                    )}
                     {seasonsList.map(season => {
                       const sportCfg = sports.find(s => s.id === season.sport)
                       const isEditing = editingSeasonId === season.id
+                      const isBasketballSeason = season.sport === 'basketball'
+                      const teamStatsOpen = teamStatsSeasonId === season.id && teamStatsDraft !== null
 
                       if (isEditing) {
                         return (
@@ -557,49 +642,154 @@ export default function Admin() {
                                 Cancel
                               </button>
                             </div>
+                            {isBasketballSeason && !seasonsTeamStatsColumnMissing && (
+                              <button
+                                type="button"
+                                onClick={() => openTeamStatsEditor(season)}
+                                className="btn-secondary w-full text-sm"
+                              >
+                                Team stat rules (basketball)…
+                              </button>
+                            )}
                           </div>
                         )
                       }
 
                       return (
-                        <div key={season.id} className="card flex items-center justify-between py-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">{sportCfg?.icon ?? '🏟️'}</span>
-                              <span className="font-medium text-slate-700 truncate">{season.name}</span>
+                        <div key={season.id} className="space-y-2">
+                          <div className="card flex items-center justify-between py-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{sportCfg?.icon ?? '🏟️'}</span>
+                                <span className="font-medium text-slate-700 truncate">{season.name}</span>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                {sportCfg?.name ?? season.sport}
+                                {(season.start_date || season.end_date) && ' · '}
+                                {season.start_date ?? ''}
+                                {season.start_date && season.end_date && ' → '}
+                                {season.end_date ?? ''}
+                              </p>
                             </div>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                              {sportCfg?.name ?? season.sport}
-                              {(season.start_date || season.end_date) && ' · '}
-                              {season.start_date ?? ''}
-                              {season.start_date && season.end_date && ' → '}
-                              {season.end_date ?? ''}
-                            </p>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isBasketballSeason && !seasonsTeamStatsColumnMissing && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (teamStatsOpen) {
+                                      setTeamStatsSeasonId(null)
+                                      setTeamStatsDraft(null)
+                                    } else {
+                                      openTeamStatsEditor(season)
+                                    }
+                                  }}
+                                  className="text-slate-400 hover:text-blue-500 p-1 text-xs font-medium px-2"
+                                  title="Team stat rules"
+                                >
+                                  🏀
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSeasonId(season.id)
+                                  setEditSeasonName(season.name)
+                                  setEditSeasonStartDate(season.start_date ?? '')
+                                  setEditSeasonEndDate(season.end_date ?? '')
+                                }}
+                                className="text-slate-400 hover:text-blue-500 p-1"
+                                title="Edit season"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteSeason(season)}
+                                disabled={deletingId === season.id}
+                                className="text-slate-400 hover:text-red-500 p-1"
+                                title="Delete season"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingSeasonId(season.id)
-                                setEditSeasonName(season.name)
-                                setEditSeasonStartDate(season.start_date ?? '')
-                                setEditSeasonEndDate(season.end_date ?? '')
-                              }}
-                              className="text-slate-400 hover:text-blue-500 p-1"
-                              title="Edit season"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteSeason(season)}
-                              disabled={deletingId === season.id}
-                              className="text-slate-400 hover:text-red-500 p-1"
-                              title="Delete season"
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                          {teamStatsOpen && (
+                            <div className="card space-y-3 border-blue-100 bg-slate-50/80">
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="text-sm font-semibold text-slate-700">
+                                  Basketball team stat rules
+                                </h4>
+                                <button
+                                  type="button"
+                                  className="text-xs text-slate-500 underline"
+                                  onClick={() => {
+                                    setTeamStatsSeasonId(null)
+                                    setTeamStatsDraft(null)
+                                  }}
+                                >
+                                  Close
+                                </button>
+                              </div>
+                              <SeasonTeamStatsEditor value={teamStatsDraft} onChange={setTeamStatsDraft} />
+                              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                                <button
+                                  type="button"
+                                  className="btn-primary flex-1"
+                                  disabled={savingTeamStatsId === season.id}
+                                  onClick={() => void handleSaveTeamStatsConfig()}
+                                >
+                                  {savingTeamStatsId === season.id ? 'Saving…' : 'Save rules'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-secondary flex-1"
+                                  onClick={() => setTeamStatsDraft({ ...BASKETBALL_TEAM_STATS_DEFAULTS })}
+                                >
+                                  Reset form to defaults
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-secondary flex-1"
+                                  onClick={() => openTeamStatsEditor(season)}
+                                >
+                                  Revert to saved
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-secondary flex-1 text-red-700 border-red-100"
+                                  disabled={savingTeamStatsId === season.id}
+                                  onClick={async () => {
+                                    if (!supabaseClient) return
+                                    setSeasonsError(null)
+                                    setSavingTeamStatsId(season.id)
+                                    const { error } = await supabaseClient
+                                      .from('seasons')
+                                      .update({ team_stats_config: {} })
+                                      .eq('id', season.id)
+                                    setSavingTeamStatsId(null)
+                                    if (error) {
+                                      if (isMissingTeamStatsConfigColumnError(error)) {
+                                        setSeasonsError(
+                                          'Missing seasons.team_stats_config column (migration 030).'
+                                        )
+                                      } else {
+                                        setSeasonsError(error.message)
+                                      }
+                                      return
+                                    }
+                                    if (gameState.cloudSync.seasonId === season.id) {
+                                      gameDispatch({ type: 'SET_TEAM_STATS_CONFIG', config: null })
+                                    }
+                                    setTeamStatsSeasonId(null)
+                                    setTeamStatsDraft(null)
+                                    void loadSeasons()
+                                  }}
+                                >
+                                  Clear saved rules
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
