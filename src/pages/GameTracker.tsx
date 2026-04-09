@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
+import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
 import type { BasketballTeamStatsConfig, Player, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
@@ -102,19 +103,10 @@ export default function GameTracker() {
     }
   }, [currentPeriod, periodButtonCount])
 
-  const periodSegmentLabels = useMemo(() => {
-    const labels = teamRules?.periodLabels ?? []
-    const ot = teamRules?.overtimeLabel ?? 'OT'
-    const out: string[] = []
-    for (let i = 0; i < periodButtonCount; i++) {
-      if (i < labels.length) {
-        out.push(labels[i]!)
-      } else {
-        out.push(ot)
-      }
-    }
-    return out
-  }, [periodButtonCount, teamRules])
+  const periodSegmentLabels = useMemo(
+    () => (teamRules ? buildPeriodSegmentLabels(teamRules, periodButtonCount) : []),
+    [periodButtonCount, teamRules]
+  )
 
   const addOvertimeLabel = useMemo(() => {
     const ot = teamRules?.overtimeLabel ?? 'OT'
@@ -186,13 +178,14 @@ export default function GameTracker() {
 
   const gridCategories = showTeamStatGrid ? sport.teamCategories! : sport.categories
 
+  const foulBaseForBonus = sport.teamFoulBaseStatId ?? null
   const teamFoulCountThisPeriod =
-    showTeamStatGrid && sport.id === 'basketball' && teamRules
-      ? activePlayer.stats[`team_foul_p${currentPeriod}`] ?? 0
+    showTeamStatGrid && foulBaseForBonus && teamRules
+      ? getBonusFoulCountForPeriod(activePlayer.stats, foulBaseForBonus, currentPeriod, teamRules)
       : 0
 
   const showBonusBanner =
-    showTeamStatGrid && sport.id === 'basketball' && teamRules !== null
+    showTeamStatGrid && Boolean(foulBaseForBonus) && teamRules !== null
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })

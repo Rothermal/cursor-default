@@ -67,6 +67,7 @@ export const sports: SportConfig[] = [
       },
     ],
     teamKeyStatIds: ['team_foul', 'team_to_used', 'team_tech'],
+    teamFoulBaseStatId: 'team_foul',
     teamCategories: [
       {
         id: 'team_fouls',
