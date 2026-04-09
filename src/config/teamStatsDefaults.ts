@@ -21,7 +21,7 @@ export interface BasketballTeamStatsPreset {
 }
 
 /**
- * Named rulesets for season UI (WU-8) and docs. Values are approximate; leagues vary.
+ * Named rulesets for Admin season team-stat rules and docs. Values are approximate; leagues vary.
  * "NFHS" entry matches {@link BASKETBALL_TEAM_STATS_DEFAULTS}.
  */
 export const BASKETBALL_PRESETS: BasketballTeamStatsPreset[] = [
