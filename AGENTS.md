@@ -24,3 +24,4 @@ See `package.json` scripts. Standard commands:
 - The app uses `HashRouter` (`/#/path`), not `BrowserRouter`. URLs in the browser will look like `http://localhost:5173/#/game`.
 - Game state persists in `localStorage` under key `statkeeper_game`. To reset state, either use the "New Game" flow in the UI or clear localStorage.
 - Sport configurations live in `src/config/sports.ts`. Adding a new sport means adding a `SportConfig` entry to the array — the UI auto-discovers it.
+- **Team-level stats (basketball):** Optional `teamCategories` on `SportConfig`; local pseudo-player ids `__team_home__` / `__team_opp__` (`src/lib/teamPlayers.ts`). Season rules: `seasons.team_stats_config`, edited in **Settings → Seasons** (`SeasonTeamStatsEditor`). Cloud: placeholder rows on `players`, `games.home_team_player_id` / `opp_team_player_id`, RPC `get_game_team_stats`. Game Summary tab **Team stats** when any team stat exists. Design: `docs/DESIGN_TEAM_STATS_*.md`.

@@ -4,7 +4,7 @@ Basketball-specific team stat categories, foul/bonus rules, half tracking, and U
 
 **Parent doc:** [DESIGN_TEAM_STATS_TRACKING.md](DESIGN_TEAM_STATS_TRACKING.md)
 
-**Status:** Design phase.
+**Status:** **Implemented** (matches current app behavior; minor UX differences possible).
 
 ---
 

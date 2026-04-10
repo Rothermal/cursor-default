@@ -16,7 +16,8 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category; missed-shot tracking with made/attempted display
 - **Minutes Played** — per-player minute counter for sports that track playing time (basketball, hockey, soccer, football)
 - **Game Notes** — free-text notes field in Game Tracker and Game Summary; synced to cloud
-- **Live Scoreboard** — auto-computed team score from player stats + editable home score adjustment; manual opponent score
+- **Live Scoreboard** — home total can be a standalone scoreboard value or computed from player scoring stats + optional adjustment; manual opponent score
+- **Basketball team stats** — home/opponent “team” rows in Game Tracker for fouls (per period), timeouts, techs, turnovers; period toggle, bonus indicators, and season rules from `seasons.team_stats_config` (edit under **Settings → Seasons**). Cloud games sync placeholder `players` + `game_stats`; **Game Summary** includes a **Team stats** tab (fouls by period, bonus events, other team stats). See [docs/DESIGN_TEAM_STATS_TRACKING.md](docs/DESIGN_TEAM_STATS_TRACKING.md)
 - **Undo Support** — undo any stat action instantly
 - **Game Summary** — per-player and team totals in organized tables; M/A (%) columns for shooting stats
 - **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; centralized Data Management in Settings
@@ -99,6 +100,11 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/024_player_merge_rpcs.sql` — `merge_players_preview` / `merge_players_execute` + `player_merge_audit` ([DESIGN_PLAYER_MERGE.md](docs/DESIGN_PLAYER_MERGE.md))
    - `supabase/migrations/025_player_merge_audit_select_policy.sql` — users can `SELECT` their own `player_merge_audit` rows (Admin merge history)
    - `supabase/migrations/026_player_stat_high_games.sql` — `get_player_stat_high_games` / `get_player_stat_high_games_for_team` for career & season “Best game” links to game summary
+   - `supabase/migrations/027_home_team_score.sql` — optional `games.home_team_score` + `get_team_game_log` column
+   - `supabase/migrations/028_team_placeholder_players.sql` — `players.is_team_placeholder`; aggregate RPCs exclude placeholders
+   - `supabase/migrations/029_merge_block_team_placeholders.sql` — merge RPCs reject placeholder players
+   - `supabase/migrations/030_team_stats_schema.sql` — `games.home_team_player_id`, `opp_team_player_id`, `seasons.team_stats_config`, display views, `get_game_team_stats` (see file for notes on `get_game_stats_resolved`)
+   - `supabase/migrations/031_get_game_team_stats.sql` — repair: `get_game_team_stats` only if needed
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -146,11 +152,16 @@ pnpm remove sharp
 src/
 ├── lib/
 │   ├── supabase.ts        # Supabase client init (graceful fallback if not configured)
-│   ├── cloudSync.ts       # Cloud game snapshot sync, hydration, and resume logic
+│   ├── cloudSync.ts       # Cloud game snapshot sync, hydration, resume, team placeholders
 │   ├── display.ts         # Shared display name helpers (teams, players)
-│   └── statDisplay.ts     # Compact stat lines for game logs (sport-aware)
+│   ├── statDisplay.ts     # Compact stat lines for game logs (sport-aware)
+│   ├── gameScore.ts       # Display/final home score (standalone vs computed from player stats)
+│   ├── teamPlayers.ts     # Team pseudo-player ids and isTeamPseudoPlayer helper
+│   ├── teamStatsPeriods.ts   # Period labels, bonus foul counts vs season rules
+│   └── teamStatsSummary.ts   # Game Summary team tab: fouls, bonus events, aggregates
 ├── config/
-│   └── sports.ts          # Sport definitions (stats, categories, scoring rules)
+│   ├── sports.ts          # Sport definitions (stats, categories, scoring rules)
+│   └── teamStatsDefaults.ts  # Basketball team-stat defaults, presets, resolveTeamStatsConfig
 ├── context/
 │   ├── AuthContext.tsx     # Auth state (sign up, sign in, sign out, session)
 │   ├── GameContext.tsx     # Game state management (reducer + localStorage)
@@ -174,7 +185,9 @@ src/
 ├── components/
 │   ├── ConfirmDialog.tsx  # Reusable confirmation modal (delete prompts)
 │   ├── Scoreboard.tsx     # Live score display
-│   └── StatButton.tsx     # Reusable stat increment/decrement button
+│   ├── StatButton.tsx     # Reusable stat increment/decrement button
+│   ├── SeasonTeamStatsEditor.tsx  # Admin: season team-stat rules (basketball)
+│   └── team-stats/        # PeriodToggle, BasketballBonusIndicator, TeamStatSummary
 ├── types.ts               # TypeScript interfaces
 ├── App.tsx                # Router + providers + auth gate
 ├── main.tsx               # Entry point
@@ -207,7 +220,12 @@ supabase/
     ├── 023_tournaments_url.sql
     ├── 024_player_merge_rpcs.sql
     ├── 025_player_merge_audit_select_policy.sql
-    └── 026_player_stat_high_games.sql
+    ├── 026_player_stat_high_games.sql
+    ├── 027_home_team_score.sql
+    ├── 028_team_placeholder_players.sql
+    ├── 029_merge_block_team_placeholders.sql
+    ├── 030_team_stats_schema.sql
+    └── 031_get_game_team_stats.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -225,6 +243,11 @@ docs/
 ├── DESIGN_USER_PERMISSIONS_AND_ROLES.md  # Placeholder: granular permissions (R → CRUD), personas TBD
 ├── DATA_INTEGRITY_AND_CREATION_PLAN.md  # Plan: DB/app enforcement, season/team creation alignment
 ├── DESIGN_PLAYER_MERGE.md  # Plan: merge duplicate players (RPC, conflicts, UI)
+├── DESIGN_TEAM_STATS_TRACKING.md      # Team-level stats (pseudo-players, UI) — **shipped**
+├── DESIGN_TEAM_STATS_BASKETBALL.md    # Basketball fouls, bonus, periods — **shipped**
+├── DESIGN_TEAM_STATS_SEASON_CONFIG.md # Season JSON rules — **shipped**
+├── DESIGN_TEAM_STATS_DATA_MODEL.md    # DB placeholders, RPCs, sync — **shipped**
+├── DESIGN_TEAM_STATS_IMPLEMENTATION.md # Work-unit plan (historical); feature complete
 └── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
 
@@ -284,11 +307,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Player pool — "Add Existing" mode on roster: pick from players you created or are guardian of; no duplicate player records when moving between teams/seasons
 - [x] Supabase admin display views — 9 human-readable SQL views (`_display` suffix) with `security_invoker = true` for safe FK browsing in Supabase table browser
 - [x] Tournament placement — `tournaments.placement` column for finish position (1st, 2nd, 3rd, etc.)
+- [x] **Team-level stat tracking (basketball)** — pseudo-players `__team_home__` / `__team_opp__`, `teamCategories` in `sports.ts`, period-scoped stat ids (`team_foul_p1`, …), bonus UI, season rules in `seasons.team_stats_config` (Admin → Seasons), cloud placeholder players + `get_game_team_stats`, checkout + Game Summary **Team stats** tab (design: [DESIGN_TEAM_STATS_TRACKING.md](docs/DESIGN_TEAM_STATS_TRACKING.md))
 
 ### What's Next
 
 - [ ] Stat view redesign: career stats page, tournament stats page, team season summary, inline game stat lines on player profile (design: [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md))
-- [ ] Game Summary Players/Team tab toggle
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams

@@ -6,7 +6,7 @@ Database schema changes, cloud sync strategy, and migration plan for team-level 
 
 **Related:** [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md), [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md)
 
-**Status:** Design phase.
+**Status:** **Implemented** — migrations `027`–`031` (see repo `supabase/migrations/`). `get_game_stats_resolved` return type was not extended for `is_team_placeholder`; filtering uses `players.is_team_placeholder` in RPCs and `get_game_team_stats` for game-level team rows.
 
 ---
 

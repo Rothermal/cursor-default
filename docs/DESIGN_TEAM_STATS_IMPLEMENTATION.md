@@ -2,6 +2,21 @@
 
 Step-by-step implementation plan for the team stats feature, broken into small work units with clear test breakpoints, dependency ordering, and guidance on which units can be assigned to parallel agents.
 
+**Status (2026):** Work units **WU-1 through WU-12** are **done** on the `stattracker` branch. Treat the sections below as a **historical checklist** and architecture reference, not pending tasks.
+
+**Shipped surface (quick ref):**
+
+| Area | Location / notes |
+|------|------------------|
+| Types & reducer | `src/types.ts`, `src/context/GameContext.tsx` (`currentPeriod`, `teamStatsConfig`, `SET_PERIOD`, `SET_TEAM_STATS_CONFIG`) |
+| Basketball config | `src/config/sports.ts` (`teamCategories`, `teamFoulBaseStatId`), `src/config/teamStatsDefaults.ts` |
+| Tracker UI | `src/pages/GameTracker.tsx`, `src/components/team-stats/*` |
+| Season rules UI | `src/components/SeasonTeamStatsEditor.tsx`, `src/pages/Admin.tsx` (Seasons) — not a standalone `SeasonSettings` route |
+| Cloud | `src/lib/cloudSync.ts` — placeholder `players`, `games.home_team_player_id` / `opp_team_player_id`, `game_stats` |
+| Checkout | `src/pages/GameCheckout.tsx`, `src/pages/PlayerSetup.tsx` (inject placeholders) |
+| Summary | `src/pages/GameSummary.tsx` — tabs **Players** / **Scores** / **Team stats**; `TeamStatSummary.tsx`, `get_game_team_stats` RPC |
+| DB | `supabase/migrations/027_*.sql` … `031_*.sql` |
+
 **Design docs implemented by this plan:**
 - [DESIGN_TEAM_STATS_TRACKING.md](DESIGN_TEAM_STATS_TRACKING.md) — core architecture (pseudo-players, injection, category switching)
 - [DESIGN_TEAM_STATS_BASKETBALL.md](DESIGN_TEAM_STATS_BASKETBALL.md) — basketball-specific stats, bonus indicators, period toggle
@@ -196,7 +211,7 @@ Add `isTeamPlayer` filters to prevent team pseudo-players from corrupting indivi
    - Renders a segmented control: `[1st Half] [2nd Half] [+ OT]`
    - Active period highlighted with sport theme color
    - `+ OT` adds a new period (increments period count in local component state; dispatches `SET_PERIOD` with new number)
-   - Use default labels from `BASKETBALL_TEAM_STATS_DEFAULTS` for now (config-driven labels come in WU-9)
+   - Period labels are config-driven via `resolveTeamStatsConfig` (season JSON + defaults)
 
 3. **`src/pages/GameTracker.tsx`** — Show `PeriodToggle` between player selector and stat grid, but only when `activePlayer.isTeamPlayer === true`.
 
@@ -240,7 +255,7 @@ Add `isTeamPlayer` filters to prevent team pseudo-players from corrupting indivi
 2. **`src/pages/GameTracker.tsx`** — When team player is active and sport is `basketball`:
    - Read current period's foul count from `activePlayer.stats[team_foul_p${currentPeriod}]`
    - Render `BasketballBonusIndicator` between the period toggle and the stat grid
-   - Pass default thresholds for now (7, 10, true) — config-driven values come in WU-9
+   - Pass thresholds from `resolveTeamStatsConfig(sport, state.teamStatsConfig)`
 
 **Files touched:** new `src/components/team-stats/BasketballBonusIndicator.tsx`, `src/pages/GameTracker.tsx`
 
@@ -265,25 +280,18 @@ Add `isTeamPlayer` filters to prevent team pseudo-players from corrupting indivi
 
 **Blocks:** WU-8, WU-10
 
-**What to do:**
+**What to do (shipped across 027–031):**
 
-1. **New: `supabase/migrations/027_team_stats_schema.sql`** — Full migration as specified in [DATA_MODEL §6.1](DESIGN_TEAM_STATS_DATA_MODEL.md):
-   - `ALTER TABLE players ADD COLUMN is_team_placeholder boolean NOT NULL DEFAULT false`
-   - `ALTER TABLE games ADD COLUMN home_team_player_id uuid REFERENCES players(id) ON DELETE SET NULL`
-   - `ALTER TABLE games ADD COLUMN opp_team_player_id uuid REFERENCES players(id) ON DELETE SET NULL`
-   - `ALTER TABLE seasons ADD COLUMN team_stats_config jsonb DEFAULT '{}'::jsonb`
-   - Partial index on `players.is_team_placeholder`
-   - Update `players_display` view to include `is_team_placeholder`
-   - Create `get_game_team_stats` RPC
-   - Update `get_season_stats_resolved` to exclude team placeholders (read current RPC definition first and modify carefully)
-   - Update `get_team_game_log` to exclude team placeholders
+1. **Migrations in repo** — `027_home_team_score.sql`, `028_team_placeholder_players.sql`, `029_merge_block_team_placeholders.sql`, `030_team_stats_schema.sql`, `031_get_game_team_stats.sql`. Together they cover placeholders, `games` FKs, `seasons.team_stats_config`, display views, `get_game_team_stats`, and aggregate RPC filters. **`get_game_stats_resolved`** was not given a new return shape (Postgres limitation); clients join `players` or use `get_game_team_stats` for placeholder-only stats.
 
-2. **Validate against existing RPCs** — Before modifying `get_season_stats_resolved`, read the current definition in `supabase/migrations/010_resolved_stats_rpcs.sql` (and any later overrides in `020_stat_tracking_ui_rpcs.sql`) to understand how to add the filter without breaking the function signature.
+2. **Original single-file sketch** — [DATA_MODEL §6.1](DESIGN_TEAM_STATS_DATA_MODEL.md) listed one migration; the repo split this for safer rollout.
 
-**Files touched:** new `supabase/migrations/027_team_stats_schema.sql`
+3. **Validate against existing RPCs** — When adding filters, read current definitions in `010`, `020`, `028`, etc.
+
+**Files touched:** `supabase/migrations/027_*.sql` through `031_*.sql` (as in repo).
 
 **Test breakpoint:**
-- Migration applies cleanly to Supabase (or local Supabase instance)
+- Migrations apply cleanly to Supabase (or local Supabase instance)
 - Existing RPCs still return correct results for games with no team stats
 - `get_game_team_stats` returns empty for existing games (no team placeholders yet)
 - `players_display` view includes `is_team_placeholder` column
@@ -334,7 +342,9 @@ Add `isTeamPlayer` filters to prevent team pseudo-players from corrupting indivi
 
 **What to do:**
 
-1. **New: `src/pages/SeasonSettings.tsx`** — Season configuration screen:
+1. **Shipped as Admin Seasons panel** — Use `SeasonTeamStatsEditor` from **`src/pages/Admin.tsx`** (expand Seasons → basketball season → team stat rules). The standalone **`src/pages/SeasonSettings.tsx`** route described here was **not** added.
+
+2. **Original sketch (historical):** `SeasonSettings.tsx` season configuration screen:
    - Load the season's current `team_stats_config` from Supabase
    - Preset dropdown (NFHS, NCAA, NBA, FIBA, Youth Rec, Custom)
    - Selecting a preset fills form fields; editing any field switches to "Custom"
@@ -349,20 +359,17 @@ Add `isTeamPlayer` filters to prevent team pseudo-players from corrupting indivi
    - Save button → upsert `seasons.team_stats_config`
    - Toast or inline confirmation on save
 
-2. **`src/App.tsx`** — Add route `/season-settings` → `SeasonSettings`
+3. **`src/App.tsx`** — Route `/season-settings` was **not** added (use Admin instead).
 
-3. **Navigation entry point** — Add a "Season Settings" or gear icon link from:
-   - `src/pages/Teams.tsx` — next to the season name/header
-   - Optionally: `src/pages/GameSetup.tsx` — small "League Rules" link
+4. **Navigation** — Team stat rules are reached from **Settings → Seasons**, not from Teams/Game Setup as originally sketched.
 
-**Files touched:** new `src/pages/SeasonSettings.tsx`, `src/App.tsx`, `src/pages/Teams.tsx`
+**Files touched (actual):** `src/components/SeasonTeamStatsEditor.tsx`, `src/pages/Admin.tsx`
 
 **Test breakpoint:**
-- Navigate to Teams → tap gear icon next to a season → Season Settings page loads
+- **Settings (Admin) → Seasons** → expand basketball season → open team stat rules
 - Select "NBA" preset → fields show: 4 quarters, no 1-and-1, bonus at 5
-- Edit bonus threshold manually → preset switches to "Custom"
-- Save → reload page → saved config persists
-- Validation: set double bonus < bonus → error message shown, save blocked
+- Save → reload → config persists on the season row
+- *(Optional / future: strict validation double bonus < bonus is not necessarily enforced in UI.)*
 
 **Commit message:** `feat: add Season Settings UI for team stat rules (presets, bonus config)`
 
@@ -670,14 +677,14 @@ After each phase merge, verify these invariants:
 
 4. **Don't break the existing flow.** The most important invariant is that existing player-level stat tracking works identically. Every WU's test checklist starts with "existing flow still works."
 
-5. **New files go in `src/components/team-stats/`.** This directory doesn't exist yet — create it in WU-4 or WU-5 (whichever lands first).
+5. **`src/components/team-stats/`** — Present in repo (`PeriodToggle`, `BasketballBonusIndicator`, `TeamStatSummary`, …).
 
-6. **Migration numbering.** As of this writing, the latest migration is `026_player_stat_high_games.sql`. The team stats migration should be `027`. If another migration lands first, renumber accordingly.
+6. **Migration numbering** — Team stats land in **`027`–`031`** alongside `027_home_team_score.sql` (standalone home score). Apply all listed files in order.
 
-7. **Cloud sync is the trickiest part.** WU-10 modifies `cloudSync.ts`, which is the most complex file in the app. Read the entire file before starting. The team pseudo-player handling should be a clear, isolated code path — not interleaved with the existing player sync logic.
+7. **Cloud sync** — Team placeholders are handled in **`cloudSync.ts`** (`ensureTeamPlaceholderPlayer`, `linkGameTeamPlaceholderIds`, hydrate merge).
 
 8. **Tailwind classes.** The app uses Tailwind 3 with a mobile-first approach. New components should match the existing design language: `rounded-xl`, `shadow-md`, `card` utility class, sport theme colors via `sport.theme.*`.
 
 ---
 
-*Document version: 0.1*
+*Document version: 0.2 — marked shipped; Admin vs SeasonSettings; migration file names aligned to repo.*
