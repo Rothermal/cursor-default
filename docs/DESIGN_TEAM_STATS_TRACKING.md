@@ -2,7 +2,7 @@
 
 Track stats at the **team** level (fouls, timeouts, turnovers, etc.) alongside existing per-player tracking. A coach or assistant can select a "team player" in the same Game Tracker UI and record stats that make sense as aggregate team events — not attributable to any individual.
 
-**Status:** Design phase. Not yet implemented.
+**Status:** **Implemented** (basketball on `stattracker`). Opponent column is optional; other sports can add `teamCategories` later.
 
 **Related docs:**
 - [DESIGN_TEAM_STATS_BASKETBALL.md](DESIGN_TEAM_STATS_BASKETBALL.md) — basketball-specific team stat categories, foul/bonus rules, half tracking

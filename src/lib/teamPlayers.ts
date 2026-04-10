@@ -1,6 +1,6 @@
 import type { Player } from '../types'
 
-/** Local deterministic ids for team pseudo-players (cloud maps these in WU-10). */
+/** Local deterministic ids for team pseudo-players (mapped to cloud `players` rows in sync). */
 export const TEAM_PLAYER_HOME_ID = '__team_home__' as const
 export const TEAM_PLAYER_OPP_ID = '__team_opp__' as const
 

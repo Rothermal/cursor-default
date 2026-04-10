@@ -4,7 +4,7 @@ Season-level configuration for team stat rules: timeout limits, bonus thresholds
 
 **Parent doc:** [DESIGN_TEAM_STATS_TRACKING.md](DESIGN_TEAM_STATS_TRACKING.md)
 
-**Status:** Design phase.
+**Status:** **Implemented** — rules are edited under **Settings (Admin) → Seasons** for basketball seasons (`team_stats_config` JSON). There is no separate `/season-settings` route.
 
 ---
 
