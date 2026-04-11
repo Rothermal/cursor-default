@@ -1,4 +1,3 @@
-import { useId } from 'react'
 import type { ShotRecord } from '../../types'
 import {
   COURT_WIDTH,
@@ -52,15 +51,11 @@ function restrictedAreaPath(): string {
   return `M ${-r} 0 A ${r} ${r} 0 0 1 ${r} 0`
 }
 
-/** FT circle: semicircle on the half-court side of the line (y ≥ FT_LINE_Y). */
-function ftCircleHalfCourtPath(): string {
-  const r = FT_CIRCLE_RADIUS
-  const cy = FT_LINE_Y
-  return `M ${-r} ${cy} A ${r} ${r} 0 0 1 ${r} ${cy}`
-}
-
-/** FT circle: semicircle on the basket / key side (y ≤ FT_LINE_Y). */
-function ftCircleBasketPath(): string {
+/**
+ * Free-throw circle: dashed semicircle lying on the FT line (endpoints on the line),
+ * opening toward the basket (center of full circle is on the half-court side of the line).
+ */
+function freeThrowKeySemicirclePath(): string {
   const r = FT_CIRCLE_RADIUS
   const cy = FT_LINE_Y
   return `M ${-r} ${cy} A ${r} ${r} 0 0 0 ${r} ${cy}`
@@ -86,9 +81,6 @@ function handlePointerDown(
 
 export default function BasketballCourt({ shots, onCourtTap, className }: BasketballCourtProps) {
   const interactive = Boolean(onCourtTap)
-  const clipId = useId().replace(/:/g, '')
-  const clipBasketId = `${clipId}-ft-basket`
-  const clipHalfId = `${clipId}-ft-half`
   const halfW = COURT_WIDTH / 2
   const padding = 2
   const halfPaintW = PAINT_WIDTH / 2
@@ -99,8 +91,6 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
   const viewW = COURT_WIDTH + padding * 2
   const viewH = courtH + padding * 2
 
-  const clipPad = 60
-
   return (
     <svg
       viewBox={`${-halfW - padding} ${svgCourtTop - padding} ${viewW} ${viewH}`}
@@ -108,25 +98,6 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
       className={className}
       style={{ width: '100%', height: 'auto', display: 'block' }}
     >
-      <defs>
-        <clipPath id={clipBasketId}>
-          <rect
-            x={-halfW - clipPad}
-            y={svgCourtTop - clipPad}
-            width={COURT_WIDTH + clipPad * 2}
-            height={FT_LINE_Y - svgCourtTop + clipPad}
-          />
-        </clipPath>
-        <clipPath id={clipHalfId}>
-          <rect
-            x={-halfW - clipPad}
-            y={FT_LINE_Y}
-            width={COURT_WIDTH + clipPad * 2}
-            height={svgCourtBottom - FT_LINE_Y + clipPad}
-          />
-        </clipPath>
-      </defs>
-
       <rect
         x={-halfW}
         y={svgCourtTop}
@@ -167,12 +138,10 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
           )
         })}
 
-        <path clipPath={`url(#${clipHalfId})`} d={ftCircleHalfCourtPath()} />
-
         <path
-          clipPath={`url(#${clipBasketId})`}
-          d={ftCircleBasketPath()}
+          d={freeThrowKeySemicirclePath()}
           strokeDasharray="1.0 0.8"
+          strokeLinecap="round"
         />
 
         <path d={restrictedAreaPath()} />
