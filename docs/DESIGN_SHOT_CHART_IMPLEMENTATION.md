@@ -112,12 +112,20 @@ SC-5  Game Summary      │
 
 **Blocks:** SC-4, SC-5
 
+**Already done (SC-2 prep, before interaction work):**
+
+- **`src/App.tsx`:** `<Route path="/shot-chart" element={<ShotChart />} />` — in production this is **`#/shot-chart`** (HashRouter).
+- **`src/pages/ShotChart.tsx`:** Shell page: guard (basketball + `gameInfo`), "← Back to Stats" → `/game`, empty court placeholder. SC-2 fills in recording UI.
+- **`src/pages/GameTracker.tsx`:** Full-width **Shot chart** button when `sport.id === 'basketball'`, below scoreboard, `navigate('/shot-chart')`.
+- **Coordinate contract:** `src/lib/shotChartCoordinates.ts` documents feet-from-rim space; `ShotRecord` in `types.ts` references it; `BasketballCourt.tsx` header points to the same. Taps must feed `isThreePointer` / `classifyShotZone` without transforming `x`/`y`.
+- **QA:** `/#/dev/shot-chart` preview and dev auth bypass unchanged; remove in a later cleanup SC.
+
 **What to do:**
 
-1. **New: `src/pages/ShotChart.tsx`** — Full-screen shot chart page:
+1. **`src/pages/ShotChart.tsx`** — Full-screen shot chart page (extend the shell):
    - Reads `sport`, `players`, `activePlayerId` from `GameContext`
-   - Guard: redirect to `/` if not basketball or no game in progress
-   - **Header**: "← Back to Stats" button (navigates to `/game`), optional "Clear All" button
+   - Guard: already redirects to `/` if not basketball or no game in progress
+   - **Header**: optional "Clear All" button (in addition to existing "← Back to Stats")
    - **Mode toggle**: "Made" / "Missed" segmented control (local state: `mode: 'made' | 'missed'`)
      - Made: green background when active
      - Missed: red background when active
@@ -136,24 +144,17 @@ SC-5  Game Summary      │
      - Paint: M/A (pct%) | Mid: M/A (pct%) | 3PT: M/A (pct%) | Total: M/A (pct%)
    - **Undo**: "↩ Undo Last Shot" button removes the last shot from local state
 
-2. **`src/App.tsx`** — Add route:
-   ```tsx
-   <Route path="/shot-chart" element={<ShotChart />} />
-   ```
+2. **`src/App.tsx`** — Route already added (`/shot-chart`).
 
-3. **`src/pages/GameTracker.tsx`** — Add "Shot Chart" button:
-   - Only visible when `sport.id === 'basketball'` (or use `sport.hasShotChart` flag once added)
-   - Placed below the scoreboard, above the stat grid
-   - Navigates to `/shot-chart`
-   - Styled prominently: full-width button with basketball icon
+3. **`src/pages/GameTracker.tsx`** — Entry button already added (basketball only).
 
-4. **`src/config/sports.ts`** — Add `hasShotChart?: boolean` to the basketball sport config (set to `true`). Add the field to `SportConfig` interface in `types.ts`.
+4. **`src/config/sports.ts`** — Optional: `hasShotChart` on `SportConfig` — **skipped for MVP**; basketball-only via `sport.id === 'basketball'`.
 
-**Files touched:** new `src/pages/ShotChart.tsx`, `src/App.tsx`, `src/pages/GameTracker.tsx`, `src/config/sports.ts`, `src/types.ts`
+**Files touched (remaining SC-2 work):** primarily `src/pages/ShotChart.tsx`; optionally `src/config/sports.ts` / `types.ts` if adding `hasShotChart` later.
 
 **Test breakpoint:**
-- Start a basketball game → see "🏀 Shot Chart" button on Game Tracker
-- Tap button → full-screen court loads with mode toggle and player selector
+- Start a basketball game → see **Shot chart** button on Game Tracker
+- Tap button → full-screen court loads; then add mode toggle and player selector
 - Toggle to "Made" → tap court → green circle appears at tapped location
 - Toggle to "Missed" → tap court → red X appears
 - Shooting summary shows correct counts and percentages
