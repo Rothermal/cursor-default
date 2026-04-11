@@ -61,13 +61,16 @@ This design covers **v1 + the v2 data model** (store player ID from the start ev
 
 ### 3.1 Coordinate System
 
-The SVG half court uses a coordinate system based on **feet**, matching real court dimensions. The basket (center of the hoop) is the origin.
+The SVG half court uses a coordinate system based on **feet**, matching real NBA court dimensions. The basket (center of the hoop) is the origin `(0, 0)`.
+
+The basket is **5.25 ft** from the baseline (4 ft to the face of the backboard + 1.25 ft to the center of the rim). This offset means the baseline sits at `y = -5.25` and the half-court line at `y = 41.75`.
 
 | Dimension | Value | Notes |
 |-----------|-------|-------|
 | Court width | 50 ft | Full width, symmetric left/right |
 | Half court depth | 47 ft | From baseline to half-court line |
-| SVG viewBox | `"-25 0 50 47"` | Origin at basket center (0,0 = basket); x: -25 to +25; y: 0 to 47 |
+| Basket offset | 5.25 ft | From baseline to basket center (4 ft backboard + 1.25 ft rim) |
+| SVG viewBox | `"-27 -7.25 54 51"` | Basket-centered origin with padding; x: -27 to +27; y: -7.25 to 43.75 |
 
 Using real-foot coordinates means shot locations are meaningful and portable — they could be compared across games, exported, or analyzed with standard basketball analytics tools.
 
@@ -78,17 +81,18 @@ All measurements in feet from the basket center:
 | Feature | Geometry | SVG Element |
 |---------|----------|-------------|
 | **Basket** | Circle, center (0, 0), radius 0.75 ft | `<circle>` |
-| **Backboard** | Line, y = -0.5, x: -3 to +3 | `<line>` |
-| **Paint / Lane** | Rectangle, 12 ft wide × 19 ft deep, centered | `<rect>` x=-6, y=0, w=12, h=19 |
-| **Free throw line** | Line at y = 19, x: -6 to +6 | `<line>` |
-| **Free throw circle** | Circle, center (0, 19), radius 6 ft | `<circle>` (top half solid, bottom half dashed) |
+| **Backboard** | Line, y = -1.25, x: -3 to +3 (4 ft from baseline) | `<line>` |
+| **Paint / Lane** | Rectangle, 16 ft wide × 19 ft deep from baseline, centered | `<rect>` x=-8, y=-5.25, w=16, h=19 |
+| **Free throw line** | Line at y = 13.75 (19 ft from baseline - 5.25 ft offset), x: -8 to +8 | `<line>` |
+| **Free throw circle** | Circle, center (0, 13.75), radius 6 ft | `<circle>` (top half solid, bottom half dashed) |
 | **Restricted area** | Arc, center (0, 0), radius 4 ft, 0° to 180° | `<path>` semicircle |
 | **Three-point arc** | Arc, center (0, 0), radius 23.75 ft | `<path>` from corner to corner |
-| **Three-point corners** | Vertical lines, x = ±22, y = 0 to ~14 ft | `<line>` (corners are 22 ft from center, not following the arc) |
-| **Half-court line** | Line at y = 47, x: -25 to +25 | `<line>` |
-| **Half-court circle** | Circle at (0, 47), radius 6 ft, bottom half only | `<path>` |
-| **Baseline** | Line at y = 0, x: -25 to +25 | `<line>` |
-| **Sidelines** | Lines at x = -25 and x = +25, y: 0 to 47 | `<line>` |
+| **Three-point corners** | Vertical lines, x = ±22, y = -5.25 to where arc begins | `<line>` (3 ft from each sideline) |
+| **Lane hash marks** | Marks on outer edges of lane at 7, 8, 11, 14 ft from baseline | `<line>` (rebounding position marks) |
+| **Half-court line** | Line at y = 41.75, x: -25 to +25 | `<line>` |
+| **Half-court circle** | Circle at (0, 41.75), radius 6 ft, bottom half only | `<path>` |
+| **Baseline** | Line at y = -5.25, x: -25 to +25 | `<line>` |
+| **Sidelines** | Lines at x = -25 and x = +25, y: -5.25 to 41.75 | `<line>` |
 
 ### 3.3 Three-Point Line Classification
 
@@ -371,18 +375,19 @@ The court component is **reusable** — it renders both in the interactive shot 
 ### 6.2 SVG Structure
 
 ```tsx
-<svg viewBox="-25 -2 50 51" preserveAspectRatio="xMidYMid meet">
+<svg viewBox="-27 -7.25 54 51" preserveAspectRatio="xMidYMid meet">
   {/* Court background */}
-  <rect x="-25" y="-2" width="50" height="51" fill="#f5e6c8" />
+  <rect x="-25" y="-5.25" width="50" height="47" fill="#e8d5b7" />
 
-  {/* Court lines (all in white or dark lines on hardwood) */}
-  <g stroke="#c0956e" strokeWidth="0.15" fill="none">
+  {/* Court lines */}
+  <g stroke="#8B6914" strokeWidth="0.3" fill="none">
     {/* Baseline, sidelines, half-court */}
-    {/* Paint rectangle */}
+    {/* Paint rectangle (16' wide) */}
     {/* Free throw line + circle */}
+    {/* Lane hash marks (rebounding positions) */}
     {/* Three-point arc + corners */}
     {/* Restricted area arc */}
-    {/* Basket + backboard */}
+    {/* Basket + backboard (backboard 4' from baseline) */}
     {/* Half-court line + circle */}
   </g>
 

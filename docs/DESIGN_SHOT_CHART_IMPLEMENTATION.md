@@ -57,22 +57,23 @@ SC-5  Game Summary      │
 **What to do:**
 
 1. **New: `src/components/shot-chart/courtGeometry.ts`**:
-   - Define constants: `COURT_WIDTH = 50`, `HALF_COURT_DEPTH = 47`, `THREE_POINT_RADIUS = 23.75`, `CORNER_THREE_X = 22`, `CORNER_THREE_Y = 14`, `RESTRICTED_RADIUS = 4`, `PAINT_WIDTH = 12`, `PAINT_DEPTH = 19`, `FT_LINE_Y = 19`, `FT_CIRCLE_RADIUS = 6`
+   - Define constants: `COURT_WIDTH = 50`, `HALF_COURT_DEPTH = 47`, `BASKET_CENTER_Y = 5.25` (4 ft backboard + 1.25 ft rim), `BASELINE_Y = -5.25`, `HALFCOURT_Y = 41.75`, `BACKBOARD_Y = -1.25`, `THREE_POINT_RADIUS = 23.75`, `CORNER_THREE_X = 22`, `RESTRICTED_RADIUS = 4`, `PAINT_WIDTH = 16` (NBA lane width), `FT_LINE_Y = 13.75` (19 ft from baseline, offset by basket), `FT_CIRCLE_RADIUS = 6`, `LANE_MARKS_FROM_BASELINE = [7, 8, 11, 14]`
    - Export `isThreePointer(x: number, y: number): boolean`
    - Export `classifyShotZone(x: number, y: number): ShotZone`
    - Export `ShotZone` type: `'restricted' | 'paint' | 'mid_range' | 'three'`
 
 2. **New: `src/components/shot-chart/BasketballCourt.tsx`**:
    - Props: `shots: ShotRecord[]`, `onCourtTap?: (x: number, y: number) => void`, `className?: string`
-   - Renders SVG with `viewBox="-25 -2 50 51"` and `preserveAspectRatio="xMidYMid meet"`
+   - Renders SVG with basket-centered viewBox and `preserveAspectRatio="xMidYMid meet"`
    - Draw all court features listed in [SHOT_CHART §3.2](DESIGN_SHOT_CHART.md):
-     - Court background (warm hardwood color: `#f5e6c8` or `#e8d5b7`)
-     - Court lines in a darker wood tone or dark brown (`#8B6914` or similar)
-     - Baseline, sidelines, half-court line
-     - Paint rectangle, free throw line, free throw circle (top half solid, bottom half dashed)
-     - Three-point arc + corner lines
+     - Court background (warm hardwood color: `#e8d5b7`)
+     - Court lines in a darker wood tone (`#8B6914`)
+     - Baseline (y=-5.25), sidelines, half-court line (y=41.75)
+     - Paint rectangle (16' wide NBA lane), free throw line, free throw circle (top half solid, bottom half dashed)
+     - Three-point arc + corner lines (corners start at baseline y=-5.25)
      - Restricted area arc
-     - Basket circle + backboard line
+     - Basket circle + backboard line (backboard at y=-1.25, 4' from baseline)
+     - Lane hash marks (rebounding positions)
      - Half-court circle (bottom half)
    - Render shot markers from `shots` array:
      - Made: green filled circle, radius 0.8, 80% opacity
