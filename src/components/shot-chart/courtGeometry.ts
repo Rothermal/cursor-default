@@ -4,16 +4,23 @@ import type { ShotZone } from '../../types'
 export const COURT_WIDTH = 50
 export const HALF_COURT_DEPTH = 47
 
-// Basket center is 5.25' from baseline (4' backboard offset + 1.25' to rim center).
+// NBA: rim 5.25' from baseline, backboard face 4' from baseline. For the diagram we use
+// half that rim offset so the basket sits halfway between the old position and the
+// baseline; the backboard interpolates on the same segment so it stays between
+// baseline and rim.
+const NBA_BASELINE_TO_RIM_FT = 5.25
+const NBA_BACKBOARD_FROM_BASELINE_FT = 4
+
 // Court coordinates: origin (0,0) = center of the rim; +y runs toward half-court;
-// baseline is behind the hoop (negative y). SVG uses the same system with +y down,
-// so the hoop is at the top of the diagram and the court opens downward.
-export const BASKET_CENTER_Y = 5.25
+// baseline is behind the hoop (negative y).
+export const BASKET_CENTER_Y = NBA_BASELINE_TO_RIM_FT / 2
 export const BASELINE_Y = -BASKET_CENTER_Y
 export const HALFCOURT_Y = HALF_COURT_DEPTH - BASKET_CENTER_Y
 
-// Backboard: face is 4' from baseline → 1.25' behind basket center
-export const BACKBOARD_Y = -(BASKET_CENTER_Y - 4)
+// Backboard: 4' from baseline in NBA; scale along the shortened baseline→rim segment.
+export const BACKBOARD_Y =
+  -BASKET_CENTER_Y +
+  (NBA_BACKBOARD_FROM_BASELINE_FT / NBA_BASELINE_TO_RIM_FT) * BASKET_CENTER_Y
 export const BACKBOARD_WIDTH = 6
 
 export const BASKET_RADIUS = 0.75
