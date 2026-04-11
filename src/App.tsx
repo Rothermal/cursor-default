@@ -17,9 +17,18 @@ import PlayerProfile from './pages/PlayerProfile'
 import CareerStats from './pages/CareerStats'
 import TeamStats from './pages/TeamStats'
 import TournamentStats from './pages/TournamentStats'
+import ShotChartPreview from './pages/ShotChartPreview'
 
 function AppRoutes() {
   const { user, loading, isConfigured } = useAuth()
+
+  if (
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    window.location.hash.includes('/dev/shot-chart')
+  ) {
+    return <ShotChartPreview />
+  }
 
   if (loading) {
     return (
@@ -54,6 +63,9 @@ function AppRoutes() {
           <Route path="/career" element={<CareerStats />} />
           <Route path="/team-stats" element={<TeamStats />} />
           <Route path="/tournament-stats" element={<TournamentStats />} />
+          {import.meta.env.DEV && (
+            <Route path="/dev/shot-chart" element={<ShotChartPreview />} />
+          )}
         </Routes>
       </GameProvider>
     </SettingsProvider>
