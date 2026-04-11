@@ -65,13 +65,6 @@ function ftCircleNearPath(): string {
   return `M ${-r} ${cy} A ${r} ${r} 0 0 0 ${r} ${cy}`
 }
 
-/** Half-court circle: semicircle that bulges into the playing area (toward the hoop). */
-function halfCourtCirclePath(): string {
-  const r = FT_CIRCLE_RADIUS
-  const cy = HALFCOURT_Y
-  return `M ${-r} ${cy} A ${r} ${r} 0 0 0 ${r} ${cy}`
-}
-
 function handlePointerDown(
   e: React.PointerEvent<SVGRectElement>,
   onCourtTap: (x: number, y: number) => void
@@ -158,8 +151,6 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
         <path d={threePointArcPath()} />
 
         <line x1={-halfW} y1={HALFCOURT_Y} x2={halfW} y2={HALFCOURT_Y} />
-
-        <path d={halfCourtCirclePath()} />
 
         <line
           x1={-BACKBOARD_WIDTH / 2}
