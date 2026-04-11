@@ -247,6 +247,17 @@ export default function GameTracker() {
         </div>
 
         <Scoreboard />
+
+        {sport.id === 'basketball' && (
+          <button
+            type="button"
+            onClick={() => navigate('/shot-chart')}
+            className="mt-3 w-full py-3 rounded-xl font-semibold text-white shadow-md active:scale-[0.99] transition-transform
+                       bg-gradient-to-r from-orange-500 to-amber-600 border border-orange-600/30"
+          >
+            Shot chart
+          </button>
+        )}
       </div>
 
       <div className="px-3 py-2 max-w-lg mx-auto w-full">
