@@ -52,13 +52,20 @@ function restrictedAreaPath(): string {
 }
 
 /**
- * Free-throw circle: dashed semicircle with endpoints on the FT line, bulging into
- * the key toward the basket (smaller y). Sweep `1` selects that half; `0` bulges toward half court.
+ * Free-throw circle — basket side: dashed semicircle on the FT line, bulging toward
+ * the hoop (smaller y). Sweep `1`.
  */
 function freeThrowKeySemicirclePath(): string {
   const r = FT_CIRCLE_RADIUS
   const cy = FT_LINE_Y
   return `M ${-r} ${cy} A ${r} ${r} 0 0 1 ${r} ${cy}`
+}
+
+/** Free-throw circle — half-court side: solid semicircle on the FT line, bulging toward +y. Sweep `0`. */
+function freeThrowHalfCourtSemicirclePath(): string {
+  const r = FT_CIRCLE_RADIUS
+  const cy = FT_LINE_Y
+  return `M ${-r} ${cy} A ${r} ${r} 0 0 0 ${r} ${cy}`
 }
 
 function handlePointerDown(
@@ -137,6 +144,8 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
             </g>
           )
         })}
+
+        <path d={freeThrowHalfCourtSemicirclePath()} />
 
         <path
           d={freeThrowKeySemicirclePath()}
