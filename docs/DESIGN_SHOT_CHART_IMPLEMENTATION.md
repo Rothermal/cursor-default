@@ -48,7 +48,7 @@ SC-5  Game Summary      │
 
 ### SC-1: Court SVG Component + Geometry Utilities
 
-**Design ref:** [SHOT_CHART §3, §6](DESIGN_SHOT_CHART.md)
+**Design ref:** [SHOT_CHART §3, §6](DESIGN_SHOT_CHART.md) — SC-1 implements a **diagram-oriented** half court (hoop at top, +y toward half court). Some markings from §3.2 are omitted or simplified for MVP; see below.
 
 **Depends on:** Nothing — this is the foundation.
 
@@ -57,45 +57,48 @@ SC-5  Game Summary      │
 **What to do:**
 
 1. **New: `src/components/shot-chart/courtGeometry.ts`**:
-   - Define constants: `COURT_WIDTH = 50`, `HALF_COURT_DEPTH = 47`, `THREE_POINT_RADIUS = 23.75`, `CORNER_THREE_X = 22`, `CORNER_THREE_Y = 14`, `RESTRICTED_RADIUS = 4`, `PAINT_WIDTH = 12`, `PAINT_DEPTH = 19`, `FT_LINE_Y = 19`, `FT_CIRCLE_RADIUS = 6`
-   - Export `isThreePointer(x: number, y: number): boolean`
-   - Export `classifyShotZone(x: number, y: number): ShotZone`
-   - Export `ShotZone` type: `'restricted' | 'paint' | 'mid_range' | 'three'`
+   - **Coordinate system:** Origin `(0, 0)` = center of the rim. **+y** runs toward the half-court line (down the screen). The baseline (out of bounds behind the hoop) is at **negative** `y` (`BASELINE_Y = -BASKET_CENTER_Y`).
+   - **Rim vs baseline (diagram):** NBA uses 5.25′ from baseline to rim center; the SVG uses **half** that offset (`BASKET_CENTER_Y = 5.25 / 2`) so the basket sits closer to the top edge. The backboard `y` is interpolated between baseline and rim using the same ratio as regulation (4′ / 5.25′).
+   - **Constants (implemented):** `COURT_WIDTH`, `HALF_COURT_DEPTH`, `BASKET_CENTER_Y`, `BASELINE_Y`, `HALFCOURT_Y`, `BACKBOARD_Y`, `BACKBOARD_WIDTH`, `BASKET_RADIUS`, `PAINT_WIDTH` (16′ NBA lane), `PAINT_DEPTH_FROM_BASELINE`, `FT_LINE_Y`, `FT_CIRCLE_RADIUS`, `RESTRICTED_RADIUS` (used only by `classifyShotZone`, not drawn), `THREE_POINT_RADIUS`, `CORNER_THREE_X`, `CORNER_THREE_ARC_Y` (derived tangent height for corner threes), `LANE_MARKS_FROM_BASELINE`.
+   - Export `isThreePointer(x, y)` and `classifyShotZone(x, y)`.
+   - **`ShotZone`** lives in **`src/types.ts`** (imported here for `classifyShotZone`).
 
 2. **New: `src/components/shot-chart/BasketballCourt.tsx`**:
    - Props: `shots: ShotRecord[]`, `onCourtTap?: (x: number, y: number) => void`, `className?: string`
-   - Renders SVG with `viewBox="-25 -2 50 51"` and `preserveAspectRatio="xMidYMid meet"`
-   - Draw all court features listed in [SHOT_CHART §3.2](DESIGN_SHOT_CHART.md):
-     - Court background (warm hardwood color: `#f5e6c8` or `#e8d5b7`)
-     - Court lines in a darker wood tone or dark brown (`#8B6914` or similar)
-     - Baseline, sidelines, half-court line
-     - Paint rectangle, free throw line, free throw circle (top half solid, bottom half dashed)
-     - Three-point arc + corner lines
-     - Restricted area arc
-     - Basket circle + backboard line
-     - Half-court circle (bottom half)
-   - Render shot markers from `shots` array:
-     - Made: green filled circle, radius 0.8, 80% opacity
-     - Missed: red X, arm span 1.2, 80% opacity
-   - Transparent overlay `<rect>` for tap handling when `onCourtTap` is provided
-   - Tap → SVG coordinate conversion using `SVGElement.getScreenCTM().inverse()` (see [SHOT_CHART §6.3](DESIGN_SHOT_CHART.md))
-   - Set `style={{ touchAction: 'none' }}` on the tap target to prevent scroll/zoom interference on mobile
+   - **`viewBox`** is computed from court bounds + padding (not a fixed literal); `preserveAspectRatio="xMidYMid meet"`.
+   - **Court styling:** Fill `#e8d5b7`, lines `#8B6914`, stroke width tuned for foot-space coordinates.
+   - **Drawn features:**
+     - Court rectangle (fill + stroke = outer boundary including baseline/sidelines for this half).
+     - Paint rectangle to the free-throw line; lane hash marks outside the lane.
+     - **Free-throw circle:** solid semicircle on the **half-court** side of the FT line; **dashed** semicircle on the **basket** side, bulging into the key. The dashed path is **inset** slightly along the arc so the first/last dashes do not merge with the solid half at the lane marks. The two halves share the same 6′ radius centered on the FT line.
+     - **Three-point line:** corner verticals from baseline to arc tangent, then **two** minor circular arcs meeting at `(0, THREE_POINT_RADIUS)` so the outer cup is unambiguous (avoids wrong sweep / “W” shape).
+     - Half-court **line** only (no center-court circle — it clipped past the line in early builds).
+     - Backboard line, rim circle, connector from backboard to rim.
+   - **Not drawn (MVP):** restricted-area arc around the hoop; half-court circle. Zone logic may still return `'restricted'` for analytics.
+   - Render shot markers from `shots`:
+     - Made: green filled circle, `r = 0.8`, ~80% opacity
+     - Missed: red X, total arm span 1.2 (±0.6 from center), ~80% opacity
+   - Transparent overlay `<rect>` for taps when `onCourtTap` is set; `touchAction: 'none'` (and pointer styling as needed).
+   - Tap → court `(x, y)` via `getScreenCTM().inverse()` (same feet space as geometry).
 
-3. **`src/types.ts`** — Add types (but don't add to `GameState` yet — that's SC-3):
+3. **`src/types.ts`** — Add types (do not add to `GameState` until SC-3):
    - `ShotZone` type
    - `ShotRecord` interface
 
-**Files touched:** new `src/components/shot-chart/courtGeometry.ts`, new `src/components/shot-chart/BasketballCourt.tsx`, `src/types.ts`
+4. **Dev-only preview (optional but present in repo):** `src/pages/ShotChartPreview.tsx` and route `/#/dev/shot-chart` (dev build) to render sample shots; when Supabase auth would block the app, dev can short-circuit to this preview for the shot-chart hash only.
+
+**Files touched:** `src/components/shot-chart/courtGeometry.ts`, `src/components/shot-chart/BasketballCourt.tsx`, `src/types.ts`, `src/pages/ShotChartPreview.tsx`, `src/App.tsx` (dev route / preview gate only)
 
 **Test breakpoint:**
 - `pnpm build` passes
-- Create a **throwaway test page** (or Storybook-style) that renders `<BasketballCourt />` with a few hardcoded shots. Verify:
-  - Court lines render correctly (three-point arc, paint, FT line, basket)
-  - Shot markers appear at correct positions
-  - Tapping the court logs coordinates to console
-  - `isThreePointer()` returns correct results: (0, 5) → false, (0, 25) → true, (23, 5) → true (corner three), (20, 5) → false
-  - `classifyShotZone()` classifies correctly: (0, 2) → restricted, (4, 10) → paint, (10, 15) → mid_range, (0, 25) → three
-- Court looks correct on mobile viewport (375px wide)
+- Open **`/#/dev/shot-chart`** in dev (or embed `<BasketballCourt />` with hardcoded shots). Verify:
+  - Three-point line, paint, FT circle halves, half-court line, basket read correctly at ~375px width
+  - Shot markers sit at stored `(x, y)` in feet
+  - With `onCourtTap`, taps report feet coordinates consistent with the diagram
+- **Geometry checks** (feet, origin at rim, +y toward half court) — examples:
+  - `isThreePointer(0, 5)` → `false`; `isThreePointer(0, 25)` → `true`; `isThreePointer(23, 5)` → `true` (corner band); `isThreePointer(20, 5)` → `false`
+  - `classifyShotZone(0, 2)` → `'restricted'`; `(4, 10)` → `'paint'`; `(10, 15)` → `'mid_range'`; `(0, 25)` → `'three'`
+  - (If any example drifts after constant tweaks, align the doc with `courtGeometry.ts` and a quick REPL or unit test.)
 
 **Commit message:** `feat: add basketball court SVG component and shot geometry utilities`
 
