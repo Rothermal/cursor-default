@@ -175,39 +175,19 @@ SC-5  Game Summary      │
 
 **Blocks:** SC-4, SC-6
 
-**What to do:**
+**Implemented:**
 
-1. **`src/types.ts`**:
-   - Add `shotChart: ShotRecord[]` to `GameState`
-   - Add `shotId?: string` to `ActionLogEntry`
-   - Add new action types to `GameAction`:
-     ```typescript
-     | { type: 'ADD_SHOT'; shot: ShotRecord }
-     | { type: 'REMOVE_LAST_SHOT' }
-     ```
+1. **`src/types.ts`** — `GameState.shotChart`, `ActionLogEntry.shotId`, `ADD_SHOT` / `REMOVE_LAST_SHOT` on `GameAction`.
 
-2. **`src/context/GameContext.tsx`**:
-   - Initialize `shotChart: []` in `createInitialState()`
-   - Handle `ADD_SHOT` in reducer:
-     - Append shot to `shotChart`
-     - Also increment the corresponding stat (`2pt`, `2pt_miss`, `3pt`, `3pt_miss`) for `shot.playerId`
-     - Create an `ActionLogEntry` with `shotId: shot.id` for undo linkage
-   - Handle `REMOVE_LAST_SHOT`:
-     - Pop the last shot from `shotChart`
-     - This is a convenience action for the shot chart page (alternative to full UNDO)
-   - Update `UNDO` handler:
-     - When the last action has a `shotId`, also remove the matching `ShotRecord` from `shotChart`
-   - Include `shotChart` in `loadState()` deserialization (default to `[]` if missing)
-   - Include `shotChart` in localStorage persistence
-   - Include shot data in `buildSyncFingerprint()` so changes trigger cloud sync
+2. **`src/context/GameContext.tsx`** — `shotChart: []` in `createInitialState`, cloud hydrate, `loadState` default; `ADD_SHOT` appends shot, increments `2pt` / `2pt_miss` / `3pt` / `3pt_miss`, logs `increment` with `shotId`; `UNDO` on `increment` with `shotId` filters that shot from `shotChart`; `REMOVE_LAST_SHOT` pops last shot and reverts stat when the last log entry matches that shot; `buildSyncFingerprint` includes `shotChart`.
 
-3. **`src/pages/ShotChart.tsx`** — Wire to GameContext:
-   - Replace local state with `state.shotChart` from context
-   - On court tap: dispatch `ADD_SHOT` instead of updating local state
-   - On undo: dispatch `UNDO` (which handles both the shot and the stat)
-   - Filter displayed shots by the shot chart's active context (all shots for now; per-player filtering is v2)
+3. **`src/pages/ShotChart.tsx`** — Renders `state.shotChart`, `onCourtTap` → `ADD_SHOT` (uses `isThreePointer` / `classifyShotZone` on tap `x,y`), made/missed toggle + player strip; **Undo** dispatches `UNDO` (same as Game Tracker for shot-originated increments).
 
-**Files touched:** `src/types.ts`, `src/context/GameContext.tsx`, `src/pages/ShotChart.tsx`
+4. **Cloud open-game hydrates** (`Games.tsx`, `PlayerProfile.tsx`, `CareerStats.tsx`) — `shotChart: []` on fresh hydrate (chart data still SC-6).
+
+**Remaining (later work units):** SC-4 polish (dedicated “undo last shot” copy, `REMOVE_LAST_SHOT` UX); SC-5 summary; SC-6 persist `shotChart` to Supabase.
+
+**Files touched:** `src/types.ts`, `src/context/GameContext.tsx`, `src/pages/ShotChart.tsx`, `Games.tsx`, `PlayerProfile.tsx`, `CareerStats.tsx`
 
 **Test breakpoint:**
 - Start a basketball game → add players → go to shot chart

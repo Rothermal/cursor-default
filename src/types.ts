@@ -103,6 +103,8 @@ export interface ActionLogEntry {
   playerId?: string
   statId?: string
   previousValue: number
+  /** When set, `UNDO` also removes the matching row from `GameState.shotChart`. */
+  shotId?: string
   /** For home_team_score_* undo: snapshot before the change. */
   previousHomeTeamScore?: number | null
   previousHomeScoreAdjustment?: number
@@ -152,6 +154,8 @@ export interface GameState {
    * Null when no season or empty config.
    */
   teamStatsConfig: Record<string, unknown> | null
+  /** Location-tagged shots from the shot chart (feet from rim; see `shotChartCoordinates.ts`). */
+  shotChart: ShotRecord[]
 }
 
 export type CloudSyncStatus =
@@ -187,6 +191,8 @@ export type GameAction =
   | { type: 'INCREMENT_HOME_SCORE' }
   | { type: 'DECREMENT_HOME_SCORE' }
   | { type: 'SET_NOTES'; notes: string }
+  | { type: 'ADD_SHOT'; shot: ShotRecord }
+  | { type: 'REMOVE_LAST_SHOT' }
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }
