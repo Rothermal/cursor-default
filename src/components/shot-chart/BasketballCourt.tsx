@@ -52,13 +52,13 @@ function restrictedAreaPath(): string {
 }
 
 /**
- * Free-throw circle: dashed semicircle lying on the FT line (endpoints on the line),
- * opening toward the basket (center of full circle is on the half-court side of the line).
+ * Free-throw circle: dashed semicircle with endpoints on the FT line, bulging into
+ * the key toward the basket (smaller y). Sweep `1` selects that half; `0` bulges toward half court.
  */
 function freeThrowKeySemicirclePath(): string {
   const r = FT_CIRCLE_RADIUS
   const cy = FT_LINE_Y
-  return `M ${-r} ${cy} A ${r} ${r} 0 0 0 ${r} ${cy}`
+  return `M ${-r} ${cy} A ${r} ${r} 0 0 1 ${r} ${cy}`
 }
 
 function handlePointerDown(
