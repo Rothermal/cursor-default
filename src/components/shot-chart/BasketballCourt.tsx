@@ -9,7 +9,6 @@ import {
   PAINT_WIDTH,
   FT_LINE_Y,
   FT_CIRCLE_RADIUS,
-  RESTRICTED_RADIUS,
   THREE_POINT_RADIUS,
   CORNER_THREE_X,
   CORNER_THREE_ARC_Y,
@@ -46,12 +45,6 @@ function threePointArcPath(): string {
     `A ${r} ${r} 0 0 0 ${cx} ${arcY}`,
     `L ${cx} ${BASELINE_Y}`,
   ].join(' ')
-}
-
-/** Restricted area: semicircle opening toward the court (+y). */
-function restrictedAreaPath(): string {
-  const r = RESTRICTED_RADIUS
-  return `M ${-r} 0 A ${r} ${r} 0 0 1 ${r} 0`
 }
 
 /**
@@ -163,8 +156,6 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
           strokeDashoffset={0.18}
           strokeLinecap="round"
         />
-
-        <path d={restrictedAreaPath()} />
 
         <path d={threePointArcPath()} />
 
