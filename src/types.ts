@@ -1,3 +1,16 @@
+export type ShotZone = 'restricted' | 'paint' | 'mid_range' | 'three'
+
+export interface ShotRecord {
+  id: string
+  x: number
+  y: number
+  made: boolean
+  shotType: '2pt' | '3pt'
+  zone: ShotZone
+  playerId: string
+  timestamp: number
+}
+
 export interface StatAction {
   id: string
   label: string
@@ -53,6 +66,7 @@ export interface SportConfig {
    * Basketball sets `team_foul`.
    */
   teamFoulBaseStatId?: string
+  hasShotChart?: boolean
 }
 
 export interface GameInfo {
