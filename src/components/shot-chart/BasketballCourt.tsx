@@ -27,6 +27,9 @@ const LINE_COLOR = '#8B6914'
 const LINE_WIDTH = 0.3
 const COURT_BG = '#e8d5b7'
 
+/** Radians: trim dashed FT arc so first/last dashes sit inside the key, off the solid junctions. */
+const FT_DASH_ARC_END_INSET_RAD = 0.14
+
 /**
  * Three-point boundary: corner verticals to arc tangents, then two minor arcs
  * meeting at (0, R) so the curve unambiguously cups toward +y (no ambiguous sweep).
@@ -52,13 +55,20 @@ function restrictedAreaPath(): string {
 }
 
 /**
- * Free-throw circle — basket side: dashed semicircle on the FT line, bulging toward
- * the hoop (smaller y). Sweep `1`.
+ * Free-throw circle — basket side: dashed arc bulging toward the hoop, same circle as
+ * the solid half but endpoints inset along the arc so dashes do not merge with the
+ * solid semicircle at (-r, FT) and (r, FT). Center (0, FT_LINE_Y); angle a from +x:
+ * x = r cos a, y = cy - r sin a (a = pi/2 at top of key).
  */
-function freeThrowKeySemicirclePath(): string {
+function freeThrowKeySemicircleDashPath(): string {
   const r = FT_CIRCLE_RADIUS
   const cy = FT_LINE_Y
-  return `M ${-r} ${cy} A ${r} ${r} 0 0 1 ${r} ${cy}`
+  const e = FT_DASH_ARC_END_INSET_RAD
+  const sx = r * Math.cos(Math.PI - e)
+  const sy = cy - r * Math.sin(Math.PI - e)
+  const ex = r * Math.cos(e)
+  const ey = cy - r * Math.sin(e)
+  return `M ${sx} ${sy} A ${r} ${r} 0 0 1 ${ex} ${ey}`
 }
 
 /** Free-throw circle — half-court side: solid semicircle on the FT line, bulging toward +y. Sweep `0`. */
@@ -148,8 +158,9 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
         <path d={freeThrowHalfCourtSemicirclePath()} />
 
         <path
-          d={freeThrowKeySemicirclePath()}
-          strokeDasharray="1.0 0.8"
+          d={freeThrowKeySemicircleDashPath()}
+          strokeDasharray="0.85 0.72"
+          strokeDashoffset={0.18}
           strokeLinecap="round"
         />
 
