@@ -28,8 +28,8 @@ const LINE_WIDTH = 0.3
 const COURT_BG = '#e8d5b7'
 
 /**
- * Three-point boundary: verticals from baseline to the arc tangent, then the
- * outer circular arc (large-arc so it bulges toward the court, not a shallow “W”).
+ * Three-point boundary: corner verticals to arc tangents, then two minor arcs
+ * meeting at (0, R) so the curve unambiguously cups toward +y (no ambiguous sweep).
  */
 function threePointArcPath(): string {
   const r = THREE_POINT_RADIUS
@@ -39,7 +39,8 @@ function threePointArcPath(): string {
   return [
     `M ${-cx} ${BASELINE_Y}`,
     `L ${-cx} ${arcY}`,
-    `A ${r} ${r} 0 1 1 ${cx} ${arcY}`,
+    `A ${r} ${r} 0 0 0 0 ${r}`,
+    `A ${r} ${r} 0 0 0 ${cx} ${arcY}`,
     `L ${cx} ${BASELINE_Y}`,
   ].join(' ')
 }
