@@ -1,5 +1,6 @@
 export type ShotZone = 'restricted' | 'paint' | 'mid_range' | 'three'
 
+/** Location on the half-court diagram in feet; same system as `BasketballCourt` taps. @see `src/lib/shotChartCoordinates.ts` */
 export interface ShotRecord {
   id: string
   x: number

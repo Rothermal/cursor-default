@@ -1,3 +1,7 @@
+/**
+ * Half-court SVG. Tap and marker `(x, y)` are feet in rim-centered space — see
+ * `src/lib/shotChartCoordinates.ts`.
+ */
 import type { ShotRecord } from '../../types'
 import {
   COURT_WIDTH,

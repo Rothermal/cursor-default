@@ -17,6 +17,7 @@ import PlayerProfile from './pages/PlayerProfile'
 import CareerStats from './pages/CareerStats'
 import TeamStats from './pages/TeamStats'
 import TournamentStats from './pages/TournamentStats'
+import ShotChart from './pages/ShotChart'
 import ShotChartPreview from './pages/ShotChartPreview'
 
 function AppRoutes() {
@@ -54,6 +55,7 @@ function AppRoutes() {
           <Route path="/players" element={<PlayerSetup />} />
           <Route path="/checkout" element={<GameCheckout />} />
           <Route path="/game" element={<GameTracker />} />
+          <Route path="/shot-chart" element={<ShotChart />} />
           <Route path="/summary" element={<GameSummary />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/teams" element={<Teams />} />
