@@ -35,6 +35,9 @@ export default function PlayerSetup() {
   const [rosterError, setRosterError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const cloudRosterLoadedRef = useRef(false)
+  /** Latest roster for merging when a cloud fetch completes (effect deps omit `players` on purpose). */
+  const playersRef = useRef(state.players)
+  playersRef.current = state.players
 
   /** Team pseudo-players for checkout + tracker when the sport defines team categories. */
   useEffect(() => {
@@ -128,6 +131,18 @@ export default function PlayerSetup() {
             p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
           ),
         ]
+      }
+
+      const snapshot = playersRef.current
+      const apiIds = new Set(loadedPlayers.map(p => p.id))
+      const extraFromLocal = snapshot.filter(
+        p =>
+          p.id !== TEAM_PLAYER_HOME_ID &&
+          p.id !== TEAM_PLAYER_OPP_ID &&
+          !apiIds.has(p.id)
+      )
+      if (extraFromLocal.length > 0) {
+        loadedPlayers = [...loadedPlayers, ...extraFromLocal]
       }
 
       const idMap = loadedPlayers.reduce<Record<string, string>>((map, player) => {
