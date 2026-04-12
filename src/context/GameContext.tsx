@@ -14,6 +14,7 @@ import type {
   ActionLogEntry,
   CloudSyncState,
   CloudSyncStatus,
+  ShotRecord,
 } from '../types'
 import { useAuth } from './AuthContext'
 import {
@@ -86,6 +87,7 @@ function createInitialState(status: CloudSyncStatus = 'idle'): GameState {
     cloudSync: createInitialCloudSyncState(status),
     currentPeriod: 1,
     teamStatsConfig: null,
+    shotChart: [],
   }
 }
 
@@ -101,6 +103,14 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }
 
+/** Stat key to increment when adding a shot from the chart. */
+function statIdForShotRecord(shot: ShotRecord): string {
+  if (shot.shotType === '3pt') {
+    return shot.made ? '3pt' : '3pt_miss'
+  }
+  return shot.made ? '2pt' : '2pt_miss'
+}
+
 function buildSyncFingerprint(state: GameState): string {
   return JSON.stringify({
     sportId: state.sport?.id ?? null,
@@ -110,6 +120,7 @@ function buildSyncFingerprint(state: GameState): string {
     homeScoreAdjustment: state.homeScoreAdjustment,
     notes: state.notes,
     teamStatsConfig: state.teamStatsConfig,
+    shotChart: state.shotChart,
     players: state.players.map(player => ({
       id: player.id,
       name: player.name,
@@ -202,6 +213,7 @@ function buildHydratedStateFromCloudGame(
     currentPeriod: 1,
     teamStatsConfig: cloudGame.teamStatsConfig,
     actionLog: [],
+    shotChart: [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
       seasonId: cloudGame.seasonId ?? null,
@@ -270,6 +282,58 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SET_ACTIVE_PLAYER':
       return { ...state, activePlayerId: action.playerId }
+
+    case 'ADD_SHOT': {
+      const shot = action.shot
+      const player = state.players.find(p => p.id === shot.playerId)
+      if (!player) return state
+      const statId = statIdForShotRecord(shot)
+      const prevValue = player.stats[statId] || 0
+      const logEntry: ActionLogEntry = {
+        id: generateId(),
+        timestamp: Date.now(),
+        type: 'increment',
+        playerId: shot.playerId,
+        statId,
+        previousValue: prevValue,
+        shotId: shot.id,
+      }
+      return {
+        ...state,
+        shotChart: [...state.shotChart, shot],
+        players: state.players.map(p =>
+          p.id === shot.playerId
+            ? { ...p, stats: { ...p.stats, [statId]: prevValue + 1 } }
+            : p
+        ),
+        actionLog: [...state.actionLog, logEntry],
+      }
+    }
+
+    case 'REMOVE_LAST_SHOT': {
+      if (state.shotChart.length === 0) return state
+      const popped = state.shotChart[state.shotChart.length - 1]
+      const nextShots = state.shotChart.slice(0, -1)
+      const last = state.actionLog[state.actionLog.length - 1]
+      if (
+        last?.type === 'increment' &&
+        last.shotId === popped.id &&
+        last.playerId === popped.playerId &&
+        last.statId === statIdForShotRecord(popped)
+      ) {
+        return {
+          ...state,
+          shotChart: nextShots,
+          actionLog: state.actionLog.slice(0, -1),
+          players: state.players.map(p =>
+            p.id === last.playerId
+              ? { ...p, stats: { ...p.stats, [last.statId!]: last.previousValue } }
+              : p
+          ),
+        }
+      }
+      return { ...state, shotChart: nextShots }
+    }
 
     case 'INCREMENT_STAT': {
       const player = state.players.find(p => p.id === action.playerId)
@@ -438,6 +502,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 : p
             ),
           }
+          if (lastAction.type === 'increment' && lastAction.shotId) {
+            newState = {
+              ...newState,
+              shotChart: newState.shotChart.filter(s => s.id !== lastAction.shotId),
+            }
+          }
           break
         case 'opponent_score_up':
         case 'opponent_score_down':
@@ -512,6 +582,7 @@ function loadState(): GameState {
         ? Math.floor(parsed.currentPeriod)
         : 1,
     teamStatsConfig: parsed.teamStatsConfig ?? null,
+    shotChart: Array.isArray(parsed.shotChart) ? parsed.shotChart : [],
     players: Array.isArray(parsed.players) ? parsed.players : [],
     actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
     cloudSync: {

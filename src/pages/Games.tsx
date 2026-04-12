@@ -233,6 +233,7 @@ export default function Games() {
       currentPeriod: 1,
       teamStatsConfig: null,
       actionLog: [],
+      shotChart: [],
       cloudSync: {
         seasonId: cloudGame.seasonId ?? null,
         teamId: cloudGame.teamId,
