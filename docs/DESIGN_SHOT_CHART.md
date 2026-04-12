@@ -2,7 +2,7 @@
 
 An interactive half-court basketball diagram where a coach taps the court to record shot locations. Shots are marked as **made** (filled circle) or **missed** (X), auto-classified by zone (paint, mid-range, three-point), and integrated with the existing stat tracking pipeline so the same data drives both the shot chart visualization and the stat counters (`2pt`, `2pt_miss`, `3pt`, `3pt_miss`, `ft`).
 
-**Status:** Design phase. Not yet implemented.
+**Status:** **MVP shipped** in app (court, shot chart page, GameState + cloud sync after migration `032_shot_chart.sql`, Game Summary tab, polish). This document still describes the full vision; some diagram details differ from the shipped court — see [DESIGN_SHOT_CHART_IMPLEMENTATION.md](DESIGN_SHOT_CHART_IMPLEMENTATION.md) **Status** for work-unit notes and intentional MVP deltas.
 
 **Related docs:**
 - [DESIGN_TEAM_STATS_TRACKING.md](DESIGN_TEAM_STATS_TRACKING.md) — team pseudo-player architecture (shot chart will support team-level tracking first)
