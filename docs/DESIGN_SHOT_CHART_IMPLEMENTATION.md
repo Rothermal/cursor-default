@@ -242,44 +242,19 @@ SC-5  Game Summary      │
 
 **Blocks:** Nothing
 
-**What to do:**
+**Implemented:**
 
-1. **New: `src/components/shot-chart/ShootingSummary.tsx`**:
-   - Props: `shots: ShotRecord[]`
-   - Computes zone-based stats: restricted, paint, mid-range, three-point, total
-   - For each zone: made count, attempt count, percentage
-   - Renders a compact grid:
-     ```
-     ┌──────────┬──────────┬──────────┐
-     │ Restrict │  Paint   │ Mid-Rng  │
-     │  4/6     │  4/8     │  2/5     │
-     │  67%     │  50%     │  40%     │
-     └──────────┴──────────┴──────────┘
-     ┌──────────┬──────────────────────┐
-     │  3-Point │      TOTAL          │
-     │  3/9     │     13/28           │
-     │  33%     │      46%            │
-     └──────────┴──────────────────────┘
-     ```
+1. **`src/components/shot-chart/ShootingSummary.tsx`** — `shots: ShotRecord[]`; aggregates by `shot.zone` (restricted, paint, mid_range, three) plus total; compact 3+2 grid (row 2: 3PT + Total).
 
-2. **`src/pages/GameSummary.tsx`**:
-   - Check if `state.shotChart.length > 0`
-   - If yes, add a "Shot Chart" tab to the summary tabs (alongside existing "Players" / "Team")
-   - The tab renders:
-     - `<BasketballCourt shots={state.shotChart} />` (read-only, no `onCourtTap`)
-     - `<ShootingSummary shots={state.shotChart} />`
+2. **`src/pages/GameSummary.tsx`** — **Shot chart** tab when `sport.id === 'basketball'` and `shotChart.length > 0`; read-only `<BasketballCourt shots={shotChart} />` and `<ShootingSummary />`. Tab hidden if no chart shots (including non-basketball).
 
-3. **Also add the `ShootingSummary` to the shot chart page** (`ShotChart.tsx`) below the court, replacing the inline summary added in SC-2.
+3. **`src/pages/ShotChart.tsx`** — `ShootingSummary` below the court.
 
-**Files touched:** new `src/components/shot-chart/ShootingSummary.tsx`, `src/pages/GameSummary.tsx`, `src/pages/ShotChart.tsx`
+**Files touched:** `ShootingSummary.tsx`, `GameSummary.tsx`, `ShotChart.tsx`
 
 **Test breakpoint:**
-- Play a game, record 10+ shots via the chart across all zones
-- Navigate to Summary → see "Shot Chart" tab
-- Tab shows read-only court with all markers
-- Zone breakdown shows correct made/attempt/percentage for each zone
-- No "Shot Chart" tab if no shots were recorded
-- Zone percentages match manual count of markers on the court
+- Record chart shots → Summary → Shot chart tab → court + zone grid
+- No tab when `shotChart` is empty
 
 **Commit message:** `feat: add shot chart visualization and zone breakdown to Game Summary`
 
