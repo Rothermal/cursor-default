@@ -2,6 +2,7 @@
  * Half-court SVG. Tap and marker `(x, y)` are feet in rim-centered space — see
  * `src/lib/shotChartCoordinates.ts`.
  */
+import { useRef } from 'react'
 import type { ShotRecord } from '../../types'
 import {
   COURT_WIDTH,
@@ -20,10 +21,16 @@ import {
   BASKET_CENTER_Y,
 } from './courtGeometry'
 
+const TAP_DEBOUNCE_MS = 120
+
 interface BasketballCourtProps {
   shots: ShotRecord[]
   onCourtTap?: (x: number, y: number) => void
   className?: string
+  /** When set, this marker plays a short pulse (newly recorded shot). */
+  newlyPlacedShotId?: string | null
+  /** When truthy, show empty-court hint when interactive and there are no shots. */
+  emptyHint?: string | boolean
 }
 
 const LINE_COLOR = '#8B6914'
@@ -77,8 +84,15 @@ function freeThrowHalfCourtSemicirclePath(): string {
 
 function handlePointerDown(
   e: React.PointerEvent<SVGRectElement>,
-  onCourtTap: (x: number, y: number) => void
+  onCourtTap: (x: number, y: number) => void,
+  lastTapAtRef: { current: number }
 ) {
+  const now = Date.now()
+  if (now - lastTapAtRef.current < TAP_DEBOUNCE_MS) {
+    return
+  }
+  lastTapAtRef.current = now
+
   const svg = e.currentTarget.ownerSVGElement
   if (!svg) return
   const pt = svg.createSVGPoint()
@@ -93,7 +107,14 @@ function handlePointerDown(
   )
 }
 
-export default function BasketballCourt({ shots, onCourtTap, className }: BasketballCourtProps) {
+export default function BasketballCourt({
+  shots,
+  onCourtTap,
+  className,
+  newlyPlacedShotId = null,
+  emptyHint,
+}: BasketballCourtProps) {
+  const lastTapAtRef = useRef(0)
   const interactive = Boolean(onCourtTap)
   const halfW = COURT_WIDTH / 2
   const padding = 2
@@ -182,22 +203,23 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
         shot.made ? (
           <circle
             key={shot.id}
+            className={shot.id === newlyPlacedShotId ? 'shot-marker-pulse' : undefined}
             cx={shot.x}
             cy={shot.y}
             r={0.8}
-            fill="rgba(34,197,94,0.8)"
-            stroke="rgba(22,163,74,0.9)"
-            strokeWidth={0.15}
+            fill="rgba(34,197,94,0.95)"
+            stroke="rgba(21,128,61,0.95)"
+            strokeWidth={0.2}
           />
         ) : (
-          <g key={shot.id}>
+          <g key={shot.id} className={shot.id === newlyPlacedShotId ? 'shot-marker-pulse' : undefined}>
             <line
               x1={shot.x - 0.6}
               y1={shot.y - 0.6}
               x2={shot.x + 0.6}
               y2={shot.y + 0.6}
-              stroke="rgba(239,68,68,0.8)"
-              strokeWidth={0.3}
+              stroke="rgba(220,38,38,0.95)"
+              strokeWidth={0.35}
               strokeLinecap="round"
             />
             <line
@@ -205,12 +227,37 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
               y1={shot.y - 0.6}
               x2={shot.x - 0.6}
               y2={shot.y + 0.6}
-              stroke="rgba(239,68,68,0.8)"
-              strokeWidth={0.3}
+              stroke="rgba(220,38,38,0.95)"
+              strokeWidth={0.35}
               strokeLinecap="round"
             />
           </g>
         )
+      )}
+
+      {interactive && onCourtTap && shots.length === 0 && emptyHint && (
+        <g pointerEvents="none" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+          <text
+            x={0}
+            y={(svgCourtTop + svgCourtBottom) / 2 - 0.9}
+            textAnchor="middle"
+            fill="rgba(71,85,105,0.9)"
+            fontSize="1.15"
+            fontWeight="600"
+          >
+            Tap the court
+          </text>
+          <text
+            x={0}
+            y={(svgCourtTop + svgCourtBottom) / 2 + 0.85}
+            textAnchor="middle"
+            fill="rgba(71,85,105,0.75)"
+            fontSize="1.05"
+            fontWeight="500"
+          >
+            to record shots
+          </text>
+        </g>
       )}
 
       {interactive && onCourtTap && (
@@ -220,7 +267,7 @@ export default function BasketballCourt({ shots, onCourtTap, className }: Basket
           width={viewW}
           height={viewH}
           fill="transparent"
-          onPointerDown={e => handlePointerDown(e, onCourtTap)}
+          onPointerDown={e => handlePointerDown(e, onCourtTap, lastTapAtRef)}
           style={{ touchAction: 'none', cursor: 'crosshair' }}
         />
       )}
