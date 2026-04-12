@@ -193,6 +193,10 @@ export type GameAction =
   | { type: 'SET_NOTES'; notes: string }
   | { type: 'ADD_SHOT'; shot: ShotRecord }
   | { type: 'REMOVE_LAST_SHOT' }
+  /** Undo once only if the last log entry is shot-chart–originated (`shotId` set). */
+  | { type: 'UNDO_LAST_SHOT' }
+  /** Pop every shot from the tail of `shotChart` that still matches the last log entry (see reducer). */
+  | { type: 'CLEAR_SHOT_CHART' }
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }

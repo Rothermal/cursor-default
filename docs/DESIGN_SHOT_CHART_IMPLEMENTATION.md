@@ -210,29 +210,25 @@ SC-5  Game Summary      │
 
 **Blocks:** SC-5
 
-**What to do:**
+**Implemented:**
 
-1. **Undo on shot chart page**:
-   - The shot chart page has its own "↩ Undo Last Shot" button
-   - This dispatches `UNDO` — the reducer checks if the last action was shot-originated (has `shotId`) and removes both the stat and the shot record
-   - Show the undo label: "Last: #23 2PT Made" or "Last: #11 3PT Missed" (derive from the last shot record)
+1. **`UNDO_LAST_SHOT`** — Only undoes when the last `actionLog` entry has `shotId` (chart-originated increment). **`UNDO`** still reverses any last action (Game Tracker bar).
 
-2. **Stat-button-to-chart awareness**:
-   - When on the Game Tracker and a coach taps the 2PT stat button directly, no shot marker appears (no location data). This is correct — the stat counter increments but the shot chart only shows location-tagged shots.
-   - Document this behavior in a small info tooltip: "Shots recorded via the Shot Chart include location data. Shots recorded via stat buttons do not appear on the chart."
+2. **`applyUndoLastEntry`** — Shared helper used by `UNDO`, `UNDO_LAST_SHOT`, `REMOVE_LAST_SHOT`, and **`CLEAR_SHOT_CHART`**.
 
-3. **Edge case**: Coach records a shot via the chart, then goes to Game Tracker and undoes it there. The `UNDO` in GameContext handles this correctly because the `ActionLogEntry` has a `shotId`. Verify this flow.
+3. **`CLEAR_SHOT_CHART`** — Confirmed on the shot chart page; repeatedly undoes tail log entries while they still match the tail of `shotChart` (reverts chart-shot stats; leaves stat-button-only history intact).
 
-4. **Edge case**: Coach undoes on the shot chart, then goes to Game Tracker. The stat counter should reflect the undo. Verify.
+4. **`REMOVE_LAST_SHOT`** — If the last log line does not match the last shot, only pops `shotChart` (no stat change).
 
-**Files touched:** `src/pages/ShotChart.tsx`, `src/context/GameContext.tsx` (minor tweaks)
+5. **Shot chart UI** — "Undo last shot" + subtitle from last shot log (`Last: #12 2PT Made`, etc.); hint when last action was not chart-originated; **Clear all chart shots** with confirm.
+
+6. **Game Tracker** — `title` tooltip on basketball **2PT / 2PT Miss / 3PT / 3PT Miss / FT / FT Miss** stat tiles: chart records location; grid taps are stats-only.
+
+**Files touched:** `src/types.ts`, `src/context/GameContext.tsx`, `src/pages/ShotChart.tsx`, `src/pages/GameTracker.tsx`
 
 **Test breakpoint:**
-- Record 3 shots via chart → go to Game Tracker → stat counters show 3 shots
-- Undo 1 on Game Tracker → go to chart → only 2 markers visible
-- Record 2 shots via chart → undo on chart → 1 marker remains, stat counter shows 4 total
-- Record shots on chart AND via stat buttons → counts are additive (expected v1 behavior)
-- Clear all shots → stat counters for 2pt/3pt/misses return to values from stat-button-only entries (they won't go to 0 if some were added via buttons)
+- Chart shots + stat-button shots → additive counts; undo last shot only when chart was last; clear chart restores stat-button-only totals for chart-backed stats
+- Undo chart shot from Game Tracker → marker removed (unchanged from SC-3)
 
 **Commit message:** `feat: polish shot chart undo coordination and stat sync edge cases`
 

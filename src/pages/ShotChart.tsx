@@ -8,7 +8,7 @@ import {
   TEAM_PLAYER_HOME_ID,
   TEAM_PLAYER_OPP_ID,
 } from '../lib/teamPlayers'
-import type { Player, ShotRecord } from '../types'
+import type { ActionLogEntry, Player, ShotRecord } from '../types'
 
 function sortTeamPlayersFirst(players: Player[]): Player[] {
   const teams = players.filter(isTeamPseudoPlayer)
@@ -24,8 +24,27 @@ function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
 }
 
+function shotLabelFromLogEntry(
+  entry: ActionLogEntry | undefined,
+  players: Player[]
+): string | null {
+  if (!entry?.shotId || entry.type !== 'increment' || !entry.playerId || !entry.statId) {
+    return null
+  }
+  const player = players.find(p => p.id === entry.playerId)
+  const num = player?.number?.trim()
+  const who = num ? `#${num}` : player?.name?.split(' ')[0] ?? 'Player'
+  const sid = entry.statId
+  let kind = sid.toUpperCase()
+  if (sid === '2pt') kind = '2PT Made'
+  else if (sid === '2pt_miss') kind = '2PT Miss'
+  else if (sid === '3pt') kind = '3PT Made'
+  else if (sid === '3pt_miss') kind = '3PT Miss'
+  return `Last: ${who} ${kind}`
+}
+
 /**
- * Shot chart: `#/shot-chart`. Taps dispatch `ADD_SHOT` (SC-3); markers use `state.shotChart`.
+ * Shot chart: `#/shot-chart`. Taps dispatch `ADD_SHOT`; markers use `state.shotChart`.
  */
 export default function ShotChart() {
   const navigate = useNavigate()
@@ -66,7 +85,24 @@ export default function ShotChart() {
     [dispatch, effectivePlayerId, mode]
   )
 
-  const canUndo = actionLog.length > 0
+  const lastEntry = actionLog.length > 0 ? actionLog[actionLog.length - 1] : undefined
+  const canUndoShot = Boolean(lastEntry?.shotId)
+  const undoShotSubtitle = useMemo(
+    () => shotLabelFromLogEntry(lastEntry, players),
+    [lastEntry, players]
+  )
+  const canClearShots = shotChart.length > 0
+
+  const handleClearChart = () => {
+    if (
+      !window.confirm(
+        'Remove every shot from the chart and undo their scoring stats? Stat taps (no location) are not changed.'
+      )
+    ) {
+      return
+    }
+    dispatch({ type: 'CLEAR_SHOT_CHART' })
+  }
 
   if (!allowed) {
     return null
@@ -158,15 +194,33 @@ export default function ShotChart() {
         </div>
       </div>
 
-      <div className="px-3 pb-2 max-w-lg mx-auto w-full">
+      <div className="px-3 pb-2 max-w-lg mx-auto w-full space-y-2">
         <button
           type="button"
-          disabled={!canUndo}
-          onClick={() => dispatch({ type: 'UNDO' })}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white text-slate-700
+          disabled={!canUndoShot}
+          onClick={() => dispatch({ type: 'UNDO_LAST_SHOT' })}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white text-slate-800
                      disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
         >
-          ↩ Undo last action
+          ↩ Undo last shot
+        </button>
+        {undoShotSubtitle && (
+          <p className="text-center text-xs text-slate-500 -mt-1">{undoShotSubtitle}</p>
+        )}
+        {!canUndoShot && actionLog.length > 0 && (
+          <p className="text-center text-xs text-slate-400">
+            Last action was not from the chart — use <span className="font-medium">Undo</span> on Game Tracker
+            for stat taps and other changes.
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={!canClearShots}
+          onClick={handleClearChart}
+          className="w-full py-2 rounded-xl text-sm font-medium border border-rose-200 bg-rose-50 text-rose-800
+                     disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
+        >
+          Clear all chart shots
         </button>
       </div>
 
