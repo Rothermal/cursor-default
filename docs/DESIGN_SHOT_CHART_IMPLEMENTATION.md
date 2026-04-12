@@ -8,6 +8,44 @@ Step-by-step implementation plan for the basketball shot chart feature, broken i
 
 ---
 
+## Status (as of 2026-04)
+
+| Work unit | Status | Notes |
+|-----------|--------|--------|
+| **SC-1** | **Shipped** | Court SVG, `courtGeometry`, types, dev preview `/#/dev/shot-chart` |
+| **SC-2** | **Shipped** | `#/shot-chart` page: made/miss, player strip, tap → `ADD_SHOT`, `ShootingSummary` on page |
+| **SC-3** | **Shipped** | `GameState.shotChart`, reducer, persistence fingerprint, hydrate from cloud |
+| **SC-4** | **Shipped** | `UNDO_LAST_SHOT`, `CLEAR_SHOT_CHART`, `ConfirmDialog` clear-all (SC-7), stat-grid tooltips |
+| **SC-5** | **Shipped** | `ShootingSummary`, Game Summary **Shot chart** tab |
+| **SC-6** | **Shipped** (apply DB) | Migration `032_shot_chart.sql`; sync + load in `cloudSync.ts`. **Run migration on Supabase** for production cloud round-trip. |
+| **SC-7** | **Shipped** | Haptics, marker pulse, tap debounce, tracker badge, empty-court hint |
+
+### Shipped product behavior (summary)
+
+- **Game Tracker (basketball):** Shot chart button with **count badge**; stat tiles for FG/FT have **tooltips** explaining chart vs grid taps.
+- **Shot chart route** `/#/shot-chart`: mode toggle, player selector, court tap records shots into **`shotChart`** and **scoring stats**; zone summary; **undo last shot** (chart-only); **clear all** with confirmation; haptic + pulse + debounce + empty hint.
+- **Game Summary:** **Shot chart** tab when there are chart shots: read-only court + zone summary.
+- **Persistence:** `shotChart` in **localStorage** with game state; **cloud** replace-sync per `(game_id, recorded_by)` after migration **032** is applied.
+- **Dev QA:** `/#/dev/shot-chart` + optional auth bypass (remove when no longer needed).
+
+### Follow-ups / backlog (not in MVP scope)
+
+- Remove or gate **`/dev/shot-chart`** and preview-only auth bypass when QA is done.
+- Optional **`hasShotChart`** on `SportConfig` instead of hard-coded basketball id.
+- **Unit tests** for `isThreePointer` / `classifyShotZone` (and optionally sync mapping).
+- **Multi-recorder:** chart rows are per `recorded_by`; merging or “primary recorder” view for shots is a future product decision.
+- **Design doc** [DESIGN_SHOT_CHART.md](DESIGN_SHOT_CHART.md): vision still describes restricted arc / some colors differently from the shipped diagram — see SC-1 notes for intentional MVP deltas.
+
+### Process / quality suggestions (for future features)
+
+1. **Keep a short “Status” block** at the top of implementation plans once work lands — avoids scanning every SC section for done vs todo.
+2. **PR template checklist:** migration applied? smoke path (record → sync → reload)? Especially when schema and client ship together.
+3. **Single contract doc** — shot chart already points at `shotChartCoordinates.ts`; for new surfaces, link that file from any new entry points.
+4. **Optional CI:** `pnpm test` with Vitest for pure functions (`courtGeometry`) is cheap insurance when geometry or sync mapping changes.
+5. **Feature flag or version gate** if the client must tolerate missing DB tables briefly (SC-6 already no-ops when `shot_chart` is missing; document that for support).
+
+---
+
 ## 1. Dependency Graph
 
 ```
@@ -120,48 +158,14 @@ SC-5  Game Summary      │
 - **Coordinate contract:** `src/lib/shotChartCoordinates.ts` documents feet-from-rim space; `ShotRecord` in `types.ts` references it; `BasketballCourt.tsx` header points to the same. Taps must feed `isThreePointer` / `classifyShotZone` without transforming `x`/`y`.
 - **QA:** `/#/dev/shot-chart` preview and dev auth bypass unchanged; remove in a later cleanup SC.
 
-**What to do:**
+**Implemented (combined SC-2 + SC-3 wiring):** Full `ShotChart` page uses **`GameState.shotChart`** and **`ADD_SHOT`** (not local-only state). Mode toggle, player strip, `ShootingSummary` below court, undo/clear flows per SC-4/SC-7. Route and tracker entry were added in prep; see **Status** section above.
 
-1. **`src/pages/ShotChart.tsx`** — Full-screen shot chart page (extend the shell):
-   - Reads `sport`, `players`, `activePlayerId` from `GameContext`
-   - Guard: already redirects to `/` if not basketball or no game in progress
-   - **Header**: optional "Clear All" button (in addition to existing "← Back to Stats")
-   - **Mode toggle**: "Made" / "Missed" segmented control (local state: `mode: 'made' | 'missed'`)
-     - Made: green background when active
-     - Missed: red background when active
-   - **Player selector**: horizontal strip (same as Game Tracker) so the coach can switch who the shot is attributed to. Active player is highlighted.
-   - **Court**: Full-width `<BasketballCourt>` with `onCourtTap` handler
-   - **On tap**: Create a `ShotRecord` from coordinates + mode + active player:
-     - `id`: generated unique ID
-     - `x`, `y`: from court tap
-     - `made`: from mode toggle
-     - `shotType`: from `isThreePointer(x, y)`
-     - `zone`: from `classifyShotZone(x, y)`
-     - `playerId`: `activePlayerId`
-     - `timestamp`: `Date.now()`
-   - For now, store shots in **local component state** (will wire to GameContext in SC-3). This lets us test the UI independently.
-   - **Shooting summary**: Below the court, show zone-based stats computed from local shot array (see [SHOT_CHART §5.7](DESIGN_SHOT_CHART.md)):
-     - Paint: M/A (pct%) | Mid: M/A (pct%) | 3PT: M/A (pct%) | Total: M/A (pct%)
-   - **Undo**: "↩ Undo Last Shot" button removes the last shot from local state
+**Optional later:** `hasShotChart` on `SportConfig` — skipped for MVP.
 
-2. **`src/App.tsx`** — Route already added (`/shot-chart`).
-
-3. **`src/pages/GameTracker.tsx`** — Entry button already added (basketball only).
-
-4. **`src/config/sports.ts`** — Optional: `hasShotChart` on `SportConfig` — **skipped for MVP**; basketball-only via `sport.id === 'basketball'`.
-
-**Files touched (remaining SC-2 work):** primarily `src/pages/ShotChart.tsx`; optionally `src/config/sports.ts` / `types.ts` if adding `hasShotChart` later.
+**Files touched:** `ShotChart.tsx`, `App.tsx`, `GameTracker.tsx` (and SC-3/4/5/7 files as listed in those sections).
 
 **Test breakpoint:**
-- Start a basketball game → see **Shot chart** button on Game Tracker
-- Tap button → full-screen court loads; then add mode toggle and player selector
-- Toggle to "Made" → tap court → green circle appears at tapped location
-- Toggle to "Missed" → tap court → red X appears
-- Shooting summary shows correct counts and percentages
-- Undo removes the last shot
-- "Back to Stats" returns to Game Tracker
-- No shot chart button for baseball or other sports
-- Court fills the screen width on mobile
+- Basketball game → **Shot chart** → record made/miss → stats and summary tab update → back to tracker shows badge
 
 **Commit message:** `feat: add interactive shot chart page with made/missed toggle and court tapping`
 
@@ -183,9 +187,7 @@ SC-5  Game Summary      │
 
 3. **`src/pages/ShotChart.tsx`** — Renders `state.shotChart`, `onCourtTap` → `ADD_SHOT` (uses `isThreePointer` / `classifyShotZone` on tap `x,y`), made/missed toggle + player strip; **Undo** dispatches `UNDO` (same as Game Tracker for shot-originated increments).
 
-4. **Cloud open-game hydrates** (`Games.tsx`, `PlayerProfile.tsx`, `CareerStats.tsx`) — `shotChart: []` on fresh hydrate (chart data still SC-6).
-
-**Remaining (later work units):** SC-4 polish (dedicated “undo last shot” copy, `REMOVE_LAST_SHOT` UX); SC-5 summary; SC-6 persist `shotChart` to Supabase.
+4. **Cloud open-game hydrates** (`Games.tsx`, `PlayerProfile.tsx`, `CareerStats.tsx`) — `shotChart` from `HydratedCloudGame` when migration **032** is applied.
 
 **Files touched:** `src/types.ts`, `src/context/GameContext.tsx`, `src/pages/ShotChart.tsx`, `Games.tsx`, `PlayerProfile.tsx`, `CareerStats.tsx`
 

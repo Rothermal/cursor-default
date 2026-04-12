@@ -18,6 +18,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Game Notes** — free-text notes field in Game Tracker and Game Summary; synced to cloud
 - **Live Scoreboard** — home total can be a standalone scoreboard value or computed from player scoring stats + optional adjustment; manual opponent score
 - **Basketball team stats** — home/opponent “team” rows in Game Tracker for fouls (per period), timeouts, techs, turnovers; period toggle, bonus indicators, and season rules from `seasons.team_stats_config` (edit under **Settings → Seasons**). Cloud games sync placeholder `players` + `game_stats`; **Game Summary** includes a **Team stats** tab (fouls by period, bonus events, other team stats). See [docs/DESIGN_TEAM_STATS_TRACKING.md](docs/DESIGN_TEAM_STATS_TRACKING.md)
+- **Basketball shot chart** — half-court SVG from Game Tracker (**Shot chart**); tap to record made/miss with zone classification; syncs with 2PT/3PT stats; **Game Summary** tab when chart shots exist; cloud persistence via migration **`032_shot_chart.sql`** ([implementation plan](docs/DESIGN_SHOT_CHART_IMPLEMENTATION.md))
 - **Undo Support** — undo any stat action instantly
 - **Game Summary** — per-player and team totals in organized tables; M/A (%) columns for shooting stats
 - **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; centralized Data Management in Settings
