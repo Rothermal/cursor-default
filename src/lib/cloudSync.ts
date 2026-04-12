@@ -1,4 +1,4 @@
-import type { GameInfo, GameState, Player } from '../types'
+import type { GameInfo, GameState, Player, ShotRecord } from '../types'
 import { supabase } from './supabase'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
 
@@ -34,6 +34,8 @@ export interface HydratedCloudGame {
   teamId: string
   gameId: string
   playerIdMap: Record<string, string>
+  /** Chart shots for this game + recorder (basketball); empty if table missing or none. */
+  shotChart: ShotRecord[]
   hydratedAt: string
 }
 
@@ -106,6 +108,15 @@ function isMissingGameTeamPlaceholderColumnError(error: { message?: string } | n
 function isMissingIsTeamPlaceholderColumnError(error: { message?: string } | null): boolean {
   if (!error?.message) return false
   return error.message.includes('is_team_placeholder') && error.message.includes('column')
+}
+
+function isMissingShotChartTableError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  const m = error.message.toLowerCase()
+  return (
+    (m.includes('shot_chart') && m.includes('relation') && m.includes('does not exist')) ||
+    (m.includes('shot_chart') && m.includes('could not find the table'))
+  )
 }
 
 function parseSeasonTeamStatsConfig(raw: unknown): Record<string, unknown> | null {
@@ -652,6 +663,77 @@ async function upsertGameStats(
   }
 }
 
+async function syncShotChartToCloud(
+  state: GameState,
+  userId: string,
+  gameId: string,
+  playerIdMap: Record<string, string>
+): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+  if (state.sport?.id !== 'basketball') {
+    return
+  }
+
+  const { error: delError } = await supabase
+    .from('shot_chart')
+    .delete()
+    .eq('game_id', gameId)
+    .eq('recorded_by', userId)
+
+  if (delError) {
+    if (isMissingShotChartTableError(delError)) {
+      return
+    }
+    throw new Error(`Shot chart sync (delete) failed: ${delError.message}`)
+  }
+
+  if (state.shotChart.length === 0) {
+    return
+  }
+
+  const rows: Array<{
+    game_id: string
+    player_id: string
+    recorded_by: string
+    client_shot_id: string
+    x: number
+    y: number
+    made: boolean
+    shot_type: '2pt' | '3pt'
+    zone: ShotRecord['zone']
+  }> = []
+
+  for (const shot of state.shotChart) {
+    const remotePlayerId = playerIdMap[shot.playerId]
+    if (!remotePlayerId) continue
+    rows.push({
+      game_id: gameId,
+      player_id: remotePlayerId,
+      recorded_by: userId,
+      client_shot_id: shot.id,
+      x: shot.x,
+      y: shot.y,
+      made: shot.made,
+      shot_type: shot.shotType,
+      zone: shot.zone,
+    })
+  }
+
+  if (rows.length === 0) {
+    return
+  }
+
+  const { error: insError } = await supabase.from('shot_chart').insert(rows)
+  if (insError) {
+    if (isMissingShotChartTableError(insError)) {
+      return
+    }
+    throw new Error(`Shot chart sync (insert) failed: ${insError.message}`)
+  }
+}
+
 export async function syncGameSnapshotToCloud({
   state,
   userId,
@@ -703,6 +785,8 @@ export async function syncGameSnapshotToCloud({
   }
 
   await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
+
+  await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
 
   await linkGameTeamPlaceholderIds(
     gameId,
@@ -898,6 +982,55 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     playerIdMap[TEAM_PLAYER_OPP_ID] = oppCloudId
   }
 
+  const remoteToLocalPlayerId: Record<string, string> = {}
+  for (const [localId, remoteId] of Object.entries(playerIdMap)) {
+    remoteToLocalPlayerId[remoteId] = localId
+  }
+
+  const shotChart: ShotRecord[] = []
+  if (sportId === 'basketball') {
+    const { data: shotRows, error: shotErr } = await supabase
+      .from('shot_chart')
+      .select('player_id, client_shot_id, x, y, made, shot_type, zone, created_at')
+      .eq('game_id', gameRow.id)
+      .eq('recorded_by', userId)
+      .order('created_at', { ascending: true })
+
+    if (shotErr) {
+      if (!isMissingShotChartTableError(shotErr)) {
+        throw new Error(`Shot chart load failed: ${shotErr.message}`)
+      }
+    } else {
+      const zones: ShotRecord['zone'][] = ['restricted', 'paint', 'mid_range', 'three']
+      for (const row of (shotRows ?? []) as Array<{
+        player_id: string
+        client_shot_id: string
+        x: number | string
+        y: number | string
+        made: boolean
+        shot_type: string
+        zone: string
+        created_at: string
+      }>) {
+        const localPlayerId = remoteToLocalPlayerId[row.player_id]
+        if (!localPlayerId) continue
+        const z = row.zone as ShotRecord['zone']
+        if (!zones.includes(z)) continue
+        const st = row.shot_type === '3pt' ? '3pt' : '2pt'
+        shotChart.push({
+          id: row.client_shot_id,
+          x: Number(row.x),
+          y: Number(row.y),
+          made: row.made,
+          shotType: st,
+          zone: z,
+          playerId: localPlayerId,
+          timestamp: new Date(row.created_at).getTime(),
+        })
+      }
+    }
+  }
+
   const activePlayerId = rosterPlayers[0]?.id ?? teamPlayers[0]?.id ?? null
 
   return {
@@ -922,6 +1055,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     teamId: teamRow.id as string,
     gameId: gameRow.id,
     playerIdMap,
+    shotChart,
     hydratedAt: new Date().toISOString(),
   }
 }

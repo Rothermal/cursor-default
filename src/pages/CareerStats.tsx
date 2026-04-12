@@ -286,7 +286,7 @@ export default function CareerStats() {
         currentPeriod: 1,
         teamStatsConfig: null,
         actionLog: [],
-        shotChart: [],
+        shotChart: cloudGame.shotChart ?? [],
         cloudSync: {
           seasonId: cloudGame.seasonId ?? null,
           teamId: cloudGame.teamId,

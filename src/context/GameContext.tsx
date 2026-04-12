@@ -263,7 +263,7 @@ function buildHydratedStateFromCloudGame(
     currentPeriod: 1,
     teamStatsConfig: cloudGame.teamStatsConfig,
     actionLog: [],
-    shotChart: [],
+    shotChart: cloudGame.shotChart ?? [],
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
       seasonId: cloudGame.seasonId ?? null,
