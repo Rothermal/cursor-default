@@ -295,35 +295,28 @@ SC-5  Game Summary      │
 
 **Blocks:** Nothing — this is the final polish pass.
 
-**What to do:**
+**Implemented:**
 
-1. **Haptic feedback**: On mobile, call `navigator.vibrate?.(10)` when a shot is registered. Gives tactile confirmation.
+1. **Haptic** — `navigator.vibrate?.(10)` when a chart shot is recorded (`ShotChart` tap handler).
 
-2. **Visual feedback**: Brief pulse animation on the shot marker when placed (CSS animation on the SVG element).
+2. **Marker pulse** — `@keyframes shot-marker-pulse` in `index.css`; newest shot id passed to `BasketballCourt` as `newlyPlacedShotId` briefly after `ADD_SHOT` lands in state.
 
-3. **Court styling polish**:
-   - Ensure court lines are visible on all devices (contrast check)
-   - Ensure markers are visible on the hardwood background
-   - Test on both light and dark backgrounds (if dark mode is ever added)
-   - Verify court proportions on various phone sizes (iPhone SE, iPhone 15, Pixel 7, etc.)
+3. **Markers** — Slightly stronger green/red fills and strokes for contrast on hardwood.
 
-4. **Prevent accidental taps**: Add a small debounce (100ms) to prevent double-registering a shot from a bouncy tap.
+4. **Tap debounce** — `BasketballCourt` overlay ignores taps within **120ms** (`TAP_DEBOUNCE_MS`).
 
-5. **Shot count badge on Game Tracker**: On the "Shot Chart" button in GameTracker, show a badge with the number of shots recorded: `🏀 Shot Chart (14)`.
+5. **Game Tracker badge** — 🏀 **Shot chart** + numeric badge when `shotChart.length > 0` (cap display `99+`).
 
-6. **Clear All confirmation**: The "Clear All" button on the shot chart should show a `ConfirmDialog` before wiping all shots.
+6. **Clear all** — `ConfirmDialog` (same component as Games/Teams) instead of `window.confirm`.
 
-7. **Empty state**: When no shots have been recorded, show a centered message on the court: "Tap the court to record shots."
+7. **Empty state** — Two-line centered SVG text on the court when interactive and `shots.length === 0`.
 
-**Files touched:** `src/pages/ShotChart.tsx`, `src/components/shot-chart/BasketballCourt.tsx`, `src/pages/GameTracker.tsx`
+**Files touched:** `ShotChart.tsx`, `BasketballCourt.tsx`, `GameTracker.tsx`, `index.css`
 
-**Test breakpoint:**
-- Tap court → feel haptic buzz → see marker pulse animation
-- Rapid double-tap → only 1 shot registered (debounce)
-- Shot chart button shows count badge
-- "Clear All" shows confirmation dialog
-- Empty court shows placeholder message
-- Court looks good on iPhone SE (375px), iPhone 15 Pro Max (430px), and desktop
+**Completion checklist (human):**
+
+- [ ] **Apply Supabase migration `032_shot_chart.sql`** if not already run (required for shot chart cloud sync — see SC-6 / README migration list).
+- Smoke: record shots, debounce, clear confirm, badge, summary tab, cloud round-trip after migration.
 
 **Commit message:** `feat: polish shot chart with haptic feedback, animations, and edge case handling`
 

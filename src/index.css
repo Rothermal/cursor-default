@@ -16,6 +16,29 @@
   }
 }
 
+@layer utilities {
+  @keyframes shot-marker-pulse {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    45% {
+      transform: scale(1.4);
+      opacity: 0.92;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .shot-marker-pulse {
+    animation: shot-marker-pulse 0.55s ease-out 1;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+}
+
 @layer components {
   .btn-primary {
     @apply bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl

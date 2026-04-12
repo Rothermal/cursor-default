@@ -77,8 +77,17 @@ function timeoutCapForPeriod(
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync } = useGame()
-  const { sport, players, activePlayerId, actionLog, notes, gameInfo, currentPeriod, teamStatsConfig } =
-    state
+  const {
+    sport,
+    players,
+    activePlayerId,
+    actionLog,
+    notes,
+    gameInfo,
+    currentPeriod,
+    teamStatsConfig,
+    shotChart,
+  } = state
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [newName, setNewName] = useState('')
@@ -252,10 +261,22 @@ export default function GameTracker() {
           <button
             type="button"
             onClick={() => navigate('/shot-chart')}
-            className="mt-3 w-full py-3 rounded-xl font-semibold text-white shadow-md active:scale-[0.99] transition-transform
+            className="relative mt-3 w-full py-3 rounded-xl font-semibold text-white shadow-md active:scale-[0.99] transition-transform
                        bg-gradient-to-r from-orange-500 to-amber-600 border border-orange-600/30"
           >
+            <span className="mr-1" aria-hidden>
+              🏀
+            </span>
             Shot chart
+            {shotChart.length > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 min-w-[1.35rem] h-6 px-1.5 rounded-full bg-white text-orange-700 text-xs font-bold
+                           flex items-center justify-center shadow border border-orange-200"
+                aria-label={`${shotChart.length} shots on chart`}
+              >
+                {shotChart.length > 99 ? '99+' : shotChart.length}
+              </span>
+            )}
           </button>
         )}
       </div>

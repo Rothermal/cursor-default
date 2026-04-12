@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import BasketballCourt from '../components/shot-chart/BasketballCourt'
 import ShootingSummary from '../components/shot-chart/ShootingSummary'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { classifyShotZone, isThreePointer } from '../components/shot-chart/courtGeometry'
 import {
   isTeamPseudoPlayer,
@@ -52,6 +53,9 @@ export default function ShotChart() {
   const { state, dispatch } = useGame()
   const { sport, gameInfo, players, activePlayerId, shotChart, actionLog } = state
   const [mode, setMode] = useState<'made' | 'missed'>('made')
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [pulseShotId, setPulseShotId] = useState<string | null>(null)
+  const pendingPulseIdRef = useRef<string | null>(null)
 
   const allowed = Boolean(sport && sport.id === 'basketball' && gameInfo)
 
@@ -71,8 +75,15 @@ export default function ShotChart() {
     (x: number, y: number) => {
       if (!effectivePlayerId) return
       const three = isThreePointer(x, y)
+      const id = newShotId()
+      pendingPulseIdRef.current = id
+      try {
+        navigator.vibrate?.(10)
+      } catch {
+        /* ignore */
+      }
       const shot: ShotRecord = {
-        id: newShotId(),
+        id,
         x,
         y,
         made: mode === 'made',
@@ -86,6 +97,18 @@ export default function ShotChart() {
     [dispatch, effectivePlayerId, mode]
   )
 
+  useEffect(() => {
+    const pending = pendingPulseIdRef.current
+    if (!pending) return
+    const last = shotChart[shotChart.length - 1]
+    if (last?.id === pending) {
+      pendingPulseIdRef.current = null
+      setPulseShotId(last.id)
+      const t = window.setTimeout(() => setPulseShotId(null), 650)
+      return () => window.clearTimeout(t)
+    }
+  }, [shotChart])
+
   const lastEntry = actionLog.length > 0 ? actionLog[actionLog.length - 1] : undefined
   const canUndoShot = Boolean(lastEntry?.shotId)
   const undoShotSubtitle = useMemo(
@@ -94,14 +117,8 @@ export default function ShotChart() {
   )
   const canClearShots = shotChart.length > 0
 
-  const handleClearChart = () => {
-    if (
-      !window.confirm(
-        'Remove every shot from the chart and undo their scoring stats? Stat taps (no location) are not changed.'
-      )
-    ) {
-      return
-    }
+  const handleClearChartConfirm = () => {
+    setShowClearConfirm(false)
     dispatch({ type: 'CLEAR_SHOT_CHART' })
   }
 
@@ -217,7 +234,7 @@ export default function ShotChart() {
         <button
           type="button"
           disabled={!canClearShots}
-          onClick={handleClearChart}
+          onClick={() => setShowClearConfirm(true)}
           className="w-full py-2 rounded-xl text-sm font-medium border border-rose-200 bg-rose-50 text-rose-800
                      disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
         >
@@ -227,12 +244,29 @@ export default function ShotChart() {
 
       <div className="px-3 pb-6 max-w-lg mx-auto w-full flex-1 flex flex-col space-y-3">
         <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm mt-1">
-          <BasketballCourt shots={shotChart} onCourtTap={onCourtTap} className="w-full" />
+          <BasketballCourt
+            shots={shotChart}
+            onCourtTap={onCourtTap}
+            className="w-full"
+            newlyPlacedShotId={pulseShotId}
+            emptyHint="Tap the court to record shots."
+          />
         </div>
         <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
           <ShootingSummary shots={shotChart} />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="Clear all chart shots?"
+        message="Remove every shot from the chart and undo their scoring stats? Stat taps (no location) are not changed."
+        confirmLabel="Clear shots"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={handleClearChartConfirm}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   )
 }
