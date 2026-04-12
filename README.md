@@ -105,6 +105,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/029_merge_block_team_placeholders.sql` — merge RPCs reject placeholder players
    - `supabase/migrations/030_team_stats_schema.sql` — `games.home_team_player_id`, `opp_team_player_id`, `seasons.team_stats_config`, display views, `get_game_team_stats` (see file for notes on `get_game_stats_resolved`)
    - `supabase/migrations/031_get_game_team_stats.sql` — repair: `get_game_team_stats` only if needed
+   - `supabase/migrations/032_shot_chart.sql` — `shot_chart` per-game shot locations (cloud sync from the shot chart; see `docs/DESIGN_SHOT_CHART_IMPLEMENTATION.md` SC-6)
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.

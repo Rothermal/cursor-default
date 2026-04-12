@@ -268,67 +268,20 @@ SC-5  Game Summary      │
 
 **Blocks:** SC-7
 
-**What to do:**
+**Implemented:**
 
-1. **New: `supabase/migrations/028_shot_chart.sql`** (or next available number):
-   ```sql
-   CREATE TABLE shot_chart (
-     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-     game_id uuid NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-     player_id uuid NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-     x numeric NOT NULL,
-     y numeric NOT NULL,
-     made boolean NOT NULL,
-     shot_type text NOT NULL CHECK (shot_type IN ('2pt', '3pt')),
-     zone text NOT NULL CHECK (zone IN ('restricted', 'paint', 'mid_range', 'three')),
-     recorded_by uuid NOT NULL REFERENCES profiles(id),
-     created_at timestamptz NOT NULL DEFAULT now()
-   );
+1. **`supabase/migrations/032_shot_chart.sql`** — Table `shot_chart` with `game_id`, `player_id`, `recorded_by`, **`client_shot_id`** (stable `ShotRecord.id` for idempotent replace), `x`, `y`, `made`, `shot_type`, `zone`, `created_at`. Unique `(game_id, recorded_by, client_shot_id)`. RLS: team members **select** on games in their teams; **insert/update/delete own** rows (`recorded_by = auth.uid()`), aligned with `game_stats`.
 
-   CREATE INDEX idx_shot_chart_game ON shot_chart(game_id);
-   CREATE INDEX idx_shot_chart_game_player ON shot_chart(game_id, player_id);
+2. **`syncGameSnapshotToCloud`** — After `upsertGameStats`, **`syncShotChartToCloud`**: for basketball only, **delete** `shot_chart` where `(game_id, recorded_by) = (…, userId)`, then **insert** all `state.shotChart` rows with mapped `player_id`. If the table is missing (old DB), delete/insert errors are ignored so sync still succeeds.
 
-   ALTER TABLE shot_chart ENABLE ROW LEVEL SECURITY;
+3. **`hydrateCloudGameFromRow`** — For `sportId === 'basketball'`, **select** `shot_chart` for `(game_id, recorded_by)`; map remote `player_id` → local via `playerIdMap`; build `HydratedCloudGame.shotChart`. **`buildHydratedStateFromCloudGame`** / **Games** / **PlayerProfile** / **CareerStats** use `cloudGame.shotChart`.
 
-   -- Team members can view shot charts for their team's games
-   CREATE POLICY "shot_chart_select" ON shot_chart
-     FOR SELECT USING (
-       game_id IN (SELECT id FROM games WHERE team_id IN (
-         SELECT team_id FROM team_members WHERE user_id = (SELECT auth.uid())
-       ))
-     );
-
-   -- Users can insert their own shot chart data
-   CREATE POLICY "shot_chart_insert" ON shot_chart
-     FOR INSERT WITH CHECK (recorded_by = (SELECT auth.uid()));
-
-   -- Users can update/delete their own shot chart data
-   CREATE POLICY "shot_chart_update" ON shot_chart
-     FOR UPDATE USING (recorded_by = (SELECT auth.uid()));
-
-   CREATE POLICY "shot_chart_delete" ON shot_chart
-     FOR DELETE USING (recorded_by = (SELECT auth.uid()));
-   ```
-
-2. **`src/lib/cloudSync.ts`** — Add shot chart sync:
-   - In `syncGameSnapshotToCloud`: after upserting `game_stats`, also upsert `shot_chart` rows
-   - Strategy: delete existing `shot_chart` rows for this `(game_id, recorded_by)` and re-insert all from `state.shotChart`. This is simpler than per-shot diffing and the row count is small (typically <50 per game).
-   - Map local player IDs to cloud player IDs using `playerIdMap` for the `player_id` column.
-
-3. **`src/lib/cloudSync.ts`** — Load shot chart on cloud resume:
-   - In `loadLatestCloudGame` / `loadCloudGameById`: after loading game stats, also query `shot_chart` for this game
-   - Map cloud player IDs back to local IDs
-   - Include in hydrated state as `shotChart: [...]`
-
-**Files touched:** new `supabase/migrations/028_shot_chart.sql`, `src/lib/cloudSync.ts`
+**Files touched:** `032_shot_chart.sql`, `cloudSync.ts`, `GameContext.tsx`, `Games.tsx`, `PlayerProfile.tsx`, `CareerStats.tsx`
 
 **Test breakpoint:**
-- Apply migration to Supabase
-- Start a cloud game → record shots via chart → verify in Supabase DB:
-  - `shot_chart` table has rows with correct `game_id`, `player_id`, `x`, `y`, `made`, `shot_type`, `zone`
-- Close and reopen the game → shot chart data restored from cloud
-- Different user on same game sees shot chart data (via RLS select policy)
-- Delete a game → shot chart rows cascade-deleted
+- Apply migration → record chart shots → sync → rows in `shot_chart`
+- Resume game → markers restored
+- Game delete cascades rows
 
 **Commit message:** `feat: add shot_chart table migration and cloud sync support`
 
