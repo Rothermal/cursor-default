@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import BasketballCourt from '../components/shot-chart/BasketballCourt'
+import ShootingSummary from '../components/shot-chart/ShootingSummary'
 import { classifyShotZone, isThreePointer } from '../components/shot-chart/courtGeometry'
 import {
   isTeamPseudoPlayer,
@@ -224,9 +225,12 @@ export default function ShotChart() {
         </button>
       </div>
 
-      <div className="px-3 pb-6 max-w-lg mx-auto w-full flex-1 flex flex-col">
+      <div className="px-3 pb-6 max-w-lg mx-auto w-full flex-1 flex flex-col space-y-3">
         <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm mt-1">
           <BasketballCourt shots={shotChart} onCourtTap={onCourtTap} className="w-full" />
+        </div>
+        <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
+          <ShootingSummary shots={shotChart} />
         </div>
       </div>
     </div>

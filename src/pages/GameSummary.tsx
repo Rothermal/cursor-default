@@ -7,6 +7,8 @@ import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { hasTrackedTeamSide } from '../lib/teamStatsSummary'
 import TeamStatSummary from '../components/team-stats/TeamStatSummary'
+import BasketballCourt from '../components/shot-chart/BasketballCourt'
+import ShootingSummary from '../components/shot-chart/ShootingSummary'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -32,7 +34,7 @@ export default function GameSummary() {
   const navigate = useNavigate()
   const { state, dispatch } = useGame()
   const { user, isConfigured } = useAuth()
-  const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment } = state
+  const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, shotChart } = state
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
   const [resolvedStats, setResolvedStats] = useState<ResolvedStatsMap | null>(null)
@@ -51,8 +53,8 @@ export default function GameSummary() {
   const [savingCorrection, setSavingCorrection] = useState(false)
   const [resolvedKey, setResolvedKey] = useState(0)
   const [viewMode, setViewMode] = useState<'primary' | 'all'>('primary')
-  /** Players vs scores vs team-level stat summary (fouls, timeouts). */
-  const [summaryTab, setSummaryTab] = useState<'players' | 'team' | 'team_stats'>('players')
+  /** Players vs scores vs team-level stat summary (fouls, timeouts) vs shot chart (basketball). */
+  const [summaryTab, setSummaryTab] = useState<'players' | 'team' | 'team_stats' | 'shot_chart'>('players')
   /** Final games: overlay from get_game_team_stats (resolved placeholder stats). */
   const [teamTrackedStatsByRemoteId, setTeamTrackedStatsByRemoteId] = useState<
     Record<string, Record<string, number>> | null
@@ -132,11 +134,19 @@ export default function GameSummary() {
       (hasTrackedTeamSide(teamStatHomeStats, sport) || hasTrackedTeamSide(teamStatOppStats, sport))
   )
 
+  const showShotChartTab = Boolean(sport?.id === 'basketball' && shotChart.length > 0)
+
   useEffect(() => {
     if (!showTeamStatsTab && summaryTab === 'team_stats') {
       setSummaryTab('players')
     }
   }, [showTeamStatsTab, summaryTab])
+
+  useEffect(() => {
+    if (!showShotChartTab && summaryTab === 'shot_chart') {
+      setSummaryTab('players')
+    }
+  }, [showShotChartTab, summaryTab])
 
   const teamStatsSummaryEl = useMemo(() => {
     if (!sport || !gameInfo || !showTeamStatsTab || summaryTab !== 'team_stats') return null
@@ -793,6 +803,17 @@ export default function GameSummary() {
                 Team stats
               </button>
             )}
+            {showShotChartTab && (
+              <button
+                type="button"
+                onClick={() => setSummaryTab('shot_chart')}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  summaryTab === 'shot_chart' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Shot chart
+              </button>
+            )}
           </div>
         {isFinalCloudGame && summaryTab === 'players' && (
           <>
@@ -835,6 +856,17 @@ export default function GameSummary() {
         </div>
 
         {teamStatsSummaryEl}
+
+        {summaryTab === 'shot_chart' && (
+          <div className="space-y-4 mb-6">
+            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <BasketballCourt shots={shotChart} className="w-full" />
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <ShootingSummary shots={shotChart} />
+            </div>
+          </div>
+        )}
 
         {summaryTab === 'team' && (
           <div className="card mb-6 border-slate-200">
