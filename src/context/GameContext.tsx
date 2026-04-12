@@ -111,6 +111,56 @@ function statIdForShotRecord(shot: ShotRecord): string {
   return shot.made ? '2pt' : '2pt_miss'
 }
 
+/** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
+function applyUndoLastEntry(state: GameState): GameState | null {
+  if (state.actionLog.length === 0) return null
+  const lastAction = state.actionLog[state.actionLog.length - 1]
+  let newState: GameState = { ...state, actionLog: state.actionLog.slice(0, -1) }
+
+  switch (lastAction.type) {
+    case 'increment':
+    case 'decrement':
+      newState = {
+        ...newState,
+        players: newState.players.map(p =>
+          p.id === lastAction.playerId
+            ? { ...p, stats: { ...p.stats, [lastAction.statId!]: lastAction.previousValue } }
+            : p
+        ),
+      }
+      if (lastAction.type === 'increment' && lastAction.shotId) {
+        newState = {
+          ...newState,
+          shotChart: newState.shotChart.filter(s => s.id !== lastAction.shotId),
+        }
+      }
+      break
+    case 'opponent_score_up':
+    case 'opponent_score_down':
+      newState = { ...newState, opponentScore: lastAction.previousValue }
+      break
+    case 'home_score_up':
+    case 'home_score_down':
+      newState = { ...newState, homeScoreAdjustment: lastAction.previousValue }
+      break
+    case 'home_team_score_up':
+    case 'home_team_score_down':
+      if (lastAction.previousHomeTeamScore == null) {
+        newState = {
+          ...newState,
+          homeTeamScore: null,
+          homeScoreAdjustment: lastAction.previousHomeScoreAdjustment ?? 0,
+        }
+      } else {
+        newState = { ...newState, homeTeamScore: lastAction.previousHomeTeamScore }
+      }
+      break
+    default:
+      return newState
+  }
+  return newState
+}
+
 function buildSyncFingerprint(state: GameState): string {
   return JSON.stringify({
     sportId: state.sport?.id ?? null,
@@ -313,26 +363,41 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'REMOVE_LAST_SHOT': {
       if (state.shotChart.length === 0) return state
       const popped = state.shotChart[state.shotChart.length - 1]
-      const nextShots = state.shotChart.slice(0, -1)
       const last = state.actionLog[state.actionLog.length - 1]
-      if (
+      const logMatchesShot =
         last?.type === 'increment' &&
         last.shotId === popped.id &&
         last.playerId === popped.playerId &&
         last.statId === statIdForShotRecord(popped)
-      ) {
-        return {
-          ...state,
-          shotChart: nextShots,
-          actionLog: state.actionLog.slice(0, -1),
-          players: state.players.map(p =>
-            p.id === last.playerId
-              ? { ...p, stats: { ...p.stats, [last.statId!]: last.previousValue } }
-              : p
-          ),
-        }
+      if (logMatchesShot) {
+        return applyUndoLastEntry(state) ?? state
       }
-      return { ...state, shotChart: nextShots }
+      return { ...state, shotChart: state.shotChart.slice(0, -1) }
+    }
+
+    case 'UNDO_LAST_SHOT': {
+      const last = state.actionLog[state.actionLog.length - 1]
+      if (!last?.shotId) return state
+      return applyUndoLastEntry(state) ?? state
+    }
+
+    case 'CLEAR_SHOT_CHART': {
+      if (state.shotChart.length === 0) return state
+      let s = state
+      while (s.shotChart.length > 0) {
+        const popped = s.shotChart[s.shotChart.length - 1]
+        const last = s.actionLog[s.actionLog.length - 1]
+        const matches =
+          last?.type === 'increment' &&
+          last.shotId === popped.id &&
+          last.playerId === popped.playerId &&
+          last.statId === statIdForShotRecord(popped)
+        if (!matches) break
+        const next = applyUndoLastEntry(s)
+        if (!next) break
+        s = next
+      }
+      return s
     }
 
     case 'INCREMENT_STAT': {
@@ -486,52 +551,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
 
-    case 'UNDO': {
-      if (state.actionLog.length === 0) return state
-      const lastAction = state.actionLog[state.actionLog.length - 1]
-      let newState = { ...state, actionLog: state.actionLog.slice(0, -1) }
-
-      switch (lastAction.type) {
-        case 'increment':
-        case 'decrement':
-          newState = {
-            ...newState,
-            players: newState.players.map(p =>
-              p.id === lastAction.playerId
-                ? { ...p, stats: { ...p.stats, [lastAction.statId!]: lastAction.previousValue } }
-                : p
-            ),
-          }
-          if (lastAction.type === 'increment' && lastAction.shotId) {
-            newState = {
-              ...newState,
-              shotChart: newState.shotChart.filter(s => s.id !== lastAction.shotId),
-            }
-          }
-          break
-        case 'opponent_score_up':
-        case 'opponent_score_down':
-          newState = { ...newState, opponentScore: lastAction.previousValue }
-          break
-        case 'home_score_up':
-        case 'home_score_down':
-          newState = { ...newState, homeScoreAdjustment: lastAction.previousValue }
-          break
-        case 'home_team_score_up':
-        case 'home_team_score_down':
-          if (lastAction.previousHomeTeamScore == null) {
-            newState = {
-              ...newState,
-              homeTeamScore: null,
-              homeScoreAdjustment: lastAction.previousHomeScoreAdjustment ?? 0,
-            }
-          } else {
-            newState = { ...newState, homeTeamScore: lastAction.previousHomeTeamScore }
-          }
-          break
-      }
-      return newState
-    }
+    case 'UNDO':
+      return applyUndoLastEntry(state) ?? state
 
     case 'RESET_GAME':
       return createInitialState(resetStatus)

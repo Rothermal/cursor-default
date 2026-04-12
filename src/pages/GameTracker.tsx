@@ -443,9 +443,20 @@ export default function GameTracker() {
                     }
                     const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined
 
-                    return (
+                    const chartAwareTitle =
+                      sport.id === 'basketball' &&
+                      (action.id === '2pt' ||
+                        action.id === '2pt_miss' ||
+                        action.id === '3pt' ||
+                        action.id === '3pt_miss' ||
+                        action.id === 'ft' ||
+                        action.id === 'ft_miss')
+                        ? 'Shots from the Shot Chart include court location. Taps here count in stats only and do not add markers on the chart.'
+                        : undefined
+
+                    const buttonKey = action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id
+                    const statButton = (
                       <StatButton
-                        key={action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id}
                         label={action.label}
                         shortLabel={action.shortLabel}
                         value={currentVal}
@@ -476,6 +487,14 @@ export default function GameTracker() {
                         }
                         attemptCount={missAction ? (activePlayer.stats[missAction.id] || 0) : undefined}
                       />
+                    )
+
+                    return chartAwareTitle ? (
+                      <span key={buttonKey} title={chartAwareTitle} className="block cursor-help">
+                        {statButton}
+                      </span>
+                    ) : (
+                      <span key={buttonKey}>{statButton}</span>
                     )
                   })}
                 </div>
