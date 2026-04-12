@@ -676,23 +676,6 @@ async function syncShotChartToCloud(
     return
   }
 
-  const { error: delError } = await supabase
-    .from('shot_chart')
-    .delete()
-    .eq('game_id', gameId)
-    .eq('recorded_by', userId)
-
-  if (delError) {
-    if (isMissingShotChartTableError(delError)) {
-      return
-    }
-    throw new Error(`Shot chart sync (delete) failed: ${delError.message}`)
-  }
-
-  if (state.shotChart.length === 0) {
-    return
-  }
-
   const rows: Array<{
     game_id: string
     player_id: string
@@ -719,6 +702,32 @@ async function syncShotChartToCloud(
       shot_type: shot.shotType,
       zone: shot.zone,
     })
+  }
+
+  // Never delete existing cloud rows unless we can replace the full local chart.
+  // Otherwise a roster change (e.g. removed player) leaves shots in `shotChart` with
+  // no `player_id` mapping → we'd wipe the table and insert nothing (silent data loss).
+  if (state.shotChart.length > 0 && rows.length !== state.shotChart.length) {
+    throw new Error(
+      `Shot chart sync aborted: ${state.shotChart.length - rows.length} chart shot(s) have no cloud player mapping.`
+    )
+  }
+
+  const { error: delError } = await supabase
+    .from('shot_chart')
+    .delete()
+    .eq('game_id', gameId)
+    .eq('recorded_by', userId)
+
+  if (delError) {
+    if (isMissingShotChartTableError(delError)) {
+      return
+    }
+    throw new Error(`Shot chart sync (delete) failed: ${delError.message}`)
+  }
+
+  if (state.shotChart.length === 0) {
+    return
   }
 
   if (rows.length === 0) {
