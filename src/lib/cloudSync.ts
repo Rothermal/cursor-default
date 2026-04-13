@@ -1,6 +1,7 @@
 import type { GameInfo, GameState, Player, ShotRecord } from '../types'
 import { supabase } from './supabase'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
+import { isValidRemotePlayerUuid } from './uuidValidation'
 
 interface SyncGameSnapshotInput {
   state: GameState
@@ -447,15 +448,18 @@ async function ensureTeamPlaceholderPlayer(
 
   const { firstName, lastName } = parsePlayerName(player.name)
 
-  if (existingRemoteId) {
+  const remoteId =
+    existingRemoteId && isValidRemotePlayerUuid(existingRemoteId) ? existingRemoteId : undefined
+
+  if (remoteId) {
     const { error: updateError } = await supabase
       .from('players')
       .update({ first_name: firstName, last_name: lastName || null, nickname: null })
-      .eq('id', existingRemoteId)
+      .eq('id', remoteId)
     if (updateError) {
       throw new Error(`Team placeholder update failed: ${updateError.message}`)
     }
-    return existingRemoteId
+    return remoteId
   }
 
   const fullInsert = {
@@ -527,16 +531,19 @@ async function ensurePlayerId(
 
   const { firstName, lastName } = parsePlayerName(player.name)
 
+  const remoteId =
+    existingRemoteId && isValidRemotePlayerUuid(existingRemoteId) ? existingRemoteId : undefined
+
   if (isTeamPseudoPlayer(player)) {
-    return ensureTeamPlaceholderPlayer(player, userId, existingRemoteId)
+    return ensureTeamPlaceholderPlayer(player, userId, remoteId)
   }
   const jerseyNumber = player.number.trim()
 
-  if (existingRemoteId) {
+  if (remoteId) {
     const { error: updateError } = await supabase
       .from('players')
       .update({ first_name: firstName, last_name: lastName, nickname: null })
-      .eq('id', existingRemoteId)
+      .eq('id', remoteId)
 
     if (updateError) {
       throw new Error(`Player update failed: ${updateError.message}`)
@@ -545,11 +552,11 @@ async function ensurePlayerId(
     await supabase
       .from('team_players')
       .upsert(
-        { team_id: teamId, player_id: existingRemoteId, jersey_number: jerseyNumber, is_active: true },
+        { team_id: teamId, player_id: remoteId, jersey_number: jerseyNumber, is_active: true },
         { onConflict: 'team_id,player_id' }
       )
 
-    return existingRemoteId
+    return remoteId
   }
 
   const { data: existingOnTeam, error: junctionLookupError } = await supabase

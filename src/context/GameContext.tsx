@@ -25,6 +25,7 @@ import {
 } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
+import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 
@@ -612,7 +613,7 @@ function loadState(): GameState {
     cloudSync: {
           ...createInitialCloudSyncState(restoredStatus),
           ...(parsed.cloudSync ?? {}),
-          playerIdMap: parsed.cloudSync?.playerIdMap ?? {},
+          playerIdMap: sanitizePlayerIdMapForCloud(parsed.cloudSync?.playerIdMap ?? {}),
           gameStatus: parsed.cloudSync?.gameStatus ?? null,
           status: restoredStatus,
         },
