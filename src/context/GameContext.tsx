@@ -24,6 +24,7 @@ import {
   getLastOpenedPreferenceSupport,
 } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
+import { logClientSyncError } from '../lib/logClientSyncError'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 
@@ -853,13 +854,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
         })
         return
       }
+      const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
           status: 'error',
-          lastError: error instanceof Error ? error.message : 'Cloud sync failed',
+          lastError: errMsg,
         },
       })
+      if (userId) {
+        void logClientSyncError(userId, errMsg, stateRef.current)
+      }
     } finally {
       syncInFlightRef.current = false
     }
