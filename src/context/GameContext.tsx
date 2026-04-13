@@ -14,6 +14,7 @@ import type {
   ActionLogEntry,
   CloudSyncState,
   CloudSyncStatus,
+  Player,
   ShotRecord,
 } from '../types'
 import { useAuth } from './AuthContext'
@@ -105,6 +106,12 @@ function normalizeCloudStatus(value: unknown, fallback: CloudSyncStatus): CloudS
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+}
+
+/** Drops chart rows whose `playerId` is no longer on the roster (avoids permanent shot-chart sync failure). */
+function shotChartWithOnlyRosterPlayers(shotChart: ShotRecord[], players: Player[]): ShotRecord[] {
+  const ids = new Set(players.map(p => p.id))
+  return shotChart.filter(s => ids.has(s.playerId))
 }
 
 /** Stat key to increment when adding a shot from the chart. */
@@ -309,23 +316,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'ADD_PLAYER':
       return { ...state, players: [...state.players, action.player] }
 
-    case 'SET_PLAYERS':
+    case 'SET_PLAYERS': {
+      const players = action.players
       return {
         ...state,
-        players: action.players,
-        activePlayerId: action.players.length > 0 ? state.activePlayerId ?? action.players[0].id : null,
+        players,
+        activePlayerId: players.length > 0 ? state.activePlayerId ?? players[0].id : null,
+        shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
       }
+    }
 
     case 'HYDRATE_STATE':
       return action.state
 
-    case 'REMOVE_PLAYER':
+    case 'REMOVE_PLAYER': {
       // Keep local->remote player mapping aligned with the current roster.
       // Removed players are not automatically deleted in Supabase to preserve history.
+      const players = state.players.filter(p => p.id !== action.playerId)
       return {
         ...state,
-        players: state.players.filter(p => p.id !== action.playerId),
+        players,
         activePlayerId: state.activePlayerId === action.playerId ? null : state.activePlayerId,
+        shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
         cloudSync: {
           ...state.cloudSync,
           playerIdMap: Object.fromEntries(
@@ -333,6 +345,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           ),
         },
       }
+    }
 
     case 'SET_ACTIVE_PLAYER':
       return { ...state, activePlayerId: action.playerId }
