@@ -24,7 +24,7 @@ import {
   getLastOpenedPreferenceSupport,
 } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
-import { logClientSyncError } from '../lib/logClientSyncError'
+import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 
@@ -32,6 +32,8 @@ import { getDisplayedHomeScore } from '../lib/gameScore'
 export const GAME_STORAGE_KEY = 'statkeeper_game'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
 const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
+/** One row per user+message: persisted `cloudSync.lastError` uploaded to `client_sync_errors`. */
+const SYNC_LAST_ERROR_BACKFILL_PREFIX = 'statkeeper_sync_err_backfill:'
 
 function getPendingSyncFlag(): boolean {
   try {
@@ -648,6 +650,45 @@ export function GameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  /** Upload a previously persisted sync error once (before `client_sync_errors` existed or insert failed). */
+  useEffect(() => {
+    if (!isConfigured || !userId || !supabase || !isOnline) return
+    const msg = state.cloudSync.lastError?.trim()
+    if (!msg || state.cloudSync.status !== 'error') return
+    if (isPersistedSyncLastErrorNetworkish(msg)) return
+
+    const key = `${SYNC_LAST_ERROR_BACKFILL_PREFIX}${userId}:${msg}`
+    try {
+      if (localStorage.getItem(key) === '1') return
+    } catch {
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      const ok = await logClientSyncError(userId, msg, stateRef.current, {
+        bypassThrottle: true,
+        extraContext: { source: 'localStorage_backfill' },
+      })
+      if (cancelled || !ok) return
+      try {
+        localStorage.setItem(key, '1')
+      } catch {
+        // ignore
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    isConfigured,
+    userId,
+    isOnline,
+    state.cloudSync.lastError,
+    state.cloudSync.status,
+  ])
 
   useEffect(() => {
     localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
