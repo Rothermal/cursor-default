@@ -401,7 +401,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CLEAR_SHOT_CHART': {
       if (state.shotChart.length === 0) return state
       let s = state
-      while (s.shotChart.length > 0) {
+      const maxIterations = s.shotChart.length + s.actionLog.length + 8
+      for (let i = 0; i < maxIterations && s.shotChart.length > 0; i++) {
         const popped = s.shotChart[s.shotChart.length - 1]
         const last = s.actionLog[s.actionLog.length - 1]
         const matches =
@@ -409,10 +410,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           last.shotId === popped.id &&
           last.playerId === popped.playerId &&
           last.statId === statIdForShotRecord(popped)
-        if (!matches) break
-        const next = applyUndoLastEntry(s)
-        if (!next) break
-        s = next
+        if (matches) {
+          const next = applyUndoLastEntry(s)
+          if (!next) {
+            s = { ...s, shotChart: s.shotChart.slice(0, -1) }
+            continue
+          }
+          s = next
+          continue
+        }
+        // Chart tail has no matching log (e.g. general UNDO removed the increment entry).
+        // Still remove the shot and roll back its FG stat so we never spin forever.
+        const player = s.players.find(p => p.id === popped.playerId)
+        const statId = statIdForShotRecord(popped)
+        if (!player) {
+          s = { ...s, shotChart: s.shotChart.slice(0, -1) }
+          continue
+        }
+        const v = player.stats[statId] || 0
+        s =
+          v > 0
+            ? {
+                ...s,
+                shotChart: s.shotChart.slice(0, -1),
+                players: s.players.map(p =>
+                  p.id === popped.playerId ? { ...p, stats: { ...p.stats, [statId]: v - 1 } } : p
+                ),
+              }
+            : { ...s, shotChart: s.shotChart.slice(0, -1) }
       }
       return s
     }
