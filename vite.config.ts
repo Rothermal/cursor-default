@@ -1,8 +1,12 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ command }) => ({
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+  },
   // GitHub Pages project sites are served from "/<repo>/".
   // Keep local dev at "/" while ensuring production builds work on Pages.
   base: command === 'build' ? '/cursor-default/' : '/',
