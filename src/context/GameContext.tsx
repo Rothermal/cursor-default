@@ -26,6 +26,7 @@ import {
 } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
+import { activePlayerIdAfterRosterChange } from '../lib/activePlayerIdForRoster'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
@@ -321,7 +322,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         players,
-        activePlayerId: players.length > 0 ? state.activePlayerId ?? players[0].id : null,
+        activePlayerId: activePlayerIdAfterRosterChange(state.activePlayerId, players),
         shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
       }
     }
