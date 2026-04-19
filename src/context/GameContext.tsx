@@ -656,7 +656,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
   const queueAnotherSyncRef = useRef(false)
-  const pendingSyncRef = useRef(false)
+  /** Seeded from localStorage so cloud hydration cannot race ahead of the pending-sync restore effect. */
+  const pendingSyncRef = useRef(getPendingSyncFlag())
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
@@ -739,10 +740,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const hydrateFromCloud = async () => {
       // Cloud-first: only skip hydration when there is unsynced local progress
       // (game in progress that has never been synced - no gameId yet).
+      //
+      // Also skip when `statkeeper_pending_sync` is set: that durable flag is written
+      // before unload when we had sync prerequisites but were offline (or hit a
+      // network-class sync failure). Hydration must not run before the effect that
+      // copies that flag into `pendingSyncRef`, otherwise we'd fetch cloud and
+      // overwrite newer local state from localStorage (silent data loss).
       const hasUnsyncedLocal =
         stateRef.current.sport &&
         stateRef.current.gameInfo &&
-        !stateRef.current.cloudSync.gameId
+        (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
       if (hasUnsyncedLocal) {
         hydratedUserRef.current = userId
         return
