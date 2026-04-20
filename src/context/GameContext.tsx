@@ -318,11 +318,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SET_PLAYERS': {
       const players = action.players
+      const prevPlayers = state.players
+      const nextIds = new Set(players.map(p => p.id))
+      // Strip chart rows only when someone left the roster. Prepending team placeholders
+      // (GameTracker / GameCheckout) adds ids without removing any — filtering there would
+      // wipe every shot because markers still use real player ids.
+      const removedAnyPlayer = prevPlayers.some(p => !nextIds.has(p.id))
+      const shotChart =
+        removedAnyPlayer || prevPlayers.length === 0 || players.length === 0
+          ? shotChartWithOnlyRosterPlayers(state.shotChart, players)
+          : state.shotChart
       return {
         ...state,
         players,
         activePlayerId: players.length > 0 ? state.activePlayerId ?? players[0].id : null,
-        shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
+        shotChart,
       }
     }
 
