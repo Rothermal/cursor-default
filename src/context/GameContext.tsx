@@ -14,7 +14,6 @@ import type {
   ActionLogEntry,
   CloudSyncState,
   CloudSyncStatus,
-  Player,
   ShotRecord,
 } from '../types'
 import { useAuth } from './AuthContext'
@@ -27,6 +26,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
+import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 
@@ -106,12 +106,6 @@ function normalizeCloudStatus(value: unknown, fallback: CloudSyncStatus): CloudS
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
-}
-
-/** Drops chart rows whose `playerId` is no longer on the roster (avoids permanent shot-chart sync failure). */
-function shotChartWithOnlyRosterPlayers(shotChart: ShotRecord[], players: Player[]): ShotRecord[] {
-  const ids = new Set(players.map(p => p.id))
-  return shotChart.filter(s => ids.has(s.playerId))
 }
 
 /** Stat key to increment when adding a shot from the chart. */
@@ -322,12 +316,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         players,
         activePlayerId: players.length > 0 ? state.activePlayerId ?? players[0].id : null,
-        shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
+        shotChart: shotChartForRoster(state.shotChart, players),
+        cloudSync: {
+          ...state.cloudSync,
+          playerIdMap: playerIdMapForRoster(state.cloudSync.playerIdMap, players),
+        },
       }
     }
 
-    case 'HYDRATE_STATE':
-      return action.state
+    case 'HYDRATE_STATE': {
+      const s = action.state
+      return {
+        ...s,
+        shotChart: shotChartForRoster(s.shotChart, s.players),
+        cloudSync: {
+          ...s.cloudSync,
+          playerIdMap: playerIdMapForRoster(s.cloudSync.playerIdMap, s.players),
+        },
+      }
+    }
 
     case 'REMOVE_PLAYER': {
       // Keep local->remote player mapping aligned with the current roster.
@@ -337,12 +344,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         players,
         activePlayerId: state.activePlayerId === action.playerId ? null : state.activePlayerId,
-        shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
+        shotChart: shotChartForRoster(state.shotChart, players),
         cloudSync: {
           ...state.cloudSync,
-          playerIdMap: Object.fromEntries(
-            Object.entries(state.cloudSync.playerIdMap).filter(([localId]) => localId !== action.playerId)
-          ),
+          playerIdMap: playerIdMapForRoster(state.cloudSync.playerIdMap, players),
         },
       }
     }
@@ -609,24 +614,27 @@ function loadState(): GameState {
       const fallbackStatus = normalizeCloudStatus(parsed.cloudSync?.status, 'idle')
       const restoredStatus = fallbackStatus === 'syncing' ? 'idle' : fallbackStatus
 
-  return {
-    ...createInitialState(restoredStatus),
-    ...parsed,
-    homeTeamScore: typeof parsed.homeTeamScore === 'number' ? parsed.homeTeamScore : null,
-    homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
-    notes: typeof parsed.notes === 'string' ? parsed.notes : '',
-    currentPeriod:
-      typeof parsed.currentPeriod === 'number' && parsed.currentPeriod >= 1
-        ? Math.floor(parsed.currentPeriod)
-        : 1,
-    teamStatsConfig: parsed.teamStatsConfig ?? null,
-    shotChart: Array.isArray(parsed.shotChart) ? parsed.shotChart : [],
-    players: Array.isArray(parsed.players) ? parsed.players : [],
-    actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
-    cloudSync: {
+      const restoredPlayers = Array.isArray(parsed.players) ? parsed.players : []
+      const sanitizedMap = sanitizePlayerIdMapForCloud(parsed.cloudSync?.playerIdMap ?? {})
+
+      return {
+        ...createInitialState(restoredStatus),
+        ...parsed,
+        homeTeamScore: typeof parsed.homeTeamScore === 'number' ? parsed.homeTeamScore : null,
+        homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
+        notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+        currentPeriod:
+          typeof parsed.currentPeriod === 'number' && parsed.currentPeriod >= 1
+            ? Math.floor(parsed.currentPeriod)
+            : 1,
+        teamStatsConfig: parsed.teamStatsConfig ?? null,
+        shotChart: shotChartForRoster(Array.isArray(parsed.shotChart) ? parsed.shotChart : [], restoredPlayers),
+        players: restoredPlayers,
+        actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
+        cloudSync: {
           ...createInitialCloudSyncState(restoredStatus),
           ...(parsed.cloudSync ?? {}),
-          playerIdMap: sanitizePlayerIdMapForCloud(parsed.cloudSync?.playerIdMap ?? {}),
+          playerIdMap: playerIdMapForRoster(sanitizedMap, restoredPlayers),
           gameStatus: parsed.cloudSync?.gameStatus ?? null,
           status: restoredStatus,
         },
