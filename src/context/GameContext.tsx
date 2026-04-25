@@ -318,10 +318,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SET_PLAYERS': {
       const players = action.players
+      const rosterIds = new Set(players.map(p => p.id))
+      const activeStillValid =
+        state.activePlayerId != null && rosterIds.has(state.activePlayerId)
+      const activePlayerId =
+        players.length === 0
+          ? null
+          : activeStillValid
+            ? state.activePlayerId
+            : players[0].id
       return {
         ...state,
         players,
-        activePlayerId: players.length > 0 ? state.activePlayerId ?? players[0].id : null,
+        activePlayerId,
         shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
       }
     }
