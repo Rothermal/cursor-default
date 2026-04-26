@@ -75,6 +75,7 @@ function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyn
     status,
     lastSyncedAt: null,
     lastError: null,
+    shotChartHydrationDroppedRows: 0,
   }
 }
 
@@ -285,6 +286,7 @@ function buildHydratedStateFromCloudGame(
       lastSyncedAt: cloudGame.hydratedAt,
       status: 'synced',
       lastError: null,
+      shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
     },
   }
 }
@@ -309,6 +311,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 gameStatus: null,
                 playerIdMap: {},
                 lastSyncedAt: null,
+                shotChartHydrationDroppedRows: 0,
               }
             : state.cloudSync,
       }
@@ -326,8 +329,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
 
-    case 'HYDRATE_STATE':
-      return action.state
+    case 'HYDRATE_STATE': {
+      const cs = action.state.cloudSync
+      return {
+        ...action.state,
+        cloudSync: {
+          ...cs,
+          shotChartHydrationDroppedRows:
+            typeof cs.shotChartHydrationDroppedRows === 'number'
+              ? Math.max(0, Math.floor(cs.shotChartHydrationDroppedRows))
+              : 0,
+        },
+      }
+    }
 
     case 'REMOVE_PLAYER': {
       // Keep local->remote player mapping aligned with the current roster.
@@ -629,6 +643,10 @@ function loadState(): GameState {
           playerIdMap: sanitizePlayerIdMapForCloud(parsed.cloudSync?.playerIdMap ?? {}),
           gameStatus: parsed.cloudSync?.gameStatus ?? null,
           status: restoredStatus,
+          shotChartHydrationDroppedRows:
+            typeof parsed.cloudSync?.shotChartHydrationDroppedRows === 'number'
+              ? Math.max(0, Math.floor(parsed.cloudSync.shotChartHydrationDroppedRows))
+              : 0,
         },
       }
     }
@@ -888,6 +906,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
             status: 'synced',
             lastSyncedAt: synced.syncedAt,
             lastError: null,
+            shotChartHydrationDroppedRows:
+              synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
           },
         })
         if (snapshotUserId) {
