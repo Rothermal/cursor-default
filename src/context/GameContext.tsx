@@ -122,6 +122,33 @@ function statIdForShotRecord(shot: ShotRecord): string {
   return shot.made ? '2pt' : '2pt_miss'
 }
 
+/** Clear every chart shot and revert linked stats/log rows (works even when non-shot actions trail the log). */
+function clearEntireShotChart(state: GameState): GameState {
+  if (state.shotChart.length === 0) return state
+  const shotIds = new Set(state.shotChart.map(s => s.id))
+  const statDeltas = new Map<string, Record<string, number>>()
+  for (const shot of state.shotChart) {
+    const sid = statIdForShotRecord(shot)
+    const prev = statDeltas.get(shot.playerId) ?? {}
+    prev[sid] = (prev[sid] ?? 0) + 1
+    statDeltas.set(shot.playerId, prev)
+  }
+  const players = state.players.map(p => {
+    const deltas = statDeltas.get(p.id)
+    if (!deltas) return p
+    const nextStats = { ...p.stats }
+    for (const [statId, n] of Object.entries(deltas)) {
+      const v = (nextStats[statId] ?? 0) - n
+      nextStats[statId] = Math.max(0, v)
+    }
+    return { ...p, stats: nextStats }
+  })
+  const actionLog = state.actionLog.filter(
+    e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
+  )
+  return { ...state, shotChart: [], players, actionLog }
+}
+
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
 function applyUndoLastEntry(state: GameState): GameState | null {
   if (state.actionLog.length === 0) return null
@@ -399,22 +426,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'CLEAR_SHOT_CHART': {
-      if (state.shotChart.length === 0) return state
-      let s = state
-      while (s.shotChart.length > 0) {
-        const popped = s.shotChart[s.shotChart.length - 1]
-        const last = s.actionLog[s.actionLog.length - 1]
-        const matches =
-          last?.type === 'increment' &&
-          last.shotId === popped.id &&
-          last.playerId === popped.playerId &&
-          last.statId === statIdForShotRecord(popped)
-        if (!matches) break
-        const next = applyUndoLastEntry(s)
-        if (!next) break
-        s = next
-      }
-      return s
+      return clearEntireShotChart(state)
     }
 
     case 'INCREMENT_STAT': {
