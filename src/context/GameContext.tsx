@@ -400,21 +400,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'CLEAR_SHOT_CHART': {
       if (state.shotChart.length === 0) return state
-      let s = state
-      while (s.shotChart.length > 0) {
-        const popped = s.shotChart[s.shotChart.length - 1]
-        const last = s.actionLog[s.actionLog.length - 1]
-        const matches =
-          last?.type === 'increment' &&
-          last.shotId === popped.id &&
-          last.playerId === popped.playerId &&
-          last.statId === statIdForShotRecord(popped)
-        if (!matches) break
-        const next = applyUndoLastEntry(s)
-        if (!next) break
-        s = next
+      // Clear by shot list, not by walking the action log tail: after non-chart actions
+      // (stat taps, scores, etc.) the last log line may not match the last shot, and the
+      // old loop would break immediately — leaving the chart non-empty and stats out of sync.
+      const shotIds = new Set(state.shotChart.map(s => s.id))
+      const shotStatCounts = new Map<string, Map<string, number>>()
+      for (const shot of state.shotChart) {
+        const statId = statIdForShotRecord(shot)
+        let byStat = shotStatCounts.get(shot.playerId)
+        if (!byStat) {
+          byStat = new Map()
+          shotStatCounts.set(shot.playerId, byStat)
+        }
+        byStat.set(statId, (byStat.get(statId) ?? 0) + 1)
       }
-      return s
+      const players = state.players.map(p => {
+        const byStat = shotStatCounts.get(p.id)
+        if (!byStat) return p
+        const stats = { ...p.stats }
+        for (const [statId, n] of byStat) {
+          const prev = stats[statId] ?? 0
+          stats[statId] = Math.max(0, prev - n)
+        }
+        return { ...p, stats }
+      })
+      const actionLog = state.actionLog.filter(
+        e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
+      )
+      return { ...state, shotChart: [], players, actionLog }
     }
 
     case 'INCREMENT_STAT': {
