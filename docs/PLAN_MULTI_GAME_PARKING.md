@@ -1,6 +1,6 @@
 # Plan: Multi-game parking, active game, and sync queue
 
-High-level blueprint for a future agent or implementer. **Not shipped** — current app uses a single `localStorage` slot (`statkeeper_game`) and one in-memory `GameState`.
+High-level blueprint for a future agent or implementer. **Not shipped** — current app uses a single `localStorage` slot (`statkeeper_game`) and one in-memory `GameState`. See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
 
 ---
 

@@ -239,7 +239,7 @@ supabase/scripts/
 └── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
 
 docs/
-├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+├── INTEGRATION_PLAN.md    # Supabase architecture & phases (§1 schema summary = post-018; see migrations)
 ├── DESIGN_SEASONS_DATA_MODEL.md  # Design: Seasons entity, roster junction, player guardians
 ├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game/tournament stat views
 ├── STAT_TRACKING_UI_PROGRESS.md  # Checklist: Phase 6 stat UI implementation

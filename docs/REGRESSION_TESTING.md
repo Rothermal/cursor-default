@@ -37,7 +37,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ## 3. Auth (Supabase)
 
-**Precondition:** `.env` has `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; migrations 001+ applied.
+**Precondition:** `.env` has `VITE_SUPABASE_URL` and **`VITE_SUPABASE_PUBLISHABLE_KEY`** or **`VITE_SUPABASE_ANON_KEY`** (see `.env.example`); migrations 001+ applied.
 
 | Step | Action | Expected |
 |------|--------|----------|

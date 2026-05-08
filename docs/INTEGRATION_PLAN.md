@@ -18,10 +18,10 @@ A parent opens StatKeeper, signs in, and manages their kids' teams with rosters 
 
 | Aspect | Detail |
 |---|---|
-| Provider | Supabase Auth (email/password + OAuth social login) |
-| Client | `@supabase/supabase-js` with `@supabase/auth-helpers-react` |
+| Provider | Supabase Auth (email/password; OAuth can be enabled in Supabase Dashboard) |
+| Client | `@supabase/supabase-js` only (no separate auth-helpers package in this repo) |
 | Session | JWT stored automatically by Supabase client; refresh handled transparently |
-| RLS | Every table uses Row Level Security; no data accessible without auth |
+| RLS | Row Level Security on cloud tables; see each `supabase/migrations/*.sql` for policies |
 
 **Env variables** (`.env`); see `.env.example` in repo:
 ```
@@ -31,130 +31,43 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 # VITE_SUPABASE_ANON_KEY=<anon-key>
 ```
 
-### 1.2 Database Schema
+### 1.2 Database schema (canonical, migrations 018+)
+
+The **ASCII diagram below is historical (pre–018)** and shows `players.team_id` and sport on `teams` — **that is not the current schema**. Use **`supabase/migrations/`** and the **README** migration list (001–**033**) as the source of truth.
+
+**Current product model (summary):**
+
+| Area | Notes |
+|------|--------|
+| **Seasons & teams** | `seasons` (sport CHECK, optional `team_stats_config`), `teams` (`season_id` required), `team_members`, `team_invites` |
+| **Roster** | `players` (global; `created_by`; optional `is_team_placeholder`); **`team_players`** junction — **no** `players.team_id` |
+| **Games** | `games`: `team_id`, **`season_id`** (denormalized, trigger per **019**), `tournament_id`, scores, notes, `last_opened_at`, team placeholder FKs (**030**), `created_by`, status |
+| **Stats & chart** | `game_stats`, RPCs **010**, `stat_corrections`, `player_checkouts`, **`shot_chart` (032)** |
+| **Debug** | **`client_sync_errors` (033)** — optional client logging of failed snapshot sync |
+
+**Integrity:** **`019_data_integrity_constraints.sql`** — tournament/game team checks, jersey uniqueness (partial index), unique team name per season, etc. See [`DATA_INTEGRITY_AND_CREATION_PLAN.md`](DATA_INTEGRITY_AND_CREATION_PLAN.md).
+
+<details>
+<summary>Historical pre-018 ERD (do not use for implementation)</summary>
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          CORE TABLES                                    │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  profiles              teams                 players                    │
-│  ─────────             ─────                 ───────                    │
-│  id (uuid, PK, FK→auth.users)               id (uuid, PK)             │
-│  display_name          id (uuid, PK)         team_id (FK→teams)        │
-│  avatar_url            owner_id (FK→profiles)se_profile_id (nullable)  │
-│  se_access_token       se_team_id (nullable) first_name                │
-│  se_refresh_token      name                  last_name                 │
-│  se_org_id             nickname (nullable)   jersey_number             │
-│  created_at            sport (text)          nickname (nullable)       │
-│                        season (text)         position (nullable)       │
-│                        created_at            is_active (bool)          │
-│                                              created_at                │
-│                                                                         │
-│  games                           game_stats                            │
-│  ─────                           ──────────                            │
-│  id (uuid, PK)                   id (uuid, PK)                        │
-│  team_id (FK→teams)              game_id (FK→games)                   │
-│  se_event_id (nullable)          player_id (FK→players)               │
-│  opponent_name                   recorded_by (FK→profiles)            │
-│  opponent_score                  stat_id (text)                        │
-│  tournament_name                 value (int)                           │
-│  game_date (date)                created_at                            │
-│  game_time (timestamptz)         updated_at                            │
-│  location (text)                                                       │
-│  status (scheduled|in_progress|final)                                  │
-│  created_at                                                            │
-│                                                                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                     COLLABORATION TABLES                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  team_members                    player_checkouts                      │
-│  ────────────                    ─────────────────                      │
-│  id (uuid, PK)                   id (uuid, PK)                        │
-│  team_id (FK→teams)              game_id (FK→games)                   │
-│  user_id (FK→profiles)           player_id (FK→players)               │
-│  role (owner|admin|scorer)       user_id (FK→profiles)                │
-│  invited_at                      is_primary (bool, default true)      │
-│  accepted_at                     checked_out_at (timestamptz)         │
-│                                  UNIQUE(game_id, player_id, user_id)  │
-│                                                                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                     ADMIN / AUDIT TABLES                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  stat_corrections                                                      │
-│  ────────────────                                                      │
-│  id (uuid, PK)                                                         │
-│  game_id (FK→games)                                                    │
-│  player_id (FK→players)                                                │
-│  stat_id (text)                                                        │
-│  corrected_value (int)                                                 │
-│  original_primary_value (int, nullable)                                │
-│  corrected_by (FK→profiles)  -- must be team owner/admin               │
-│  reason (text, nullable)                                               │
-│  created_at (timestamptz)                                              │
-│  UNIQUE(game_id, player_id, stat_id)                                   │
-│                                                                         │
+│  (Legacy) teams had sport/season on team; players had team_id — removed  │
+│  in migration 018 in favor of seasons + team_players.)                │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-Migrations `008_player_checkouts.sql`, `009_stat_corrections.sql`, and `010_resolved_stats_rpcs.sql` implement these Phase 3 structures.
+</details>
 
-**Post–018 / 019 data model notes:** Migration `019_data_integrity_constraints.sql` adds `games.season_id` (denormalized from `teams.season_id`, kept in sync by trigger), validates `games.tournament_id` against `tournaments.team_id` via trigger, constrains `seasons.sport` to known app ids, unique `(season_id, name)` on teams, and a partial unique index on active non-empty jersey numbers per team. See [`DATA_INTEGRITY_AND_CREATION_PLAN.md`](DATA_INTEGRITY_AND_CREATION_PLAN.md) and `supabase/scripts/audit_data_integrity_pre_019.sql` before applying on existing databases.
+Migrations **`008`–`010`** implement checkouts, corrections, and resolved-stats RPCs. **`018`** is the seasons / roster junction redesign; **`019`** adds constraints and `games.season_id`.
 
-### 1.3 Row Level Security Policies
+### 1.3 Row Level Security
 
-```sql
--- Users see their own profile
-CREATE POLICY "profiles_own" ON profiles
-  FOR ALL USING (id = auth.uid());
+Policies are defined **per migration** (not duplicated here). Patterns: team-scoped read on games/stats; recorders write their own `game_stats` / `shot_chart` rows; stricter rules for admin corrections and player merge. See `003`, `004`–`006`, `008`, `009`, `032`, `033`, etc.
 
--- Users see teams they are a member of
-CREATE POLICY "teams_member" ON teams
-  FOR SELECT USING (
-    id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid())
-  );
+### 1.4 Indexes
 
--- Team owners/admins can update team
-CREATE POLICY "teams_manage" ON teams
-  FOR UPDATE USING (
-    id IN (SELECT team_id FROM team_members
-           WHERE user_id = auth.uid() AND role IN ('owner', 'admin'))
-  );
-
--- Players visible to team members
-CREATE POLICY "players_team_member" ON players
-  FOR SELECT USING (
-    team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid())
-  );
-
--- Stats: anyone on the team can read; only the recorder can edit their own
-CREATE POLICY "stats_read" ON game_stats
-  FOR SELECT USING (
-    game_id IN (SELECT id FROM games WHERE team_id IN (
-      SELECT team_id FROM team_members WHERE user_id = auth.uid()
-    ))
-  );
-
-CREATE POLICY "stats_own_write" ON game_stats
-  FOR INSERT WITH CHECK (recorded_by = auth.uid());
-
-CREATE POLICY "stats_own_update" ON game_stats
-  FOR UPDATE USING (recorded_by = auth.uid());
-```
-
-### 1.4 Key Indexes
-
-```sql
-CREATE INDEX idx_team_members_user ON team_members(user_id);
-CREATE INDEX idx_team_members_team ON team_members(team_id);
-CREATE INDEX idx_game_stats_game ON game_stats(game_id);
-CREATE INDEX idx_game_stats_player ON game_stats(player_id);
-CREATE INDEX idx_game_stats_recorder ON game_stats(recorded_by);
-CREATE INDEX idx_games_team_date ON games(team_id, game_date);
-CREATE INDEX idx_players_team ON players(team_id);
-```
+Created alongside tables in migrations (e.g. `idx_game_stats_*`, `idx_shot_chart_*`, `idx_games_season`). There is **no** `idx_players_team` on a `players.team_id` column in the shipped schema.
 
 ---
 
@@ -204,7 +117,7 @@ User clicks "Connect Sports Engine"
 |---|---|
 | `se-auth-callback` | Handle OAuth2 callback, exchange code for tokens, store in DB |
 | `se-sync-teams` | Fetch user's teams/orgs from SE, upsert into `teams` table |
-| `se-sync-roster` | Fetch roster for a team, upsert into `players` table |
+| `se-sync-roster` | Fetch roster for a team; in the **current** schema would upsert **`players`** + **`team_players`** (not `players.team_id`) |
 | `se-sync-schedule` | Fetch upcoming events/games, upsert into `games` table |
 
 ### 2.4 Key GraphQL Queries
@@ -696,7 +609,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Save stat actions to `game_stats` in real time (debounced snapshot sync + flush on leave Game Tracker)
 - [x] Game finalization flow (status → final)
 - [x] Nickname/relabel UI for teams and players (Cloud Teams page: team and player display names)
-- [ ] Offline stat tracking with background sync (reconnect-triggered sync and durable pending-sync flag are implemented)
+- [ ] Offline stat tracking with **multi-game parking + explicit per-game sync queue** (reconnect-triggered sync and durable pending-sync flag exist today for **one** active game — see [PLAN_MULTI_GAME_PARKING.md](PLAN_MULTI_GAME_PARKING.md))
 
 ### Phase 3: Season Stats + Multi-Parent Checkout + Admin Review
 > **Goal**: Accumulated stats, leaderboards, player checkout, and admin stat corrections.
@@ -716,6 +629,9 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Player profile page with season totals and game log
 - [x] Team leaderboard page (uses resolved totals)
 - [x] Conflict indicator when multiple parents tracked same player without checkout
+- [x] **Basketball shot chart** — `/shot-chart`, migration **032**, sync in `cloudSync.ts`
+- [x] **Basketball team stats** — pseudo-players, `seasons.team_stats_config`, migrations **027–031**, Game Summary team tab
+- [x] **Sync diagnostics** — `client_sync_errors` (**033**), `logClientSyncError.ts`, UUID validation for `playerIdMap` (`uuidValidation.ts`)
 - [ ] Invite links: shareable URL to join team (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 
 ### Phase 4: Polish + Capacitor
@@ -747,46 +663,35 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 | **Status** | Deployed |
 | **Trigger** | Push to `stattracker` branch |
 | **Workflow** | `.github/workflows/deploy.yml` |
-| **Build** | `pnpm build` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from GitHub Actions secrets |
+| **Build** | `pnpm build` with `VITE_SUPABASE_URL` and a Supabase **publishable** or **anon** key from GitHub Actions secrets (workflow currently passes `VITE_SUPABASE_ANON_KEY`; the app prefers `VITE_SUPABASE_PUBLISHABLE_KEY` when set — see `src/lib/supabase.ts`) |
 
-Supabase credentials must be set as [GitHub repository secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) for cloud features (auth, teams, games, sync) to work in production. See [`GITHUB_PAGES_DEPLOY.md`](../GITHUB_PAGES_DEPLOY.md) for setup steps.
+Supabase credentials must be set as [GitHub repository secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) for cloud features (auth, teams, games, sync) to work in production. See [`GITHUB_PAGES_DEPLOY.md`](../GITHUB_PAGES_DEPLOY.md) for setup steps. **Deploy branch:** `stattracker` (see `.github/workflows/deploy.yml`).
 
 ---
 
 ## 9. Environment Variables Summary
 
 ```env
-# Supabase (required)
-# In GitHub Actions secrets:
-#   VITE_SUPABASE_URL
-#   VITE_SUPABASE_ANON_KEY
+# Supabase (required for cloud) — see .env.example in repo
 VITE_SUPABASE_URL=https://<project>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon-key>
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
+# Legacy (still read by src/lib/supabase.ts if publishable is unset):
+# VITE_SUPABASE_ANON_KEY=<anon-key>
 ```
 
-The `VITE_` prefix is required by Vite to expose variables to the browser. The anon key is safe for client-side use because Row Level Security protects all data server-side.
+The `VITE_` prefix is required by Vite to expose variables to the browser. The publishable/anon key is safe for client-side use because Row Level Security protects data server-side.
 
 ---
 
 ## 10. Future Enhancements
 
-A backlog of ideas to iterate over:
+> **Note:** Many items that historically lived in this backlog are **already shipped** (home score adjustment, tournaments table, minutes, notes, missed shots, deletes, seasons on games, etc.). Treat the **README** “Features / What’s Done” sections as the live checklist. What follows is a **short residual backlog**; older numbered items were archived into README where implemented.
 
-1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats).
-2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud.
-   - **Team names**: Edit primary team name (and nickname) from the Teams page; keep history when editing (update historical game records). Also support editing **opponent** team names from both Game Setup and Games history.
-   - **Player names**: Edit first name, last name, and jersey number from both the Teams roster and PlayerSetup; currently only nickname is editable.
-   - **Tournaments**: (a) Tournament name field in Game Setup remains editable. (b) Tournaments as its own table — central `tournaments` table in Supabase; games reference `tournament_id`; multiple games in the same tournament can be aggregated (e.g., tournament standings, stats across games). Design: [DESIGN_TOURNAMENTS.md](DESIGN_TOURNAMENTS.md).
-4. **Minutes played, game notes, missed shots** — Extend stat tracking:
-   - **Minutes played**: Per-player counter with +/- buttons (whole minutes); only for sports that traditionally track minutes played (e.g., basketball, hockey, soccer, football).
-   - **Notes**: Open text field at the bottom; editable and saved during the game; sync to cloud; editable from multiple areas (Game Tracker, Game Summary, etc.).
-   - **Missed shots**: Per-player single counter with +/- buttons; only for sports that track shots (e.g., basketball, hockey).
-5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding.
-6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
-7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard).
-9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions).
-10. *(Add more as we go)*
+1. **Score totals in game list** — Games history list could show home vs opponent score on each card (partially improved; refine as needed).
+2. **Optional stat descriptions** — Toggle for full stat names vs abbreviations.
+3. **Bulk / archive games** — Beyond per-row delete in Games and Settings Data Management.
+4. **Multi-game parking + sync queue** — Multiple in-progress sessions per device, offline-safe; see [PLAN_MULTI_GAME_PARKING.md](PLAN_MULTI_GAME_PARKING.md).
+5. *(Add more as we go)*
 
 ---
 
@@ -808,39 +713,25 @@ High-level test scripts for all features (offline, auth, teams, games, checkout,
 
 ---
 
-## 14. File Structure (Projected)
+## 14. File structure (reference)
+
+> **Note:** This tree is a **compact index**, not an exhaustive file list. See **README → Project structure** for the canonical layout.
 
 ```
 src/
 ├── lib/
-│   └── supabase.ts           # Supabase client init
+│   ├── supabase.ts, cloudSync.ts, logClientSyncError.ts, uuidValidation.ts
+│   ├── teamPlayers.ts, gameScore.ts, statDisplay.ts, …
 ├── context/
-│   ├── AuthContext.tsx       # Auth state
-│   ├── GameContext.tsx       # Game state + cloud sync
-│   └── SettingsContext.tsx   # App settings
+│   ├── AuthContext.tsx, GameContext.tsx, SettingsContext.tsx
 ├── pages/
-│   ├── Auth.tsx              # Sign in / sign up
-│   ├── SportSelect.tsx       # Home — choose sport
-│   ├── GameSetup.tsx         # Game info (team, opponent, date)
-│   ├── PlayerSetup.tsx       # Add/remove players
-│   ├── GameCheckout.tsx      # Pre-game player checkout (route /checkout)
-│   ├── GameTracker.tsx      # Live stat tracking
-│   ├── GameSummary.tsx       # Post-game tables + resolved stats + admin corrections
-│   ├── Games.tsx             # Cloud game history, resume/finalize
-│   ├── Teams.tsx             # Cloud teams + roster + invites
-│   ├── Leaderboard.tsx       # Season leaderboard
-│   ├── PlayerProfile.tsx     # Player season totals + game log
-│   └── Admin.tsx             # Settings (sports toggles)
-supabase/
-├── migrations/
-│   ├── 001_profiles.sql … 006_teams_insert_policy_fix.sql
-│   ├── 007_games_last_opened_preference.sql
-│   ├── 008_player_checkouts.sql
-│   ├── 009_stat_corrections.sql
-│   ├── 010_resolved_stats_rpcs.sql
-│   ├── 011_team_invites.sql
-│   ├── 015_home_score_adjustment.sql
-│   └── 016_tournaments.sql
+│   ├── Auth, SportSelect, GameSetup, PlayerSetup, GameCheckout, GameTracker
+│   ├── GameSummary, Games, Teams, Admin, Leaderboard, PlayerProfile
+│   ├── CareerStats (/career), TeamStats (/team-stats), TournamentStats (/tournament-stats)
+│   ├── ShotChart (/shot-chart), ShotChartPreview (dev: /dev/shot-chart)
+├── App.tsx                  # HashRouter routes
+supabase/migrations/
+│   └── 001 … 033 (see README for full names: through client_sync_errors)
 ```
 
-Future: `PlayerProfile.tsx`, `Leaderboard.tsx` (season stats UI); `AdminReview.tsx` as standalone page optional — admin review currently lives in GameSummary.
+Admin review and stat corrections live in **Game Summary**, not a separate `AdminReview` page.
