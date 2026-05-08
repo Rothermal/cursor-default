@@ -23,10 +23,12 @@ A parent opens StatKeeper, signs in, and manages their kids' teams with rosters 
 | Session | JWT stored automatically by Supabase client; refresh handled transparently |
 | RLS | Every table uses Row Level Security; no data accessible without auth |
 
-**Env variables** (`.env`):
+**Env variables** (`.env`); see `.env.example` in repo:
 ```
 VITE_SUPABASE_URL=https://<project>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon-key>
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
+# Legacy fallback still supported in code:
+# VITE_SUPABASE_ANON_KEY=<anon-key>
 ```
 
 ### 1.2 Database Schema
