@@ -796,18 +796,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
         if (cancelled) return
 
-        hydratedUserRef.current = userId
         const nextState = buildHydratedStateFromCloudGame(cloudGame)
-        if (!nextState) return
+        if (!nextState) {
+          // `null` from API: nothing to resume. Non-null `cloudGame` but null state (e.g. unknown sport):
+          // do not mark hydrated — a later retry may succeed if data changes.
+          if (cloudGame === null) {
+            hydratedUserRef.current = userId
+          }
+          return
+        }
 
         if (nextState.cloudSync.gameId && canHydrateAsActiveGame(nextState.cloudSync.gameStatus ?? '')) {
           setResumeTarget(userId, nextState.cloudSync.gameId)
         }
+        hydratedUserRef.current = userId
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
       } catch (error) {
         if (cancelled) return
-        hydratedUserRef.current = userId
         dispatch({
           type: 'SET_CLOUD_SYNC_STATE',
           cloudSync: {
@@ -822,7 +828,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, userId])
+  }, [isConfigured, isOnline, userId])
 
   useEffect(() => {
     if (!userId) return
