@@ -282,7 +282,7 @@ Add `isTeamPlayer` filters to prevent team pseudo-players from corrupting indivi
 
 **What to do (shipped across 027–031):**
 
-1. **Migrations in repo** — `027_home_team_score.sql`, `028_team_placeholder_players.sql`, `029_merge_block_team_placeholders.sql`, `030_team_stats_schema.sql`, `031_get_game_team_stats.sql`. Together they cover placeholders, `games` FKs, `seasons.team_stats_config`, display views, `get_game_team_stats`, and aggregate RPC filters. **`get_game_stats_resolved`** was not given a new return shape (Postgres limitation); clients join `players` or use `get_game_team_stats` for placeholder-only stats.
+1. **Migrations in repo** — `027_home_team_score.sql` through `031_get_game_team_stats.sql` for team stats placeholders, `games` FKs, `seasons.team_stats_config`, display views, `get_game_team_stats`, and aggregate RPC filters. **`get_game_stats_resolved`** was not given a new return shape (Postgres limitation); clients join `players` or use `get_game_team_stats` for placeholder-only stats. **`032_shot_chart.sql`** adds per-game shot persistence (see shot chart design docs). **`033_client_sync_errors.sql`** is unrelated to team stats (client-reported snapshot failures).
 
 2. **Original single-file sketch** — [DATA_MODEL §6.1](DESIGN_TEAM_STATS_DATA_MODEL.md) listed one migration; the repo split this for safer rollout.
 

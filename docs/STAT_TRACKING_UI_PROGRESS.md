@@ -1,44 +1,25 @@
 # Stat tracking UI (Phase 6) — implementation progress
 
-Parent plan: [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) · Seasons phase table: [DESIGN_SEASONS_DATA_MODEL.md §10](DESIGN_SEASONS_DATA_MODEL.md).
+Parent plan: [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) · Seasons: [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md).
 
-## Done (this branch)
+**Status:** Phase 6 UI and RPCs described in the parent design are **implemented** in the app (leaderboard, player profile, career, team stats, tournament stats, game log fallbacks, tournament placement editing, Games list polish). Treat this file as a **historical work log**, not an open backlog.
+
+## Shipped (summary)
 
 - [x] Migration **`020_stat_tracking_ui_rpcs.sql`**: `get_player_game_log`, `get_career_stats_resolved`, `get_team_game_log`
-- [x] **Leaderboard**: season dropdown, URL `seasonId` + `teamId`, games played on rows, **Team stats →** link, **Career** link per row (opens `/career` with `playerId` + season sport)
-- [x] **Player profile**: season line in header, **Career →**, inline game log (RPC; N×`get_game_stats_resolved` fallback if RPC missing)
-- [x] **`/career`**: career totals + by-season list; multi-sport picker when needed
-- [x] **`/team-stats`**: W/L, tournaments list + placement, game-by-game (RPC or per-game fallback)
-- [x] **Teams** roster: **Career** link per player
-- [x] **`keyStatIds`** on basketball + **`formatCompactGameStatLine`** in `src/lib/statDisplay.ts`
+- [x] **Leaderboard** — season + team scope, games played, links to Career / team stats
+- [x] **Player profile** — season header, career link, inline game log (RPC + fallback)
+- [x] **`/career`**, **`/team-stats`**, **`/tournament-stats`** routes and pages
+- [x] Migration **021** `get_tournament_stats_resolved` + fallbacks
+- [x] **`keyStatIds`** across sports + **`formatCompactGameStatLine`** in `src/lib/statDisplay.ts`
+- [x] Team season **By opponent** table; **Games** list scores / tournament deep links; tournament **placement** edit for owner/admin
+- [x] Teams roster **Career** links; Game Summary **Players / Team** tabs
 
-## Not done yet
+## Optional follow-ups (product, not blockers)
 
-- [x] **Tournament stats** page `/tournament-stats` + migration **021** `get_tournament_stats_resolved` (fallback aggregates per game if RPC missing)
-- [x] **Game Summary** Players / Team tab (team tab = score card + team totals tables only)
-- [x] **`keyStatIds`** for baseball, football, hockey, soccer + `statDisplay` uses only configured keys (no bogus basketball ids)
-- [x] Team season summary: **By opponent** table (aggregated W-L-T, PF-PA, +/-)
-- [x] **Cloud Games** list: `teamDisplayName`, final score line via `get_game_stats_resolved`, **Tournament stats** link when `tournament_id` set
-- [x] **Tournament stats**: **Career** link per leaderboard row; team **owner/admin** can edit **placement** (`tournaments.placement`) in-app
-
-## Latest slice (021 + UI)
-
-- `021_tournament_stats_rpc.sql`
-- `TournamentStats.tsx`, route, Team stats → **Stats →** per tournament
-- `GameSummary.tsx`: **Players** / **Team** toggle (alongside cloud Primary/All when applicable)
-
-## Slice: polish (keyStatIds, team by-opponent, games list)
-
-- `sports.ts`: `keyStatIds` for all sports
-- `statDisplay.ts`: score label helper; only iterate `keyStatIds` when set
-- `TeamStats.tsx`: **By opponent** section
-- `Games.tsx`: nickname + season in team query, score on final cards, tournament deep link
-
-## Slice: leaderboard career + editable tournament placement
-
-- `Leaderboard.tsx`: row layout with **Career** link (HashRouter-safe `Link`)
-- `TournamentStats.tsx`: same **Career** links on tournament leaderboard; **Placement** form for owners/admins (updates `tournaments.placement`, blank clears)
+- Further stat-view polish per [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) (copy, layout, or additional aggregates).
+- Any new RPCs if reporting outgrows client-side fallbacks.
 
 ## Apply in Supabase
 
-Run `020_stat_tracking_ui_rpcs.sql` after migrations through **010** (resolved stats). Optional if you rely on client fallbacks, but recommended for performance.
+Run **`020`** after migrations through **010** (resolved stats). Run **`021`** for tournament aggregates. See README for full migration order through **033**.
