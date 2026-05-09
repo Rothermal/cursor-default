@@ -4,6 +4,8 @@ Redesign the data model to make **Season** a first-class entity at the top of th
 
 **Companion doc:** [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) — stat page redesign covering career stats, season stats, game stats (player and team splits).
 
+**Status:** Migration **018** (seasons, `team_players`, guardians) and later migrations are **applied** in the product database. Early sections that contrast “current” vs “new” model describe the **historical pre-018** layout; for the **shipped** schema, use `supabase/migrations/` and [DATA_INTEGRITY_AND_CREATION_PLAN.md](DATA_INTEGRITY_AND_CREATION_PLAN.md).
+
 ---
 
 ## 1. Goals
