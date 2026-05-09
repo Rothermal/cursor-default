@@ -76,6 +76,7 @@ function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyn
     status,
     lastSyncedAt: null,
     lastError: null,
+    shotChartHydrationDroppedRows: 0,
   }
 }
 
@@ -121,6 +122,33 @@ function statIdForShotRecord(shot: ShotRecord): string {
     return shot.made ? '3pt' : '3pt_miss'
   }
   return shot.made ? '2pt' : '2pt_miss'
+}
+
+/** Clear every chart shot and revert linked stats/log rows (works even when non-shot actions trail the log). */
+function clearEntireShotChart(state: GameState): GameState {
+  if (state.shotChart.length === 0) return state
+  const shotIds = new Set(state.shotChart.map(s => s.id))
+  const statDeltas = new Map<string, Record<string, number>>()
+  for (const shot of state.shotChart) {
+    const sid = statIdForShotRecord(shot)
+    const prev = statDeltas.get(shot.playerId) ?? {}
+    prev[sid] = (prev[sid] ?? 0) + 1
+    statDeltas.set(shot.playerId, prev)
+  }
+  const players = state.players.map(p => {
+    const deltas = statDeltas.get(p.id)
+    if (!deltas) return p
+    const nextStats = { ...p.stats }
+    for (const [statId, n] of Object.entries(deltas)) {
+      const v = (nextStats[statId] ?? 0) - n
+      nextStats[statId] = Math.max(0, v)
+    }
+    return { ...p, stats: nextStats }
+  })
+  const actionLog = state.actionLog.filter(
+    e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
+  )
+  return { ...state, shotChart: [], players, actionLog }
 }
 
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
@@ -286,6 +314,7 @@ function buildHydratedStateFromCloudGame(
       lastSyncedAt: cloudGame.hydratedAt,
       status: 'synced',
       lastError: null,
+      shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
     },
   }
 }
@@ -310,6 +339,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 gameStatus: null,
                 playerIdMap: {},
                 lastSyncedAt: null,
+                shotChartHydrationDroppedRows: 0,
               }
             : state.cloudSync,
       }
@@ -319,16 +349,37 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SET_PLAYERS': {
       const players = action.players
+      const prevPlayers = state.players
+      const nextIds = new Set(players.map(p => p.id))
+      // Strip chart rows only when someone left the roster. Prepending team placeholders
+      // (GameTracker / GameCheckout) adds ids without removing any — filtering there would
+      // wipe every shot because markers still use real player ids.
+      const removedAnyPlayer = prevPlayers.some(p => !nextIds.has(p.id))
+      const shotChart =
+        removedAnyPlayer || prevPlayers.length === 0 || players.length === 0
+          ? shotChartWithOnlyRosterPlayers(state.shotChart, players)
+          : state.shotChart
       return {
         ...state,
         players,
         activePlayerId: activePlayerIdAfterRosterChange(state.activePlayerId, players),
-        shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
+        shotChart,
       }
     }
 
-    case 'HYDRATE_STATE':
-      return action.state
+    case 'HYDRATE_STATE': {
+      const cs = action.state.cloudSync
+      return {
+        ...action.state,
+        cloudSync: {
+          ...cs,
+          shotChartHydrationDroppedRows:
+            typeof cs.shotChartHydrationDroppedRows === 'number'
+              ? Math.max(0, Math.floor(cs.shotChartHydrationDroppedRows))
+              : 0,
+        },
+      }
+    }
 
     case 'REMOVE_PLAYER': {
       // Keep local->remote player mapping aligned with the current roster.
@@ -400,35 +451,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'CLEAR_SHOT_CHART': {
-      if (state.shotChart.length === 0) return state
-      // Clear by shot list, not by walking the action log tail: after non-chart actions
-      // (stat taps, scores, etc.) the last log line may not match the last shot, and the
-      // old loop would break immediately — leaving the chart non-empty and stats out of sync.
-      const shotIds = new Set(state.shotChart.map(s => s.id))
-      const shotStatCounts = new Map<string, Map<string, number>>()
-      for (const shot of state.shotChart) {
-        const statId = statIdForShotRecord(shot)
-        let byStat = shotStatCounts.get(shot.playerId)
-        if (!byStat) {
-          byStat = new Map()
-          shotStatCounts.set(shot.playerId, byStat)
-        }
-        byStat.set(statId, (byStat.get(statId) ?? 0) + 1)
-      }
-      const players = state.players.map(p => {
-        const byStat = shotStatCounts.get(p.id)
-        if (!byStat) return p
-        const stats = { ...p.stats }
-        for (const [statId, n] of byStat) {
-          const prev = stats[statId] ?? 0
-          stats[statId] = Math.max(0, prev - n)
-        }
-        return { ...p, stats }
-      })
-      const actionLog = state.actionLog.filter(
-        e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
-      )
-      return { ...state, shotChart: [], players, actionLog }
+      return clearEntireShotChart(state)
     }
 
     case 'INCREMENT_STAT': {
@@ -643,6 +666,10 @@ function loadState(): GameState {
           playerIdMap: sanitizePlayerIdMapForCloud(parsed.cloudSync?.playerIdMap ?? {}),
           gameStatus: parsed.cloudSync?.gameStatus ?? null,
           status: restoredStatus,
+          shotChartHydrationDroppedRows:
+            typeof parsed.cloudSync?.shotChartHydrationDroppedRows === 'number'
+              ? Math.max(0, Math.floor(parsed.cloudSync.shotChartHydrationDroppedRows))
+              : 0,
         },
       }
     }
@@ -915,6 +942,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
             status: 'synced',
             lastSyncedAt: synced.syncedAt,
             lastError: null,
+            shotChartHydrationDroppedRows:
+              synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
           },
         })
         if (snapshotUserId) {

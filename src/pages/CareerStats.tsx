@@ -296,6 +296,7 @@ export default function CareerStats() {
           status: 'synced',
           lastSyncedAt: cloudGame.hydratedAt,
           lastError: null,
+          shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
         },
       }
       dispatch({ type: 'HYDRATE_STATE', state: nextState })
