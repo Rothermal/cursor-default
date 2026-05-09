@@ -13,7 +13,7 @@ For **new** environments or clones, still run `supabase/scripts/audit_data_integ
 ### 1.1 Why old or mixed data behaves poorly
 
 - **Season identity is ambiguous.** There is no uniqueness rule tying “one logical season” to a single row. The **Teams** flow creates seasons with human names (e.g. `"Spring 2026"`). **`cloudSync.ts`** (`ensureSeason`) creates or finds a season using the **calendar year from the game date** as the season `name`, plus `sport`. The same user can end up with multiple seasons for the same sport/year or divergent naming, and duplicate **teams** (`owner_id` + `name` + `season_id`) are not prevented by the database.
-- **Games do not store `season_id`.** Season is implied only through `teams.season_id`. If team/season data was repaired or inconsistent in SQL, games have no direct column to validate or filter without joining teams.
+- **Games store `season_id`.** Since migration **019**, `games.season_id` is populated from `teams.season_id` (trigger-maintained). Season can still be inferred via `teams`, but the column exists for reporting and integrity.
 - **Tournament linkage is only partially enforced.** `games.tournament_id` is nullable; `tournament_name` is denormalized for display. Nothing in the database prevents `tournament_id` pointing at a `tournaments` row whose `team_id` differs from `games.team_id`, or `tournament_name` disagreeing with the FK row.
 - **Roster flexibility vs. ambiguity.** `team_players.jersey_number` is optional. That is fine for flexibility but allows ambiguous rosters and confusing stats when historical data is messy.
 
@@ -26,7 +26,7 @@ For **new** environments or clones, still run `supabase/scripts/audit_data_integ
 | `tournaments` | Scoped by `team_id` only (season is indirect via team). |
 | `players`     | Global row; `created_by` NOT NULL. |
 | `team_players`| Junction: player ↔ team, optional `jersey_number`. |
-| `games`       | `team_id` + optional `tournament_id` + `tournament_name`; season via team. |
+| `games`       | `team_id` + optional `tournament_id` + `tournament_name`; **`season_id`** on row (denormalized from team, **019** trigger). |
 
 ### 1.3 Two creation paths today
 

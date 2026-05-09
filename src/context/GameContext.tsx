@@ -26,6 +26,7 @@ import {
 } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
+import { activePlayerIdAfterRosterChange } from '../lib/activePlayerIdForRoster'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
@@ -348,7 +349,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         players,
-        activePlayerId: players.length > 0 ? state.activePlayerId ?? players[0].id : null,
+        activePlayerId: activePlayerIdAfterRosterChange(state.activePlayerId, players),
         shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
       }
     }
@@ -668,7 +669,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
   const queueAnotherSyncRef = useRef(false)
-  const pendingSyncRef = useRef(false)
+  /** Seeded from localStorage so cloud hydration cannot race ahead of the pending-sync restore effect. */
+  const pendingSyncRef = useRef(getPendingSyncFlag())
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
@@ -751,10 +753,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const hydrateFromCloud = async () => {
       // Cloud-first: only skip hydration when there is unsynced local progress
       // (game in progress that has never been synced - no gameId yet).
+      //
+      // Also skip when `statkeeper_pending_sync` is set: that durable flag is written
+      // before unload when we had sync prerequisites but were offline (or hit a
+      // network-class sync failure). Hydration must not run before the effect that
+      // copies that flag into `pendingSyncRef`, otherwise we'd fetch cloud and
+      // overwrite newer local state from localStorage (silent data loss).
       const hasUnsyncedLocal =
         stateRef.current.sport &&
         stateRef.current.gameInfo &&
-        !stateRef.current.cloudSync.gameId
+        (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
       if (hasUnsyncedLocal) {
         hydratedUserRef.current = userId
         return
@@ -775,18 +783,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
         if (cancelled) return
 
-        hydratedUserRef.current = userId
         const nextState = buildHydratedStateFromCloudGame(cloudGame)
-        if (!nextState) return
+        if (!nextState) {
+          // `null` from API: nothing to resume. Non-null `cloudGame` but null state (e.g. unknown sport):
+          // do not mark hydrated — a later retry may succeed if data changes.
+          if (cloudGame === null) {
+            hydratedUserRef.current = userId
+          }
+          return
+        }
 
         if (nextState.cloudSync.gameId && canHydrateAsActiveGame(nextState.cloudSync.gameStatus ?? '')) {
           setResumeTarget(userId, nextState.cloudSync.gameId)
         }
+        hydratedUserRef.current = userId
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
       } catch (error) {
         if (cancelled) return
-        hydratedUserRef.current = userId
         dispatch({
           type: 'SET_CLOUD_SYNC_STATE',
           cloudSync: {
@@ -801,7 +815,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, userId])
+  }, [isConfigured, isOnline, userId])
 
   useEffect(() => {
     if (!userId) return
