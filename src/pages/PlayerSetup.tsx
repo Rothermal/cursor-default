@@ -38,6 +38,9 @@ export default function PlayerSetup() {
   /** Latest roster for merging when a cloud fetch completes (effect deps omit `players` on purpose). */
   const playersRef = useRef(state.players)
   playersRef.current = state.players
+  /** Same for `gameInfo`: async roster load must not use a stale null from the effect closure. */
+  const gameInfoRef = useRef(state.gameInfo)
+  gameInfoRef.current = state.gameInfo
 
   /** Team pseudo-players for checkout + tracker when the sport defines team categories. */
   useEffect(() => {
@@ -107,10 +110,11 @@ export default function PlayerSetup() {
         stats: {},
       }))
 
-      if (sport?.teamCategories?.length && state.gameInfo) {
+      const gameInfoNow = gameInfoRef.current
+      if (sport?.teamCategories?.length && gameInfoNow) {
         const homeTeamPlayer = {
           id: TEAM_PLAYER_HOME_ID,
-          name: state.gameInfo.teamName,
+          name: gameInfoNow.teamName,
           number: '★',
           stats: {},
           isTeamPlayer: true as const,
@@ -118,7 +122,7 @@ export default function PlayerSetup() {
         }
         const oppTeamPlayer = {
           id: TEAM_PLAYER_OPP_ID,
-          name: state.gameInfo.opponentName,
+          name: gameInfoNow.opponentName,
           number: '★',
           stats: {},
           isTeamPlayer: true as const,

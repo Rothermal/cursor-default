@@ -723,14 +723,10 @@ async function syncShotChartToCloud(
     })
   }
 
-  // Never delete existing cloud rows unless we can replace the full local chart.
-  // Otherwise a roster change (e.g. removed player) leaves shots in `shotChart` with
-  // no `player_id` mapping → we'd wipe the table and insert nothing (silent data loss).
-  if (state.shotChart.length > 0 && rows.length !== state.shotChart.length) {
-    throw new Error(
-      `Shot chart sync aborted: ${state.shotChart.length - rows.length} chart shot(s) have no cloud player mapping.`
-    )
-  }
+  // When some local shots have no cloud `player_id` (e.g. roster replaced before we
+  // trimmed `shotChart`), still sync stats and the mappable subset of the chart.
+  // Full delete+insert would drop orphan rows from Supabase; partial sync matches
+  // the intentional local orphan state until the user clears those shots.
 
   const { error: delError } = await supabase
     .from('shot_chart')
