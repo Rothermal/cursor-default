@@ -1,6 +1,6 @@
 # Stat tracking UI (Phase 6) — implementation progress
 
-Parent plan: [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) · Seasons: [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md).
+Parent plan: [DESIGN_STAT_TRACKING_UI.md](../DESIGN_STAT_TRACKING_UI.md) · Seasons: [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md).
 
 **Status:** Phase 6 UI and RPCs described in the parent design are **implemented** in the app (leaderboard, player profile, career, team stats, tournament stats, game log fallbacks, tournament placement editing, Games list polish). Treat this file as a **historical work log**, not an open backlog.
 
@@ -17,7 +17,7 @@ Parent plan: [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) · Seasons
 
 ## Optional follow-ups (product, not blockers)
 
-- Further stat-view polish per [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) (copy, layout, or additional aggregates).
+- Further stat-view polish per [DESIGN_STAT_TRACKING_UI.md](../DESIGN_STAT_TRACKING_UI.md) (copy, layout, or additional aggregates).
 - Any new RPCs if reporting outgrows client-side fallbacks.
 
 ## Apply in Supabase

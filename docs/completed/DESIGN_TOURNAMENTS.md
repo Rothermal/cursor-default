@@ -21,7 +21,7 @@ Design for elevating tournaments from a free-text field to a first-class entity:
 
 **Database:** See migrations `016` (`tournaments` table), `023` (`tournaments.url` — optional external link). `games` has optional `tournament_id` FK and legacy `tournament_name`.
 
-**Historical note — before `016` ([003_games_stats.sql](supabase/migrations/003_games_stats.sql)):**
+**Historical note — before `016` ([003_games_stats.sql](../../supabase/migrations/003_games_stats.sql)):**
 
 - `games` had `tournament_name text` only; no `tournament_id` or `tournaments` table.
 
@@ -154,7 +154,7 @@ This design does not assign a specific migration number; when implementing, add 
 
 ## 9. File and doc references
 
-- Games schema: [supabase/migrations/003_games_stats.sql](supabase/migrations/003_games_stats.sql)
+- Games schema: [supabase/migrations/003_games_stats.sql](../../supabase/migrations/003_games_stats.sql)
 - Game Setup: [src/pages/GameSetup.tsx](src/pages/GameSetup.tsx)
 - Games list: [src/pages/Games.tsx](src/pages/Games.tsx)
 - Game Summary: [src/pages/GameSummary.tsx](src/pages/GameSummary.tsx)

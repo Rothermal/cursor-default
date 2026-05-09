@@ -45,7 +45,7 @@ The **ASCII diagram below is historical (pre–018)** and shows `players.team_id
 | **Stats & chart** | `game_stats`, RPCs **010**, `stat_corrections`, `player_checkouts`, **`shot_chart` (032)** |
 | **Debug** | **`client_sync_errors` (033)** — optional client logging of failed snapshot sync |
 
-**Integrity:** **`019_data_integrity_constraints.sql`** — tournament/game team checks, jersey uniqueness (partial index), unique team name per season, etc. See [`DATA_INTEGRITY_AND_CREATION_PLAN.md`](DATA_INTEGRITY_AND_CREATION_PLAN.md).
+**Integrity:** **`019_data_integrity_constraints.sql`** — tournament/game team checks, jersey uniqueness (partial index), unique team name per season, etc. See [`completed/DATA_INTEGRITY_AND_CREATION_PLAN.md`](completed/DATA_INTEGRITY_AND_CREATION_PLAN.md).
 
 <details>
 <summary>Historical pre-018 ERD (do not use for implementation)</summary>
@@ -621,7 +621,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Season stats RPC (`get_season_stats_resolved`) (migration 010)
 - [x] Season stats UI — Leaderboard (team selector, sortable by stat), Player Profile (season totals, game log, view game)
 - [x] Team invite system — invite by email (owner/admin), accept/decline, roles, member list (migration 011)
-- [x] Game Summary: "Primary View" vs "All Submissions" toggle (design: [DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md](DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md))
+- [x] Game Summary: "Primary View" vs "All Submissions" toggle (design: [completed/DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md](completed/DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md))
 - [x] Admin: reassign primary checkout after a game (Game Summary "Primary recorder" section; RPC `set_primary_recorder`, migration 014)
 - [ ] Admin: stat review page with side-by-side parent submissions
 - [x] Admin: correct individual stats with reason (audit trail) — inline in Game Summary review mode
@@ -632,7 +632,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] **Basketball shot chart** — `/shot-chart`, migration **032**, sync in `cloudSync.ts`
 - [x] **Basketball team stats** — pseudo-players, `seasons.team_stats_config`, migrations **027–031**, Game Summary team tab
 - [x] **Sync diagnostics** — `client_sync_errors` (**033**), `logClientSyncError.ts`, UUID validation for `playerIdMap` (`uuidValidation.ts`)
-- [ ] Invite links: shareable URL to join team (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](DESIGN_MULTI_PARENT_INVITE_LINKS.md))
+- [ ] Invite links: shareable URL to join team (design: [archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md](archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 
 ### Phase 4: Polish + Capacitor
 > **Goal**: Native app distribution and final UX polish.

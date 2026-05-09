@@ -4,7 +4,7 @@ High-level navigation redo: keep the **home screen** as-is; after **choosing a s
 
 **Status:** Product decisions recorded (see §10). Ready to break into implementation slices.
 
-**Related docs:** [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md), [DATA_INTEGRITY_AND_CREATION_PLAN.md](DATA_INTEGRITY_AND_CREATION_PLAN.md), [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md). **Future:** granular permissions — [DESIGN_USER_PERMISSIONS_AND_ROLES.md](DESIGN_USER_PERMISSIONS_AND_ROLES.md) (placeholder).
+**Related docs:** [DESIGN_SEASONS_DATA_MODEL.md](../completed/DESIGN_SEASONS_DATA_MODEL.md), [DATA_INTEGRITY_AND_CREATION_PLAN.md](../completed/DATA_INTEGRITY_AND_CREATION_PLAN.md), [DESIGN_STAT_TRACKING_UI.md](../DESIGN_STAT_TRACKING_UI.md). **Future:** granular permissions — [DESIGN_USER_PERMISSIONS_AND_ROLES.md](DESIGN_USER_PERMISSIONS_AND_ROLES.md) (placeholder).
 
 ---
 

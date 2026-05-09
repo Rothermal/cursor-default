@@ -135,7 +135,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4d.2 | (Optional) With Supabase configured | App **skips the auth screen** when the URL hash contains `/dev/shot-chart` so the preview loads immediately |
 | 4d.3 | Production build (`pnpm build` + `pnpm preview`) | The `/dev/shot-chart` route is **not** registered in production bundles; use a **real** basketball game and `#/shot-chart` for end-user testing |
 
-**Related:** Full shot chart flow (stats, cloud) — start a basketball game → **Shot chart** on Game Tracker → `#/shot-chart`. See [DESIGN_SHOT_CHART_IMPLEMENTATION.md](DESIGN_SHOT_CHART_IMPLEMENTATION.md).
+**Related:** Full shot chart flow (stats, cloud) — start a basketball game → **Shot chart** on Game Tracker → `#/shot-chart`. See [completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md).
 
 ---
 
@@ -297,7 +297,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev).
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a script fails on cloud features, confirm migrations through **019** are applied in Supabase SQL Editor when using seasons, `team_players`, and data-integrity constraints (`019_data_integrity_constraints.sql`). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if upgrading an existing project. For **player merge** (Teams → Merge players), apply **`024_player_merge_rpcs.sql`** ([DESIGN_PLAYER_MERGE.md](DESIGN_PLAYER_MERGE.md)).
+- **Migrations:** If a script fails on cloud features, confirm migrations through **019** are applied in Supabase SQL Editor when using seasons, `team_players`, and data-integrity constraints (`019_data_integrity_constraints.sql`). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if upgrading an existing project. For **player merge** (Teams → Merge players), apply **`024_player_merge_rpcs.sql`** ([completed/DESIGN_PLAYER_MERGE.md](completed/DESIGN_PLAYER_MERGE.md)).
 
 ---
 
