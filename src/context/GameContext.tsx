@@ -26,6 +26,7 @@ import {
 } from '../lib/cloudSync'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
+import { activePlayerIdAfterRosterChange } from '../lib/activePlayerIdForRoster'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
@@ -318,17 +319,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SET_PLAYERS': {
       const players = action.players
-      const activeStillValid =
-        state.activePlayerId != null && players.some(p => p.id === state.activePlayerId)
       return {
         ...state,
         players,
-        activePlayerId:
-          players.length > 0
-            ? activeStillValid
-              ? state.activePlayerId
-              : players[0].id
-            : null,
+        activePlayerId: activePlayerIdAfterRosterChange(state.activePlayerId, players),
         shotChart: shotChartWithOnlyRosterPlayers(state.shotChart, players),
       }
     }
@@ -408,7 +402,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CLEAR_SHOT_CHART': {
       if (state.shotChart.length === 0) return state
       let s = state
-      while (s.shotChart.length > 0) {
+      const maxIterations = s.shotChart.length + s.actionLog.length + 8
+      for (let i = 0; i < maxIterations && s.shotChart.length > 0; i++) {
         const popped = s.shotChart[s.shotChart.length - 1]
         const last = s.actionLog[s.actionLog.length - 1]
         const matches =
@@ -416,12 +411,41 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           last.shotId === popped.id &&
           last.playerId === popped.playerId &&
           last.statId === statIdForShotRecord(popped)
-        if (!matches) break
-        const next = applyUndoLastEntry(s)
-        if (!next) break
-        s = next
+        if (matches) {
+          const next = applyUndoLastEntry(s)
+          if (!next) {
+            s = { ...s, shotChart: s.shotChart.slice(0, -1) }
+            continue
+          }
+          s = next
+          continue
+        }
+        // Chart tail has no matching log (e.g. general UNDO removed the increment entry).
+        // Still remove the shot and roll back its FG stat so we never spin forever.
+        const player = s.players.find(p => p.id === popped.playerId)
+        const statId = statIdForShotRecord(popped)
+        if (!player) {
+          s = { ...s, shotChart: s.shotChart.slice(0, -1) }
+          continue
+        }
+        const v = player.stats[statId] || 0
+        s =
+          v > 0
+            ? {
+                ...s,
+                shotChart: s.shotChart.slice(0, -1),
+                players: s.players.map(p =>
+                  p.id === popped.playerId ? { ...p, stats: { ...p.stats, [statId]: v - 1 } } : p
+                ),
+              }
+            : { ...s, shotChart: s.shotChart.slice(0, -1) }
       }
-      return s
+      // Undo chain can stop early while shots remain; roster changes can leave
+      // `playerId`s not on `players` → shot-chart sync throws permanently unless dropped.
+      return {
+        ...s,
+        shotChart: shotChartWithOnlyRosterPlayers(s.shotChart, s.players),
+      }
     }
 
     case 'INCREMENT_STAT': {
@@ -663,7 +687,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
   const queueAnotherSyncRef = useRef(false)
-  const pendingSyncRef = useRef(false)
+  /** Seeded from localStorage so cloud hydration cannot race ahead of the pending-sync restore effect. */
+  const pendingSyncRef = useRef(getPendingSyncFlag())
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
@@ -746,10 +771,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const hydrateFromCloud = async () => {
       // Cloud-first: only skip hydration when there is unsynced local progress
       // (game in progress that has never been synced - no gameId yet).
+      //
+      // Also skip when `statkeeper_pending_sync` is set: that durable flag is written
+      // before unload when we had sync prerequisites but were offline (or hit a
+      // network-class sync failure). Hydration must not run before the effect that
+      // copies that flag into `pendingSyncRef`, otherwise we'd fetch cloud and
+      // overwrite newer local state from localStorage (silent data loss).
       const hasUnsyncedLocal =
         stateRef.current.sport &&
         stateRef.current.gameInfo &&
-        !stateRef.current.cloudSync.gameId
+        (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
       if (hasUnsyncedLocal) {
         hydratedUserRef.current = userId
         return
@@ -770,18 +801,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
         if (cancelled) return
 
-        hydratedUserRef.current = userId
         const nextState = buildHydratedStateFromCloudGame(cloudGame)
-        if (!nextState) return
+        if (!nextState) {
+          // `null` from API: nothing to resume. Non-null `cloudGame` but null state (e.g. unknown sport):
+          // do not mark hydrated — a later retry may succeed if data changes.
+          if (cloudGame === null) {
+            hydratedUserRef.current = userId
+          }
+          return
+        }
 
         if (nextState.cloudSync.gameId && canHydrateAsActiveGame(nextState.cloudSync.gameStatus ?? '')) {
           setResumeTarget(userId, nextState.cloudSync.gameId)
         }
+        hydratedUserRef.current = userId
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
       } catch (error) {
         if (cancelled) return
-        hydratedUserRef.current = userId
         dispatch({
           type: 'SET_CLOUD_SYNC_STATE',
           cloudSync: {
@@ -796,7 +833,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, userId])
+  }, [isConfigured, isOnline, userId])
 
   useEffect(() => {
     if (!userId) return

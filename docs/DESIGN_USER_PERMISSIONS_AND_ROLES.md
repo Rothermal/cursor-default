@@ -1,6 +1,6 @@
 # Design (placeholder): User permissions & roles
 
-**Status:** Placeholder — no implementation yet. Requires a deeper product discussion before schema, RLS, or UI work.
+**Status:** Placeholder for **fine-grained** permissions beyond today’s **`team_members.role`** (`owner` | `admin` | `scorer`). Those coarse roles **are implemented** (invites, RLS, merge authorization, etc.). This doc is for a future permission matrix (read vs CRUD per resource).
 
 ## Intent
 
