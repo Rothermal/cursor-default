@@ -174,6 +174,12 @@ export interface CloudSyncState {
   status: CloudSyncStatus
   lastSyncedAt: string | null
   lastError: string | null
+  /**
+   * Shot-chart rows present in Supabase for this game/recorder that were not mapped into
+   * `shotChart` during hydration (e.g. player no longer on roster). Sync must not delete
+   * cloud rows while this is positive and local `shotChart` is empty.
+   */
+  shotChartHydrationDroppedRows: number
 }
 
 export type GameAction =

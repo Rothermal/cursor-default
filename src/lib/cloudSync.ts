@@ -8,6 +8,8 @@ interface SyncGameSnapshotInput {
   userId: string
 }
 
+export type ShotChartCloudSyncMode = 'synced' | 'skipped_incomplete_hydration'
+
 export interface SyncGameSnapshotResult {
   seasonId: string
   teamId: string
@@ -16,6 +18,8 @@ export interface SyncGameSnapshotResult {
   syncedAt: string
   /** True when the cloud row is already final — no writes were performed (avoids clobbering scores). */
   skippedFinalGame?: boolean
+  /** When set, `shot_chart` was left unchanged (see `CloudSyncState.shotChartHydrationDroppedRows`). */
+  shotChartCloudSync?: ShotChartCloudSyncMode
 }
 
 export interface HydratedCloudGame {
@@ -37,6 +41,8 @@ export interface HydratedCloudGame {
   playerIdMap: Record<string, string>
   /** Chart shots for this game + recorder (basketball); empty if table missing or none. */
   shotChart: ShotRecord[]
+  /** `shot_chart` rows for this game/recorder that could not be mapped into `shotChart`. */
+  shotChartHydrationDroppedRows: number
   hydratedAt: string
 }
 
@@ -675,12 +681,18 @@ async function syncShotChartToCloud(
   userId: string,
   gameId: string,
   playerIdMap: Record<string, string>
-): Promise<void> {
+): Promise<ShotChartCloudSyncMode> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
   }
   if (state.sport?.id !== 'basketball') {
-    return
+    return 'synced'
+  }
+
+  // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
+  // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
+  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
+    return 'skipped_incomplete_hydration'
   }
 
   const rows: Array<{
@@ -724,26 +736,27 @@ async function syncShotChartToCloud(
 
   if (delError) {
     if (isMissingShotChartTableError(delError)) {
-      return
+      return 'synced'
     }
     throw new Error(`Shot chart sync (delete) failed: ${delError.message}`)
   }
 
   if (state.shotChart.length === 0) {
-    return
+    return 'synced'
   }
 
   if (rows.length === 0) {
-    return
+    return 'synced'
   }
 
   const { error: insError } = await supabase.from('shot_chart').insert(rows)
   if (insError) {
     if (isMissingShotChartTableError(insError)) {
-      return
+      return 'synced'
     }
     throw new Error(`Shot chart sync (insert) failed: ${insError.message}`)
   }
+  return 'synced'
 }
 
 export async function syncGameSnapshotToCloud({
@@ -777,6 +790,7 @@ export async function syncGameSnapshotToCloud({
         playerIdMap: state.cloudSync.playerIdMap,
         syncedAt: new Date().toISOString(),
         skippedFinalGame: true,
+        shotChartCloudSync: 'synced',
       }
     }
   }
@@ -798,7 +812,7 @@ export async function syncGameSnapshotToCloud({
 
   await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
 
-  await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
+  const shotChartCloudSync = await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
 
   await linkGameTeamPlaceholderIds(
     gameId,
@@ -817,6 +831,7 @@ export async function syncGameSnapshotToCloud({
     gameId,
     playerIdMap: nextPlayerIdMap,
     syncedAt: new Date().toISOString(),
+    shotChartCloudSync,
   }
 }
 
@@ -1000,6 +1015,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
   }
 
   const shotChart: ShotRecord[] = []
+  let shotChartHydrationDroppedRows = 0
   if (sportId === 'basketball') {
     const { data: shotRows, error: shotErr } = await supabase
       .from('shot_chart')
@@ -1025,9 +1041,15 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
         created_at: string
       }>) {
         const localPlayerId = remoteToLocalPlayerId[row.player_id]
-        if (!localPlayerId) continue
+        if (!localPlayerId) {
+          shotChartHydrationDroppedRows += 1
+          continue
+        }
         const z = row.zone as ShotRecord['zone']
-        if (!zones.includes(z)) continue
+        if (!zones.includes(z)) {
+          shotChartHydrationDroppedRows += 1
+          continue
+        }
         const st = row.shot_type === '3pt' ? '3pt' : '2pt'
         shotChart.push({
           id: row.client_shot_id,
@@ -1068,6 +1090,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     gameId: gameRow.id,
     playerIdMap,
     shotChart,
+    shotChartHydrationDroppedRows,
     hydratedAt: new Date().toISOString(),
   }
 }
