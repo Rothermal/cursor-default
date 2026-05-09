@@ -440,7 +440,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               }
             : { ...s, shotChart: s.shotChart.slice(0, -1) }
       }
-      return s
+      // Undo chain can stop early while shots remain; roster changes can leave
+      // `playerId`s not on `players` → shot-chart sync throws permanently unless dropped.
+      return {
+        ...s,
+        shotChart: shotChartWithOnlyRosterPlayers(s.shotChart, s.players),
+      }
     }
 
     case 'INCREMENT_STAT': {
