@@ -107,6 +107,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/030_team_stats_schema.sql` — `games.home_team_player_id`, `opp_team_player_id`, `seasons.team_stats_config`, display views, `get_game_team_stats` (see file for notes on `get_game_stats_resolved`)
    - `supabase/migrations/031_get_game_team_stats.sql` — repair: `get_game_team_stats` only if needed
    - `supabase/migrations/032_shot_chart.sql` — `shot_chart` per-game shot locations (cloud sync from the shot chart; see `docs/DESIGN_SHOT_CHART_IMPLEMENTATION.md` SC-6)
+   - `supabase/migrations/033_client_sync_errors.sql` — `client_sync_errors` for failed cloud sync attempts (debugging; RLS: own rows only)
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -155,6 +156,8 @@ src/
 ├── lib/
 │   ├── supabase.ts        # Supabase client init (graceful fallback if not configured)
 │   ├── cloudSync.ts       # Cloud game snapshot sync, hydration, resume, team placeholders
+│   ├── logClientSyncError.ts  # Inserts failed sync rows into client_sync_errors (Supabase)
+│   ├── uuidValidation.ts  # Remote player id UUID checks (sync + persisted playerIdMap)
 │   ├── display.ts         # Shared display name helpers (teams, players)
 │   ├── statDisplay.ts     # Compact stat lines for game logs (sport-aware)
 │   ├── gameScore.ts       # Display/final home score (standalone vs computed from player stats)
@@ -227,14 +230,16 @@ supabase/
     ├── 028_team_placeholder_players.sql
     ├── 029_merge_block_team_placeholders.sql
     ├── 030_team_stats_schema.sql
-    └── 031_get_game_team_stats.sql
+    ├── 031_get_game_team_stats.sql
+    ├── 032_shot_chart.sql
+    └── 033_client_sync_errors.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
 └── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
 
 docs/
-├── INTEGRATION_PLAN.md    # Full architecture, data model, and phased roadmap
+├── INTEGRATION_PLAN.md    # Supabase architecture & phases (§1 schema summary = post-018; see migrations)
 ├── DESIGN_SEASONS_DATA_MODEL.md  # Design: Seasons entity, roster junction, player guardians
 ├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game/tournament stat views
 ├── STAT_TRACKING_UI_PROGRESS.md  # Checklist: Phase 6 stat UI implementation
@@ -250,6 +255,7 @@ docs/
 ├── DESIGN_TEAM_STATS_SEASON_CONFIG.md # Season JSON rules — **shipped**
 ├── DESIGN_TEAM_STATS_DATA_MODEL.md    # DB placeholders, RPCs, sync — **shipped**
 ├── DESIGN_TEAM_STATS_IMPLEMENTATION.md # Work-unit plan (historical); feature complete
+├── PLAN_MULTI_GAME_PARKING.md # Roadmap: multiple parked games + sync queue (not shipped)
 └── REGRESSION_TESTING.md  # High-level test scripts for all features
 ```
 
@@ -313,6 +319,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
+- [ ] **Multi-game parking + sync queue** — multiple in-progress/paused games per device, offline-safe snapshots, ordered cloud sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] Stat view redesign: career stats page, tournament stats page, team season summary, inline game stat lines on player profile (design: [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md))
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)

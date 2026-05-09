@@ -78,9 +78,11 @@ export default defineConfig(({ command }) => ({
 
 > If your repo name is not `cursor-default`, change `/cursor-default/` to `/<your-repo-name>/` everywhere above.
 
-### 1.2 Add the GitHub Actions workflow
+### 1.2 GitHub Actions workflow
 
-Create `.github/workflows/deploy.yml` with the following contents:
+The repo already contains **`.github/workflows/deploy.yml`**. Ensure the **`on.push.branches`** entry matches how you deploy (this project uses **`stattracker`**).
+
+**Trigger (`on:`) excerpt:**
 
 ```yaml
 name: Deploy to GitHub Pages
@@ -88,66 +90,20 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main
+      - stattracker
   workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
 ```
 
-Commit and push:
+> The snippet above is the **`on:`** block only. The full workflow lives in **`.github/workflows/deploy.yml`** in the repo (install, `pnpm build`, upload artifact, deploy). Keep the doc in sync when you change branches or job names.
 
-```bash
-git add vite.config.ts .github/workflows/deploy.yml GITHUB_PAGES_DEPLOY.md
-git commit -m "Set up GitHub Pages deployment"
-git push
-```
+**Repository secrets (Settings → Secrets and variables → Actions):**
+
+| Secret | Purpose |
+|--------|---------|
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Passed into the build today (see workflow `env`). The Vite app also accepts **`VITE_SUPABASE_PUBLISHABLE_KEY`** locally (`.env.example`); you may add that secret and extend the workflow `env` block to pass it if you prefer the newer key name. |
+
+Without these, the production build still runs but **cloud features are disabled** (same as missing `.env` locally).
 
 ---
 
@@ -164,7 +120,7 @@ GitHub will now expect a workflow (like `deploy.yml`) to publish the site.
 
 ## 3. Trigger a deployment
 
-1. Push to the `main` branch (or use **Actions → Deploy to GitHub Pages → Run workflow**).
+1. Push to the **`stattracker`** branch (or use **Actions → Deploy to GitHub Pages → Run workflow**). The workflow (`.github/workflows/deploy.yml`) runs on `push` to `stattracker` and on `workflow_dispatch`.
 2. Open the **Actions** tab and wait for the **Deploy to GitHub Pages** workflow to finish successfully.
 3. Return to **Settings → Pages** to see the published URL.
 
@@ -184,7 +140,7 @@ For a project site it will be:
    - Open the same URL.
    - Use **Add to Home Screen** / **Install app** in the browser menu to install the PWA.
 
-After this, every push to `main` will automatically rebuild and redeploy StatKeeper to GitHub Pages.
+After this, every push to **`stattracker`** will automatically rebuild and redeploy StatKeeper to GitHub Pages.
 
 ---
 
