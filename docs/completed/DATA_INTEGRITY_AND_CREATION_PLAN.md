@@ -2,7 +2,7 @@
 
 This document captures a planned set of database and application changes to reduce drift after schema evolution (especially migration 018: seasons, `team_players`, `players.created_by`), align team/season creation across UI paths, and enforce clearer rules for required fields and insert order.
 
-**Status:** Database Phase A audit and migration **`019` are applied** on the production-ready database. App changes (`cloudSync`, Game Setup, Teams) are in the codebase. **Next:** run a full app regression (see checklist §5 and [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md), including §13).
+**Status:** Database Phase A audit and migration **`019` are applied** on the production-ready database. App changes (`cloudSync`, Game Setup, Teams) are in the codebase. **Next:** run a full app regression (see checklist §5 and [`REGRESSION_TESTING.md`](../REGRESSION_TESTING.md), including §13).
 
 For **new** environments or clones, still run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if you are importing legacy data that might violate constraints.
 
@@ -101,8 +101,8 @@ Applied on the primary database. New environments: apply `019_data_integrity_con
 
 ### Phase D — Documentation & tests
 
-- Update [`docs/INTEGRATION_PLAN.md`](INTEGRATION_PLAN.md) schema section if `games.season_id` or new constraints land.
-- Extend [`docs/REGRESSION_TESTING.md`](REGRESSION_TESTING.md) with cases: duplicate team blocked, invalid tournament FK rejected, cloud game uses selected team’s season.
+- Update [`../INTEGRATION_PLAN.md`](../INTEGRATION_PLAN.md) schema section if `games.season_id` or new constraints land.
+- Extend [`../REGRESSION_TESTING.md`](../REGRESSION_TESTING.md) with cases: duplicate team blocked, invalid tournament FK rejected, cloud game uses selected team’s season.
 - Add new migration filename to [`README.md`](../README.md) migration list when shipped.
 
 ---
@@ -125,7 +125,7 @@ Applied on the primary database. New environments: apply `019_data_integrity_con
 - [x] `cloudSync` prefers matching owner team+season by name+sport before year-based season; `ensureTeam` handles unique-name conflicts; `ensureGame` includes optional `season_id` with column fallback.
 - [x] Game Setup: tournament name required when “+ Add new tournament”; optional season picker for **New team** cloud path; Teams: required season name when creating new season.
 - [x] README migration list updated; INTEGRATION_PLAN + regression doc nudged.
-- [ ] Full app regression pass ([`REGRESSION_TESTING.md`](REGRESSION_TESTING.md), including §13) — **DB is ready;** run when convenient.
+- [ ] Full app regression pass ([`REGRESSION_TESTING.md`](../REGRESSION_TESTING.md), including §13) — **DB is ready;** run when convenient.
 
 ---
 

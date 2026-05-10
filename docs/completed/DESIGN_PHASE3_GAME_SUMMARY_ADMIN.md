@@ -134,4 +134,4 @@ Design for the remaining Phase 3 features: Primary vs All Submissions view, reas
 - **P1:** Primary vs All Submissions toggle (Part 2), Reassign primary (Part 3). Use existing RPC; add client query for raw submissions and profiles.
 - **P2:** Conflict indicator in Primary view (Part 1), Review queue section (Part 4). Both use data we already have from `get_game_stats_resolved`.
 - **P3:** Side-by-side view later.
-- Design doc location: `docs/DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md`. Update this file as we make implementation decisions or add ideas.
+- Design doc location: `docs/completed/DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md`. Update this file as we make implementation decisions or add ideas.

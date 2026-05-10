@@ -32,7 +32,7 @@ The following are **examples only** — not final roles. We need to decide which
 ## Dependencies
 
 - [DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md](DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md) (navigation and CRUD surfaces).
-- [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md) (current data model).
+- [DESIGN_SEASONS_DATA_MODEL.md](../completed/DESIGN_SEASONS_DATA_MODEL.md) (current data model).
 - Existing RLS on `teams`, `team_members`, `seasons`, `tournaments`, `games`, etc.
 
 ## Next steps (when prioritized)

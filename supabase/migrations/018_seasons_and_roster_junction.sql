@@ -8,7 +8,7 @@
 --   4. tournaments.placement – tournament finish position
 --   5. Display views    – human-readable JOINs for Supabase admin browsing
 --
--- Design doc: docs/DESIGN_SEASONS_DATA_MODEL.md
+-- Design doc: docs/completed/DESIGN_SEASONS_DATA_MODEL.md
 -- ============================================================================
 
 -- --------------------------------------------------------------------------

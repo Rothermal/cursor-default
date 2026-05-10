@@ -2,7 +2,7 @@
 -- Migration 019: Data integrity — seasons.sport, teams uniqueness, roster
 -- jerseys, games.season_id + tournament FK check, sync trigger
 -- ============================================================================
--- See docs/DATA_INTEGRITY_AND_CREATION_PLAN.md
+-- See docs/completed/DATA_INTEGRITY_AND_CREATION_PLAN.md
 --
 -- Preconditions (migration will abort with clear errors if violated):
 --   - No duplicate (season_id, name) on teams

@@ -17,8 +17,8 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Minutes Played** — per-player minute counter for sports that track playing time (basketball, hockey, soccer, football)
 - **Game Notes** — free-text notes field in Game Tracker and Game Summary; synced to cloud
 - **Live Scoreboard** — home total can be a standalone scoreboard value or computed from player scoring stats + optional adjustment; manual opponent score
-- **Basketball team stats** — home/opponent “team” rows in Game Tracker for fouls (per period), timeouts, techs, turnovers; period toggle, bonus indicators, and season rules from `seasons.team_stats_config` (edit under **Settings → Seasons**). Cloud games sync placeholder `players` + `game_stats`; **Game Summary** includes a **Team stats** tab (fouls by period, bonus events, other team stats). See [docs/DESIGN_TEAM_STATS_TRACKING.md](docs/DESIGN_TEAM_STATS_TRACKING.md)
-- **Basketball shot chart** — half-court SVG from Game Tracker (**Shot chart**); tap to record made/miss with zone classification; syncs with 2PT/3PT stats; **Game Summary** tab when chart shots exist; cloud persistence via migration **`032_shot_chart.sql`** ([implementation plan](docs/DESIGN_SHOT_CHART_IMPLEMENTATION.md))
+- **Basketball team stats** — home/opponent “team” rows in Game Tracker for fouls (per period), timeouts, techs, turnovers; period toggle, bonus indicators, and season rules from `seasons.team_stats_config` (edit under **Settings → Seasons**). Cloud games sync placeholder `players` + `game_stats`; **Game Summary** includes a **Team stats** tab (fouls by period, bonus events, other team stats). See [docs/completed/DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md)
+- **Basketball shot chart** — half-court SVG from Game Tracker (**Shot chart**); tap to record made/miss with zone classification; syncs with 2PT/3PT stats; **Game Summary** tab when chart shots exist; cloud persistence via migration **`032_shot_chart.sql`** ([implementation plan](docs/completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md))
 - **Undo Support** — undo any stat action instantly
 - **Game Summary** — per-player and team totals in organized tables; M/A (%) columns for shooting stats
 - **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; centralized Data Management in Settings
@@ -98,7 +98,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/021_tournament_stats_rpc.sql` — `get_tournament_stats_resolved`
    - `supabase/migrations/022_games_is_exhibition_generated.sql` — optional generated `games.is_exhibition` (`tournament_id IS NULL`); see `supabase/scripts/normalize_exhibition_games.sql` for legacy row cleanup
    - `supabase/migrations/023_tournaments_url.sql` — optional `tournaments.url` (bracket/registration link); set or edit from Game Setup when creating or selecting a tournament
-   - `supabase/migrations/024_player_merge_rpcs.sql` — `merge_players_preview` / `merge_players_execute` + `player_merge_audit` ([DESIGN_PLAYER_MERGE.md](docs/DESIGN_PLAYER_MERGE.md))
+   - `supabase/migrations/024_player_merge_rpcs.sql` — `merge_players_preview` / `merge_players_execute` + `player_merge_audit` ([DESIGN_PLAYER_MERGE.md](docs/completed/DESIGN_PLAYER_MERGE.md))
    - `supabase/migrations/025_player_merge_audit_select_policy.sql` — users can `SELECT` their own `player_merge_audit` rows (Admin merge history)
    - `supabase/migrations/026_player_stat_high_games.sql` — `get_player_stat_high_games` / `get_player_stat_high_games_for_team` for career & season “Best game” links to game summary
    - `supabase/migrations/027_home_team_score.sql` — optional `games.home_team_score` + `get_team_game_log` column
@@ -106,7 +106,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/029_merge_block_team_placeholders.sql` — merge RPCs reject placeholder players
    - `supabase/migrations/030_team_stats_schema.sql` — `games.home_team_player_id`, `opp_team_player_id`, `seasons.team_stats_config`, display views, `get_game_team_stats` (see file for notes on `get_game_stats_resolved`)
    - `supabase/migrations/031_get_game_team_stats.sql` — repair: `get_game_team_stats` only if needed
-   - `supabase/migrations/032_shot_chart.sql` — `shot_chart` per-game shot locations (cloud sync from the shot chart; see `docs/DESIGN_SHOT_CHART_IMPLEMENTATION.md` SC-6)
+   - `supabase/migrations/032_shot_chart.sql` — `shot_chart` per-game shot locations (cloud sync from the shot chart; see `docs/completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md` SC-6)
    - `supabase/migrations/033_client_sync_errors.sql` — `client_sync_errors` for failed cloud sync attempts (debugging; RLS: own rows only)
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
@@ -240,23 +240,28 @@ supabase/scripts/
 
 docs/
 ├── INTEGRATION_PLAN.md    # Supabase architecture & phases (§1 schema summary = post-018; see migrations)
-├── DESIGN_SEASONS_DATA_MODEL.md  # Design: Seasons entity, roster junction, player guardians
-├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game/tournament stat views
-├── STAT_TRACKING_UI_PROGRESS.md  # Checklist: Phase 6 stat UI implementation
-├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md  # Design: Primary vs All Submissions, reassign primary, review queue
-├── DESIGN_MULTI_PARENT_INVITE_LINKS.md  # Design: Invite links and multi-parent collaboration
-├── DESIGN_TOURNAMENTS.md  # Design: Tournaments table, game link, UI and tournament-scoped views
-├── DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md  # Design: Sport → seasons → team → tournaments/exhibition → games
-├── DESIGN_USER_PERMISSIONS_AND_ROLES.md  # Placeholder: granular permissions (R → CRUD), personas TBD
-├── DATA_INTEGRITY_AND_CREATION_PLAN.md  # Plan: DB/app enforcement, season/team creation alignment
-├── DESIGN_PLAYER_MERGE.md  # Plan: merge duplicate players (RPC, conflicts, UI)
-├── DESIGN_TEAM_STATS_TRACKING.md      # Team-level stats (pseudo-players, UI) — **shipped**
-├── DESIGN_TEAM_STATS_BASKETBALL.md    # Basketball fouls, bonus, periods — **shipped**
-├── DESIGN_TEAM_STATS_SEASON_CONFIG.md # Season JSON rules — **shipped**
-├── DESIGN_TEAM_STATS_DATA_MODEL.md    # DB placeholders, RPCs, sync — **shipped**
-├── DESIGN_TEAM_STATS_IMPLEMENTATION.md # Work-unit plan (historical); feature complete
+├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game views (living doc; progress table)
+├── DESIGN_TEAM_INFO_PAGE.md # Team hub / drill-down (implementation plan; not built)
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: multiple parked games + sync queue (not shipped)
-└── REGRESSION_TESTING.md  # High-level test scripts for all features
+├── REGRESSION_TESTING.md  # High-level test scripts for all features
+├── completed/             # Shipped features — design & implementation references
+│   ├── DESIGN_SEASONS_DATA_MODEL.md
+│   ├── STAT_TRACKING_UI_PROGRESS.md
+│   ├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md
+│   ├── DESIGN_TOURNAMENTS.md
+│   ├── DATA_INTEGRITY_AND_CREATION_PLAN.md
+│   ├── DESIGN_PLAYER_MERGE.md
+│   ├── DESIGN_TEAM_STATS_TRACKING.md
+│   ├── DESIGN_TEAM_STATS_BASKETBALL.md
+│   ├── DESIGN_TEAM_STATS_SEASON_CONFIG.md
+│   ├── DESIGN_TEAM_STATS_DATA_MODEL.md
+│   ├── DESIGN_TEAM_STATS_IMPLEMENTATION.md
+│   ├── DESIGN_SHOT_CHART.md
+│   └── DESIGN_SHOT_CHART_IMPLEMENTATION.md
+└── archived/              # Future / placeholder / not-built specs
+    ├── DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md
+    ├── DESIGN_MULTI_PARENT_INVITE_LINKS.md
+    └── DESIGN_USER_PERMISSIONS_AND_ROLES.md
 ```
 
 ### Testing
@@ -315,13 +320,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Player pool — "Add Existing" mode on roster: pick from players you created or are guardian of; no duplicate player records when moving between teams/seasons
 - [x] Supabase admin display views — 9 human-readable SQL views (`_display` suffix) with `security_invoker = true` for safe FK browsing in Supabase table browser
 - [x] Tournament placement — `tournaments.placement` column for finish position (1st, 2nd, 3rd, etc.)
-- [x] **Team-level stat tracking (basketball)** — pseudo-players `__team_home__` / `__team_opp__`, `teamCategories` in `sports.ts`, period-scoped stat ids (`team_foul_p1`, …), bonus UI, season rules in `seasons.team_stats_config` (Admin → Seasons), cloud placeholder players + `get_game_team_stats`, checkout + Game Summary **Team stats** tab (design: [DESIGN_TEAM_STATS_TRACKING.md](docs/DESIGN_TEAM_STATS_TRACKING.md))
+- [x] **Team-level stat tracking (basketball)** — pseudo-players `__team_home__` / `__team_opp__`, `teamCategories` in `sports.ts`, period-scoped stat ids (`team_foul_p1`, …), bonus UI, season rules in `seasons.team_stats_config` (Admin → Seasons), cloud placeholder players + `get_game_team_stats`, checkout + Game Summary **Team stats** tab (design: [DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md))
 
 ### What's Next
 
 - [ ] **Multi-game parking + sync queue** — multiple in-progress/paused games per device, offline-safe snapshots, ordered cloud sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] Stat view redesign: career stats page, tournament stats page, team season summary, inline game stat lines on player profile (design: [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md))
-- [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
+- [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams
 
@@ -330,14 +335,14 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 A backlog of ideas to iterate over:
 
 1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats). *Implemented: home score = computed from player stats + editable adjustment (+/− buttons on Scoreboard); adjustment persisted and synced (migration 015).*
-2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud. *Implemented: team name + nickname editable from Teams page; player first/last name, jersey number, nickname editable from Teams roster; opponent name editable from Games history (inline edit). Tournaments as first-class entity — `tournaments` table (migration 016) with team-scoped picker in Game Setup; games reference `tournament_id`. Design: [DESIGN_TOURNAMENTS.md](docs/DESIGN_TOURNAMENTS.md).*
+2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud. *Implemented: team name + nickname editable from Teams page; player first/last name, jersey number, nickname editable from Teams roster; opponent name editable from Games history (inline edit). Tournaments as first-class entity — `tournaments` table (migration 016) with team-scoped picker in Game Setup; games reference `tournament_id`. Design: [DESIGN_TOURNAMENTS.md](docs/completed/DESIGN_TOURNAMENTS.md).*
 4. **Minutes played, game notes, missed shots** — Extend stat tracking. *Implemented: minutes played as per-player counter in basketball (stat `min`, Playmaking category); game notes with free-text field in Game Tracker and Game Summary, synced to cloud (migration 017); missed shots for basketball with [−][A][+] attempt buttons and M/A (%) columns in Game Summary.*
 5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding. *Implemented: delete teams, players (hard delete), games, and tournaments from the Teams page, Games page, Game Setup tournament picker, and a centralized Data Management section in Settings (Admin). All deletes show a confirmation dialog. Cascading deletes handled by Supabase FK constraints (`ON DELETE CASCADE`).*
 6. **Score totals in game list** — Game summaries / game history menu should show the score totals for each team (home vs opponent) in the list.
 7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard). *Implemented: `seasons` table as top-level entity (migration 018); teams belong to a season via `season_id` FK; games inherit season through their team; season filter in Game Setup; season CRUD in Settings. Design: [DESIGN_SEASONS_DATA_MODEL.md](docs/DESIGN_SEASONS_DATA_MODEL.md).*
+8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard). *Implemented: `seasons` table as top-level entity (migration 018); teams belong to a season via `season_id` FK; games inherit season through their team; season filter in Game Setup; season CRUD in Settings. Design: [DESIGN_SEASONS_DATA_MODEL.md](docs/completed/DESIGN_SEASONS_DATA_MODEL.md).*
 9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions). *Partially addressed by enhancement #5 (delete games individually from Games page and Data Management in Settings). Bulk actions and archive not yet implemented.*
-10. **Data integrity & creation order** — Migration **`019` applied** on the database (sport CHECK, unique team per season, active jersey uniqueness, `games.season_id` + triggers, tournament/team validation). App aligns `cloudSync` and Game Setup / Teams. Full plan and checklist: [docs/DATA_INTEGRITY_AND_CREATION_PLAN.md](docs/DATA_INTEGRITY_AND_CREATION_PLAN.md). Regression: [docs/REGRESSION_TESTING.md](docs/REGRESSION_TESTING.md) §13.
+10. **Data integrity & creation order** — Migration **`019` applied** on the database (sport CHECK, unique team per season, active jersey uniqueness, `games.season_id` + triggers, tournament/team validation). App aligns `cloudSync` and Game Setup / Teams. Full plan and checklist: [docs/completed/DATA_INTEGRITY_AND_CREATION_PLAN.md](docs/completed/DATA_INTEGRITY_AND_CREATION_PLAN.md). Regression: [docs/REGRESSION_TESTING.md](docs/REGRESSION_TESTING.md) §13.
 11. *(Add more as we go)*
 
 ### Known Issues

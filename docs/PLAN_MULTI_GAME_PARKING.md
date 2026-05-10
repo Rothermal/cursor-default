@@ -108,7 +108,7 @@ High-level blueprint for a future agent or implementer. **Not shipped** — curr
 - `src/context/GameContext.tsx` — reducer, `loadState`, `GAME_STORAGE_KEY`, `runCloudSync`, resume hydration.
 - `src/lib/cloudSync.ts` — `syncGameSnapshotToCloud`, `ensureGame` ordering.
 - `src/lib/logClientSyncError.ts` — optional logging per failed job.
-- `docs/DATA_INTEGRITY_AND_CREATION_PLAN.md` — broader integrity context.
+- [completed/DATA_INTEGRITY_AND_CREATION_PLAN.md](completed/DATA_INTEGRITY_AND_CREATION_PLAN.md) — broader integrity context.
 
 ---
 

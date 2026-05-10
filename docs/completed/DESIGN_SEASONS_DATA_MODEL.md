@@ -2,7 +2,7 @@
 
 Redesign the data model to make **Season** a first-class entity at the top of the hierarchy, decouple players from teams via a junction table, and add Supabase admin display views for human-readable FK browsing.
 
-**Companion doc:** [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) — stat page redesign covering career stats, season stats, game stats (player and team splits).
+**Companion doc:** [DESIGN_STAT_TRACKING_UI.md](../DESIGN_STAT_TRACKING_UI.md) — stat page redesign covering career stats, season stats, game stats (player and team splits).
 
 **Status:** Migration **018** (seasons, `team_players`, guardians) and later migrations are **applied** in the product database. Early sections that contrast “current” vs “new” model describe the **historical pre-018** layout; for the **shipped** schema, use `supabase/migrations/` and [DATA_INTEGRITY_AND_CREATION_PLAN.md](DATA_INTEGRITY_AND_CREATION_PLAN.md).
 
@@ -466,7 +466,7 @@ These views are for **admin browsing only** — the app continues to query base 
 
 ## 7. Stat Tracking Scope Changes
 
-> **Full UI design:** [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md)
+> **Full UI design:** [DESIGN_STAT_TRACKING_UI.md](../DESIGN_STAT_TRACKING_UI.md)
 
 ### 7.1 Stat View Categories
 
@@ -564,7 +564,7 @@ The migration is destructive (drops columns). Before running, recommend a Supaba
 | **3. Roster Refactor** | Teams page uses `team_players` junction; "Add Existing" player pool mode; PlayerSetup updated | **Done** |
 | **4. Guardian Claim** | "Claim" button on roster players; guardian status indicator; auto-guardian on player creation | **Done** |
 | **5. Cloud Sync** | `cloudSync.ts` handles season context, junction-based player lookup, auto-create guardian link | **Done** |
-| **6. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | **In progress** — branch `cursor/stat-tracking-ui-phase6`; migration `020_stat_tracking_ui_rpcs.sql`; see [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md) §Progress |
+| **6. Stat Views** | Career stats page, season-scoped stats, game stats (player + team splits) | **In progress** — branch `cursor/stat-tracking-ui-phase6`; migration `020_stat_tracking_ui_rpcs.sql`; see [DESIGN_STAT_TRACKING_UI.md](../DESIGN_STAT_TRACKING_UI.md) §Progress |
 | **7. Player Transfer** | UI to add an existing player to a new team; player search/autocomplete | Planned |
 
 ---
@@ -596,4 +596,4 @@ The migration is destructive (drops columns). Before running, recommend a Supaba
 | `src/pages/Admin.tsx` | Settings — add season management |
 | `src/pages/Leaderboard.tsx` | Season stats — scope by season |
 | `src/pages/PlayerProfile.tsx` | Player stats — add career view |
-| `docs/INTEGRATION_PLAN.md` | Overall architecture — update data model section |
+| `../INTEGRATION_PLAN.md` | Overall architecture — update data model section |

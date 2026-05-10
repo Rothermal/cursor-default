@@ -1,6 +1,6 @@
 # Design: Stat Tracking UI Redesign
 
-Redesign the stat viewing pages to support **career stats**, **season-scoped stats**, and **game stats split into player and team views**. Builds on the seasons data model from [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md).
+Redesign the stat viewing pages to support **career stats**, **season-scoped stats**, and **game stats split into player and team views**. Builds on the seasons data model from [completed/DESIGN_SEASONS_DATA_MODEL.md](completed/DESIGN_SEASONS_DATA_MODEL.md).
 
 ### Progress (live)
 
@@ -15,7 +15,7 @@ Redesign the stat viewing pages to support **career stats**, **season-scoped sta
 | Game Summary Players / Team tab | Done (toggle on summary) |
 | `SportConfig.keyStats` + shared compact line helper | Done (`keyStatIds` on all sports + `statDisplay.ts`) |
 
-Detailed checklist: [STAT_TRACKING_UI_PROGRESS.md](STAT_TRACKING_UI_PROGRESS.md).
+Detailed checklist: [completed/STAT_TRACKING_UI_PROGRESS.md](completed/STAT_TRACKING_UI_PROGRESS.md).
 
 ---
 
@@ -681,4 +681,4 @@ This could be configured per sport in `sports.ts` as a new `SportConfig.keyStats
 | `src/types.ts` | TypeScript types — may need new interfaces for career/game-log data |
 | `src/App.tsx` | Router — add `/career` and `/team-stats` routes |
 | `supabase/migrations/010_resolved_stats_rpcs.sql` | Current resolved RPCs — new RPCs extend this |
-| `docs/DESIGN_SEASONS_DATA_MODEL.md` | Seasons schema — prerequisite for season scoping |
+| `docs/completed/DESIGN_SEASONS_DATA_MODEL.md` | Seasons schema — prerequisite for season scoping |
