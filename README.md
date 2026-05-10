@@ -241,6 +241,7 @@ supabase/scripts/
 docs/
 ├── INTEGRATION_PLAN.md    # Supabase architecture & phases (§1 schema summary = post-018; see migrations)
 ├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game views (living doc; progress table)
+├── DESIGN_TEAM_INFO_PAGE.md # Team hub / drill-down (implementation plan; not built)
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: multiple parked games + sync queue (not shipped)
 ├── REGRESSION_TESTING.md  # High-level test scripts for all features
 ├── completed/             # Shipped features — design & implementation references
@@ -260,8 +261,7 @@ docs/
 └── archived/              # Future / placeholder / not-built specs
     ├── DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md
     ├── DESIGN_MULTI_PARENT_INVITE_LINKS.md
-    ├── DESIGN_USER_PERMISSIONS_AND_ROLES.md
-    └── DESIGN_TEAM_INFO_PAGE.md
+    └── DESIGN_USER_PERMISSIONS_AND_ROLES.md
 ```
 
 ### Testing
