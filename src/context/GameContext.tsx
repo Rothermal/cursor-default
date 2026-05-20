@@ -4,6 +4,7 @@ import {
   useReducer,
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   type ReactNode,
@@ -30,6 +31,11 @@ import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
+import {
+  buildGameSyncFingerprint,
+  shouldDeferCloudResumeHydration,
+  withLastSyncedGameFingerprint,
+} from '../lib/gameSyncFingerprint'
 
 /** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
 export const GAME_STORAGE_KEY = 'statkeeper_game'
@@ -76,6 +82,7 @@ function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyn
     status,
     lastSyncedAt: null,
     lastError: null,
+    lastSyncedGameFingerprint: null,
     shotChartHydrationDroppedRows: 0,
   }
 }
@@ -195,25 +202,6 @@ function applyUndoLastEntry(state: GameState): GameState | null {
   return newState
 }
 
-function buildSyncFingerprint(state: GameState): string {
-  return JSON.stringify({
-    sportId: state.sport?.id ?? null,
-    gameInfo: state.gameInfo,
-    opponentScore: state.opponentScore,
-    homeTeamScore: state.homeTeamScore,
-    homeScoreAdjustment: state.homeScoreAdjustment,
-    notes: state.notes,
-    teamStatsConfig: state.teamStatsConfig,
-    shotChart: state.shotChart,
-    players: state.players.map(player => ({
-      id: player.id,
-      name: player.name,
-      number: player.number,
-      stats: player.stats,
-    })),
-  })
-}
-
 function hasSyncPrereqs(state: GameState, isConfigured: boolean, userId: string | null): boolean {
   return Boolean(
     isConfigured &&
@@ -285,7 +273,7 @@ function buildHydratedStateFromCloudGame(
   const sport = sports.find(item => item.id === cloudGame.sportId)
   if (!sport) return null
 
-  return {
+  return withLastSyncedGameFingerprint({
     sport,
     gameInfo: cloudGame.gameInfo,
     players: cloudGame.players,
@@ -310,7 +298,7 @@ function buildHydratedStateFromCloudGame(
       lastError: null,
       shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
     },
-  }
+  })
 }
 
 function gameReducer(state: GameState, action: GameAction): GameState {
@@ -333,6 +321,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 gameStatus: null,
                 playerIdMap: {},
                 lastSyncedAt: null,
+                lastSyncedGameFingerprint: null,
                 shotChartHydrationDroppedRows: 0,
               }
             : state.cloudSync,
@@ -351,7 +340,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const removedAnyPlayer = prevPlayers.some(p => !nextIds.has(p.id))
       const shotChart =
         removedAnyPlayer || prevPlayers.length === 0 || players.length === 0
-          ? shotChartWithOnlyRosterPlayers(state.shotChart, players)
+          ? shotChartForRoster(state.shotChart, players)
           : state.shotChart
       return {
         ...state,
@@ -672,6 +661,10 @@ function loadState(): GameState {
             typeof parsed.cloudSync?.shotChartHydrationDroppedRows === 'number'
               ? Math.max(0, Math.floor(parsed.cloudSync.shotChartHydrationDroppedRows))
               : 0,
+          lastSyncedGameFingerprint:
+            typeof parsed.cloudSync?.lastSyncedGameFingerprint === 'string'
+              ? parsed.cloudSync.lastSyncedGameFingerprint
+              : null,
         },
       }
     }
@@ -705,7 +698,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     stateRef.current = state
   }, [state])
 
@@ -781,22 +774,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
     const hydrateFromCloud = async () => {
-      // Cloud-first: only skip hydration when there is unsynced local progress
-      // (game in progress that has never been synced - no gameId yet).
-      //
-      // Also skip when `statkeeper_pending_sync` is set: that durable flag is written
-      // before unload when we had sync prerequisites but were offline (or hit a
-      // network-class sync failure). Hydration must not run before the effect that
-      // copies that flag into `pendingSyncRef`, otherwise we'd fetch cloud and
-      // overwrite newer local state from localStorage (silent data loss).
-      const hasUnsyncedLocal =
-        stateRef.current.sport &&
-        stateRef.current.gameInfo &&
-        (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
-      if (hasUnsyncedLocal) {
+      // Skip auto-resume when local progress is not yet reflected in the last synced fingerprint,
+      // when there is no cloud game id yet, or when `statkeeper_pending_sync` is set (offline / network
+      // failure path). Otherwise a cloud fetch can overwrite newer localStorage state (silent data loss).
+      if (shouldDeferCloudResumeHydration(stateRef.current, getPendingSyncFlag())) {
         hydratedUserRef.current = userId
         return
       }
+
+      const fingerprintBeforeFetch = buildGameSyncFingerprint(stateRef.current)
 
       try {
         const preferredGameId = getResumeTarget(userId)
@@ -826,6 +812,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (nextState.cloudSync.gameId && canHydrateAsActiveGame(nextState.cloudSync.gameStatus ?? '')) {
           setResumeTarget(userId, nextState.cloudSync.gameId)
         }
+
+        if (buildGameSyncFingerprint(stateRef.current) !== fingerprintBeforeFetch) {
+          // Local game changed while the cloud fetch was in flight; do not replace it with stale data.
+          hydratedUserRef.current = userId
+          return
+        }
+
         hydratedUserRef.current = userId
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
@@ -897,7 +890,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         queueAnotherSyncRef.current = false
 
         const snapshot = stateRef.current
-        const snapshotFingerprint = buildSyncFingerprint(snapshot)
+        const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
         const snapshotUserId = userId
 
         if (!canSyncState(snapshot, isConfigured, snapshotUserId, isOnline)) {
@@ -927,7 +920,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           userId: snapshotUserId!,
         })
 
-        const isStale = snapshotFingerprint !== buildSyncFingerprint(stateRef.current)
+        const isStale = snapshotFingerprint !== buildGameSyncFingerprint(stateRef.current)
         if (isStale) {
           queueAnotherSyncRef.current = true
           continue
@@ -946,6 +939,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             lastError: null,
             shotChartHydrationDroppedRows:
               synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
+            lastSyncedGameFingerprint: buildGameSyncFingerprint(snapshot),
           },
         })
         if (snapshotUserId) {
@@ -991,15 +985,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     void runCloudSync()
   }, [runCloudSync])
 
-  const syncFingerprint = buildSyncFingerprint(state)
+  const syncFingerprint = buildGameSyncFingerprint(state)
   const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
-
-  useEffect(() => {
-    if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
-      pendingSyncRef.current = true
-      setPendingSyncFlag(true)
-    }
-  }, [isConfigured, isOnline, syncFingerprint, userId])
 
   // Restore durable pending-sync flag on load so we sync after reopen when user had been offline
   useEffect(() => {

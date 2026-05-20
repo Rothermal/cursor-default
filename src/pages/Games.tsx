@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
+import { withLastSyncedGameFingerprint } from '../lib/gameSyncFingerprint'
 import { sports } from '../config/sports'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
@@ -244,10 +245,11 @@ export default function Games() {
         lastSyncedAt: cloudGame.hydratedAt,
         lastError: null,
         shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
+        lastSyncedGameFingerprint: null,
       },
     }
 
-    dispatch({ type: 'HYDRATE_STATE', state: nextState })
+    dispatch({ type: 'HYDRATE_STATE', state: withLastSyncedGameFingerprint(nextState) })
     setLoadingGameId(null)
     navigate(cloudGame.status === 'final' ? '/summary' : '/game')
   }
