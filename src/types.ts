@@ -201,7 +201,7 @@ export type GameAction =
   | { type: 'REMOVE_LAST_SHOT' }
   /** Undo once only if the last log entry is shot-chart–originated (`shotId` set). */
   | { type: 'UNDO_LAST_SHOT' }
-  /** Pop every shot from the tail of `shotChart` that still matches the last log entry (see reducer). */
+  /** Remove all chart shots, strip their `increment` log rows, and align stats (see `clearEntireShotChartInState`). */
   | { type: 'CLEAR_SHOT_CHART' }
   | { type: 'UNDO' }
   | { type: 'RESET_GAME' }
