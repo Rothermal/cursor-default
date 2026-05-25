@@ -351,7 +351,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const removedAnyPlayer = prevPlayers.some(p => !nextIds.has(p.id))
       const shotChart =
         removedAnyPlayer || prevPlayers.length === 0 || players.length === 0
-          ? shotChartWithOnlyRosterPlayers(state.shotChart, players)
+          ? shotChartForRoster(state.shotChart, players)
           : state.shotChart
       return {
         ...state,
