@@ -206,6 +206,7 @@ optional RPC for efficiency later.
 | Risk | Mitigation |
 |------|-----------|
 | Double-plotting when multiple recorders charted | Primary-recorder dedup (Option C); unit-tested selection. |
+| **Review shots leaking into sync (data corruption)** | Review shots are display-only component state, **never** written into `GameState.shotChart`; see §7 D7. |
 | Overwriting an active recorder's local edits with review data | Only load review shots for non-recorders / read-only surfaces; never replace a live local `shotChart` mid-recording. |
 | RLS unexpectedly blocks cross-recorder reads | RLS already grants team-member SELECT on `shot_chart` (migration `032`); verify in manual test with two users. |
 | Per-game existence checks add N queries to the list | Batch into one `in('game_id', ids)` count/exists query; cache; or defer (indicator is optional). |
@@ -218,13 +219,128 @@ optional RPC for efficiency later.
 - Season/career cross-game shot aggregation/heatmaps.
 - Opponent multi-player rosters.
 
-## 7. Open questions
+## 7. Pre-handoff design decisions (resolve before build)
 
-1. **Q4 (umbrella):** Confirm primary-recorder dedup (Option C) vs. union vs. viewer-only.
-   Default: Option C.
-2. Should in-progress review (Task 4) be in v1 or limited to final games first?
-   Default: final games are the priority; in-progress review is a thin add-on.
-3. Build the resolved RPC now or only if the client join is slow? Default: client-side
-   first; RPC as a measured follow-up.
-4. Is the Cloud Games list indicator (Task 5) worth the extra query, or skip for v1?
-   Default: include with a single batched query.
+These are the decisions a build agent needs locked down for F3. Each has a **recommended
+default**; fill in `Decision:` to confirm or override. **D7 is the safety-critical one**
+(review shots must never sync). Other highest-leverage: **D1–D4 (multi-recorder
+resolution), D6 (in-progress scope), D8 (read path).** F3 reuses F1 `ShotChartPanel`
+(read-only mode) and F2 `shotsForSelection`/selection — those contracts (F1 §7 D12–D14,
+F2 §8 D12–D14) must be settled first.
+
+### A. Multi-recorder resolution
+
+- **D1 — Resolution strategy.** (Umbrella Q4.) Viewer-only / union / **primary recorder
+  per player with fallback**.
+  - _Recommended:_ Option C (primary-per-player, no duplicates; mirrors stat resolution).
+  - _Decision:_ ____
+
+- **D2 — Fallback precedence when a player has no primary checkout.**
+  - _Recommended:_ primary (`player_checkouts.is_primary`) → game **creator's** rows →
+    deterministic lowest `recorded_by` (uuid order). Pick exactly one recorder's rows so
+    there are never duplicates.
+  - _Decision:_ ____
+
+- **D3 — Per-player independence.** Different players may have different primary recorders;
+  resolve each player's shots independently.
+  - _Recommended:_ yes, independent per player.
+  - _Decision:_ ____
+
+- **D4 — Stat/shot divergence is acceptable.** Resolved stats (`get_game_stats_resolved`,
+  which can **average** across recorders) and the shot chart (one recorder's markers) may
+  not match exactly (e.g. a player's 2PT count vs. their plotted makes).
+  - _Recommended:_ accept divergence; label the review chart "primary recorder's chart"
+    so it's clear the markers reflect one recorder, while stats are the official resolved
+    values. Do **not** try to reconcile counts in v1.
+  - _Decision:_ ____
+
+### B. Scope & where review loads
+
+- **D5 — Final-game source precedence.** In the Game Summary tab, prefer the review set:
+  `reviewShotChart ?? shotChart`; keep the tab visible if either is non-empty.
+  - _Recommended:_ as stated.
+  - _Decision:_ ____
+
+- **D6 — In-progress review in v1, or final-games-first?** (Task 4.)
+  - _Recommended:_ ship **final games first** (the primary review surface); add in-progress
+    review (read-only, for non-recorders) as a thin follow-up in the same PR if time allows.
+  - _Decision:_ ____
+
+- **D7 — SAFETY: review shots must never be written back to the cloud.** The existing
+  `syncShotChartToCloud` deletes `(game_id, recorded_by = me)` rows and re-inserts
+  `state.shotChart`. If review shots (a teammate's) were placed into `GameState.shotChart`,
+  a sync would **re-attribute them to the viewer** and corrupt data.
+  - _Recommended (required):_ review shots live in **component-local state only**, passed
+    to a **read-only** `ShotChartPanel` via `shotsOverride`; they are **never** dispatched
+    into `GameState.shotChart`. For in-progress non-recorder viewing, the chart is strictly
+    read-only (no recording mode entered). Final games already skip sync (`gameStatus ===
+    'final'`), but the rule applies everywhere.
+  - _Decision:_ ____
+
+- **D8 — Recorder detection (who is "the recorder").** Determines whether to load review
+  data vs. trust local shots.
+  - _Recommended:_ treat the viewer as the recorder for a game when the active local
+    `GameState.cloudSync.gameId` equals that game **and** local `shotChart` is non-empty
+    (or the game is the one currently being tracked). Otherwise it's a review open → load
+    review shots, read-only.
+  - _Decision:_ ____
+
+### C. Read path / data
+
+- **D9 — Client-side join vs. RPC for v1.** (Umbrella.) 
+  - _Recommended:_ client-side `loadGameShotChartForReview` first (no migration);
+    `get_game_shot_chart` RPC only as a measured follow-up (Task 6).
+  - _Decision:_ ____
+
+- **D10 — RLS / visibility confirmation.** Cross-recorder reads rely on the viewer being a
+  `team_members` row for the game's team (migration `032` SELECT policy). The game creator
+  (owner) qualifies; solo games are unaffected (viewer == only recorder).
+  - _Recommended:_ verify with a two-user manual test; no policy change expected.
+  - _Decision:_ ____
+
+- **D11 — Unmappable rows (remote `player_id` not in `playerIdMap`).** Reuse hydration's
+  approach: skip and count as dropped (`shotChartHydrationDroppedRows`-style), don't error.
+  - _Recommended:_ as stated; surface the dropped count where hydration already does.
+  - _Decision:_ ____
+
+- **D12 — Caching review shots per game during a summary session.** Avoid refetch on tab
+  switches / `resolvedKey` bumps.
+  - _Recommended:_ load once per `gameId` (effect keyed on `gameId`), cache in local state;
+    refetch only when the primary recorder is reassigned (reuse the existing `resolvedKey`).
+  - _Decision:_ ____
+
+### D. Discoverability UI
+
+- **D13 — Cloud Games list shot-chart indicator (Task 5) in v1?** (Umbrella.)
+  - _Recommended:_ include, using **one batched** existence query
+    (`shot_chart` ids `in (gameIds)`), rendering a "🏀 chart" pill.
+  - _Decision:_ ____
+
+- **D14 — Indicator content.** Existence pill vs. shot count.
+  - _Recommended:_ existence pill only (cheapest); count is a follow-up.
+  - _Decision:_ ____
+
+- **D15 — Read-only panel chrome.** In review/read-only mode the `ShotChartPanel` hides
+  recording controls: no `onCourtTap`, no made/missed toggle, no "Undo last shot" / "Clear
+  all". F2's selector strip is shown as a **filter** only.
+  - _Recommended:_ as stated (matches F1 §7 D12 `readOnly`).
+  - _Decision:_ ____
+
+### E. Acceptance criteria & regression
+
+- **D16 — Acceptance criteria.** e.g. "User B (same team) sees user A's shots on a final
+  game; two recorders → no duplicate markers; reassigning the primary recorder updates the
+  review chart; review shots never appear in `GameState.shotChart` and never sync;
+  non-basketball games show no tab/indicator; missing `shot_chart` table degrades to empty
+  with no error."
+  - _Decision (add/adjust):_ ____
+
+- **D17 — Regression checklist.** Viewer-only hydration still works (own shots, offline);
+  finalizing a game still works; the existing summary shot chart tab is unaffected for
+  solo-recorded games; `mapShotRows` refactor keeps hydration byte-for-byte equivalent.
+  - _Decision (add/adjust):_ ____
+
+### F. Explicitly out of F3
+Editing/correcting teammates' shots; season/career heatmaps; opponent multi-player
+rosters. The `get_game_shot_chart` RPC (Task 6) is an optional performance follow-up, not
+required for v1.
