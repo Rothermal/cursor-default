@@ -213,10 +213,153 @@ and lets F3 reuse the panel in read-only mode.
 - Showing charts for cloud-saved games / multi-recorder (→ **F3**).
 - Resume-UI scores (→ **F4**).
 
-## 7. Open questions
+## 7. Pre-handoff design decisions (resolve before build)
 
-1. **Q1 (umbrella):** Confirm tabs-inside-tracker over a separate page. Default: yes.
-2. Should the tracker **remember** the last view per game (e.g. reopen on Shot Chart)?
-   Default: no — always open on Stats.
-3. Keep the chart's dedicated "Undo last shot" button, or rely solely on the shared
-   bottom Undo bar? Default: keep both (chart undo has shot-only semantics).
+These are the decisions a build agent needs locked down. Each has a **recommended
+default**; fill in `Decision:` to confirm or override. The first block (D2, D4, D5,
+D6–D7, D12–D14) is highest-leverage — it shapes structure; the rest are fill-in details.
+Grounding: the only runtime references to the old route are `src/App.tsx` (the route)
+and `src/pages/GameTracker.tsx` (the button); all other matches are docs or unrelated
+`shotChart` state usage.
+
+### A. Product / UX
+
+- **D1 — "Main tab" target.** Confirm this means a segmented control inside the Game
+  Tracker page (`/game`), not a new app-wide bottom nav.
+  - _Recommended:_ in-page segmented control on `/game`.
+  - _Decision:_ ____
+
+- **D2 — Mount vs. unmount the chart on the Stats view.** Keep `ShotChartPanel` mounted
+  but hidden (preserves made/missed mode + avoids court re-layout flicker) vs. unmount it
+  (cleaner; resets the toggle and replays the empty-court render).
+  - _Recommended:_ keep mounted, hidden via CSS (`hidden`/`display:none`).
+  - _Decision:_ ____
+
+- **D3 — Default view + memory.** Always open on Stats; do not persist the active view to
+  `GameState`/cloud. Decide whether the view and the made/missed toggle are remembered
+  across in-session switches.
+  - _Recommended:_ open on Stats every load; remember view + toggle only while mounted
+    (implied by D2), not persisted.
+  - _Decision:_ ____
+
+- **D4 — Two undo affordances.** GameTracker's fixed bottom **Undo** bar undoes *any* last
+  action; the chart's **Undo last shot** only undoes a shot-originated entry. Keep both, or
+  hide the bottom bar on the Chart view?
+  - _Recommended:_ keep both; ensure the fixed bottom bar layers above the court without
+    obscuring the `ShootingSummary` (account for it in the scroll-area bottom padding).
+  - _Decision:_ ____
+
+- **D5 — `hasShotChart` flag vs. hardcoded `sport.id === 'basketball'`.** F1 is the natural
+  point to add `SportConfig.hasShotChart?: boolean` (a documented backlog item) so the
+  segmented control, the `App` redirect guard, and later F3 all key off one flag.
+  - _Recommended:_ introduce `hasShotChart: true` on basketball in this PR; gate the
+    control on it.
+  - _Decision:_ ____
+
+### B. Layout / interaction (highest bug-risk for the build agent)
+
+- **D6 — Canonical vertical element order on `/game`** and which pieces are shared vs.
+  view-specific.
+  - _Recommended:_
+    - **Always:** nav row → `Scoreboard` → `PlayerSelectorStrip` → segmented control.
+    - **Stats view only:** period toggle → bonus banner → category/team grid → notes.
+    - **Chart view only:** made/missed toggle → court → `ShootingSummary` → chart undo/clear.
+  - _Decision:_ ____
+
+- **D7 — Period toggle + bonus banner on the Chart view.** These are stat-grid concepts
+  (team fouls/timeouts, `periodScoped`) with no meaning for shots.
+  - _Recommended:_ hidden on the Chart view.
+  - _Decision:_ ____
+
+- **D8 — Team pseudo-player + Chart interplay.** When the active player is
+  `__team_home__`/`__team_opp__`, the Stats view shows the team grid; the Chart view
+  records a shot for that pseudo-player (this is how opponent shots get charted). Confirm
+  this is intended and the period toggle's absence on the chart is acceptable.
+  - _Recommended:_ allow charting for team pseudo-players; period toggle hidden on chart.
+  - _Decision:_ ____
+
+- **D9 — Scoreboard interactivity on the Chart view.** `Scoreboard` (+/- opponent/home)
+  stays mounted and interactive above the segmented control regardless of view.
+  - _Recommended:_ yes, shared and interactive in both views.
+  - _Decision:_ ____
+
+- **D10 — Court sizing under the shared header.** Court is a full-width aspect-scaled SVG;
+  with `Scoreboard` + strip + control above it inside `flex-1 overflow-y-auto`, verify it's
+  large enough at 320–375px. Decide whether the player strip collapses on the chart view if
+  space is tight.
+  - _Recommended:_ ship without collapsing; flag strip-collapse as a follow-up only if 320px
+    testing shows the court is too small.
+  - _Decision:_ ____
+
+- **D11 — Chart "coordinate help" copy.** `ShotChart.tsx` shows a title + "Tap coordinates
+  are feet from the rim…" help text that is noise in a tab.
+  - _Recommended:_ drop the title + coordinate help; keep only the made/missed toggle.
+  - _Decision:_ ____
+
+### C. Component contracts (design once; forward-compatible with F2/F3)
+
+- **D12 — `ShotChartPanel` prop interface.** Define now so F3 doesn't force a rewrite:
+  ```ts
+  interface ShotChartPanelProps {
+    readOnly?: boolean              // F3 review: no onCourtTap, no undo/clear
+    shotsOverride?: ShotRecord[]    // F3 all-recorder set; default = state.shotChart
+    selection?: ShotChartSelection  // F2 filtering; default = active player
+  }
+  ```
+  Decide whether the panel reads `useGame()` directly (recommended for the live case) and
+  treats these as optional overrides.
+  - _Recommended:_ panel reads context for live recording; the three props are optional and
+    default to live/full behavior.
+  - _Decision:_ ____
+
+- **D13 — `PlayerSelectorStrip` prop contract.** Include F1's `onAddPlayer?` and the
+  F2-ready `onSelectAll?` / `allActive?`; move `sortTeamPlayersFirst` inside the component.
+  - _Recommended:_ as stated; strip owns sorting; F1 omits the F2 props.
+  - _Decision:_ ____
+
+- **D14 — Selection-state ownership.** Decide whether `trackerView` (F1) and the later
+  `showAll`/selection (F2) live in `GameTracker` or inside `ShotChartPanel`. Settle now to
+  avoid a state-lift refactor when F2 lands.
+  - _Recommended:_ `GameTracker` owns `trackerView`; lift the F2 selection into `GameTracker`
+    too so the shared strip can drive both views.
+  - _Decision:_ ____
+
+### D. Accessibility & polish
+
+- **D15 — Segmented control a11y.** `role="tablist"`/`tab`/`tabpanel`, `aria-selected`,
+  arrow-key nav. The existing Game Summary tabs don't fully do this.
+  - _Recommended:_ implement proper tab a11y for the new control (don't copy the summary
+    tabs' gaps).
+  - _Decision:_ ____
+
+- **D16 — Badge + tooltip copy.** Fold the shot-count badge into the segment label
+  (e.g. `Shot Chart · 12`, cap `99+`); update the stat-tile "chart-aware" tooltips to say
+  "switch to the Shot Chart tab" instead of "the Shot Chart."
+  - _Recommended:_ as stated.
+  - _Decision:_ ____
+
+- **D17 — Haptics/pulse.** Keep `navigator.vibrate` + marker pulse in the panel, unchanged.
+  - _Recommended:_ no behavior change.
+  - _Decision:_ ____
+
+### E. Acceptance criteria & regression (write into the build PR)
+
+- **D18 — Acceptance criteria.** e.g. "Recording a shot on the Chart view updates the
+  2PT/3PT counter on the Stats view and the scoreboard; switching views never changes the
+  active player; non-basketball games render identically to today; `#/shot-chart` redirects
+  to `/game`."
+  - _Decision (add/adjust):_ ____
+
+- **D19 — Regression checklist.** Re-verify: `#/shot-chart` deep link redirects; reload
+  mid-game opens on Stats with shots intact; `ShotChartPreview` (`#/dev/shot-chart`)
+  unchanged; `PlayerProfile`/`CareerStats` cloud-open still hydrate shots; `GameSummary`
+  back button still targets `/game`.
+  - _Decision (add/adjust):_ ____
+
+- **D20 — Docs to update in the same PR.** `AGENTS.md` Gotchas line, `docs/REGRESSION_TESTING.md`
+  §4d, and `README.md` (references the shot chart flow).
+  - _Decision:_ ____
+
+### F. Explicitly out of F1
+Filtering by player/team (**F2**), cloud/multi-recorder review (**F3**), resume-UI scores
+(**F4**). But D12–D14 must be decided **with F2/F3 in mind** so those land as thin additions.
