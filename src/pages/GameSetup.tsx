@@ -350,6 +350,7 @@ export default function GameSetup() {
         playerIdMap: {},
         lastSyncedAt: null,
         lastError: null,
+        lastSyncedGameFingerprint: null,
       },
     })
     dispatch({

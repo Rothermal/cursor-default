@@ -676,6 +676,15 @@ async function upsertGameStats(
   }
 }
 
+/**
+ * When true, skip Supabase `shot_chart` delete+replace: hydration omitted DB rows that never
+ * entered local `shotChart`, so a full replace could wipe cloud-only rows by mistake.
+ * When `shotChart` is empty (user cleared the chart), returns false so the DELETE still runs.
+ */
+export function shouldDeferShotChartCloudSync(state: GameState): boolean {
+  return state.cloudSync.shotChartHydrationDroppedRows > 0 && state.shotChart.length > 0
+}
+
 async function syncShotChartToCloud(
   state: GameState,
   userId: string,
@@ -689,9 +698,7 @@ async function syncShotChartToCloud(
     return 'synced'
   }
 
-  // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
-  // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
-  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
+  if (shouldDeferShotChartCloudSync(state)) {
     return 'skipped_incomplete_hydration'
   }
 
@@ -726,7 +733,7 @@ async function syncShotChartToCloud(
   // When some local shots have no cloud `player_id` (e.g. roster replaced before we
   // trimmed `shotChart`), still sync stats and the mappable subset of the chart.
   // Full delete+insert would drop orphan rows from Supabase; partial sync matches
-  // the intentional local orphan state until the user clears those shots.
+  // the intentional local orphan state until the chart is empty (see `shouldDeferShotChartCloudSync`).
 
   const { error: delError } = await supabase
     .from('shot_chart')
