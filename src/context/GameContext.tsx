@@ -31,10 +31,15 @@ import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 
-/** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
-export const GAME_STORAGE_KEY = 'statkeeper_game'
+import {
+  GAME_OWNER_KEY,
+  GAME_STORAGE_KEY,
+  PENDING_SYNC_KEY,
+} from '../lib/gameStorageKeys'
+
+export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
+
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
-const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 /** One row per user+message: persisted `cloudSync.lastError` uploaded to `client_sync_errors`. */
 const SYNC_LAST_ERROR_BACKFILL_PREFIX = 'statkeeper_sync_err_backfill:'
 
@@ -633,8 +638,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
-function loadState(): GameState {
+function loadState(userId: string | null): GameState {
   try {
+    if (userId) {
+      const owner = localStorage.getItem(GAME_OWNER_KEY)
+      if (owner && owner !== userId) {
+        localStorage.removeItem(GAME_STORAGE_KEY)
+        localStorage.removeItem(PENDING_SYNC_KEY)
+        return createInitialState()
+      }
+    }
+
     const saved = localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
@@ -694,7 +708,7 @@ const GameContext = createContext<GameContextType | null>(null)
 export function GameProvider({ children }: { children: ReactNode }) {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
-  const [state, dispatch] = useReducer(gameReducer, undefined, loadState)
+  const [state, dispatch] = useReducer(gameReducer, userId, loadState)
   const [isOnline, setIsOnline] = useState(getInitialOnlineState)
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
@@ -750,7 +764,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    if (userId) {
+      localStorage.setItem(GAME_OWNER_KEY, userId)
+    }
+  }, [state, userId])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
