@@ -282,7 +282,7 @@ export default function PlayerProfile() {
       homeScoreAdjustment: cloudGame.homeScoreAdjustment,
       notes: cloudGame.notes,
       currentPeriod: 1,
-      teamStatsConfig: null,
+      teamStatsConfig: cloudGame.teamStatsConfig ?? null,
       actionLog: [],
       shotChart: cloudGame.shotChart ?? [],
       cloudSync: {
