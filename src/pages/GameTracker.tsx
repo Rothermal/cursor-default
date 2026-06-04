@@ -11,6 +11,7 @@ import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import {
   isTeamPseudoPlayer,
+  playersWithTeamPlaceholders,
   TEAM_PLAYER_HOME_ID,
   TEAM_PLAYER_OPP_ID,
 } from '../lib/teamPlayers'
@@ -142,34 +143,10 @@ export default function GameTracker() {
   useEffect(() => {
     if (!sport?.teamCategories?.length || !gameInfo) return
 
-    const hasHome = players.some(p => p.id === TEAM_PLAYER_HOME_ID)
-    const hasOpp = players.some(p => p.id === TEAM_PLAYER_OPP_ID)
-    if (hasHome && hasOpp) return
+    const nextPlayers = playersWithTeamPlaceholders(players, gameInfo.teamName, gameInfo.opponentName)
+    if (!nextPlayers) return
 
-    const homeTeamPlayer: Player = {
-      id: TEAM_PLAYER_HOME_ID,
-      name: gameInfo.teamName,
-      number: '★',
-      stats: {},
-      isTeamPlayer: true,
-      teamSide: 'home',
-    }
-    const oppTeamPlayer: Player = {
-      id: TEAM_PLAYER_OPP_ID,
-      name: gameInfo.opponentName,
-      number: '★',
-      stats: {},
-      isTeamPlayer: true,
-      teamSide: 'opponent',
-    }
-
-    const withoutPlaceholders = players.filter(
-      p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
-    )
-    dispatch({
-      type: 'SET_PLAYERS',
-      players: [homeTeamPlayer, oppTeamPlayer, ...withoutPlaceholders],
-    })
+    dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
   }, [sport, gameInfo, players, dispatch])
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
