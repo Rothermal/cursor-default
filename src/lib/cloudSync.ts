@@ -10,6 +10,11 @@ interface SyncGameSnapshotInput {
 
 export type ShotChartCloudSyncMode = 'synced' | 'skipped_incomplete_hydration'
 
+/** Skip delete+replace when local chart is empty but cloud still has rows hydration could not map. */
+export function shouldSkipShotChartSync(shotChartLength: number, droppedHydrationRows: number): boolean {
+  return droppedHydrationRows > 0 && shotChartLength === 0
+}
+
 export interface SyncGameSnapshotResult {
   seasonId: string
   teamId: string
@@ -689,9 +694,10 @@ async function syncShotChartToCloud(
     return 'synced'
   }
 
-  // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
-  // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
-  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
+  // Hydration skipped one or more DB rows (e.g. shooter not on roster). When local chart is
+  // still empty, delete+replace would wipe those orphan cloud rows. Allow sync once the user
+  // has local shots (including after CLEAR_SHOT_CHART resets the dropped-row flag).
+  if (shouldSkipShotChartSync(state.shotChart.length, state.cloudSync.shotChartHydrationDroppedRows)) {
     return 'skipped_incomplete_hydration'
   }
 

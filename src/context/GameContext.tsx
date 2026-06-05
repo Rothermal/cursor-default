@@ -142,7 +142,16 @@ function clearEntireShotChart(state: GameState): GameState {
   const actionLog = state.actionLog.filter(
     e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
   )
-  return { ...state, shotChart: [], players, actionLog }
+  return {
+    ...state,
+    shotChart: [],
+    players,
+    actionLog,
+    cloudSync: {
+      ...state.cloudSync,
+      shotChartHydrationDroppedRows: 0,
+    },
+  }
 }
 
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
