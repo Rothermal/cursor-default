@@ -173,6 +173,8 @@ export interface CloudSyncState {
   playerIdMap: Record<string, string>
   status: CloudSyncStatus
   lastSyncedAt: string | null
+  /** Fingerprint at last successful sync/hydrate; skip cloud hydrate when local state diverges. */
+  lastSyncedFingerprint: string | null
   lastError: string | null
   /**
    * Shot-chart rows present in Supabase for this game/recorder that were not mapped into

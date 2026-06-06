@@ -284,7 +284,7 @@ export default function CareerStats() {
         homeScoreAdjustment: cloudGame.homeScoreAdjustment,
         notes: cloudGame.notes,
         currentPeriod: 1,
-        teamStatsConfig: null,
+        teamStatsConfig: cloudGame.teamStatsConfig,
         actionLog: [],
         shotChart: cloudGame.shotChart ?? [],
         cloudSync: {
@@ -295,6 +295,7 @@ export default function CareerStats() {
           playerIdMap: cloudGame.playerIdMap,
           status: 'synced',
           lastSyncedAt: cloudGame.hydratedAt,
+          lastSyncedFingerprint: null,
           lastError: null,
           shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
         },

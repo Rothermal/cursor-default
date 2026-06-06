@@ -28,13 +28,18 @@ import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/l
 import { activePlayerIdAfterRosterChange } from '../lib/activePlayerIdForRoster'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
+import {
+  clearGameStorage,
+  GAME_STORAGE_KEY,
+  PENDING_SYNC_KEY,
+  setGameOwner,
+  shouldDiscardStoredGame,
+} from '../lib/gameStorage'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 
-/** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
-export const GAME_STORAGE_KEY = 'statkeeper_game'
+export { GAME_STORAGE_KEY } from '../lib/gameStorage'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
-const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 /** One row per user+message: persisted `cloudSync.lastError` uploaded to `client_sync_errors`. */
 const SYNC_LAST_ERROR_BACKFILL_PREFIX = 'statkeeper_sync_err_backfill:'
 
@@ -75,6 +80,7 @@ function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyn
     playerIdMap: {},
     status,
     lastSyncedAt: null,
+    lastSyncedFingerprint: null,
     lastError: null,
     shotChartHydrationDroppedRows: 0,
   }
@@ -368,9 +374,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'HYDRATE_STATE': {
       const s = action.state
       const cs = s.cloudSync
-      return {
+      const shotChart = shotChartForRoster(s.shotChart, s.players)
+      const hydrated: GameState = {
         ...s,
-        shotChart: shotChartForRoster(s.shotChart, s.players),
+        shotChart,
         cloudSync: {
           ...cs,
           playerIdMap: playerIdMapForRoster(cs.playerIdMap, s.players),
@@ -378,6 +385,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             typeof cs.shotChartHydrationDroppedRows === 'number'
               ? Math.max(0, Math.floor(cs.shotChartHydrationDroppedRows))
               : 0,
+        },
+      }
+      return {
+        ...hydrated,
+        cloudSync: {
+          ...hydrated.cloudSync,
+          lastSyncedFingerprint: buildSyncFingerprint(hydrated),
         },
       }
     }
@@ -633,7 +647,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
-function loadState(): GameState {
+function loadState(userId: string | null): GameState {
+  if (userId && shouldDiscardStoredGame(userId)) {
+    clearGameStorage()
+    return createInitialState()
+  }
+
   try {
     const saved = localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
@@ -668,6 +687,10 @@ function loadState(): GameState {
           playerIdMap: playerIdMapForRoster(sanitizedMap, restoredPlayers),
           gameStatus: parsed.cloudSync?.gameStatus ?? null,
           status: restoredStatus,
+          lastSyncedFingerprint:
+            typeof parsed.cloudSync?.lastSyncedFingerprint === 'string'
+              ? parsed.cloudSync.lastSyncedFingerprint
+              : null,
           shotChartHydrationDroppedRows:
             typeof parsed.cloudSync?.shotChartHydrationDroppedRows === 'number'
               ? Math.max(0, Math.floor(parsed.cloudSync.shotChartHydrationDroppedRows))
@@ -694,7 +717,7 @@ const GameContext = createContext<GameContextType | null>(null)
 export function GameProvider({ children }: { children: ReactNode }) {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
-  const [state, dispatch] = useReducer(gameReducer, undefined, loadState)
+  const [state, dispatch] = useReducer(gameReducer, userId, loadState)
   const [isOnline, setIsOnline] = useState(getInitialOnlineState)
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
@@ -749,8 +772,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   ])
 
   useEffect(() => {
+    if (!userId) return
     localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    setGameOwner(userId)
+  }, [state, userId])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -789,11 +814,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // network-class sync failure). Hydration must not run before the effect that
       // copies that flag into `pendingSyncRef`, otherwise we'd fetch cloud and
       // overwrite newer local state from localStorage (silent data loss).
+      const localSnapshot = stateRef.current
       const hasUnsyncedLocal =
-        stateRef.current.sport &&
-        stateRef.current.gameInfo &&
-        (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
-      if (hasUnsyncedLocal) {
+        localSnapshot.sport &&
+        localSnapshot.gameInfo &&
+        (!localSnapshot.cloudSync.gameId || getPendingSyncFlag())
+      const localFingerprint = buildSyncFingerprint(localSnapshot)
+      const hasDirtyLocalSinceSync =
+        Boolean(localSnapshot.cloudSync.gameId) &&
+        Boolean(localSnapshot.cloudSync.lastSyncedFingerprint) &&
+        localFingerprint !== localSnapshot.cloudSync.lastSyncedFingerprint
+      if (hasUnsyncedLocal || hasDirtyLocalSinceSync) {
         hydratedUserRef.current = userId
         return
       }
@@ -943,6 +974,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             playerIdMap: synced.playerIdMap,
             status: 'synced',
             lastSyncedAt: synced.syncedAt,
+            lastSyncedFingerprint: snapshotFingerprint,
             lastError: null,
             shotChartHydrationDroppedRows:
               synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,

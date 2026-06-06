@@ -349,6 +349,7 @@ export default function GameSetup() {
         gameStatus: null,
         playerIdMap: {},
         lastSyncedAt: null,
+        lastSyncedFingerprint: null,
         lastError: null,
       },
     })
