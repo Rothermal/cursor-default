@@ -28,35 +28,22 @@ import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/l
 import { activePlayerIdAfterRosterChange } from '../lib/activePlayerIdForRoster'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
+import {
+  GAME_OWNER_KEY,
+  GAME_STORAGE_KEY,
+  clearGameStorage,
+  getPendingSyncFlag,
+  persistGameState,
+  setPendingSyncFlag,
+  shouldDiscardStoredGame,
+} from '../lib/gameStorage'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 
-/** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
-export const GAME_STORAGE_KEY = 'statkeeper_game'
+export { GAME_STORAGE_KEY, clearGameStorage } from '../lib/gameStorage'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
-const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 /** One row per user+message: persisted `cloudSync.lastError` uploaded to `client_sync_errors`. */
 const SYNC_LAST_ERROR_BACKFILL_PREFIX = 'statkeeper_sync_err_backfill:'
-
-function getPendingSyncFlag(): boolean {
-  try {
-    return localStorage.getItem(PENDING_SYNC_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function setPendingSyncFlag(pending: boolean): void {
-  try {
-    if (pending) {
-      localStorage.setItem(PENDING_SYNC_KEY, '1')
-    } else {
-      localStorage.removeItem(PENDING_SYNC_KEY)
-    }
-  } catch {
-    // ignore
-  }
-}
 
 const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
   'offline',
@@ -633,8 +620,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
-function loadState(): GameState {
+function loadState(userId: string | null): GameState {
   try {
+    const storedOwner = localStorage.getItem(GAME_OWNER_KEY)
+    if (shouldDiscardStoredGame(storedOwner, userId)) {
+      clearGameStorage()
+      return createInitialState()
+    }
+
     const saved = localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
@@ -694,7 +687,7 @@ const GameContext = createContext<GameContextType | null>(null)
 export function GameProvider({ children }: { children: ReactNode }) {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
-  const [state, dispatch] = useReducer(gameReducer, undefined, loadState)
+  const [state, dispatch] = useReducer(gameReducer, createInitialState())
   const [isOnline, setIsOnline] = useState(getInitialOnlineState)
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
@@ -704,10 +697,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
+  const storageReadyRef = useRef(false)
 
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    const loaded = loadState(userId)
+    stateRef.current = loaded
+    dispatch({ type: 'HYDRATE_STATE', state: loaded })
+    storageReadyRef.current = true
+  }, [userId])
 
   /** Upload a previously persisted sync error once (before `client_sync_errors` existed or insert failed). */
   useEffect(() => {
@@ -749,8 +750,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
   ])
 
   useEffect(() => {
-    localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    if (!storageReadyRef.current) return
+    persistGameState(state, userId)
+  }, [state, userId])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)

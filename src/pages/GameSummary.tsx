@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
+import { useGame } from '../context/GameContext'
+import { clearGameStorage } from '../lib/gameStorage'
 import { computeCategoryTotal } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
@@ -620,11 +621,7 @@ export default function GameSummary() {
 
     // Clear persisted game so this game no longer appears as in progress (fixes
     // "completed game appears as both final and in progress").
-    try {
-      localStorage.removeItem(GAME_STORAGE_KEY)
-    } catch {
-      // ignore
-    }
+    clearGameStorage()
     dispatch({ type: 'RESET_GAME' })
     navigate('/games')
   }
