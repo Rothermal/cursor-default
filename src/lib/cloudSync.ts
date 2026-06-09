@@ -1,5 +1,9 @@
 import type { GameInfo, GameState, Player, ShotRecord } from '../types'
 import { supabase } from './supabase'
+import {
+  shouldAvoidShotChartCloudDelete,
+  shouldSkipShotChartCloudDeleteReplace,
+} from './shotChartSyncPolicy'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
 import { isValidRemotePlayerUuid } from './uuidValidation'
 
@@ -689,9 +693,14 @@ async function syncShotChartToCloud(
     return 'synced'
   }
 
-  // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
-  // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
-  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
+  // Hydration skipped DB rows (e.g. shooter not on roster). Only block delete+replace while the
+  // local chart is still empty — otherwise new shots could never reach cloud (permanent skip).
+  if (
+    shouldSkipShotChartCloudDeleteReplace(
+      state.cloudSync.shotChartHydrationDroppedRows,
+      state.shotChart.length
+    )
+  ) {
     return 'skipped_incomplete_hydration'
   }
 
@@ -724,9 +733,10 @@ async function syncShotChartToCloud(
   }
 
   // When some local shots have no cloud `player_id` (e.g. roster replaced before we
-  // trimmed `shotChart`), still sync stats and the mappable subset of the chart.
-  // Full delete+insert would drop orphan rows from Supabase; partial sync matches
-  // the intentional local orphan state until the user clears those shots.
+  // trimmed `shotChart`), still sync stats but do not wipe cloud rows we cannot replace.
+  if (shouldAvoidShotChartCloudDelete(state.shotChart.length, rows.length)) {
+    return 'synced'
+  }
 
   const { error: delError } = await supabase
     .from('shot_chart')
@@ -742,10 +752,6 @@ async function syncShotChartToCloud(
   }
 
   if (state.shotChart.length === 0) {
-    return 'synced'
-  }
-
-  if (rows.length === 0) {
     return 'synced'
   }
 
