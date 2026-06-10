@@ -450,7 +450,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'CLEAR_SHOT_CHART': {
-      return clearEntireShotChart(state)
+      const cleared = clearEntireShotChart(state)
+      if (cleared === state) return state
+      return {
+        ...cleared,
+        cloudSync: { ...cleared.cloudSync, shotChartHydrationDroppedRows: 0 },
+      }
     }
 
     case 'INCREMENT_STAT': {
@@ -968,6 +973,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return
       }
       const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
+      // Durable flag prevents cloud hydration from overwriting unsynced local state on reload.
+      pendingSyncRef.current = true
+      setPendingSyncFlag(true)
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
@@ -1047,3 +1055,6 @@ export function useGame(): GameContextType {
   }
   return context
 }
+
+/** @internal Exported for unit tests */
+export { gameReducer, createInitialState }

@@ -1,4 +1,5 @@
 import type { GameInfo, GameState, Player, ShotRecord } from '../types'
+import { shouldSkipShotChartCloudSync } from './shotChartCloudSyncPolicy'
 import { supabase } from './supabase'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
 import { isValidRemotePlayerUuid } from './uuidValidation'
@@ -691,7 +692,7 @@ async function syncShotChartToCloud(
 
   // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
   // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
-  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
+  if (shouldSkipShotChartCloudSync(state.cloudSync.shotChartHydrationDroppedRows)) {
     return 'skipped_incomplete_hydration'
   }
 
