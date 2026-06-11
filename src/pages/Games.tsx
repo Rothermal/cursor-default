@@ -231,7 +231,7 @@ export default function Games() {
       homeScoreAdjustment: cloudGame.homeScoreAdjustment,
       notes: cloudGame.notes,
       currentPeriod: 1,
-      teamStatsConfig: null,
+      teamStatsConfig: cloudGame.teamStatsConfig,
       actionLog: [],
       shotChart: cloudGame.shotChart ?? [],
       cloudSync: {
