@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { clearGameLocalStorage } from '../lib/gameStorage'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    clearGameLocalStorage()
     if (!supabase) return
     await supabase.auth.signOut()
   }, [])

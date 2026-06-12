@@ -7,6 +7,7 @@ import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { sports } from '../config/sports'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
+import { buildSyncFingerprint } from '../lib/syncFingerprint'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { teamDisplayName } from '../lib/display'
 
@@ -231,7 +232,7 @@ export default function Games() {
       homeScoreAdjustment: cloudGame.homeScoreAdjustment,
       notes: cloudGame.notes,
       currentPeriod: 1,
-      teamStatsConfig: null,
+      teamStatsConfig: cloudGame.teamStatsConfig,
       actionLog: [],
       shotChart: cloudGame.shotChart ?? [],
       cloudSync: {
@@ -242,10 +243,12 @@ export default function Games() {
         playerIdMap: cloudGame.playerIdMap,
         status: 'synced',
         lastSyncedAt: cloudGame.hydratedAt,
+        lastSyncedFingerprint: null,
         lastError: null,
         shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
       },
     }
+    nextState.cloudSync.lastSyncedFingerprint = buildSyncFingerprint(nextState)
 
     dispatch({ type: 'HYDRATE_STATE', state: nextState })
     setLoadingGameId(null)

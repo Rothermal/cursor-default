@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import type { GameState } from '../types'
+import { buildSyncFingerprint } from '../lib/syncFingerprint'
 import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
@@ -282,7 +283,7 @@ export default function PlayerProfile() {
       homeScoreAdjustment: cloudGame.homeScoreAdjustment,
       notes: cloudGame.notes,
       currentPeriod: 1,
-      teamStatsConfig: null,
+      teamStatsConfig: cloudGame.teamStatsConfig,
       actionLog: [],
       shotChart: cloudGame.shotChart ?? [],
       cloudSync: {
@@ -293,10 +294,12 @@ export default function PlayerProfile() {
         playerIdMap: cloudGame.playerIdMap,
         status: 'synced',
         lastSyncedAt: cloudGame.hydratedAt,
+        lastSyncedFingerprint: null,
         lastError: null,
         shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
       },
     }
+    nextState.cloudSync.lastSyncedFingerprint = buildSyncFingerprint(nextState)
 
     dispatch({ type: 'HYDRATE_STATE', state: nextState })
     setLoadingGameId(null)
