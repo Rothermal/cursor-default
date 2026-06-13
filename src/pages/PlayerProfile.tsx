@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
-import { useGame } from '../context/GameContext'
+import { useGame, gameStateFromHydratedCloudGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
-import type { GameState } from '../types'
 import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
@@ -272,31 +271,7 @@ export default function PlayerProfile() {
 
     await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
 
-    const nextState: GameState = {
-      sport,
-      gameInfo: cloudGame.gameInfo,
-      players: cloudGame.players,
-      activePlayerId: cloudGame.activePlayerId,
-      opponentScore: cloudGame.opponentScore,
-      homeTeamScore: cloudGame.homeTeamScore,
-      homeScoreAdjustment: cloudGame.homeScoreAdjustment,
-      notes: cloudGame.notes,
-      currentPeriod: 1,
-      teamStatsConfig: null,
-      actionLog: [],
-      shotChart: cloudGame.shotChart ?? [],
-      cloudSync: {
-        seasonId: cloudGame.seasonId ?? null,
-        teamId: cloudGame.teamId,
-        gameId: cloudGame.gameId,
-        gameStatus: cloudGame.status,
-        playerIdMap: cloudGame.playerIdMap,
-        status: 'synced',
-        lastSyncedAt: cloudGame.hydratedAt,
-        lastError: null,
-        shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
-      },
-    }
+    const nextState = gameStateFromHydratedCloudGame(cloudGame, sport)
 
     dispatch({ type: 'HYDRATE_STATE', state: nextState })
     setLoadingGameId(null)
