@@ -243,6 +243,7 @@ export default function Games() {
         status: 'synced',
         lastSyncedAt: cloudGame.hydratedAt,
         lastError: null,
+        lastSyncedFingerprint: null,
         shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
       },
     }

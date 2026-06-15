@@ -174,6 +174,8 @@ export interface CloudSyncState {
   status: CloudSyncStatus
   lastSyncedAt: string | null
   lastError: string | null
+  /** Fingerprint of game payload last successfully synced; used to skip cloud hydration over newer local edits. */
+  lastSyncedFingerprint: string | null
   /**
    * Shot-chart rows present in Supabase for this game/recorder that were not mapped into
    * `shotChart` during hydration (e.g. player no longer on roster). Sync must not delete
