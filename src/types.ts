@@ -173,6 +173,8 @@ export interface CloudSyncState {
   playerIdMap: Record<string, string>
   status: CloudSyncStatus
   lastSyncedAt: string | null
+  /** Fingerprint of synced fields after the last successful cloud sync (detects unsynced local edits). */
+  lastSyncedFingerprint: string | null
   lastError: string | null
   /**
    * Shot-chart rows present in Supabase for this game/recorder that were not mapped into
