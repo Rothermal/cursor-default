@@ -27,6 +27,7 @@ import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { activePlayerIdAfterRosterChange } from '../lib/activePlayerIdForRoster'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
+import { hasUnsyncedLocalProgress } from '../lib/localSyncGuard'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
@@ -142,7 +143,16 @@ function clearEntireShotChart(state: GameState): GameState {
   const actionLog = state.actionLog.filter(
     e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
   )
-  return { ...state, shotChart: [], players, actionLog }
+  return {
+    ...state,
+    shotChart: [],
+    players,
+    actionLog,
+    cloudSync: {
+      ...state.cloudSync,
+      shotChartHydrationDroppedRows: 0,
+    },
+  }
 }
 
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
@@ -789,10 +799,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // network-class sync failure). Hydration must not run before the effect that
       // copies that flag into `pendingSyncRef`, otherwise we'd fetch cloud and
       // overwrite newer local state from localStorage (silent data loss).
-      const hasUnsyncedLocal =
-        stateRef.current.sport &&
-        stateRef.current.gameInfo &&
-        (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
+      const hasUnsyncedLocal = hasUnsyncedLocalProgress(
+        stateRef.current,
+        getPendingSyncFlag()
+      )
       if (hasUnsyncedLocal) {
         hydratedUserRef.current = userId
         return

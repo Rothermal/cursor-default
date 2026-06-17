@@ -142,15 +142,15 @@ export default function GameTracker() {
   useEffect(() => {
     if (!sport?.teamCategories?.length || !gameInfo) return
 
-    const hasHome = players.some(p => p.id === TEAM_PLAYER_HOME_ID)
-    const hasOpp = players.some(p => p.id === TEAM_PLAYER_OPP_ID)
-    if (hasHome && hasOpp) return
+    const existingHome = players.find(p => p.id === TEAM_PLAYER_HOME_ID)
+    const existingOpp = players.find(p => p.id === TEAM_PLAYER_OPP_ID)
+    if (existingHome && existingOpp) return
 
     const homeTeamPlayer: Player = {
       id: TEAM_PLAYER_HOME_ID,
       name: gameInfo.teamName,
       number: '★',
-      stats: {},
+      stats: existingHome?.stats ?? {},
       isTeamPlayer: true,
       teamSide: 'home',
     }
@@ -158,7 +158,7 @@ export default function GameTracker() {
       id: TEAM_PLAYER_OPP_ID,
       name: gameInfo.opponentName,
       number: '★',
-      stats: {},
+      stats: existingOpp?.stats ?? {},
       isTeamPlayer: true,
       teamSide: 'opponent',
     }

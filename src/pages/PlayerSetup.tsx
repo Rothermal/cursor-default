@@ -45,14 +45,14 @@ export default function PlayerSetup() {
   /** Team pseudo-players for checkout + tracker when the sport defines team categories. */
   useEffect(() => {
     if (!sport?.teamCategories?.length || !state.gameInfo) return
-    const hasHome = state.players.some(p => p.id === TEAM_PLAYER_HOME_ID)
-    const hasOpp = state.players.some(p => p.id === TEAM_PLAYER_OPP_ID)
-    if (hasHome && hasOpp) return
+    const existingHome = state.players.find(p => p.id === TEAM_PLAYER_HOME_ID)
+    const existingOpp = state.players.find(p => p.id === TEAM_PLAYER_OPP_ID)
+    if (existingHome && existingOpp) return
     const homeTeamPlayer = {
       id: TEAM_PLAYER_HOME_ID,
       name: state.gameInfo.teamName,
       number: '★',
-      stats: {},
+      stats: existingHome?.stats ?? {},
       isTeamPlayer: true as const,
       teamSide: 'home' as const,
     }
@@ -60,7 +60,7 @@ export default function PlayerSetup() {
       id: TEAM_PLAYER_OPP_ID,
       name: state.gameInfo.opponentName,
       number: '★',
-      stats: {},
+      stats: existingOpp?.stats ?? {},
       isTeamPlayer: true as const,
       teamSide: 'opponent' as const,
     }

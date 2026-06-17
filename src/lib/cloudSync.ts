@@ -689,12 +689,6 @@ async function syncShotChartToCloud(
     return 'synced'
   }
 
-  // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
-  // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
-  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
-    return 'skipped_incomplete_hydration'
-  }
-
   const rows: Array<{
     game_id: string
     player_id: string
@@ -727,6 +721,23 @@ async function syncShotChartToCloud(
   // trimmed `shotChart`), still sync stats and the mappable subset of the chart.
   // Full delete+insert would drop orphan rows from Supabase; partial sync matches
   // the intentional local orphan state until the user clears those shots.
+
+  const incompleteHydration = state.cloudSync.shotChartHydrationDroppedRows > 0
+  if (incompleteHydration) {
+    if (rows.length === 0) {
+      return 'skipped_incomplete_hydration'
+    }
+    const { error: upsertError } = await supabase.from('shot_chart').upsert(rows, {
+      onConflict: 'game_id,recorded_by,client_shot_id',
+    })
+    if (upsertError) {
+      if (isMissingShotChartTableError(upsertError)) {
+        return 'synced'
+      }
+      throw new Error(`Shot chart sync (upsert) failed: ${upsertError.message}`)
+    }
+    return 'skipped_incomplete_hydration'
+  }
 
   const { error: delError } = await supabase
     .from('shot_chart')

@@ -32,14 +32,14 @@ export default function GameCheckout() {
 
   useLayoutEffect(() => {
     if (!sport?.teamCategories?.length || !gameInfo) return
-    const hasHome = players.some(p => p.id === TEAM_PLAYER_HOME_ID)
-    const hasOpp = players.some(p => p.id === TEAM_PLAYER_OPP_ID)
-    if (hasHome && hasOpp) return
+    const existingHome = players.find(p => p.id === TEAM_PLAYER_HOME_ID)
+    const existingOpp = players.find(p => p.id === TEAM_PLAYER_OPP_ID)
+    if (existingHome && existingOpp) return
     const homeTeamPlayer = {
       id: TEAM_PLAYER_HOME_ID,
       name: gameInfo.teamName,
       number: '★',
-      stats: {},
+      stats: existingHome?.stats ?? {},
       isTeamPlayer: true as const,
       teamSide: 'home' as const,
     }
@@ -47,7 +47,7 @@ export default function GameCheckout() {
       id: TEAM_PLAYER_OPP_ID,
       name: gameInfo.opponentName,
       number: '★',
-      stats: {},
+      stats: existingOpp?.stats ?? {},
       isTeamPlayer: true as const,
       teamSide: 'opponent' as const,
     }
