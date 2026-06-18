@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
+import { isTeamPseudoPlayer, playersWithTeamPlaceholders } from '../lib/teamPlayers'
 
 interface CheckoutRow {
   player_id: string
@@ -32,32 +32,9 @@ export default function GameCheckout() {
 
   useLayoutEffect(() => {
     if (!sport?.teamCategories?.length || !gameInfo) return
-    const hasHome = players.some(p => p.id === TEAM_PLAYER_HOME_ID)
-    const hasOpp = players.some(p => p.id === TEAM_PLAYER_OPP_ID)
-    if (hasHome && hasOpp) return
-    const homeTeamPlayer = {
-      id: TEAM_PLAYER_HOME_ID,
-      name: gameInfo.teamName,
-      number: '★',
-      stats: {},
-      isTeamPlayer: true as const,
-      teamSide: 'home' as const,
-    }
-    const oppTeamPlayer = {
-      id: TEAM_PLAYER_OPP_ID,
-      name: gameInfo.opponentName,
-      number: '★',
-      stats: {},
-      isTeamPlayer: true as const,
-      teamSide: 'opponent' as const,
-    }
-    const without = players.filter(
-      p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
-    )
-    dispatch({
-      type: 'SET_PLAYERS',
-      players: [homeTeamPlayer, oppTeamPlayer, ...without],
-    })
+    const nextPlayers = playersWithTeamPlaceholders(players, gameInfo.teamName, gameInfo.opponentName)
+    if (!nextPlayers) return
+    dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
   }, [sport, gameInfo, players, dispatch])
 
   // If we have no gameId yet (first time), trigger sync so game is created
