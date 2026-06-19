@@ -676,38 +676,26 @@ async function upsertGameStats(
   }
 }
 
-async function syncShotChartToCloud(
-  state: GameState,
-  userId: string,
+type ShotChartRow = {
+  game_id: string
+  player_id: string
+  recorded_by: string
+  client_shot_id: string
+  x: number
+  y: number
+  made: boolean
+  shot_type: '2pt' | '3pt'
+  zone: ShotRecord['zone']
+}
+
+function buildShotChartRowsForCloud(
+  shotChart: ShotRecord[],
   gameId: string,
+  userId: string,
   playerIdMap: Record<string, string>
-): Promise<ShotChartCloudSyncMode> {
-  if (!supabase) {
-    throw new Error('Supabase client not configured')
-  }
-  if (state.sport?.id !== 'basketball') {
-    return 'synced'
-  }
-
-  // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
-  // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
-  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
-    return 'skipped_incomplete_hydration'
-  }
-
-  const rows: Array<{
-    game_id: string
-    player_id: string
-    recorded_by: string
-    client_shot_id: string
-    x: number
-    y: number
-    made: boolean
-    shot_type: '2pt' | '3pt'
-    zone: ShotRecord['zone']
-  }> = []
-
-  for (const shot of state.shotChart) {
+): ShotChartRow[] {
+  const rows: ShotChartRow[] = []
+  for (const shot of shotChart) {
     const remotePlayerId = playerIdMap[shot.playerId]
     if (!remotePlayerId) continue
     rows.push({
@@ -721,6 +709,43 @@ async function syncShotChartToCloud(
       shot_type: shot.shotType,
       zone: shot.zone,
     })
+  }
+  return rows
+}
+
+/** @internal Exported for unit tests. */
+export async function syncShotChartToCloud(
+  state: GameState,
+  userId: string,
+  gameId: string,
+  playerIdMap: Record<string, string>
+): Promise<ShotChartCloudSyncMode> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+  if (state.sport?.id !== 'basketball') {
+    return 'synced'
+  }
+
+  const rows = buildShotChartRowsForCloud(state.shotChart, gameId, userId, playerIdMap)
+
+  // Hydration skipped one or more DB rows (e.g. shooter not on roster). Never delete+replace
+  // `shot_chart` in that case — local `shotChart` is incomplete and would wipe orphan cloud rows.
+  // Upsert mappable local rows so new shots still reach the cloud.
+  if (state.cloudSync.shotChartHydrationDroppedRows > 0) {
+    if (rows.length === 0) {
+      return 'skipped_incomplete_hydration'
+    }
+    const { error: upsertError } = await supabase
+      .from('shot_chart')
+      .upsert(rows, { onConflict: 'game_id,recorded_by,client_shot_id' })
+    if (upsertError) {
+      if (isMissingShotChartTableError(upsertError)) {
+        return 'synced'
+      }
+      throw new Error(`Shot chart sync (upsert) failed: ${upsertError.message}`)
+    }
+    return 'skipped_incomplete_hydration'
   }
 
   // When some local shots have no cloud `player_id` (e.g. roster replaced before we

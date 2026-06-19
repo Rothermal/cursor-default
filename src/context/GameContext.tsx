@@ -450,7 +450,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'CLEAR_SHOT_CHART': {
-      return clearEntireShotChart(state)
+      const cleared = clearEntireShotChart(state)
+      return {
+        ...cleared,
+        cloudSync: {
+          ...cleared.cloudSync,
+          // User cleared the local chart; allow full delete+replace on the next sync.
+          shotChartHydrationDroppedRows: 0,
+        },
+      }
     }
 
     case 'INCREMENT_STAT': {
