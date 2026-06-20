@@ -142,7 +142,7 @@ function clearEntireShotChart(state: GameState): GameState {
   const actionLog = state.actionLog.filter(
     e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
   )
-  return { ...state, shotChart: [], players, actionLog }
+  return { ...state, shotChart: [], players, actionLog, cloudSync: { ...state.cloudSync, shotChartHydrationDroppedRows: 0 } }
 }
 
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
@@ -812,6 +812,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
           }
         }
         if (cancelled) return
+
+        // Re-check after async fetch: user may have started a new local game while we loaded cloud.
+        const hasUnsyncedLocalNow =
+          stateRef.current.sport &&
+          stateRef.current.gameInfo &&
+          (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
+        if (hasUnsyncedLocalNow) {
+          hydratedUserRef.current = userId
+          return
+        }
 
         const nextState = buildHydratedStateFromCloudGame(cloudGame)
         if (!nextState) {
