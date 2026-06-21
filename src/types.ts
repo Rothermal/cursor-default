@@ -173,6 +173,8 @@ export interface CloudSyncState {
   playerIdMap: Record<string, string>
   status: CloudSyncStatus
   lastSyncedAt: string | null
+  /** Fingerprint of last successful cloud sync; used to skip hydration when local edits are newer. */
+  lastSyncedFingerprint?: string | null
   lastError: string | null
   /**
    * Shot-chart rows present in Supabase for this game/recorder that were not mapped into
