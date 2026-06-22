@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { withLastSyncedGameFingerprint } from '../lib/gameSyncFingerprint'
+import { guardCloudGameHydrate } from '../lib/cloudResumeGuard'
 import { playerDisplayName } from '../lib/display'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
@@ -38,7 +39,7 @@ export default function CareerStats() {
   const sportParam = searchParams.get('sport')
 
   const { isConfigured, user } = useAuth()
-  const { dispatch } = useGame()
+  const { state, dispatch } = useGame()
   const supabaseClient = supabase
   const userId = user?.id ?? null
 
@@ -272,6 +273,7 @@ export default function CareerStats() {
   const openGameSummary = useCallback(
     async (gameId: string) => {
       if (!userId || !sportConfig || !supabaseClient) return
+      if (!guardCloudGameHydrate(state)) return
       const cloudGame = await loadCloudGameById(userId, gameId).catch(() => null)
       if (!cloudGame) return
       await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
@@ -304,7 +306,7 @@ export default function CareerStats() {
       dispatch({ type: 'HYDRATE_STATE', state: withLastSyncedGameFingerprint(nextState) })
       navigate('/summary')
     },
-    [userId, sportConfig, supabaseClient, dispatch, navigate]
+    [userId, sportConfig, supabaseClient, dispatch, navigate, state]
   )
 
   if (!playerId) {

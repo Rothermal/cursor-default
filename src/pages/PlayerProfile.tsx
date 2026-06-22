@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { withLastSyncedGameFingerprint } from '../lib/gameSyncFingerprint'
+import { guardCloudGameHydrate } from '../lib/cloudResumeGuard'
 import type { GameState } from '../types'
 import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
@@ -67,7 +68,7 @@ export default function PlayerProfile() {
   const seasonIdFromUrl = searchParams.get('seasonId')
 
   const { user, isConfigured } = useAuth()
-  const { dispatch } = useGame()
+  const { state, dispatch } = useGame()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -257,6 +258,7 @@ export default function PlayerProfile() {
 
   const handleViewGame = async (gameId: string) => {
     if (!user) return
+    if (!guardCloudGameHydrate(state)) return
     setError(null)
     setLoadingGameId(gameId)
 

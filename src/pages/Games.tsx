@@ -5,6 +5,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { withLastSyncedGameFingerprint } from '../lib/gameSyncFingerprint'
+import { guardCloudGameHydrate } from '../lib/cloudResumeGuard'
 import { sports } from '../config/sports'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
@@ -204,6 +205,7 @@ export default function Games() {
 
   const handleOpenGame = async (gameId: string) => {
     if (!userId) return
+    if (!guardCloudGameHydrate(state)) return
     setError(null)
     setLoadingGameId(gameId)
     const cloudGame = await loadCloudGameById(userId, gameId).catch(err => {

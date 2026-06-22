@@ -33,6 +33,15 @@ export default function SportSelect() {
   })()
 
   const handleSelect = (sportId: string) => {
+    const hasActiveGame = state.sport && state.players.length > 0
+    if (
+      hasActiveGame &&
+      !window.confirm(
+        'Starting a new game will discard your active game. Continue?'
+      )
+    ) {
+      return
+    }
     const sport = sports.find(s => s.id === sportId)
     if (sport) {
       dispatch({ type: 'SET_SPORT', sport })
