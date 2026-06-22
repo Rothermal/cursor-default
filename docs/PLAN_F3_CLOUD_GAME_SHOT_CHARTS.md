@@ -204,106 +204,63 @@ if the client-side join is a measured bottleneck.
   if users ask to review without leaving the tracker).
 - Season/career cross-game shot aggregation/heatmaps; opponent multi-player rosters.
 
-## 7. Pre-handoff design decisions (resolve before build)
+## 7. Pre-handoff design decisions — RESOLVED
 
-Each has a **recommended default** + `Decision:`. **D6 is safety-critical** (review shots
-must never sync). Items marked **[CHANGED]** arose from the F1 pivot. F3 reuses F2's
-`shotsForSelection` + `selection` contract (F2 §8 **D13–D17**, already resolved) and renders
-review in the **Game Summary** (no live-tracker read-only mode).
+All F3 decisions are settled (signed off; every one confirmed as the recommended default).
+**D6 is safety-critical** (review shots must never sync). Items marked **[CHANGED]** arose
+from the F1 pivot. F3 reuses F2's `shotsForSelection` + `selection` contract (F2 §8
+**D13–D17**, resolved) and renders review in the **Game Summary** (no live-tracker
+read-only mode).
 
 ### A. Multi-recorder resolution
 
-- **D1 — Resolution strategy.** (Umbrella Q4.) Viewer-only / union / **primary recorder per
-  player with fallback**.
-  - _Recommended:_ Option C (primary-per-player; no duplicates; mirrors stat resolution).
-  - _Decision:_ ____
-
-- **D2 — Fallback precedence when a player has no primary checkout.**
-  - _Recommended:_ primary (`player_checkouts.is_primary`) → game **creator's** rows →
-    deterministic lowest `recorded_by`. Exactly one recorder's rows, so never duplicates.
-  - _Decision:_ ____
-
-- **D3 — Per-player independence.** Resolve each player's shots independently.
-  - _Recommended:_ yes.
-  - _Decision:_ ____
-
-- **D4 — Stat/shot divergence is acceptable.** Resolved stats (which can **average** across
-  recorders) and the shot chart (one recorder's markers) may not match exactly.
-  - _Recommended:_ accept divergence; label "primary recorder's chart"; don't reconcile in v1.
-  - _Decision:_ ____
+- **D1 — Resolution strategy.** **Option C** — primary recorder per player with fallback
+  (no duplicates; mirrors stat resolution).
+- **D2 — Fallback precedence.** primary (`player_checkouts.is_primary`) → game **creator's**
+  rows → deterministic lowest `recorded_by`. Exactly one recorder's rows per player.
+- **D3 — Per-player independence.** **Yes** — resolve each player's shots independently.
+- **D4 — Stat/shot divergence is acceptable.** Accept divergence; label "primary recorder's
+  chart"; don't reconcile counts in v1.
 
 ### B. Surface & scope
 
-- **D5 — [CHANGED] Review surface.** Render review in the **Game Summary "Shot chart" tab**
-  for **both final and in-progress** cloud games. (Earlier draft proposed a read-only mode
-  on the live tracker for in-progress — dropped because F1 made the tracker the recording
-  surface.)
-  - _Recommended:_ Game Summary only, covering final + in-progress; tracker stays
-    recording-only and shows your own hydrated shots.
-  - _Decision:_ ____
-
-- **D6 — SAFETY: review shots must never be written back to the cloud.** `syncShotChartToCloud`
-  deletes `(game_id, recorded_by = me)` rows and re-inserts `state.shotChart`. Putting a
-  teammate's review shots into `GameState.shotChart` would **re-attribute them to the
-  viewer**.
-  - _Recommended (required):_ review shots live in **`GameSummary` local state only**, fed
-    to a read-only `BasketballCourt`; **never** dispatched into `GameState.shotChart`. The
-    live tracker (the only shot-syncing surface) is untouched. (Final games already skip
-    sync; in-progress review is Summary-side and never writes.)
-  - _Decision:_ ____
-
-- **D7 — Source precedence in the tab.** Use `reviewShotChart ?? shotChart`; keep the tab
+- **D5 — [CHANGED] Review surface.** **Game Summary "Shot chart" tab only**, covering
+  **both final and in-progress** cloud games. The live tracker stays recording-only and
+  shows the viewer's own hydrated shots. (Drops the earlier read-only-live-tracker idea.)
+- **D6 — SAFETY (required): review shots never sync.** Review shots live in **`GameSummary`
+  local state only**, fed to a read-only `BasketballCourt`; **never** dispatched into
+  `GameState.shotChart`. The live tracker (the only shot-syncing surface) is untouched.
+- **D7 — Source precedence in the tab.** `reviewShotChart ?? shotChart`; keep the tab
   visible if either is non-empty.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
 
 ### C. Read path / data
 
-- **D8 — Client-side join vs. RPC for v1.**
-  - _Recommended:_ client-side `loadGameShotChartForReview` first; `get_game_shot_chart` RPC
-    only as a measured follow-up (Task 5).
-  - _Decision:_ ____
-
-- **D9 — RLS / visibility confirmation.** Cross-recorder reads rely on the viewer being a
-  `team_members` row for the game's team (migration `032` policy). Creator/owner qualifies;
-  solo games unaffected.
-  - _Recommended:_ verify with a two-user manual test; no policy change expected.
-  - _Decision:_ ____
-
-- **D10 — Unmappable rows (remote `player_id` not in `playerIdMap`).** Skip and count as
-  dropped (reuse hydration's accounting); don't error.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
-- **D11 — Caching review shots per game in a summary session.** Load once per `gameId`
-  (effect keyed on `gameId`), refetch only on primary-recorder reassignment (`resolvedKey`).
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
+- **D8 — Client-side join vs. RPC for v1.** **Client-side** `loadGameShotChartForReview`
+  first; `get_game_shot_chart` RPC only as a measured follow-up (Task 5).
+- **D9 — RLS / visibility.** Rely on the existing team-member SELECT policy (migration
+  `032`); **verify with a two-user manual test**; no policy change expected.
+- **D10 — Unmappable rows.** Skip and count as dropped (reuse hydration's accounting);
+  don't error.
+- **D11 — Caching.** Load once per `gameId` (effect keyed on `gameId`); refetch only on
+  primary-recorder reassignment (`resolvedKey`).
 
 ### D. Discoverability UI
 
-- **D12 — Cloud Games list indicator (Task 4) in v1?**
-  - _Recommended:_ include, using **one batched** existence query, rendering a "🏀 chart" pill.
-  - _Decision:_ ____
-
-- **D13 — Indicator content.** Existence pill vs. shot count.
-  - _Recommended:_ existence pill only (cheapest); count is a follow-up.
-  - _Decision:_ ____
+- **D12 — Cloud Games list indicator (Task 4).** **Include in v1**, using **one batched**
+  existence query, rendering a "🏀 chart" pill.
+- **D13 — Indicator content.** **Existence pill only** (cheapest); count is a follow-up.
 
 ### E. Acceptance criteria & regression
 
-- **D14 — Acceptance criteria.** "User B (same team) sees user A's shots on a final game's
+- **D14 — Acceptance criteria.** User B (same team) sees user A's shots on a final game's
   Summary; in-progress games show all-recorder shots via Summary too; two recorders → no
   duplicate markers; reassigning the primary updates the review chart; review shots never
   appear in `GameState.shotChart` and never sync; the live tracker still shows only the
   viewer's own shots; non-basketball games show no tab/indicator; missing `shot_chart`
-  table degrades to empty with no error."
-  - _Decision (add/adjust):_ ____
-
+  table degrades to empty with no error.
 - **D15 — Regression checklist.** Viewer-only hydration still works (own shots, offline);
   finalizing still works; the summary shot chart tab is unaffected for solo-recorded games;
   the `mapShotRows` refactor keeps hydration equivalent; the live tracker is unchanged.
-  - _Decision (add/adjust):_ ____
 
 ### F. Explicitly out of F3
 Editing/correcting teammates' shots; a read-only inline review mode on the live tracker;
