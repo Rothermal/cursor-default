@@ -56,6 +56,9 @@ speculative UI.
 
 ## F5 — Auto 2/3 with manual override chip
 
+> **Expanded to a full plan:** [PLAN_F5_AUTO_2_3_OVERRIDE.md](PLAN_F5_AUTO_2_3_OVERRIDE.md)
+> (tasks + pre-handoff decisions).
+
 **Goal:** In `CourtEventPopup`, the location-detected shot value (`isThreePointer(x,y)`)
 is shown and can be **overridden** with one tap (foot-on-the-line, deep heave, or scorer
 disagreement) before logging Made/Missed.
