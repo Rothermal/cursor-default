@@ -9,7 +9,11 @@ interface SyncGameSnapshotInput {
   userId: string
 }
 
-export type ShotChartCloudSyncMode = 'synced' | 'skipped_incomplete_hydration'
+export type ShotChartCloudSyncMode =
+  | 'synced'
+  | 'skipped_incomplete_hydration'
+  /** Local chart has rows but none map to a cloud `player_id`; never run a full-table delete in that case. */
+  | 'skipped_unmappable_shots'
 
 export interface SyncGameSnapshotResult {
   seasonId: string
@@ -677,7 +681,7 @@ async function upsertGameStats(
   }
 }
 
-async function syncShotChartToCloud(
+export async function syncShotChartToCloud(
   state: GameState,
   userId: string,
   gameId: string,
@@ -726,8 +730,12 @@ async function syncShotChartToCloud(
 
   // When some local shots have no cloud `player_id` (e.g. roster replaced before we
   // trimmed `shotChart`), still sync stats and the mappable subset of the chart.
-  // Full delete+insert would drop orphan rows from Supabase; partial sync matches
-  // the intentional local orphan state until the user clears those shots.
+  // If *none* map, skip entirely: `delete()` runs before insert, so zero insertable
+  // rows would wipe every existing `shot_chart` row for this game/recorder.
+
+  if (state.shotChart.length > 0 && rows.length === 0) {
+    return 'skipped_unmappable_shots'
+  }
 
   // Never delete cloud rows when every local shot lacks a remote player id — the delete
   // would run before this function could insert anything, wiping legitimate `shot_chart` history.
@@ -749,10 +757,6 @@ async function syncShotChartToCloud(
   }
 
   if (state.shotChart.length === 0) {
-    return 'synced'
-  }
-
-  if (rows.length === 0) {
     return 'synced'
   }
 
