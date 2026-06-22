@@ -175,6 +175,11 @@ export interface CloudSyncState {
   lastSyncedAt: string | null
   lastError: string | null
   /**
+   * Fingerprint of game fields last written to/read from cloud on this device (`buildGameSyncFingerprint`).
+   * When null/undefined (legacy saves), defer auto cloud resume until a successful sync sets it.
+   */
+  lastSyncedGameFingerprint: string | null
+  /**
    * Shot-chart rows present in Supabase for this game/recorder that were not mapped into
    * `shotChart` during hydration (e.g. player no longer on roster). Sync must not delete
    * cloud rows while this is positive and local `shotChart` is empty.
