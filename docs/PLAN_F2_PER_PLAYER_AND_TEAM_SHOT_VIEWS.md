@@ -251,123 +251,71 @@ filtering. One tested pure function prevents three subtly different implementati
 - Per-player breakdown panel in team view (follow-up).
 - Season/career heatmaps ([completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md) §2.3).
 
-## 8. Pre-handoff design decisions (resolve before build)
+## 8. Pre-handoff design decisions — RESOLVED
 
-Each has a **recommended default** + `Decision:`. Items marked **[CHANGED]** or **[NEW]**
-arise from the F1 court-capture pivot. F2 now **owns** the selection/contract decisions
-(the rewritten F1 enumerates only its own D1–D10 and no longer carries the old "D12–D14"
-component contracts).
+All F2 decisions are settled (signed off in discussion; every one confirmed as the
+recommended default). Items marked **[CHANGED]** or **[NEW]** arose from the F1
+court-capture pivot. F2 **owns** the selection/contract decisions (the rewritten F1
+enumerates only its own D1–D10 and no longer carries the old "D12–D14" contracts).
 
 ### A. Selection model & recording
 
-- **D1 — Default view on page open.** Active player's filtered view vs. "All". The court is
-  always visible inline now, so the default determines what you first see.
-  - _Recommended:_ default to the **active chip's view** (individual → that player; team
-    pseudo → that side); "All" only when there's no active player.
-  - _Decision:_ ____
-
-- **D2 — [NEW] View-filter ↔ active-player coupling.** Does selecting a chip set **both**
-  the recording target (`activePlayerId`) and the displayed filter?
-  - _Recommended:_ **coupled** — one chip controls both (simplest mental model; the popup
-    still confirms attribution at log time).
-  - _Decision:_ ____
-
-- **D3 — [CHANGED] Recording while "All" is selected.** Previously "review-only / disable
-  taps." With the popup confirming the player, recording is now safe in any view.
-  - _Recommended:_ **allow recording in "All"** — a court tap opens `CourtEventPopup` for
-    `activePlayerId` (shown/confirmable; F6 can switch). "All" changes only the display.
-  - _Decision:_ ____
-
-- **D4 — "All" affordance placement.** Leading chip in the sticky `PlayerSelectorStrip` vs.
-  a separate control.
-  - _Recommended:_ leading **"All"** chip in the sticky strip.
-  - _Decision:_ ____
-
-- **D5 — Does selecting "All" change `activePlayerId`?**
-  - _Recommended:_ **no** — "All" is a display overlay; the last active player stays the
-    recording target so a tap-to-log still works.
-  - _Decision:_ ____
-
-- **D6 — Team-chip dual semantics.** A team chip **records to that pseudo-player** and
-  **shows that side's union**. (Umbrella Q2.)
-  - _Recommended:_ combined.
-  - _Decision:_ ____
+- **D1 — Default view on page open.** Default to the **active chip's view** (individual →
+  that player; team pseudo → that side); use "All" only when there is no active player.
+- **D2 — [NEW] View-filter ↔ active-player coupling.** **Coupled** — selecting a chip sets
+  **both** the recording target (`activePlayerId`) and the displayed filter.
+- **D3 — [CHANGED] Recording while "All" is selected.** **Allowed** — a court tap opens
+  `CourtEventPopup` for `activePlayerId` (shown/confirmable; F6 can switch). "All" changes
+  only the display. (Reverses the earlier "review-only / disable taps" idea.)
+- **D4 — "All" affordance placement.** Leading **"All"** chip in the sticky
+  `PlayerSelectorStrip`.
+- **D5 — Does selecting "All" change `activePlayerId`?** **No** — "All" is a display
+  overlay; the last active player stays the recording target so tap-to-log still works.
+- **D6 — Team-chip dual semantics.** **Combined** — a team chip records to that
+  pseudo-player **and** shows that side's union.
 
 ### B. Visual treatment
 
-- **D7 — Per-player marker colors in team views.** (Umbrella Q3.)
-  - _Recommended:_ v1 uniform made/miss; per-player color + legend is a follow-up.
-  - _Decision:_ ____
-
+- **D7 — Per-player marker colors in team views.** **v1 uniform** made/miss; per-player
+  color + legend is a follow-up.
 - **D8 — Context label format.** `Shot chart — {label}  made/att (FG%)` as in §3.3.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
-- **D9 — Per-player breakdown in team view** (small list alongside the merged court).
-  - _Recommended:_ v1 no — merged court + aggregate summary only; breakdown is a follow-up.
-  - _Decision:_ ____
-
-- **D10 — Empty-state copy** (individual / team / all) per §3.4.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
+- **D9 — Per-player breakdown in team view.** **v1 no** — merged court + aggregate summary
+  only; breakdown is a follow-up.
+- **D10 — Empty-state copy.** As in §3.4 (individual / team / all).
 
 ### C. Consistency across surfaces
 
-- **D11 — Any game-level shot-count indicator** (e.g. a small total near the court) reflects
-  the **whole-game** total, while `ShootingSummary` reflects the **filtered** view.
-  - _Recommended:_ as stated (avoid a count that silently changes with the filter).
-  - _Decision:_ ____
-
-- **D12 — Game Summary default selection.** Defaults to "All" for whole-game review.
-  - _Recommended:_ "All" in the summary.
-  - _Decision:_ ____
+- **D11 — Game-level shot-count indicator.** Any such indicator reflects the **whole-game**
+  total; `ShootingSummary` reflects the **filtered** view (no count that silently changes
+  with the filter).
+- **D12 — Game Summary default selection.** **"All"** for whole-game review.
 
 ### D. Component contract & data edges
 
 - **D13 — `ShotChartSelection` shape.** `{ kind: 'all' } | { kind: 'player'; playerId }`,
   where a team chip is `{ kind: 'player'; playerId: '__team_home__' | '__team_opp__' }`.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
-- **D14 — [CHANGED] Recording target derivation.** The recording target is **always
-  `activePlayerId`** (the popup logs to it), **independent of the view filter** — including
-  in "All" (no longer `null`/disabled). Selecting an individual/team chip updates
-  `activePlayerId`; selecting "All" leaves it unchanged.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
+- **D14 — [CHANGED] Recording target derivation.** **Always `activePlayerId`** (the popup
+  logs to it), **independent of the view filter** — including "All" (no longer
+  `null`/disabled). Selecting an individual/team chip updates `activePlayerId`; selecting
+  "All" leaves it unchanged.
 - **D15 — Orphan shots (playerId not on the current roster).** Excluded from individual/team
-  views (no id match); appear only under "All". (`rosterAlignment` already strips them
-  locally on `SET_PLAYERS`; cloud/summary data may still contain them.)
-  - _Recommended:_ accept "orphans show only in All"; no special-casing in v1.
-  - _Decision:_ ____
-
+  views (no id match); appear only under "All". No special-casing in v1.
 - **D16 — [NEW] State ownership / component contract** (replaces the stale "F1 D12–D14"
   dependency). `activePlayerId` is **global** (`GameState`, via `SET_ACTIVE_PLAYER`); the
   view filter (`showAll` → `selection`) is **local UI state in `GameTracker`**, not
   persisted; `ShotChartPanel` receives the derived `selection` and (for F3) optional
   `shotsOverride` / `readOnly`.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
 - **D17 — Selection persistence.** View filter is local UI state; not persisted to
-  `GameState`/cloud; re-derives from `activePlayerId` on load (no Stats/Chart tab exists —
-  the page is single-scroll per F1 D1).
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
+  `GameState`/cloud; re-derives from `activePlayerId` on load (single-scroll page per F1 D1).
 
 ### E. Acceptance criteria & regression
 
-- **D18 — Acceptance criteria.** "Selecting an individual shows only their markers and
-  zone%; selecting a team shows that side's union and **never** the other side; 'All' shows
-  every shot **and still records** to the active player via the popup; selecting a chip
-  updates both the view and the recording target; the Game Summary chart tab filters
-  identically."
-  - _Decision (add/adjust):_ ____
-
+- **D18 — Acceptance criteria.** Selecting an individual shows only their markers and zone%;
+  selecting a team shows that side's union and **never** the other side; "All" shows every
+  shot **and still records** to the active player via the popup; selecting a chip updates
+  both the view and the recording target; the Game Summary chart tab filters identically.
 - **D19 — Unit + manual coverage.** Unit: the `shotsForSelection`/`sideOf` matrix (Task 1).
   Manual: the multi-player matrix in §5 on both the tracker and the summary.
-  - _Decision (add/adjust):_ ____
 
 ### F. Explicitly out of F2
 Cloud/multi-recorder aggregation (**F3**); per-player marker colors + legend; per-player
