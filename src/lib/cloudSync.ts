@@ -1,6 +1,7 @@
 import type { GameInfo, GameState, Player, ShotRecord } from '../types'
 import { supabase } from './supabase'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
+import { hasMappableChartShot } from './shotChartSyncMapping'
 import { isValidRemotePlayerUuid } from './uuidValidation'
 
 interface SyncGameSnapshotInput {
@@ -734,6 +735,12 @@ export async function syncShotChartToCloud(
 
   if (state.shotChart.length > 0 && rows.length === 0) {
     return 'skipped_unmappable_shots'
+  }
+
+  // Never delete cloud rows when every local shot lacks a remote player id — the delete
+  // would run before this function could insert anything, wiping legitimate `shot_chart` history.
+  if (state.shotChart.length > 0 && !hasMappableChartShot(state.shotChart, playerIdMap)) {
+    return 'skipped_incomplete_hydration'
   }
 
   const { error: delError } = await supabase
