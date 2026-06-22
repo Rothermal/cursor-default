@@ -1,4 +1,4 @@
-# Court Event Capture — Enhancements Roadmap (F5–F11)
+# Court Event Capture — Enhancements Roadmap (F5–F12)
 
 > **For agentic workers:** This is a roadmap of **named, ordered, phased sketches** for
 > the follow-on enhancements to the Court Event Capture model introduced in
@@ -24,6 +24,7 @@ These are the user's six requested enhancements plus the deferred "Option B" hyb
 | F9 | suggestion #4 | Rebound-after-miss chained prompt |
 | F10 | suggestion #6 | Shot sequence numbers / recency |
 | F11 | Option B | Hybrid 1-tap quick buttons for blk/stl/ast |
+| F12 | user idea | Recent-events undo popup (last ~5 events, undo from top) |
 
 ## Recommended implementation order (whole program)
 
@@ -36,8 +37,9 @@ F1  Single-page tracker + Court Event Capture (foundation)
  ├─ F2  Per-player / team shot filtering        (high value once the court is central)
  ├─ F5  Auto 2/3 override chip                   (tiny; correctness)
  ├─ F6  In-popup player confirm/switch           (attribution safety; user's top pain)
+ ├─ F12 Recent-events undo popup                 (correction UX; PRECEDES F7)
  ├─ F3  Cloud-saved game shot review             (after capture + filtering are stable)
- ├─ F7  Assist-linking on a made shot            (medium; undo coordination)
+ ├─ F7  Assist-linking on a made shot            (two-step undo, made transparent by F12)
  ├─ F8  Live per-player line in popup            (small; context)
  ├─ F9  Rebound-after-miss prompt                (needs live tuning; opt-in)
  ├─ F10 Shot sequence numbers / recency          (cosmetic)
@@ -46,11 +48,12 @@ F4  In-progress scores on resume UI              (independent; quick win, anytim
 ```
 
 **Why this order:** F5 and F6 are cheap and directly improve the core capture loop
-(correct shot value; correct/confirmed player) — do them right after F1. F2 and F3 are
-the originally-planned chart features and are most valuable once the court is the primary
-surface. F7–F10 are progressive polish. F11 is intentionally last: build it only if live
-testing shows the extra tap for block/steal/assist is a real friction, to avoid
-speculative UI.
+(correct shot value; correct/confirmed player) — do them right after F1. **F12 precedes
+F7** because the recent-events popup is what makes F7's two-step assist undo transparent
+(so F7 needs no reducer change). F2 and F3 are the originally-planned chart features and
+are most valuable once the court is the primary surface. F8–F10 are progressive polish.
+F11 is intentionally last: build it only if live testing shows the extra tap for
+block/steal/assist is a real friction, to avoid speculative UI.
 
 ---
 
@@ -105,7 +108,8 @@ sticky strip and next taps follow) vs. one-off (this event only). Default: globa
 ## F7 — Assist-linking on a made shot
 
 > **Expanded to a full plan:** [PLAN_F7_ASSIST_LINKING.md](PLAN_F7_ASSIST_LINKING.md)
-> (tasks + pre-handoff decisions; the one F5–F11 feature with a local reducer change).
+> (tasks + pre-handoff decisions). Uses **two-step undo made transparent by F12** — **no
+> reducer change** (F5–F12 stay data-model-free).
 
 **Goal:** After a **Made** shot, optionally credit the assisting teammate in the same
 gesture (assists are almost always tied to a made FG).
@@ -210,13 +214,42 @@ friction.
 
 ---
 
+## F12 — Recent-events undo popup
+
+> **Expanded to a full plan:** [PLAN_F12_RECENT_EVENTS_UNDO.md](PLAN_F12_RECENT_EVENTS_UNDO.md)
+> (tasks + pre-handoff decisions). **Build before F7.**
+
+**Goal:** Replace the silent single-Undo with a popup listing the **last ~5 events** in
+plain language (`<player> — <event>`) so the user can see and undo recent actions. Reads the
+existing `actionLog`; undoes via the existing LIFO `UNDO`.
+
+**Depends on:** F1 (enhances its undo bar). Pairs with F7 (makes two-step assist undo
+transparent). **Effort:** S.
+
+**Phases:**
+- **P1:** `describeActionLogEntry` label helper (+ test); `RecentEventsPopup` showing the
+  last ~5 entries; the bottom Undo opens it; top-row undo = today's single `UNDO`.
+- **P2 (optional):** cascade-to-row undo (B) — undo everything newer than a tapped row via
+  sequential `UNDO`s.
+
+**Key files:** `src/lib/actionLogLabels.ts`, `src/components/RecentEventsPopup.tsx`,
+`src/pages/GameTracker.tsx`.
+
+**FUTURE NOTE — Option C (arbitrary out-of-order undo):** undoing a *middle* event is unsafe
+with today's stored-`previousValue` LIFO model and needs a bigger refactor (inverse deltas
+or event-sourced recompute). **Gather usage data first** before committing to it; v1 is
+LIFO (A) + optional cascade (B). See the F12 plan §6.
+
+---
+
 ## Notes
 
-- **No data-model changes** across F5–F11; all map to existing `ADD_SHOT` /
-  `INCREMENT_STAT` and existing stat ids.
+- **No data-model changes** across F5–F12; all map to existing `ADD_SHOT` /
+  `INCREMENT_STAT` / `UNDO` and existing stat ids. (F7 uses two-step undo + F12 instead of a
+  reducer change.)
 - **F2/F3 interplay:** F2's `shotsForSelection` filtering and F3's all-recorder review
-  apply to the inline court from F1 regardless of these enhancements; F5–F11 only change
-  the *capture* experience, not the stored shape.
+  apply to the inline court from F1 regardless of these enhancements; F5–F12 only change
+  the *capture/correction* experience, not the stored shape.
 - When promoting any item to active work, expand it into its own
   `PLAN_F{n}_*.md` with full tasks + a Pre-handoff design decisions section (same format
   as F1–F4).

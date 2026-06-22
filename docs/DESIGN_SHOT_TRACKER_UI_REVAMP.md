@@ -11,7 +11,7 @@ cross-cutting decisions so the individual plans stay consistent.
 > primary, additive input** — a court tap opens an event popup (shot / rebound / steal /
 > block / assist) for the selected player, while the **full stat grid stays editable** so
 > every stat can still be entered/adjusted directly. This spawned a family of follow-on
-> enhancements (F5–F11). See
+> enhancements (F5–F12). See
 > [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) and
 > [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md).
 
@@ -23,9 +23,9 @@ cross-cutting decisions so the individual plans stay consistent.
 | **F2** | Per-player + team shot views | [PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md](PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md) | Filter the inline court to the selected player; team selections show every player's shots on that side. |
 | **F3** | Shot trackers on cloud-saved games | [PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md](PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md) | Show full (all-recorder) shot charts when reviewing in-progress/final cloud games. |
 | **F4** | In-progress scores on the resume UI | [PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | Live score on the home active-game card and the Cloud Games list. |
-| **F5–F11** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | 2/3 override · in-popup player switch · assist-linking · per-player line · rebound-after-miss · sequence numbers · Option B quick buttons. |
+| **F5–F12** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | 2/3 override (F5) · in-popup player switch (F6) · assist-linking (F7) · per-player line (F8) · rebound-after-miss (F9) · sequence numbers (F10) · Option B quick buttons (F11) · recent-events undo popup (F12). |
 
-F1 is the foundation for F2, F3, and F5–F11. F4 is independent and can land anytime.
+F1 is the foundation for F2, F3, and F5–F12. F4 is independent and can land anytime.
 
 ## Why these belong together
 
@@ -33,7 +33,7 @@ The shipped shot chart ([completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_C
 [completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md))
 deferred per-player filtering (§2.2, §8.2) and richer review surfaces. F2/F3 are that
 deferred work. F1 reimagines *how stats are entered during live play* (court-as-input),
-which the original docs hinted at but never built; F5–F11 refine that loop. F4 is an
+which the original docs hinted at but never built; F5–F12 refine that loop. F4 is an
 orthogonal review/resume quality-of-life win.
 
 ## Current architecture (what the plans build on)
@@ -101,7 +101,7 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 2. **Single scroll page, no tabs, no visible scrollbar** (F1). Standard scrolling; a
    **sticky player strip** keeps the active player visible.
 3. **Extract shared components** (F1): `PlayerSelectorStrip` (was duplicated),
-   `ShotChartPanel` (inline court), `CourtEventPopup`. F2/F3/F5–F11 are thin additions on
+   `ShotChartPanel` (inline court), `CourtEventPopup`. F2/F3/F5–F12 are thin additions on
    top of these.
 4. **One shot-filtering helper** (F2): `src/lib/shotChartViews.ts#shotsForSelection`
    maps a selection (player / team side / all) to the displayed `ShotRecord[]`. The inline
@@ -112,7 +112,7 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 6. **Keep the full stat grid** (F1): the court popup is additive, not a replacement — all
    stats remain directly enterable and adjustable via their buttons (needed to fix/adjust
    counts). No `capturedViaCourt` hiding, no `types.ts`/`sports.ts` change.
-7. **No data-model changes anywhere in F1 + F5–F11** — all map to `ADD_SHOT` /
+7. **No data-model changes anywhere in F1 + F5–F12** — all map to `ADD_SHOT` /
    `INCREMENT_STAT` and existing stat ids. F3 may add an optional read-only RPC.
 8. **`/shot-chart` redirects to `/game`** after F1 (dev `/dev/shot-chart` untouched). No
    new dependencies.
@@ -124,8 +124,9 @@ F1  Single-page tracker + Court Event Capture     (foundation)
  ├─ F2  Per-player / team shot filtering
  ├─ F5  Auto 2/3 override chip                     (tiny; correctness)
  ├─ F6  In-popup player confirm/switch             (attribution; top pain)
+ ├─ F12 Recent-events undo popup                   (correction UX; PRECEDES F7)
  ├─ F3  Cloud-saved game shot review
- ├─ F7  Assist-linking on a made shot
+ ├─ F7  Assist-linking on a made shot              (two-step undo via F12)
  ├─ F8  Live per-player line in popup
  ├─ F9  Rebound-after-miss prompt                  (opt-in)
  ├─ F10 Shot sequence numbers / recency            (cosmetic)
