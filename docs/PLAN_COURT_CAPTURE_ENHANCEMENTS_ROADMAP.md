@@ -104,6 +104,9 @@ sticky strip and next taps follow) vs. one-off (this event only). Default: globa
 
 ## F7 — Assist-linking on a made shot
 
+> **Expanded to a full plan:** [PLAN_F7_ASSIST_LINKING.md](PLAN_F7_ASSIST_LINKING.md)
+> (tasks + pre-handoff decisions; the one F5–F11 feature with a local reducer change).
+
 **Goal:** After a **Made** shot, optionally credit the assisting teammate in the same
 gesture (assists are almost always tied to a made FG).
 

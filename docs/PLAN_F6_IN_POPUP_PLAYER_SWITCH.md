@@ -146,49 +146,34 @@ No `types.ts`/reducer change — `SET_ACTIVE_PLAYER` already exists.
 - Multi-player events beyond assist-linking (that's **F7**).
 - Adding new players from inside the popup (use the strip's `+`).
 
-## 7. Pre-handoff design decisions (resolve before build)
+## 7. Pre-handoff design decisions — RESOLVED
 
-Each has a recommended default + `Decision:`.
+All F6 decisions are settled (signed off; every one confirmed as recommended).
 
 ### A. Behavior
 
-- **D1 — Switch scope.** Global (updates `activePlayerId`) vs. one-off (this event only).
-  - _Recommended:_ **global** — single source of truth; the sticky strip and F2 view filter
-    follow; next taps default to the chosen player. (A one-off mode adds state + ambiguity;
-    defer unless requested.)
-  - _Decision:_ ____
-
+- **D1 — Switch scope.** **Global** — choosing a player updates `activePlayerId` (single
+  source of truth); the sticky strip and the F2 view filter follow; subsequent taps default
+  to the chosen player. (One-off "this event only" mode deferred.)
 - **D2 — Popup stays open after switching.** Choosing a player updates the header and keeps
   the popup open (preserving the pending tap location and F5 2/3 value); the user then picks
   the event.
-  - _Recommended:_ stay open.
-  - _Decision:_ ____
-
 - **D3 — Picker contents/order.** `sortTeamPlayersFirst(players)` — team pseudo-players
   first, then individuals (same as the sticky strip).
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
-- **D4 — Cancel-after-switch behavior.** If the user switches the player but then Cancels
-  the popup (logs nothing), does the active-player change persist?
-  - _Recommended:_ **yes, it persists** — switching is an explicit action; reverting it on
-    Cancel would be surprising. (No event is logged, only the selection changed.)
-  - _Decision:_ ____
+- **D4 — Cancel-after-switch.** The active-player change **persists** — switching is an
+  explicit action; only the event is skipped on Cancel.
 
 ### B. UI / reuse
 
-- **D5 — Reuse `PlayerSelectorStrip` vs. a new `PlayerPickerMenu`.** Reuse if the strip can
-  render compactly (no "All"/`+`); otherwise a tiny dedicated menu.
-  - _Recommended:_ reuse `PlayerSelectorStrip` in a compact "picker" mode if clean; else add
-    a minimal `PlayerPickerMenu` (build-agent's call based on the component's shape).
-  - _Decision:_ ____
+- **D5 — Reuse vs. new menu.** Reuse `PlayerSelectorStrip` in a compact "picker" mode if it
+  renders cleanly without the "All"/`+` affordances; otherwise add a minimal
+  `PlayerPickerMenu` (build-agent's call based on the component's shape).
 
 ### C. Acceptance & tests
 
 - **D6 — Acceptance.** Switching credits the chosen player for shots and secondary actions;
   the sticky strip + inline court (F2) follow; team pseudo-players selectable; undo correct;
   Cancel logs nothing.
-  - _Decision (add/adjust):_ ____
 
 ### D. Explicitly out of F6
 One-off attribution mode; assist-linking (**F7**); adding players from the popup.
