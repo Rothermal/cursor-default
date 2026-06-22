@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
+import { withLastSyncedGameFingerprint } from '../lib/gameSyncFingerprint'
 import { playerDisplayName } from '../lib/display'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
@@ -297,9 +298,10 @@ export default function CareerStats() {
           lastSyncedAt: cloudGame.hydratedAt,
           lastError: null,
           shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
+          lastSyncedGameFingerprint: null,
         },
       }
-      dispatch({ type: 'HYDRATE_STATE', state: nextState })
+      dispatch({ type: 'HYDRATE_STATE', state: withLastSyncedGameFingerprint(nextState) })
       navigate('/summary')
     },
     [userId, sportConfig, supabaseClient, dispatch, navigate]
