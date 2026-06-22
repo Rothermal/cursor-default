@@ -7,10 +7,11 @@ cross-cutting decisions so the individual plans stay consistent.
 > **Status:** Planning only. No code shipped. Each linked plan/sketch is a draft for review.
 >
 > **Major pivot (recorded):** F1 was originally "make the shot chart a tab." After
-> live-use feedback it is now a **single scrollable Game Tracker** where the **court is
-> the primary input** — a court tap opens an event popup (shot / rebound / steal / block /
-> assist) for the selected player, and the stat grid shrinks to FT / fouls / TO / minutes.
-> This spawned a family of follow-on enhancements (F5–F11). See
+> live-use feedback it is now a **single scrollable Game Tracker** where the **court is a
+> primary, additive input** — a court tap opens an event popup (shot / rebound / steal /
+> block / assist) for the selected player, while the **full stat grid stays editable** so
+> every stat can still be entered/adjusted directly. This spawned a family of follow-on
+> enhancements (F5–F11). See
 > [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) and
 > [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md).
 
@@ -18,7 +19,7 @@ cross-cutting decisions so the individual plans stay consistent.
 
 | # | Feature | Plan | One-line goal |
 |---|---------|------|----------------|
-| **F1** | Single-page Game Tracker + **Court Event Capture** | [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) | One scroll page; tap court → event popup (Made/Miss w/ auto 2-3 · Off/Def Reb · Steal · Block · Assist); shrink grid to FT/Foul/TO/Min. |
+| **F1** | Single-page Game Tracker + **Court Event Capture** | [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) | One scroll page; tap court → event popup (Made/Miss w/ auto 2-3 · Off/Def Reb · Steal · Block · Assist) as an *additive* fast input; the **full stat grid stays editable**. |
 | **F2** | Per-player + team shot views | [PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md](PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md) | Filter the inline court to the selected player; team selections show every player's shots on that side. |
 | **F3** | Shot trackers on cloud-saved games | [PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md](PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md) | Show full (all-recorder) shot charts when reviewing in-progress/final cloud games. |
 | **F4** | In-progress scores on the resume UI | [PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | Live score on the home active-game card and the Cloud Games list. |
@@ -92,9 +93,11 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 
 ## Cross-cutting decisions (apply across plans)
 
-1. **Court Event Capture (Option A) is the primary input** (F1). A court tap opens a
-   popup that resolves the event and updates the **selected** player via existing
-   dispatches; only shots store location. FT / fouls / TO / minutes stay as buttons.
+1. **Court Event Capture (Option A) is a primary, additive input** (F1). A court tap opens
+   a popup that resolves the event and updates the **selected** player via existing
+   dispatches; only shots store location. The **full stat grid is retained** — the popup is
+   a faster path, not a replacement, so every stat stays directly enterable/adjustable via
+   its button (the two paths are additive, like today's chart-vs-buttons model).
 2. **Single scroll page, no tabs, no visible scrollbar** (F1). Standard scrolling; a
    **sticky player strip** keeps the active player visible.
 3. **Extract shared components** (F1): `PlayerSelectorStrip` (was duplicated),
@@ -106,8 +109,9 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
    filtering.
 5. **`teamSide` is derived, not stored** (F2): a roster player is home unless it's the
    opponent pseudo-player. No migration / `Player` change.
-6. **Hide court-owned grid actions via config** (F1): `capturedViaCourt?: boolean` on
-   `StatAction` (`sports.ts`) rather than hard-coded ids.
+6. **Keep the full stat grid** (F1): the court popup is additive, not a replacement — all
+   stats remain directly enterable and adjustable via their buttons (needed to fix/adjust
+   counts). No `capturedViaCourt` hiding, no `types.ts`/`sports.ts` change.
 7. **No data-model changes anywhere in F1 + F5–F11** — all map to `ADD_SHOT` /
    `INCREMENT_STAT` and existing stat ids. F3 may add an optional read-only RPC.
 8. **`/shot-chart` redirects to `/game`** after F1 (dev `/dev/shot-chart` untouched). No
@@ -139,7 +143,7 @@ Resolved items are struck/marked; defaults are what the plans assume.
 | # | Question | Status / default |
 |---|----------|------------------|
 | Q1 | F1 page model: tabs vs single page? | **Resolved:** single scrollable page, no tabs, standard scrolling (no visible scrollbar). |
-| Q1b | F1 input model: stat-grid vs court-as-primary-input? | **Resolved:** **Court Event Capture (Option A)** — court popup owns shot/reb/stl/blk/ast; grid keeps FT/foul/TO/min. |
+| Q1b | F1 input model: stat-grid vs court-as-primary-input? | **Resolved:** **Court Event Capture (Option A)** — court popup is an *additive* fast input for shot/reb/stl/blk/ast; the **full grid stays editable** (every stat still adjustable via its button). |
 | Q1c | F1 sticky scope? | Default: pin the player strip only (F1 §7 D2). |
 | Q2 | F2: keep an explicit "All" view alongside per-player/team? | Yes — team chip = side union; add an "All shots" affordance. |
 | Q3 | F2: per-player marker colors? | v1 uniform; color is a follow-up. |
