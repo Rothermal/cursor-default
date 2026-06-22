@@ -2,9 +2,10 @@
 
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
-> shared context. Depends on **F1** ([PLAN_F1_SHOT_CHART_IN_TRACKER_TAB.md](PLAN_F1_SHOT_CHART_IN_TRACKER_TAB.md))
-> for the extracted `ShotChartPanel` + `PlayerSelectorStrip` and the component/state
-> contracts (F1 §7 D12–D14).
+> shared context. Depends on **F1** ([PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md))
+> for the inline court (`ShotChartPanel` / `CourtEventPopup`) and `PlayerSelectorStrip`.
+> Note: after F1 the court lives **inline in the single-page Game Tracker** (not a tab);
+> F2's filtering applies to that inline court and to the Game Summary chart.
 
 **Goal:** When a player is selected, the shot chart shows **only that player's shots**;
 when a team (home/opponent) is selected, the chart shows **all tracked shots for every
