@@ -149,7 +149,17 @@ function clearEntireShotChart(state: GameState): GameState {
   const actionLog = state.actionLog.filter(
     e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
   )
-  return { ...state, shotChart: [], players, actionLog }
+  // User cleared the chart — local is authoritative; allow delete+replace on next sync.
+  return {
+    ...state,
+    shotChart: [],
+    players,
+    actionLog,
+    cloudSync: {
+      ...state.cloudSync,
+      shotChartHydrationDroppedRows: 0,
+    },
+  }
 }
 
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
@@ -962,6 +972,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return
       }
       const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
+      pendingSyncRef.current = true
+      setPendingSyncFlag(true)
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
