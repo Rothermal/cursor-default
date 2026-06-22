@@ -34,11 +34,11 @@ anytime as a quick win.
 
 ```
 F1  Single-page tracker + Court Event Capture (foundation)
- ├─ F2  Per-player / team shot filtering        (high value once the court is central)
+ ├─ F2  Per-player / team shot filtering        (needs F1)
+ ├─ F3  Cloud-saved game shot review             (needs F1 + F2)
  ├─ F5  Auto 2/3 override chip                   (tiny; correctness)
  ├─ F6  In-popup player confirm/switch           (attribution safety; user's top pain)
  ├─ F12 Recent-events undo popup                 (correction UX; PRECEDES F7)
- ├─ F3  Cloud-saved game shot review             (after capture + filtering are stable)
  ├─ F7  Assist-linking on a made shot            (two-step undo, made transparent by F12)
  ├─ F8  Live per-player line in popup            (small; context)
  ├─ F9  Rebound-after-miss prompt                (needs live tuning; opt-in)
@@ -47,13 +47,15 @@ F1  Single-page tracker + Court Event Capture (foundation)
 F4  In-progress scores on resume UI              (independent; quick win, anytime)
 ```
 
-**Why this order:** F5 and F6 are cheap and directly improve the core capture loop
-(correct shot value; correct/confirmed player) — do them right after F1. **F12 precedes
-F7** because the recent-events popup is what makes F7's two-step assist undo transparent
-(so F7 needs no reducer change). F2 and F3 are the originally-planned chart features and
-are most valuable once the court is the primary surface. F8–F10 are progressive polish.
-F11 is intentionally last: build it only if live testing shows the extra tap for
-block/steal/assist is a real friction, to avoid speculative UI.
+**Hard constraints (everything else is flexible):** F1 first · **F2 before F3** (F3 reuses
+F2's `shotsForSelection`) · **F12 before F7** (F7's two-step assist undo relies on F12's
+visible event list) · F4 anytime.
+
+**Why this order:** F1 is the foundation. F2 then F3 deliver the per-player + cloud chart
+features early. F5 and F6 are cheap capture-loop wins (correct shot value; confirmed
+player). F12 precedes F7 so the recent-events popup makes F7's two-step assist undo
+transparent (no reducer change). F8–F10 are progressive polish. F11 is intentionally last:
+build it only if live testing shows the extra tap for block/steal/assist is real friction.
 
 ---
 

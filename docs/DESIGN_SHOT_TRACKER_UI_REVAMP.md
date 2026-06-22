@@ -121,17 +121,19 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 
 ```
 F1  Single-page tracker + Court Event Capture     (foundation)
- ├─ F2  Per-player / team shot filtering
- ├─ F5  Auto 2/3 override chip                     (tiny; correctness)
+ ├─ F2  Per-player / team shot filtering           (needs F1)
+ ├─ F3  Cloud-saved game shot review               (needs F1 + F2)
+ ├─ F5  Auto 2/3 override chip                      (tiny; correctness)
  ├─ F6  In-popup player confirm/switch             (attribution; top pain)
  ├─ F12 Recent-events undo popup                   (correction UX; PRECEDES F7)
- ├─ F3  Cloud-saved game shot review
  ├─ F7  Assist-linking on a made shot              (two-step undo via F12)
  ├─ F8  Live per-player line in popup
  ├─ F9  Rebound-after-miss prompt                  (opt-in)
  ├─ F10 Shot sequence numbers / recency            (cosmetic)
  └─ F11 Hybrid quick buttons (Option B)            (only if testing shows it's needed)
 F4  In-progress scores on resume UI                (independent; quick win, anytime)
+
+Hard constraints: F1 first · F2 before F3 · F12 before F7 · F4 anytime. Other slots flexible.
 ```
 
 Rationale and per-feature phases: see
