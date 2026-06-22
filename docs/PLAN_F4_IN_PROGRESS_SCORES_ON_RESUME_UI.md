@@ -185,96 +185,51 @@ No new files, no migration, no helper additions (reuse `gameScore.ts`).
 - Per-period or detailed score breakdowns on the cards (the full breakdown lives in
   Game Summary).
 
-## 7. Pre-handoff design decisions (resolve before build)
+## 7. Pre-handoff design decisions — RESOLVED
 
-These are the decisions a build agent needs locked down for F4. Each has a **recommended
-default**; fill in `Decision:` to confirm or override. Highest-leverage: **D1 (home-card
-score inputs), D5–D6 (cloud score source + multi-recorder scoping), D7 (which statuses /
-0–0).** F4 is independent of F1–F3 and touches only `SportSelect.tsx` and `Games.tsx`.
+All F4 decisions are settled (signed off; every one confirmed as the recommended default).
+F4 is independent of F1–F3 and touches only `SportSelect.tsx` and `Games.tsx`.
 
 ### A. Home active-game card
 
-- **D1 — Score inputs must mirror `Scoreboard`.** Use
-  `state.players.filter(p => !isTeamPseudoPlayer(p))` (roster only) +
-  `getDisplayedHomeScore(...)` + `state.opponentScore`. (Confirmed against
-  `Scoreboard.tsx:12-13`, which excludes team pseudo-players.)
-  - _Recommended:_ as stated (roster-only, to match the in-game scoreboard exactly).
-  - _Decision:_ ____
-
-- **D2 — Format.** `home–opp` with an en dash, `tabular-nums`, matching the existing
-  final score-line style.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
-- **D3 — Show period/quarter on the card?**
-  - _Recommended:_ no — score only in v1 (period is basketball-team-stats-specific and
-    adds clutter).
-  - _Decision:_ ____
-
-- **D4 — Show 0–0 for a brand-new active game?** The card only appears when there's an
-  active local game (`hasActiveGame`).
-  - _Recommended:_ yes — show `0–0`; the card already signals an active game, and a live
-    0–0 is informative, not noise.
-  - _Decision:_ ____
+- **D1 — Score inputs mirror `Scoreboard`.** `state.players.filter(p => !isTeamPseudoPlayer(p))`
+  (roster only) + `getDisplayedHomeScore(...)` + `state.opponentScore` (matches `Scoreboard.tsx:12-13`).
+- **D2 — Format.** `home–opp` with an en dash, `tabular-nums`, matching the final score-line style.
+- **D3 — Period/quarter on the card?** **No** — score only in v1.
+- **D4 — Show 0–0 for a brand-new active game?** **Yes** — the card already signals an
+  active game; a live 0–0 is informative.
 
 ### B. Cloud Games list
 
-- **D5 — Score source precedence.** (Umbrella Q5.) Prefer the synced `games` row
-  (`home_team_score` / `opponent_score`); fall back to a `game_stats` aggregate only when
-  `home_team_score == null`.
-  - _Recommended:_ as stated (cheap row path first; stats aggregate only for legacy
-    null-home games).
-  - _Decision:_ ____
-
-- **D6 — Multi-recorder scoping for the stats fallback.** For in-progress games,
-  `game_stats` can contain rows from multiple recorders; summing **all** of them would
-  inflate the home score.
-  - _Recommended:_ scope the fallback sum to the game **creator's** rows
-    (`recorded_by = game.created_by`) to avoid double-counting co-recorders. (Finals keep
-    using the resolved RPC, which already de-duplicates.) This is an approximate list hint;
-    the authoritative number is the row's `home_team_score` when present.
-  - _Decision:_ ____
-
-- **D7 — Which statuses show a score, and 0–0 handling.**
-  - _Recommended:_ show for **`in_progress`** and **`final`** (existing); for
-    **`scheduled`**, **hide** the score when it's `0–0` (no game played yet). Always show
-    the status badge regardless.
-  - _Decision:_ ____
-
-- **D8 — Performance / batching.** Only the null-home fallback triggers a query.
-  - _Recommended:_ per-game query on the fallback path only (most games hit the no-query
-    row path); batch into one `in('game_id', ids)` aggregate only if profiling shows it's
-    needed.
-  - _Decision:_ ____
-
-- **D9 — Staleness.** List scores reflect last-synced state (no realtime subscription).
-  - _Recommended:_ accept for v1; the home card is the live surface. Document the caveat.
-  - _Decision:_ ____
+- **D5 — Score source precedence.** Prefer the synced `games` row (`home_team_score` /
+  `opponent_score`); fall back to a `game_stats` aggregate only when `home_team_score == null`.
+- **D6 — Multi-recorder scoping for the stats fallback.** Scope the fallback sum to the
+  game **creator's** rows (`recorded_by = game.created_by`) to avoid double-counting
+  co-recorders. (Finals keep the resolved RPC.) The row's `home_team_score` is authoritative
+  when present.
+- **D7 — Statuses + 0–0.** Show a score for **`in_progress`** and **`final`**; for
+  **`scheduled`**, hide the score when it's `0–0`. Always show the status badge.
+- **D8 — Performance.** Per-game query only on the null-home fallback path; batch into one
+  `in('game_id', ids)` aggregate only if profiling shows it's needed.
+- **D9 — Staleness.** List scores reflect last-synced state (no realtime subscription); the
+  home card is the live surface. Documented caveat.
 
 ### C. Display & edges
 
 - **D10 — Pill placement.** Reuse the existing `scoreHint` span position (next to
   "vs {opponent}") and styling for all statuses.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
-- **D11 — Missing sport/team mapping.** When the team→sport lookup is missing, skip the
-  score line but still render the card (matches the current final-path `continue`).
-  - _Recommended:_ as stated; never let a missing mapping break the card.
-  - _Decision:_ ____
+- **D11 — Missing sport/team mapping.** Skip the score line but still render the card
+  (matches the current final-path `continue`); never let a missing mapping break the card.
 
 ### D. Acceptance criteria & regression
 
-- **D12 — Acceptance criteria.** e.g. "Home card score equals the Game Tracker scoreboard
-  for both scoring modes and with team pseudo-players present; in-progress cloud games show
-  the synced score (row path) or a creator-scoped stats aggregate (legacy null-home);
-  finals are unchanged; scheduled 0–0 hides the score; status badges remain."
-  - _Decision (add/adjust):_ ____
-
+- **D12 — Acceptance criteria.** Home card score equals the Game Tracker scoreboard for both
+  scoring modes and with team pseudo-players present; in-progress cloud games show the synced
+  score (row path) or a creator-scoped stats aggregate (legacy null-home); finals are
+  unchanged; scheduled 0–0 hides the score; status badges remain.
 - **D13 — Regression checklist.** Final score lines unchanged (still via
   `get_game_stats_resolved`); existing `scoreHint` span styling preserved; no new query for
-  games that have a synced `home_team_score`; home card still renders Resume/New correctly.
-  - _Decision (add/adjust):_ ____
+  games with a synced `home_team_score`; home card still renders Resume/New correctly.
 
 ### E. Explicitly out of F4
 Realtime list updates; per-period/detailed breakdowns on cards (those live in Game
