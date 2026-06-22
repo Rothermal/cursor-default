@@ -80,6 +80,9 @@ location, force value.
 
 ## F6 — In-popup player confirm / switch
 
+> **Expanded to a full plan:** [PLAN_F6_IN_POPUP_PLAYER_SWITCH.md](PLAN_F6_IN_POPUP_PLAYER_SWITCH.md)
+> (tasks + pre-handoff decisions).
+
 **Goal:** The popup header shows the selected player and lets you **switch attribution**
 before logging — the strongest fix for "I logged it to the wrong/at-the-time-unclear
 player." Confirms who gets the stat at the moment of the event.

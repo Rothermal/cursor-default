@@ -157,49 +157,32 @@ No `types.ts`/reducer change — `ADD_SHOT` already takes `shotType` + `zone`.
 - Moving/dragging an existing marker (separate future idea).
 - Free throws (not court shots).
 
-## 7. Pre-handoff design decisions (resolve before build)
+## 7. Pre-handoff design decisions — RESOLVED
 
-Small feature; each has a recommended default + `Decision:`.
+All F5 decisions are settled (signed off; every one confirmed as recommended).
 
 ### A. Behavior
 
 - **D1 — Marker location on override.** Keep the **literal tap location** (`x,y` unchanged);
   the chip changes only how the shot is **scored**.
-  - _Recommended:_ keep location, force value.
-  - _Decision:_ ____
-
-- **D2 — Zone coherence (the subtle one).** Derive `zone` from the chosen value via
-  `zoneForForcedShotType` (forced 3PT → `three`; forced 2PT in a `three` location →
-  `mid_range`; otherwise the location zone).
-  - _Recommended:_ as stated — keeps the `ShootingSummary` coherent.
-  - _Alternative:_ keep the raw location zone (simpler, but the summary can show a 3PT shot
-    under mid-range).
-  - _Decision:_ ____
-
+- **D2 — Zone coherence.** Derive `zone` from the chosen value via `zoneForForcedShotType`
+  (forced 3PT → `three`; forced 2PT in a `three` location → `mid_range`; otherwise the
+  location zone) — keeps the `ShootingSummary` coherent.
 - **D3 — Override scope.** **Per-shot** — the chip resets to the auto-detected default on
   every new court tap (no sticky override).
-  - _Recommended:_ per-shot.
-  - _Decision:_ ____
 
 ### B. UI
 
 - **D4 — Chip placement / style.** A `2PT / 3PT` segmented control near the detected-value
-  line, with the active (chosen) value highlighted; default = detected.
-  - _Recommended:_ as stated.
-  - _Decision:_ ____
-
-- **D5 — Indicate an active override?** Optionally show a subtle "(overridden)" hint when
-  the chip differs from the auto-detection.
-  - _Recommended:_ light touch — highlight the chosen segment; an explicit "(overridden)"
-    label is optional polish.
-  - _Decision:_ ____
+  line, active value highlighted, default = detected.
+- **D5 — Override indicator.** Light touch — highlight the chosen segment; an explicit
+  "(overridden)" label is optional polish.
 
 ### C. Acceptance & tests
 
 - **D6 — Acceptance + tests.** Unit: `zoneForForcedShotType` matrix. Manual: the §4 cases
   (default matches location; override changes stat/score/summary; marker stays; per-shot
   reset; secondary actions unaffected; undo works).
-  - _Decision (add/adjust):_ ____
 
 ### D. Explicitly out of F5
 Post-log editing, marker drag, free throws. F5 only adds the pre-log 2/3 override to the
