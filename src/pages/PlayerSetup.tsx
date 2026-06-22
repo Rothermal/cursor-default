@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
+import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 
 function generateLocalId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -42,35 +42,15 @@ export default function PlayerSetup() {
   const gameInfoRef = useRef(state.gameInfo)
   gameInfoRef.current = state.gameInfo
 
-  /** Team pseudo-players for checkout + tracker when the sport defines team categories. */
   useEffect(() => {
     if (!sport?.teamCategories?.length || !state.gameInfo) return
-    const hasHome = state.players.some(p => p.id === TEAM_PLAYER_HOME_ID)
-    const hasOpp = state.players.some(p => p.id === TEAM_PLAYER_OPP_ID)
-    if (hasHome && hasOpp) return
-    const homeTeamPlayer = {
-      id: TEAM_PLAYER_HOME_ID,
-      name: state.gameInfo.teamName,
-      number: '★',
-      stats: {},
-      isTeamPlayer: true as const,
-      teamSide: 'home' as const,
-    }
-    const oppTeamPlayer = {
-      id: TEAM_PLAYER_OPP_ID,
-      name: state.gameInfo.opponentName,
-      number: '★',
-      stats: {},
-      isTeamPlayer: true as const,
-      teamSide: 'opponent' as const,
-    }
-    const without = state.players.filter(
-      p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
+    const nextPlayers = playersWithTeamPlaceholders(
+      state.players,
+      state.gameInfo.teamName,
+      state.gameInfo.opponentName
     )
-    dispatch({
-      type: 'SET_PLAYERS',
-      players: [homeTeamPlayer, oppTeamPlayer, ...without],
-    })
+    if (!nextPlayers) return
+    dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
   }, [sport, state.gameInfo, state.players, dispatch])
 
   useEffect(() => {
@@ -112,29 +92,21 @@ export default function PlayerSetup() {
 
       const gameInfoNow = gameInfoRef.current
       if (sport?.teamCategories?.length && gameInfoNow) {
-        const homeTeamPlayer = {
-          id: TEAM_PLAYER_HOME_ID,
-          name: gameInfoNow.teamName,
-          number: '★',
-          stats: {},
-          isTeamPlayer: true as const,
-          teamSide: 'home' as const,
-        }
-        const oppTeamPlayer = {
-          id: TEAM_PLAYER_OPP_ID,
-          name: gameInfoNow.opponentName,
-          number: '★',
-          stats: {},
-          isTeamPlayer: true as const,
-          teamSide: 'opponent' as const,
-        }
-        loadedPlayers = [
-          homeTeamPlayer,
-          oppTeamPlayer,
+        const snapshot = playersRef.current
+        const mergedForTeams = [
+          ...snapshot.filter(
+            p => p.id === TEAM_PLAYER_HOME_ID || p.id === TEAM_PLAYER_OPP_ID
+          ),
           ...loadedPlayers.filter(
             p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
           ),
         ]
+        loadedPlayers =
+          playersWithTeamPlaceholders(
+            mergedForTeams,
+            gameInfoNow.teamName,
+            gameInfoNow.opponentName
+          ) ?? loadedPlayers
       }
 
       const snapshot = playersRef.current
