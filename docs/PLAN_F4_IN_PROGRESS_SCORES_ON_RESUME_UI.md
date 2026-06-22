@@ -67,6 +67,11 @@ vs. legacy player-stat sum + adjustment). **Using `rosterPlayers` (not all `play
 required** so the card matches the in-game scoreboard, which filters pseudo-players at
 `Scoreboard.tsx:12`.
 
+> **Post-F1 note:** F1's court popup records shots via the same `ADD_SHOT`/`INCREMENT_STAT`
+> dispatches, so court-captured points already flow into player stats and thus into
+> `getDisplayedHomeScore`. The live card score reflects them automatically — F4 needs no
+> change for the court-capture pivot.
+
 ### 2.2 Cloud Games list (in-progress + scheduled)
 
 Extend the existing `finalScoreLines` effect to cover non-final games. Strategy per game:
@@ -201,7 +206,7 @@ score inputs), D5–D6 (cloud score source + multi-recorder scoping), D7 (which 
   - _Recommended:_ as stated.
   - _Decision:_ ____
 
-- **D3 — Show period/quarter on the card?** (Umbrella Q3 for F4.)
+- **D3 — Show period/quarter on the card?**
   - _Recommended:_ no — score only in v1 (period is basketball-team-stats-specific and
     adds clutter).
   - _Decision:_ ____
@@ -230,7 +235,7 @@ score inputs), D5–D6 (cloud score source + multi-recorder scoping), D7 (which 
     the authoritative number is the row's `home_team_score` when present.
   - _Decision:_ ____
 
-- **D7 — Which statuses show a score, and 0–0 handling.** (Umbrella Q2 for F4.)
+- **D7 — Which statuses show a score, and 0–0 handling.**
   - _Recommended:_ show for **`in_progress`** and **`final`** (existing); for
     **`scheduled`**, **hide** the score when it's `0–0` (no game played yet). Always show
     the status badge regardless.
