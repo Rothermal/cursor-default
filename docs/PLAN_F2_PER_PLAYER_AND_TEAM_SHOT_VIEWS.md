@@ -3,18 +3,30 @@
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
 > shared context. Depends on **F1** ([PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md))
-> for the inline court (`ShotChartPanel` / `CourtEventPopup`) and `PlayerSelectorStrip`.
-> Note: after F1 the court lives **inline in the single-page Game Tracker** (not a tab);
-> F2's filtering applies to that inline court and to the Game Summary chart.
+> for the inline court (`ShotChartPanel`), the `CourtEventPopup`, and the sticky
+> `PlayerSelectorStrip`. After F1 the court lives **inline in the single-page Game
+> Tracker** (not a tab); F2's filtering applies to that inline court and to the Game
+> Summary chart.
 
-**Goal:** When a player is selected, the shot chart shows **only that player's shots**;
-when a team (home/opponent) is selected, the chart shows **all tracked shots for every
-player on that side**. A whole-game ("All shots") view remains available.
+> **Reconciled with the F1 pivot (read this):** Recording now happens through the
+> **`CourtEventPopup`**, which **explicitly shows and confirms the attributed player**
+> (and F6 will let you switch it). Two consequences for F2:
+> 1. **Recording is allowed in every view, including "All"** — a court tap opens the popup
+>    for the active player, so there is no "silent mis-attribution" risk. (This **reverses**
+>    the earlier "All is review-only / disable taps" idea.)
+> 2. The **view filter** (what's displayed) and the **active/recording player** (who the
+>    popup logs to) are clearly separable; selecting a chip sets both (coupled), but "All"
+>    changes only the display, not the recording target. See §8 D3/D5/D14.
 
-**Architecture:** Add one pure helper, `shotsForSelection()`, that maps the current
-selection (individual player id, team side, or "all") to the subset of `ShotRecord[]`
-to display. The shot panel, the chart's zone summary, and the Game Summary chart tab all
-consume it. No schema change — `ShotRecord.playerId` already exists; team side is derived.
+**Goal:** When a player is selected, the inline shot chart shows **only that player's
+shots**; when a team (home/opponent) is selected, it shows **all tracked shots for every
+player on that side**. A whole-game **"All shots"** view is always available, and recording
+remains possible in any view.
+
+**Architecture:** Add one pure helper, `shotsForSelection()`, mapping the current view
+selection (individual player id, team side, or "all") to the displayed `ShotRecord[]`.
+The inline `ShotChartPanel`, its zone summary, and the Game Summary chart tab all consume
+it. No schema change — `ShotRecord.playerId` already exists; team side is derived.
 
 **Tech Stack:** React 18 + TypeScript, Vitest for the helper. No new dependencies.
 
@@ -24,22 +36,21 @@ consume it. No schema change — `ShotRecord.playerId` already exists; team side
 
 `ShotRecord.playerId` is recorded per shot, but **display never filters**:
 
-- `ShotChart.tsx` and the `GameSummary` "Shot chart" tab both render
-  `<BasketballCourt shots={shotChart} />` — the entire game's shots, merged.
-- The player-selector strip controls **which player a new shot is attributed to**
-  (`SET_ACTIVE_PLAYER` → `effectivePlayerId`), but selecting a player does **not**
-  change what's shown.
-- Team pseudo-players (`__team_home__`, `__team_opp__`) appear in the strip and can be
-  the active "shooter," but there's no concept of "show everyone on the home team."
+- `BasketballCourt` (in the inline panel and the `GameSummary` "Shot chart" tab) renders
+  the *entire* `shotChart` array, merged across players.
+- The player-selector strip controls **which player a new event is attributed to**
+  (`SET_ACTIVE_PLAYER` → `activePlayerId`), but selecting a player does **not** change
+  what's shown.
+- Team pseudo-players (`__team_home__`, `__team_opp__`) can be the active recorder, but
+  there's no concept of "show everyone on the home team."
 
-The shipped design explicitly deferred this: see
-[completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md) §2.2 ("v2: Per-Player
-Shot Charts") and §8.2 ("Per-Player Filtering (v2)").
+Deferred in the shipped design: [completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md)
+§2.2 ("v2: Per-Player Shot Charts") and §8.2 ("Per-Player Filtering (v2)").
 
 ## 2. Team model & the side-derivation rule
 
 StatKeeper tracks **one home roster of individuals** plus a **single opponent
-pseudo-player** (there is no opponent roster). Team pseudo-players carry
+pseudo-player** (no opponent roster). Team pseudo-players carry
 `teamSide: 'home' | 'opponent'`; individual roster players carry no `teamSide`.
 
 **Rule — `sideOf(player)`** (no migration, no `Player` change):
@@ -52,19 +63,14 @@ function sideOf(player: Player): 'home' | 'opponent' {
 ```
 
 So:
-- **Home team view** = every shot whose `playerId` belongs to a home-side player
-  (all individual roster players **plus** `__team_home__` if any shots were recorded
-  against the home pseudo-player).
-- **Opponent team view** = every shot whose `playerId` is the opponent pseudo-player
-  (`__team_opp__`). (Could grow if opponent individuals are ever added — the rule
-  already generalizes.)
+- **Home team view** = every shot whose `playerId` is a home-side player (all individual
+  roster players **plus** `__team_home__` if shots were recorded against it).
+- **Opponent team view** = shots whose `playerId` is `__team_opp__`.
 - **Individual view** = exactly that player's shots.
 
 ## 3. Design
 
 ### 3.1 Selection model
-
-Introduce a `ShotChartSelection`:
 
 ```ts
 type ShotChartSelection =
@@ -72,12 +78,9 @@ type ShotChartSelection =
   | { kind: 'player'; playerId: string }   // individual OR a team pseudo-player id
 ```
 
-`kind: 'player'` with a **team pseudo-player id** means "show that whole side."
-`kind: 'player'` with an **individual id** means "show just that player." This keeps
-the existing strip (which already lists team pseudo-players first, then individuals)
-as the primary control — selecting a chip filters the chart.
-
-The view helper:
+`kind: 'player'` with a **team pseudo-player id** → show that whole side; with an
+**individual id** → show just that player. The sticky `PlayerSelectorStrip` (team
+pseudo-players first, then individuals, plus a leading **"All"** chip) is the control.
 
 ```ts
 // src/lib/shotChartViews.ts
@@ -91,34 +94,39 @@ export function shotsForSelection(
   if (!target) return shots                 // defensive: unknown id → show all
   if (isTeamPseudoPlayer(target)) {
     const side = sideOf(target)
-    const sideIds = new Set(
-      players.filter(p => sideOf(p) === side).map(p => p.id)
-    )
+    const sideIds = new Set(players.filter(p => sideOf(p) === side).map(p => p.id))
     return shots.filter(s => sideIds.has(s.playerId))
   }
   return shots.filter(s => s.playerId === selection.playerId)
 }
 ```
 
-`sideOf` and `ShotChartSelection` live in the same module. The helper is pure and unit-tested.
+Pure and unit-tested. `sideOf` and `ShotChartSelection` live in the same module.
 
-### 3.2 How the selection ties to the active player
+### 3.2 View filter vs. recording target (post-F1)
 
-- **Recording** still uses `activePlayerId` (`effectivePlayerId`) — unchanged. Tapping
-  the court attributes the shot to the currently selected chip.
-- **Display** uses the same selection: the chart shows the subset for the selected chip.
-  - Select **#23** → record shots for #23, see only #23's shots.
-  - Select **★ Rebels (home)** → record shots for the home team pseudo-player, see
-    **all home players' + home-team** shots (the merged team view).
-  - Select **★ Brawlers (opp)** → record/show opponent shots.
-- Add a small **"All shots"** toggle/chip (at the start of the strip or as a header
-  control) for the whole-game view. This is `selection = { kind: 'all' }` and is the
-  current behavior. Default selection when opening the chart = the current
-  `activePlayerId` (or "All" if none) — see §8.
+F1 separates *display* from *recording* cleanly:
 
-### 3.3 Header / context label
+- **Recording target** = `activePlayerId` (global, `GameState`). A court tap opens
+  `CourtEventPopup`, which shows that player (`#23 Jordan`) and logs the chosen event to
+  them. **This works in any view, including "All"** — the popup confirms attribution, so
+  there's no silent mis-attribution. (F6 adds in-popup switching.)
+- **View filter** = `ShotChartSelection`, controlling which markers the inline court and
+  `ShootingSummary` display.
+- **Coupling:** selecting an individual/team chip sets **both** the recording target
+  (`SET_ACTIVE_PLAYER`) and the view filter to that chip. Selecting **"All"** changes only
+  the **display**; `activePlayerId` is unchanged, so a tap in All view still records to the
+  last active player (shown in the popup). See §8 D2–D5.
 
-Above the court, show what's being displayed and a per-selection record line, e.g.:
+Examples:
+- Select **#23** → record to #23, see only #23's shots.
+- Select **★ Rebels (home)** → record to the home pseudo-player, see the home side union.
+- Select **★ Brawlers (opp)** → record/show opponent shots.
+- Select **All** → see every shot; a court tap still logs to whoever was active (popup confirms).
+
+### 3.3 Context label
+
+Above the court, show the current view + its shooting line (always visible on the single page):
 
 ```
 Shot chart — #23 Michael Jordan        7/15 (47%)
@@ -126,20 +134,19 @@ Shot chart — Rebels (team)            22/48 (46%)
 Shot chart — All shots                31/70 (44%)
 ```
 
-`ShootingSummary` already aggregates any `shots` array, so it just receives the
-filtered subset and the zone breakdown updates automatically.
+`ShootingSummary` aggregates whatever filtered subset it's given, so zone numbers update automatically.
 
 ### 3.4 Empty states
 
 - Individual with no shots: court shows the interactive empty hint ("Tap the court to
-  record shots") when interactive; read-only surfaces show "No shots for {name}."
+  record shots"); read-only surfaces show "No shots for {name}."
 - Team view with no shots: "No shots recorded for {team} yet."
 
 ### 3.5 Marker styling (v1 vs follow-up)
 
-v1 keeps the current uniform made(green)/missed(red) markers in every view. **Per-player
-color-coding + legend** in team views is a documented follow-up (Q3 in the umbrella doc);
-it adds a color scale and legend but no data change. Not in v1 scope to keep the diff small.
+v1 keeps uniform made(green)/missed(red) markers in every view. **Per-player color-coding
++ legend** in team views is a follow-up (umbrella Q3) — adds a color scale + legend, no
+data change.
 
 ### 3.6 File structure
 
@@ -147,13 +154,14 @@ it adds a color scale and legend but no data change. Not in v1 scope to keep the
 |------|--------|
 | `src/lib/shotChartViews.ts` | **Create** — `ShotChartSelection`, `sideOf`, `shotsForSelection`. |
 | `src/lib/shotChartViews.test.ts` | **Create** — Vitest unit tests (individual, home union, opponent, all, unknown id). |
-| `src/components/shot-chart/ShotChartPanel.tsx` | **Modify** — derive `selection` from the active chip + an "All" toggle; pass `shotsForSelection(...)` to `BasketballCourt` and `ShootingSummary`; add the context label. |
-| `src/components/PlayerSelectorStrip.tsx` | **Modify** — optional leading **"All shots"** chip (`onSelectAll`, `allActive`) so the strip can express the `all` selection. |
+| `src/components/shot-chart/ShotChartPanel.tsx` | **Modify** — consume the view `selection`; pass `shotsForSelection(...)` to `BasketballCourt` and `ShootingSummary`; add the context label + empty states. (No made/missed toggle — F1 removed it.) |
+| `src/components/PlayerSelectorStrip.tsx` | **Modify** — optional leading **"All"** chip (`onSelectAll`, `allActive`). |
+| `src/pages/GameTracker.tsx` | **Modify** — owns the view-filter state (`showAll`) and passes the derived `selection` to `ShotChartPanel`; the sticky strip's "All" chip toggles it. |
 | `src/pages/GameSummary.tsx` | **Modify** — the "Shot chart" tab gains the same selector + filtering (read-only strip, no recording). |
 
 ### 3.7 Why a shared helper (DRY)
 
-F1's in-tab panel, the Game Summary tab, and F3's cloud review all need identical
+F1's inline panel, the Game Summary tab, and F3's cloud review all need identical
 filtering. One tested pure function prevents three subtly different implementations
 (a classic source of "opponent shots leak into the home view" bugs).
 
@@ -170,67 +178,60 @@ filtering. One tested pure function prevents three subtly different implementati
   - unknown id → returns all (defensive).
   - `sideOf`: individual → `'home'`; home pseudo → `'home'`; opp pseudo → `'opponent'`.
 - [ ] Run `pnpm test src/lib/shotChartViews.test.ts`. Expected: FAIL (module missing).
-- [ ] **Create `src/lib/shotChartViews.ts`** implementing `ShotChartSelection`,
-  `sideOf`, `shotsForSelection` exactly as in §2/§3.1 (import `isTeamPseudoPlayer`
-  from `src/lib/teamPlayers.ts`).
-- [ ] Run `pnpm test src/lib/shotChartViews.test.ts`. Expected: PASS.
+- [ ] **Create `src/lib/shotChartViews.ts`** implementing `ShotChartSelection`, `sideOf`,
+  `shotsForSelection` exactly as in §2/§3.1 (import `isTeamPseudoPlayer` from
+  `src/lib/teamPlayers.ts`).
+- [ ] Run the test. Expected: PASS.
 - [ ] **Commit:** `feat: add shotChartViews helper for per-player/team shot filtering`
 
-### Task 2: "All shots" affordance in the selector strip
+### Task 2: "All" chip in the sticky selector strip
 
 - [ ] **Modify `src/components/PlayerSelectorStrip.tsx`**: add optional props
-  `onSelectAll?: () => void` and `allActive?: boolean`. When `onSelectAll` is set,
-  render a leading "All" chip (active styling when `allActive`). Selecting a player
-  chip clears the all state via the existing `onSelect`.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass; existing tracker strip unaffected
-  when `onSelectAll` is omitted.
+  `onSelectAll?: () => void` and `allActive?: boolean`. When `onSelectAll` is set, render a
+  leading "All" chip (active styling when `allActive`). Selecting a player chip clears the
+  all state via `onSelect`.
+- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass; the tracker strip is unaffected when
+  `onSelectAll` is omitted.
 - [ ] **Commit:** `feat: add optional All chip to PlayerSelectorStrip`
 
-### Task 3: Filter the in-tracker chart panel (F1's `ShotChartPanel`)
+### Task 3: Filter the inline court (F1's `ShotChartPanel`)
 
-- [ ] **Modify `ShotChartPanel.tsx`**: add local `const [showAll, setShowAll] = useState(false)`.
-  Derive `selection`: `showAll ? { kind: 'all' } : { kind: 'player', playerId: effectivePlayerId }`.
-- [ ] Compute `visibleShots = shotsForSelection(shotChart, players, selection)` and pass
-  it to `BasketballCourt` and `ShootingSummary` (instead of raw `shotChart`).
-- [ ] Render `PlayerSelectorStrip` with `onSelectAll={() => setShowAll(true)}`,
-  `allActive={showAll}`, and `onSelect={id => { setShowAll(false); dispatch SET_ACTIVE_PLAYER }}`.
-  (In F1 the strip is owned by `GameTracker`; coordinate the `showAll` state via a prop
-  or lift it — see note below.)
-- [ ] Add the context label line above the court (`Shot chart — {label}  M/A (%)`).
-- [ ] Add the team/individual **empty states** (§3.4).
+- [ ] **Modify `GameTracker.tsx`**: add local `const [showAll, setShowAll] = useState(false)`
+  (the view-filter state). Derive `selection = showAll ? { kind: 'all' } :
+  { kind: 'player', playerId: activePlayerId }`. Pass `selection` to `ShotChartPanel`.
+- [ ] Wire the sticky `PlayerSelectorStrip`: `onSelectAll={() => setShowAll(true)}`,
+  `allActive={showAll}`, `onSelect={id => { setShowAll(false); dispatch SET_ACTIVE_PLAYER }}`.
+- [ ] **Modify `ShotChartPanel.tsx`**: compute `visibleShots = shotsForSelection(shotChart,
+  players, selection)` and pass it to `BasketballCourt` and `ShootingSummary`. **Do not**
+  disable court taps in any view — a tap always opens `CourtEventPopup` for `activePlayerId`.
+- [ ] Add the context label (§3.3) and empty states (§3.4).
 - [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
-- [ ] **Commit:** `feat: filter Game Tracker shot chart by selected player or team`
-
-> **State-ownership note:** In F1, the player strip lives in `GameTracker` (shared by the
-> Stats and Chart views). The cleanest wiring is to lift `showAll` into `GameTracker` and
-> pass `selection` down to `ShotChartPanel`; the "All" chip then only renders while the
-> Chart view is active. Document the chosen ownership in the PR. (See F1 §7 D14.)
+- [ ] **Commit:** `feat: filter inline shot chart by selected player or team`
 
 ### Task 4: Filter the Game Summary shot chart tab
 
-- [ ] **Modify `src/pages/GameSummary.tsx`**: in the `summaryTab === 'shot_chart'` block
-  (lines ~860–869), add a read-only `PlayerSelectorStrip` (no `onAddPlayer`) + "All" chip
-  with local `selection` state, and pass `shotsForSelection(shotChart, players, selection)`
-  to `BasketballCourt` and `ShootingSummary`.
-- [ ] Default selection = `{ kind: 'all' }` for the summary (reviewing the whole game).
+- [ ] **Modify `src/pages/GameSummary.tsx`**: in the `summaryTab === 'shot_chart'` block,
+  add a read-only `PlayerSelectorStrip` (no `onAddPlayer`) + "All" chip with local
+  `selection` state; pass `shotsForSelection(shotChart, players, selection)` to
+  `BasketballCourt` and `ShootingSummary`.
+- [ ] Default selection = `{ kind: 'all' }` for the summary (whole-game review).
 - [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
-- [ ] Manual: finalize/open a game with shots from 2+ players → Summary → Shot chart →
-  switch chips → chart + zone numbers filter correctly; "All" shows everything.
+- [ ] Manual: open a game with shots from 2+ players → Summary → Shot chart → switch chips →
+  chart + zone numbers filter correctly; "All" shows everything.
 - [ ] **Commit:** `feat: per-player/team filtering in Game Summary shot chart`
 
 ## 5. Testing
 
-- **Unit:** `pnpm test src/lib/shotChartViews.test.ts` (the filtering matrix above).
+- **Unit:** `pnpm test src/lib/shotChartViews.test.ts`.
 - **Build/lint:** `pnpm build`, `pnpm lint`.
-- **Manual (GUI, `pnpm dev`):**
-  - Record shots for #23, #11, and the opponent pseudo-player.
+- **Manual (GUI, `pnpm dev`, `#/game`):**
+  - Record (via the court popup) shots for #23, #11, and the opponent pseudo-player.
   - Select **#23** → only #23's markers + #23 zone summary.
   - Select **#11** → only #11's markers.
-  - Select **★ home team** → #23 + #11 (+ any home-team shots) merged; **no** opponent markers.
+  - Select **★ home team** → #23 + #11 (+ home-team) merged; **no** opponent markers.
   - Select **★ opponent** → only opponent markers.
-  - Tap **All** → every marker.
-  - Recording while a chip is selected attributes the new shot to that chip and it
-    appears immediately in that filtered view.
+  - Tap **All** → every marker; a court tap still opens the popup for the last active
+    player (confirmed in the popup header) and the new shot appears.
   - Empty player → empty-state copy.
   - Repeat the filter checks on the **Game Summary** shot chart tab.
 
@@ -239,137 +240,136 @@ filtering. One tested pure function prevents three subtly different implementati
 | Risk | Mitigation |
 |------|-----------|
 | Opponent shots leaking into the home view (or vice versa) | Single tested helper with explicit side-union tests; surfaces never filter inline. |
-| Confusion between "who I'm recording for" vs "what I'm viewing" | They're intentionally the same selection; the context label makes the current view explicit. |
-| Selecting a team pseudo-player to *record* vs to *view all* is ambiguous | By design, both: a team chip records to the team pseudo-player **and** shows the side union. Documented in the label/help text. Revisit if users want record-vs-view split (follow-up). |
-| Future opponent roster | `sideOf`/`shotsForSelection` already generalize via `teamSide`; no rework needed. |
+| "What I'm viewing" vs "who I'm recording" confusion | The `CourtEventPopup` header always names the recording player (and F6 lets you switch), so attribution is explicit even in "All" view. |
+| Team chip means record-to-team **and** show side union | Intended; documented in the context label/help. Revisit a record-vs-view split only if users ask. |
+| Future opponent roster | `sideOf`/`shotsForSelection` already generalize via `teamSide`. |
 
 ## 7. Out of scope (other plans / follow-ups)
 
-- Cloud / multi-recorder aggregation of shots (→ **F3**).
-- Per-player marker colors + legend in team views (follow-up; data-ready).
-- Season/career heatmaps across games ([completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md) §2.3).
+- Cloud / multi-recorder aggregation (→ **F3**).
+- Per-player marker colors + legend (follow-up; data-ready).
+- Per-player breakdown panel in team view (follow-up).
+- Season/career heatmaps ([completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md) §2.3).
 
 ## 8. Pre-handoff design decisions (resolve before build)
 
-These are the decisions a build agent needs locked down for F2. Each has a **recommended
-default**; fill in `Decision:` to confirm or override. Highest-leverage first: **D2
-(recording target in "All" view), D1 (default selection), D3 ("All" affordance), D11–D13
-(contract + recording-target derivation)** — they define the interaction model; the rest
-are fill-in details. F2 builds on F1 §7 **D12–D14** (component contracts + state
-ownership); those must already be decided.
+Each has a **recommended default** + `Decision:`. Items marked **[CHANGED]** or **[NEW]**
+arise from the F1 court-capture pivot. F2 now **owns** the selection/contract decisions
+(the rewritten F1 enumerates only its own D1–D10 and no longer carries the old "D12–D14"
+component contracts).
 
-### A. Selection model & recording target
+### A. Selection model & recording
 
-- **D1 — Default selection when the chart opens.** Active player's filtered view vs. "All".
-  Note: on a fresh game the active player is often a team pseudo-player (the strip lists
-  them first), which would default to a team-side view.
-  - _Recommended:_ default to the active chip's view (individual → that player; team
-    pseudo → that side). Use "All" only when there is no active player.
+- **D1 — Default view on page open.** Active player's filtered view vs. "All". The court is
+  always visible inline now, so the default determines what you first see.
+  - _Recommended:_ default to the **active chip's view** (individual → that player; team
+    pseudo → that side); "All" only when there's no active player.
   - _Decision:_ ____
 
-- **D2 — Recording target while "All shots" is selected (key interaction).** "All" shows
-  both teams, so there is no single shooter. When the court is tapped in All view, who owns
-  the shot?
-  - _Recommended:_ **All is review-only** — disable court taps in All view and show a hint
-    ("Select a player or team to record"). The underlying `activePlayerId` is preserved, so
-    re-selecting a chip resumes recording. (Avoids the "I tapped in the overview and it
-    silently went to #23" trap.)
-  - _Alternative:_ keep taps enabled and record to the still-active `activePlayerId`.
+- **D2 — [NEW] View-filter ↔ active-player coupling.** Does selecting a chip set **both**
+  the recording target (`activePlayerId`) and the displayed filter?
+  - _Recommended:_ **coupled** — one chip controls both (simplest mental model; the popup
+    still confirms attribution at log time).
   - _Decision:_ ____
 
-- **D3 — "All shots" affordance placement.** Leading chip in `PlayerSelectorStrip` vs. a
-  separate toggle above the court.
-  - _Recommended:_ leading **"All"** chip in the strip (one control surface; matches the
-    `onSelectAll`/`allActive` props in Task 2).
+- **D3 — [CHANGED] Recording while "All" is selected.** Previously "review-only / disable
+  taps." With the popup confirming the player, recording is now safe in any view.
+  - _Recommended:_ **allow recording in "All"** — a court tap opens `CourtEventPopup` for
+    `activePlayerId` (shown/confirmable; F6 can switch). "All" changes only the display.
   - _Decision:_ ____
 
-- **D4 — Does selecting "All" change `activePlayerId`?** It's a view overlay, not a shooter.
-  - _Recommended:_ no — leave `activePlayerId` as-is so toggling back resumes recording for
-    the same player (pairs with D2).
+- **D4 — "All" affordance placement.** Leading chip in the sticky `PlayerSelectorStrip` vs.
+  a separate control.
+  - _Recommended:_ leading **"All"** chip in the sticky strip.
   - _Decision:_ ____
 
-- **D5 — Team-chip dual semantics.** Selecting a team pseudo-player both **records to that
-  pseudo-player** and **shows that side's union**. (Umbrella Q2.)
-  - _Recommended:_ combined (record-to-team + show side union). Revisit a record-vs-view
-    split only if users ask.
+- **D5 — Does selecting "All" change `activePlayerId`?**
+  - _Recommended:_ **no** — "All" is a display overlay; the last active player stays the
+    recording target so a tap-to-log still works.
+  - _Decision:_ ____
+
+- **D6 — Team-chip dual semantics.** A team chip **records to that pseudo-player** and
+  **shows that side's union**. (Umbrella Q2.)
+  - _Recommended:_ combined.
   - _Decision:_ ____
 
 ### B. Visual treatment
 
-- **D6 — Marker color-coding per player in team views.** (Umbrella Q3.)
-  - _Recommended:_ v1 uniform made(green)/missed(red); per-player color + legend is a
-    follow-up (data is already player-tagged).
+- **D7 — Per-player marker colors in team views.** (Umbrella Q3.)
+  - _Recommended:_ v1 uniform made/miss; per-player color + legend is a follow-up.
   - _Decision:_ ____
 
-- **D7 — Context label format above the court.** e.g. `Shot chart — #23 Michael Jordan
-  7/15 (47%)` / `… Rebels (team) 22/48 (46%)` / `… All shots 31/70 (44%)`.
-  - _Recommended:_ show selection label + made/attempts + FG% inline as above.
+- **D8 — Context label format.** `Shot chart — {label}  made/att (FG%)` as in §3.3.
+  - _Recommended:_ as stated.
   - _Decision:_ ____
 
-- **D8 — Per-player breakdown in team view.** In addition to the merged court +
-  aggregate `ShootingSummary`, show a small per-player shot/FG% list?
-  - _Recommended:_ v1 no — merged court + aggregate summary only; per-player breakdown is a
-    follow-up.
+- **D9 — Per-player breakdown in team view** (small list alongside the merged court).
+  - _Recommended:_ v1 no — merged court + aggregate summary only; breakdown is a follow-up.
   - _Decision:_ ____
 
-- **D9 — Empty-state copy.** Individual: "No shots for {name}." (read-only) / interactive
-  empty hint when recordable. Team: "No shots recorded for {team} yet." All: existing
-  empty-court copy.
+- **D10 — Empty-state copy** (individual / team / all) per §3.4.
   - _Recommended:_ as stated.
   - _Decision:_ ____
 
 ### C. Consistency across surfaces
 
-- **D10 — Shot-count badge on F1's "Shot Chart" segment label.** Does the badge reflect the
-  **whole-game** total or the **currently filtered** count?
-  - _Recommended:_ whole-game total (a stable game-level indicator), independent of the
-    active filter.
+- **D11 — Any game-level shot-count indicator** (e.g. a small total near the court) reflects
+  the **whole-game** total, while `ShootingSummary` reflects the **filtered** view.
+  - _Recommended:_ as stated (avoid a count that silently changes with the filter).
   - _Decision:_ ____
 
-- **D11 — Game Summary default selection.** The summary chart tab defaults to "All" for
-  whole-game review (vs. mirroring the tracker's last selection).
+- **D12 — Game Summary default selection.** Defaults to "All" for whole-game review.
   - _Recommended:_ "All" in the summary.
   - _Decision:_ ____
 
-### D. Component contract & data edges (depends on F1 D12–D14)
+### D. Component contract & data edges
 
-- **D12 — `ShotChartSelection` shape.** `{ kind: 'all' } | { kind: 'player'; playerId }`,
+- **D13 — `ShotChartSelection` shape.** `{ kind: 'all' } | { kind: 'player'; playerId }`,
   where a team chip is `{ kind: 'player'; playerId: '__team_home__' | '__team_opp__' }`.
-  - _Recommended:_ as stated (team chips reuse the `'player'` kind with the pseudo id).
+  - _Recommended:_ as stated.
   - _Decision:_ ____
 
-- **D13 — Recording-target derivation from selection.** `selection.kind === 'player'
-  ? selection.playerId : null` → individual → that player; team pseudo → pseudo id; all →
-  `null` (no recording, per D2).
-  - _Recommended:_ as stated; the panel disables `onCourtTap` when the target is `null`.
+- **D14 — [CHANGED] Recording target derivation.** The recording target is **always
+  `activePlayerId`** (the popup logs to it), **independent of the view filter** — including
+  in "All" (no longer `null`/disabled). Selecting an individual/team chip updates
+  `activePlayerId`; selecting "All" leaves it unchanged.
+  - _Recommended:_ as stated.
   - _Decision:_ ____
 
-- **D14 — Orphan shots (playerId not on the current roster).** `rosterAlignment` strips
-  these locally on `SET_PLAYERS`, but cloud/summary data may still contain them.
-  `shotsForSelection` excludes them from individual/team views (no id match) and they only
-  appear under "All".
-  - _Recommended:_ accept "orphans show only in All"; do not special-case in v1.
+- **D15 — Orphan shots (playerId not on the current roster).** Excluded from individual/team
+  views (no id match); appear only under "All". (`rosterAlignment` already strips them
+  locally on `SET_PLAYERS`; cloud/summary data may still contain them.)
+  - _Recommended:_ accept "orphans show only in All"; no special-casing in v1.
   - _Decision:_ ____
 
-- **D15 — Selection persistence.** Local UI state; not persisted to `GameState`/cloud;
-  resets per F1 §7 D3 (tracker opens on Stats; selection re-derives from active player).
+- **D16 — [NEW] State ownership / component contract** (replaces the stale "F1 D12–D14"
+  dependency). `activePlayerId` is **global** (`GameState`, via `SET_ACTIVE_PLAYER`); the
+  view filter (`showAll` → `selection`) is **local UI state in `GameTracker`**, not
+  persisted; `ShotChartPanel` receives the derived `selection` and (for F3) optional
+  `shotsOverride` / `readOnly`.
+  - _Recommended:_ as stated.
+  - _Decision:_ ____
+
+- **D17 — Selection persistence.** View filter is local UI state; not persisted to
+  `GameState`/cloud; re-derives from `activePlayerId` on load (no Stats/Chart tab exists —
+  the page is single-scroll per F1 D1).
   - _Recommended:_ as stated.
   - _Decision:_ ____
 
 ### E. Acceptance criteria & regression
 
-- **D16 — Acceptance criteria.** e.g. "Selecting an individual shows only their markers and
+- **D18 — Acceptance criteria.** "Selecting an individual shows only their markers and
   zone%; selecting a team shows that side's union and **never** the other side; 'All' shows
-  every shot and (per D2) disables recording; recording while a player/team chip is selected
-  attributes the new shot to that chip and it appears immediately in the filtered view; the
-  Game Summary chart tab filters identically."
+  every shot **and still records** to the active player via the popup; selecting a chip
+  updates both the view and the recording target; the Game Summary chart tab filters
+  identically."
   - _Decision (add/adjust):_ ____
 
-- **D17 — Unit + manual coverage.** Unit: the `shotsForSelection`/`sideOf` matrix (Task 1).
+- **D19 — Unit + manual coverage.** Unit: the `shotsForSelection`/`sideOf` matrix (Task 1).
   Manual: the multi-player matrix in §5 on both the tracker and the summary.
   - _Decision (add/adjust):_ ____
 
 ### F. Explicitly out of F2
 Cloud/multi-recorder aggregation (**F3**); per-player marker colors + legend; per-player
-breakdown panel; season/career heatmaps. D12–D14 above must stay consistent with F3's
-review path (which supplies a different source array but the **same** `selection`).
+breakdown panel; season/career heatmaps. D13–D17 must stay consistent with F3's review path
+(which supplies a different source array — `shotsOverride` — but the **same** `selection`).
