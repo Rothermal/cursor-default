@@ -12,6 +12,7 @@ export function buildGameSyncFingerprint(state: GameState): string {
     homeTeamScore: state.homeTeamScore,
     homeScoreAdjustment: state.homeScoreAdjustment,
     notes: state.notes,
+    currentPeriod: state.currentPeriod,
     teamStatsConfig: state.teamStatsConfig,
     shotChart: state.shotChart,
     players: state.players.map(player => ({
@@ -41,6 +42,32 @@ export function withLastSyncedGameFingerprint(state: GameState): GameState {
  * When true, automatic "resume latest cloud game" hydration must not replace `state` — local
  * progress is ahead of the last known synced snapshot, or the durable pending-sync flag is set.
  */
+/**
+ * `currentPeriod` is not stored in the cloud games row; preserve it from local state when
+ * hydrating the same active game (e.g. after reload).
+ */
+export function currentPeriodForCloudHydrate(
+  localState: GameState,
+  targetGameId: string | null | undefined
+): number {
+  if (
+    targetGameId &&
+    localState.cloudSync.gameId === targetGameId &&
+    typeof localState.currentPeriod === 'number' &&
+    localState.currentPeriod >= 1
+  ) {
+    return Math.floor(localState.currentPeriod)
+  }
+  return 1
+}
+
+/**
+ * Block manual "open game" hydration when local progress would be silently overwritten.
+ */
+export function shouldBlockManualCloudHydrate(state: GameState, pendingDurable: boolean): boolean {
+  return shouldDeferCloudResumeHydration(state, pendingDurable)
+}
+
 export function shouldDeferCloudResumeHydration(state: GameState, pendingDurable: boolean): boolean {
   const cs = state.cloudSync
   return Boolean(

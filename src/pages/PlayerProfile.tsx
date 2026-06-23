@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
-import { withLastSyncedGameFingerprint } from '../lib/gameSyncFingerprint'
+import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import type { GameState } from '../types'
 import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
@@ -67,7 +68,7 @@ export default function PlayerProfile() {
   const seasonIdFromUrl = searchParams.get('seasonId')
 
   const { user, isConfigured } = useAuth()
-  const { dispatch } = useGame()
+  const { state, dispatch } = useGame()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -257,6 +258,11 @@ export default function PlayerProfile() {
 
   const handleViewGame = async (gameId: string) => {
     if (!user) return
+    if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
+      setError('Finish syncing your current game before opening another.')
+      setLoadingGameId(null)
+      return
+    }
     setError(null)
     setLoadingGameId(gameId)
 
@@ -282,7 +288,7 @@ export default function PlayerProfile() {
       homeTeamScore: cloudGame.homeTeamScore,
       homeScoreAdjustment: cloudGame.homeScoreAdjustment,
       notes: cloudGame.notes,
-      currentPeriod: 1,
+      currentPeriod: currentPeriodForCloudHydrate(state, cloudGame.gameId),
       teamStatsConfig: cloudGame.teamStatsConfig ?? null,
       actionLog: [],
       shotChart: cloudGame.shotChart ?? [],

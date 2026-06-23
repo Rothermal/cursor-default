@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState } from '../types'
 import {
   buildGameSyncFingerprint,
+  currentPeriodForCloudHydrate,
   shouldDeferCloudResumeHydration,
   withLastSyncedGameFingerprint,
 } from './gameSyncFingerprint'
@@ -89,5 +90,20 @@ describe('gameSyncFingerprint', () => {
       cloudSync: { ...baseState().cloudSync, gameId: null, lastSyncedGameFingerprint: 'x' },
     })
     expect(shouldDeferCloudResumeHydration(s, false)).toBe(true)
+  })
+
+  it('defers when current period changed since last sync', () => {
+    const synced = withLastSyncedGameFingerprint(baseState({ currentPeriod: 1 }))
+    const advanced = baseState({
+      currentPeriod: 2,
+      cloudSync: { ...synced.cloudSync },
+    })
+    expect(shouldDeferCloudResumeHydration(advanced, false)).toBe(true)
+  })
+
+  it('currentPeriodForCloudHydrate preserves period for same game id', () => {
+    const local = baseState({ currentPeriod: 3 })
+    expect(currentPeriodForCloudHydrate(local, 'g1')).toBe(3)
+    expect(currentPeriodForCloudHydrate(local, 'other')).toBe(1)
   })
 })

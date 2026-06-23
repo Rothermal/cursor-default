@@ -4,6 +4,14 @@ export const GAME_STORAGE_KEY = 'statkeeper_game'
 export const GAME_OWNER_KEY = 'statkeeper_game_owner'
 export const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 
+export function getPendingSyncFlag(): boolean {
+  try {
+    return localStorage.getItem(PENDING_SYNC_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function clearPersistedGameStorage(): void {
   try {
     localStorage.removeItem(GAME_STORAGE_KEY)

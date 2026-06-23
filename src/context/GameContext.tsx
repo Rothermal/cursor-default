@@ -33,6 +33,7 @@ import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import {
   buildGameSyncFingerprint,
+  currentPeriodForCloudHydrate,
   shouldDeferCloudResumeHydration,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
@@ -40,6 +41,7 @@ import {
 import {
   GAME_OWNER_KEY,
   GAME_STORAGE_KEY,
+  getPendingSyncFlag,
   PENDING_SYNC_KEY,
 } from '../lib/gameStorageKeys'
 
@@ -48,14 +50,6 @@ export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
 /** One row per user+message: persisted `cloudSync.lastError` uploaded to `client_sync_errors`. */
 const SYNC_LAST_ERROR_BACKFILL_PREFIX = 'statkeeper_sync_err_backfill:'
-
-function getPendingSyncFlag(): boolean {
-  try {
-    return localStorage.getItem(PENDING_SYNC_KEY) === '1'
-  } catch {
-    return false
-  }
-}
 
 function setPendingSyncFlag(pending: boolean): void {
   try {
@@ -282,7 +276,8 @@ function canHydrateAsActiveGame(status: string): boolean {
 }
 
 function buildHydratedStateFromCloudGame(
-  cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>>
+  cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>>,
+  localState?: GameState
 ): GameState | null {
   if (!cloudGame) return null
   const sport = sports.find(item => item.id === cloudGame.sportId)
@@ -297,7 +292,9 @@ function buildHydratedStateFromCloudGame(
     homeTeamScore: cloudGame.homeTeamScore,
     homeScoreAdjustment: cloudGame.homeScoreAdjustment,
     notes: cloudGame.notes,
-    currentPeriod: 1,
+    currentPeriod: localState
+      ? currentPeriodForCloudHydrate(localState, cloudGame.gameId)
+      : 1,
     teamStatsConfig: cloudGame.teamStatsConfig,
     actionLog: [],
     shotChart: cloudGame.shotChart ?? [],
@@ -826,7 +823,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
         if (cancelled) return
 
-        const nextState = buildHydratedStateFromCloudGame(cloudGame)
+        const nextState = buildHydratedStateFromCloudGame(cloudGame, stateRef.current)
         if (!nextState) {
           // `null` from API: nothing to resume. Non-null `cloudGame` but null state (e.g. unknown sport):
           // do not mark hydrated — a later retry may succeed if data changes.
@@ -965,7 +962,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
             lastSyncedAt: synced.syncedAt,
             lastError: null,
             shotChartHydrationDroppedRows:
-              synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
+              synced.shotChartCloudSync === 'synced'
+                ? 0
+                : snapshot.cloudSync.shotChartHydrationDroppedRows,
             lastSyncedGameFingerprint: buildGameSyncFingerprint(snapshot),
           },
         })

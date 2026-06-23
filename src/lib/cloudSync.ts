@@ -11,6 +11,8 @@ interface SyncGameSnapshotInput {
 
 export type ShotChartCloudSyncMode =
   | 'synced'
+  /** Upsert-only path after incomplete hydration; must not clear `shotChartHydrationDroppedRows`. */
+  | 'synced_upsert_only'
   | 'skipped_incomplete_hydration'
   /** Local chart has rows but none map to a cloud `player_id`; never run a full-table delete in that case. */
   | 'skipped_unmappable_shots'
@@ -734,11 +736,11 @@ export async function syncShotChartToCloud(
       .upsert(rows, { onConflict: 'game_id,recorded_by,client_shot_id' })
     if (upsertError) {
       if (isMissingShotChartTableError(upsertError)) {
-        return 'synced'
+        return 'synced_upsert_only'
       }
       throw new Error(`Shot chart sync (upsert) failed: ${upsertError.message}`)
     }
-    return 'synced'
+    return 'synced_upsert_only'
   }
 
   // When some local shots have no cloud `player_id` (e.g. roster replaced before we
