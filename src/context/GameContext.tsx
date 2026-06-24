@@ -965,7 +965,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
             lastSyncedAt: synced.syncedAt,
             lastError: null,
             shotChartHydrationDroppedRows:
-              synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
+              synced.shotChartCloudSync === 'synced'
+                ? 0
+                : snapshot.cloudSync.shotChartHydrationDroppedRows,
             lastSyncedGameFingerprint: buildGameSyncFingerprint(snapshot),
           },
         })
