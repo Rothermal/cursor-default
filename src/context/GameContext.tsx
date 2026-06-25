@@ -33,6 +33,7 @@ import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import {
   buildGameSyncFingerprint,
+  currentPeriodForCloudHydrate,
   shouldDeferCloudResumeHydration,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
@@ -41,6 +42,8 @@ import {
   GAME_OWNER_KEY,
   GAME_STORAGE_KEY,
   PENDING_SYNC_KEY,
+  getPendingSyncFlag,
+  setPendingSyncFlag,
 } from '../lib/gameStorageKeys'
 
 export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
@@ -48,26 +51,6 @@ export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
 /** One row per user+message: persisted `cloudSync.lastError` uploaded to `client_sync_errors`. */
 const SYNC_LAST_ERROR_BACKFILL_PREFIX = 'statkeeper_sync_err_backfill:'
-
-function getPendingSyncFlag(): boolean {
-  try {
-    return localStorage.getItem(PENDING_SYNC_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function setPendingSyncFlag(pending: boolean): void {
-  try {
-    if (pending) {
-      localStorage.setItem(PENDING_SYNC_KEY, '1')
-    } else {
-      localStorage.removeItem(PENDING_SYNC_KEY)
-    }
-  } catch {
-    // ignore
-  }
-}
 
 const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
   'offline',
@@ -282,7 +265,8 @@ function canHydrateAsActiveGame(status: string): boolean {
 }
 
 function buildHydratedStateFromCloudGame(
-  cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>>
+  cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>>,
+  localState?: GameState
 ): GameState | null {
   if (!cloudGame) return null
   const sport = sports.find(item => item.id === cloudGame.sportId)
@@ -297,7 +281,9 @@ function buildHydratedStateFromCloudGame(
     homeTeamScore: cloudGame.homeTeamScore,
     homeScoreAdjustment: cloudGame.homeScoreAdjustment,
     notes: cloudGame.notes,
-    currentPeriod: 1,
+    currentPeriod: localState
+      ? currentPeriodForCloudHydrate(localState, cloudGame.gameId)
+      : 1,
     teamStatsConfig: cloudGame.teamStatsConfig,
     actionLog: [],
     shotChart: cloudGame.shotChart ?? [],
@@ -702,9 +688,13 @@ function loadState(userId: string | null): GameState {
 interface GameContextType {
   state: GameState
   dispatch: React.Dispatch<GameAction>
-  /** Trigger an immediate cloud sync (e.g. when leaving Game Tracker). */
-  flushCloudSync: () => void
+  /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
+  flushCloudSync: () => Promise<FlushCloudSyncResult>
 }
+
+export type FlushCloudSyncResult =
+  | { ok: true }
+  | { ok: false; reason: string }
 
 const GameContext = createContext<GameContextType | null>(null)
 
@@ -826,7 +816,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
         if (cancelled) return
 
-        const nextState = buildHydratedStateFromCloudGame(cloudGame)
+        const nextState = buildHydratedStateFromCloudGame(cloudGame, stateRef.current)
         if (!nextState) {
           // `null` from API: nothing to resume. Non-null `cloudGame` but null state (e.g. unknown sport):
           // do not mark hydrated — a later retry may succeed if data changes.
@@ -1008,13 +998,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, isOnline, userId])
 
-  const flushCloudSync = useCallback(() => {
+  const flushCloudSync = useCallback(async (): Promise<FlushCloudSyncResult> => {
     if (debounceTimerRef.current !== null) {
       window.clearTimeout(debounceTimerRef.current)
       debounceTimerRef.current = null
     }
-    void runCloudSync()
-  }, [runCloudSync])
+    await runCloudSync()
+    const s = stateRef.current
+    if (s.cloudSync.status === 'error') {
+      return { ok: false, reason: s.cloudSync.lastError ?? 'Cloud sync failed' }
+    }
+    if (!isOnline || s.cloudSync.status === 'offline') {
+      return { ok: false, reason: 'Offline — connect to sync before continuing' }
+    }
+    if (getPendingSyncFlag() || shouldDeferCloudResumeHydration(s, getPendingSyncFlag())) {
+      return { ok: false, reason: 'Latest changes could not be synced. Try again.' }
+    }
+    return { ok: true }
+  }, [isOnline, runCloudSync])
 
   const syncFingerprint = buildGameSyncFingerprint(state)
   const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
