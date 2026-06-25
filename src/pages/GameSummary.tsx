@@ -32,7 +32,7 @@ type CheckoutsByPlayerMap = Record<string, CheckoutOption[]>
 
 export default function GameSummary() {
   const navigate = useNavigate()
-  const { state, dispatch } = useGame()
+  const { state, dispatch, flushCloudSync } = useGame()
   const { user, isConfigured } = useAuth()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, shotChart } = state
   const [finalizing, setFinalizing] = useState(false)
@@ -570,6 +570,13 @@ export default function GameSummary() {
     if (!canFinalizeCloudGame || !state.cloudSync.gameId) return
     setFinalizeError(null)
     setFinalizing(true)
+
+    const syncResult = await flushCloudSync()
+    if (!syncResult.ok) {
+      setFinalizing(false)
+      setFinalizeError(syncResult.reason)
+      return
+    }
 
     const initial = await supabase!
       .from('games')
