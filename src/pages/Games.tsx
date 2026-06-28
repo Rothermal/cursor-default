@@ -250,6 +250,7 @@ export default function Games() {
         lastSyncedAt: cloudGame.hydratedAt,
         lastError: null,
         shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
+        shotChartClearedLocally: false,
         lastSyncedGameFingerprint: null,
       },
     }

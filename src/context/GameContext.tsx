@@ -34,6 +34,7 @@ import { getDisplayedHomeScore } from '../lib/gameScore'
 import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
+  localSyncedGameIdForHydrate,
   shouldDeferCloudResumeHydration,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
@@ -72,6 +73,7 @@ function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyn
     lastError: null,
     lastSyncedGameFingerprint: null,
     shotChartHydrationDroppedRows: 0,
+    shotChartClearedLocally: false,
   }
 }
 
@@ -146,6 +148,7 @@ function clearEntireShotChart(state: GameState): GameState {
     cloudSync: {
       ...state.cloudSync,
       shotChartHydrationDroppedRows: 0,
+      shotChartClearedLocally: true,
     },
   }
 }
@@ -298,6 +301,7 @@ function buildHydratedStateFromCloudGame(
       status: 'synced',
       lastError: null,
       shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
+      shotChartClearedLocally: false,
     },
   })
 }
@@ -324,6 +328,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 lastSyncedAt: null,
                 lastSyncedGameFingerprint: null,
                 shotChartHydrationDroppedRows: 0,
+                shotChartClearedLocally: false,
               }
             : state.cloudSync,
       }
@@ -368,6 +373,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             typeof cs.shotChartHydrationDroppedRows === 'number'
               ? Math.max(0, Math.floor(cs.shotChartHydrationDroppedRows))
               : 0,
+          shotChartClearedLocally: cs.shotChartClearedLocally === true,
         },
       }
     }
@@ -415,6 +421,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             : p
         ),
         actionLog: [...state.actionLog, logEntry],
+        cloudSync: {
+          ...state.cloudSync,
+          shotChartClearedLocally: false,
+        },
       }
     }
 
@@ -671,6 +681,7 @@ function loadState(userId: string | null): GameState {
             typeof parsed.cloudSync?.shotChartHydrationDroppedRows === 'number'
               ? Math.max(0, Math.floor(parsed.cloudSync.shotChartHydrationDroppedRows))
               : 0,
+          shotChartClearedLocally: parsed.cloudSync?.shotChartClearedLocally === true,
           lastSyncedGameFingerprint:
             typeof parsed.cloudSync?.lastSyncedGameFingerprint === 'string'
               ? parsed.cloudSync.lastSyncedGameFingerprint
@@ -802,16 +813,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const fingerprintBeforeFetch = buildGameSyncFingerprint(stateRef.current)
 
       try {
+        const localSyncedGameId = localSyncedGameIdForHydrate(stateRef.current)
         const preferredGameId = getResumeTarget(userId)
-        const latestCloudGame = await loadLatestCloudGame(userId)
-        let cloudGame = latestCloudGame
+        let cloudGame = localSyncedGameId
+          ? await loadCloudGameById(userId, localSyncedGameId)
+          : null
 
-        if (preferredGameId && getLastOpenedPreferenceSupport() === 'missing') {
-          const preferredCloudGame = await loadCloudGameById(userId, preferredGameId)
-          if (preferredCloudGame && canHydrateAsActiveGame(preferredCloudGame.status)) {
-            cloudGame = preferredCloudGame
-          } else {
-            setResumeTarget(userId, null)
+        if (!cloudGame) {
+          cloudGame = await loadLatestCloudGame(userId)
+          if (preferredGameId && getLastOpenedPreferenceSupport() === 'missing') {
+            const preferredCloudGame = await loadCloudGameById(userId, preferredGameId)
+            if (preferredCloudGame && canHydrateAsActiveGame(preferredCloudGame.status)) {
+              cloudGame = preferredCloudGame
+            } else {
+              setResumeTarget(userId, null)
+            }
           }
         }
         if (cancelled) return
@@ -956,6 +972,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
             lastError: null,
             shotChartHydrationDroppedRows:
               synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
+            shotChartClearedLocally:
+              synced.shotChartCloudSync === 'synced' && snapshot.shotChart.length === 0
+                ? false
+                : snapshot.cloudSync.shotChartClearedLocally,
             lastSyncedGameFingerprint: buildGameSyncFingerprint(snapshot),
           },
         })

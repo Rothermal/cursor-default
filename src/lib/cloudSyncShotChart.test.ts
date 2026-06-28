@@ -55,6 +55,7 @@ function basketballState(overrides: Partial<GameState> = {}): GameState {
       lastSyncedAt: null,
       lastError: null,
       shotChartHydrationDroppedRows: 0,
+      shotChartClearedLocally: false,
       lastSyncedGameFingerprint: null,
     },
     ...overrides,
@@ -102,5 +103,39 @@ describe('syncShotChartToCloud', () => {
     expect(mode).toBe('synced_partial')
     expect(upsertMock).toHaveBeenCalled()
     expect(deleteMock).not.toHaveBeenCalled()
+  })
+
+  it('does not delete cloud rows when local chart is empty without explicit user clear', async () => {
+    const state = basketballState({
+      shotChart: [],
+      cloudSync: {
+        ...basketballState().cloudSync,
+        shotChartClearedLocally: false,
+      },
+    })
+
+    const mode = await syncShotChartToCloud(state, 'user-1', 'game-1', {
+      'local-1': '00000000-0000-4000-8000-000000000001',
+    })
+
+    expect(mode).toBe('synced')
+    expect(deleteMock).not.toHaveBeenCalled()
+  })
+
+  it('deletes cloud rows when user explicitly cleared the local chart', async () => {
+    const state = basketballState({
+      shotChart: [],
+      cloudSync: {
+        ...basketballState().cloudSync,
+        shotChartClearedLocally: true,
+      },
+    })
+
+    const mode = await syncShotChartToCloud(state, 'user-1', 'game-1', {
+      'local-1': '00000000-0000-4000-8000-000000000001',
+    })
+
+    expect(mode).toBe('synced')
+    expect(deleteMock).toHaveBeenCalled()
   })
 })
