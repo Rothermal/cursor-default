@@ -185,6 +185,12 @@ export interface CloudSyncState {
    * cloud rows while this is positive and local `shotChart` is empty.
    */
   shotChartHydrationDroppedRows: number
+  /**
+   * Set when the user clears the shot chart locally (`CLEAR_SHOT_CHART`). Allows sync to delete
+   * cloud rows for an empty chart; without this, stale tabs with `shotChart: []` must not run
+   * delete+replace and wipe shots recorded in another tab.
+   */
+  shotChartClearedLocally: boolean
 }
 
 export type GameAction =

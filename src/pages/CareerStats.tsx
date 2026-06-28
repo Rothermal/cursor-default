@@ -303,6 +303,7 @@ export default function CareerStats() {
           lastSyncedAt: cloudGame.hydratedAt,
           lastError: null,
           shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
+          shotChartClearedLocally: false,
           lastSyncedGameFingerprint: null,
         },
       }

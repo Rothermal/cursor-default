@@ -758,6 +758,11 @@ export async function syncShotChartToCloud(
     return 'skipped_incomplete_hydration'
   }
 
+  // Empty local chart without an explicit user clear (e.g. stale tab) must not delete cloud rows.
+  if (state.shotChart.length === 0 && !state.cloudSync.shotChartClearedLocally) {
+    return 'synced'
+  }
+
   const { error: delError } = await supabase
     .from('shot_chart')
     .delete()

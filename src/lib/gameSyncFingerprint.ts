@@ -63,6 +63,21 @@ export function shouldBlockManualCloudHydrate(state: GameState, pendingDurable: 
 }
 
 /**
+ * When local state matches the last synced fingerprint for a known `gameId`, auto-resume should
+ * hydrate that game — not whichever game has the newest `last_opened_at` in the cloud.
+ */
+export function localSyncedGameIdForHydrate(state: GameState): string | null {
+  const cs = state.cloudSync
+  if (!cs.gameId || cs.lastSyncedGameFingerprint == null) {
+    return null
+  }
+  if (buildGameSyncFingerprint(state) !== cs.lastSyncedGameFingerprint) {
+    return null
+  }
+  return cs.gameId
+}
+
+/**
  * When true, automatic "resume latest cloud game" hydration must not replace `state` — local
  * progress is ahead of the last known synced snapshot, or the durable pending-sync flag is set.
  */

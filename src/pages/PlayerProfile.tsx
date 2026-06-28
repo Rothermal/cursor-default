@@ -301,6 +301,7 @@ export default function PlayerProfile() {
         lastSyncedAt: cloudGame.hydratedAt,
         lastError: null,
         shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
+        shotChartClearedLocally: false,
         lastSyncedGameFingerprint: null,
       },
     }
