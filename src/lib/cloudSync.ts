@@ -572,13 +572,18 @@ async function ensurePlayerId(
     return remoteId
   }
 
-  const { data: existingOnTeam, error: junctionLookupError } = await supabase
+  let junctionQuery = supabase
     .from('team_players')
-    .select('player_id, players!inner(id, first_name, last_name)')
+    .select('player_id, jersey_number, players!inner(id, first_name, last_name)')
     .eq('team_id', teamId)
     .eq('players.first_name', firstName)
     .eq('players.last_name', lastName)
-    .limit(1)
+
+  if (jerseyNumber) {
+    junctionQuery = junctionQuery.eq('jersey_number', jerseyNumber)
+  }
+
+  const { data: existingOnTeam, error: junctionLookupError } = await junctionQuery.limit(1)
 
   if (!junctionLookupError && existingOnTeam && existingOnTeam.length > 0) {
     const playerId = (existingOnTeam[0] as { player_id: string }).player_id

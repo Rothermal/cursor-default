@@ -3,6 +3,7 @@ import type { GameState } from '../types'
 import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
+  localSyncedGameIdForHydrate,
   shouldDeferCloudResumeHydration,
   withLastSyncedGameFingerprint,
 } from './gameSyncFingerprint'
@@ -105,5 +106,26 @@ describe('gameSyncFingerprint', () => {
     const local = baseState({ currentPeriod: 3 })
     expect(currentPeriodForCloudHydrate(local, 'g1')).toBe(3)
     expect(currentPeriodForCloudHydrate(local, 'other')).toBe(1)
+  })
+
+  it('localSyncedGameIdForHydrate returns game id when fingerprint matches', () => {
+    const synced = withLastSyncedGameFingerprint(baseState())
+    expect(localSyncedGameIdForHydrate(synced)).toBe('g1')
+  })
+
+  it('localSyncedGameIdForHydrate returns null when local edits are unsynced', () => {
+    const syncedFp = buildGameSyncFingerprint(baseState())
+    const edited = baseState({
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { pts: 9 } }],
+      cloudSync: { ...baseState().cloudSync, lastSyncedGameFingerprint: syncedFp },
+    })
+    expect(localSyncedGameIdForHydrate(edited)).toBeNull()
+  })
+
+  it('localSyncedGameIdForHydrate returns null without cloud game id', () => {
+    const s = baseState({
+      cloudSync: { ...baseState().cloudSync, gameId: null },
+    })
+    expect(localSyncedGameIdForHydrate(withLastSyncedGameFingerprint(s))).toBeNull()
   })
 })

@@ -340,17 +340,23 @@ export default function GameSetup() {
           ? selectedNewTeamSeasonId
           : null
 
+    const preserveCloudGame =
+      Boolean(state.cloudSync.gameId) &&
+      state.cloudSync.teamId === (teamMode === 'existing' ? selectedTeamId || null : null)
+
     dispatch({
       type: 'SET_CLOUD_SYNC_STATE',
       cloudSync: {
         seasonId: resolvedSeasonIdForSync,
         teamId: teamMode === 'existing' ? selectedTeamId || null : null,
-        gameId: null,
-        gameStatus: null,
-        playerIdMap: {},
-        lastSyncedAt: null,
+        gameId: preserveCloudGame ? state.cloudSync.gameId : null,
+        gameStatus: preserveCloudGame ? state.cloudSync.gameStatus : null,
+        playerIdMap: preserveCloudGame ? state.cloudSync.playerIdMap : {},
+        lastSyncedAt: preserveCloudGame ? state.cloudSync.lastSyncedAt : null,
         lastError: null,
-        lastSyncedGameFingerprint: null,
+        lastSyncedGameFingerprint: preserveCloudGame
+          ? state.cloudSync.lastSyncedGameFingerprint
+          : null,
       },
     })
     dispatch({

@@ -34,6 +34,7 @@ import { getDisplayedHomeScore } from '../lib/gameScore'
 import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
+  localSyncedGameIdForHydrate,
   shouldDeferCloudResumeHydration,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
@@ -802,16 +803,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const fingerprintBeforeFetch = buildGameSyncFingerprint(stateRef.current)
 
       try {
-        const preferredGameId = getResumeTarget(userId)
-        const latestCloudGame = await loadLatestCloudGame(userId)
-        let cloudGame = latestCloudGame
+        const localSyncedGameId = localSyncedGameIdForHydrate(stateRef.current)
+        let cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>> = null
 
-        if (preferredGameId && getLastOpenedPreferenceSupport() === 'missing') {
-          const preferredCloudGame = await loadCloudGameById(userId, preferredGameId)
-          if (preferredCloudGame && canHydrateAsActiveGame(preferredCloudGame.status)) {
-            cloudGame = preferredCloudGame
-          } else {
-            setResumeTarget(userId, null)
+        if (localSyncedGameId) {
+          cloudGame = await loadCloudGameById(userId, localSyncedGameId)
+        } else {
+          const preferredGameId = getResumeTarget(userId)
+          cloudGame = await loadLatestCloudGame(userId)
+
+          if (preferredGameId && getLastOpenedPreferenceSupport() === 'missing') {
+            const preferredCloudGame = await loadCloudGameById(userId, preferredGameId)
+            if (preferredCloudGame && canHydrateAsActiveGame(preferredCloudGame.status)) {
+              cloudGame = preferredCloudGame
+            } else {
+              setResumeTarget(userId, null)
+            }
           }
         }
         if (cancelled) return
