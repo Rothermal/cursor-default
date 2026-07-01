@@ -57,6 +57,22 @@ export function currentPeriodForCloudHydrate(
   return 1
 }
 
+/**
+ * When local state matches the last synced fingerprint, resume that specific cloud game
+ * instead of `loadLatestCloudGame` (which follows `last_opened_at` and may be a different game).
+ */
+export function localSyncedGameIdForHydrate(state: GameState): string | null {
+  const cs = state.cloudSync
+  if (
+    !cs.gameId ||
+    cs.lastSyncedGameFingerprint == null ||
+    buildGameSyncFingerprint(state) !== cs.lastSyncedGameFingerprint
+  ) {
+    return null
+  }
+  return cs.gameId
+}
+
 /** Block manual "open game" hydration when local progress would be silently overwritten. */
 export function shouldBlockManualCloudHydrate(state: GameState, pendingDurable: boolean): boolean {
   return shouldDeferCloudResumeHydration(state, pendingDurable)
