@@ -4,6 +4,7 @@ import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
   shouldDeferCloudResumeHydration,
+  shouldRejectSkippedFinalSync,
   withLastSyncedGameFingerprint,
 } from './gameSyncFingerprint'
 
@@ -105,5 +106,26 @@ describe('gameSyncFingerprint', () => {
     const local = baseState({ currentPeriod: 3 })
     expect(currentPeriodForCloudHydrate(local, 'g1')).toBe(3)
     expect(currentPeriodForCloudHydrate(local, 'other')).toBe(1)
+  })
+
+  it('shouldRejectSkippedFinalSync when local stats differ from last synced fingerprint', () => {
+    const syncedFp = buildGameSyncFingerprint(baseState())
+    const edited = baseState({
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { pts: 9 } }],
+      cloudSync: {
+        ...baseState().cloudSync,
+        lastSyncedGameFingerprint: syncedFp,
+      },
+    })
+    expect(shouldRejectSkippedFinalSync(edited, false)).toBe(true)
+  })
+
+  it('shouldRejectSkippedFinalSync is false when local matches last synced fingerprint', () => {
+    const s0 = baseState()
+    const fp = buildGameSyncFingerprint(s0)
+    const s = baseState({
+      cloudSync: { ...s0.cloudSync, lastSyncedGameFingerprint: fp },
+    })
+    expect(shouldRejectSkippedFinalSync(s, false)).toBe(false)
   })
 })

@@ -35,6 +35,7 @@ import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
   shouldDeferCloudResumeHydration,
+  shouldRejectSkippedFinalSync,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
 
@@ -941,6 +942,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (isStale) {
           queueAnotherSyncRef.current = true
           continue
+        }
+
+        // Cloud row is already `final` — syncGameSnapshotToCloud skips all writes. Do not mark
+        // success or advance the fingerprint when local stats are still ahead of the last sync;
+        // otherwise flushCloudSync (e.g. before finalize) returns ok while stats never upload.
+        if (
+          synced.skippedFinalGame &&
+          shouldRejectSkippedFinalSync(snapshot, getPendingSyncFlag())
+        ) {
+          pendingSyncRef.current = true
+          setPendingSyncFlag(true)
+          dispatch({
+            type: 'SET_CLOUD_SYNC_STATE',
+            cloudSync: {
+              status: 'error',
+              lastError:
+                'This game is already finalized in the cloud. Latest stats could not be saved.',
+              gameStatus: 'final',
+            },
+          })
+          break
         }
 
         dispatch({

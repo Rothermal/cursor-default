@@ -77,3 +77,8 @@ export function shouldDeferCloudResumeHydration(state: GameState, pendingDurable
         buildGameSyncFingerprint(state) !== cs.lastSyncedGameFingerprint)
   )
 }
+
+/** True when a skipped-final sync must not be treated as success (local edits not yet uploaded). */
+export function shouldRejectSkippedFinalSync(state: GameState, pendingDurable: boolean): boolean {
+  return shouldDeferCloudResumeHydration(state, pendingDurable)
+}
