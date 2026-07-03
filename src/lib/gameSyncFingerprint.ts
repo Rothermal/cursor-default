@@ -63,6 +63,18 @@ export function shouldBlockManualCloudHydrate(state: GameState, pendingDurable: 
 }
 
 /**
+ * When the cloud game is already `final`, sync is a no-op. Reject treating that as success if
+ * local edits were never uploaded — otherwise flush/finalize reports ok while stats are lost.
+ */
+export function shouldRejectSkippedFinalSync(state: GameState): boolean {
+  const cs = state.cloudSync
+  if (cs.lastSyncedGameFingerprint == null) {
+    return true
+  }
+  return buildGameSyncFingerprint(state) !== cs.lastSyncedGameFingerprint
+}
+
+/**
  * When true, automatic "resume latest cloud game" hydration must not replace `state` — local
  * progress is ahead of the last known synced snapshot, or the durable pending-sync flag is set.
  */

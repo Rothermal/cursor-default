@@ -35,6 +35,7 @@ import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
   shouldDeferCloudResumeHydration,
+  shouldRejectSkippedFinalSync,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
 
@@ -941,6 +942,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (isStale) {
           queueAnotherSyncRef.current = true
           continue
+        }
+
+        if (synced.skippedFinalGame && shouldRejectSkippedFinalSync(snapshot)) {
+          pendingSyncRef.current = true
+          setPendingSyncFlag(true)
+          dispatch({
+            type: 'SET_CLOUD_SYNC_STATE',
+            cloudSync: {
+              gameStatus: 'final',
+              status: 'error',
+              lastError: 'Game was finalized elsewhere. Unsynced stats could not be saved.',
+            },
+          })
+          break
         }
 
         dispatch({
