@@ -8,6 +8,7 @@ import type { BasketballTeamStatsConfig, Player, StatAction, StatCategory } from
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
 import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
+import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
@@ -73,7 +74,6 @@ export default function GameTracker() {
     gameInfo,
     currentPeriod,
     teamStatsConfig,
-    shotChart,
   } = state
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
@@ -216,29 +216,6 @@ export default function GameTracker() {
         </div>
 
         <Scoreboard />
-
-        {sport.id === 'basketball' && (
-          <button
-            type="button"
-            onClick={() => navigate('/shot-chart')}
-            className="relative mt-3 w-full py-3 rounded-xl font-semibold text-white shadow-md active:scale-[0.99] transition-transform
-                       bg-gradient-to-r from-orange-500 to-amber-600 border border-orange-600/30"
-          >
-            <span className="mr-1" aria-hidden>
-              🏀
-            </span>
-            Shot chart
-            {shotChart.length > 0 && (
-              <span
-                className="absolute -top-1.5 -right-1.5 min-w-[1.35rem] h-6 px-1.5 rounded-full bg-white text-orange-700 text-xs font-bold
-                           flex items-center justify-center shadow border border-orange-200"
-                aria-label={`${shotChart.length} shots on chart`}
-              >
-                {shotChart.length > 99 ? '99+' : shotChart.length}
-              </span>
-            )}
-          </button>
-        )}
       </div>
 
       <PlayerSelectorStrip
@@ -247,6 +224,7 @@ export default function GameTracker() {
         onSelectPlayer={playerId => dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })}
         activeBgClass={sport.theme.bg}
         onAddPlayer={() => setShowAddPlayer(!showAddPlayer)}
+        sticky
       />
 
       {showAddPlayer && (
@@ -280,6 +258,12 @@ export default function GameTracker() {
         </div>
       )}
 
+      {sport.id === 'basketball' && (
+        <div className="px-3 py-2 max-w-lg mx-auto w-full">
+          <ShotChartPanel />
+        </div>
+      )}
+
       {showPeriodToggle && teamRules && (
         <div className="px-3 max-w-lg mx-auto w-full">
           <PeriodToggle
@@ -305,7 +289,7 @@ export default function GameTracker() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 pb-20 max-w-lg mx-auto w-full">
+      <div className="px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
           {gridCategories.map(category => {
             const missMap: Record<string, typeof category.actions[0]> = {}
