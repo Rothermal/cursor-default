@@ -162,6 +162,23 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 4f. Per-player / team shot views (F2)
+
+**Precondition:** Basketball game with court shots recorded for 2+ individuals **and** the opponent pseudo-player (via the court popup, §4e).
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4f.1 | Game Tracker → select **#A** (individual chip) | Court shows **only** #A's markers; context label "Shot chart — #A {name}" + #A's made/att (FG%); zone summary matches |
+| 4f.2 | Select **#B** | Only #B's markers/numbers |
+| 4f.3 | Select the **home team** chip (★) | Union of every home-side shot (**all individuals + home pseudo**); **no** opponent markers; label "{team} (team)" |
+| 4f.4 | Select the **opponent** chip (★) | Only opponent pseudo shots |
+| 4f.5 | Tap the leading **All** chip | Every marker shown; label "All shots"; `activePlayerId` unchanged — a court tap still opens the popup for the **last active player** (named in the popup header) and the new shot appears |
+| 4f.6 | While in All view, select a player chip | All view exits; that player becomes both the view and the recording target |
+| 4f.7 | Select a player with no shots | Court shows the tap hint; zone summary shows "No shots for {name}." (team: "No shots recorded for {team} yet.") |
+| 4f.8 | Game Summary → Shot chart tab | Same selector strip (read-only, no `+`); defaults to **All**; switching chips filters the chart + zone numbers identically; selections here do **not** change the tracker's active player |
+
+---
+
 ## 5. Game flow (local state)
 
 **Precondition:** Any mode (offline or signed in).

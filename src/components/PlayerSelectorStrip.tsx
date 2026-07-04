@@ -12,6 +12,10 @@ interface PlayerSelectorStripProps {
   onAddPlayer?: () => void
   /** Pin the strip to the top of the page scroll (single-page Game Tracker). */
   sticky?: boolean
+  /** When provided, renders a leading "All" chip (whole-game shot view, F2). */
+  onSelectAll?: () => void
+  /** Active styling for the "All" chip; player chips render inactive while set. */
+  allActive?: boolean
 }
 
 /**
@@ -25,6 +29,8 @@ export default function PlayerSelectorStrip({
   activeBgClass,
   onAddPlayer,
   sticky = false,
+  onSelectAll,
+  allActive = false,
 }: PlayerSelectorStripProps) {
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
   const teamSelectorCount = selectorPlayers.filter(isTeamPseudoPlayer).length
@@ -32,10 +38,33 @@ export default function PlayerSelectorStrip({
   const strip = (
     <div className="px-3 py-2 max-w-lg mx-auto w-full">
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-stretch">
+        {onSelectAll && (
+          <div className="flex flex-shrink-0 items-stretch gap-2">
+            <button
+              type="button"
+              onClick={onSelectAll}
+              title="Show every shot on the chart"
+              className={`
+                flex-shrink-0 px-3 py-2 rounded-xl text-sm font-semibold
+                transition-all duration-150 active:scale-95
+                ${allActive
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-slate-600 border border-slate-200'
+                }
+              `}
+            >
+              All
+            </button>
+            <div
+              className="w-px self-stretch min-h-[2.5rem] bg-slate-300 shrink-0"
+              aria-hidden
+            />
+          </div>
+        )}
         {selectorPlayers.map((player, index) => {
           const isTeam = isTeamPseudoPlayer(player)
           const showDivider = isTeam && index === teamSelectorCount - 1 && teamSelectorCount > 0
-          const isActive = player.id === activePlayerId
+          const isActive = !allActive && player.id === activePlayerId
 
           return (
             <div key={player.id} className="flex flex-shrink-0 items-stretch gap-2">
