@@ -4,7 +4,7 @@ import BasketballCourt from './BasketballCourt'
 import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
 import { classifyShotZone, isThreePointer } from './courtGeometry'
-import { sortTeamPlayersFirst } from '../PlayerSelectorStrip'
+import { sortTeamPlayersFirst } from '../../lib/teamPlayers'
 import type { ActionLogEntry, Player, ShotRecord } from '../../types'
 
 function newShotId(): string {

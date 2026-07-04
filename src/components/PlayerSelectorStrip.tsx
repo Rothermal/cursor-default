@@ -1,21 +1,6 @@
 import { useMemo } from 'react'
 import type { Player } from '../types'
-import {
-  isTeamPseudoPlayer,
-  TEAM_PLAYER_HOME_ID,
-  TEAM_PLAYER_OPP_ID,
-} from '../lib/teamPlayers'
-
-/** Team pseudo-players (home, opponent) first, then individuals — shared selector order. */
-export function sortTeamPlayersFirst(players: Player[]): Player[] {
-  const teams = players.filter(isTeamPseudoPlayer)
-  const home = teams.find(p => p.id === TEAM_PLAYER_HOME_ID || p.teamSide === 'home')
-  const opp = teams.find(p => p.id === TEAM_PLAYER_OPP_ID || p.teamSide === 'opponent')
-  const restTeam = teams.filter(p => p !== home && p !== opp)
-  const individuals = players.filter(p => !isTeamPseudoPlayer(p))
-  const orderedTeams = [home, opp, ...restTeam].filter(Boolean) as Player[]
-  return [...orderedTeams, ...individuals]
-}
+import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../lib/teamPlayers'
 
 interface PlayerSelectorStripProps {
   players: Player[]
