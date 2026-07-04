@@ -169,7 +169,7 @@ filtering. One tested pure function prevents three subtly different implementati
 
 ### Task 1: View helper + tests (TDD)
 
-- [ ] **Create `src/lib/shotChartViews.test.ts`** with cases:
+- [x] **Create `src/lib/shotChartViews.test.ts`** with cases:
   - `all` → returns the input array unchanged.
   - individual id → only that player's shots.
   - `__team_home__` → union of all individual roster players + home pseudo shots,
@@ -177,48 +177,48 @@ filtering. One tested pure function prevents three subtly different implementati
   - `__team_opp__` → only opponent pseudo shots.
   - unknown id → returns all (defensive).
   - `sideOf`: individual → `'home'`; home pseudo → `'home'`; opp pseudo → `'opponent'`.
-- [ ] Run `pnpm test src/lib/shotChartViews.test.ts`. Expected: FAIL (module missing).
-- [ ] **Create `src/lib/shotChartViews.ts`** implementing `ShotChartSelection`, `sideOf`,
+- [x] Run `pnpm test src/lib/shotChartViews.test.ts`. Expected: FAIL (module missing).
+- [x] **Create `src/lib/shotChartViews.ts`** implementing `ShotChartSelection`, `sideOf`,
   `shotsForSelection` exactly as in §2/§3.1 (import `isTeamPseudoPlayer` from
   `src/lib/teamPlayers.ts`).
-- [ ] Run the test. Expected: PASS.
-- [ ] **Commit:** `feat: add shotChartViews helper for per-player/team shot filtering`
+- [x] Run the test. Expected: PASS.
+- [x] **Commit:** `feat: add shotChartViews helper for per-player/team shot filtering`
 
 ### Task 2: "All" chip in the sticky selector strip
 
-- [ ] **Modify `src/components/PlayerSelectorStrip.tsx`**: add optional props
+- [x] **Modify `src/components/PlayerSelectorStrip.tsx`**: add optional props
   `onSelectAll?: () => void` and `allActive?: boolean`. When `onSelectAll` is set, render a
   leading "All" chip (active styling when `allActive`). Selecting a player chip clears the
   all state via `onSelect`.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass; the tracker strip is unaffected when
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass; the tracker strip is unaffected when
   `onSelectAll` is omitted.
-- [ ] **Commit:** `feat: add optional All chip to PlayerSelectorStrip`
+- [x] **Commit:** `feat: add optional All chip to PlayerSelectorStrip`
 
 ### Task 3: Filter the inline court (F1's `ShotChartPanel`)
 
-- [ ] **Modify `GameTracker.tsx`**: add local `const [showAll, setShowAll] = useState(false)`
+- [x] **Modify `GameTracker.tsx`**: add local `const [showAll, setShowAll] = useState(false)`
   (the view-filter state). Derive `selection = showAll ? { kind: 'all' } :
   { kind: 'player', playerId: activePlayerId }`. Pass `selection` to `ShotChartPanel`.
-- [ ] Wire the sticky `PlayerSelectorStrip`: `onSelectAll={() => setShowAll(true)}`,
+- [x] Wire the sticky `PlayerSelectorStrip`: `onSelectAll={() => setShowAll(true)}`,
   `allActive={showAll}`, `onSelect={id => { setShowAll(false); dispatch SET_ACTIVE_PLAYER }}`.
-- [ ] **Modify `ShotChartPanel.tsx`**: compute `visibleShots = shotsForSelection(shotChart,
+- [x] **Modify `ShotChartPanel.tsx`**: compute `visibleShots = shotsForSelection(shotChart,
   players, selection)` and pass it to `BasketballCourt` and `ShootingSummary`. **Do not**
   disable court taps in any view — a tap always opens `CourtEventPopup` for `activePlayerId`.
-- [ ] Add the context label (§3.3) and empty states (§3.4).
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
-- [ ] **Commit:** `feat: filter inline shot chart by selected player or team`
+- [x] Add the context label (§3.3) and empty states (§3.4).
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] **Commit:** `feat: filter inline shot chart by selected player or team`
 
 ### Task 4: Filter the Game Summary shot chart tab
 
-- [ ] **Modify `src/pages/GameSummary.tsx`**: in the `summaryTab === 'shot_chart'` block,
+- [x] **Modify `src/pages/GameSummary.tsx`**: in the `summaryTab === 'shot_chart'` block,
   add a read-only `PlayerSelectorStrip` (no `onAddPlayer`) + "All" chip with local
   `selection` state; pass `shotsForSelection(shotChart, players, selection)` to
   `BasketballCourt` and `ShootingSummary`.
-- [ ] Default selection = `{ kind: 'all' }` for the summary (whole-game review).
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
-- [ ] Manual: open a game with shots from 2+ players → Summary → Shot chart → switch chips →
+- [x] Default selection = `{ kind: 'all' }` for the summary (whole-game review).
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [ ] Manual (pending user QA): open a game with shots from 2+ players → Summary → Shot chart → switch chips →
   chart + zone numbers filter correctly; "All" shows everything.
-- [ ] **Commit:** `feat: per-player/team filtering in Game Summary shot chart`
+- [x] **Commit:** `feat: per-player/team filtering in Game Summary shot chart`
 
 ## 5. Testing
 
