@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { clearPersistedGameStorage } from '../lib/gameStorageKeys'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import type { User, Session } from '@supabase/supabase-js'
 
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (!supabase) return
+    clearPersistedGameStorage()
     await supabase.auth.signOut()
   }, [])
 

@@ -4,6 +4,7 @@ import {
   useReducer,
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   type ReactNode,
@@ -30,33 +31,27 @@ import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
+import {
+  buildGameSyncFingerprint,
+  currentPeriodForCloudHydrate,
+  shouldDeferCloudResumeHydration,
+  shouldRejectSkippedFinalSync,
+  withLastSyncedGameFingerprint,
+} from '../lib/gameSyncFingerprint'
 
-/** Persisted game state key; clear this when finalizing so the game no longer appears as in progress. */
-export const GAME_STORAGE_KEY = 'statkeeper_game'
+import {
+  GAME_OWNER_KEY,
+  GAME_STORAGE_KEY,
+  PENDING_SYNC_KEY,
+  getPendingSyncFlag,
+  setPendingSyncFlag,
+} from '../lib/gameStorageKeys'
+
+export { GAME_STORAGE_KEY } from '../lib/gameStorageKeys'
+
 const CLOUD_RESUME_TARGETS_KEY = 'statkeeper_cloud_resume_targets'
-const PENDING_SYNC_KEY = 'statkeeper_pending_sync'
 /** One row per user+message: persisted `cloudSync.lastError` uploaded to `client_sync_errors`. */
 const SYNC_LAST_ERROR_BACKFILL_PREFIX = 'statkeeper_sync_err_backfill:'
-
-function getPendingSyncFlag(): boolean {
-  try {
-    return localStorage.getItem(PENDING_SYNC_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function setPendingSyncFlag(pending: boolean): void {
-  try {
-    if (pending) {
-      localStorage.setItem(PENDING_SYNC_KEY, '1')
-    } else {
-      localStorage.removeItem(PENDING_SYNC_KEY)
-    }
-  } catch {
-    // ignore
-  }
-}
 
 const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
   'offline',
@@ -76,6 +71,7 @@ function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyn
     status,
     lastSyncedAt: null,
     lastError: null,
+    lastSyncedGameFingerprint: null,
     shotChartHydrationDroppedRows: 0,
   }
 }
@@ -142,7 +138,17 @@ function clearEntireShotChart(state: GameState): GameState {
   const actionLog = state.actionLog.filter(
     e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
   )
-  return { ...state, shotChart: [], players, actionLog }
+  // User cleared the chart — local is authoritative; allow delete+replace on next sync.
+  return {
+    ...state,
+    shotChart: [],
+    players,
+    actionLog,
+    cloudSync: {
+      ...state.cloudSync,
+      shotChartHydrationDroppedRows: 0,
+    },
+  }
 }
 
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
@@ -193,25 +199,6 @@ function applyUndoLastEntry(state: GameState): GameState | null {
       return newState
   }
   return newState
-}
-
-function buildSyncFingerprint(state: GameState): string {
-  return JSON.stringify({
-    sportId: state.sport?.id ?? null,
-    gameInfo: state.gameInfo,
-    opponentScore: state.opponentScore,
-    homeTeamScore: state.homeTeamScore,
-    homeScoreAdjustment: state.homeScoreAdjustment,
-    notes: state.notes,
-    teamStatsConfig: state.teamStatsConfig,
-    shotChart: state.shotChart,
-    players: state.players.map(player => ({
-      id: player.id,
-      name: player.name,
-      number: player.number,
-      stats: player.stats,
-    })),
-  })
 }
 
 function hasSyncPrereqs(state: GameState, isConfigured: boolean, userId: string | null): boolean {
@@ -279,13 +266,14 @@ function canHydrateAsActiveGame(status: string): boolean {
 }
 
 function buildHydratedStateFromCloudGame(
-  cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>>
+  cloudGame: Awaited<ReturnType<typeof loadLatestCloudGame>>,
+  localState?: GameState
 ): GameState | null {
   if (!cloudGame) return null
   const sport = sports.find(item => item.id === cloudGame.sportId)
   if (!sport) return null
 
-  return {
+  return withLastSyncedGameFingerprint({
     sport,
     gameInfo: cloudGame.gameInfo,
     players: cloudGame.players,
@@ -294,7 +282,9 @@ function buildHydratedStateFromCloudGame(
     homeTeamScore: cloudGame.homeTeamScore,
     homeScoreAdjustment: cloudGame.homeScoreAdjustment,
     notes: cloudGame.notes,
-    currentPeriod: 1,
+    currentPeriod: localState
+      ? currentPeriodForCloudHydrate(localState, cloudGame.gameId)
+      : 1,
     teamStatsConfig: cloudGame.teamStatsConfig,
     actionLog: [],
     shotChart: cloudGame.shotChart ?? [],
@@ -310,7 +300,7 @@ function buildHydratedStateFromCloudGame(
       lastError: null,
       shotChartHydrationDroppedRows: cloudGame.shotChartHydrationDroppedRows ?? 0,
     },
-  }
+  })
 }
 
 function gameReducer(state: GameState, action: GameAction): GameState {
@@ -333,6 +323,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 gameStatus: null,
                 playerIdMap: {},
                 lastSyncedAt: null,
+                lastSyncedGameFingerprint: null,
                 shotChartHydrationDroppedRows: 0,
               }
             : state.cloudSync,
@@ -633,8 +624,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
-function loadState(): GameState {
+function loadState(userId: string | null): GameState {
   try {
+    if (userId) {
+      const owner = localStorage.getItem(GAME_OWNER_KEY)
+      if (owner && owner !== userId) {
+        localStorage.removeItem(GAME_STORAGE_KEY)
+        localStorage.removeItem(PENDING_SYNC_KEY)
+        return createInitialState()
+      }
+    }
+
     const saved = localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
@@ -672,6 +672,10 @@ function loadState(): GameState {
             typeof parsed.cloudSync?.shotChartHydrationDroppedRows === 'number'
               ? Math.max(0, Math.floor(parsed.cloudSync.shotChartHydrationDroppedRows))
               : 0,
+          lastSyncedGameFingerprint:
+            typeof parsed.cloudSync?.lastSyncedGameFingerprint === 'string'
+              ? parsed.cloudSync.lastSyncedGameFingerprint
+              : null,
         },
       }
     }
@@ -685,16 +689,20 @@ function loadState(): GameState {
 interface GameContextType {
   state: GameState
   dispatch: React.Dispatch<GameAction>
-  /** Trigger an immediate cloud sync (e.g. when leaving Game Tracker). */
-  flushCloudSync: () => void
+  /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
+  flushCloudSync: () => Promise<FlushCloudSyncResult>
 }
+
+export type FlushCloudSyncResult =
+  | { ok: true }
+  | { ok: false; reason: string }
 
 const GameContext = createContext<GameContextType | null>(null)
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
-  const [state, dispatch] = useReducer(gameReducer, undefined, loadState)
+  const [state, dispatch] = useReducer(gameReducer, userId, loadState)
   const [isOnline, setIsOnline] = useState(getInitialOnlineState)
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
@@ -705,7 +713,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     stateRef.current = state
   }, [state])
 
@@ -750,7 +758,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    if (userId) {
+      localStorage.setItem(GAME_OWNER_KEY, userId)
+    }
+  }, [state, userId])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -781,22 +792,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
     const hydrateFromCloud = async () => {
-      // Cloud-first: only skip hydration when there is unsynced local progress
-      // (game in progress that has never been synced - no gameId yet).
-      //
-      // Also skip when `statkeeper_pending_sync` is set: that durable flag is written
-      // before unload when we had sync prerequisites but were offline (or hit a
-      // network-class sync failure). Hydration must not run before the effect that
-      // copies that flag into `pendingSyncRef`, otherwise we'd fetch cloud and
-      // overwrite newer local state from localStorage (silent data loss).
-      const hasUnsyncedLocal =
-        stateRef.current.sport &&
-        stateRef.current.gameInfo &&
-        (!stateRef.current.cloudSync.gameId || getPendingSyncFlag())
-      if (hasUnsyncedLocal) {
+      // Skip auto-resume when local progress is not yet reflected in the last synced fingerprint,
+      // when there is no cloud game id yet, or when `statkeeper_pending_sync` is set (offline / network
+      // failure path). Otherwise a cloud fetch can overwrite newer localStorage state (silent data loss).
+      if (shouldDeferCloudResumeHydration(stateRef.current, getPendingSyncFlag())) {
         hydratedUserRef.current = userId
         return
       }
+
+      const fingerprintBeforeFetch = buildGameSyncFingerprint(stateRef.current)
 
       try {
         const preferredGameId = getResumeTarget(userId)
@@ -813,7 +817,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
         if (cancelled) return
 
-        const nextState = buildHydratedStateFromCloudGame(cloudGame)
+        const nextState = buildHydratedStateFromCloudGame(cloudGame, stateRef.current)
         if (!nextState) {
           // `null` from API: nothing to resume. Non-null `cloudGame` but null state (e.g. unknown sport):
           // do not mark hydrated — a later retry may succeed if data changes.
@@ -826,6 +830,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (nextState.cloudSync.gameId && canHydrateAsActiveGame(nextState.cloudSync.gameStatus ?? '')) {
           setResumeTarget(userId, nextState.cloudSync.gameId)
         }
+
+        if (buildGameSyncFingerprint(stateRef.current) !== fingerprintBeforeFetch) {
+          // Local game changed while the cloud fetch was in flight; do not replace it with stale data.
+          hydratedUserRef.current = userId
+          return
+        }
+
         hydratedUserRef.current = userId
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
@@ -897,7 +908,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         queueAnotherSyncRef.current = false
 
         const snapshot = stateRef.current
-        const snapshotFingerprint = buildSyncFingerprint(snapshot)
+        const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
         const snapshotUserId = userId
 
         if (!canSyncState(snapshot, isConfigured, snapshotUserId, isOnline)) {
@@ -927,10 +938,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
           userId: snapshotUserId!,
         })
 
-        const isStale = snapshotFingerprint !== buildSyncFingerprint(stateRef.current)
+        const isStale = snapshotFingerprint !== buildGameSyncFingerprint(stateRef.current)
         if (isStale) {
           queueAnotherSyncRef.current = true
           continue
+        }
+
+        if (synced.skippedFinalGame && shouldRejectSkippedFinalSync(snapshot)) {
+          pendingSyncRef.current = true
+          setPendingSyncFlag(true)
+          dispatch({
+            type: 'SET_CLOUD_SYNC_STATE',
+            cloudSync: {
+              gameStatus: 'final',
+              status: 'error',
+              lastError: 'Game was finalized elsewhere. Unsynced stats could not be saved.',
+            },
+          })
+          break
         }
 
         dispatch({
@@ -946,6 +971,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             lastError: null,
             shotChartHydrationDroppedRows:
               synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
+            lastSyncedGameFingerprint: buildGameSyncFingerprint(snapshot),
           },
         })
         if (snapshotUserId) {
@@ -968,6 +994,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return
       }
       const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
+      pendingSyncRef.current = true
+      setPendingSyncFlag(true)
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {
@@ -983,23 +1011,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, isOnline, userId])
 
-  const flushCloudSync = useCallback(() => {
+  const flushCloudSync = useCallback(async (): Promise<FlushCloudSyncResult> => {
     if (debounceTimerRef.current !== null) {
       window.clearTimeout(debounceTimerRef.current)
       debounceTimerRef.current = null
     }
-    void runCloudSync()
-  }, [runCloudSync])
-
-  const syncFingerprint = buildSyncFingerprint(state)
-  const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
-
-  useEffect(() => {
-    if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
-      pendingSyncRef.current = true
-      setPendingSyncFlag(true)
+    await runCloudSync()
+    const s = stateRef.current
+    if (s.cloudSync.status === 'error') {
+      return { ok: false, reason: s.cloudSync.lastError ?? 'Cloud sync failed' }
     }
-  }, [isConfigured, isOnline, syncFingerprint, userId])
+    if (!isOnline || s.cloudSync.status === 'offline') {
+      return { ok: false, reason: 'Offline — connect to sync before continuing' }
+    }
+    if (getPendingSyncFlag() || shouldDeferCloudResumeHydration(s, getPendingSyncFlag())) {
+      return { ok: false, reason: 'Latest changes could not be synced. Try again.' }
+    }
+    return { ok: true }
+  }, [isOnline, runCloudSync])
+
+  const syncFingerprint = buildGameSyncFingerprint(state)
+  const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
 
   // Restore durable pending-sync flag on load so we sync after reopen when user had been offline
   useEffect(() => {
