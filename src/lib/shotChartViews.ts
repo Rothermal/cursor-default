@@ -19,6 +19,32 @@ export function sideOf(player: Player): 'home' | 'opponent' {
   return 'home'
 }
 
+/** "{view}" part of the context label (§3.3): who the chart is currently showing. */
+export function shotViewLabel(selection: ShotChartSelection, players: Player[]): string {
+  if (selection.kind === 'all') return 'All shots'
+  const target = players.find(p => p.id === selection.playerId)
+  if (!target) return 'All shots'
+  if (isTeamPseudoPlayer(target)) return `${target.name} (team)`
+  return `#${target.number || '?'} ${target.name}`
+}
+
+/** Empty-state copy per view (§3.4 / D10). */
+export function shotViewEmptyCopy(selection: ShotChartSelection, players: Player[]): string {
+  if (selection.kind === 'all') return 'No chart shots recorded.'
+  const target = players.find(p => p.id === selection.playerId)
+  if (!target) return 'No chart shots recorded.'
+  if (isTeamPseudoPlayer(target)) return `No shots recorded for ${target.name} yet.`
+  return `No shots for ${target.name}.`
+}
+
+/** `made/att (FG%)` line for the context label. */
+export function shootingLine(shots: ShotRecord[]): string {
+  const att = shots.length
+  const made = shots.filter(s => s.made).length
+  if (att === 0) return '0/0'
+  return `${made}/${att} (${Math.round((made / att) * 100)}%)`
+}
+
 /** Shots visible under the given selection. Unknown player ids fall back to all (defensive). */
 export function shotsForSelection(
   shots: ShotRecord[],

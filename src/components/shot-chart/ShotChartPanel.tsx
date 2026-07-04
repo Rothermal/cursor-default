@@ -6,7 +6,13 @@ import ConfirmDialog from '../ConfirmDialog'
 import CourtEventPopup, { type CourtEvent } from './CourtEventPopup'
 import { classifyShotZone, isThreePointer } from './courtGeometry'
 import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
-import { shotsForSelection, type ShotChartSelection } from '../../lib/shotChartViews'
+import {
+  shootingLine,
+  shotsForSelection,
+  shotViewEmptyCopy,
+  shotViewLabel,
+  type ShotChartSelection,
+} from '../../lib/shotChartViews'
 import type { ActionLogEntry, Player, ShotRecord } from '../../types'
 
 function newShotId(): string {
@@ -26,30 +32,6 @@ function popupPlayerLabel(player: Player | undefined): string {
   return `#${player.number || '?'} ${player.name.split(' ')[0]}`
 }
 
-/** "{view}" part of the context label (§3.3): who the chart is currently showing. */
-function viewLabel(selection: ShotChartSelection, players: Player[]): string {
-  if (selection.kind === 'all') return 'All shots'
-  const target = players.find(p => p.id === selection.playerId)
-  if (!target) return 'All shots'
-  if (isTeamPseudoPlayer(target)) return `${target.name} (team)`
-  return `#${target.number || '?'} ${target.name}`
-}
-
-/** Empty-state copy per view (§3.4 / D10). */
-function emptyCopy(selection: ShotChartSelection, players: Player[]): string {
-  if (selection.kind === 'all') return 'No chart shots recorded.'
-  const target = players.find(p => p.id === selection.playerId)
-  if (!target) return 'No chart shots recorded.'
-  if (isTeamPseudoPlayer(target)) return `No shots recorded for ${target.name} yet.`
-  return `No shots for ${target.name}.`
-}
-
-function shootingLine(shots: ShotRecord[]): string {
-  const att = shots.length
-  const made = shots.filter(s => s.made).length
-  if (att === 0) return '0/0'
-  return `${made}/${att} (${Math.round((made / att) * 100)}%)`
-}
 
 function shotLabelFromLogEntry(
   entry: ActionLogEntry | undefined,
@@ -177,7 +159,7 @@ export default function ShotChartPanel({ selection }: ShotChartPanelProps) {
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2 px-1">
         <p className="text-sm font-semibold text-slate-600 truncate">
-          Shot chart — {viewLabel(selection, players)}
+          Shot chart — {shotViewLabel(selection, players)}
         </p>
         <p className="text-sm font-bold text-slate-700 shrink-0">{shootingLine(visibleShots)}</p>
       </div>
@@ -193,7 +175,7 @@ export default function ShotChartPanel({ selection }: ShotChartPanelProps) {
       </div>
 
       <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
-        <ShootingSummary shots={visibleShots} emptyMessage={emptyCopy(selection, players)} />
+        <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
       </div>
 
       <button

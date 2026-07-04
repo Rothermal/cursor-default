@@ -9,6 +9,14 @@ import { hasTrackedTeamSide } from '../lib/teamStatsSummary'
 import TeamStatSummary from '../components/team-stats/TeamStatSummary'
 import BasketballCourt from '../components/shot-chart/BasketballCourt'
 import ShootingSummary from '../components/shot-chart/ShootingSummary'
+import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
+import {
+  shootingLine,
+  shotsForSelection,
+  shotViewEmptyCopy,
+  shotViewLabel,
+  type ShotChartSelection,
+} from '../lib/shotChartViews'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -55,6 +63,8 @@ export default function GameSummary() {
   const [viewMode, setViewMode] = useState<'primary' | 'all'>('primary')
   /** Players vs scores vs team-level stat summary (fouls, timeouts) vs shot chart (basketball). */
   const [summaryTab, setSummaryTab] = useState<'players' | 'team' | 'team_stats' | 'shot_chart'>('players')
+  /** Shot chart tab view filter (F2); defaults to All for whole-game review (D12). Read-only — never changes `activePlayerId`. */
+  const [shotViewSelection, setShotViewSelection] = useState<ShotChartSelection>({ kind: 'all' })
   /** Final games: overlay from get_game_team_stats (resolved placeholder stats). */
   const [teamTrackedStatsByRemoteId, setTeamTrackedStatsByRemoteId] = useState<
     Record<string, Record<string, number>> | null
@@ -864,16 +874,42 @@ export default function GameSummary() {
 
         {teamStatsSummaryEl}
 
-        {summaryTab === 'shot_chart' && (
-          <div className="space-y-4 mb-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <BasketballCourt shots={shotChart} className="w-full" />
+        {summaryTab === 'shot_chart' && (() => {
+          const visibleShots = shotsForSelection(shotChart, players, shotViewSelection)
+          return (
+            <div className="space-y-3 mb-6">
+              <PlayerSelectorStrip
+                players={players}
+                activePlayerId={
+                  shotViewSelection.kind === 'player' ? shotViewSelection.playerId : null
+                }
+                onSelectPlayer={playerId =>
+                  setShotViewSelection({ kind: 'player', playerId })
+                }
+                activeBgClass={sport?.theme.bg ?? 'bg-orange-500'}
+                onSelectAll={() => setShotViewSelection({ kind: 'all' })}
+                allActive={shotViewSelection.kind === 'all'}
+              />
+              <div className="flex items-baseline justify-between gap-2 px-1">
+                <p className="text-sm font-semibold text-slate-600 truncate">
+                  Shot chart — {shotViewLabel(shotViewSelection, players)}
+                </p>
+                <p className="text-sm font-bold text-slate-700 shrink-0">
+                  {shootingLine(visibleShots)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <BasketballCourt shots={visibleShots} className="w-full" />
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <ShootingSummary
+                  shots={visibleShots}
+                  emptyMessage={shotViewEmptyCopy(shotViewSelection, players)}
+                />
+              </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <ShootingSummary shots={shotChart} />
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
         {summaryTab === 'team' && (
           <div className="card mb-6 border-slate-200">
