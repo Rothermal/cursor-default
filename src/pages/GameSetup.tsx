@@ -340,17 +340,13 @@ export default function GameSetup() {
           ? selectedNewTeamSeasonId
           : null
 
+    // Only update season/team here. Preserve gameId/playerIdMap/fingerprint when the user
+    // returns from player setup for the same game; SET_GAME_INFO clears them on team change.
     dispatch({
       type: 'SET_CLOUD_SYNC_STATE',
       cloudSync: {
         seasonId: resolvedSeasonIdForSync,
         teamId: teamMode === 'existing' ? selectedTeamId || null : null,
-        gameId: null,
-        gameStatus: null,
-        playerIdMap: {},
-        lastSyncedAt: null,
-        lastError: null,
-        lastSyncedGameFingerprint: null,
       },
     })
     dispatch({
