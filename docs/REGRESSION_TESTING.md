@@ -180,6 +180,23 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 4g. Cloud shot chart review — all recorders (F3)
+
+**Precondition:** Supabase configured, migration `032_shot_chart.sql` applied. Two users (A and B) on the same team. User A records a basketball game with court shots (§4e).
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4g.1 | User B → Cloud Games → open A's **final** game → Game Summary → Shot chart tab | A's shots render for B (read-only), even though B recorded none; note under the header: "Combined from all recorders…" |
+| 4g.2 | Filter with the selector strip (F2) | Per-player / team / All filtering works on the review shots |
+| 4g.3 | User B opens A's **in-progress** game → Game Tracker → "Summary →" → Shot chart tab | Same all-recorder chart via the Summary (the live tracker still shows only B's own shots) |
+| 4g.4 | Two recorders chart the same game | No duplicate markers — each player's shots come from **one** recorder (primary → game creator → lowest recorder id) |
+| 4g.5 | Admin reassigns the primary recorder (Game Summary, final game) | Review chart refetches and reflects the new primary's shots |
+| 4g.6 | Return to Game Tracker after viewing the review chart | Tracker court unchanged (viewer's own shots only); review shots are never written into game state and never sync |
+| 4g.7 | Cloud Games list | Basketball games with any `shot_chart` rows show a small **🏀 chart** pill; non-basketball and chartless games show none |
+| 4g.8 | DB without migration `032` | No errors; Shot chart tab absent/empty; no pill |
+
+---
+
 ## 5. Game flow (local state)
 
 **Precondition:** Any mode (offline or signed in).

@@ -2,6 +2,7 @@ import type { GameInfo, GameState, Player, ShotRecord } from '../types'
 import { supabase } from './supabase'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
 import { hasMappableChartShot } from './shotChartSyncMapping'
+import { pickRecorderPerPlayer } from './shotChartReview'
 import { isValidRemotePlayerUuid } from './uuidValidation'
 
 interface SyncGameSnapshotInput {
@@ -131,6 +132,64 @@ function isMissingShotChartTableError(error: { message?: string } | null): boole
     (m.includes('shot_chart') && m.includes('relation') && m.includes('does not exist')) ||
     (m.includes('shot_chart') && m.includes('could not find the table'))
   )
+}
+
+/** Raw `shot_chart` row shape as selected from Supabase. */
+type RemoteShotRow = {
+  player_id: string
+  client_shot_id: string
+  x: number | string
+  y: number | string
+  made: boolean
+  shot_type: string
+  zone: string
+  created_at: string
+}
+
+const SHOT_ZONES: ShotRecord['zone'][] = ['restricted', 'paint', 'mid_range', 'three']
+
+/**
+ * Map remote `shot_chart` rows to local `ShotRecord`s (zone validation, number coercion,
+ * remote→local player id lookup). Rows that can't be mapped are counted as dropped.
+ * Shared by hydration and the review load path (F3).
+ */
+function mapShotRows(
+  rows: RemoteShotRow[],
+  remoteToLocalPlayerId: Record<string, string>
+): { shotChart: ShotRecord[]; droppedRows: number } {
+  const shotChart: ShotRecord[] = []
+  let droppedRows = 0
+  for (const row of rows) {
+    const localPlayerId = remoteToLocalPlayerId[row.player_id]
+    if (!localPlayerId) {
+      droppedRows += 1
+      continue
+    }
+    const z = row.zone as ShotRecord['zone']
+    if (!SHOT_ZONES.includes(z)) {
+      droppedRows += 1
+      continue
+    }
+    shotChart.push({
+      id: row.client_shot_id,
+      x: Number(row.x),
+      y: Number(row.y),
+      made: row.made,
+      shotType: row.shot_type === '3pt' ? '3pt' : '2pt',
+      zone: z,
+      playerId: localPlayerId,
+      timestamp: new Date(row.created_at).getTime(),
+    })
+  }
+  return { shotChart, droppedRows }
+}
+
+function invertPlayerIdMap(playerIdMap: Record<string, string>): Record<string, string> {
+  const remoteToLocal: Record<string, string> = {}
+  for (const [localId, remoteId] of Object.entries(playerIdMap)) {
+    remoteToLocal[remoteId] = localId
+  }
+  return remoteToLocal
 }
 
 function parseSeasonTeamStatsConfig(raw: unknown): Record<string, unknown> | null {
@@ -1035,12 +1094,9 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     playerIdMap[TEAM_PLAYER_OPP_ID] = oppCloudId
   }
 
-  const remoteToLocalPlayerId: Record<string, string> = {}
-  for (const [localId, remoteId] of Object.entries(playerIdMap)) {
-    remoteToLocalPlayerId[remoteId] = localId
-  }
+  const remoteToLocalPlayerId = invertPlayerIdMap(playerIdMap)
 
-  const shotChart: ShotRecord[] = []
+  let shotChart: ShotRecord[] = []
   let shotChartHydrationDroppedRows = 0
   if (sportId === 'basketball') {
     const { data: shotRows, error: shotErr } = await supabase
@@ -1055,39 +1111,9 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
         throw new Error(`Shot chart load failed: ${shotErr.message}`)
       }
     } else {
-      const zones: ShotRecord['zone'][] = ['restricted', 'paint', 'mid_range', 'three']
-      for (const row of (shotRows ?? []) as Array<{
-        player_id: string
-        client_shot_id: string
-        x: number | string
-        y: number | string
-        made: boolean
-        shot_type: string
-        zone: string
-        created_at: string
-      }>) {
-        const localPlayerId = remoteToLocalPlayerId[row.player_id]
-        if (!localPlayerId) {
-          shotChartHydrationDroppedRows += 1
-          continue
-        }
-        const z = row.zone as ShotRecord['zone']
-        if (!zones.includes(z)) {
-          shotChartHydrationDroppedRows += 1
-          continue
-        }
-        const st = row.shot_type === '3pt' ? '3pt' : '2pt'
-        shotChart.push({
-          id: row.client_shot_id,
-          x: Number(row.x),
-          y: Number(row.y),
-          made: row.made,
-          shotType: st,
-          zone: z,
-          playerId: localPlayerId,
-          timestamp: new Date(row.created_at).getTime(),
-        })
-      }
+      const mapped = mapShotRows((shotRows ?? []) as RemoteShotRow[], remoteToLocalPlayerId)
+      shotChart = mapped.shotChart
+      shotChartHydrationDroppedRows = mapped.droppedRows
     }
   }
 
@@ -1291,6 +1317,79 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
   }
 
   return hydrateCloudGameFromRow(userId, gameRow as unknown as CloudGameRow)
+}
+
+export interface GameShotChartReview {
+  /** One recorder's shots per player (primary → creator → lowest recorder), local player ids. */
+  shotChart: ShotRecord[]
+  /** Rows skipped because the player id could not be mapped or the zone was invalid. */
+  droppedRows: number
+}
+
+/**
+ * All-recorder shot chart for cloud-game review (F3 §2.2a). Fetches every team-visible
+ * `shot_chart` row for the game (RLS scopes to the viewer's teams), de-duplicates to one
+ * recorder per player via `pickRecorderPerPlayer`, and maps remote player ids to local
+ * ones via `playerIdMap`. **Display-only** — callers must never dispatch the result into
+ * `GameState.shotChart` (F3 D6: review shots must not sync).
+ */
+export async function loadGameShotChartForReview(
+  gameId: string,
+  playerIdMap: Record<string, string>
+): Promise<GameShotChartReview> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  const { data: shotRows, error: shotErr } = await supabase
+    .from('shot_chart')
+    .select('player_id, recorded_by, client_shot_id, x, y, made, shot_type, zone, created_at')
+    .eq('game_id', gameId)
+    .order('created_at', { ascending: true })
+
+  if (shotErr) {
+    if (isMissingShotChartTableError(shotErr)) {
+      return { shotChart: [], droppedRows: 0 }
+    }
+    throw new Error(`Shot chart review load failed: ${shotErr.message}`)
+  }
+
+  const rows = (shotRows ?? []) as Array<RemoteShotRow & { recorded_by: string }>
+  if (rows.length === 0) {
+    return { shotChart: [], droppedRows: 0 }
+  }
+
+  // Primary recorder per player (best-effort; empty map on error → creator fallback).
+  const primaryByPlayerRemoteId: Record<string, string> = {}
+  const { data: checkoutRows, error: checkoutErr } = await supabase
+    .from('player_checkouts')
+    .select('player_id, user_id, is_primary')
+    .eq('game_id', gameId)
+  if (!checkoutErr) {
+    for (const row of (checkoutRows ?? []) as Array<{
+      player_id: string
+      user_id: string
+      is_primary: boolean
+    }>) {
+      if (row.is_primary) {
+        primaryByPlayerRemoteId[row.player_id] = row.user_id
+      }
+    }
+  }
+
+  // Game creator (fallback recorder); best-effort.
+  let creatorId: string | null = null
+  const { data: gameRow, error: gameErr } = await supabase
+    .from('games')
+    .select('created_by')
+    .eq('id', gameId)
+    .maybeSingle()
+  if (!gameErr && gameRow) {
+    creatorId = (gameRow as { created_by: string | null }).created_by ?? null
+  }
+
+  const resolvedRows = pickRecorderPerPlayer(rows, primaryByPlayerRemoteId, creatorId)
+  return mapShotRows(resolvedRows, invertPlayerIdMap(playerIdMap))
 }
 
 export async function touchCloudGameLastOpened(gameId: string): Promise<void> {

@@ -70,6 +70,8 @@ export default function Games() {
   const [games, setGames] = useState<GameRow[]>([])
   const [teamMap, setTeamMap] = useState<Record<string, TeamRow>>({})
   const [finalScoreLines, setFinalScoreLines] = useState<Record<string, string>>({})
+  /** Basketball games that have any `shot_chart` rows (F3 discoverability pill). */
+  const [chartGameIds, setChartGameIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -179,6 +181,34 @@ export default function Games() {
     }
 
     void loadScores()
+    return () => {
+      cancelled = true
+    }
+  }, [games, teamMap, supabaseClient])
+
+  // One batched existence check for shot-chart availability on basketball games (F3 D12).
+  useEffect(() => {
+    if (!supabaseClient) return
+    const basketballIds = games
+      .filter(g => teamMap[g.team_id]?.seasons?.sport === 'basketball')
+      .map(g => g.id)
+    if (basketballIds.length === 0) {
+      setChartGameIds(new Set())
+      return
+    }
+
+    let cancelled = false
+    const loadChartPresence = async () => {
+      const { data, error: chartError } = await supabaseClient
+        .from('shot_chart')
+        .select('game_id')
+        .in('game_id', basketballIds)
+      // Missing table / RLS errors: indicator is optional, degrade silently.
+      if (cancelled || chartError) return
+      setChartGameIds(new Set((data ?? []).map(row => (row as { game_id: string }).game_id)))
+    }
+
+    void loadChartPresence()
     return () => {
       cancelled = true
     }
@@ -387,8 +417,16 @@ export default function Games() {
             )}
           </div>
         )}
-        <p className="text-xs text-slate-400 mt-1">
-          {game.game_date}
+        <p className="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+          <span>{game.game_date}</span>
+          {chartGameIds.has(game.id) && (
+            <span
+              className="text-[11px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 font-semibold"
+              title="This game has a shot chart"
+            >
+              🏀 chart
+            </span>
+          )}
         </p>
         <div className="flex gap-2 mt-3">
           <button
