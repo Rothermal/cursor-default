@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> **New to this repo?** Read [docs/AGENT_CODEBASE_OVERVIEW.md](docs/AGENT_CODEBASE_OVERVIEW.md) first for architecture, file map, and doc workflow. This file is runtime ops and gotchas only.
+
 ## Cursor Cloud specific instructions
 
 **StatKeeper** is a mobile-first React web app for tracking sports statistics in real time. It uses React 18 + TypeScript + Vite + Tailwind CSS 3.
