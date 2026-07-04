@@ -309,7 +309,7 @@ export default function BasketballCourt({
             fontSize="1.05"
             fontWeight="500"
           >
-            to record shots
+            to log an event
           </text>
         </g>
       )}

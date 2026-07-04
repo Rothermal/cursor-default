@@ -3,12 +3,26 @@ import { useGame } from '../../context/GameContext'
 import BasketballCourt from './BasketballCourt'
 import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
+import CourtEventPopup, { type CourtEvent } from './CourtEventPopup'
 import { classifyShotZone, isThreePointer } from './courtGeometry'
-import { sortTeamPlayersFirst } from '../../lib/teamPlayers'
+import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 import type { ActionLogEntry, Player, ShotRecord } from '../../types'
 
 function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+/** Court tap awaiting resolution in the event popup. */
+interface PendingCourtTap {
+  x: number
+  y: number
+  shotType: '2pt' | '3pt'
+}
+
+function popupPlayerLabel(player: Player | undefined): string {
+  if (!player) return 'Player'
+  if (isTeamPseudoPlayer(player)) return `★ ${player.name}`
+  return `#${player.number || '?'} ${player.name.split(' ')[0]}`
 }
 
 function shotLabelFromLogEntry(
@@ -38,7 +52,7 @@ function shotLabelFromLogEntry(
 export default function ShotChartPanel() {
   const { state, dispatch } = useGame()
   const { players, activePlayerId, shotChart, actionLog } = state
-  const [mode, setMode] = useState<'made' | 'missed'>('made')
+  const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)
   const pendingPulseIdRef = useRef<string | null>(null)
@@ -48,31 +62,52 @@ export default function ShotChartPanel() {
     activePlayerId && players.some(p => p.id === activePlayerId)
       ? activePlayerId
       : selectorPlayers[0]?.id ?? null
+  const effectivePlayer = players.find(p => p.id === effectivePlayerId)
 
+  // A confirmed court tap only opens the popup — nothing is logged until a choice is made.
   const onCourtTap = useCallback(
     (x: number, y: number) => {
       if (!effectivePlayerId) return
-      const three = isThreePointer(x, y)
-      const id = newShotId()
-      pendingPulseIdRef.current = id
       try {
         navigator.vibrate?.(10)
       } catch {
         /* ignore */
       }
+      setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt' })
+    },
+    [effectivePlayerId]
+  )
+
+  const handlePopupPick = useCallback(
+    (event: CourtEvent) => {
+      const tap = pendingTap
+      setPendingTap(null)
+      if (!tap || !effectivePlayerId) return
+
+      if (event.kind === 'stat') {
+        dispatch({
+          type: 'INCREMENT_STAT',
+          playerId: effectivePlayerId,
+          statId: event.statId,
+        })
+        return
+      }
+
+      const id = newShotId()
+      pendingPulseIdRef.current = id
       const shot: ShotRecord = {
         id,
-        x,
-        y,
-        made: mode === 'made',
-        shotType: three ? '3pt' : '2pt',
-        zone: classifyShotZone(x, y),
+        x: tap.x,
+        y: tap.y,
+        made: event.made,
+        shotType: tap.shotType,
+        zone: classifyShotZone(tap.x, tap.y),
         playerId: effectivePlayerId,
         timestamp: Date.now(),
       }
       dispatch({ type: 'ADD_SHOT', shot })
     },
-    [dispatch, effectivePlayerId, mode]
+    [dispatch, effectivePlayerId, pendingTap]
   )
 
   useEffect(() => {
@@ -102,38 +137,13 @@ export default function ShotChartPanel() {
 
   return (
     <div className="space-y-2">
-      <div className="flex rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <button
-          type="button"
-          onClick={() => setMode('made')}
-          className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-            mode === 'made'
-              ? 'bg-emerald-600 text-white'
-              : 'bg-white text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          Made
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('missed')}
-          className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-            mode === 'missed'
-              ? 'bg-rose-600 text-white'
-              : 'bg-white text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          Missed
-        </button>
-      </div>
-
       <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
         <BasketballCourt
           shots={shotChart}
           onCourtTap={onCourtTap}
           className="w-full"
           newlyPlacedShotId={pulseShotId}
-          emptyHint="Tap the court to record shots."
+          emptyHint="Tap the court to log an event."
         />
       </div>
 
@@ -162,6 +172,15 @@ export default function ShotChartPanel() {
       >
         Clear all chart shots
       </button>
+
+      {pendingTap && (
+        <CourtEventPopup
+          playerLabel={popupPlayerLabel(effectivePlayer)}
+          shotType={pendingTap.shotType}
+          onPick={handlePopupPick}
+          onCancel={() => setPendingTap(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={showClearConfirm}
