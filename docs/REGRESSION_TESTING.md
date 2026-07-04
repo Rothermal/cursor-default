@@ -235,6 +235,9 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 6.11 | Cloud Games → **Final** game card | Shows home–away score (from resolved stats + adjustment) when RPC succeeds |
 | 6.12 | Cloud Games → game with `tournament_id` | **Tournament stats** link next to tournament name opens `/tournament-stats` |
 | 6.11 | Cloud Games → Edit opponent name → press Escape or ✕ | Edit cancelled; original name restored |
+| 6.13 | (F4) Home page with an active game → score some points → back Home | Active-game card shows the live score (e.g. "62–54"), equal to the Game Tracker scoreboard in both scoring modes; team pseudo-players excluded |
+| 6.14 | (F4) Cloud Games → **In Progress** game card | Shows the last-synced score next to "vs {opponent}" (row `home_team_score` when synced; else the viewer's `game_stats` sum). Final cards unchanged |
+| 6.15 | (F4) Scheduled game with no score yet | No score shown (0–0 hidden for scheduled); status badge still present |
 
 ---
 

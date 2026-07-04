@@ -125,20 +125,21 @@ No new files, no migration, no helper additions (reuse `gameScore.ts`).
 
 ### Task 1: Live score on the home active-game card
 
-- [ ] **Modify `src/pages/SportSelect.tsx`**: when `hasActiveGame`, compute
+- [x] **Modify `src/pages/SportSelect.tsx`**: when `hasActiveGame`, compute
   `rosterPlayers = state.players.filter(p => !isTeamPseudoPlayer(p))` and
   `liveHomeScore = getDisplayedHomeScore(state.sport!, rosterPlayers, state.homeTeamScore, state.homeScoreAdjustment)`
   (import both from their libs) and render `{liveHomeScore} – {state.opponentScore}`
   in the card, near the team/opponent line.
-- [ ] Verify the inputs match `Scoreboard.tsx:12-13` so the card and the in-game scoreboard agree.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] Verify the inputs match `Scoreboard.tsx:12-13` so the card and the in-game scoreboard agree.
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. ✓
 - [ ] Manual: start a basketball game, score some points, go Home → active-game card shows
-  the running score; matches the Game Tracker scoreboard.
-- [ ] **Commit:** `feat: show live score on the home active-game card`
+  the running score; matches the Game Tracker scoreboard. *(pending user QA — see
+  REGRESSION_TESTING.md §6.13)*
+- [x] **Commit:** `feat: show live score on the home active-game card`
 
 ### Task 2: Score lines for in-progress cloud games
 
-- [ ] **Modify `src/pages/Games.tsx`**: generalize the `finalScoreLines` effect to all
+- [x] **Modify `src/pages/Games.tsx`**: generalize the `finalScoreLines` effect to all
   games:
   - For each game, if `home_team_score != null`, set the line to
     `${home_team_score}–${opponent_score}` (no query).
@@ -147,12 +148,13 @@ No new files, no migration, no helper additions (reuse `gameScore.ts`).
     - otherwise → sum `game_stats` (scoped per §7 D6) into `byStat`, then
       `resolveFinalHomeScoreFromGameRow(sport, byStat, g)`.
   - Store into the (renamed) `scoreLines` map.
-- [ ] **Modify `renderGameCard`**: show the score pill for the desired statuses (per §7 D7;
-  default in_progress + final), keeping the status badge.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] **Modify `renderGameCard`**: show the score pill for the desired statuses (per §7 D7;
+  default in_progress + final), keeping the status badge. *(Scheduled hides only a `0–0`.)*
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. ✓ (+ full test suite green)
 - [ ] Manual (Supabase configured): an in-progress game with a synced score shows the
-  score in the list; a final game still shows its resolved score.
-- [ ] **Commit:** `feat: show in-progress scores in the Cloud Games list`
+  score in the list; a final game still shows its resolved score. *(pending user QA — see
+  REGRESSION_TESTING.md §6.14–6.15)*
+- [x] **Commit:** `feat: show in-progress scores in the Cloud Games list`
 
 ## 4. Testing
 
