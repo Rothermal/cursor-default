@@ -69,7 +69,8 @@ export default function Games() {
 
   const [games, setGames] = useState<GameRow[]>([])
   const [teamMap, setTeamMap] = useState<Record<string, TeamRow>>({})
-  const [finalScoreLines, setFinalScoreLines] = useState<Record<string, string>>({})
+  /** Score line per game id, all statuses (F4): synced row snapshot or stats aggregate. */
+  const [scoreLines, setScoreLines] = useState<Record<string, string>>({})
   /** Basketball games that have any `shot_chart` rows (F3 discoverability pill). */
   const [chartGameIds, setChartGameIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
@@ -149,42 +150,62 @@ export default function Games() {
     }
   }, [isConfigured, supabaseClient, userId])
 
+  // Score lines for all statuses (F4). Precedence per D5: the synced `games` row
+  // (`home_team_score`) is authoritative and needs no query; only legacy null-home games
+  // fall back to a stats aggregate — resolved RPC for finals, a creator-scoped
+  // `game_stats` sum otherwise (D6; this list only shows the viewer's own games).
   useEffect(() => {
     if (!supabaseClient) return
-    const finals = games.filter(g => g.status === 'final')
-    if (finals.length === 0) {
-      setFinalScoreLines({})
+    if (games.length === 0) {
+      setScoreLines({})
       return
     }
 
     let cancelled = false
     const loadScores = async () => {
       const next: Record<string, string> = {}
-      for (const g of finals) {
+      for (const g of games) {
+        if (g.home_team_score != null) {
+          next[g.id] = `${g.home_team_score}–${g.opponent_score}`
+          continue
+        }
+
         const team = teamMap[g.team_id]
         const sport = sports.find(s => s.id === team?.seasons?.sport)
         if (!sport) continue
 
-        const { data, error: rpcError } = await supabaseClient.rpc('get_game_stats_resolved', {
-          p_game_id: g.id,
-        })
-        if (cancelled || rpcError) continue
-
         const byStat: Record<string, number> = {}
-        for (const row of (data ?? []) as { stat_id: string; value: number }[]) {
-          byStat[row.stat_id] = (byStat[row.stat_id] ?? 0) + Number(row.value)
+        if (g.status === 'final') {
+          const { data, error: rpcError } = await supabaseClient.rpc('get_game_stats_resolved', {
+            p_game_id: g.id,
+          })
+          if (cancelled || rpcError) continue
+          for (const row of (data ?? []) as { stat_id: string; value: number }[]) {
+            byStat[row.stat_id] = (byStat[row.stat_id] ?? 0) + Number(row.value)
+          }
+        } else {
+          if (!userId) continue
+          const { data, error: statsError } = await supabaseClient
+            .from('game_stats')
+            .select('stat_id, value')
+            .eq('game_id', g.id)
+            .eq('recorded_by', userId)
+          if (cancelled || statsError) continue
+          for (const row of (data ?? []) as { stat_id: string; value: number }[]) {
+            byStat[row.stat_id] = (byStat[row.stat_id] ?? 0) + Number(row.value)
+          }
         }
         const home = resolveFinalHomeScoreFromGameRow(sport, byStat, g)
         next[g.id] = `${home}–${g.opponent_score}`
       }
-      if (!cancelled) setFinalScoreLines(next)
+      if (!cancelled) setScoreLines(next)
     }
 
     void loadScores()
     return () => {
       cancelled = true
     }
-  }, [games, teamMap, supabaseClient])
+  }, [games, teamMap, supabaseClient, userId])
 
   // One batched existence check for shot-chart availability on basketball games (F3 D12).
   useEffect(() => {
@@ -348,7 +369,10 @@ export default function Games() {
   const renderGameCard = (game: GameRow) => {
     const team = teamMap[game.team_id]
     const sport = sports.find(item => item.id === team?.seasons?.sport)
-    const scoreHint = game.status === 'final' ? finalScoreLines[game.id] : null
+    // All statuses show a score (F4 D7), except a scheduled game still at 0–0.
+    const scoreLine = scoreLines[game.id] ?? null
+    const scoreHint =
+      game.status === 'scheduled' && scoreLine === '0–0' ? null : scoreLine
 
     return (
       <div key={game.id} className="card">
