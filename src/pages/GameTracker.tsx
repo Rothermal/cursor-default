@@ -4,27 +4,14 @@ import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
-import type { BasketballTeamStatsConfig, Player, StatAction, StatCategory } from '../types'
+import type { BasketballTeamStatsConfig, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
+import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
+import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
-import {
-  isTeamPseudoPlayer,
-  playersWithTeamPlaceholders,
-  TEAM_PLAYER_HOME_ID,
-  TEAM_PLAYER_OPP_ID,
-} from '../lib/teamPlayers'
-
-function sortTeamPlayersFirst(players: Player[]): Player[] {
-  const teams = players.filter(isTeamPseudoPlayer)
-  const home = teams.find(p => p.id === TEAM_PLAYER_HOME_ID || p.teamSide === 'home')
-  const opp = teams.find(p => p.id === TEAM_PLAYER_OPP_ID || p.teamSide === 'opponent')
-  const restTeam = teams.filter(p => p !== home && p !== opp)
-  const individuals = players.filter(p => !isTeamPseudoPlayer(p))
-  const orderedTeams = [home, opp, ...restTeam].filter(Boolean) as Player[]
-  return [...orderedTeams, ...individuals]
-}
+import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
 
 /** Strip `_pN` suffix for config lookup (undo log stores scoped ids). */
 function baseStatId(statId: string): string {
@@ -87,7 +74,6 @@ export default function GameTracker() {
     gameInfo,
     currentPeriod,
     teamStatsConfig,
-    shotChart,
   } = state
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
@@ -148,9 +134,6 @@ export default function GameTracker() {
 
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
   }, [sport, gameInfo, players, dispatch])
-
-  const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
-  const teamSelectorCount = selectorPlayers.filter(isTeamPseudoPlayer).length
 
   if (!sport || !gameInfo || players.length === 0) {
     navigate('/')
@@ -233,84 +216,20 @@ export default function GameTracker() {
         </div>
 
         <Scoreboard />
-
-        {sport.id === 'basketball' && (
-          <button
-            type="button"
-            onClick={() => navigate('/shot-chart')}
-            className="relative mt-3 w-full py-3 rounded-xl font-semibold text-white shadow-md active:scale-[0.99] transition-transform
-                       bg-gradient-to-r from-orange-500 to-amber-600 border border-orange-600/30"
-          >
-            <span className="mr-1" aria-hidden>
-              🏀
-            </span>
-            Shot chart
-            {shotChart.length > 0 && (
-              <span
-                className="absolute -top-1.5 -right-1.5 min-w-[1.35rem] h-6 px-1.5 rounded-full bg-white text-orange-700 text-xs font-bold
-                           flex items-center justify-center shadow border border-orange-200"
-                aria-label={`${shotChart.length} shots on chart`}
-              >
-                {shotChart.length > 99 ? '99+' : shotChart.length}
-              </span>
-            )}
-          </button>
-        )}
       </div>
 
-      <div className="px-3 py-2 max-w-lg mx-auto w-full">
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide items-stretch">
-          {selectorPlayers.map((player, index) => {
-            const isTeam = isTeamPseudoPlayer(player)
-            const showDivider = isTeam && index === teamSelectorCount - 1 && teamSelectorCount > 0
-            const isActive = player.id === activePlayer.id
+      <PlayerSelectorStrip
+        players={players}
+        activePlayerId={activePlayer.id}
+        onSelectPlayer={playerId => dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })}
+        activeBgClass={sport.theme.bg}
+        onAddPlayer={() => setShowAddPlayer(!showAddPlayer)}
+        sticky
+      />
 
-            return (
-              <div key={player.id} className="flex flex-shrink-0 items-stretch gap-2">
-                <button
-                  onClick={() => dispatch({ type: 'SET_ACTIVE_PLAYER', playerId: player.id })}
-                  title={player.name}
-                  className={`
-                    flex-shrink-0 px-3 py-2 rounded-xl text-sm font-semibold max-w-[10.5rem]
-                    transition-all duration-150 active:scale-95 text-left
-                    ${isTeam
-                      ? isActive
-                        ? `bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-md ring-2 ring-white/30`
-                        : `bg-gradient-to-br from-slate-100 to-slate-200/90 text-slate-800 border border-slate-300/80 shadow-sm`
-                      : isActive
-                        ? `${sport.theme.bg} text-white shadow-md`
-                        : 'bg-white text-slate-600 border border-slate-200'
-                    }
-                  `}
-                >
-                  <span className={isTeam ? 'opacity-90' : 'opacity-70'}>
-                    {isTeam ? '★' : `#${player.number || '?'}`}
-                  </span>{' '}
-                  <span className="line-clamp-2 break-words">
-                    {isTeam ? player.name : player.name.split(' ')[0]}
-                  </span>
-                </button>
-                {showDivider && (
-                  <div
-                    className="w-px self-stretch min-h-[2.5rem] bg-slate-300 shrink-0"
-                    aria-hidden
-                  />
-                )}
-              </div>
-            )
-          })}
-          <button
-            onClick={() => setShowAddPlayer(!showAddPlayer)}
-            className="flex-shrink-0 w-10 h-10 rounded-xl bg-white border-2 border-dashed
-                       border-slate-300 text-slate-400 text-xl font-bold
-                       active:scale-95 transition-transform flex items-center justify-center"
-          >
-            +
-          </button>
-        </div>
-
-        {showAddPlayer && (
-          <div className="card mt-2 flex gap-2 items-end">
+      {showAddPlayer && (
+        <div className="px-3 max-w-lg mx-auto w-full">
+          <div className="card mb-2 flex gap-2 items-end">
             <input
               type="text"
               value={newNumber}
@@ -336,8 +255,19 @@ export default function GameTracker() {
               Add
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {sport.id === 'basketball' && (
+        <div className="px-3 py-2 max-w-lg mx-auto w-full">
+          <ShotChartPanel />
+          <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
+            The court popup and the buttons below adjust the same player stats — the popup is
+            fast in-play entry (shots keep their location); the buttons are for direct entry
+            and corrections.
+          </p>
+        </div>
+      )}
 
       {showPeriodToggle && teamRules && (
         <div className="px-3 max-w-lg mx-auto w-full">
@@ -364,7 +294,7 @@ export default function GameTracker() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 pb-20 max-w-lg mx-auto w-full">
+      <div className="px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
           {gridCategories.map(category => {
             const missMap: Record<string, typeof category.actions[0]> = {}
@@ -449,7 +379,7 @@ export default function GameTracker() {
                         action.id === '3pt_miss' ||
                         action.id === 'ft' ||
                         action.id === 'ft_miss')
-                        ? 'Shots from the Shot Chart include court location. Taps here count in stats only and do not add markers on the chart.'
+                        ? 'Shots logged from the court above store a location marker and count here too. Taps here count in stats only (no marker). Both adjust the same stat — use +/− to correct.'
                         : undefined
 
                     const buttonKey = action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id

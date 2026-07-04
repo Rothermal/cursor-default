@@ -47,3 +47,14 @@ export function isTeamPseudoPlayer(player: Pick<Player, 'id' | 'isTeamPlayer'>):
   if (player.isTeamPlayer === true) return true
   return LOCAL_TEAM_PLAYER_IDS.has(player.id)
 }
+
+/** Team pseudo-players (home, opponent) first, then individuals — shared player-selector order. */
+export function sortTeamPlayersFirst(players: Player[]): Player[] {
+  const teams = players.filter(isTeamPseudoPlayer)
+  const home = teams.find(p => p.id === TEAM_PLAYER_HOME_ID || p.teamSide === 'home')
+  const opp = teams.find(p => p.id === TEAM_PLAYER_OPP_ID || p.teamSide === 'opponent')
+  const restTeam = teams.filter(p => p !== home && p !== opp)
+  const individuals = players.filter(p => !isTeamPseudoPlayer(p))
+  const orderedTeams = [home, opp, ...restTeam].filter(Boolean) as Player[]
+  return [...orderedTeams, ...individuals]
+}
