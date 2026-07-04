@@ -120,51 +120,53 @@ if the client-side join is a measured bottleneck.
 
 ### Task 1: Primary-recorder selection helper + tests
 
-- [ ] **Create `src/lib/shotChartReview.test.ts`**:
+- [x] **Create `src/lib/shotChartReview.test.ts`**:
   - Player with a primary recorder → only that recorder's rows kept.
   - Player with no primary but a creator recorder → creator's rows kept.
   - Player with neither → lowest-ordered `recorded_by` kept (deterministic).
   - Multiple players resolve independently (no cross-contamination).
-- [ ] Run `pnpm test src/lib/shotChartReview.test.ts`. Expected: FAIL (missing module).
-- [ ] **Create `src/lib/shotChartReview.ts`** with
+- [x] Run `pnpm test src/lib/shotChartReview.test.ts`. Expected: FAIL (missing module). ✓ failed as expected
+- [x] **Create `src/lib/shotChartReview.ts`** with
   `pickRecorderPerPlayer(rows, primaryByPlayerRemoteId, creatorId)`. Pure; operates on
   remote-id-shaped rows.
-- [ ] Run the test. Expected: PASS.
-- [ ] **Commit:** `feat: add shotChartReview primary-recorder selection helper`
+- [x] Run the test. Expected: PASS. ✓ 9 tests pass
+- [x] **Commit:** `feat: add shotChartReview primary-recorder selection helper`
 
 ### Task 2: Review load path in cloudSync
 
-- [ ] **Refactor `cloudSync.ts`**: extract the remote-row → `ShotRecord` mapping (zone
+- [x] **Refactor `cloudSync.ts`**: extract the remote-row → `ShotRecord` mapping (zone
   validation, number coercion, `remoteToLocalPlayerId` lookup, dropped-row counting) from
   `hydrateCloudGameFromRow` (lines ~1017–1066) into a shared
   `mapShotRows(rows, remoteToLocalPlayerId)`. Verify hydration behaves identically.
-- [ ] **Add `loadGameShotChartForReview(userId, gameId, playerIdMap, opts?)`** per §2.2a;
+- [x] **Add `loadGameShotChartForReview(gameId, playerIdMap)`** per §2.2a;
   return `{ shotChart, droppedRows }`; tolerate the missing-table error
-  (`isMissingShotChartTableError`).
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
-- [ ] **Commit:** `feat: load all-recorder shot chart for cloud game review`
+  (`isMissingShotChartTableError`). *(No `userId` param needed — RLS scopes reads to the
+  authenticated session.)*
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. ✓
+- [x] **Commit:** `feat: load all-recorder shot chart for cloud game review`
 
 ### Task 3: Wire review shots into Game Summary (final + in-progress cloud games)
 
-- [ ] **Modify `GameSummary.tsx`**: add `reviewShotChart` state + an effect that, when
+- [x] **Modify `GameSummary.tsx`**: add `reviewShotChart` state + an effect that, when
   `gameId && sport.id === 'basketball'` (any cloud game, not just final), calls
-  `loadGameShotChartForReview(userId, gameId, playerIdMap)` and stores the result. Key the
+  `loadGameShotChartForReview(gameId, playerIdMap)` and stores the result. Key the
   effect on `gameId` (+ `resolvedKey` for primary-recorder reassignment).
-- [ ] In the shot chart tab render + F2 selector wiring, use `reviewShotChart ?? shotChart`
+- [x] In the shot chart tab render + F2 selector wiring, use `reviewShotChart ?? shotChart`
   as the source. Keep the tab visible when either is non-empty.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. ✓
 - [ ] Manual (Supabase + migration `032`): user A records a game with shots; user B (same
   team) opens it → Summary → Shot chart shows A's shots; F2 filtering works; for an
-  in-progress game B reaches Summary via "Summary →".
-- [ ] **Commit:** `feat: all-recorder shot chart in Game Summary for cloud games`
+  in-progress game B reaches Summary via "Summary →". *(pending user QA — needs two
+  accounts; see REGRESSION_TESTING.md §4g)*
+- [x] **Commit:** `feat: all-recorder shot chart in Game Summary for cloud games`
 
 ### Task 4: Cloud Games list indicator (optional but recommended)
 
-- [ ] **Modify `Games.tsx`**: after loading games, for basketball games run **one batched**
+- [x] **Modify `Games.tsx`**: after loading games, for basketball games run **one batched**
   existence check (`shot_chart` `player_id`/`game_id` `in (gameIds)`) and render a small
   "🏀 chart" pill on cards that have shots.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
-- [ ] **Commit:** `feat: indicate shot-chart availability on Cloud Games cards`
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. ✓ (+ full test suite green)
+- [x] **Commit:** `feat: indicate shot-chart availability on Cloud Games cards`
 
 ### Task 5 (optional follow-up): resolved RPC
 
