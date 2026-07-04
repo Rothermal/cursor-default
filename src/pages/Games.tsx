@@ -217,7 +217,10 @@ export default function Games() {
       return null
     })
 
-    if (!cloudGame) return
+    if (!cloudGame) {
+      setLoadingGameId(null)
+      return
+    }
     await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
 
     const sport = sports.find(item => item.id === cloudGame.sportId)
