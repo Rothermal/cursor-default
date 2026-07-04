@@ -1,4 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+
+/**
+ * Presses within this window after opening are ignored. Combined with the
+ * pointer-down arming check below, this stops the court tap that opened the
+ * popup from also activating whichever button renders under the finger.
+ */
+const ARMING_DELAY_MS = 300
 
 /** Stat-only events the popup can record (no court location stored). */
 export const COURT_STAT_EVENTS = [
@@ -37,6 +44,34 @@ export default function CourtEventPopup({
   onPick,
   onCancel,
 }: CourtEventPopupProps) {
+  /**
+   * Ghost-tap guard: the court tap that opens the popup fires a trailing `click` at the
+   * same screen point, which would instantly press whatever button rendered under the
+   * finger. A press only counts when its `pointerdown` landed on the popup itself, at
+   * least ARMING_DELAY_MS after opening — the opening tap's pointer-down happened before
+   * the popup existed, so it can never arm it.
+   */
+  const openedAtRef = useRef(Date.now())
+  const armedRef = useRef(false)
+
+  const handlePointerDownCapture = () => {
+    if (Date.now() - openedAtRef.current >= ARMING_DELAY_MS) {
+      armedRef.current = true
+    }
+  }
+
+  const pick = (event: CourtEvent) => {
+    if (!armedRef.current) return
+    armedRef.current = false
+    onPick(event)
+  }
+
+  const cancel = () => {
+    if (!armedRef.current) return
+    armedRef.current = false
+    onCancel()
+  }
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel()
@@ -48,7 +83,8 @@ export default function CourtEventPopup({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onClick={onCancel}
+      onPointerDownCapture={handlePointerDownCapture}
+      onClick={cancel}
     >
       <div
         className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-4 space-y-3"
@@ -64,7 +100,7 @@ export default function CourtEventPopup({
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => onPick({ kind: 'shot', made: true })}
+            onClick={() => pick({ kind: 'shot', made: true })}
             className="py-4 rounded-xl text-base font-bold text-white bg-emerald-600
                        active:bg-emerald-700 active:scale-95 transition-transform"
           >
@@ -72,7 +108,7 @@ export default function CourtEventPopup({
           </button>
           <button
             type="button"
-            onClick={() => onPick({ kind: 'shot', made: false })}
+            onClick={() => pick({ kind: 'shot', made: false })}
             className="py-4 rounded-xl text-base font-bold text-white bg-rose-600
                        active:bg-rose-700 active:scale-95 transition-transform"
           >
@@ -85,7 +121,7 @@ export default function CourtEventPopup({
             <button
               key={statId}
               type="button"
-              onClick={() => onPick({ kind: 'stat', statId })}
+              onClick={() => pick({ kind: 'stat', statId })}
               className="py-3 px-1 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100
                          border border-slate-200 active:bg-slate-200 active:scale-95 transition-transform"
             >
@@ -100,7 +136,7 @@ export default function CourtEventPopup({
 
         <button
           type="button"
-          onClick={onCancel}
+          onClick={cancel}
           className="w-full py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-300
                      active:scale-95 transition-transform"
         >
