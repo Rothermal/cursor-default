@@ -22,8 +22,12 @@ import {
 } from './courtGeometry'
 
 const TAP_DEBOUNCE_MS = 120
-/** Screen-px movement beyond which a pointer gesture counts as a scroll, not a tap (D9). */
-const TAP_MOVE_TOLERANCE_PX = 10
+/**
+ * Screen-px movement beyond which a pointer gesture counts as a scroll, not a tap (D9).
+ * 10px rejected too many real taps in device testing (fingers drift a few px); 18px keeps
+ * taps forgiving while a deliberate scroll flick still travels well past it.
+ */
+const TAP_MOVE_TOLERANCE_PX = 18
 
 interface BasketballCourtProps {
   shots: ShotRecord[]
