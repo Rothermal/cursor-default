@@ -261,6 +261,11 @@ export default function GameTracker() {
       {sport.id === 'basketball' && (
         <div className="px-3 py-2 max-w-lg mx-auto w-full">
           <ShotChartPanel />
+          <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
+            The court popup and the buttons below adjust the same player stats — the popup is
+            fast in-play entry (shots keep their location); the buttons are for direct entry
+            and corrections.
+          </p>
         </div>
       )}
 
@@ -374,7 +379,7 @@ export default function GameTracker() {
                         action.id === '3pt_miss' ||
                         action.id === 'ft' ||
                         action.id === 'ft_miss')
-                        ? 'Shots from the Shot Chart include court location. Taps here count in stats only and do not add markers on the chart.'
+                        ? 'Shots logged from the court above store a location marker and count here too. Taps here count in stats only (no marker). Both adjust the same stat — use +/− to correct.'
                         : undefined
 
                     const buttonKey = action.periodScoped ? `${action.id}_p${currentPeriod}` : action.id

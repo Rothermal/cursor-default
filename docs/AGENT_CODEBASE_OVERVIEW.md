@@ -78,8 +78,8 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/setup` | GameSetup | Team, opponent, date, season/tournament |
 | `/players` | PlayerSetup | Roster + active player |
 | `/checkout` | GameCheckout | Multi-recorder stat checkout (cloud games) |
-| `/game` | GameTracker | Live stat entry, scoreboard, undo |
-| `/shot-chart` | ShotChart | Basketball court capture (from tracker) |
+| `/game` | GameTracker | Live stat entry, scoreboard, undo; basketball: inline court + event popup |
+| `/shot-chart` | ShotChart | **Legacy** — redirects to `/game` (court is inline now) |
 | `/summary` | GameSummary | Post-game review, finalize, sync |
 | `/admin` | Admin | Seasons, sport toggles, data management |
 | `/teams` | Teams | Team rosters, invites |
@@ -91,7 +91,7 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/tournament-stats` | TournamentStats | Tournament-scoped stats |
 | `/dev/shot-chart` | ShotChartPreview | **Dev only** — no auth, sample data |
 
-**Primary live-game path:** `/` → `/setup` → `/players` → `/checkout?` → `/game` ↔ `/shot-chart` → `/summary`
+**Primary live-game path:** `/` → `/setup` → `/players` → `/checkout?` → `/game` → `/summary`
 
 ---
 

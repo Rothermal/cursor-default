@@ -177,19 +177,19 @@ Three shippable phases. Each phase ends green (`pnpm build`/`lint`) and is indep
 Goal: collapse the two pages into one scroll, with a sticky player strip; the court keeps
 its **current** made/missed toggle recording for now (de-risk layout before the popup).
 
-- [ ] **Create `PlayerSelectorStrip.tsx`** from the existing `GameTracker` strip markup
+- [x] **Create `PlayerSelectorStrip.tsx`** from the existing `GameTracker` strip markup
   (`sortTeamPlayersFirst`, team divider, optional `+`); add a `sticky?` prop.
-- [ ] **Create `ShotChartPanel.tsx`** by lifting the court body out of `ShotChart.tsx`
+- [x] **Create `ShotChartPanel.tsx`** by lifting the court body out of `ShotChart.tsx`
   (court, `ShootingSummary`, undo last shot / clear), reading `useGame()`; keep the
   made/missed toggle for Phase 1.
-- [ ] **Modify `GameTracker.tsx`**: render Score → sticky `PlayerSelectorStrip` →
+- [x] **Modify `GameTracker.tsx`**: render Score → sticky `PlayerSelectorStrip` →
   `ShotChartPanel` (basketball only) → existing **full** stat grid → notes, all in one
   scroll; remove the "Shot chart" nav button.
-- [ ] **Redirect `/shot-chart` → `/game`** (`App.tsx` / reduce `ShotChart.tsx`).
-- [ ] **Phantom-tap discrimination** in `BasketballCourt` (~10px pointer-move threshold).
-- [ ] `pnpm build` + `pnpm lint`; manual: basketball game scrolls as one page; sticky
+- [x] **Redirect `/shot-chart` → `/game`** (`App.tsx` / reduce `ShotChart.tsx`).
+- [x] **Phantom-tap discrimination** in `BasketballCourt` (~10px pointer-move threshold).
+- [x] `pnpm build` + `pnpm lint` green; manual (pending user QA): basketball game scrolls as one page; sticky
   strip keeps the active player visible; scrolling over the court records no shots.
-- [ ] **Commits:** `refactor: extract PlayerSelectorStrip`; `refactor: extract ShotChartPanel`;
+- [x] **Commits:** `refactor: extract PlayerSelectorStrip`; `refactor: extract ShotChartPanel`;
   `feat: single-page Game Tracker with inline court + sticky player strip`;
   `feat: redirect legacy /shot-chart to /game`; `fix: ignore court scroll gestures as taps`.
 
@@ -197,30 +197,30 @@ its **current** made/missed toggle recording for now (de-risk layout before the 
 
 Goal: add the event popup as the court's input; the grid stays full.
 
-- [ ] **Create `CourtEventPopup.tsx`**: props `{ playerId, playerLabel, x, y, shotType,
+- [x] **Create `CourtEventPopup.tsx`**: props `{ playerId, playerLabel, x, y, shotType,
   onPick(event), onCancel }`. Renders Made/Miss (primary) + Off Reb/Def Reb/Steal/Block/
   Assist (secondary) + Cancel; shows the detected `shotType`; dismiss on Cancel or
   tap-outside.
-- [ ] **Modify `ShotChartPanel`/`BasketballCourt`**: a confirmed tap opens the popup with
+- [x] **Modify `ShotChartPanel`/`BasketballCourt`**: a confirmed tap opens the popup with
   the tapped `(x,y)` and the active `playerId`; remove the made/missed mode toggle.
-- [ ] **Wire dispatches** per §2.2: Made/Miss → `ADD_SHOT`; Off/Def Reb, Steal, Block,
+- [x] **Wire dispatches** per §2.2: Made/Miss → `ADD_SHOT`; Off/Def Reb, Steal, Block,
   Assist → `INCREMENT_STAT`. Verify undo (shot `shotId` link; stat increments) works.
-- [ ] `pnpm build` + `pnpm lint`; manual: tap court → popup → each branch updates the
+- [x] `pnpm build` + `pnpm lint` green; manual (pending user QA): tap court → popup → each branch updates the
   selected player's stats; only Made/Miss leave a marker; Cancel logs nothing; undo
   reverts the last event; the grid buttons still adjust the same stats.
-- [ ] **Commit:** `feat: court event capture popup (shot/rebound/steal/block/assist)`.
+- [x] **Commit:** `feat: court event capture popup (shot/rebound/steal/block/assist)`.
 
 ### Phase 3 — Dual-input clarity + docs
 
 Goal: make the two input paths understandable and document the flow (no grid shrink).
 
-- [ ] **Modify `GameTracker.tsx`**: update the scoring-tile tooltips and add a short note
+- [x] **Modify `GameTracker.tsx`**: update the scoring-tile tooltips and add a short note
   that the court popup and the grid both adjust the same player stats (popup = fast entry +
   location for shots; buttons = direct entry/corrections).
-- [ ] **Docs:** `AGENTS.md`, `docs/REGRESSION_TESTING.md` §4d, `README.md`.
-- [ ] `pnpm build` + `pnpm lint`; manual: tooltips read correctly; entering a stat via the
+- [x] **Docs:** `AGENTS.md`, `docs/REGRESSION_TESTING.md` §4d, `README.md`.
+- [x] `pnpm build` + `pnpm lint` green; manual (pending user QA): tooltips read correctly; entering a stat via the
   popup and adjusting it via its button behaves additively as documented.
-- [ ] **Commit:** `docs+ux: clarify court popup vs grid dual input; document court capture flow`.
+- [x] **Commit:** `docs+ux: clarify court popup vs grid dual input; document court capture flow`.
 
 ## 4. Testing
 

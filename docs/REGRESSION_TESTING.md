@@ -133,9 +133,32 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 |------|--------|------------|
 | 4d.1 | `pnpm dev` → open `http://localhost:5173/#/dev/shot-chart` (HashRouter) | **Shot chart preview (dev)** page with sample made/miss markers on the court |
 | 4d.2 | (Optional) With Supabase configured | App **skips the auth screen** when the URL hash contains `/dev/shot-chart` so the preview loads immediately |
-| 4d.3 | Production build (`pnpm build` + `pnpm preview`) | The `/dev/shot-chart` route is **not** registered in production bundles; use a **real** basketball game and `#/shot-chart` for end-user testing |
+| 4d.3 | Production build (`pnpm build` + `pnpm preview`) | The `/dev/shot-chart` route is **not** registered in production bundles; use a **real** basketball game and the inline court on `#/game` for end-user testing |
 
-**Related:** Full shot chart flow (stats, cloud) — start a basketball game → **Shot chart** on Game Tracker → `#/shot-chart`. See [completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md).
+**Related:** Full court capture flow (stats, cloud) — start a basketball game → court is inline on Game Tracker (`#/game`), see **§4e**. See [completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md) and [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
+
+---
+
+## 4e. Court event capture (basketball Game Tracker)
+
+**Precondition:** Basketball selected (enabled). Works in both offline and cloud modes. The court is **inline** on Game Tracker — one scrollable page: Score → sticky player strip → court → full stat grid → notes.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4e.1 | Start a basketball game → Game Tracker | Single scroll page; half-court below the player strip; **no** separate "Shot chart" button |
+| 4e.2 | Scroll down to the stat grid | Player-select strip stays **pinned** at the top (score scrolls away); active player always visible |
+| 4e.3 | Tap the court (inside the paint) | `CourtEventPopup` opens: player label, "Detected: 2-pointer", **Made / Missed** buttons, Off Reb · Def Reb · Steal · Block · Assist, Cancel. Nothing is logged yet |
+| 4e.4 | Tap **Made** | Popup closes; green marker at tap point; selected player's `2PT` +1; scoreboard +2 |
+| 4e.5 | Tap the court beyond the arc → **Missed** | "Detected: 3-pointer"; red ✕ marker; `3 Miss` +1; score unchanged |
+| 4e.6 | Tap court → **Off Reb** (repeat for Def Reb / Steal / Block / Assist) | Popup closes; the matching stat (`OFF`/`DEF`/`STL`/`BLK`/`AST`) +1; **no marker** on the court |
+| 4e.7 | Tap court → **Cancel** (or tap outside the popup) | Popup dismisses; no stat, no marker |
+| 4e.8 | Start a scroll gesture with the finger **on the court** | Page scrolls; no popup opens (tap-vs-scroll discrimination, ~10px tolerance) |
+| 4e.9 | Select the opponent team chip (★) → tap court → Made | Shot attributed to the opponent pseudo-player |
+| 4e.10 | Tap **↩ Undo** (bottom bar) or **↩ Undo last shot** after a popup shot | Marker removed and stat reverted |
+| 4e.11 | Log a made 2 via popup, then tap the `2PT` grid button | Both increment the same stat (additive — dual input by design); correct with the button's − or Undo |
+| 4e.12 | Open `#/shot-chart` directly | Redirects to `#/game` (or home when no basketball game) |
+| 4e.13 | Non-basketball sport (e.g. soccer) → Game Tracker | Page unchanged: no court, full grid only |
+| 4e.14 | Reload mid-game | Shots/stats restored from `localStorage`; markers still on the court |
 
 ---
 
@@ -295,7 +318,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 ## Notes
 
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
-- **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev).
+- **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
 - **Migrations:** If a script fails on cloud features, confirm migrations through **019** are applied in Supabase SQL Editor when using seasons, `team_players`, and data-integrity constraints (`019_data_integrity_constraints.sql`). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if upgrading an existing project. For **player merge** (Teams → Merge players), apply **`024_player_merge_rpcs.sql`** ([completed/DESIGN_PLAYER_MERGE.md](completed/DESIGN_PLAYER_MERGE.md)).
 
