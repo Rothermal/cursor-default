@@ -19,6 +19,8 @@ import {
 } from '../lib/shotChartViews'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { loadGameShotChartForReview } from '../lib/cloudSync'
+import type { ShotRecord } from '../types'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
 type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
@@ -65,6 +67,12 @@ export default function GameSummary() {
   const [summaryTab, setSummaryTab] = useState<'players' | 'team' | 'team_stats' | 'shot_chart'>('players')
   /** Shot chart tab view filter (F2); defaults to All for whole-game review (D12). Read-only — never changes `activePlayerId`. */
   const [shotViewSelection, setShotViewSelection] = useState<ShotChartSelection>({ kind: 'all' })
+  /**
+   * All-recorder review shots for cloud games (F3). Display-only local state — NEVER
+   * dispatched into `GameState.shotChart` (D6: review shots must not sync). Null until
+   * loaded; falls back to the viewer's own hydrated `shotChart`.
+   */
+  const [reviewShotChart, setReviewShotChart] = useState<ShotRecord[] | null>(null)
   /** Final games: overlay from get_game_team_stats (resolved placeholder stats). */
   const [teamTrackedStatsByRemoteId, setTeamTrackedStatsByRemoteId] = useState<
     Record<string, Record<string, number>> | null
@@ -144,7 +152,35 @@ export default function GameSummary() {
       (hasTrackedTeamSide(teamStatHomeStats, sport) || hasTrackedTeamSide(teamStatOppStats, sport))
   )
 
-  const showShotChartTab = Boolean(sport?.id === 'basketball' && shotChart.length > 0)
+  // All-recorder review shots for any cloud game, final or in-progress (F3 D5). Keyed on
+  // gameId; resolvedKey refetches after a primary-recorder reassignment (D11).
+  useEffect(() => {
+    setReviewShotChart(null)
+    if (!isConfigured || !supabase || !gameId || sport?.id !== 'basketball') return
+
+    let cancelled = false
+    const load = async () => {
+      try {
+        const result = await loadGameShotChartForReview(gameId, playerIdMap)
+        if (!cancelled) setReviewShotChart(result.shotChart)
+      } catch {
+        // Review load is best-effort; fall back to the viewer's own hydrated shots.
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- playerIdMap is stable per gameId
+  }, [isConfigured, gameId, sport?.id, resolvedKey])
+
+  /** Source for the shot chart tab: review set when loaded, else own hydrated shots (D7). */
+  const summaryShotChart = reviewShotChart ?? shotChart
+  const isReviewShotChart = reviewShotChart !== null && reviewShotChart.length > 0
+
+  const showShotChartTab = Boolean(
+    sport?.id === 'basketball' && (shotChart.length > 0 || summaryShotChart.length > 0)
+  )
 
   useEffect(() => {
     if (!showTeamStatsTab && summaryTab === 'team_stats') {
@@ -875,7 +911,7 @@ export default function GameSummary() {
         {teamStatsSummaryEl}
 
         {summaryTab === 'shot_chart' && (() => {
-          const visibleShots = shotsForSelection(shotChart, players, shotViewSelection)
+          const visibleShots = shotsForSelection(summaryShotChart, players, shotViewSelection)
           return (
             <div className="space-y-3 mb-6">
               <PlayerSelectorStrip
@@ -898,6 +934,12 @@ export default function GameSummary() {
                   {shootingLine(visibleShots)}
                 </p>
               </div>
+              {isReviewShotChart && (
+                <p className="text-xs text-slate-400 px-1">
+                  Combined from all recorders — each player&apos;s shots come from their
+                  primary recorder&apos;s chart.
+                </p>
+              )}
               <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                 <BasketballCourt shots={visibleShots} className="w-full" />
               </div>
