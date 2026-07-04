@@ -12,6 +12,7 @@ import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
+import type { ShotChartSelection } from '../lib/shotChartViews'
 
 /** Strip `_pN` suffix for config lookup (undo log stores scoped ids). */
 function baseStatId(statId: string): string {
@@ -80,6 +81,9 @@ export default function GameTracker() {
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [localNotes, setLocalNotes] = useState(notes)
+  // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
+  // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
+  const [showAllShots, setShowAllShots] = useState(false)
 
   const teamRules = useMemo(
     () => (sport ? resolveTeamStatsConfig(sport, teamStatsConfig) : null),
@@ -141,6 +145,10 @@ export default function GameTracker() {
   }
 
   const activePlayer = players.find(p => p.id === activePlayerId) || players[0]
+  const isBasketball = sport.id === 'basketball'
+  const shotChartSelection: ShotChartSelection = showAllShots
+    ? { kind: 'all' }
+    : { kind: 'player', playerId: activePlayer.id }
   const showTeamStatGrid = Boolean(activePlayer.isTeamPlayer && sport.teamCategories?.length)
   const showPeriodToggle =
     showTeamStatGrid && hasPeriodScopedActions(sport.teamCategories)
@@ -221,10 +229,15 @@ export default function GameTracker() {
       <PlayerSelectorStrip
         players={players}
         activePlayerId={activePlayer.id}
-        onSelectPlayer={playerId => dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })}
+        onSelectPlayer={playerId => {
+          setShowAllShots(false)
+          dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })
+        }}
         activeBgClass={sport.theme.bg}
         onAddPlayer={() => setShowAddPlayer(!showAddPlayer)}
         sticky
+        onSelectAll={isBasketball ? () => setShowAllShots(true) : undefined}
+        allActive={showAllShots}
       />
 
       {showAddPlayer && (
@@ -258,9 +271,9 @@ export default function GameTracker() {
         </div>
       )}
 
-      {sport.id === 'basketball' && (
+      {isBasketball && (
         <div className="px-3 py-2 max-w-lg mx-auto w-full">
-          <ShotChartPanel />
+          <ShotChartPanel selection={shotChartSelection} />
           <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
             The court popup and the buttons below adjust the same player stats — the popup is
             fast in-play entry (shots keep their location); the buttons are for direct entry

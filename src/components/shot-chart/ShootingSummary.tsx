@@ -4,6 +4,8 @@ import type { ShotRecord, ShotZone } from '../../types'
 interface ShootingSummaryProps {
   shots: ShotRecord[]
   className?: string
+  /** Copy when `shots` is empty (view-specific empty states, F2 §3.4). */
+  emptyMessage?: string
 }
 
 const ROW1_ZONES: { zone: ShotZone; shortLabel: string }[] = [
@@ -37,7 +39,11 @@ function ZoneCell({
   )
 }
 
-export default function ShootingSummary({ shots, className }: ShootingSummaryProps) {
+export default function ShootingSummary({
+  shots,
+  className,
+  emptyMessage = 'No chart shots recorded.',
+}: ShootingSummaryProps) {
   const byZone = useMemo(() => {
     const counts: Record<ShotZone, { made: number; att: number }> = {
       restricted: { made: 0, att: 0 },
@@ -61,7 +67,7 @@ export default function ShootingSummary({ shots, className }: ShootingSummaryPro
 
   if (shots.length === 0) {
     return (
-      <p className={`text-sm text-slate-500 ${className ?? ''}`.trim()}>No chart shots recorded.</p>
+      <p className={`text-sm text-slate-500 ${className ?? ''}`.trim()}>{emptyMessage}</p>
     )
   }
 
