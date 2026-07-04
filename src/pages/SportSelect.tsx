@@ -3,6 +3,8 @@ import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import { sports } from '../config/sports'
+import { getDisplayedHomeScore } from '../lib/gameScore'
+import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 
 export default function SportSelect() {
   const navigate = useNavigate()
@@ -33,6 +35,20 @@ export default function SportSelect() {
   })()
 
   const hasActiveGame = state.sport && state.players.length > 0
+
+  // Live score, mirroring Scoreboard.tsx exactly: roster players only (no team
+  // pseudo-players) so the card always matches the in-game scoreboard (F4 D1).
+  const liveScoreLine = (() => {
+    if (!hasActiveGame) return null
+    const rosterPlayers = state.players.filter(p => !isTeamPseudoPlayer(p))
+    const homeScore = getDisplayedHomeScore(
+      state.sport!,
+      rosterPlayers,
+      state.homeTeamScore,
+      state.homeScoreAdjustment
+    )
+    return `${homeScore}–${state.opponentScore}`
+  })()
 
   const handleSelect = (sportId: string) => {
     if (
@@ -77,6 +93,11 @@ export default function SportSelect() {
                 <p className="text-sm text-blue-600">
                   {state.gameInfo?.teamName} vs {state.gameInfo?.opponentName}
                 </p>
+                {liveScoreLine && (
+                  <p className="text-base font-bold text-blue-800 tabular-nums mt-0.5">
+                    {liveScoreLine}
+                  </p>
+                )}
                 {syncStatusLabel && (
                   <p className="text-xs text-blue-500 mt-1">{syncStatusLabel}</p>
                 )}
