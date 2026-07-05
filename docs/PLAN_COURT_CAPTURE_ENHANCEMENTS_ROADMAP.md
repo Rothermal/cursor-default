@@ -2,7 +2,7 @@
 
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
 > Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
-> F5, F6, F7, and F12 have expanded implementation plans. F8-F11 are still sketches
+> F5 is implemented. F6, F7, and F12 have expanded implementation plans. F8-F11 are still sketches
 > (goal, dependency, phases, files, effort, open question); when one is picked up, expand
 > it to a full plan with a "Pre-handoff design decisions" section.
 
@@ -28,14 +28,14 @@ These are the user's six requested enhancements plus the deferred "Option B" hyb
 ## Recommended implementation order (whole program)
 
 Foundation first, then attribution-correctness wins, then progressive polish, with the
-speculative hybrid gated on real use. F1-F4 have landed; F3/F4 still have Supabase-heavy
+speculative hybrid gated on real use. F1-F5 have landed; F3/F4 still have Supabase-heavy
 manual QA items tracked in [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
 
 ```
 F1  Single-page tracker + Court Event Capture (implemented)
  ├─ F2  Per-player / team shot filtering        (implemented)
  ├─ F3  Cloud-saved game shot review             (implemented; two-user QA pending)
- ├─ F5  Auto 2/3 override chip                   (tiny; correctness)
+ ├─ F5  Auto 2/3 override chip                   (implemented)
  ├─ F6  In-popup player confirm/switch           (attribution safety; user's top pain)
  ├─ F12 Recent-events undo popup                 (correction UX; PRECEDES F7)
  ├─ F7  Assist-linking on a made shot            (two-step undo, made transparent by F12)
@@ -47,11 +47,11 @@ F4  In-progress scores on resume UI              (implemented; cloud-list QA pen
 ```
 
 **Hard constraints for remaining work:** **F12 before F7** (F7's two-step assist undo
-relies on F12's visible event list). F5/F6/F8/F9/F10 can be sequenced by product priority.
+relies on F12's visible event list). F6/F8/F9/F10 can be sequenced by product priority.
 F11 should stay gated on live-use feedback.
 
-**Why this order:** F5 and F6 are cheap capture-loop wins (correct shot value; confirmed
-player). F12 precedes F7 so the recent-events popup makes F7's two-step assist undo
+**Why this order:** F6 is the next cheap capture-loop attribution win (confirmed player).
+F12 precedes F7 so the recent-events popup makes F7's two-step assist undo
 transparent (no reducer change). F8-F10 are progressive polish. F11 is intentionally last:
 build it only if live testing shows the extra tap for block/steal/assist is real friction.
 

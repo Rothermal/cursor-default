@@ -106,29 +106,29 @@ No `types.ts`/reducer change — `ADD_SHOT` already takes `shotType` + `zone`.
 
 ### Task 1: Zone-coherence helper + test (TDD)
 
-- [ ] **Add a test** for `zoneForForcedShotType`:
+- [x] **Add a test** for `zoneForForcedShotType`:
   - forced `'3pt'` at any `(x,y)` → `'three'`.
   - forced `'2pt'` at a location that classifies as `'three'` → `'mid_range'`.
   - forced `'2pt'` at a paint/restricted/mid location → that same zone.
   - chip matches detection → equals `classifyShotZone(x,y)`.
-- [ ] Run the test. Expected: FAIL (helper missing).
-- [ ] **Implement `zoneForForcedShotType`** per §2.3.
-- [ ] Run the test. Expected: PASS.
-- [ ] **Commit:** `feat: add zoneForForcedShotType helper for shot-value override`
+- [x] Run the test. Expected: FAIL (helper missing). Failed as expected.
+- [x] **Implement `zoneForForcedShotType`** per §2.3.
+- [x] Run the test. Expected: PASS. `pnpm.cmd test src/components/shot-chart/courtGeometry.test.ts`
+- [x] **Commit:** `feat: add zoneForForcedShotType helper for shot-value override`
 
 ### Task 2: 2PT/3PT chip in the popup
 
-- [ ] **Modify `CourtEventPopup.tsx`**: add `const [shotType, setShotType] = useState<'2pt'|'3pt'>(isThreePointer(x,y) ? '3pt' : '2pt')`
+- [x] **Modify `CourtEventPopup.tsx`**: add `const [shotType, setShotType] = useState<'2pt'|'3pt'>(isThreePointer(x,y) ? '3pt' : '2pt')`
   and a segmented `2PT / 3PT` control bound to it.
-- [ ] On **Made/Missed**, build the `ShotRecord` with `shotType` = the chip value and
+- [x] On **Made/Missed**, build the `ShotRecord` with `shotType` = the chip value and
   `zone = zoneForForcedShotType(x, y, shotType)`; dispatch `ADD_SHOT` (made/missed per the
   button). The secondary actions ignore the chip.
-- [ ] Re-default the chip whenever a new tap opens the popup (per-shot scope, §2.4).
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] Re-default the chip whenever a new tap opens the popup (per-shot scope, §2.4).
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. Build passed; lint passed with existing fast-refresh warnings.
 - [ ] Manual: tap just inside the arc → defaults **2PT**; flip to **3PT** → Made →
   `3pt` increments, score +3, marker at the tapped spot, summary counts it under 3-Point;
   tap clearly beyond the arc → defaults **3PT**; flip to **2PT** → counts as a 2 / mid-range.
-- [ ] **Commit:** `feat: manual 2PT/3PT override in the court event popup`
+- [x] **Commit:** `feat: manual 2PT/3PT override in the court event popup`
 
 ## 4. Testing
 

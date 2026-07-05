@@ -4,7 +4,7 @@ Umbrella doc for the StatKeeper basketball shot-tracking revamp. It captures the
 context, the data model the work builds on, the recommended build order, and the
 cross-cutting decisions so the individual plans stay consistent.
 
-> **Status:** F1-F4 are implemented in the app and documented in the linked plans. F5, F6,
+> **Status:** F1-F5 are implemented in the app and documented in the linked plans. F6,
 > F7, and F12 have expanded implementation plans; F8-F11 remain roadmap sketches until
 > promoted to full plans. Manual Supabase-heavy QA is still tracked in
 > [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
@@ -26,7 +26,8 @@ cross-cutting decisions so the individual plans stay consistent.
 | **F2** | Per-player + team shot views | [PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md](PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md) | **Implemented.** Filter the inline court to the selected player; team selections show every player's shots on that side; All shows everything. |
 | **F3** | Shot trackers on cloud-saved games | [PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md](PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md) | **Implemented; needs two-user QA.** Show full all-recorder shot charts when reviewing in-progress/final cloud games. |
 | **F4** | In-progress scores on the resume UI | [PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | **Implemented; needs cloud-list QA.** Live score on the home active-game card and the Cloud Games list. |
-| **F5-F12** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | **Next court-capture work.** 2/3 override (F5), in-popup player switch (F6), assist-linking (F7), per-player line (F8), rebound-after-miss (F9), sequence numbers (F10), Option B quick buttons (F11), recent-events undo popup (F12). |
+| **F5** | Auto 2/3 with manual override chip | [PLAN_F5_AUTO_2_3_OVERRIDE.md](PLAN_F5_AUTO_2_3_OVERRIDE.md) | **Implemented.** The popup's 2PT/3PT value defaults from court location and can be overridden before logging Made/Missed. |
+| **F6-F12** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | **Next court-capture work.** In-popup player switch (F6), assist-linking (F7), per-player line (F8), rebound-after-miss (F9), sequence numbers (F10), Option B quick buttons (F11), recent-events undo popup (F12). |
 
 F1 is the foundation for F2, F3, and F5-F12. F4 is independent and has landed.
 
@@ -126,7 +127,7 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 F1  Single-page tracker + Court Event Capture     (implemented)
  ├─ F2  Per-player / team shot filtering           (implemented)
  ├─ F3  Cloud-saved game shot review               (implemented; two-user QA pending)
- ├─ F5  Auto 2/3 override chip                      (tiny; correctness)
+ ├─ F5  Auto 2/3 override chip                      (implemented)
  ├─ F6  In-popup player confirm/switch             (attribution; top pain)
  ├─ F12 Recent-events undo popup                   (correction UX; PRECEDES F7)
  ├─ F7  Assist-linking on a made shot              (two-step undo via F12)
@@ -136,7 +137,7 @@ F1  Single-page tracker + Court Event Capture     (implemented)
  └─ F11 Hybrid quick buttons (Option B)            (only if testing shows it's needed)
 F4  In-progress scores on resume UI                (implemented; cloud-list QA pending)
 
-Hard constraints for remaining work: F12 before F7. F5/F6/F8/F9/F10 can be sequenced by
+Hard constraints for remaining work: F12 before F7. F6/F8/F9/F10 can be sequenced by
 product priority; F11 should stay gated on live-use feedback.
 ```
 
