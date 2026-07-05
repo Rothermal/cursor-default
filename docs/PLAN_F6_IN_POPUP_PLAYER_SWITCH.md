@@ -97,25 +97,25 @@ No `types.ts`/reducer change — `SET_ACTIVE_PLAYER` already exists.
 
 ### Task 1: Player picker UI in the popup
 
-- [ ] **Modify `CourtEventPopup.tsx`**: make the header (player name) a button with a `▾`
+- [x] **Modify `CourtEventPopup.tsx`**: make the header (player name) a button with a `▾`
   affordance; add local `const [pickerOpen, setPickerOpen] = useState(false)`.
-- [ ] Render an inline picker when `pickerOpen`: list `sortTeamPlayersFirst(players)` (team
+- [x] Render an inline picker when `pickerOpen`: list `sortTeamPlayersFirst(players)` (team
   pseudo-players first, then individuals), highlighting the current player.
-- [ ] Decide reuse vs. new: if `PlayerSelectorStrip` can render compactly without an "All"
+- [x] Decide reuse vs. new: if `PlayerSelectorStrip` can render compactly without an "All"
   chip / add button, reuse it; otherwise add a minimal `PlayerPickerMenu`.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
-- [ ] **Commit:** `feat: player picker affordance in court event popup`
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. Build passed; lint passed with existing fast-refresh warnings.
+- [x] **Commit:** `feat: player picker affordance in court event popup`
 
 ### Task 2: Wire the switch (global active player)
 
-- [ ] On pick: `dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })`, close the picker, keep
+- [x] On pick: `dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })`, close the picker, keep
   the popup open showing the new player; the popup's pending `(x,y)`/shot-value are preserved.
-- [ ] Ensure the next event (shot or secondary action) is attributed to the new active player.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] Ensure the next event (shot or secondary action) is attributed to the new active player.
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass. Build passed; lint passed with existing fast-refresh warnings.
 - [ ] Manual: open popup for #23 → switch to #11 → Made → `2pt`/`3pt` credited to **#11**;
   sticky strip now highlights #11; after closing, the inline court shows #11's shots
   (F2 coupling).
-- [ ] **Commit:** `feat: switch attributed player inside the court event popup`
+- [x] **Commit:** `feat: switch attributed player inside the court event popup`
 
 ## 4. Testing
 

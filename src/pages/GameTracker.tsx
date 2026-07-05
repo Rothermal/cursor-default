@@ -139,6 +139,14 @@ export default function GameTracker() {
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
   }, [sport, gameInfo, players, dispatch])
 
+  const handleSelectPlayer = useCallback(
+    (playerId: string) => {
+      setShowAllShots(false)
+      dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })
+    },
+    [dispatch]
+  )
+
   if (!sport || !gameInfo || players.length === 0) {
     navigate('/')
     return null
@@ -229,10 +237,7 @@ export default function GameTracker() {
       <PlayerSelectorStrip
         players={players}
         activePlayerId={activePlayer.id}
-        onSelectPlayer={playerId => {
-          setShowAllShots(false)
-          dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })
-        }}
+        onSelectPlayer={handleSelectPlayer}
         activeBgClass={sport.theme.bg}
         onAddPlayer={() => setShowAddPlayer(!showAddPlayer)}
         sticky
@@ -273,7 +278,7 @@ export default function GameTracker() {
 
       {isBasketball && (
         <div className="px-3 py-2 max-w-lg mx-auto w-full">
-          <ShotChartPanel selection={shotChartSelection} />
+          <ShotChartPanel selection={shotChartSelection} onSelectPlayer={handleSelectPlayer} />
           <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
             The court popup and the buttons below adjust the same player stats — the popup is
             fast in-play entry (shots keep their location); the buttons are for direct entry

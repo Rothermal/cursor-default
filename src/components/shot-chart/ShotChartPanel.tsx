@@ -61,9 +61,11 @@ interface ShotChartPanelProps {
   /** View filter (F2): which shots the court and zone summary display. Recording always
    *  targets the active player regardless of the view (D14). */
   selection: ShotChartSelection
+  /** Same action as the sticky player strip; used by F6's in-popup player switch. */
+  onSelectPlayer: (playerId: string) => void
 }
 
-export default function ShotChartPanel({ selection }: ShotChartPanelProps) {
+export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
   const { players, activePlayerId, shotChart, actionLog } = state
   const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
@@ -200,9 +202,12 @@ export default function ShotChartPanel({ selection }: ShotChartPanelProps) {
         Clear all chart shots
       </button>
 
-      {pendingTap && (
+      {pendingTap && effectivePlayerId && (
         <CourtEventPopup
           playerLabel={popupPlayerLabel(effectivePlayer)}
+          players={players}
+          activePlayerId={effectivePlayerId}
+          onSelectPlayer={onSelectPlayer}
           shotType={pendingTap.shotType}
           onPick={handlePopupPick}
           onCancel={() => setPendingTap(null)}
