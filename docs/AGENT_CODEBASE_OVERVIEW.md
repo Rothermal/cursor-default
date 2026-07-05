@@ -204,7 +204,6 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`PLAN_F5_AUTO_2_3_OVERRIDE.md`](PLAN_F5_AUTO_2_3_OVERRIDE.md) | Next small court-capture correctness win: pre-log 2PT/3PT override |
 | [`PLAN_F6_IN_POPUP_PLAYER_SWITCH.md`](PLAN_F6_IN_POPUP_PLAYER_SWITCH.md) | Next attribution win: confirm/switch player inside `CourtEventPopup` |
 | [`PLAN_F12_RECENT_EVENTS_UNDO.md`](PLAN_F12_RECENT_EVENTS_UNDO.md) | Recent-events undo popup; build before F7 |
 | [`PLAN_F7_ASSIST_LINKING.md`](PLAN_F7_ASSIST_LINKING.md) | Assist-linking after made shots; depends on F12 for transparent undo |
@@ -212,16 +211,17 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue |
 | [`PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md`](PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md) | Team hub drill-down routes |
 
-**Court program status:** F1-F4 are implemented; manual Supabase-heavy QA remains in
-[`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). For remaining court work, F5/F6 are ready
-small slices, F12 must precede F7, F8-F10 are polish sketches, and F11 should stay gated on
-live-use feedback.
+**Court program status:** F1-F5 are implemented; manual Supabase-heavy QA remains in
+[`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). For remaining court work, F6 is the next
+small attribution slice, F12 must precede F7, F8-F10 are polish sketches, and F11 should
+stay gated on live-use feedback.
 
 ### Verification norms
 
 CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)): `pnpm lint` → `pnpm test` → `pnpm build`.
 
-Vitest covers **`src/lib/` pure helpers only**. UI validated manually via [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md).
+Vitest covers pure helpers in `src/lib/` plus small component-adjacent helpers such as
+court geometry. UI validated manually via [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md).
 
 When shipping a feature, plans typically call for updating this overview (if architecture changes), `AGENTS.md`, `REGRESSION_TESTING.md`, and `README.md`.
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * Presses within this window after opening are ignored. Combined with the
@@ -20,13 +20,13 @@ export type CourtStatEventId = (typeof COURT_STAT_EVENTS)[number]['statId']
 
 /** Choice made in the popup: a located shot, or a stat-only increment. */
 export type CourtEvent =
-  | { kind: 'shot'; made: boolean }
+  | { kind: 'shot'; made: boolean; shotType: '2pt' | '3pt' }
   | { kind: 'stat'; statId: CourtStatEventId }
 
 interface CourtEventPopupProps {
   /** Display label for the player the event will be attributed to (e.g. "#23 Jordan"). */
   playerLabel: string
-  /** Detected from the tap location via `isThreePointer` (override is F5, later). */
+  /** Detected from the tap location via `isThreePointer`; user can override before logging. */
   shotType: '2pt' | '3pt'
   onPick: (event: CourtEvent) => void
   /** Cancel button, tap-outside, and Escape all dismiss with no change (D8). */
@@ -44,6 +44,8 @@ export default function CourtEventPopup({
   onPick,
   onCancel,
 }: CourtEventPopupProps) {
+  const [selectedShotType, setSelectedShotType] = useState<'2pt' | '3pt'>(shotType)
+
   /**
    * Ghost-tap guard: the court tap that opens the popup fires a trailing `click` at the
    * same screen point, which would instantly press whatever button rendered under the
@@ -53,6 +55,10 @@ export default function CourtEventPopup({
    */
   const openedAtRef = useRef(Date.now())
   const armedRef = useRef(false)
+
+  useEffect(() => {
+    setSelectedShotType(shotType)
+  }, [shotType])
 
   const handlePointerDownCapture = () => {
     if (Date.now() - openedAtRef.current >= ARMING_DELAY_MS) {
@@ -70,6 +76,11 @@ export default function CourtEventPopup({
     if (!armedRef.current) return
     armedRef.current = false
     onCancel()
+  }
+
+  const chooseShotType = (nextShotType: '2pt' | '3pt') => {
+    if (!armedRef.current) return
+    setSelectedShotType(nextShotType)
   }
 
   useEffect(() => {
@@ -92,15 +103,32 @@ export default function CourtEventPopup({
       >
         <div>
           <h3 className="text-base font-bold text-slate-800 truncate">{playerLabel}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Detected: <span className="font-semibold">{shotType === '3pt' ? '3-pointer' : '2-pointer'}</span>
-          </p>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-slate-500">Shot value</span>
+            <div className="grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-100 p-1">
+              {(['2pt', '3pt'] as const).map(value => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => chooseShotType(value)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                    selectedShotType === value
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 active:text-slate-800'
+                  }`}
+                  aria-pressed={selectedShotType === value}
+                >
+                  {value === '3pt' ? '3PT' : '2PT'}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => pick({ kind: 'shot', made: true })}
+            onClick={() => pick({ kind: 'shot', made: true, shotType: selectedShotType })}
             className="py-4 rounded-xl text-base font-bold text-white bg-emerald-600
                        active:bg-emerald-700 active:scale-95 transition-transform"
           >
@@ -108,7 +136,7 @@ export default function CourtEventPopup({
           </button>
           <button
             type="button"
-            onClick={() => pick({ kind: 'shot', made: false })}
+            onClick={() => pick({ kind: 'shot', made: false, shotType: selectedShotType })}
             className="py-4 rounded-xl text-base font-bold text-white bg-rose-600
                        active:bg-rose-700 active:scale-95 transition-transform"
           >

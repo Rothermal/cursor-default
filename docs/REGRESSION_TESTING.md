@@ -147,7 +147,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 |------|--------|----------|
 | 4e.1 | Start a basketball game → Game Tracker | Single scroll page; half-court below the player strip; **no** separate "Shot chart" button |
 | 4e.2 | Scroll down to the stat grid | Player-select strip stays **pinned** at the top (score scrolls away); active player always visible |
-| 4e.3 | Tap the court (inside the paint) | `CourtEventPopup` opens: player label, "Detected: 2-pointer", **Made / Missed** buttons, Off Reb · Def Reb · Steal · Block · Assist, Cancel. Nothing is logged yet |
+| 4e.3 | Tap the court (inside the paint) | `CourtEventPopup` opens: player label, **2PT / 3PT** shot-value segmented control defaulted to **2PT**, **Made / Missed** buttons, Off Reb · Def Reb · Steal · Block · Assist, Cancel. Nothing is logged yet |
 | 4e.4 | Tap **Made** | Popup closes; green marker at tap point; selected player's `2PT` +1; scoreboard +2 |
 | 4e.5 | Tap the court beyond the arc → **Missed** | "Detected: 3-pointer"; red ✕ marker; `3 Miss` +1; score unchanged |
 | 4e.6 | Tap court → **Off Reb** (repeat for Def Reb / Steal / Block / Assist) | Popup closes; the matching stat (`OFF`/`DEF`/`STL`/`BLK`/`AST`) +1; **no marker** on the court |
@@ -160,6 +160,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.13 | Non-basketball sport (e.g. soccer) → Game Tracker | Page unchanged: no court, full grid only |
 | 4e.14 | Reload mid-game | Shots/stats restored from `localStorage`; markers still on the court |
 | 4e.15 | Tap the court at a spot where a popup button will appear (e.g. where Def Reb renders) | Popup opens and **waits** — the opening tap never activates the button under the finger (ghost-tap guard: presses count only when begun on the popup, ≥300ms after it opened). A deliberate second tap then works normally |
+| 4e.16 | Tap just inside the arc → switch the chip to **3PT** → **Made** | Shot records as `3pt`, score +3, marker remains at the tapped location, and the zone summary counts it under 3-Point |
+| 4e.17 | Tap clearly beyond the arc → switch the chip to **2PT** → **Made** | Shot records as `2pt`, score +2, marker remains at the tapped location, and the zone summary counts it under a 2-point zone (mid-range when the raw location was `three`) |
 
 ---
 

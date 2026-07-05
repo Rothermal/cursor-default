@@ -58,3 +58,13 @@ export function classifyShotZone(x: number, y: number): ShotZone {
   if (isThreePointer(x, y)) return 'three'
   return 'mid_range'
 }
+
+export function zoneForForcedShotType(
+  x: number,
+  y: number,
+  shotType: '2pt' | '3pt'
+): ShotZone {
+  if (shotType === '3pt') return 'three'
+  const zone = classifyShotZone(x, y)
+  return zone === 'three' ? 'mid_range' : zone
+}

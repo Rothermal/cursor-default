@@ -4,7 +4,7 @@ import BasketballCourt from './BasketballCourt'
 import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
 import CourtEventPopup, { type CourtEvent } from './CourtEventPopup'
-import { classifyShotZone, isThreePointer } from './courtGeometry'
+import { isThreePointer, zoneForForcedShotType } from './courtGeometry'
 import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 import {
   shootingLine,
@@ -114,8 +114,8 @@ export default function ShotChartPanel({ selection }: ShotChartPanelProps) {
         x: tap.x,
         y: tap.y,
         made: event.made,
-        shotType: tap.shotType,
-        zone: classifyShotZone(tap.x, tap.y),
+        shotType: event.shotType,
+        zone: zoneForForcedShotType(tap.x, tap.y, event.shotType),
         playerId: effectivePlayerId,
         timestamp: Date.now(),
       }
