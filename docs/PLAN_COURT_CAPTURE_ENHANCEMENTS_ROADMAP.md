@@ -1,11 +1,10 @@
 # Court Event Capture — Enhancements Roadmap (F5–F12)
 
-> **For agentic workers:** This is a roadmap of **named, ordered, phased sketches** for
-> the follow-on enhancements to the Court Event Capture model introduced in
-> [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md). Each
-> item is a sketch (goal, dependency, phases, files, effort, open question), not yet a
-> full task-by-task plan. When one is picked up, expand it to a full plan with a
-> "Pre-handoff design decisions" section like F1–F4.
+> **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
+> Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
+> F5, F6, F7, and F12 have expanded implementation plans. F8-F11 are still sketches
+> (goal, dependency, phases, files, effort, open question); when one is picked up, expand
+> it to a full plan with a "Pre-handoff design decisions" section.
 
 All of these **depend on F1** (the single-page tracker + `CourtEventPopup`). None changes
 the data model — they map to existing dispatches (`ADD_SHOT`, `INCREMENT_STAT`) and reuse
@@ -29,13 +28,13 @@ These are the user's six requested enhancements plus the deferred "Option B" hyb
 ## Recommended implementation order (whole program)
 
 Foundation first, then attribution-correctness wins, then progressive polish, with the
-speculative hybrid gated on real use. F4 (resume scores) is independent and can slot in
-anytime as a quick win.
+speculative hybrid gated on real use. F1-F4 have landed; F3/F4 still have Supabase-heavy
+manual QA items tracked in [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
 
 ```
-F1  Single-page tracker + Court Event Capture (foundation)
- ├─ F2  Per-player / team shot filtering        (needs F1)
- ├─ F3  Cloud-saved game shot review             (needs F1 + F2)
+F1  Single-page tracker + Court Event Capture (implemented)
+ ├─ F2  Per-player / team shot filtering        (implemented)
+ ├─ F3  Cloud-saved game shot review             (implemented; two-user QA pending)
  ├─ F5  Auto 2/3 override chip                   (tiny; correctness)
  ├─ F6  In-popup player confirm/switch           (attribution safety; user's top pain)
  ├─ F12 Recent-events undo popup                 (correction UX; PRECEDES F7)
@@ -44,17 +43,16 @@ F1  Single-page tracker + Court Event Capture (foundation)
  ├─ F9  Rebound-after-miss prompt                (needs live tuning; opt-in)
  ├─ F10 Shot sequence numbers / recency          (cosmetic)
  └─ F11 Hybrid quick buttons (Option B)          (only if testing shows blk/stl/ast need 1-tap)
-F4  In-progress scores on resume UI              (independent; quick win, anytime)
+F4  In-progress scores on resume UI              (implemented; cloud-list QA pending)
 ```
 
-**Hard constraints (everything else is flexible):** F1 first · **F2 before F3** (F3 reuses
-F2's `shotsForSelection`) · **F12 before F7** (F7's two-step assist undo relies on F12's
-visible event list) · F4 anytime.
+**Hard constraints for remaining work:** **F12 before F7** (F7's two-step assist undo
+relies on F12's visible event list). F5/F6/F8/F9/F10 can be sequenced by product priority.
+F11 should stay gated on live-use feedback.
 
-**Why this order:** F1 is the foundation. F2 then F3 deliver the per-player + cloud chart
-features early. F5 and F6 are cheap capture-loop wins (correct shot value; confirmed
+**Why this order:** F5 and F6 are cheap capture-loop wins (correct shot value; confirmed
 player). F12 precedes F7 so the recent-events popup makes F7's two-step assist undo
-transparent (no reducer change). F8–F10 are progressive polish. F11 is intentionally last:
+transparent (no reducer change). F8-F10 are progressive polish. F11 is intentionally last:
 build it only if live testing shows the extra tap for block/steal/assist is real friction.
 
 ---
