@@ -697,7 +697,7 @@ The `VITE_` prefix is required by Vite to expose variables to the browser. The p
 
 ## 11. Known Issues
 
-1. **Completed game appears as both final and in progress** — When a game is completed from the summary, in cloud saves it appears as both a completed game and as an in-progress game. When a game is closed and saved, the in-progress game should end.
+1. **Verify historical duplicate final/in-progress listing** — Older notes reported that a completed cloud game could appear as both final and in progress after finalization. Re-test this against the current Cloud Games flow before treating it as an active bug; if it still reproduces, fix the finalization/list filtering path.
 
 ---
 

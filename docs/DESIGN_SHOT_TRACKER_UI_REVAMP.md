@@ -4,7 +4,10 @@ Umbrella doc for the StatKeeper basketball shot-tracking revamp. It captures the
 context, the data model the work builds on, the recommended build order, and the
 cross-cutting decisions so the individual plans stay consistent.
 
-> **Status:** Planning only. No code shipped. Each linked plan/sketch is a draft for review.
+> **Status:** F1-F4 are implemented in the app and documented in the linked plans. F5, F6,
+> F7, and F12 have expanded implementation plans; F8-F11 remain roadmap sketches until
+> promoted to full plans. Manual Supabase-heavy QA is still tracked in
+> [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
 >
 > **Major pivot (recorded):** F1 was originally "make the shot chart a tab." After
 > live-use feedback it is now a **single scrollable Game Tracker** where the **court is a
@@ -19,22 +22,21 @@ cross-cutting decisions so the individual plans stay consistent.
 
 | # | Feature | Plan | One-line goal |
 |---|---------|------|----------------|
-| **F1** | Single-page Game Tracker + **Court Event Capture** | [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) | One scroll page; tap court → event popup (Made/Miss w/ auto 2-3 · Off/Def Reb · Steal · Block · Assist) as an *additive* fast input; the **full stat grid stays editable**. |
-| **F2** | Per-player + team shot views | [PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md](PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md) | Filter the inline court to the selected player; team selections show every player's shots on that side. |
-| **F3** | Shot trackers on cloud-saved games | [PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md](PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md) | Show full (all-recorder) shot charts when reviewing in-progress/final cloud games. |
-| **F4** | In-progress scores on the resume UI | [PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | Live score on the home active-game card and the Cloud Games list. |
-| **F5–F12** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | 2/3 override (F5) · in-popup player switch (F6) · assist-linking (F7) · per-player line (F8) · rebound-after-miss (F9) · sequence numbers (F10) · Option B quick buttons (F11) · recent-events undo popup (F12). |
+| **F1** | Single-page Game Tracker + **Court Event Capture** | [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) | **Implemented.** One scroll page; tap court -> event popup (Made/Miss w/ auto 2-3, Off/Def Reb, Steal, Block, Assist) as an additive fast input; the **full stat grid stays editable**. |
+| **F2** | Per-player + team shot views | [PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md](PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md) | **Implemented.** Filter the inline court to the selected player; team selections show every player's shots on that side; All shows everything. |
+| **F3** | Shot trackers on cloud-saved games | [PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md](PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md) | **Implemented; needs two-user QA.** Show full all-recorder shot charts when reviewing in-progress/final cloud games. |
+| **F4** | In-progress scores on the resume UI | [PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | **Implemented; needs cloud-list QA.** Live score on the home active-game card and the Cloud Games list. |
+| **F5-F12** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | **Next court-capture work.** 2/3 override (F5), in-popup player switch (F6), assist-linking (F7), per-player line (F8), rebound-after-miss (F9), sequence numbers (F10), Option B quick buttons (F11), recent-events undo popup (F12). |
 
-F1 is the foundation for F2, F3, and F5–F12. F4 is independent and can land anytime.
+F1 is the foundation for F2, F3, and F5-F12. F4 is independent and has landed.
 
 ## Why these belong together
 
-The shipped shot chart ([completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md),
+The original shot chart ([completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md),
 [completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md))
-deferred per-player filtering (§2.2, §8.2) and richer review surfaces. F2/F3 are that
-deferred work. F1 reimagines *how stats are entered during live play* (court-as-input),
-which the original docs hinted at but never built; F5–F12 refine that loop. F4 is an
-orthogonal review/resume quality-of-life win.
+deferred per-player filtering (§2.2, §8.2) and richer review surfaces. F2/F3 shipped that
+deferred work. F1 reimagined *how stats are entered during live play* (court-as-input);
+F5-F12 refine that loop. F4 shipped as an orthogonal review/resume quality-of-life win.
 
 ## Current architecture (what the plans build on)
 
@@ -51,9 +53,9 @@ interface ShotRecord {
 }
 ```
 
-Shots live in `GameState.shotChart: ShotRecord[]` (one flat array per game). Key gap for
-F2/F3: **recording is per-player, but display is not** — `BasketballCourt` renders the
-whole array.
+Shots live in `GameState.shotChart: ShotRecord[]` (one flat array per game). F2/F3 now
+consume that player attribution through `shotsForSelection` and the cloud review load path;
+future court-capture enhancements should keep this flat `ShotRecord[]` shape.
 
 **For F1:** the court popup needs **no new data** — Made/Miss → `ADD_SHOT` (which already
 increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/block/assist →
@@ -63,14 +65,14 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 
 | Surface | File | Role |
 |---------|------|------|
-| Game Tracker | `src/pages/GameTracker.tsx` | The main page: scoreboard, player selector strip, stat grid, period toggle, undo bar; today has a **Shot chart** button → `/shot-chart`. **F1 turns this into the single-page court-capture screen.** |
-| Shot Chart page | `src/pages/ShotChart.tsx` | `/shot-chart` route. **F1 redirects this to `/game`** (body becomes the inline `ShotChartPanel`). |
+| Game Tracker | `src/pages/GameTracker.tsx` | The main page: scoreboard, sticky player selector strip, inline court capture, stat grid, period toggle, undo bar. |
+| Shot Chart page | `src/pages/ShotChart.tsx` | Legacy `/shot-chart` route; redirects to `/game`. |
 | Game Summary | `src/pages/GameSummary.tsx` | Read-only tabs (Players / Scores / Team stats / Shot chart) for live + cloud games. |
 | Cloud Games list | `src/pages/Games.tsx` | Lists cloud games; Resume / View Summary; final games show a resolved score line. |
 | Home | `src/pages/SportSelect.tsx` | Active-game card (local state) with Resume/New. |
-| Court | `src/components/shot-chart/BasketballCourt.tsx` | Reusable SVG half-court; `shots` + optional `onCourtTap`. F1 adds tap-vs-scroll discrimination. |
+| Court | `src/components/shot-chart/BasketballCourt.tsx` | Reusable SVG half-court; `shots` + optional `onCourtTap`, with tap-vs-scroll discrimination. |
 | Shooting summary | `src/components/shot-chart/ShootingSummary.tsx` | Zone breakdown for a `shots` array. |
-| Player ordering | `sortTeamPlayersFirst()` (duplicated in `GameTracker`/`ShotChart`) | Team pseudo-players first; F1 extracts this into `PlayerSelectorStrip`. |
+| Player selector | `src/components/PlayerSelectorStrip.tsx` | Shared team-first strip with optional All chip for shot-chart views. |
 
 ### Player model
 
@@ -85,8 +87,9 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 - `shot_chart` table (`supabase/migrations/032_shot_chart.sql`): one row per
   `(game_id, recorded_by, client_shot_id)`. RLS: team members can SELECT all rows for
   their teams' games; writes limited to `recorded_by = auth.uid()`.
-- Hydration (`hydrateCloudGameFromRow`, `src/lib/cloudSync.ts`) loads **only
-  `recorded_by = userId`** shots today (F3 changes this for review).
+- Hydration (`hydrateCloudGameFromRow`, `src/lib/cloudSync.ts`) still loads the viewer's
+  own shots into live `GameState`; F3's `loadGameShotChartForReview` separately loads
+  display-only all-recorder shots for Game Summary review.
 - Scores: `getDisplayedHomeScore()` / `resolveFinalHomeScoreFromGameRow()`
   (`src/lib/gameScore.ts`); `games` rows carry `opponent_score`, `home_team_score`
   (nullable), `home_score_adjustment`.
@@ -120,9 +123,9 @@ increments `2pt`/`3pt`(`_miss`) + links a `shotId` for undo); rebound/steal/bloc
 ## Recommended build order
 
 ```
-F1  Single-page tracker + Court Event Capture     (foundation)
- ├─ F2  Per-player / team shot filtering           (needs F1)
- ├─ F3  Cloud-saved game shot review               (needs F1 + F2)
+F1  Single-page tracker + Court Event Capture     (implemented)
+ ├─ F2  Per-player / team shot filtering           (implemented)
+ ├─ F3  Cloud-saved game shot review               (implemented; two-user QA pending)
  ├─ F5  Auto 2/3 override chip                      (tiny; correctness)
  ├─ F6  In-popup player confirm/switch             (attribution; top pain)
  ├─ F12 Recent-events undo popup                   (correction UX; PRECEDES F7)
@@ -131,9 +134,10 @@ F1  Single-page tracker + Court Event Capture     (foundation)
  ├─ F9  Rebound-after-miss prompt                  (opt-in)
  ├─ F10 Shot sequence numbers / recency            (cosmetic)
  └─ F11 Hybrid quick buttons (Option B)            (only if testing shows it's needed)
-F4  In-progress scores on resume UI                (independent; quick win, anytime)
+F4  In-progress scores on resume UI                (implemented; cloud-list QA pending)
 
-Hard constraints: F1 first · F2 before F3 · F12 before F7 · F4 anytime. Other slots flexible.
+Hard constraints for remaining work: F12 before F7. F5/F6/F8/F9/F10 can be sequenced by
+product priority; F11 should stay gated on live-use feedback.
 ```
 
 Rationale and per-feature phases: see
