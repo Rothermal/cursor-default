@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { loadGameShotChartForReview } from '../lib/cloudSync'
+import { mergeReviewAndLocalShots } from '../lib/shotChartReview'
 import type { ShotRecord } from '../types'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
@@ -174,8 +175,8 @@ export default function GameSummary() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playerIdMap is stable per gameId
   }, [isConfigured, gameId, sport?.id, resolvedKey])
 
-  /** Source for the shot chart tab: review set when loaded, else own hydrated shots (D7). */
-  const summaryShotChart = reviewShotChart ?? shotChart
+  /** Source for the shot chart tab: review rows plus any unsynced local shots (D7). */
+  const summaryShotChart = mergeReviewAndLocalShots(shotChart, reviewShotChart)
   const isReviewShotChart = reviewShotChart !== null && reviewShotChart.length > 0
 
   const showShotChartTab = Boolean(

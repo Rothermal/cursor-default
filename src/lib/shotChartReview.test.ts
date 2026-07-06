@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest'
-import { pickRecorderPerPlayer } from './shotChartReview'
+import { mergeReviewAndLocalShots, pickRecorderPerPlayer } from './shotChartReview'
+import type { ShotRecord } from '../types'
+
+function shot(id: string, timestamp: number): ShotRecord {
+  return {
+    id,
+    playerId: 'p1',
+    x: 0,
+    y: 8,
+    made: true,
+    shotType: '2pt',
+    zone: 'paint',
+    timestamp,
+  }
+}
+
+describe('mergeReviewAndLocalShots', () => {
+  it('returns local shots while review is still loading', () => {
+    expect(mergeReviewAndLocalShots([shot('local-1', 1)], null)).toEqual([shot('local-1', 1)])
+  })
+
+  it('keeps unsynced local shots when review loaded empty from cloud', () => {
+    const merged = mergeReviewAndLocalShots([shot('local-1', 2)], [])
+    expect(merged.map(s => s.id)).toEqual(['local-1'])
+  })
+
+  it('merges review and local-only shots in timestamp order', () => {
+    const merged = mergeReviewAndLocalShots(
+      [shot('local-new', 3)],
+      [shot('cloud-old', 1), shot('cloud-mid', 2)]
+    )
+    expect(merged.map(s => s.id)).toEqual(['cloud-old', 'cloud-mid', 'local-new'])
+  })
+})
 
 interface Row {
   player_id: string
