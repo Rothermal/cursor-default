@@ -166,6 +166,11 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.19 | Tap court → switch to another player/team → **Cancel** | No stat or marker is recorded, but the active player remains the switched selection |
 | 4e.20 | Log a mix of shots, rebounds, steals, blocks, assists, and score changes -> tap bottom **Undo** | Recent events lists the last ~5 events, newest first, using player/team + event labels |
 | 4e.21 | With Recent events open, tap **Undo** on the newest row repeatedly | Each tap reverts the next newest event; older rows are disabled until they become newest; shot markers disappear when their linked shot is undone |
+| 4e.22 | Tap court as #A → **Made** → **Assisted by?** choose #B | #A gets the made shot + marker + score; #B gets `AST +1`; active player remains #A |
+| 4e.23 | Open bottom **Undo** after an assisted made shot | Recent events shows the assist and shot as adjacent newest rows; undo once removes the assist; undo again removes the shot + marker |
+| 4e.24 | Tap court as #A → **Made** → **No assist** | Only the shot is logged; no player's `AST` changes |
+| 4e.25 | Tap court → **Missed**, Off Reb, Def Reb, Steal, Block, or standalone Assist | No **Assisted by?** step appears |
+| 4e.26 | Tap court as #A → **Made** | The **Assisted by?** choices exclude #A; opponent pseudo-player shots skip the assist step |
 
 ---
 

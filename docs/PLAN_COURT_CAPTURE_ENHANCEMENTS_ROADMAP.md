@@ -2,7 +2,7 @@
 
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
 > Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
-> F5, F6, and F12 are implemented. F7 has an expanded implementation plan. F8-F11 are still sketches
+> F5, F6, F7, and F12 are implemented. F8-F11 are still sketches
 > (goal, dependency, phases, files, effort, open question); when one is picked up, expand
 > it to a full plan with a "Pre-handoff design decisions" section.
 
@@ -38,7 +38,7 @@ F1  Single-page tracker + Court Event Capture (implemented)
  ├─ F5  Auto 2/3 override chip                   (implemented)
  ├─ F6  In-popup player confirm/switch           (implemented)
  ├─ F12 Recent-events undo popup                 (implemented; unblocks F7)
- ├─ F7  Assist-linking on a made shot            (two-step undo, made transparent by F12)
+ ├─ F7  Assist-linking on a made shot            (implemented)
  ├─ F8  Live per-player line in popup            (small; context)
  ├─ F9  Rebound-after-miss prompt                (needs live tuning; opt-in)
  ├─ F10 Shot sequence numbers / recency          (cosmetic)
@@ -46,10 +46,10 @@ F1  Single-page tracker + Court Event Capture (implemented)
 F4  In-progress scores on resume UI              (implemented; cloud-list QA pending)
 ```
 
-**Remaining work:** F12 is complete, so F7 is unblocked. F8/F9/F10 can be sequenced by
-product priority. F11 should stay gated on live-use feedback.
+**Remaining work:** F8/F9/F10 can be sequenced by product priority. F11 should stay gated on
+live-use feedback.
 
-**Why this order:** F12 now gives F7's two-step assist undo a visible event list
+**Why this order:** F12 gives F7's two-step assist undo a visible event list
 (no reducer change). F8-F10 are progressive polish. F11 is intentionally last:
 build it only if live testing shows the extra tap for block/steal/assist is real friction.
 
@@ -107,7 +107,7 @@ sticky strip and next taps follow) vs. one-off (this event only). Default: globa
 
 > **Expanded to a full plan:** [PLAN_F7_ASSIST_LINKING.md](PLAN_F7_ASSIST_LINKING.md)
 > (tasks + pre-handoff decisions). Uses **two-step undo made transparent by F12** — **no
-> reducer change** (F5–F12 stay data-model-free).
+> reducer change** (F5–F12 stay data-model-free). **Status:** Implemented.
 
 **Goal:** After a **Made** shot, optionally credit the assisting teammate in the same
 gesture (assists are almost always tied to a made FG).
@@ -116,17 +116,15 @@ gesture (assists are almost always tied to a made FG).
 (undo coordination is the real work).
 
 **Phases:**
-- **P1:** After Made, show an optional "Assisted by …" picker (skippable / "no assist").
-  Picking a teammate dispatches `INCREMENT_STAT(assister, 'ast')` in addition to the shot.
-- **P2:** Undo coordination — ensure undoing the shot and the linked assist behaves
-  predictably (either a single combined undo step or two independent steps with clear
-  ordering). Polish: default to no-assist, surface recent passers first.
+- **P1:** Implemented: after Made, show an optional "Assisted by …" picker (skippable /
+  "no assist"). Picking a teammate dispatches `INCREMENT_STAT(assister, 'ast')` after the shot.
+- **P2:** Implemented by F12 visibility: undoing the shot and linked assist stays two
+  independent LIFO steps with clear ordering. Recent-passers ordering remains future polish.
 
-**Key files:** `CourtEventPopup.tsx`, possibly `GameContext.tsx` (a combined action or
-careful sequential dispatch + `actionLog` linkage), undo logic.
+**Key files:** `CourtEventPopup.tsx`, `ShotChartPanel.tsx`, `src/lib/assistCandidates.ts`.
 
-**Open question:** One combined undo (shot+assist revert together) vs. two separate undo
-steps. Default: two steps (simpler, matches existing per-action undo), documented.
+**Resolved:** two separate undo steps (assist, then shot) with F12 visibility; no reducer
+linkage.
 
 ---
 
