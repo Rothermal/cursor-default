@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Player } from '../../types'
+import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 
 /**
  * Presses within this window after opening are ignored. Combined with the
@@ -18,6 +20,11 @@ export const COURT_STAT_EVENTS = [
 
 export type CourtStatEventId = (typeof COURT_STAT_EVENTS)[number]['statId']
 
+function playerPickerLabel(player: Player): string {
+  if (isTeamPseudoPlayer(player)) return `${player.number || '*'} ${player.name}`
+  return `#${player.number || '?'} ${player.name.split(' ')[0]}`
+}
+
 /** Choice made in the popup: a located shot, or a stat-only increment. */
 export type CourtEvent =
   | { kind: 'shot'; made: boolean; shotType: '2pt' | '3pt' }
@@ -26,6 +33,9 @@ export type CourtEvent =
 interface CourtEventPopupProps {
   /** Display label for the player the event will be attributed to (e.g. "#23 Jordan"). */
   playerLabel: string
+  players: Player[]
+  activePlayerId: string
+  onSelectPlayer: (playerId: string) => void
   /** Detected from the tap location via `isThreePointer`; user can override before logging. */
   shotType: '2pt' | '3pt'
   onPick: (event: CourtEvent) => void
@@ -40,11 +50,15 @@ interface CourtEventPopupProps {
  */
 export default function CourtEventPopup({
   playerLabel,
+  players,
+  activePlayerId,
+  onSelectPlayer,
   shotType,
   onPick,
   onCancel,
 }: CourtEventPopupProps) {
   const [selectedShotType, setSelectedShotType] = useState<'2pt' | '3pt'>(shotType)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   /**
    * Ghost-tap guard: the court tap that opens the popup fires a trailing `click` at the
@@ -83,6 +97,17 @@ export default function CourtEventPopup({
     setSelectedShotType(nextShotType)
   }
 
+  const togglePlayerPicker = () => {
+    if (!armedRef.current) return
+    setPickerOpen(open => !open)
+  }
+
+  const selectPlayer = (playerId: string) => {
+    if (!armedRef.current) return
+    onSelectPlayer(playerId)
+    setPickerOpen(false)
+  }
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel()
@@ -102,7 +127,47 @@ export default function CourtEventPopup({
         onClick={e => e.stopPropagation()}
       >
         <div>
-          <h3 className="text-base font-bold text-slate-800 truncate">{playerLabel}</h3>
+          <button
+            type="button"
+            onClick={togglePlayerPicker}
+            className="w-full flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2
+                       text-left active:bg-slate-100 active:scale-[0.99] transition-transform"
+            aria-expanded={pickerOpen}
+          >
+            <span className="min-w-0">
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Log for
+              </span>
+              <span className="block text-base font-bold text-slate-800 truncate">{playerLabel}</span>
+            </span>
+            <span className="text-slate-400 text-sm" aria-hidden>
+              {pickerOpen ? '^' : 'v'}
+            </span>
+          </button>
+          {pickerOpen && (
+            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2">
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {sortTeamPlayersFirst(players).map(player => {
+                  const active = player.id === activePlayerId
+                  return (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => selectPlayer(player.id)}
+                      title={player.name}
+                      className={`flex-shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-left active:scale-95 transition-transform ${
+                        active
+                          ? 'bg-slate-800 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      {playerPickerLabel(player)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="text-xs font-semibold text-slate-500">Shot value</span>
             <div className="grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-100 p-1">

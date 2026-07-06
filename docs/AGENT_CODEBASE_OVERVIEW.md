@@ -204,17 +204,15 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`PLAN_F6_IN_POPUP_PLAYER_SWITCH.md`](PLAN_F6_IN_POPUP_PLAYER_SWITCH.md) | Next attribution win: confirm/switch player inside `CourtEventPopup` |
 | [`PLAN_F12_RECENT_EVENTS_UNDO.md`](PLAN_F12_RECENT_EVENTS_UNDO.md) | Recent-events undo popup; build before F7 |
 | [`PLAN_F7_ASSIST_LINKING.md`](PLAN_F7_ASSIST_LINKING.md) | Assist-linking after made shots; depends on F12 for transparent undo |
 | [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Remaining F8-F11 sketches and overall court-capture order |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue |
 | [`PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md`](PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md) | Team hub drill-down routes |
 
-**Court program status:** F1-F5 are implemented; manual Supabase-heavy QA remains in
-[`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). For remaining court work, F6 is the next
-small attribution slice, F12 must precede F7, F8-F10 are polish sketches, and F11 should
-stay gated on live-use feedback.
+**Court program status:** F1-F6 are implemented; manual Supabase-heavy QA remains in
+[`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). For remaining court work, F12 must precede
+F7, F8-F10 are polish sketches, and F11 should stay gated on live-use feedback.
 
 ### Verification norms
 
