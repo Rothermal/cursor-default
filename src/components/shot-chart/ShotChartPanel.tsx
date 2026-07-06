@@ -122,6 +122,13 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         timestamp: Date.now(),
       }
       dispatch({ type: 'ADD_SHOT', shot })
+      if (event.assistPlayerId) {
+        dispatch({
+          type: 'INCREMENT_STAT',
+          playerId: event.assistPlayerId,
+          statId: 'ast',
+        })
+      }
     },
     [dispatch, effectivePlayerId, pendingTap]
   )

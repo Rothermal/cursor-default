@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Player } from '../../types'
+import { assistCandidatesForMadeShot } from '../../lib/assistCandidates'
 import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 
 /**
@@ -27,7 +28,7 @@ function playerPickerLabel(player: Player): string {
 
 /** Choice made in the popup: a located shot, or a stat-only increment. */
 export type CourtEvent =
-  | { kind: 'shot'; made: boolean; shotType: '2pt' | '3pt' }
+  | { kind: 'shot'; made: boolean; shotType: '2pt' | '3pt'; assistPlayerId?: string }
   | { kind: 'stat'; statId: CourtStatEventId }
 
 interface CourtEventPopupProps {
@@ -59,6 +60,8 @@ export default function CourtEventPopup({
 }: CourtEventPopupProps) {
   const [selectedShotType, setSelectedShotType] = useState<'2pt' | '3pt'>(shotType)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pendingMadeShotType, setPendingMadeShotType] = useState<'2pt' | '3pt' | null>(null)
+  const assistCandidates = assistCandidatesForMadeShot(players, activePlayerId)
 
   /**
    * Ghost-tap guard: the court tap that opens the popup fires a trailing `click` at the
@@ -86,6 +89,22 @@ export default function CourtEventPopup({
     onPick(event)
   }
 
+  const continueMadeShot = () => {
+    if (!armedRef.current) return
+    if (assistCandidates.length === 0) {
+      pick({ kind: 'shot', made: true, shotType: selectedShotType })
+      return
+    }
+    armedRef.current = false
+    setPickerOpen(false)
+    setPendingMadeShotType(selectedShotType)
+  }
+
+  const finishMadeShot = (assistPlayerId?: string) => {
+    if (!pendingMadeShotType) return
+    pick({ kind: 'shot', made: true, shotType: pendingMadeShotType, assistPlayerId })
+  }
+
   const cancel = () => {
     if (!armedRef.current) return
     armedRef.current = false
@@ -94,16 +113,19 @@ export default function CourtEventPopup({
 
   const chooseShotType = (nextShotType: '2pt' | '3pt') => {
     if (!armedRef.current) return
+    if (pendingMadeShotType) return
     setSelectedShotType(nextShotType)
   }
 
   const togglePlayerPicker = () => {
     if (!armedRef.current) return
+    if (pendingMadeShotType) return
     setPickerOpen(open => !open)
   }
 
   const selectPlayer = (playerId: string) => {
     if (!armedRef.current) return
+    if (pendingMadeShotType) return
     onSelectPlayer(playerId)
     setPickerOpen(false)
   }
@@ -130,8 +152,10 @@ export default function CourtEventPopup({
           <button
             type="button"
             onClick={togglePlayerPicker}
+            disabled={Boolean(pendingMadeShotType)}
             className="w-full flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2
-                       text-left active:bg-slate-100 active:scale-[0.99] transition-transform"
+                       text-left active:bg-slate-100 active:scale-[0.99] transition-transform
+                       disabled:cursor-default disabled:opacity-90"
             aria-expanded={pickerOpen}
           >
             <span className="min-w-0">
@@ -176,6 +200,7 @@ export default function CourtEventPopup({
                   key={value}
                   type="button"
                   onClick={() => chooseShotType(value)}
+                  disabled={Boolean(pendingMadeShotType)}
                   className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${
                     selectedShotType === value
                       ? 'bg-white text-slate-900 shadow-sm'
@@ -190,42 +215,77 @@ export default function CourtEventPopup({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => pick({ kind: 'shot', made: true, shotType: selectedShotType })}
-            className="py-4 rounded-xl text-base font-bold text-white bg-emerald-600
-                       active:bg-emerald-700 active:scale-95 transition-transform"
-          >
-            Made
-          </button>
-          <button
-            type="button"
-            onClick={() => pick({ kind: 'shot', made: false, shotType: selectedShotType })}
-            className="py-4 rounded-xl text-base font-bold text-white bg-rose-600
-                       active:bg-rose-700 active:scale-95 transition-transform"
-          >
-            Missed
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          {COURT_STAT_EVENTS.map(({ statId, label }) => (
+        {pendingMadeShotType ? (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+              <p className="text-sm font-bold text-emerald-900">Assisted by?</p>
+              <p className="text-xs text-emerald-700">Optional. The shooter stays active.</p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {assistCandidates.map(player => (
+                <button
+                  key={player.id}
+                  type="button"
+                  onClick={() => finishMadeShot(player.id)}
+                  title={player.name}
+                  className="flex-shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2
+                             text-sm font-semibold text-slate-700 active:bg-slate-100 active:scale-95
+                             transition-transform"
+                >
+                  {playerPickerLabel(player)}
+                </button>
+              ))}
+            </div>
             <button
-              key={statId}
               type="button"
-              onClick={() => pick({ kind: 'stat', statId })}
-              className="py-3 px-1 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100
-                         border border-slate-200 active:bg-slate-200 active:scale-95 transition-transform"
+              onClick={() => finishMadeShot()}
+              className="w-full py-3 rounded-xl text-sm font-bold text-slate-700 bg-slate-100
+                         border border-slate-200 active:bg-slate-200 active:scale-95
+                         transition-transform"
             >
-              {label}
+              No assist
             </button>
-          ))}
-        </div>
-        <p className="text-[11px] text-slate-400 leading-snug">
-          Shots save the tapped court location. The other events only add the stat — same as
-          tapping its button below the court.
-        </p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={continueMadeShot}
+                className="py-4 rounded-xl text-base font-bold text-white bg-emerald-600
+                           active:bg-emerald-700 active:scale-95 transition-transform"
+              >
+                Made
+              </button>
+              <button
+                type="button"
+                onClick={() => pick({ kind: 'shot', made: false, shotType: selectedShotType })}
+                className="py-4 rounded-xl text-base font-bold text-white bg-rose-600
+                           active:bg-rose-700 active:scale-95 transition-transform"
+              >
+                Missed
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {COURT_STAT_EVENTS.map(({ statId, label }) => (
+                <button
+                  key={statId}
+                  type="button"
+                  onClick={() => pick({ kind: 'stat', statId })}
+                  className="py-3 px-1 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100
+                             border border-slate-200 active:bg-slate-200 active:scale-95 transition-transform"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 leading-snug">
+              Shots save the tapped court location. The other events only add the stat — same as
+              tapping its button below the court.
+            </p>
+          </>
+        )}
 
         <button
           type="button"

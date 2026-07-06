@@ -1,5 +1,8 @@
 # Feature 7 Plan: Assist-Linking on a Made Shot
 
+> **Status:** Implemented. Recent-passers ordering remains future polish; v1 uses same-side
+> candidate ordering from the player strip.
+
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) and the
 > [enhancements roadmap](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md). **Depends on F1**
@@ -82,6 +85,8 @@ link them in the reducer. Instead:
 | File | Change |
 |------|--------|
 | `src/components/shot-chart/CourtEventPopup.tsx` | **Modify** — after Made, show the optional assister picker (reuse F6's picker, filtered to same-side non-shooter players). On pick, dispatch `ADD_SHOT` (shooter) then `INCREMENT_STAT(assistPlayerId, 'ast')`; on skip, just `ADD_SHOT`. |
+| `src/components/shot-chart/ShotChartPanel.tsx` | **Modify** — after receiving a made-shot event with `assistPlayerId`, dispatch `ADD_SHOT` then `INCREMENT_STAT(ast)`. |
+| `src/lib/assistCandidates.ts` | **Create** — pure same-side, non-shooter assist candidate helper (+ unit test). |
 
 No `types.ts` / `GameContext` reducer change.
 
@@ -89,16 +94,15 @@ No `types.ts` / `GameContext` reducer change.
 
 ### Task 1: Assister picker after Made
 
-- [ ] **Modify `CourtEventPopup.tsx`**: after the user taps **Made**, show the optional
+- [x] **Modify `CourtEventPopup.tsx`**: after the user taps **Made**, show the optional
   "Assisted by?" step — same-side players excluding the shooter (reuse F6's picker) plus a
   prominent **No assist** (default). Missed/secondary actions never show it.
-- [ ] On pick: dispatch `ADD_SHOT` (shooter) **then** `INCREMENT_STAT(assistPlayerId, 'ast')`.
+- [x] On pick: dispatch `ADD_SHOT` (shooter) **then** `INCREMENT_STAT(assistPlayerId, 'ast')`.
   On skip: dispatch `ADD_SHOT` only (today's behavior).
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass.
 - [ ] Manual: Made by #23 → "Assisted by?" → pick #11 → #23 gets the made shot + marker, #11
   gets `+1 ast`; the recent-events list (F12) shows both rows; two undos revert assist then
   shot. Skip → only the shot is logged.
-- [ ] **Commit:** `feat: optional assist-linking after a made shot in the court popup`
 
 ### Task 2 (polish): defaults & recent passers
 
