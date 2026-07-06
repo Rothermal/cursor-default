@@ -1,5 +1,7 @@
 # Feature 12 Plan: Recent-Events Undo Popup
 
+> **Status:** Implemented. Optional cascade-to-row undo remains deferred; v1 is LIFO/top-only.
+
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) and the
 > [enhancements roadmap](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md). **Enhances F1**
@@ -103,27 +105,24 @@ The chart-specific "Undo last shot" on the court (F1) is unchanged.
 
 ### Task 1: Label helper + tests (TDD)
 
-- [ ] **Create `src/lib/actionLogLabels.test.ts`**: a player stat increment →
+- [x] **Create `src/lib/actionLogLabels.test.ts`**: a player stat increment →
   `{ who: '#23 Player B', what: '2PT made' }`-style; a decrement; opponent/home score
   events; a shot-originated increment (via `shotId`). Use a sample `SportConfig` + players.
-- [ ] Run the test. Expected: FAIL (module missing).
-- [ ] **Create `src/lib/actionLogLabels.ts`** by extracting/generalizing `GameTracker`'s
+- [x] **Create `src/lib/actionLogLabels.ts`** by extracting/generalizing `GameTracker`'s
   `lastActionLabel`/`findStatShortLabel`.
-- [ ] Run the test. Expected: PASS.
-- [ ] **Commit:** `feat: add actionLogLabels helper for readable event descriptions`
+- [x] Run the focused helper test. Expected: PASS.
 
 ### Task 2: RecentEventsPopup (LIFO/top-only)
 
-- [ ] **Create `RecentEventsPopup.tsx`**: props `{ entries, players, sport, onUndoTop, onClose }`.
+- [x] **Create `RecentEventsPopup.tsx`**: props `{ entries, players, sport, onUndoTop, onClose }`.
   Render the last ~5 `actionLog` entries (most recent first) via `describeActionLogEntry`,
   each with an undo affordance; the top row's undo calls `onUndoTop` (→ dispatch `UNDO`).
   Empty state when the log is empty.
-- [ ] **Modify `GameTracker.tsx`**: the bottom Undo opens the popup; wire `onUndoTop` →
+- [x] **Modify `GameTracker.tsx`**: the bottom Undo opens the popup; wire `onUndoTop` →
   `dispatch({ type: 'UNDO' })`; reuse `describeActionLogEntry` for the bar one-liner.
-- [ ] Run `pnpm build` + `pnpm lint`. Expected: pass.
+- [x] Run `pnpm build` + `pnpm lint`. Expected: pass.
 - [ ] Manual: log several events → open popup → see the readable list → undo top → list
   updates and the stat reverts; repeat to walk back.
-- [ ] **Commit:** `feat: recent-events undo popup on the Game Tracker`
 
 ### Task 3 (optional): cascade-to-row (B)
 

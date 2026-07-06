@@ -4,8 +4,8 @@ Umbrella doc for the StatKeeper basketball shot-tracking revamp. It captures the
 context, the data model the work builds on, the recommended build order, and the
 cross-cutting decisions so the individual plans stay consistent.
 
-> **Status:** F1-F6 are implemented in the app and documented in the linked plans. F7 and
-> F12 have expanded implementation plans; F8-F11 remain roadmap sketches until
+> **Status:** F1-F6 and F12 are implemented in the app and documented in the linked plans. F7
+> has an expanded implementation plan; F8-F11 remain roadmap sketches until
 > promoted to full plans. Manual Supabase-heavy QA is still tracked in
 > [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
 >
@@ -28,7 +28,8 @@ cross-cutting decisions so the individual plans stay consistent.
 | **F4** | In-progress scores on the resume UI | [PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | **Implemented; needs cloud-list QA.** Live score on the home active-game card and the Cloud Games list. |
 | **F5** | Auto 2/3 with manual override chip | [PLAN_F5_AUTO_2_3_OVERRIDE.md](PLAN_F5_AUTO_2_3_OVERRIDE.md) | **Implemented.** The popup's 2PT/3PT value defaults from court location and can be overridden before logging Made/Missed. |
 | **F6** | In-popup player confirm/switch | [PLAN_F6_IN_POPUP_PLAYER_SWITCH.md](PLAN_F6_IN_POPUP_PLAYER_SWITCH.md) | **Implemented.** The popup's Log for control can switch the active player before logging an event. |
-| **F7-F12** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | **Next court-capture work.** Assist-linking (F7), per-player line (F8), rebound-after-miss (F9), sequence numbers (F10), Option B quick buttons (F11), recent-events undo popup (F12). |
+| **F12** | Recent-events undo popup | [PLAN_F12_RECENT_EVENTS_UNDO.md](PLAN_F12_RECENT_EVENTS_UNDO.md) | **Implemented.** The bottom Undo opens a recent-events popup; the newest event can be undone via existing LIFO `UNDO`. |
+| **F7-F11** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | **Next court-capture work.** Assist-linking (F7), per-player line (F8), rebound-after-miss (F9), sequence numbers (F10), Option B quick buttons (F11). |
 
 F1 is the foundation for F2, F3, and F5-F12. F4 is independent and has landed.
 
@@ -130,7 +131,7 @@ F1  Single-page tracker + Court Event Capture     (implemented)
  ├─ F3  Cloud-saved game shot review               (implemented; two-user QA pending)
  ├─ F5  Auto 2/3 override chip                      (implemented)
  ├─ F6  In-popup player confirm/switch             (implemented)
- ├─ F12 Recent-events undo popup                   (correction UX; PRECEDES F7)
+ ├─ F12 Recent-events undo popup                   (implemented)
  ├─ F7  Assist-linking on a made shot              (two-step undo via F12)
  ├─ F8  Live per-player line in popup
  ├─ F9  Rebound-after-miss prompt                  (opt-in)
@@ -138,8 +139,8 @@ F1  Single-page tracker + Court Event Capture     (implemented)
  └─ F11 Hybrid quick buttons (Option B)            (only if testing shows it's needed)
 F4  In-progress scores on resume UI                (implemented; cloud-list QA pending)
 
-Hard constraints for remaining work: F12 before F7. F8/F9/F10 can be sequenced by
-product priority; F11 should stay gated on live-use feedback.
+F12 is complete, so F7 is unblocked. F8/F9/F10 can be sequenced by product priority;
+F11 should stay gated on live-use feedback.
 ```
 
 Rationale and per-feature phases: see
@@ -163,6 +164,6 @@ Resolved items are struck/marked; defaults are what the plans assume.
 ## Testing posture
 
 Standard StatKeeper loop: `pnpm build` + `pnpm lint`; Vitest for new pure helpers
-(`shotChartViews`, `shotChartReview`); manual GUI via `pnpm dev` (HashRouter URLs,
+(`shotChartViews`, `shotChartReview`, `actionLogLabels`); manual GUI via `pnpm dev` (HashRouter URLs,
 `#/game`, dev-only `#/dev/shot-chart`). Cloud steps (F3; F4 list scores) need a configured
 Supabase project with migration `032` applied.

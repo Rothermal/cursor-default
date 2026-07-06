@@ -9,26 +9,12 @@ import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
 import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
 import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
+import RecentEventsPopup from '../components/RecentEventsPopup'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
 import type { ShotChartSelection } from '../lib/shotChartViews'
-
-/** Strip `_pN` suffix for config lookup (undo log stores scoped ids). */
-function baseStatId(statId: string): string {
-  return statId.replace(/_p\d+$/, '')
-}
-
-function findStatShortLabel(categories: StatCategory[] | undefined, statId: string | undefined): string {
-  if (!statId) return ''
-  const base = baseStatId(statId)
-  for (const cat of categories ?? []) {
-    for (const action of cat.actions) {
-      if (action.id === base) return action.shortLabel
-    }
-  }
-  return statId
-}
+import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -81,6 +67,7 @@ export default function GameTracker() {
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [localNotes, setLocalNotes] = useState(notes)
+  const [showRecentEvents, setShowRecentEvents] = useState(false)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
   const [showAllShots, setShowAllShots] = useState(false)
@@ -177,26 +164,9 @@ export default function GameTracker() {
   }
 
   const lastAction = actionLog.length > 0 ? actionLog[actionLog.length - 1] : null
-  const lastActionLabel = (() => {
-    if (!lastAction) return null
-    if (lastAction.type === 'opponent_score_up') return 'Opp +1'
-    if (lastAction.type === 'opponent_score_down') return 'Opp -1'
-    if (lastAction.type === 'home_score_up' || lastAction.type === 'home_team_score_up') return 'Home +1'
-    if (lastAction.type === 'home_score_down' || lastAction.type === 'home_team_score_down') return 'Home -1'
-    const player = players.find(p => p.id === lastAction.playerId)
-    if (!player) return null
-    const statId = lastAction.statId
-    let statLabel =
-      findStatShortLabel(sport.categories, statId) ||
-      findStatShortLabel(sport.teamCategories, statId)
-    if (!statLabel && statId) statLabel = statId
-    const direction = lastAction.type === 'increment' ? '+' : '-'
-    if (player.isTeamPlayer) {
-      const prefix = player.name.trim().split(/\s+/)[0] || 'Team'
-      return `${prefix} ${statLabel} ${direction}`
-    }
-    return `#${player.number || '?'} ${statLabel} ${direction}`
-  })()
+  const lastActionLabel = lastAction
+    ? formatActionLogEntryLabel(lastAction, players, sport)
+    : null
 
   const handleAddPlayer = () => {
     if (!newName.trim()) return
@@ -467,13 +437,13 @@ export default function GameTracker() {
 
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="text-xs text-slate-400">
+          <div className="min-w-0 pr-3 text-xs text-slate-400">
             {lastActionLabel && (
-              <span>Last: <span className="font-medium text-slate-600">{lastActionLabel}</span></span>
+              <span className="block truncate">Last: <span className="font-medium text-slate-600">{lastActionLabel}</span></span>
             )}
           </div>
           <button
-            onClick={handleUndo}
+            onClick={() => setShowRecentEvents(true)}
             disabled={actionLog.length === 0}
             className="btn-secondary py-2 px-4 text-sm disabled:opacity-30"
           >
@@ -481,6 +451,16 @@ export default function GameTracker() {
           </button>
         </div>
       </div>
+
+      {showRecentEvents && (
+        <RecentEventsPopup
+          entries={actionLog}
+          players={players}
+          sport={sport}
+          onUndoTop={handleUndo}
+          onClose={() => setShowRecentEvents(false)}
+        />
+      )}
     </div>
   )
 }

@@ -15,7 +15,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 1.3 | Choose sport → Game Setup → enter team, opponent, date → Continue | Player setup |
 | 1.4 | Add 2+ players → Start Game | Game Tracker loads; scoreboard shows 0–0 |
 | 1.5 | Tap stat buttons (e.g. 2PT, AST) | Home score updates; opponent can be adjusted manually |
-| 1.6 | Tap Undo | Last action reverted |
+| 1.6 | Tap Undo -> top-row **Undo** in Recent events | Last action reverted |
 | 1.7 | Game Summary | Totals per player and team; no cloud sync UI |
 | 1.8 | Reload page | Same game state (localStorage); no cloud games or teams |
 
@@ -118,7 +118,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 |------|--------|----------|
 | 4c.1 | Start a basketball game → Game Tracker → Scoring section | Six buttons in 2-column grid: FT / FT Miss, 2PT / 2PT Miss, 3PT / 3PT Miss. Made buttons are amber; Miss buttons are slate/gray |
 | 4c.2 | Tap 2PT (+) twice → tap 2 Miss (+) once | 2PT shows 2, 2 Miss shows 1; scoreboard shows 4 pts (only makes score) |
-| 4c.3 | Tap Undo | Last miss action reversed; 2 Miss back to 0 |
+| 4c.3 | Tap Undo -> top-row **Undo** in Recent events | Last miss action reversed; 2 Miss back to 0 |
 | 4c.4 | Navigate to Game Summary | Scoring table shows "FT M/A", "2PT M/A", "3PT M/A" columns — each cell displays made/total (e.g. "2/3") and percentage (67%) |
 | 4c.5 | Team totals row | Same M/A format with team-level percentage |
 | 4c.6 | Miss buttons do not affect home team score | Scoreboard points unchanged when Miss is tapped |
@@ -154,7 +154,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.7 | Tap court → **Cancel** (or tap outside the popup) | Popup dismisses; no stat, no marker |
 | 4e.8 | Start a scroll gesture with the finger **on the court** | Page scrolls; no popup opens (tap-vs-scroll discrimination, ~18px tolerance — slightly wobbly taps still count as taps) |
 | 4e.9 | Select the opponent team chip (★) → tap court → Made | Shot attributed to the opponent pseudo-player |
-| 4e.10 | Tap **↩ Undo** (bottom bar) or **↩ Undo last shot** after a popup shot | Marker removed and stat reverted |
+| 4e.10 | Tap bottom **Undo** -> Recent events opens -> top-row **Undo** after a popup shot, or tap **↩ Undo last shot** | Marker removed and stat reverted |
 | 4e.11 | Log a made 2 via popup, then tap the `2PT` grid button | Both increment the same stat (additive — dual input by design); correct with the button's − or Undo |
 | 4e.12 | Open `#/shot-chart` directly | Redirects to `#/game` (or home when no basketball game) |
 | 4e.13 | Non-basketball sport (e.g. soccer) → Game Tracker | Page unchanged: no court, full grid only |
@@ -164,6 +164,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.17 | Tap clearly beyond the arc → switch the chip to **2PT** → **Made** | Shot records as `2pt`, score +2, marker remains at the tapped location, and the zone summary counts it under a 2-point zone (mid-range when the raw location was `three`) |
 | 4e.18 | Tap court while #A is active → open **Log for** picker → choose #B → **Made** | Popup stays open after choosing #B; shot is credited to #B; sticky strip highlights #B; the inline court filters to #B |
 | 4e.19 | Tap court → switch to another player/team → **Cancel** | No stat or marker is recorded, but the active player remains the switched selection |
+| 4e.20 | Log a mix of shots, rebounds, steals, blocks, assists, and score changes -> tap bottom **Undo** | Recent events lists the last ~5 events, newest first, using player/team + event labels |
+| 4e.21 | With Recent events open, tap **Undo** on the newest row repeatedly | Each tap reverts the next newest event; older rows are disabled until they become newest; shot markers disappear when their linked shot is undone |
 
 ---
 
@@ -214,7 +216,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 5.5 | Select player B; tap AST, REB | Player B stats increment; home score unchanged for non-scoring stats |
 | 5.6 | Increment opponent score | Opponent score +1 |
 | 5.6a | On Scoreboard: tap + or − under home team score | Home score increases or decreases by 1 (stays ≥ computed from stats); Undo restores |
-| 5.7 | Undo last action | Previous value restored |
+| 5.7 | Tap Undo -> top-row **Undo** in Recent events | Previous value restored |
 | 5.8 | Game Summary | Tables show per-player and team totals; categories correct |
 | 5.9 | New Game (from home with active game) | Reset; can start new game |
 
