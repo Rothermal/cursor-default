@@ -2,7 +2,7 @@
 
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
 > Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
-> F5 and F6 are implemented. F7 and F12 have expanded implementation plans. F8-F11 are still sketches
+> F5, F6, and F12 are implemented. F7 has an expanded implementation plan. F8-F11 are still sketches
 > (goal, dependency, phases, files, effort, open question); when one is picked up, expand
 > it to a full plan with a "Pre-handoff design decisions" section.
 
@@ -37,7 +37,7 @@ F1  Single-page tracker + Court Event Capture (implemented)
  ├─ F3  Cloud-saved game shot review             (implemented; two-user QA pending)
  ├─ F5  Auto 2/3 override chip                   (implemented)
  ├─ F6  In-popup player confirm/switch           (implemented)
- ├─ F12 Recent-events undo popup                 (correction UX; PRECEDES F7)
+ ├─ F12 Recent-events undo popup                 (implemented; unblocks F7)
  ├─ F7  Assist-linking on a made shot            (two-step undo, made transparent by F12)
  ├─ F8  Live per-player line in popup            (small; context)
  ├─ F9  Rebound-after-miss prompt                (needs live tuning; opt-in)
@@ -46,12 +46,11 @@ F1  Single-page tracker + Court Event Capture (implemented)
 F4  In-progress scores on resume UI              (implemented; cloud-list QA pending)
 ```
 
-**Hard constraints for remaining work:** **F12 before F7** (F7's two-step assist undo
-relies on F12's visible event list). F8/F9/F10 can be sequenced by product priority.
-F11 should stay gated on live-use feedback.
+**Remaining work:** F12 is complete, so F7 is unblocked. F8/F9/F10 can be sequenced by
+product priority. F11 should stay gated on live-use feedback.
 
-**Why this order:** F12 precedes F7 so the recent-events popup makes F7's two-step assist undo
-transparent (no reducer change). F8-F10 are progressive polish. F11 is intentionally last:
+**Why this order:** F12 now gives F7's two-step assist undo a visible event list
+(no reducer change). F8-F10 are progressive polish. F11 is intentionally last:
 build it only if live testing shows the extra tap for block/steal/assist is real friction.
 
 ---
@@ -216,18 +215,18 @@ friction.
 ## F12 — Recent-events undo popup
 
 > **Expanded to a full plan:** [PLAN_F12_RECENT_EVENTS_UNDO.md](PLAN_F12_RECENT_EVENTS_UNDO.md)
-> (tasks + pre-handoff decisions). **Build before F7.**
+> (tasks + pre-handoff decisions). **Implemented before F7.**
 
 **Goal:** Replace the silent single-Undo with a popup listing the **last ~5 events** in
 plain language (`<player> — <event>`) so the user can see and undo recent actions. Reads the
 existing `actionLog`; undoes via the existing LIFO `UNDO`.
 
 **Depends on:** F1 (enhances its undo bar). Pairs with F7 (makes two-step assist undo
-transparent). **Effort:** S.
+transparent). **Effort:** S. **Status:** Implemented.
 
 **Phases:**
-- **P1:** `describeActionLogEntry` label helper (+ test); `RecentEventsPopup` showing the
-  last ~5 entries; the bottom Undo opens it; top-row undo = today's single `UNDO`.
+- **P1:** Implemented: `describeActionLogEntry` label helper (+ test); `RecentEventsPopup`
+  showing the last ~5 entries; the bottom Undo opens it; top-row undo = today's single `UNDO`.
 - **P2 (optional):** cascade-to-row undo (B) — undo everything newer than a tapped row via
   sequential `UNDO`s.
 
