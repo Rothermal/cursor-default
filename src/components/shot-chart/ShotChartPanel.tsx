@@ -5,6 +5,7 @@ import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
 import CourtEventPopup, { type CourtEvent } from './CourtEventPopup'
 import { isThreePointer, zoneForForcedShotType } from './courtGeometry'
+import { formatCompactGameStatLine } from '../../lib/statDisplay'
 import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 import {
   shootingLine,
@@ -67,7 +68,7 @@ interface ShotChartPanelProps {
 
 export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
-  const { players, activePlayerId, shotChart, actionLog } = state
+  const { sport, players, activePlayerId, shotChart, actionLog } = state
   const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)
@@ -79,6 +80,10 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       ? activePlayerId
       : selectorPlayers[0]?.id ?? null
   const effectivePlayer = players.find(p => p.id === effectivePlayerId)
+  const playerStatLine =
+    sport && effectivePlayer
+      ? formatCompactGameStatLine(sport, effectivePlayer.stats)
+      : undefined
 
   // A confirmed court tap only opens the popup — nothing is logged until a choice is made.
   const onCourtTap = useCallback(
@@ -212,6 +217,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       {pendingTap && effectivePlayerId && (
         <CourtEventPopup
           playerLabel={popupPlayerLabel(effectivePlayer)}
+          playerStatLine={playerStatLine}
           players={players}
           activePlayerId={effectivePlayerId}
           onSelectPlayer={onSelectPlayer}

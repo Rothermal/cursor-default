@@ -147,7 +147,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 |------|--------|----------|
 | 4e.1 | Start a basketball game → Game Tracker | Single scroll page; half-court below the player strip; **no** separate "Shot chart" button |
 | 4e.2 | Scroll down to the stat grid | Player-select strip stays **pinned** at the top (score scrolls away); active player always visible |
-| 4e.3 | Tap the court (inside the paint) | `CourtEventPopup` opens: Log for player switcher, **2PT / 3PT** shot-value segmented control defaulted to **2PT**, **Made / Missed** buttons, Off Reb · Def Reb · Steal · Block · Assist, Cancel. Nothing is logged yet |
+| 4e.3 | Tap the court (inside the paint) | `CourtEventPopup` opens: Log for player switcher with compact live stat line, **2PT / 3PT** shot-value segmented control defaulted to **2PT**, **Made / Missed** buttons, Off Reb · Def Reb · Steal · Block · Assist, Cancel. Nothing is logged yet |
 | 4e.4 | Tap **Made** | Popup closes; green marker at tap point; selected player's `2PT` +1; scoreboard +2 |
 | 4e.5 | Tap the court beyond the arc → **Missed** | "Detected: 3-pointer"; red ✕ marker; `3 Miss` +1; score unchanged |
 | 4e.6 | Tap court → **Off Reb** (repeat for Def Reb / Steal / Block / Assist) | Popup closes; the matching stat (`OFF`/`DEF`/`STL`/`BLK`/`AST`) +1; **no marker** on the court |
@@ -171,6 +171,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.24 | Tap court as #A → **Made** → **No assist** | Only the shot is logged; no player's `AST` changes |
 | 4e.25 | Tap court → **Missed**, Off Reb, Def Reb, Steal, Block, or standalone Assist | No **Assisted by?** step appears |
 | 4e.26 | Tap court as #A → **Made** | The **Assisted by?** choices exclude #A; opponent pseudo-player shots skip the assist step |
+| 4e.27 | Tap court for a player with stats, then use **Log for** to switch players | The compact stat line under the player name updates with the selected player's live stats |
 
 ---
 
