@@ -2,7 +2,7 @@
 
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
 > Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
-> F5, F6, F7, and F12 are implemented. F8-F11 are still sketches
+> F5, F6, F7, F8, and F12 are implemented. F9-F11 are still sketches
 > (goal, dependency, phases, files, effort, open question); when one is picked up, expand
 > it to a full plan with a "Pre-handoff design decisions" section.
 
@@ -39,18 +39,18 @@ F1  Single-page tracker + Court Event Capture (implemented)
  ├─ F6  In-popup player confirm/switch           (implemented)
  ├─ F12 Recent-events undo popup                 (implemented; unblocks F7)
  ├─ F7  Assist-linking on a made shot            (implemented)
- ├─ F8  Live per-player line in popup            (small; context)
+ ├─ F8  Live per-player line in popup            (implemented)
  ├─ F9  Rebound-after-miss prompt                (needs live tuning; opt-in)
  ├─ F10 Shot sequence numbers / recency          (cosmetic)
  └─ F11 Hybrid quick buttons (Option B)          (only if testing shows blk/stl/ast need 1-tap)
 F4  In-progress scores on resume UI              (implemented; cloud-list QA pending)
 ```
 
-**Remaining work:** F8/F9/F10 can be sequenced by product priority. F11 should stay gated on
+**Remaining work:** F9/F10 can be sequenced by product priority. F11 should stay gated on
 live-use feedback.
 
 **Why this order:** F12 gives F7's two-step assist undo a visible event list
-(no reducer change). F8-F10 are progressive polish. F11 is intentionally last:
+(no reducer change). F9-F10 are progressive polish. F11 is intentionally last:
 build it only if live testing shows the extra tap for block/steal/assist is real friction.
 
 ---
@@ -130,20 +130,22 @@ linkage.
 
 ## F8 — Live per-player line in the popup
 
+> **Expanded to a full plan:** [PLAN_F8_LIVE_PER_PLAYER_LINE.md](PLAN_F8_LIVE_PER_PLAYER_LINE.md).
+> **Status:** Implemented.
+
 **Goal:** Show the selected player's quick stat line (e.g. `12 pts · 5 reb · 3 ast`) in
 the popup header for instant context while logging.
 
 **Depends on:** F1; nice with F6. **Effort:** XS.
 
 **Phases:**
-- **P1:** Compute the compact line from `player.stats` using existing helpers
-  (`keyStatIds` in `sports.ts` + `src/lib/statDisplay.ts`) and render it under the player
-  name in `CourtEventPopup`.
+- **P1:** Implemented: compute the compact line from `player.stats` using existing helper
+  `formatCompactGameStatLine` and render it under the player name in `CourtEventPopup`.
 
 **Key files:** `CourtEventPopup.tsx`, `src/lib/statDisplay.ts` (reuse).
 
-**Open question:** Which stats to show — sport `keyStatIds` (default) vs. a shot-specific
-set (pts/FG/reb/ast). Default: `keyStatIds`.
+**Resolved:** use existing `formatCompactGameStatLine` output: score, basketball rebounds,
+and sport `keyStatIds`.
 
 ---
 

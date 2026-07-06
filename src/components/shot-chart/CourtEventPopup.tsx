@@ -34,6 +34,8 @@ export type CourtEvent =
 interface CourtEventPopupProps {
   /** Display label for the player the event will be attributed to (e.g. "#23 Jordan"). */
   playerLabel: string
+  /** Compact display-only live stat context for the selected player. */
+  playerStatLine?: string
   players: Player[]
   activePlayerId: string
   onSelectPlayer: (playerId: string) => void
@@ -51,6 +53,7 @@ interface CourtEventPopupProps {
  */
 export default function CourtEventPopup({
   playerLabel,
+  playerStatLine,
   players,
   activePlayerId,
   onSelectPlayer,
@@ -163,6 +166,11 @@ export default function CourtEventPopup({
                 Log for
               </span>
               <span className="block text-base font-bold text-slate-800 truncate">{playerLabel}</span>
+              {playerStatLine && (
+                <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+                  {playerStatLine}
+                </span>
+              )}
             </span>
             <span className="text-slate-400 text-sm" aria-hidden>
               {pickerOpen ? '^' : 'v'}
