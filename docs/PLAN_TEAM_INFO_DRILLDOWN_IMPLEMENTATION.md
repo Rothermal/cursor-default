@@ -8,6 +8,11 @@
 
 **Tech Stack:** React 18, TypeScript, Vite, Tailwind CSS, React Router `HashRouter`, Supabase client queries/RPCs, Vitest for pure helper tests, manual browser regression for route and mobile UI behavior.
 
+**Current recommendation:** Keep this as one umbrella plan, but execute it as multiple
+small features/PRs. The immediate next build is **TI-1 Team Info MVP** only: data
+contracts, shared helpers, `/team?teamId=`, hero/record/roster count, basic stat links,
+and `/teams` -> Team Info navigation.
+
 ---
 
 ## 1. Plans reviewed and how they relate
@@ -26,7 +31,7 @@
 
 ## 2. Recommended focus
 
-Start with **Team Info hub + minimal navigation shell**.
+Start with **TI-1: Team Info hub MVP + minimal navigation shell**.
 
 Why this comes first:
 
@@ -46,6 +51,27 @@ Defer these until after the hub exists:
 
 ---
 
+## 2a. Pre-handoff design decisions
+
+- **D1 - Route shape:** Query-param routes are canonical for this feature:
+  `/team?teamId=`, `/team/roster?teamId=`, `/team/schedule?teamId=`.
+- **D2 - Data model:** No Supabase schema changes for Team Info. Use existing
+  `teams`, `seasons`, `team_players`, `games`, `tournaments`, `team_members`, and shipped
+  stats RPCs.
+- **D3 - Availability:** v1 is cloud-team only. Offline/local-only teams are out of scope
+  until the app has a broader local team model.
+- **D4 - Management backstop:** `/teams` remains the owner/admin management surface until
+  the later management-migration slice. TI-1 should link back to `/teams` for management.
+- **D5 - Stats strategy:** Link into existing stat pages first; do not rebuild leaderboard,
+  player profile, team stats, tournament stats, or game summary data views inside TI-1.
+- **D6 - Permissions:** Read-only/scorer users can view Team Info. Any management controls
+  introduced later must reuse existing owner/admin role checks from `Teams.tsx`.
+- **D7 - Start Game:** `/setup?teamId=` is a later slice, not part of TI-1.
+- **D8 - Broad navigation:** This feature adds team-level routes without replacing the
+  broader Sport -> Season -> Team -> Tournament navigation model.
+
+---
+
 ## 3. Execution principles
 
 - Keep each section shippable behind existing routes and behavior.
@@ -58,9 +84,34 @@ Defer these until after the hub exists:
 
 ---
 
+## 3a. Known reuse points
+
+Start with these existing surfaces before creating new abstractions:
+
+- `src/lib/display.ts`
+  - `teamDisplayName`
+  - `playerDisplayName`
+- `src/lib/gameScore.ts`
+  - `resolveFinalHomeScoreFromGameRow`
+  - existing score-row fallback behavior
+- `src/lib/statDisplay.ts`
+  - `formatCompactGameStatLine`
+- `src/pages/Teams.tsx`
+  - team loading queries
+  - owner/admin/scorer role checks
+  - roster/member management behavior to preserve until TI-7
+- Existing stat routes and query params:
+  - `/leaderboard?teamId=&seasonId=`
+  - `/team-stats?teamId=`
+  - `/player?playerId=&teamId=`
+  - `/tournament-stats?teamId=`
+  - `/summary` hydration patterns from game/profile links
+
+---
+
 ## 4. Implementation sections
 
-### Section 0: Confirm current data contracts
+### TI-1a: Confirm current data contracts
 
 **Purpose:** Lock down the data shapes before UI work.
 
@@ -90,7 +141,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 1: Shared team-info helpers
+### TI-1b: Shared team-info helpers
 
 **Purpose:** Keep record, grouping, display, and route helpers out of page components.
 
@@ -112,7 +163,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 2: Team Info route and hero MVP
+### TI-1c: Team Info route and hero MVP
 
 **Purpose:** Create the first useful `/team?teamId=` page.
 
@@ -142,9 +193,20 @@ Defer these until after the hub exists:
 
 **Commit target:** new route, minimal page, team list link.
 
+**TI-1 MVP acceptance criteria:**
+- Signed-in user can open `/teams` and select an existing team.
+- Primary team card/row action opens `/team?teamId=<id>`.
+- Missing, invalid, or unauthorized `teamId` renders a useful loading/error/empty state.
+- Team Info hero shows team display name, season, sport, record, roster count, and game
+  count.
+- Record calculation uses finalized games and existing score helpers.
+- Basic links to existing stat/management pages render only when their required ids exist.
+- `/teams` remains reachable as the management backstop.
+- `pnpm lint` and `pnpm build` pass.
+
 ---
 
-### Section 3: Segmented shell and overview cards
+### TI-2: Segmented shell and overview cards
 
 **Purpose:** Make the hub useful without introducing new full-page drill-downs yet.
 
@@ -181,7 +243,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 4: Roster drill-down
+### TI-3: Roster drill-down
 
 **Purpose:** Move roster reading into the new hierarchy before moving roster management.
 
@@ -207,7 +269,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 5: Schedule and Game Info drill-down
+### TI-4: Schedule and Game Info drill-down
 
 **Purpose:** Add team-scoped games before altering global Cloud Games behavior.
 
@@ -234,7 +296,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 6: Player Info route alignment
+### TI-5: Player Info route alignment
 
 **Purpose:** Align player profile navigation with the team hub while preserving existing `/player` links.
 
@@ -263,7 +325,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 7: Season Info route
+### TI-6: Season Info route
 
 **Purpose:** Provide a season detail page only after the team route is established.
 
@@ -287,9 +349,10 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 8: Move team management into the hierarchy
+### TI-7: Move team management into the hierarchy
 
-**Purpose:** Decompose the current `/teams` page only after read-only drill-downs are stable.
+**Purpose:** Decompose the current `/teams` page only after read-only drill-downs are
+stable. This is a later/high-risk slice, not part of the MVP.
 
 **Likely files:**
 - Modify `src/pages/Teams.tsx`
@@ -313,7 +376,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 9: Start Game and cross-page back-links
+### TI-8: Start Game and cross-page back-links
 
 **Purpose:** Make the new hierarchy feel complete without changing the broader navigation plan.
 
@@ -341,7 +404,7 @@ Defer these until after the hub exists:
 
 ---
 
-### Section 10: Regression docs and polish
+### TI-9: Regression docs and polish
 
 **Purpose:** Make the feature maintainable after implementation.
 
@@ -387,11 +450,47 @@ Use these as digestible review chunks:
 
 ---
 
+### Current TI PR labels
+
+Use these labels when opening implementation PRs:
+
+1. **TI-0 Planning cleanup** - this file.
+2. **TI-1 Team Info MVP** - helpers, `/team?teamId=`, hero, basic data, Teams list link.
+3. **TI-2 Overview cards** - segmented control and preview cards.
+4. **TI-3 Roster read-only drill-down** - embedded/full roster.
+5. **TI-4 Schedule + Game Info** - team games and single game details.
+6. **TI-5 Player Info compatibility** - route alignment and back links.
+7. **TI-6 Season Info** - season route and team links.
+8. **TI-7 Management migration** - later/high-risk move of roster/member/merge behavior from `/teams`.
+9. **TI-8 Start Game + navigation polish** - setup preselect and cross-page links.
+10. **TI-9 Regression docs** - finalized test scripts.
+
+---
+
+## 5a. Open questions to resolve during implementation
+
+- **Q1 - Record source:** For TI-1, is finalized-game record enough, or should in-progress
+  games affect any hero status copy? Recommendation: finalized-game record only.
+- **Q2 - Role display:** Should Team Info expose the current user's role in the MVP hero?
+  Recommendation: no, unless needed to explain hidden management controls.
+- **Q3 - Team members card timing:** Should team members appear in TI-2 overview or wait
+  until TI-7 management migration? Recommendation: preview/read-only in TI-2 only if the
+  existing Teams query is easy to reuse.
+- **Q4 - Start Game placement:** Should the Start Game CTA appear disabled in TI-1 or wait
+  until `/setup?teamId=` is implemented? Recommendation: wait until TI-8 to avoid a dead
+  control.
+- **Q5 - Player route naming:** Should `/player-info` become canonical, or should
+  `/player` remain canonical with team-context back links? Recommendation: decide in TI-5
+  after reviewing reuse cost in `PlayerProfile.tsx`.
+
+---
+
 ## 6. Key risks and guardrails
 
 | Risk | Guardrail |
 |---|---|
 | Teams page currently owns too many behaviors. | Do not decompose it until the read-only hub, roster, and schedule pages are working. |
+| Management migration scope balloons. | Treat TI-7 as later/high-risk; preserve `/teams` as the management backstop through TI-1 through TI-6. |
 | Record calculations drift between pages. | Reuse `resolveFinalHomeScoreFromGameRow` and test a shared record helper. |
 | Team schedule accidentally copies global `Games` user-created filtering. | Query by `games.team_id` for team schedule and overview. |
 | `/setup?teamId=` conflicts with sport selection state. | Preselect only when the team loads with a season sport; otherwise show a clear loading/error state. |
