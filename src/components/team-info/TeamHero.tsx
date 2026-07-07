@@ -6,7 +6,7 @@ interface TeamHeroProps {
   legalName?: string | null
   seasonName: string
   sportName: string
-  sportIcon: string
+  sportIcon?: string
   record: TeamRecord
   rosterCount: number
   gameCount: number
@@ -27,7 +27,7 @@ export default function TeamHero({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-500">
-            {sportIcon} {sportName}{seasonName ? ` / ${seasonName}` : ''}
+            {sportIcon ? `${sportIcon} ` : ''}{sportName}{seasonName ? ` / ${seasonName}` : ''}
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 break-words">{teamName}</h1>
           {legalName && legalName !== teamName && (

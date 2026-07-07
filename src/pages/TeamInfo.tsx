@@ -200,14 +200,14 @@ export default function TeamInfo() {
               Teams
             </button>
           </section>
-        ) : team && sport ? (
+        ) : team ? (
           <>
             <TeamHero
               teamName={teamDisplayName(team)}
               legalName={team.name}
               seasonName={team.seasons.name}
-              sportName={sport.name}
-              sportIcon={sport.icon}
+              sportName={sport?.name ?? team.seasons.sport}
+              sportIcon={sport?.icon ?? ''}
               record={record}
               rosterCount={rosterCount}
               gameCount={games.length}
@@ -255,11 +255,11 @@ export default function TeamInfo() {
               </div>
             </section>
           </>
-        ) : (
+        ) : loading ? (
           <section className="card">
             <p className="text-sm text-slate-500 animate-pulse">Loading Team Info...</p>
           </section>
-        )}
+        ) : null}
       </div>
     </div>
   )

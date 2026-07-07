@@ -55,7 +55,7 @@ interface PoolPlayer {
 
 export default function Teams() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user, isConfigured } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const userId = user?.id ?? null
@@ -1063,7 +1063,11 @@ export default function Teams() {
                         <div className="flex items-center gap-0.5 shrink-0">
                           <button
                             type="button"
-                            onClick={e => { e.stopPropagation(); setSelectedTeamId(team.id) }}
+                            onClick={e => {
+                              e.stopPropagation()
+                              setSelectedTeamId(team.id)
+                              setSearchParams({ teamId: team.id }, { replace: true })
+                            }}
                             className="text-xs font-semibold text-blue-600 px-1.5 py-1"
                             title="Manage roster and members on this page"
                           >
