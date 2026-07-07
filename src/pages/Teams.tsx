@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName, playerRosterSelectLabel } from '../lib/display'
+import { teamInfoPath } from '../lib/teamInfo'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -54,9 +55,11 @@ interface PoolPlayer {
 
 export default function Teams() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user, isConfigured } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const userId = user?.id ?? null
+  const requestedTeamId = searchParams.get('teamId')
   const supabaseClient = supabase
 
   const [teams, setTeams] = useState<TeamRow[]>([])
@@ -149,6 +152,9 @@ export default function Teams() {
       const loadedTeams = (data ?? []) as unknown as TeamRow[]
       setTeams(loadedTeams)
       setSelectedTeamId(prev => {
+        if (requestedTeamId && loadedTeams.some(team => team.id === requestedTeamId)) {
+          return requestedTeamId
+        }
         if (prev && loadedTeams.some(team => team.id === prev)) return prev
         return loadedTeams[0]?.id ?? ''
       })
@@ -159,7 +165,7 @@ export default function Teams() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, supabaseClient, userId])
+  }, [isConfigured, requestedTeamId, supabaseClient, userId])
 
   useEffect(() => {
     if (!isConfigured || !userId || !supabaseClient) {
@@ -1039,7 +1045,7 @@ export default function Teams() {
                       <div className="flex items-start justify-between gap-2">
                         <button
                           type="button"
-                          onClick={() => setSelectedTeamId(team.id)}
+                          onClick={() => navigate(teamInfoPath(team.id))}
                           className="flex-1 text-left"
                         >
                           <p className="font-medium text-slate-700">
@@ -1055,6 +1061,18 @@ export default function Teams() {
                           </p>
                         </button>
                         <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              setSelectedTeamId(team.id)
+                              setSearchParams({ teamId: team.id }, { replace: true })
+                            }}
+                            className="text-xs font-semibold text-blue-600 px-1.5 py-1"
+                            title="Manage roster and members on this page"
+                          >
+                            Manage
+                          </button>
                           <button
                             type="button"
                             onClick={e => { e.stopPropagation(); startEditTeam(team) }}
