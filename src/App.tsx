@@ -11,6 +11,7 @@ import GameCheckout from './pages/GameCheckout'
 import GameSummary from './pages/GameSummary'
 import Admin from './pages/Admin'
 import Teams from './pages/Teams'
+import TeamInfo from './pages/TeamInfo'
 import Games from './pages/Games'
 import Leaderboard from './pages/Leaderboard'
 import PlayerProfile from './pages/PlayerProfile'
@@ -59,6 +60,7 @@ function AppRoutes() {
           <Route path="/summary" element={<GameSummary />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/teams" element={<Teams />} />
+          <Route path="/team" element={<TeamInfo />} />
           <Route path="/games" element={<Games />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/player" element={<PlayerProfile />} />

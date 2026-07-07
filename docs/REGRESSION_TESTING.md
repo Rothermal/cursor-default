@@ -66,6 +66,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.6 | Remove player | Player removed from roster (soft deactivate) |
 | 4.7 | Season Stats link (when team selected) | Navigate to Leaderboard with that team pre-selected |
 | 4.8 | Reload → Teams | Same teams and roster (from Supabase) |
+| 4.9 | Teams → tap a team card's primary name area | Opens `/team?teamId=<id>`; Team Info shows display name, season, sport, record, roster count, game count, and links back to Season Stats, Team Stats, and Manage Team |
+| 4.10 | Teams → tap **Manage** on a team card | Stays on `/teams`; roster/member management switches to that team |
 
 ---
 
