@@ -3,8 +3,8 @@
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
 > Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
 > F5, F6, F7, F8, F9, and F12 are implemented. F10 is no longer needed as a
-> standalone visible-numbering feature and is superseded by F13. F11 remains gated on
-> live-use feedback. F13 is drafted for review in
+> standalone visible-numbering feature and is superseded by F13. F11 and F13 are both
+> held pending further user feedback before any build work. F13 is drafted for review in
 > [PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md).
 
 F5-F12 depend on F1 (the single-page tracker + `CourtEventPopup`) and avoid data-model
@@ -44,19 +44,20 @@ F1  Single-page tracker + Court Event Capture       (implemented)
  |-- F8  Live per-player line in popup              (implemented)
  |-- F9  Rebound-after-miss prompt                  (implemented; opt-in)
  |-- F10 Shot sequence numbers / recency            (superseded; no standalone work)
- |-- F13 Shot detail + linked metadata/edit modal   (planned; review draft)
- `-- F11 Hybrid quick buttons (Option B)            (only if live testing shows friction)
+ |-- F13 Shot detail + linked metadata/edit modal   (hold pending user feedback)
+ `-- F11 Hybrid quick buttons (Option B)            (hold pending user feedback)
 F4  In-progress scores on resume UI                 (implemented; cloud-list QA pending)
 ```
 
-**Remaining work:** F13 should be reviewed and phased before build. F11 should stay gated
-on live-use feedback.
+**Remaining work:** F11 and F13 are both paused. Revisit only after further user feedback
+clarifies whether quick non-shot buttons or shot detail/editing are worth prioritizing.
 
 **Why this order:** F12 gives F7's two-step assist undo a visible event list without a
 reducer change. F13 is the natural successor to F7/F9 because it turns their
 adjacent-but-unlinked stat increments into durable shot metadata and an eventual edit
-surface. F11 is intentionally last: build it only if live testing shows the extra tap for
-block/steal/assist is real friction.
+surface. Both are intentionally held now: build F11 only if live testing shows the extra
+tap for block/steal/assist is real friction, and build F13 only if shot detail/editing
+proves important enough for the larger data-model work.
 
 ---
 
@@ -157,7 +158,7 @@ belongs at the metadata/detail level:
 ## F13 - Shot detail + linked metadata + edit modal
 
 > **Expanded to a draft plan:** [PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md).
-> **Status:** Planning draft for review.
+> **Status:** Held pending further user feedback.
 
 **Goal:** Tap an existing shot marker to inspect the shot event: shot number, shooter,
 result/value, zone/location, timestamp/order, and any F7 assist or F9 rebound linked to
@@ -186,6 +187,8 @@ ever infer F7/F9 links (recommended no).
 ---
 
 ## F11 - Hybrid quick buttons for block / steal / assist (Option B)
+
+> **Status:** Held pending further user feedback.
 
 **Goal:** For coaches who log many blocks/steals/assists, add dedicated one-tap buttons
 next to the court while keeping the popup's secondary row.
