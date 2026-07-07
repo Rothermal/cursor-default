@@ -77,7 +77,7 @@ interface MergeAuditListRow {
 
 export default function Admin() {
   const navigate = useNavigate()
-  const { isSportEnabled, toggleSport } = useSettings()
+  const { settings, isSportEnabled, toggleSport, setReboundPromptAfterMissEnabled } = useSettings()
   const { isConfigured, user } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const supabaseClient = supabase
@@ -482,6 +482,44 @@ export default function Admin() {
               Enable at least one sport to start tracking games.
             </p>
           )}
+        </section>
+
+        <section className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-700">Game tracker</h2>
+          </div>
+
+          <div className="card flex items-center justify-between gap-3 py-3">
+            <div>
+              <span className="font-medium text-slate-700">Missed-shot rebound prompt</span>
+              <p className="text-xs text-slate-400">
+                After a court miss, ask whether to add an offensive or defensive rebound.
+              </p>
+            </div>
+
+            <button
+              onClick={() =>
+                setReboundPromptAfterMissEnabled(
+                  !settings.courtCapture.reboundPromptAfterMiss
+                )
+              }
+              className={`
+                relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
+                ${settings.courtCapture.reboundPromptAfterMiss ? 'bg-blue-600' : 'bg-slate-300'}
+              `}
+              role="switch"
+              aria-checked={settings.courtCapture.reboundPromptAfterMiss}
+              aria-label="Toggle missed-shot rebound prompt"
+            >
+              <span
+                className={`
+                  absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow
+                  transition-transform duration-200
+                  ${settings.courtCapture.reboundPromptAfterMiss ? 'translate-x-5' : 'translate-x-0'}
+                `}
+              />
+            </button>
+          </div>
         </section>
 
         {isConfigured && user && (

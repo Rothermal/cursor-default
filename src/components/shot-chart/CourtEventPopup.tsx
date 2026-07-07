@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Player } from '../../types'
 import { assistCandidatesForMadeShot } from '../../lib/assistCandidates'
+import {
+  reboundPromptOptionsForMiss,
+  type ReboundPromptOptions,
+  type ReboundStatId,
+} from '../../lib/reboundPrompt'
 import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 
 /**
@@ -27,8 +32,19 @@ function playerPickerLabel(player: Player): string {
 }
 
 /** Choice made in the popup: a located shot, or a stat-only increment. */
+export interface CourtReboundChoice {
+  statId: ReboundStatId
+  playerId: string
+}
+
 export type CourtEvent =
-  | { kind: 'shot'; made: boolean; shotType: '2pt' | '3pt'; assistPlayerId?: string }
+  | {
+      kind: 'shot'
+      made: boolean
+      shotType: '2pt' | '3pt'
+      assistPlayerId?: string
+      rebound?: CourtReboundChoice
+    }
   | { kind: 'stat'; statId: CourtStatEventId }
 
 interface CourtEventPopupProps {
@@ -39,6 +55,7 @@ interface CourtEventPopupProps {
   players: Player[]
   activePlayerId: string
   onSelectPlayer: (playerId: string) => void
+  reboundPromptAfterMissEnabled?: boolean
   /** Detected from the tap location via `isThreePointer`; user can override before logging. */
   shotType: '2pt' | '3pt'
   onPick: (event: CourtEvent) => void
@@ -57,6 +74,7 @@ export default function CourtEventPopup({
   players,
   activePlayerId,
   onSelectPlayer,
+  reboundPromptAfterMissEnabled = false,
   shotType,
   onPick,
   onCancel,
@@ -64,7 +82,12 @@ export default function CourtEventPopup({
   const [selectedShotType, setSelectedShotType] = useState<'2pt' | '3pt'>(shotType)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingMadeShotType, setPendingMadeShotType] = useState<'2pt' | '3pt' | null>(null)
+  const [pendingMissedShotType, setPendingMissedShotType] = useState<'2pt' | '3pt' | null>(null)
+  const [missReboundOptions, setMissReboundOptions] = useState<ReboundPromptOptions | null>(null)
+  const [offensiveReboundPlayerId, setOffensiveReboundPlayerId] = useState<string | null>(null)
+  const [defensiveReboundPlayerId, setDefensiveReboundPlayerId] = useState<string | null>(null)
   const assistCandidates = assistCandidatesForMadeShot(players, activePlayerId)
+  const isFollowUpStep = Boolean(pendingMadeShotType || pendingMissedShotType)
 
   /**
    * Ghost-tap guard: the court tap that opens the popup fires a trailing `click` at the
@@ -108,6 +131,42 @@ export default function CourtEventPopup({
     pick({ kind: 'shot', made: true, shotType: pendingMadeShotType, assistPlayerId })
   }
 
+  const continueMissedShot = () => {
+    if (!armedRef.current) return
+    if (!reboundPromptAfterMissEnabled) {
+      pick({ kind: 'shot', made: false, shotType: selectedShotType })
+      return
+    }
+
+    const reboundOptions = reboundPromptOptionsForMiss(players, activePlayerId)
+    if (!reboundOptions) {
+      pick({ kind: 'shot', made: false, shotType: selectedShotType })
+      return
+    }
+
+    armedRef.current = false
+    setPickerOpen(false)
+    setPendingMissedShotType(selectedShotType)
+    setMissReboundOptions(reboundOptions)
+    setOffensiveReboundPlayerId(reboundOptions.defaultOffensivePlayerId)
+    setDefensiveReboundPlayerId(reboundOptions.defaultDefensivePlayerId)
+  }
+
+  const selectReboundPlayer = (statId: ReboundStatId, playerId: string) => {
+    if (!armedRef.current) return
+    if (!pendingMissedShotType) return
+    if (statId === 'oreb') {
+      setOffensiveReboundPlayerId(playerId)
+    } else {
+      setDefensiveReboundPlayerId(playerId)
+    }
+  }
+
+  const finishMissedShot = (rebound?: CourtReboundChoice) => {
+    if (!pendingMissedShotType) return
+    pick({ kind: 'shot', made: false, shotType: pendingMissedShotType, rebound })
+  }
+
   const cancel = () => {
     if (!armedRef.current) return
     armedRef.current = false
@@ -116,22 +175,49 @@ export default function CourtEventPopup({
 
   const chooseShotType = (nextShotType: '2pt' | '3pt') => {
     if (!armedRef.current) return
-    if (pendingMadeShotType) return
+    if (isFollowUpStep) return
     setSelectedShotType(nextShotType)
   }
 
   const togglePlayerPicker = () => {
     if (!armedRef.current) return
-    if (pendingMadeShotType) return
+    if (isFollowUpStep) return
     setPickerOpen(open => !open)
   }
 
   const selectPlayer = (playerId: string) => {
     if (!armedRef.current) return
-    if (pendingMadeShotType) return
+    if (isFollowUpStep) return
     onSelectPlayer(playerId)
     setPickerOpen(false)
   }
+
+  const reboundCandidateButtons = (
+    statId: ReboundStatId,
+    candidates: Player[],
+    selectedPlayerId: string | null
+  ) => (
+    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      {candidates.map(player => {
+        const active = player.id === selectedPlayerId
+        return (
+          <button
+            key={player.id}
+            type="button"
+            onClick={() => selectReboundPlayer(statId, player.id)}
+            title={player.name}
+            className={`flex-shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-left active:scale-95 transition-transform ${
+              active
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+          >
+            {playerPickerLabel(player)}
+          </button>
+        )
+      })}
+    </div>
+  )
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -155,7 +241,7 @@ export default function CourtEventPopup({
           <button
             type="button"
             onClick={togglePlayerPicker}
-            disabled={Boolean(pendingMadeShotType)}
+            disabled={isFollowUpStep}
             className="w-full flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2
                        text-left active:bg-slate-100 active:scale-[0.99] transition-transform
                        disabled:cursor-default disabled:opacity-90"
@@ -208,7 +294,7 @@ export default function CourtEventPopup({
                   key={value}
                   type="button"
                   onClick={() => chooseShotType(value)}
-                  disabled={Boolean(pendingMadeShotType)}
+                  disabled={isFollowUpStep}
                   className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${
                     selectedShotType === value
                       ? 'bg-white text-slate-900 shadow-sm'
@@ -254,6 +340,79 @@ export default function CourtEventPopup({
               No assist
             </button>
           </div>
+        ) : pendingMissedShotType ? (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+              <p className="text-sm font-bold text-rose-900">Rebound?</p>
+              <p className="text-xs text-rose-700">Optional. The missed shot stays with {playerLabel}.</p>
+            </div>
+
+            {missReboundOptions && (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-2 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Offensive rebound
+                    </p>
+                    <button
+                      type="button"
+                      disabled={!offensiveReboundPlayerId}
+                      onClick={() => {
+                        if (!offensiveReboundPlayerId) return
+                        finishMissedShot({ statId: 'oreb', playerId: offensiveReboundPlayerId })
+                      }}
+                      className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-bold text-white
+                                 disabled:opacity-40 disabled:pointer-events-none active:bg-sky-700
+                                 active:scale-95 transition-transform"
+                    >
+                      Off Reb
+                    </button>
+                  </div>
+                  {reboundCandidateButtons(
+                    'oreb',
+                    missReboundOptions.offensiveCandidates,
+                    offensiveReboundPlayerId
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-2 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Defensive rebound
+                    </p>
+                    <button
+                      type="button"
+                      disabled={!defensiveReboundPlayerId}
+                      onClick={() => {
+                        if (!defensiveReboundPlayerId) return
+                        finishMissedShot({ statId: 'dreb', playerId: defensiveReboundPlayerId })
+                      }}
+                      className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white
+                                 disabled:opacity-40 disabled:pointer-events-none active:bg-indigo-700
+                                 active:scale-95 transition-transform"
+                    >
+                      Def Reb
+                    </button>
+                  </div>
+                  {reboundCandidateButtons(
+                    'dreb',
+                    missReboundOptions.defensiveCandidates,
+                    defensiveReboundPlayerId
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => finishMissedShot()}
+              className="w-full py-3 rounded-xl text-sm font-bold text-slate-700 bg-slate-100
+                         border border-slate-200 active:bg-slate-200 active:scale-95
+                         transition-transform"
+            >
+              No rebound
+            </button>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2">
@@ -267,7 +426,7 @@ export default function CourtEventPopup({
               </button>
               <button
                 type="button"
-                onClick={() => pick({ kind: 'shot', made: false, shotType: selectedShotType })}
+                onClick={continueMissedShot}
                 className="py-4 rounded-xl text-base font-bold text-white bg-rose-600
                            active:bg-rose-700 active:scale-95 transition-transform"
               >
