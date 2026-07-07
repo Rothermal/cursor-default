@@ -8,6 +8,7 @@ import {
   teamInfoPath,
   teamLeaderboardPath,
   teamManagementPath,
+  teamRosterPath,
   teamStatsPath,
 } from './teamInfo'
 
@@ -138,6 +139,7 @@ describe('splitTeamGames', () => {
 describe('team info paths', () => {
   it('builds query-param team routes', () => {
     expect(teamInfoPath('team 1')).toBe('/team?teamId=team%201')
+    expect(teamRosterPath('team 1')).toBe('/team/roster?teamId=team%201')
     expect(teamLeaderboardPath('team 1', 'season 1')).toBe(
       '/leaderboard?teamId=team+1&seasonId=season+1'
     )

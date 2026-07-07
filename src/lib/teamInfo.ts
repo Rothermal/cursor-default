@@ -79,6 +79,10 @@ export function teamInfoPath(teamId: string): string {
   return `/team?teamId=${encodeURIComponent(teamId)}`
 }
 
+export function teamRosterPath(teamId: string): string {
+  return `/team/roster?teamId=${encodeURIComponent(teamId)}`
+}
+
 export function teamLeaderboardPath(teamId: string, seasonId?: string | null): string {
   const params = new URLSearchParams({ teamId })
   if (seasonId) params.set('seasonId', seasonId)
