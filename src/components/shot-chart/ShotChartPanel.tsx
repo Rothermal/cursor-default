@@ -26,6 +26,8 @@ interface PendingCourtTap {
   x: number
   y: number
   shotType: '2pt' | '3pt'
+  /** Locked logging target; only changes via in-popup player picker (F6). */
+  playerId: string
 }
 
 function popupPlayerLabel(player: Player | undefined): string {
@@ -81,11 +83,9 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
     activePlayerId && players.some(p => p.id === activePlayerId)
       ? activePlayerId
       : selectorPlayers[0]?.id ?? null
-  const effectivePlayer = players.find(p => p.id === effectivePlayerId)
-  const playerStatLine =
-    sport && effectivePlayer
-      ? formatCompactGameStatLine(sport, effectivePlayer.stats)
-      : undefined
+  const pendingLoggingPlayer = pendingTap
+    ? players.find(p => p.id === pendingTap.playerId)
+    : undefined
 
   // A confirmed court tap only opens the popup — nothing is logged until a choice is made.
   const onCourtTap = useCallback(
@@ -96,21 +96,30 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       } catch {
         /* ignore */
       }
-      setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt' })
+      setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt', playerId: effectivePlayerId })
     },
     [effectivePlayerId]
+  )
+
+  const handlePopupSelectPlayer = useCallback(
+    (playerId: string) => {
+      onSelectPlayer(playerId)
+      setPendingTap(prev => (prev ? { ...prev, playerId } : null))
+    },
+    [onSelectPlayer]
   )
 
   const handlePopupPick = useCallback(
     (event: CourtEvent) => {
       const tap = pendingTap
       setPendingTap(null)
-      if (!tap || !effectivePlayerId) return
+      if (!tap) return
+      const loggingPlayerId = tap.playerId
 
       if (event.kind === 'stat') {
         dispatch({
           type: 'INCREMENT_STAT',
-          playerId: effectivePlayerId,
+          playerId: loggingPlayerId,
           statId: event.statId,
         })
         return
@@ -125,7 +134,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         made: event.made,
         shotType: event.shotType,
         zone: zoneForForcedShotType(tap.x, tap.y, event.shotType),
-        playerId: effectivePlayerId,
+        playerId: loggingPlayerId,
         timestamp: Date.now(),
       }
       dispatch({ type: 'ADD_SHOT', shot })
@@ -134,6 +143,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
           type: 'INCREMENT_STAT',
           playerId: event.assistPlayerId,
           statId: 'ast',
+          linkedShotId: id,
         })
       }
       if (event.rebound) {
@@ -141,10 +151,11 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
           type: 'INCREMENT_STAT',
           playerId: event.rebound.playerId,
           statId: event.rebound.statId,
+          linkedShotId: id,
         })
       }
     },
-    [dispatch, effectivePlayerId, pendingTap]
+    [dispatch, pendingTap]
   )
 
   useEffect(() => {
@@ -223,13 +234,17 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         Clear all chart shots
       </button>
 
-      {pendingTap && effectivePlayerId && (
+      {pendingTap && (
         <CourtEventPopup
-          playerLabel={popupPlayerLabel(effectivePlayer)}
-          playerStatLine={playerStatLine}
+          playerLabel={popupPlayerLabel(pendingLoggingPlayer)}
+          playerStatLine={
+            sport && pendingLoggingPlayer
+              ? formatCompactGameStatLine(sport, pendingLoggingPlayer.stats)
+              : undefined
+          }
           players={players}
-          activePlayerId={effectivePlayerId}
-          onSelectPlayer={onSelectPlayer}
+          activePlayerId={pendingTap.playerId}
+          onSelectPlayer={handlePopupSelectPlayer}
           reboundPromptAfterMissEnabled={settings.courtCapture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
           onPick={handlePopupPick}
@@ -240,7 +255,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       <ConfirmDialog
         open={showClearConfirm}
         title="Clear all chart shots?"
-        message="Remove every shot from the chart and undo their scoring stats? Stat taps (no location) are not changed."
+        message="Remove every shot from the chart and undo their scoring stats? Linked assists and rebound prompts are cleared too. Other stat taps are not changed."
         confirmLabel="Clear shots"
         cancelLabel="Cancel"
         destructive

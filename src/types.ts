@@ -105,6 +105,8 @@ export interface ActionLogEntry {
   previousValue: number
   /** When set, `UNDO` also removes the matching row from `GameState.shotChart`. */
   shotId?: string
+  /** Court-popup stat chained immediately after a shot (F7 assist, F9 rebound). */
+  linkedShotId?: string
   /** For home_team_score_* undo: snapshot before the change. */
   previousHomeTeamScore?: number | null
   previousHomeScoreAdjustment?: number
@@ -195,7 +197,7 @@ export type GameAction =
   | { type: 'ADD_PLAYER'; player: Player }
   | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'SET_ACTIVE_PLAYER'; playerId: string }
-  | { type: 'INCREMENT_STAT'; playerId: string; statId: string }
+  | { type: 'INCREMENT_STAT'; playerId: string; statId: string; linkedShotId?: string }
   | { type: 'DECREMENT_STAT'; playerId: string; statId: string }
   | { type: 'INCREMENT_OPPONENT_SCORE' }
   | { type: 'DECREMENT_OPPONENT_SCORE' }
