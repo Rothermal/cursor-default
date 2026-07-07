@@ -68,6 +68,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.8 | Reload → Teams | Same teams and roster (from Supabase) |
 | 4.9 | Teams → tap a team card's primary name area | Opens `/team?teamId=<id>`; Team Info shows display name, season, sport, record, roster count, game count, and links back to Season Stats, Team Stats, and Manage Team |
 | 4.10 | Teams → tap **Manage** on a team card | Stays on `/teams`; roster/member management switches to that team |
+| 4.11 | Team Info → switch **Overview / Roster / Schedule** segments | Segment content changes in place; URL stays `/team?teamId=<id>`; no management actions move off `/teams` |
+| 4.12 | Team Info → Overview | Shows stat links, roster preview, schedule preview, recent results, tournaments, and read-only team members when data exists |
+| 4.13 | Team Info → Roster | Shows the full active roster and read-only member list; player rows link to existing Player Profile |
+| 4.14 | Team Info → Schedule | Shows upcoming/live games, recent finalized results, and tournament links; Cloud Games remains the management/resume backstop |
 
 ---
 

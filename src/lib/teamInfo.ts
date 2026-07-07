@@ -16,10 +16,32 @@ export interface TeamRecord {
   gamesPlayed: number
 }
 
+export type TeamGameResult = 'W' | 'L' | 'T'
+
 export interface SplitTeamGames<T> {
   upcoming: T[]
   inProgress: T[]
   completed: T[]
+}
+
+export function resolveTeamInfoHomeScore(
+  sport: SportConfig | null,
+  game: TeamInfoGame,
+  statsTotalsByGameId: Record<string, Record<string, number>> = {}
+): number | null {
+  if (game.home_team_score != null) return game.home_team_score
+  if (!sport || !(game.id in statsTotalsByGameId)) return null
+  return resolveFinalHomeScoreFromGameRow(
+    sport,
+    statsTotalsByGameId[game.id] ?? {},
+    game
+  )
+}
+
+export function teamGameResult(homeScore: number, opponentScore: number): TeamGameResult {
+  if (homeScore > opponentScore) return 'W'
+  if (homeScore < opponentScore) return 'L'
+  return 'T'
 }
 
 export function computeTeamRecord(
@@ -31,22 +53,14 @@ export function computeTeamRecord(
 
   for (const game of games) {
     if (game.status !== 'final' || game.opponent_score == null) continue
-    if (game.home_team_score == null && (!sport || !(game.id in statsTotalsByGameId))) {
-      continue
-    }
+    const homeScore = resolveTeamInfoHomeScore(sport, game, statsTotalsByGameId)
+    if (homeScore == null) continue
 
-    const homeScore =
-      game.home_team_score != null
-        ? game.home_team_score
-        : resolveFinalHomeScoreFromGameRow(
-            sport!,
-            statsTotalsByGameId[game.id] ?? {},
-            game
-          )
     record.gamesPlayed += 1
 
-    if (homeScore > game.opponent_score) record.wins += 1
-    else if (homeScore < game.opponent_score) record.losses += 1
+    const result = teamGameResult(homeScore, game.opponent_score)
+    if (result === 'W') record.wins += 1
+    else if (result === 'L') record.losses += 1
     else record.ties += 1
   }
 
