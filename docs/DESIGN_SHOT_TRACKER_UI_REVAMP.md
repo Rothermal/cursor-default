@@ -5,8 +5,8 @@ context, the data model the work builds on, the recommended build order, and the
 cross-cutting decisions so the individual plans stay consistent.
 
 > **Status:** F1-F9 and F12 are implemented in the app and documented in the linked plans.
-> F10 is no longer needed as a standalone feature and is superseded by F13. F13 is a
-> planning draft; F11 remains gated on live-use feedback. Manual Supabase-heavy QA is still tracked in
+> F10 is no longer needed as a standalone feature and is superseded by F13. F11 and F13
+> are both held pending further user feedback. Manual Supabase-heavy QA is still tracked in
 > [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
 >
 > **Major pivot (recorded):** F1 was originally "make the shot chart a tab." After
@@ -31,7 +31,7 @@ cross-cutting decisions so the individual plans stay consistent.
 | **F12** | Recent-events undo popup | [PLAN_F12_RECENT_EVENTS_UNDO.md](PLAN_F12_RECENT_EVENTS_UNDO.md) | **Implemented.** The bottom Undo opens a recent-events popup; the newest event can be undone via existing LIFO `UNDO`. |
 | **F7** | Assist-linking on a made shot | [PLAN_F7_ASSIST_LINKING.md](PLAN_F7_ASSIST_LINKING.md) | **Implemented.** After a made court shot, optionally credit a same-side teammate assist as a separate `ast` increment. |
 | **F8** | Live per-player line in popup | [PLAN_F8_LIVE_PER_PLAYER_LINE.md](PLAN_F8_LIVE_PER_PLAYER_LINE.md) | **Implemented.** Shows the selected player's compact live stat line under the popup's Log for label. |
-| **F9-F13** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | F9 rebound-after-miss is implemented; F10 visible numbering is superseded by F13 shot detail/edit planning; F11 remains gated. |
+| **F9-F13** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | F9 rebound-after-miss is implemented; F10 visible numbering is superseded by F13; F11 and F13 are held pending further feedback. |
 
 F1 is the foundation for F2, F3, and F5-F12. F4 is independent and has landed.
 
@@ -141,8 +141,8 @@ F1  Single-page tracker + Court Event Capture     (implemented)
  └─ F11 Hybrid quick buttons (Option B)            (only if testing shows it's needed)
 F4  In-progress scores on resume UI                (implemented; cloud-list QA pending)
 
-F9 is complete. F10 is superseded by F13 shot detail/edit planning. F13 should be reviewed
-before build; F11 should stay gated on live-use feedback.
+F9 is complete. F10 is superseded by F13 shot detail/edit planning. F11 and F13 are both
+held pending further user feedback before build work resumes.
 ```
 
 Rationale and per-feature phases: see
@@ -165,7 +165,7 @@ Resolved items are struck/marked; defaults are what the plans assume.
 | Q3 | F2: per-player marker colors? | v1 uniform; color is a follow-up. |
 | Q4 | F3: all-recorder vs primary-recorder shots on cloud review? | All-recorder via a review path, **de-duped to the primary recorder per player** (F3 §7 D1–D2). |
 | Q5 | F4: trust the synced `games` row score vs aggregate stats? | Row snapshot first; stats fallback only when `home_team_score` is null (creator-scoped). |
-| Q6 | F11 (Option B) quick buttons — build now or gate on testing? | Gate on live testing of Option A; default A. |
+| Q6 | F11 (Option B) quick buttons — build now or gate on testing? | **Held:** revisit only after further user feedback shows non-shot popup friction. |
 
 | Q7 | F10 visible numbering? | **Resolved:** no standalone marker numbering; superseded by F13 shot detail metadata. |
 

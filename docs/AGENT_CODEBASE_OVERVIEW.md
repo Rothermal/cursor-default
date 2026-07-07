@@ -205,14 +205,14 @@ flowchart LR
 | Doc | Topic |
 |-----|-------|
 | [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Court-capture roadmap; F10 superseded by F13 |
-| [`PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md) | Draft plan for shot detail, linked metadata, and editing |
+| [`PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md) | Held draft plan for shot detail, linked metadata, and editing |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue |
 | [`PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md`](PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md) | Team hub drill-down routes |
 
 **Court program status:** F1-F9 and F12 are implemented; manual Supabase-heavy QA remains in
 [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). F10 standalone marker numbering is no
-longer needed and is superseded by F13 shot detail/edit planning. F11 should stay gated on
-live-use feedback.
+longer needed and is superseded by F13 shot detail/edit planning. F11 and F13 are both
+held pending further user feedback.
 
 ### Verification norms
 

@@ -324,7 +324,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] **Court capture polish** — F5 shot-value override, F6 in-popup player switching, F12 recent-events undo, F7 assist-linking, F8 popup stat line, and F9 rebound-after-miss prompt are implemented; F10 visible numbering is superseded by F13 shot detail/edit planning, while F11 remains gated on live-use feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
+- [ ] **Court capture polish** — F5 shot-value override, F6 in-popup player switching, F12 recent-events undo, F7 assist-linking, F8 popup stat line, and F9 rebound-after-miss prompt are implemented; F10 visible numbering is superseded by F13, and both F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
 - [ ] **Team Info hub + drill-downs** — canonical `/team?teamId=` route with roster, schedule, player/game/season drill-downs ([plan](docs/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md))
 - [ ] **Multi-game parking + sync queue** — multiple in-progress/paused games per device, offline-safe snapshots, ordered cloud sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements

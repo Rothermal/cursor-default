@@ -4,7 +4,10 @@
 > visible numbering is no longer needed as a standalone feature; the useful version is a
 > tappable shot detail surface with durable shot number and linked F7/F9 metadata.
 >
-> Status: planning draft for review.
+> Status: held pending further user feedback.
+>
+> **Hold note:** Do not start implementation until further live-use/user feedback confirms
+> that shot detail/editing is worth prioritizing over smaller court-capture refinements.
 
 ## Goal
 
