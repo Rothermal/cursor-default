@@ -64,6 +64,15 @@ describe('computeTeamRecord', () => {
 
     expect(record).toEqual({ wins: 0, losses: 0, ties: 0, gamesPlayed: 0 })
   })
+
+  it('counts stored scores even when sport config is unavailable', () => {
+    const record = computeTeamRecord(null, [
+      { id: 'win', status: 'final', opponent_score: 40, home_team_score: 41 },
+      { id: 'legacy', status: 'final', opponent_score: 10, home_team_score: null },
+    ])
+
+    expect(record).toEqual({ wins: 1, losses: 0, ties: 0, gamesPlayed: 1 })
+  })
 })
 
 describe('splitTeamGames', () => {

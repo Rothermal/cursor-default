@@ -23,7 +23,7 @@ export interface SplitTeamGames<T> {
 }
 
 export function computeTeamRecord(
-  sport: SportConfig,
+  sport: SportConfig | null,
   games: TeamInfoGame[],
   statsTotalsByGameId: Record<string, Record<string, number>> = {}
 ): TeamRecord {
@@ -31,13 +31,18 @@ export function computeTeamRecord(
 
   for (const game of games) {
     if (game.status !== 'final' || game.opponent_score == null) continue
-    if (game.home_team_score == null && !(game.id in statsTotalsByGameId)) continue
+    if (game.home_team_score == null && (!sport || !(game.id in statsTotalsByGameId))) {
+      continue
+    }
 
-    const homeScore = resolveFinalHomeScoreFromGameRow(
-      sport,
-      statsTotalsByGameId[game.id] ?? {},
-      game
-    )
+    const homeScore =
+      game.home_team_score != null
+        ? game.home_team_score
+        : resolveFinalHomeScoreFromGameRow(
+            sport!,
+            statsTotalsByGameId[game.id] ?? {},
+            game
+          )
     record.gamesPlayed += 1
 
     if (homeScore > game.opponent_score) record.wins += 1

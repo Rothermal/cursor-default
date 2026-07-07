@@ -12,7 +12,6 @@ import {
   teamManagementPath,
   teamStatsPath,
   type TeamInfoGame,
-  type TeamRecord,
 } from '../lib/teamInfo'
 
 interface TeamRow {
@@ -30,10 +29,6 @@ interface TeamRow {
 interface GameRow extends TeamInfoGame {
   game_date: string
   opponent_name: string
-}
-
-function emptyRecord(): TeamRecord {
-  return { wins: 0, losses: 0, ties: 0, gamesPlayed: 0 }
 }
 
 export default function TeamInfo() {
@@ -56,7 +51,7 @@ export default function TeamInfo() {
   )
 
   const record = useMemo(
-    () => (sport ? computeTeamRecord(sport, games, statsTotalsByGameId) : emptyRecord()),
+    () => computeTeamRecord(sport, games, statsTotalsByGameId),
     [games, sport, statsTotalsByGameId]
   )
 
