@@ -410,6 +410,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         playerId: action.playerId,
         statId: action.statId,
         previousValue: prevValue,
+        linkedShotId: action.linkedShotId,
       }
       return {
         ...state,
