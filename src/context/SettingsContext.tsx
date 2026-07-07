@@ -4,6 +4,9 @@ const STORAGE_KEY = 'statkeeper_settings'
 
 interface Settings {
   enabledSports: Record<string, boolean>
+  courtCapture: {
+    reboundPromptAfterMiss: boolean
+  }
 }
 
 const defaultSettings: Settings = {
@@ -13,6 +16,9 @@ const defaultSettings: Settings = {
     football: false,
     hockey: false,
     soccer: false,
+  },
+  courtCapture: {
+    reboundPromptAfterMiss: false,
   },
 }
 
@@ -25,6 +31,7 @@ function loadSettings(): Settings {
         ...defaultSettings,
         ...parsed,
         enabledSports: { ...defaultSettings.enabledSports, ...parsed.enabledSports },
+        courtCapture: { ...defaultSettings.courtCapture, ...parsed.courtCapture },
       }
     }
   } catch {
@@ -38,6 +45,7 @@ interface SettingsContextType {
   isSportEnabled: (sportId: string) => boolean
   toggleSport: (sportId: string) => void
   setSportEnabled: (sportId: string, enabled: boolean) => void
+  setReboundPromptAfterMissEnabled: (enabled: boolean) => void
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null)
@@ -74,8 +82,26 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const setReboundPromptAfterMissEnabled = useCallback((enabled: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      courtCapture: {
+        ...prev.courtCapture,
+        reboundPromptAfterMiss: enabled,
+      },
+    }))
+  }, [])
+
   return (
-    <SettingsContext.Provider value={{ settings, isSportEnabled, toggleSport, setSportEnabled }}>
+    <SettingsContext.Provider
+      value={{
+        settings,
+        isSportEnabled,
+        toggleSport,
+        setSportEnabled,
+        setReboundPromptAfterMissEnabled,
+      }}
+    >
       {children}
     </SettingsContext.Provider>
   )

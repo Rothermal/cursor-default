@@ -4,8 +4,8 @@ Umbrella doc for the StatKeeper basketball shot-tracking revamp. It captures the
 context, the data model the work builds on, the recommended build order, and the
 cross-cutting decisions so the individual plans stay consistent.
 
-> **Status:** F1-F8 and F12 are implemented in the app and documented in the linked plans.
-> F9-F11 remain roadmap sketches until
+> **Status:** F1-F9 and F12 are implemented in the app and documented in the linked plans.
+> F10-F11 remain roadmap sketches until
 > promoted to full plans. Manual Supabase-heavy QA is still tracked in
 > [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
 >
@@ -31,7 +31,7 @@ cross-cutting decisions so the individual plans stay consistent.
 | **F12** | Recent-events undo popup | [PLAN_F12_RECENT_EVENTS_UNDO.md](PLAN_F12_RECENT_EVENTS_UNDO.md) | **Implemented.** The bottom Undo opens a recent-events popup; the newest event can be undone via existing LIFO `UNDO`. |
 | **F7** | Assist-linking on a made shot | [PLAN_F7_ASSIST_LINKING.md](PLAN_F7_ASSIST_LINKING.md) | **Implemented.** After a made court shot, optionally credit a same-side teammate assist as a separate `ast` increment. |
 | **F8** | Live per-player line in popup | [PLAN_F8_LIVE_PER_PLAYER_LINE.md](PLAN_F8_LIVE_PER_PLAYER_LINE.md) | **Implemented.** Shows the selected player's compact live stat line under the popup's Log for label. |
-| **F9-F11** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | **Next court-capture work.** Rebound-after-miss (F9), sequence numbers (F10), Option B quick buttons (F11). |
+| **F9-F11** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | F9 rebound-after-miss is implemented; next court-capture work is sequence numbers (F10) or Option B quick buttons (F11). |
 
 F1 is the foundation for F2, F3, and F5-F12. F4 is independent and has landed.
 
@@ -136,12 +136,12 @@ F1  Single-page tracker + Court Event Capture     (implemented)
  ├─ F12 Recent-events undo popup                   (implemented)
  ├─ F7  Assist-linking on a made shot              (implemented)
  ├─ F8  Live per-player line in popup             (implemented)
- ├─ F9  Rebound-after-miss prompt                  (opt-in)
+ ├─ F9  Rebound-after-miss prompt                  (implemented; opt-in)
  ├─ F10 Shot sequence numbers / recency            (cosmetic)
  └─ F11 Hybrid quick buttons (Option B)            (only if testing shows it's needed)
 F4  In-progress scores on resume UI                (implemented; cloud-list QA pending)
 
-F8 is complete. F9/F10 can be sequenced by product priority; F11 should stay gated on
+F9 is complete. F10 can be sequenced by product priority; F11 should stay gated on
 live-use feedback.
 ```
 

@@ -149,7 +149,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.2 | Scroll down to the stat grid | Player-select strip stays **pinned** at the top (score scrolls away); active player always visible |
 | 4e.3 | Tap the court (inside the paint) | `CourtEventPopup` opens: Log for player switcher with compact live stat line, **2PT / 3PT** shot-value segmented control defaulted to **2PT**, **Made / Missed** buttons, Off Reb · Def Reb · Steal · Block · Assist, Cancel. Nothing is logged yet |
 | 4e.4 | Tap **Made** | Popup closes; green marker at tap point; selected player's `2PT` +1; scoreboard +2 |
-| 4e.5 | Tap the court beyond the arc → **Missed** | "Detected: 3-pointer"; red ✕ marker; `3 Miss` +1; score unchanged |
+| 4e.5 | With **Settings → Game tracker → Missed-shot rebound prompt** off, tap the court beyond the arc → **Missed** | "Detected: 3-pointer"; red ✕ marker; `3 Miss` +1; score unchanged |
 | 4e.6 | Tap court → **Off Reb** (repeat for Def Reb / Steal / Block / Assist) | Popup closes; the matching stat (`OFF`/`DEF`/`STL`/`BLK`/`AST`) +1; **no marker** on the court |
 | 4e.7 | Tap court → **Cancel** (or tap outside the popup) | Popup dismisses; no stat, no marker |
 | 4e.8 | Start a scroll gesture with the finger **on the court** | Page scrolls; no popup opens (tap-vs-scroll discrimination, ~18px tolerance — slightly wobbly taps still count as taps) |
@@ -172,6 +172,13 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.25 | Tap court → **Missed**, Off Reb, Def Reb, Steal, Block, or standalone Assist | No **Assisted by?** step appears |
 | 4e.26 | Tap court as #A → **Made** | The **Assisted by?** choices exclude #A; opponent pseudo-player shots skip the assist step |
 | 4e.27 | Tap court for a player with stats, then use **Log for** to switch players | The compact stat line under the player name updates with the selected player's live stats |
+| 4e.28 | Settings → Game tracker → turn **Missed-shot rebound prompt** on; return to Game Tracker; tap court as #A → **Missed** | Popup advances to **Rebound?**; the Log for picker and shot-value controls are read-only for the pending miss |
+| 4e.29 | On the Rebound? step after #A misses, leave the offensive row on the home team default → **Off Reb** | Popup closes; red miss marker is saved for #A; home team pseudo-player gets `OFF +1`; score unchanged |
+| 4e.30 | Repeat #A miss → choose a player chip in the offensive row → **Off Reb** | Popup closes; red miss marker is saved for #A; selected player gets `OFF +1` |
+| 4e.31 | Select the opponent team chip → tap court → **Missed** → **Off Reb** | Opponent miss marker is saved; opponent team pseudo-player gets `OFF +1` |
+| 4e.32 | Select the opponent team chip → tap court → **Missed** → choose a home player in the defensive row → **Def Reb** | Opponent miss marker is saved; selected home player gets `DEF +1` |
+| 4e.33 | With rebound prompt on, tap court → **Missed** → **No rebound** | Popup closes; only the miss is logged; no `OFF`/`DEF` stat changes |
+| 4e.34 | Open bottom **Undo** after a missed shot with rebound | Recent events shows rebound above the miss; undo once removes the rebound; undo again removes the shot + marker |
 
 ---
 
