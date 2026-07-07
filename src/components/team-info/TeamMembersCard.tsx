@@ -10,6 +10,7 @@ export interface TeamInfoMember {
 interface TeamMembersCardProps {
   members: TeamInfoMember[]
   error?: string | null
+  limit?: number
 }
 
 function memberDisplayName(member: TeamInfoMember): string {
@@ -18,7 +19,10 @@ function memberDisplayName(member: TeamInfoMember): string {
   return 'Unknown'
 }
 
-export default function TeamMembersCard({ members, error }: TeamMembersCardProps) {
+export default function TeamMembersCard({ members, error, limit }: TeamMembersCardProps) {
+  const visibleMembers = typeof limit === 'number' ? members.slice(0, limit) : members
+  const hiddenCount = Math.max(0, members.length - visibleMembers.length)
+
   return (
     <section className="card space-y-3">
       <div>
@@ -32,7 +36,7 @@ export default function TeamMembersCard({ members, error }: TeamMembersCardProps
         <p className="text-sm text-slate-500">No members found.</p>
       ) : (
         <div className="space-y-2">
-          {members.slice(0, 5).map(member => (
+          {visibleMembers.map(member => (
             <div key={member.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-medium text-slate-800 truncate">{memberDisplayName(member)}</p>
@@ -45,6 +49,9 @@ export default function TeamMembersCard({ members, error }: TeamMembersCardProps
               </p>
             </div>
           ))}
+          {hiddenCount > 0 && (
+            <p className="text-xs text-slate-500">+{hiddenCount} more members</p>
+          )}
         </div>
       )}
     </section>

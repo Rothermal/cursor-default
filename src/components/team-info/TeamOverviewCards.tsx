@@ -42,7 +42,7 @@ export default function TeamOverviewCards({
       <RecentResultsCard games={recentResults.slice(0, 3)} />
       <div className="grid gap-4 lg:grid-cols-2">
         <TournamentCard teamId={teamId} tournaments={tournaments} error={tournamentError} />
-        <TeamMembersCard members={members} error={membersError} />
+        <TeamMembersCard members={members} error={membersError} limit={5} />
       </div>
     </div>
   )
