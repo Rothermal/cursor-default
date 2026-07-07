@@ -15,7 +15,6 @@ import type {
   ActionLogEntry,
   CloudSyncState,
   CloudSyncStatus,
-  ShotRecord,
 } from '../types'
 import { useAuth } from './AuthContext'
 import {
@@ -38,6 +37,7 @@ import {
   shouldRejectSkippedFinalSync,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
+import { clearEntireShotChart, statIdForShotRecord } from '../lib/clearShotChart'
 
 import {
   GAME_OWNER_KEY,
@@ -104,51 +104,6 @@ function normalizeCloudStatus(value: unknown, fallback: CloudSyncStatus): CloudS
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
-}
-
-/** Stat key to increment when adding a shot from the chart. */
-function statIdForShotRecord(shot: ShotRecord): string {
-  if (shot.shotType === '3pt') {
-    return shot.made ? '3pt' : '3pt_miss'
-  }
-  return shot.made ? '2pt' : '2pt_miss'
-}
-
-/** Clear every chart shot and revert linked stats/log rows (works even when non-shot actions trail the log). */
-function clearEntireShotChart(state: GameState): GameState {
-  if (state.shotChart.length === 0) return state
-  const shotIds = new Set(state.shotChart.map(s => s.id))
-  const statDeltas = new Map<string, Record<string, number>>()
-  for (const shot of state.shotChart) {
-    const sid = statIdForShotRecord(shot)
-    const prev = statDeltas.get(shot.playerId) ?? {}
-    prev[sid] = (prev[sid] ?? 0) + 1
-    statDeltas.set(shot.playerId, prev)
-  }
-  const players = state.players.map(p => {
-    const deltas = statDeltas.get(p.id)
-    if (!deltas) return p
-    const nextStats = { ...p.stats }
-    for (const [statId, n] of Object.entries(deltas)) {
-      const v = (nextStats[statId] ?? 0) - n
-      nextStats[statId] = Math.max(0, v)
-    }
-    return { ...p, stats: nextStats }
-  })
-  const actionLog = state.actionLog.filter(
-    e => !(e.type === 'increment' && e.shotId && shotIds.has(e.shotId))
-  )
-  // User cleared the chart — local is authoritative; allow delete+replace on next sync.
-  return {
-    ...state,
-    shotChart: [],
-    players,
-    actionLog,
-    cloudSync: {
-      ...state.cloudSync,
-      shotChartHydrationDroppedRows: 0,
-    },
-  }
 }
 
 /** Revert the last `actionLog` entry (and linked shot when `shotId` is set). Returns null if log empty. */
