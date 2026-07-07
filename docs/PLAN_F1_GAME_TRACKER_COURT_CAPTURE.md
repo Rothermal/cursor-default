@@ -255,8 +255,9 @@ Goal: make the two input paths understandable and document the flow (no grid shr
 
 - Filtering the court by player/team (→ **F2**).
 - 2/3 override chip (→ **F5**), in-popup player switch (→ **F6**), assist-linking
-  (→ **F7**), per-player line (→ **F8**), rebound-after-miss prompt (→ **F9**), sequence
-  numbers (→ **F10**), 1-tap court-adjacent quick buttons / Option B (→ **F11**).
+  (→ **F7**), per-player line (→ **F8**), rebound-after-miss prompt (→ **F9**), shot
+  detail/edit workflow (→ **F13**; supersedes standalone F10 numbering), 1-tap
+  court-adjacent quick buttons / Option B (→ **F11**).
 - Cloud/multi-recorder review (→ **F3**); resume-UI scores (→ **F4**).
 
 ## 7. Pre-handoff design decisions — RESOLVED
