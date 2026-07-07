@@ -11,38 +11,37 @@ export function statIdForShotRecord(shot: {
   return shot.made ? '2pt' : '2pt_miss'
 }
 
+const LINKED_COURT_STAT_IDS = new Set(['ast', 'oreb', 'dreb'])
+
 /**
- * F7 court-popup assists are a plain `INCREMENT_STAT(ast)` logged immediately after
- * `ADD_SHOT`. When clearing the chart, those rows must be reverted too.
+ * Court-popup stats chained immediately after `ADD_SHOT` (F7 assist, F9 rebound).
+ * Only entries with explicit `linkedShotId` are reverted on chart clear.
  */
-export function linkedCourtAssistEntryIds(
+export function linkedCourtStatEntryIds(
   actionLog: ActionLogEntry[],
   clearedShotIds: Set<string>
 ): Set<string> {
   const linked = new Set<string>()
-  for (let i = 0; i < actionLog.length - 1; i++) {
-    const entry = actionLog[i]
-    const next = actionLog[i + 1]
+  for (const entry of actionLog) {
     if (
       entry.type === 'increment' &&
-      entry.shotId &&
-      clearedShotIds.has(entry.shotId) &&
-      next.type === 'increment' &&
-      next.statId === 'ast' &&
-      !next.shotId &&
-      next.playerId
+      entry.linkedShotId &&
+      clearedShotIds.has(entry.linkedShotId)
     ) {
-      linked.add(next.id)
+      linked.add(entry.id)
     }
   }
   return linked
 }
 
+/** @deprecated Use linkedCourtStatEntryIds */
+export const linkedCourtAssistEntryIds = linkedCourtStatEntryIds
+
 /** Clear every chart shot and revert linked stats/log rows (works even when non-shot actions trail the log). */
 export function clearEntireShotChart(state: GameState): GameState {
   if (state.shotChart.length === 0) return state
   const shotIds = new Set(state.shotChart.map(s => s.id))
-  const linkedAssistIds = linkedCourtAssistEntryIds(state.actionLog, shotIds)
+  const linkedStatIds = linkedCourtStatEntryIds(state.actionLog, shotIds)
 
   const statDeltas = new Map<string, Record<string, number>>()
   for (const shot of state.shotChart) {
@@ -52,9 +51,10 @@ export function clearEntireShotChart(state: GameState): GameState {
     statDeltas.set(shot.playerId, prev)
   }
   for (const entry of state.actionLog) {
-    if (!linkedAssistIds.has(entry.id) || !entry.playerId) continue
+    if (!linkedStatIds.has(entry.id) || !entry.playerId || !entry.statId) continue
+    if (!LINKED_COURT_STAT_IDS.has(entry.statId)) continue
     const prev = statDeltas.get(entry.playerId) ?? {}
-    prev.ast = (prev.ast ?? 0) + 1
+    prev[entry.statId] = (prev[entry.statId] ?? 0) + 1
     statDeltas.set(entry.playerId, prev)
   }
 
@@ -72,7 +72,7 @@ export function clearEntireShotChart(state: GameState): GameState {
     e =>
       !(
         (e.type === 'increment' && e.shotId && shotIds.has(e.shotId)) ||
-        linkedAssistIds.has(e.id)
+        linkedStatIds.has(e.id)
       )
   )
   return {
