@@ -2,7 +2,7 @@
 
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
 > Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
-> F5, F6, F7, F8, and F12 are implemented. F9-F11 are still sketches
+> F5, F6, F7, F8, F9, and F12 are implemented. F10-F11 are still sketches
 > (goal, dependency, phases, files, effort, open question); when one is picked up, expand
 > it to a full plan with a "Pre-handoff design decisions" section.
 
@@ -40,17 +40,17 @@ F1  Single-page tracker + Court Event Capture (implemented)
  ├─ F12 Recent-events undo popup                 (implemented; unblocks F7)
  ├─ F7  Assist-linking on a made shot            (implemented)
  ├─ F8  Live per-player line in popup            (implemented)
- ├─ F9  Rebound-after-miss prompt                (needs live tuning; opt-in)
+ ├─ F9  Rebound-after-miss prompt                (implemented; opt-in)
  ├─ F10 Shot sequence numbers / recency          (cosmetic)
  └─ F11 Hybrid quick buttons (Option B)          (only if testing shows blk/stl/ast need 1-tap)
 F4  In-progress scores on resume UI              (implemented; cloud-list QA pending)
 ```
 
-**Remaining work:** F9/F10 can be sequenced by product priority. F11 should stay gated on
+**Remaining work:** F10 can be sequenced by product priority. F11 should stay gated on
 live-use feedback.
 
 **Why this order:** F12 gives F7's two-step assist undo a visible event list
-(no reducer change). F9-F10 are progressive polish. F11 is intentionally last:
+(no reducer change). F10 is progressive polish. F11 is intentionally last:
 build it only if live testing shows the extra tap for block/steal/assist is real friction.
 
 ---
@@ -151,6 +151,9 @@ and sport `keyStatIds`.
 
 ## F9 — Rebound-after-miss chained prompt
 
+> **Expanded to a full plan:** [PLAN_F9_REBOUND_AFTER_MISS_PROMPT.md](PLAN_F9_REBOUND_AFTER_MISS_PROMPT.md).
+> **Status:** Implemented.
+
 **Goal:** A missed shot is usually followed by a rebound; optionally chain a quick
 "Rebound? Off / Def / none" prompt right after **Missed** to capture the sequence without
 a second court tap.
@@ -158,16 +161,18 @@ a second court tap.
 **Depends on:** F1. **Effort:** S–M.
 
 **Phases:**
-- **P1:** After Missed, present a follow-up mini-prompt (Off / Def / Skip). Off/Def
-  dispatch `oreb`/`dreb` for the chosen player.
-- **P2:** A setting to enable/disable the chain (some coaches will find it naggy);
-  consider whether the rebound can be attributed to a different player/team in the same
-  prompt (reuse F6 picker).
+- **P1:** Implemented: after Missed, the opt-in prompt can record Off Reb, Def Reb, or
+  No rebound. The shot stays locked to the missed-shot player/team.
+- **P2:** Implemented: Settings toggle defaults off. Off rebound defaults to the missed
+  shot side's team pseudo-player; Def rebound defaults to the opposite side's team
+  pseudo-player. Candidate chips allow switching to an individual on that side.
 
-**Key files:** `CourtEventPopup.tsx`, `src/context/SettingsContext.tsx` (toggle).
+**Key files:** `CourtEventPopup.tsx`, `ShotChartPanel.tsx`,
+`src/lib/reboundPrompt.ts`, `src/context/SettingsContext.tsx` (toggle).
 
-**Open question:** Default on or off? Default: **off** (opt-in), to avoid slowing users
-who don't want it.
+**Resolved:** Default **off** (opt-in). Rebound dispatch stays separate from the shot:
+`ADD_SHOT` first, then optional `INCREMENT_STAT(oreb|dreb)`, so F12 recent-events undo
+shows the rebound above the miss.
 
 ---
 

@@ -26,7 +26,7 @@ flowchart TB
   end
   subgraph state [State Layer]
     AuthCtx["AuthContext — Supabase session"]
-    SettingsCtx["SettingsContext — enabled sports"]
+    SettingsCtx["SettingsContext — enabled sports + tracker prefs"]
     GameCtx["GameContext — reducer + localStorage + cloud sync"]
   end
   subgraph data [Data Layer]
@@ -54,7 +54,7 @@ flowchart TB
 | [`src/App.tsx`](../src/App.tsx) | Auth gate + route table | Adding a route |
 | [`src/context/GameContext.tsx`](../src/context/GameContext.tsx) | Game reducer, persistence, sync orchestration | Stat tracking, undo, scores, shot chart state |
 | [`src/context/AuthContext.tsx`](../src/context/AuthContext.tsx) | Session lifecycle | Auth bugs |
-| [`src/context/SettingsContext.tsx`](../src/context/SettingsContext.tsx) | Enabled sports toggles | Sport visibility |
+| [`src/context/SettingsContext.tsx`](../src/context/SettingsContext.tsx) | Enabled sports + tracker preferences | Sport visibility, court-capture toggles |
 | [`src/config/sports.ts`](../src/config/sports.ts) | Sport stat schema (`SportConfig`) | New sport or stat category |
 | [`src/types.ts`](../src/types.ts) | Core domain types | Type changes |
 | [`src/lib/cloudSync.ts`](../src/lib/cloudSync.ts) | Upload/download game snapshots | Cloud sync bugs |
@@ -204,12 +204,12 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Remaining F9-F11 sketches and overall court-capture order |
+| [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Remaining F10-F11 sketches and overall court-capture order |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue |
 | [`PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md`](PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md) | Team hub drill-down routes |
 
-**Court program status:** F1-F8 and F12 are implemented; manual Supabase-heavy QA remains in
-[`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). F9-F10 are polish sketches, and F11 should
+**Court program status:** F1-F9 and F12 are implemented; manual Supabase-heavy QA remains in
+[`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). F10 is a polish sketch, and F11 should
 stay gated on live-use feedback.
 
 ### Verification norms

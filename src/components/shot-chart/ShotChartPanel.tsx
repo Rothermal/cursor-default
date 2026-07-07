@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../../context/GameContext'
+import { useSettings } from '../../context/SettingsContext'
 import BasketballCourt from './BasketballCourt'
 import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
@@ -68,6 +69,7 @@ interface ShotChartPanelProps {
 
 export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
+  const { settings } = useSettings()
   const { sport, players, activePlayerId, shotChart, actionLog } = state
   const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -132,6 +134,13 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
           type: 'INCREMENT_STAT',
           playerId: event.assistPlayerId,
           statId: 'ast',
+        })
+      }
+      if (event.rebound) {
+        dispatch({
+          type: 'INCREMENT_STAT',
+          playerId: event.rebound.playerId,
+          statId: event.rebound.statId,
         })
       }
     },
@@ -221,6 +230,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
           players={players}
           activePlayerId={effectivePlayerId}
           onSelectPlayer={onSelectPlayer}
+          reboundPromptAfterMissEnabled={settings.courtCapture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
           onPick={handlePopupPick}
           onCancel={() => setPendingTap(null)}
