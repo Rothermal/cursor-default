@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import SegmentedControl from '../components/SegmentedControl'
 import TeamHero from '../components/team-info/TeamHero'
+import RecentResultsCard, { type TeamInfoResultGame } from '../components/team-info/RecentResultsCard'
+import RosterPreviewCard, { type TeamInfoRosterPlayer } from '../components/team-info/RosterPreviewCard'
+import SchedulePreviewCard, { type TeamInfoScheduleGame } from '../components/team-info/SchedulePreviewCard'
+import TeamMembersCard, { type TeamInfoMember } from '../components/team-info/TeamMembersCard'
+import TeamOverviewCards from '../components/team-info/TeamOverviewCards'
+import TournamentCard, { type TeamInfoTournament } from '../components/team-info/TournamentCard'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { teamDisplayName } from '../lib/display'
 import { supabase } from '../lib/supabase'
 import {
   computeTeamRecord,
+  resolveTeamInfoHomeScore,
   splitTeamGames,
-  teamLeaderboardPath,
-  teamManagementPath,
-  teamStatsPath,
+  teamGameResult,
   type TeamInfoGame,
 } from '../lib/teamInfo'
 
@@ -29,7 +35,17 @@ interface TeamRow {
 interface GameRow extends TeamInfoGame {
   game_date: string
   opponent_name: string
+  tournament_name: string | null
+  tournament_id: string | null
 }
+
+type TeamInfoSegment = 'overview' | 'roster' | 'schedule'
+
+const segmentOptions: Array<{ value: TeamInfoSegment; label: string }> = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'roster', label: 'Roster' },
+  { value: 'schedule', label: 'Schedule' },
+]
 
 export default function TeamInfo() {
   const navigate = useNavigate()
@@ -39,11 +55,16 @@ export default function TeamInfo() {
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
-  const [rosterCount, setRosterCount] = useState(0)
+  const [rosterPlayers, setRosterPlayers] = useState<TeamInfoRosterPlayer[]>([])
   const [games, setGames] = useState<GameRow[]>([])
+  const [tournaments, setTournaments] = useState<TeamInfoTournament[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamInfoMember[]>([])
+  const [tournamentError, setTournamentError] = useState<string | null>(null)
+  const [membersError, setMembersError] = useState<string | null>(null)
   const [statsTotalsByGameId, setStatsTotalsByGameId] = useState<Record<string, Record<string, number>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeSegment, setActiveSegment] = useState<TeamInfoSegment>('overview')
 
   const sport = useMemo(
     () => (team ? sports.find(item => item.id === team.seasons.sport) ?? null : null),
@@ -57,6 +78,45 @@ export default function TeamInfo() {
 
   const gameGroups = useMemo(() => splitTeamGames(games), [games])
 
+  const gamesWithScores = useMemo(
+    () =>
+      games.map(game => {
+        const homeScore = resolveTeamInfoHomeScore(sport, game, statsTotalsByGameId)
+        const scoreLine =
+          homeScore != null && game.opponent_score != null
+            ? `${homeScore}-${game.opponent_score}`
+            : null
+        const result =
+          game.status === 'final' && homeScore != null && game.opponent_score != null
+            ? teamGameResult(homeScore, game.opponent_score)
+            : null
+        return { ...game, scoreLine, result }
+      }),
+    [games, sport, statsTotalsByGameId]
+  )
+
+  const upcomingPreviewGames = useMemo<TeamInfoScheduleGame[]>(() => {
+    const active = gameGroups.inProgress
+    const upcoming = [...gameGroups.upcoming].sort((a, b) => a.game_date.localeCompare(b.game_date))
+    return [...active, ...upcoming]
+  }, [gameGroups])
+
+  const recentResults = useMemo<TeamInfoResultGame[]>(
+    () =>
+      gamesWithScores
+        .filter(game => game.status === 'final')
+        .sort((a, b) => b.game_date.localeCompare(a.game_date))
+        .map(game => ({
+          id: game.id,
+          game_date: game.game_date,
+          opponent_name: game.opponent_name,
+          tournament_name: game.tournament_name,
+          scoreLine: game.scoreLine,
+          result: game.result,
+        })),
+    [gamesWithScores]
+  )
+
   useEffect(() => {
     if (!teamId || !isConfigured || !supabaseClient) {
       setLoading(false)
@@ -68,10 +128,15 @@ export default function TeamInfo() {
       setLoading(true)
       setError(null)
       setTeam(null)
+      setRosterPlayers([])
       setGames([])
+      setTournaments([])
+      setTeamMembers([])
+      setTournamentError(null)
+      setMembersError(null)
       setStatsTotalsByGameId({})
 
-      const [teamRes, rosterRes, gamesRes] = await Promise.all([
+      const [teamRes, rosterRes, gamesRes, tournamentsRes, membersRes] = await Promise.all([
         supabaseClient
           .from('teams')
           .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
@@ -79,14 +144,24 @@ export default function TeamInfo() {
           .single(),
         supabaseClient
           .from('team_players')
-          .select('id', { count: 'exact', head: true })
+          .select('jersey_number,players!inner(id,first_name,last_name,nickname)')
           .eq('team_id', teamId)
-          .eq('is_active', true),
+          .eq('is_active', true)
+          .order('joined_at', { ascending: true }),
         supabaseClient
           .from('games')
-          .select('id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,status')
+          .select(
+            'id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,status,tournament_name,tournament_id'
+          )
           .eq('team_id', teamId)
           .order('game_date', { ascending: false }),
+        supabaseClient
+          .from('tournaments')
+          .select('id,name,placement,url')
+          .eq('team_id', teamId),
+        supabaseClient.rpc('get_team_members_with_profiles', {
+          p_team_id: teamId,
+        }),
       ])
 
       if (cancelled) return
@@ -108,10 +183,36 @@ export default function TeamInfo() {
       }
 
       const loadedTeam = teamRes.data as unknown as TeamRow
+      type TeamPlayerJoin = {
+        jersey_number: string | null
+        players: {
+          id: string
+          first_name: string
+          last_name: string | null
+          nickname: string | null
+        }
+      }
       const loadedGames = (gamesRes.data ?? []) as GameRow[]
       setTeam(loadedTeam)
-      setRosterCount(rosterRes.count ?? 0)
+      setRosterPlayers(((rosterRes.data ?? []) as unknown as TeamPlayerJoin[]).map(row => ({
+        id: row.players.id,
+        first_name: row.players.first_name,
+        last_name: row.players.last_name,
+        nickname: row.players.nickname,
+        jersey_number: row.jersey_number,
+      })))
       setGames(loadedGames)
+      if (tournamentsRes.error) {
+        setTournamentError(tournamentsRes.error.message)
+      } else {
+        setTournaments((tournamentsRes.data ?? []) as TeamInfoTournament[])
+      }
+      if (membersRes.error) {
+        setMembersError(membersRes.error.message)
+      } else {
+        const rows = (membersRes.data ?? []) as Array<TeamInfoMember & { team_id?: string }>
+        setTeamMembers(rows)
+      }
 
       const legacyFinals = loadedGames.filter(
         game => game.status === 'final' && game.home_team_score == null
@@ -204,51 +305,49 @@ export default function TeamInfo() {
               sportName={sport?.name ?? team.seasons.sport}
               sportIcon={sport?.icon ?? ''}
               record={record}
-              rosterCount={rosterCount}
+              rosterCount={rosterPlayers.length}
               gameCount={games.length}
             />
 
-            <section className="card space-y-3">
-              <h2 className="font-semibold text-slate-800">Team Links</h2>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Link
-                  to={teamLeaderboardPath(team.id, team.season_id)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 hover:border-blue-300"
-                >
-                  Season Stats
-                </Link>
-                <Link
-                  to={teamStatsPath(team.id)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 hover:border-blue-300"
-                >
-                  Team Stats
-                </Link>
-                <Link
-                  to={teamManagementPath(team.id)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 hover:border-blue-300"
-                >
-                  Manage Team
-                </Link>
-              </div>
-            </section>
+            <SegmentedControl
+              label="Team Info sections"
+              options={segmentOptions}
+              value={activeSegment}
+              onChange={setActiveSegment}
+            />
 
-            <section className="card space-y-3">
-              <h2 className="font-semibold text-slate-800">Game Snapshot</h2>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Upcoming</p>
-                  <p className="text-lg font-bold text-slate-800">{gameGroups.upcoming.length}</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Live</p>
-                  <p className="text-lg font-bold text-slate-800">{gameGroups.inProgress.length}</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Final</p>
-                  <p className="text-lg font-bold text-slate-800">{gameGroups.completed.length}</p>
-                </div>
+            {activeSegment === 'overview' && (
+              <TeamOverviewCards
+                teamId={team.id}
+                seasonId={team.season_id}
+                roster={rosterPlayers}
+                upcomingGames={upcomingPreviewGames}
+                recentResults={recentResults}
+                tournaments={tournaments}
+                members={teamMembers}
+                tournamentError={tournamentError}
+                membersError={membersError}
+              />
+            )}
+
+            {activeSegment === 'roster' && (
+              <div className="space-y-4">
+                <RosterPreviewCard teamId={team.id} players={rosterPlayers} />
+                <TeamMembersCard members={teamMembers} error={membersError} />
               </div>
-            </section>
+            )}
+
+            {activeSegment === 'schedule' && (
+              <div className="space-y-4">
+                <SchedulePreviewCard games={upcomingPreviewGames} />
+                <RecentResultsCard games={recentResults} />
+                <TournamentCard
+                  teamId={team.id}
+                  tournaments={tournaments}
+                  error={tournamentError}
+                />
+              </div>
+            )}
           </>
         ) : loading ? (
           <section className="card">

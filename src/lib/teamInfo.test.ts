@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { sports } from '../config/sports'
 import {
   computeTeamRecord,
+  resolveTeamInfoHomeScore,
   splitTeamGames,
+  teamGameResult,
   teamInfoPath,
   teamLeaderboardPath,
   teamManagementPath,
@@ -72,6 +74,47 @@ describe('computeTeamRecord', () => {
     ])
 
     expect(record).toEqual({ wins: 1, losses: 0, ties: 0, gamesPlayed: 1 })
+  })
+})
+
+describe('resolveTeamInfoHomeScore', () => {
+  it('uses stored home score before stat totals', () => {
+    const score = resolveTeamInfoHomeScore(
+      null,
+      { id: 'stored', status: 'final', opponent_score: 10, home_team_score: 22 },
+      { stored: { '2pt': 1 } }
+    )
+
+    expect(score).toBe(22)
+  })
+
+  it('uses resolved stats for legacy rows when sport is available', () => {
+    const score = resolveTeamInfoHomeScore(
+      basketball,
+      { id: 'legacy', status: 'final', opponent_score: 10, home_team_score: null },
+      { legacy: { '2pt': 4, ft: 1 } }
+    )
+
+    expect(score).toBe(9)
+  })
+
+  it('returns null for legacy rows without sport-specific scoring context', () => {
+    expect(
+      resolveTeamInfoHomeScore(null, {
+        id: 'legacy',
+        status: 'final',
+        opponent_score: 10,
+        home_team_score: null,
+      })
+    ).toBeNull()
+  })
+})
+
+describe('teamGameResult', () => {
+  it('labels wins, losses, and ties', () => {
+    expect(teamGameResult(12, 10)).toBe('W')
+    expect(teamGameResult(8, 10)).toBe('L')
+    expect(teamGameResult(10, 10)).toBe('T')
   })
 })
 
