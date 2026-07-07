@@ -31,6 +31,7 @@ export function computeTeamRecord(
 
   for (const game of games) {
     if (game.status !== 'final' || game.opponent_score == null) continue
+    if (game.home_team_score == null && !(game.id in statsTotalsByGameId)) continue
 
     const homeScore = resolveFinalHomeScoreFromGameRow(
       sport,

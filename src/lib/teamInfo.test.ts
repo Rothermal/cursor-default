@@ -50,6 +50,20 @@ describe('computeTeamRecord', () => {
 
     expect(record).toEqual({ wins: 0, losses: 0, ties: 0, gamesPlayed: 0 })
   })
+
+  it('skips legacy final games when resolved stat totals are unavailable', () => {
+    const record = computeTeamRecord(basketball, [
+      {
+        id: 'legacy-missing-stats',
+        status: 'final',
+        opponent_score: 10,
+        home_team_score: null,
+        home_score_adjustment: 0,
+      },
+    ])
+
+    expect(record).toEqual({ wins: 0, losses: 0, ties: 0, gamesPlayed: 0 })
+  })
 })
 
 describe('splitTeamGames', () => {

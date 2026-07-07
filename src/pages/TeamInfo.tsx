@@ -200,7 +200,7 @@ export default function TeamInfo() {
               Teams
             </button>
           </section>
-        ) : team ? (
+        ) : team && !loading ? (
           <>
             <TeamHero
               teamName={teamDisplayName(team)}
