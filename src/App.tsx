@@ -70,6 +70,7 @@ function AppRoutes() {
           <Route path="/games" element={<Games />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/player" element={<PlayerProfile />} />
+          <Route path="/player-info" element={<PlayerProfile />} />
           <Route path="/career" element={<CareerStats />} />
           <Route path="/team-stats" element={<TeamStats />} />
           <Route path="/tournament-stats" element={<TournamentStats />} />

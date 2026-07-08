@@ -3,6 +3,7 @@ import { sports } from '../config/sports'
 import {
   computeTeamRecord,
   gameInfoPath,
+  playerInfoPath,
   resolveTeamInfoHomeScore,
   splitTeamGames,
   teamGameResult,
@@ -144,6 +145,9 @@ describe('team info paths', () => {
     expect(teamRosterPath('team 1')).toBe('/team/roster?teamId=team%201')
     expect(teamSchedulePath('team 1')).toBe('/team/schedule?teamId=team%201')
     expect(gameInfoPath('game 1', 'team 1')).toBe('/game-info?gameId=game+1&teamId=team+1')
+    expect(playerInfoPath('player 1', 'team 1', 'season 1')).toBe(
+      '/player-info?playerId=player+1&teamId=team+1&seasonId=season+1'
+    )
     expect(teamLeaderboardPath('team 1', 'season 1')).toBe(
       '/leaderboard?teamId=team+1&seasonId=season+1'
     )

@@ -93,6 +93,12 @@ export function gameInfoPath(gameId: string, teamId?: string | null): string {
   return `/game-info?${params.toString()}`
 }
 
+export function playerInfoPath(playerId: string, teamId: string, seasonId?: string | null): string {
+  const params = new URLSearchParams({ playerId, teamId })
+  if (seasonId) params.set('seasonId', seasonId)
+  return `/player-info?${params.toString()}`
+}
+
 export function teamLeaderboardPath(teamId: string, seasonId?: string | null): string {
   const params = new URLSearchParams({ teamId })
   if (seasonId) params.set('seasonId', seasonId)
