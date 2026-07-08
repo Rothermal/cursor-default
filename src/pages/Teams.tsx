@@ -132,6 +132,27 @@ export default function Teams() {
     [teams, selectedTeamId]
   )
 
+  const managementRouteMessage = useMemo(() => {
+    if (!isManagementRoute || loadingTeams || selectedTeam) return null
+    if (!requestedTeamId) return 'Choose a team from Cloud Teams before opening management.'
+    return 'That team could not be found or you no longer have access to it.'
+  }, [isManagementRoute, loadingTeams, requestedTeamId, selectedTeam])
+  const backPath = isManagementRoute
+    ? selectedTeam ? teamInfoPath(selectedTeam.id) : '/teams'
+    : '/admin'
+
+  useEffect(() => {
+    if (!isManagementRoute && requestedTeamId) {
+      navigate(teamManagementPath(requestedTeamId), { replace: true })
+    }
+  }, [isManagementRoute, navigate, requestedTeamId])
+
+  useEffect(() => {
+    if (isManagementRoute && selectedTeamId && selectedTeamId !== requestedTeamId) {
+      setSelectedTeamId('')
+    }
+  }, [isManagementRoute, requestedTeamId, selectedTeamId])
+
   useEffect(() => {
     if (!isConfigured || !userId || !supabaseClient) return
 
@@ -157,6 +178,7 @@ export default function Teams() {
         if (requestedTeamId && loadedTeams.some(team => team.id === requestedTeamId)) {
           return requestedTeamId
         }
+        if (isManagementRoute) return ''
         if (prev && loadedTeams.some(team => team.id === prev)) return prev
         return loadedTeams[0]?.id ?? ''
       })
@@ -167,7 +189,7 @@ export default function Teams() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, requestedTeamId, supabaseClient, userId])
+  }, [isConfigured, isManagementRoute, requestedTeamId, supabaseClient, userId])
 
   useEffect(() => {
     if (!isConfigured || !userId || !supabaseClient) {
@@ -859,7 +881,7 @@ export default function Teams() {
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate(isManagementRoute && selectedTeam ? teamInfoPath(selectedTeam.id) : '/admin')}
+            onClick={() => navigate(backPath)}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >
@@ -913,6 +935,16 @@ export default function Teams() {
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
             {error}
           </div>
+        )}
+
+        {managementRouteMessage && (
+          <section className="card space-y-3">
+            <p className="font-semibold text-slate-700">Team unavailable</p>
+            <p className="text-sm text-slate-500">{managementRouteMessage}</p>
+            <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
+              Back to Cloud Teams
+            </button>
+          </section>
         )}
 
         {!isManagementRoute && (
@@ -1112,7 +1144,7 @@ export default function Teams() {
           </>
         )}
 
-        {isManagementRoute && (
+        {isManagementRoute && !managementRouteMessage && selectedTeam && (
           <section className="card space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-700">Roster</h2>
