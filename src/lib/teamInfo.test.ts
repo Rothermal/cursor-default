@@ -156,6 +156,6 @@ describe('team info paths', () => {
       '/leaderboard?teamId=team+1&seasonId=season+1'
     )
     expect(teamStatsPath('team 1')).toBe('/team-stats?teamId=team%201')
-    expect(teamManagementPath('team 1')).toBe('/teams?teamId=team%201')
+    expect(teamManagementPath('team 1')).toBe('/team/manage?teamId=team%201')
   })
 })

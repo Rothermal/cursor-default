@@ -116,5 +116,5 @@ export function teamStatsPath(teamId: string): string {
 }
 
 export function teamManagementPath(teamId: string): string {
-  return `/teams?teamId=${encodeURIComponent(teamId)}`
+  return `/team/manage?teamId=${encodeURIComponent(teamId)}`
 }

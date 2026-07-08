@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName, playerRosterSelectLabel } from '../lib/display'
-import { teamInfoPath } from '../lib/teamInfo'
+import { teamInfoPath, teamManagementPath } from '../lib/teamInfo'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -54,12 +54,14 @@ interface PoolPlayer {
 }
 
 export default function Teams() {
+  const location = useLocation()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const { user, isConfigured } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const userId = user?.id ?? null
   const requestedTeamId = searchParams.get('teamId')
+  const isManagementRoute = location.pathname === '/team/manage'
   const supabaseClient = supabase
 
   const [teams, setTeams] = useState<TeamRow[]>([])
@@ -578,6 +580,7 @@ export default function Teams() {
     setNewPlayerFirst('')
     setNewPlayerLast('')
     setNewPlayerNumber('')
+    navigate(teamManagementPath(createdTeam.id))
   }
 
   const handleAddPlayer = async () => {
@@ -856,15 +859,19 @@ export default function Teams() {
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate(isManagementRoute && selectedTeam ? teamInfoPath(selectedTeam.id) : '/admin')}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
           </button>
           <div>
-            <h1 className="text-lg font-bold">Cloud Teams</h1>
-            <p className="text-sm opacity-80">Create teams and manage rosters</p>
+            <h1 className="text-lg font-bold">{isManagementRoute ? 'Manage Team' : 'Cloud Teams'}</h1>
+            <p className="text-sm opacity-80">
+              {isManagementRoute && selectedTeam
+                ? teamDisplayName(selectedTeam)
+                : 'Create teams and review your cloud teams'}
+            </p>
           </div>
         </div>
       </header>
@@ -908,81 +915,83 @@ export default function Teams() {
           </div>
         )}
 
-        <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Create Team</h2>
-          <input
-            type="text"
-            value={newTeamName}
-            onChange={e => setNewTeamName(e.target.value)}
-            placeholder="Team name"
-            className="input-field"
-          />
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Season</label>
-            <select
-              value={seasonMode === 'existing' ? selectedSeasonId : '__new__'}
-              onChange={e => {
-                if (e.target.value === '__new__') {
-                  setSeasonMode('new')
-                  setSelectedSeasonId('')
-                } else {
-                  setSeasonMode('existing')
-                  setSelectedSeasonId(e.target.value)
-                }
-              }}
-              className="input-field"
-            >
-              <option value="__new__">Create new season...</option>
-              {existingSeasons.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.sport})
-                </option>
-              ))}
-            </select>
-          </div>
-          {seasonMode === 'new' && (
-            <div className="grid grid-cols-2 gap-2">
-              <select
-                value={newTeamSport}
-                onChange={e => setNewTeamSport(e.target.value)}
-                className="input-field"
-              >
-                {sports.map(sport => (
-                  <option key={sport.id} value={sport.id}>
-                    {sport.icon} {sport.name}
-                  </option>
-                ))}
-              </select>
+        {!isManagementRoute && (
+          <>
+            <section className="card space-y-3">
+              <h2 className="font-semibold text-slate-700">Create Team</h2>
               <input
                 type="text"
-                value={newTeamSeason}
-                onChange={e => setNewTeamSeason(e.target.value)}
-                placeholder="Season name (required)"
+                value={newTeamName}
+                onChange={e => setNewTeamName(e.target.value)}
+                placeholder="Team name"
                 className="input-field"
-                required
               />
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => { void handleCreateTeam() }}
-            disabled={
-              !newTeamName.trim()
-              || creatingTeam
-              || (seasonMode === 'existing' && !selectedSeasonId)
-              || (seasonMode === 'new' && !newTeamSeason.trim())
-            }
-            className="btn-primary w-full"
-          >
-            {creatingTeam ? 'Creating...' : 'Create Team'}
-          </button>
-        </section>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Season</label>
+                <select
+                  value={seasonMode === 'existing' ? selectedSeasonId : '__new__'}
+                  onChange={e => {
+                    if (e.target.value === '__new__') {
+                      setSeasonMode('new')
+                      setSelectedSeasonId('')
+                    } else {
+                      setSeasonMode('existing')
+                      setSelectedSeasonId(e.target.value)
+                    }
+                  }}
+                  className="input-field"
+                >
+                  <option value="__new__">Create new season...</option>
+                  {existingSeasons.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.sport})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {seasonMode === 'new' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={newTeamSport}
+                    onChange={e => setNewTeamSport(e.target.value)}
+                    className="input-field"
+                  >
+                    {sports.map(sport => (
+                      <option key={sport.id} value={sport.id}>
+                        {sport.icon} {sport.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={newTeamSeason}
+                    onChange={e => setNewTeamSeason(e.target.value)}
+                    placeholder="Season name (required)"
+                    className="input-field"
+                    required
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => { void handleCreateTeam() }}
+                disabled={
+                  !newTeamName.trim()
+                  || creatingTeam
+                  || (seasonMode === 'existing' && !selectedSeasonId)
+                  || (seasonMode === 'new' && !newTeamSeason.trim())
+                }
+                className="btn-primary w-full"
+              >
+                {creatingTeam ? 'Creating...' : 'Create Team'}
+              </button>
+            </section>
 
-        <section className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-700">Teams</h2>
-            {loadingTeams && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
-          </div>
+            <section className="card space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-slate-700">Teams</h2>
+                {loadingTeams && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+              </div>
 
           {teams.length === 0 && !loadingTeams ? (
             <p className="text-sm text-slate-500">No teams yet. Create one above.</p>
@@ -1065,11 +1074,10 @@ export default function Teams() {
                             type="button"
                             onClick={e => {
                               e.stopPropagation()
-                              setSelectedTeamId(team.id)
-                              setSearchParams({ teamId: team.id }, { replace: true })
+                              navigate(teamManagementPath(team.id))
                             }}
                             className="text-xs font-semibold text-blue-600 px-1.5 py-1"
-                            title="Manage roster and members on this page"
+                            title="Manage roster and members"
                           >
                             Manage
                           </button>
@@ -1100,9 +1108,12 @@ export default function Teams() {
               })}
             </div>
           )}
-        </section>
+            </section>
+          </>
+        )}
 
-        <section className="card space-y-3">
+        {isManagementRoute && (
+          <section className="card space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-700">Roster</h2>
             <div className="flex items-center gap-2">
@@ -1373,7 +1384,8 @@ export default function Teams() {
           ) : (
             <p className="text-sm text-slate-500">Select a team to manage its roster.</p>
           )}
-        </section>
+          </section>
+        )}
 
         <ConfirmDialog
           open={confirmDeleteTeam !== null}
@@ -1407,7 +1419,7 @@ export default function Teams() {
           onCancel={() => setConfirmDeletePlayer(null)}
         />
 
-        {selectedTeam && (
+        {isManagementRoute && selectedTeam && (
           <section className="card space-y-3">
             <h2 className="font-semibold text-slate-700">Team Members</h2>
             {loadingMembers ? (
@@ -1499,7 +1511,7 @@ export default function Teams() {
         )}
       </div>
 
-      {mergeWizardOpen && supabaseClient && (
+      {isManagementRoute && mergeWizardOpen && supabaseClient && (
         <MergePlayerWizard
           supabase={supabaseClient}
           candidates={mergeCandidates}
