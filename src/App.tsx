@@ -65,6 +65,7 @@ function AppRoutes() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/teams" element={<Teams />} />
           <Route path="/team" element={<TeamInfo />} />
+          <Route path="/team/manage" element={<Teams />} />
           <Route path="/team/roster" element={<TeamRoster />} />
           <Route path="/team/schedule" element={<TeamSchedule />} />
           <Route path="/team/season" element={<SeasonInfo />} />

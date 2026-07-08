@@ -57,22 +57,25 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | Step | Action | Expected |
 |------|--------|----------|
 | 4.1 | Home → Teams | Cloud Teams page; Create Team form |
-| 4.2 | Create team (name, sport, season) | Team appears in list; selected |
-| 4.3 | Add players (number, first, last) | Players appear in Roster |
+| 4.2 | Create team (name, sport, season) | Opens `/team/manage?teamId=<id>` for the created team |
+| 4.3 | Team Manage → add players (number, first, last) | Players appear in Roster |
 | 4.4 | Edit team name (pencil) → change primary name → Save | Team name updates in list; reflected in Game Setup dropdown and Games page |
 | 4.4b | Edit team nickname (pencil) → set or clear display name → Save | If set: display name shown in list with primary name in parens; if cleared: primary name shown directly |
 | 4.5 | Edit player (pencil) → change first name, last name, jersey number → Save | Player row updates with new values; reflected in cloud roster |
 | 4.5b | Edit player nickname | Display name updates; primary name shown in parentheses if nickname set |
 | 4.6 | Remove player | Player removed from roster (soft deactivate) |
-| 4.7 | Season Stats link (when team selected) | Navigate to Leaderboard with that team pre-selected |
+| 4.7 | Team Manage → Season Stats link | Navigate to Leaderboard with that team pre-selected |
 | 4.8 | Reload → Teams | Same teams and roster (from Supabase) |
 | 4.9 | Teams → tap a team card's primary name area | Opens `/team?teamId=<id>`; Team Info shows display name, season, sport, record, roster count, game count, and links back to Season Stats, Team Stats, and Manage Team |
-| 4.10 | Teams → tap **Manage** on a team card | Stays on `/teams`; roster/member management switches to that team |
-| 4.11 | Team Info → switch **Overview / Roster / Schedule** segments | Segment content changes in place; URL stays `/team?teamId=<id>`; no management actions move off `/teams` |
+| 4.10 | Teams → tap **Manage** on a team card | Opens `/team/manage?teamId=<id>` with roster and member management for that team |
+| 4.10b | Open legacy `/teams?teamId=<id>` link | Redirects to `/team/manage?teamId=<id>` |
+| 4.10c | Open `/team/manage` without a team id or with an invalid id | Shows Team unavailable state; does not auto-select or manage another team |
+| 4.11 | Team Info → switch **Overview / Roster / Schedule** segments | Segment content changes in place; URL stays `/team?teamId=<id>`; Manage links open `/team/manage?teamId=<id>` |
 | 4.12 | Team Info → Overview | Shows stat links, roster preview, schedule preview, recent results, tournaments, and read-only team members when data exists |
 | 4.13 | Team Info → Roster | Shows the full active roster and read-only member list; player rows link to `/player-info?playerId=<id>&teamId=<id>` |
 | 4.14 | Team Info → Overview roster preview → View roster | Opens `/team/roster?teamId=<id>`; shows the same active roster as a read-only Team Roster page |
 | 4.15 | Team Roster → Back to Team | Returns to `/team?teamId=<id>` |
+| 4.15b | Team Manage → Back | Returns to `/team?teamId=<id>` |
 | 4.16 | Team Info → Schedule | Shows upcoming/live games, recent finalized results, and tournament links; game rows open Game Info |
 | 4.17 | Team Info → Schedule preview → View schedule | Opens `/team/schedule?teamId=<id>`; groups games into live, upcoming, and finals with final scores/results |
 | 4.18 | Team Schedule → tap a scheduled/live/final game | Opens `/game-info?gameId=<id>&teamId=<id>`; shows game details, status/score, and stat leaders when resolved stats exist |
@@ -90,15 +93,15 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 4a.1 | As **scorer-only** (not owner/admin): Teams → select a team | **Merge players** link next to Season Stats is **not** shown |
-| 4a.2 | As **owner** or **admin**: Teams → select that team; ensure ≥2 players exist across teams you admin | **Merge players** (amber) appears in Roster header |
+| 4a.1 | As **scorer-only** (not owner/admin): Teams → Manage a team | **Merge players** link next to Season Stats is **not** shown |
+| 4a.2 | As **owner** or **admin**: Teams → Manage that team; ensure ≥2 players exist across teams you admin | **Merge players** (amber) appears in Roster header |
 | 4a.3 | Tap **Merge players** → read intro → **Continue** | Pick survivor / duplicate step |
 | 4a.4 | Choose **survivor** (keep) and **duplicate** (remove) → **Load conflicts** | Either conflict sections appear, or message that there are no overlapping stat/roster conflicts |
 | 4a.5 | If **game_stats** conflicts: pick **keep survivor** vs **keep duplicate** row for each | Radios work; one choice per conflict |
 | 4a.6 | If **stat_corrections** conflicts: pick survivor / duplicate / **discard both** per row | Choices stick |
 | 4a.7 | If **team_players** conflicts (same team on both profiles): set jersey, **Active**, position → **Continue to confirm** | Confirm step shows summary |
 | 4a.8 | Type **MERGE** (all caps) → **Merge players** | Success: modal closes; duplicate gone from candidate pool / roster lists after refresh |
-| 4a.9 | Teams → roster / Leaderboard / Player profile for **survivor** | Stats and games that belonged to duplicate now attribute to survivor (where applicable) |
+| 4a.9 | Team Manage roster / Leaderboard / Player profile for **survivor** | Stats and games that belonged to duplicate now attribute to survivor (where applicable) |
 | 4a.10 | (Optional) Supabase Table Editor → `player_merge_audit` | New row with `duplicate_player_id`, `survivor_player_id`, `merged_by`, `resolutions` json |
 | 4a.11 | Settings (Admin) → expand **Player merge (advanced)** | Section opens; **Your recent merges** loads or shows migration **025** hint if RLS blocks reads |
 | 4a.12 | **Open merge wizard** from Admin (with ≥2 candidates) | Same modal as Teams; complete a test merge → row appears under **Your recent merges** (after **025** applied) |
@@ -338,13 +341,13 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 10.1 | As owner: Teams → select team → Team Members | Member list; "Invite by email" section |
+| 10.1 | As owner: Teams → Manage team → Team Members | Member list; "Invite by email" section |
 | 10.2 | Enter invitee email → Lookup | User found; display name shown |
 | 10.3 | Choose role (Scorer / Admin) → Send Invite | Invite sent; member row shows "Pending" |
 | 10.4 | As invitee: sign in → Teams | "Pending invites" banner with team name |
 | 10.5 | Accept | Banner clears; team appears in list; member shows "Accepted" |
 | 10.6 | As invitee: open team | Can see roster; can start games for that team |
-| 10.7 | As owner: Team Members | Invitee listed with role; Remove available |
+| 10.7 | As owner: Team Manage → Team Members | Invitee listed with role; Remove available |
 | 10.8 | As invitee: Decline (alternative flow) | Invite removed; team no longer in list |
 | 10.9 | As admin (invited as admin): same team → Invite by email | Can lookup and send invite |
 
