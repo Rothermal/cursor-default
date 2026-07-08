@@ -1,7 +1,7 @@
 # Feature 2 Plan: Per-Player Shot Tracker + Team Views
 
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
-> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
+> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
 > shared context. Depends on **F1** ([PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md))
 > for the inline court (`ShotChartPanel`), the `CourtEventPopup`, and the sticky
 > `PlayerSelectorStrip`. After F1 the court lives **inline in the single-page Game
@@ -44,7 +44,7 @@ it. No schema change — `ShotRecord.playerId` already exists; team side is deri
 - Team pseudo-players (`__team_home__`, `__team_opp__`) can be the active recorder, but
   there's no concept of "show everyone on the home team."
 
-Deferred in the shipped design: [completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md)
+Deferred in the shipped design: [DESIGN_SHOT_CHART.md](DESIGN_SHOT_CHART.md)
 §2.2 ("v2: Per-Player Shot Charts") and §8.2 ("Per-Player Filtering (v2)").
 
 ## 2. Team model & the side-derivation rule
@@ -249,7 +249,7 @@ filtering. One tested pure function prevents three subtly different implementati
 - Cloud / multi-recorder aggregation (→ **F3**).
 - Per-player marker colors + legend (follow-up; data-ready).
 - Per-player breakdown panel in team view (follow-up).
-- Season/career heatmaps ([completed/DESIGN_SHOT_CHART.md](completed/DESIGN_SHOT_CHART.md) §2.3).
+- Season/career heatmaps ([DESIGN_SHOT_CHART.md](DESIGN_SHOT_CHART.md) §2.3).
 
 ## 8. Pre-handoff design decisions — RESOLVED
 

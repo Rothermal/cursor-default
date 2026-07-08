@@ -4,8 +4,8 @@
 > candidate ordering from the player strip.
 
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
-> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) and the
-> [enhancements roadmap](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md). **Depends on F1**
+> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) and the
+> [enhancements roadmap](../PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md). **Depends on F1**
 > ([PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md)); pairs
 > with **F6** (player picker reuse) and **F12** (recent-events undo popup, which makes the
 > two-step undo transparent).

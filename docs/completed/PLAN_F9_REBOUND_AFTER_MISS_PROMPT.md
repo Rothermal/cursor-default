@@ -1,7 +1,7 @@
 # F9 - Rebound-after-miss chained prompt
 
 > Expands the F9 sketch in
-> [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md).
+> [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](../PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md).
 > Status: implemented.
 
 ## Goal
