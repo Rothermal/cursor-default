@@ -11,6 +11,7 @@ import {
   teamLeaderboardPath,
   teamManagementPath,
   teamRosterPath,
+  teamSeasonPath,
   teamSchedulePath,
   teamStatsPath,
 } from './teamInfo'
@@ -144,6 +145,9 @@ describe('team info paths', () => {
     expect(teamInfoPath('team 1')).toBe('/team?teamId=team%201')
     expect(teamRosterPath('team 1')).toBe('/team/roster?teamId=team%201')
     expect(teamSchedulePath('team 1')).toBe('/team/schedule?teamId=team%201')
+    expect(teamSeasonPath('season 1', 'team 1')).toBe(
+      '/team/season?seasonId=season+1&teamId=team+1'
+    )
     expect(gameInfoPath('game 1', 'team 1')).toBe('/game-info?gameId=game+1&teamId=team+1')
     expect(playerInfoPath('player 1', 'team 1', 'season 1')).toBe(
       '/player-info?playerId=player+1&teamId=team+1&seasonId=season+1'

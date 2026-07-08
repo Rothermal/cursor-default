@@ -1,7 +1,7 @@
 # Court Event Capture - Enhancements Roadmap (F5-F13)
 
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
-> Event Capture model introduced in [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
+> Event Capture model introduced in [completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
 > F5, F6, F7, F8, F9, and F12 are implemented. F10 is no longer needed as a
 > standalone visible-numbering feature and is superseded by F13. F11 and F13 are both
 > held pending further user feedback before any build work. F13 is drafted for review in
@@ -63,7 +63,7 @@ proves important enough for the larger data-model work.
 
 ## F5 - Auto 2/3 with manual override chip
 
-> **Expanded to a full plan:** [PLAN_F5_AUTO_2_3_OVERRIDE.md](PLAN_F5_AUTO_2_3_OVERRIDE.md).
+> **Expanded to a full plan:** [completed/PLAN_F5_AUTO_2_3_OVERRIDE.md](completed/PLAN_F5_AUTO_2_3_OVERRIDE.md).
 > **Status:** Implemented.
 
 **Goal:** In `CourtEventPopup`, the location-detected shot value (`isThreePointer(x,y)`)
@@ -78,7 +78,7 @@ overrides 2PT/3PT.
 
 ## F6 - In-popup player confirm / switch
 
-> **Expanded to a full plan:** [PLAN_F6_IN_POPUP_PLAYER_SWITCH.md](PLAN_F6_IN_POPUP_PLAYER_SWITCH.md).
+> **Expanded to a full plan:** [completed/PLAN_F6_IN_POPUP_PLAYER_SWITCH.md](completed/PLAN_F6_IN_POPUP_PLAYER_SWITCH.md).
 > **Status:** Implemented.
 
 **Goal:** The popup header shows the selected player and lets the scorer switch attribution
@@ -92,7 +92,7 @@ before logging.
 
 ## F7 - Assist-linking on a made shot
 
-> **Expanded to a full plan:** [PLAN_F7_ASSIST_LINKING.md](PLAN_F7_ASSIST_LINKING.md).
+> **Expanded to a full plan:** [completed/PLAN_F7_ASSIST_LINKING.md](completed/PLAN_F7_ASSIST_LINKING.md).
 > **Status:** Implemented.
 
 **Goal:** After a made shot, optionally credit a same-side teammate assist in the same
@@ -107,7 +107,7 @@ F12's recent-events popup. No reducer/data-model change in F7.
 
 ## F8 - Live per-player line in the popup
 
-> **Expanded to a full plan:** [PLAN_F8_LIVE_PER_PLAYER_LINE.md](PLAN_F8_LIVE_PER_PLAYER_LINE.md).
+> **Expanded to a full plan:** [completed/PLAN_F8_LIVE_PER_PLAYER_LINE.md](completed/PLAN_F8_LIVE_PER_PLAYER_LINE.md).
 > **Status:** Implemented.
 
 **Goal:** Show the selected player's quick stat line in `CourtEventPopup`.
@@ -121,7 +121,7 @@ and sport `keyStatIds`.
 
 ## F9 - Rebound-after-miss chained prompt
 
-> **Expanded to a full plan:** [PLAN_F9_REBOUND_AFTER_MISS_PROMPT.md](PLAN_F9_REBOUND_AFTER_MISS_PROMPT.md).
+> **Expanded to a full plan:** [completed/PLAN_F9_REBOUND_AFTER_MISS_PROMPT.md](completed/PLAN_F9_REBOUND_AFTER_MISS_PROMPT.md).
 > **Status:** Implemented.
 
 **Goal:** After a missed shot, optionally prompt for Off Reb, Def Reb, or No rebound.
@@ -210,7 +210,7 @@ setting, built only if Option A testing shows real friction.
 
 ## F12 - Recent-events undo popup
 
-> **Expanded to a full plan:** [PLAN_F12_RECENT_EVENTS_UNDO.md](PLAN_F12_RECENT_EVENTS_UNDO.md).
+> **Expanded to a full plan:** [completed/PLAN_F12_RECENT_EVENTS_UNDO.md](completed/PLAN_F12_RECENT_EVENTS_UNDO.md).
 > **Status:** Implemented before F7.
 
 **Goal:** Replace silent single Undo with a popup listing the last few events in plain

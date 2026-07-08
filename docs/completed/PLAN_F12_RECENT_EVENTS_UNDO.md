@@ -3,8 +3,8 @@
 > **Status:** Implemented. Optional cascade-to-row undo remains deferred; v1 is LIFO/top-only.
 
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
-> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) and the
-> [enhancements roadmap](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md). **Enhances F1**
+> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) and the
+> [enhancements roadmap](../PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md). **Enhances F1**
 > ([PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md))'s undo
 > bar. **Build F12 before F7** — F7's two-step assist undo relies on F12 for transparency.
 

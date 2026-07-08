@@ -1,7 +1,7 @@
 # Feature 3 Plan: Shot Trackers Viewable on Cloud-Saved Games
 
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
-> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
+> syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
 > shared context. Builds on **F1** (inline court, `ShotChartPanel`) and **F2**
 > (`shotsForSelection`, the read-only selector + the `selection` contract, F2 §8 D13–D17).
 

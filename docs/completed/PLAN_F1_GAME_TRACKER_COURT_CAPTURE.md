@@ -1,9 +1,9 @@
 # Feature 1 Plan: Single-Page Game Tracker + Court Event Capture (Option A)
 
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
-> syntax. See the umbrella [DESIGN_SHOT_TRACKER_UI_REVAMP.md](DESIGN_SHOT_TRACKER_UI_REVAMP.md)
+> syntax. See the umbrella [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md)
 > for shared context. Follow-on enhancements live in
-> [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md)
+> [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](../PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md)
 > (F5–F11).
 >
 > **Supersedes** the earlier "shot chart as a tab" design. After live-use feedback we
