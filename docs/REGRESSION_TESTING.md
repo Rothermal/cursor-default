@@ -73,7 +73,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.13 | Team Info → Roster | Shows the full active roster and read-only member list; player rows link to existing Player Profile |
 | 4.14 | Team Info → Overview roster preview → View roster | Opens `/team/roster?teamId=<id>`; shows the same active roster as a read-only Team Roster page |
 | 4.15 | Team Roster → Back to Team | Returns to `/team?teamId=<id>` |
-| 4.16 | Team Info → Schedule | Shows upcoming/live games, recent finalized results, and tournament links; Cloud Games remains the management/resume backstop |
+| 4.16 | Team Info → Schedule | Shows upcoming/live games, recent finalized results, and tournament links; game rows open Game Info |
+| 4.17 | Team Info → Schedule preview → View schedule | Opens `/team/schedule?teamId=<id>`; groups games into live, upcoming, and finals with final scores/results |
+| 4.18 | Team Schedule → tap a scheduled/live/final game | Opens `/game-info?gameId=<id>&teamId=<id>`; shows game details, status/score, and stat leaders when resolved stats exist |
+| 4.19 | Game Info → View full summary on a finalized game | Hydrates the cloud game through the existing flow and opens `/summary`; pending local sync still blocks hydration |
 
 ---
 

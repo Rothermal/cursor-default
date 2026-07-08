@@ -13,6 +13,8 @@ import Admin from './pages/Admin'
 import Teams from './pages/Teams'
 import TeamInfo from './pages/TeamInfo'
 import TeamRoster from './pages/TeamRoster'
+import TeamSchedule from './pages/TeamSchedule'
+import GameInfo from './pages/GameInfo'
 import Games from './pages/Games'
 import Leaderboard from './pages/Leaderboard'
 import PlayerProfile from './pages/PlayerProfile'
@@ -63,6 +65,8 @@ function AppRoutes() {
           <Route path="/teams" element={<Teams />} />
           <Route path="/team" element={<TeamInfo />} />
           <Route path="/team/roster" element={<TeamRoster />} />
+          <Route path="/team/schedule" element={<TeamSchedule />} />
+          <Route path="/game-info" element={<GameInfo />} />
           <Route path="/games" element={<Games />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/player" element={<PlayerProfile />} />

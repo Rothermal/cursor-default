@@ -37,9 +37,9 @@ export default function TeamOverviewCards({
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <RosterPreviewCard teamId={teamId} players={roster} limit={5} />
-        <SchedulePreviewCard games={upcomingGames.slice(0, 3)} />
+        <SchedulePreviewCard teamId={teamId} games={upcomingGames.slice(0, 3)} />
       </div>
-      <RecentResultsCard games={recentResults.slice(0, 3)} />
+      <RecentResultsCard teamId={teamId} games={recentResults.slice(0, 3)} />
       <div className="grid gap-4 lg:grid-cols-2">
         <TournamentCard teamId={teamId} tournaments={tournaments} error={tournamentError} />
         <TeamMembersCard members={members} error={membersError} limit={5} />
