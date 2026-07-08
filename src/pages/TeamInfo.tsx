@@ -10,10 +10,12 @@ import TeamOverviewCards from '../components/team-info/TeamOverviewCards'
 import TournamentCard, { type TeamInfoTournament } from '../components/team-info/TournamentCard'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
+import { useGame } from '../context/GameContext'
 import { teamDisplayName } from '../lib/display'
 import { supabase } from '../lib/supabase'
 import {
   computeTeamRecord,
+  gameSetupPath,
   resolveTeamInfoHomeScore,
   splitTeamGames,
   teamGameResult,
@@ -53,6 +55,7 @@ export default function TeamInfo() {
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
   const { isConfigured } = useAuth()
+  const { state: gameState, dispatch: gameDispatch } = useGame()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -117,6 +120,27 @@ export default function TeamInfo() {
         })),
     [gamesWithScores]
   )
+
+  const handleStartGame = () => {
+    if (!team || !sport) return
+    const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
+    if (
+      hasActiveGame &&
+      !window.confirm('Starting a new game will discard your active game. Continue?')
+    ) {
+      return
+    }
+
+    gameDispatch({ type: 'SET_SPORT', sport })
+    gameDispatch({
+      type: 'SET_CLOUD_SYNC_STATE',
+      cloudSync: {
+        seasonId: team.season_id,
+        teamId: team.id,
+      },
+    })
+    navigate(gameSetupPath(team.id))
+  }
 
   useEffect(() => {
     if (!teamId || !isConfigured || !supabaseClient) {
@@ -286,7 +310,18 @@ export default function TeamInfo() {
           >
             Back to Teams
           </button>
-          {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+          <div className="flex items-center gap-3">
+            {team && sport && !loading && (
+              <button
+                type="button"
+                onClick={handleStartGame}
+                className="btn-primary py-2 px-3 text-sm"
+              >
+                Start Game
+              </button>
+            )}
+            {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+          </div>
         </div>
 
         {error ? (

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { sports } from '../config/sports'
 import {
   computeTeamRecord,
+  gameSetupPath,
   gameInfoPath,
   playerInfoPath,
   resolveTeamInfoHomeScore,
@@ -149,6 +150,7 @@ describe('team info paths', () => {
       '/team/season?seasonId=season+1&teamId=team+1'
     )
     expect(gameInfoPath('game 1', 'team 1')).toBe('/game-info?gameId=game+1&teamId=team+1')
+    expect(gameSetupPath('team 1')).toBe('/setup?teamId=team%201')
     expect(playerInfoPath('player 1', 'team 1', 'season 1')).toBe(
       '/player-info?playerId=player+1&teamId=team+1&seasonId=season+1'
     )

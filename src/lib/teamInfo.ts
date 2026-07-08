@@ -99,6 +99,10 @@ export function gameInfoPath(gameId: string, teamId?: string | null): string {
   return `/game-info?${params.toString()}`
 }
 
+export function gameSetupPath(teamId: string): string {
+  return `/setup?teamId=${encodeURIComponent(teamId)}`
+}
+
 export function playerInfoPath(playerId: string, teamId: string, seasonId?: string | null): string {
   const params = new URLSearchParams({ playerId, teamId })
   if (seasonId) params.set('seasonId', seasonId)

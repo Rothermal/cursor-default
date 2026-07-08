@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
+import { teamInfoPath, teamStatsPath } from '../lib/teamInfo'
 
 interface TeamRow {
   id: string
@@ -387,7 +388,7 @@ export default function TournamentStats() {
     return (
       <div className="min-h-screen flex flex-col px-4 py-6 max-w-lg mx-auto">
         {error && <div className="card bg-red-50 text-red-700 text-sm mb-4">{error}</div>}
-        <button type="button" onClick={() => navigate(`/team-stats?teamId=${teamId}`)} className="btn-primary">
+        <button type="button" onClick={() => navigate(teamStatsPath(teamId))} className="btn-primary">
           Back to team stats
         </button>
       </div>
@@ -403,7 +404,7 @@ export default function TournamentStats() {
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate(`/team-stats?teamId=${teamId}`)}
+            onClick={() => navigate(teamInfoPath(teamId))}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
           >
             ←
@@ -428,6 +429,14 @@ export default function TournamentStats() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
+        <button
+          type="button"
+          onClick={() => navigate(teamStatsPath(teamId))}
+          className="text-sm font-semibold text-blue-600"
+        >
+          Team stats →
+        </button>
+
         <section className="card space-y-2">
           <h2 className="font-semibold text-slate-700">Record</h2>
           <div className="flex gap-3 flex-wrap">
