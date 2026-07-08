@@ -71,7 +71,9 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.11 | Team Info → switch **Overview / Roster / Schedule** segments | Segment content changes in place; URL stays `/team?teamId=<id>`; no management actions move off `/teams` |
 | 4.12 | Team Info → Overview | Shows stat links, roster preview, schedule preview, recent results, tournaments, and read-only team members when data exists |
 | 4.13 | Team Info → Roster | Shows the full active roster and read-only member list; player rows link to existing Player Profile |
-| 4.14 | Team Info → Schedule | Shows upcoming/live games, recent finalized results, and tournament links; Cloud Games remains the management/resume backstop |
+| 4.14 | Team Info → Overview roster preview → View roster | Opens `/team/roster?teamId=<id>`; shows the same active roster as a read-only Team Roster page |
+| 4.15 | Team Roster → Back to Team | Returns to `/team?teamId=<id>` |
+| 4.16 | Team Info → Schedule | Shows upcoming/live games, recent finalized results, and tournament links; Cloud Games remains the management/resume backstop |
 
 ---
 
