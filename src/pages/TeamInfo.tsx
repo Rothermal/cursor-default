@@ -339,8 +339,8 @@ export default function TeamInfo() {
 
             {activeSegment === 'schedule' && (
               <div className="space-y-4">
-                <SchedulePreviewCard games={upcomingPreviewGames} />
-                <RecentResultsCard games={recentResults} />
+                <SchedulePreviewCard teamId={team.id} games={upcomingPreviewGames} />
+                <RecentResultsCard teamId={team.id} games={recentResults} />
                 <TournamentCard
                   teamId={team.id}
                   tournaments={tournaments}

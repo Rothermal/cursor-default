@@ -83,6 +83,16 @@ export function teamRosterPath(teamId: string): string {
   return `/team/roster?teamId=${encodeURIComponent(teamId)}`
 }
 
+export function teamSchedulePath(teamId: string): string {
+  return `/team/schedule?teamId=${encodeURIComponent(teamId)}`
+}
+
+export function gameInfoPath(gameId: string, teamId?: string | null): string {
+  const params = new URLSearchParams({ gameId })
+  if (teamId) params.set('teamId', teamId)
+  return `/game-info?${params.toString()}`
+}
+
 export function teamLeaderboardPath(teamId: string, seasonId?: string | null): string {
   const params = new URLSearchParams({ teamId })
   if (seasonId) params.set('seasonId', seasonId)

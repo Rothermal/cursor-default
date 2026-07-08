@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { sports } from '../config/sports'
 import {
   computeTeamRecord,
+  gameInfoPath,
   resolveTeamInfoHomeScore,
   splitTeamGames,
   teamGameResult,
@@ -9,6 +10,7 @@ import {
   teamLeaderboardPath,
   teamManagementPath,
   teamRosterPath,
+  teamSchedulePath,
   teamStatsPath,
 } from './teamInfo'
 
@@ -140,6 +142,8 @@ describe('team info paths', () => {
   it('builds query-param team routes', () => {
     expect(teamInfoPath('team 1')).toBe('/team?teamId=team%201')
     expect(teamRosterPath('team 1')).toBe('/team/roster?teamId=team%201')
+    expect(teamSchedulePath('team 1')).toBe('/team/schedule?teamId=team%201')
+    expect(gameInfoPath('game 1', 'team 1')).toBe('/game-info?gameId=game+1&teamId=team+1')
     expect(teamLeaderboardPath('team 1', 'season 1')).toBe(
       '/leaderboard?teamId=team+1&seasonId=season+1'
     )

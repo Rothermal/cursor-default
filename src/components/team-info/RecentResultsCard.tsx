@@ -1,5 +1,5 @@
-import ResultBadge from './ResultBadge'
 import type { TeamGameResult } from '../../lib/teamInfo'
+import GameCard from './GameCard'
 
 export interface TeamInfoResultGame {
   id: string
@@ -12,9 +12,10 @@ export interface TeamInfoResultGame {
 
 interface RecentResultsCardProps {
   games: TeamInfoResultGame[]
+  teamId?: string
 }
 
-export default function RecentResultsCard({ games }: RecentResultsCardProps) {
+export default function RecentResultsCard({ games, teamId }: RecentResultsCardProps) {
   return (
     <section className="card space-y-3">
       <div>
@@ -27,18 +28,7 @@ export default function RecentResultsCard({ games }: RecentResultsCardProps) {
       ) : (
         <div className="space-y-2">
           {games.map(game => (
-            <div key={game.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800 truncate">vs {game.opponent_name}</p>
-                  <p className="text-xs text-slate-500">{game.game_date}</p>
-                </div>
-                <ResultBadge result={game.result} scoreLine={game.scoreLine} />
-              </div>
-              {game.tournament_name && (
-                <p className="mt-1 text-xs text-slate-500 truncate">{game.tournament_name}</p>
-              )}
-            </div>
+            <GameCard key={game.id} game={{ ...game, status: 'final' }} teamId={teamId} />
           ))}
         </div>
       )}
