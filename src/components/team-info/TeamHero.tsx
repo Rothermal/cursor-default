@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { TeamRecord } from '../../lib/teamInfo'
 import RecordBadge from './RecordBadge'
 
@@ -5,6 +6,7 @@ interface TeamHeroProps {
   teamName: string
   legalName?: string | null
   seasonName: string
+  seasonHref?: string
   sportName: string
   sportIcon?: string
   record: TeamRecord
@@ -16,6 +18,7 @@ export default function TeamHero({
   teamName,
   legalName,
   seasonName,
+  seasonHref,
   sportName,
   sportIcon,
   record,
@@ -27,7 +30,16 @@ export default function TeamHero({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-500">
-            {sportIcon ? `${sportIcon} ` : ''}{sportName}{seasonName ? ` / ${seasonName}` : ''}
+            {sportIcon ? `${sportIcon} ` : ''}
+            {sportName}
+            {seasonName && ' / '}
+            {seasonName && seasonHref ? (
+              <Link to={seasonHref} className="text-blue-600 hover:text-blue-700">
+                {seasonName}
+              </Link>
+            ) : (
+              seasonName
+            )}
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 break-words">{teamName}</h1>
           {legalName && legalName !== teamName && (

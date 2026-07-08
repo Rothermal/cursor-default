@@ -17,6 +17,7 @@ import {
   resolveTeamInfoHomeScore,
   splitTeamGames,
   teamGameResult,
+  teamSeasonPath,
   type TeamInfoGame,
 } from '../lib/teamInfo'
 
@@ -302,6 +303,7 @@ export default function TeamInfo() {
               teamName={teamDisplayName(team)}
               legalName={team.name}
               seasonName={team.seasons.name}
+              seasonHref={teamSeasonPath(team.season_id)}
               sportName={sport?.name ?? team.seasons.sport}
               sportIcon={sport?.icon ?? ''}
               record={record}
