@@ -15,22 +15,22 @@ cross-cutting decisions so the individual plans stay consistent.
 > block / assist) for the selected player, while the **full stat grid stays editable** so
 > every stat can still be entered/adjusted directly. This spawned a family of follow-on
 > enhancements (F5–F12). See
-> [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) and
+> [completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) and
 > [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md).
 
 ## Features
 
 | # | Feature | Plan | One-line goal |
 |---|---------|------|----------------|
-| **F1** | Single-page Game Tracker + **Court Event Capture** | [PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) | **Implemented.** One scroll page; tap court -> event popup (Made/Miss w/ auto 2-3, Off/Def Reb, Steal, Block, Assist) as an additive fast input; the **full stat grid stays editable**. |
-| **F2** | Per-player + team shot views | [PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md](PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md) | **Implemented.** Filter the inline court to the selected player; team selections show every player's shots on that side; All shows everything. |
-| **F3** | Shot trackers on cloud-saved games | [PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md](PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md) | **Implemented; needs two-user QA.** Show full all-recorder shot charts when reviewing in-progress/final cloud games. |
-| **F4** | In-progress scores on the resume UI | [PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | **Implemented; needs cloud-list QA.** Live score on the home active-game card and the Cloud Games list. |
-| **F5** | Auto 2/3 with manual override chip | [PLAN_F5_AUTO_2_3_OVERRIDE.md](PLAN_F5_AUTO_2_3_OVERRIDE.md) | **Implemented.** The popup's 2PT/3PT value defaults from court location and can be overridden before logging Made/Missed. |
-| **F6** | In-popup player confirm/switch | [PLAN_F6_IN_POPUP_PLAYER_SWITCH.md](PLAN_F6_IN_POPUP_PLAYER_SWITCH.md) | **Implemented.** The popup's Log for control can switch the active player before logging an event. |
-| **F12** | Recent-events undo popup | [PLAN_F12_RECENT_EVENTS_UNDO.md](PLAN_F12_RECENT_EVENTS_UNDO.md) | **Implemented.** The bottom Undo opens a recent-events popup; the newest event can be undone via existing LIFO `UNDO`. |
-| **F7** | Assist-linking on a made shot | [PLAN_F7_ASSIST_LINKING.md](PLAN_F7_ASSIST_LINKING.md) | **Implemented.** After a made court shot, optionally credit a same-side teammate assist as a separate `ast` increment. |
-| **F8** | Live per-player line in popup | [PLAN_F8_LIVE_PER_PLAYER_LINE.md](PLAN_F8_LIVE_PER_PLAYER_LINE.md) | **Implemented.** Shows the selected player's compact live stat line under the popup's Log for label. |
+| **F1** | Single-page Game Tracker + **Court Event Capture** | [completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md) | **Implemented.** One scroll page; tap court -> event popup (Made/Miss w/ auto 2-3, Off/Def Reb, Steal, Block, Assist) as an additive fast input; the **full stat grid stays editable**. |
+| **F2** | Per-player + team shot views | [completed/PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md](completed/PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md) | **Implemented.** Filter the inline court to the selected player; team selections show every player's shots on that side; All shows everything. |
+| **F3** | Shot trackers on cloud-saved games | [completed/PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md](completed/PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md) | **Implemented; needs two-user QA.** Show full all-recorder shot charts when reviewing in-progress/final cloud games. |
+| **F4** | In-progress scores on the resume UI | [completed/PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md](completed/PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md) | **Implemented; needs cloud-list QA.** Live score on the home active-game card and the Cloud Games list. |
+| **F5** | Auto 2/3 with manual override chip | [completed/PLAN_F5_AUTO_2_3_OVERRIDE.md](completed/PLAN_F5_AUTO_2_3_OVERRIDE.md) | **Implemented.** The popup's 2PT/3PT value defaults from court location and can be overridden before logging Made/Missed. |
+| **F6** | In-popup player confirm/switch | [completed/PLAN_F6_IN_POPUP_PLAYER_SWITCH.md](completed/PLAN_F6_IN_POPUP_PLAYER_SWITCH.md) | **Implemented.** The popup's Log for control can switch the active player before logging an event. |
+| **F12** | Recent-events undo popup | [completed/PLAN_F12_RECENT_EVENTS_UNDO.md](completed/PLAN_F12_RECENT_EVENTS_UNDO.md) | **Implemented.** The bottom Undo opens a recent-events popup; the newest event can be undone via existing LIFO `UNDO`. |
+| **F7** | Assist-linking on a made shot | [completed/PLAN_F7_ASSIST_LINKING.md](completed/PLAN_F7_ASSIST_LINKING.md) | **Implemented.** After a made court shot, optionally credit a same-side teammate assist as a separate `ast` increment. |
+| **F8** | Live per-player line in popup | [completed/PLAN_F8_LIVE_PER_PLAYER_LINE.md](completed/PLAN_F8_LIVE_PER_PLAYER_LINE.md) | **Implemented.** Shows the selected player's compact live stat line under the popup's Log for label. |
 | **F9-F13** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | F9 rebound-after-miss is implemented; F10 visible numbering is superseded by F13; F11 and F13 are held pending further feedback. |
 
 F1 is the foundation for F2, F3, and F5-F12. F4 is independent and has landed.

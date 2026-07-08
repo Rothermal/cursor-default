@@ -303,7 +303,7 @@ export default function TeamInfo() {
               teamName={teamDisplayName(team)}
               legalName={team.name}
               seasonName={team.seasons.name}
-              seasonHref={teamSeasonPath(team.season_id)}
+              seasonHref={teamSeasonPath(team.season_id, team.id)}
               sportName={sport?.name ?? team.seasons.sport}
               sportIcon={sport?.icon ?? ''}
               record={record}

@@ -25,6 +25,7 @@ export default function SeasonInfo() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const seasonId = searchParams.get('seasonId')
+  const teamId = searchParams.get('teamId')
   const { isConfigured } = useAuth()
   const supabaseClient = supabase
 
@@ -37,6 +38,8 @@ export default function SeasonInfo() {
     () => (season ? sports.find(item => item.id === season.sport) ?? null : null),
     [season]
   )
+  const backHref = teamId ? teamInfoPath(teamId) : '/teams'
+  const backLabel = teamId ? 'Back to Team' : 'Back to Teams'
 
   useEffect(() => {
     if (!seasonId || !isConfigured || !supabaseClient) {
@@ -122,13 +125,12 @@ export default function SeasonInfo() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/teams')}
+          <Link
+            to={backHref}
             className="text-sm font-semibold text-blue-600"
           >
-            Back to Teams
-          </button>
+            {backLabel}
+          </Link>
           {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
         </div>
 

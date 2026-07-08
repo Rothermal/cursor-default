@@ -87,8 +87,10 @@ export function teamSchedulePath(teamId: string): string {
   return `/team/schedule?teamId=${encodeURIComponent(teamId)}`
 }
 
-export function teamSeasonPath(seasonId: string): string {
-  return `/team/season?seasonId=${encodeURIComponent(seasonId)}`
+export function teamSeasonPath(seasonId: string, teamId?: string | null): string {
+  const params = new URLSearchParams({ seasonId })
+  if (teamId) params.set('teamId', teamId)
+  return `/team/season?${params.toString()}`
 }
 
 export function gameInfoPath(gameId: string, teamId?: string | null): string {
