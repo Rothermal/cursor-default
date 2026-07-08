@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -12,6 +12,7 @@ import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
+import { teamInfoPath } from '../lib/teamInfo'
 
 interface TeamRow {
   id: string
@@ -62,6 +63,7 @@ function isMissingRpcError(msg: string): boolean {
 
 export default function PlayerProfile() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
   const playerId = searchParams.get('playerId')
@@ -313,6 +315,10 @@ export default function PlayerProfile() {
   const leaderboardHref = team
     ? `/leaderboard?teamId=${team.id}&seasonId=${team.season_id}`
     : '/leaderboard'
+  const isPlayerInfoRoute = location.pathname === '/player-info'
+  const backHref = isPlayerInfoRoute && team ? teamInfoPath(team.id) : leaderboardHref
+  const backLabel = isPlayerInfoRoute ? 'Back to Team' : 'Back'
+  const pageTitle = isPlayerInfoRoute ? 'Player Info' : 'Player Profile'
 
   if (!teamId || !playerId) {
     return (
@@ -378,14 +384,14 @@ export default function PlayerProfile() {
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate(leaderboardHref)}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
-                       active:scale-90 transition-transform"
+            onClick={() => navigate(backHref)}
+            className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1.5 text-xs font-semibold
+                       hover:bg-white/30 active:scale-95 transition-transform"
           >
-            ←
+            {backLabel}
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold">Player Profile</h1>
+            <h1 className="text-lg font-bold">{pageTitle}</h1>
             <p className="text-sm opacity-80">
               #{player.jersey_number || '—'} {playerDisplayName(player)}
             </p>

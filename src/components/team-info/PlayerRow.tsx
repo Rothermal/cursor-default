@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { playerDisplayName } from '../../lib/display'
+import { playerInfoPath } from '../../lib/teamInfo'
 
 export interface TeamInfoRosterPlayer {
   id: string
@@ -17,7 +18,7 @@ interface PlayerRowProps {
 export default function PlayerRow({ teamId, player }: PlayerRowProps) {
   return (
     <Link
-      to={`/player?playerId=${encodeURIComponent(player.id)}&teamId=${encodeURIComponent(teamId)}`}
+      to={playerInfoPath(player.id, teamId)}
       className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 hover:border-blue-200"
     >
       <div className="min-w-0">
