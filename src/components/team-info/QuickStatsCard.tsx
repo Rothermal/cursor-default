@@ -17,7 +17,7 @@ export default function QuickStatsCard({ teamId, seasonId, firstTournamentId }: 
 
       <div className="grid gap-2 sm:grid-cols-2">
         <Link
-          to={teamLeaderboardPath(teamId, seasonId)}
+          to={teamLeaderboardPath(teamId, seasonId, true)}
           className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 hover:border-blue-300"
         >
           Season Stats

@@ -319,7 +319,7 @@ export default function TeamStats() {
 
         <button
           type="button"
-          onClick={() => navigate(teamLeaderboardPath(teamId, team.season_id))}
+          onClick={() => navigate(teamLeaderboardPath(teamId, team.season_id, true))}
           className="text-sm font-semibold text-blue-600"
         >
           Season leaderboard →

@@ -79,7 +79,7 @@ export default function GameSetup() {
   const [requestedTeamSportError, setRequestedTeamSportError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (sport || !requestedTeamId || !isCloudFlow || !supabase) return
+    if (!requestedTeamId || !isCloudFlow || !supabase) return
 
     const client = supabase
     let cancelled = false
@@ -107,7 +107,18 @@ export default function GameSetup() {
         return
       }
 
-      dispatch({ type: 'SET_SPORT', sport: requestedSport })
+      if (sport?.id !== requestedSport.id) {
+        const hasActiveGame = Boolean(state.sport && state.players.length > 0)
+        if (
+          hasActiveGame &&
+          !window.confirm('Starting a new game will discard your active game. Continue?')
+        ) {
+          navigate('/')
+          return
+        }
+
+        dispatch({ type: 'SET_SPORT', sport: requestedSport })
+      }
       setLoadingRequestedTeamSport(false)
     }
 
@@ -115,7 +126,7 @@ export default function GameSetup() {
     return () => {
       cancelled = true
     }
-  }, [dispatch, isCloudFlow, requestedTeamId, sport])
+  }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, state.players.length, state.sport])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
