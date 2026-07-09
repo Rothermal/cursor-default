@@ -10,7 +10,8 @@ import GameTracker from './pages/GameTracker'
 import GameCheckout from './pages/GameCheckout'
 import GameSummary from './pages/GameSummary'
 import Admin from './pages/Admin'
-import Teams from './pages/Teams'
+import TeamsList from './pages/TeamsList'
+import TeamManage from './pages/TeamManage'
 import TeamInfo from './pages/TeamInfo'
 import TeamRoster from './pages/TeamRoster'
 import TeamSchedule from './pages/TeamSchedule'
@@ -63,9 +64,9 @@ function AppRoutes() {
           <Route path="/shot-chart" element={<ShotChart />} />
           <Route path="/summary" element={<GameSummary />} />
           <Route path="/admin" element={<Admin />} />
-          <Route path="/teams" element={<Teams />} />
+          <Route path="/teams" element={<TeamsList />} />
           <Route path="/team" element={<TeamInfo />} />
-          <Route path="/team/manage" element={<Teams />} />
+          <Route path="/team/manage" element={<TeamManage />} />
           <Route path="/team/roster" element={<TeamRoster />} />
           <Route path="/team/schedule" element={<TeamSchedule />} />
           <Route path="/team/season" element={<SeasonInfo />} />

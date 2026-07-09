@@ -82,9 +82,9 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/shot-chart` | ShotChart | **Legacy** — redirects to `/game` (court is inline now) |
 | `/summary` | GameSummary | Post-game review, finalize, sync |
 | `/admin` | Admin | Seasons, sport toggles, data management |
-| `/teams` | Teams | Cloud team list/create entry, pending invites |
+| `/teams` | TeamsList | Cloud team list/create entry, pending invites |
 | `/team` | TeamInfo | Team hub with overview, roster, schedule, stats links, Start Game |
-| `/team/manage` | Teams | Team roster/member management for one team |
+| `/team/manage` | TeamManage | Team roster/member management for one team |
 | `/team/roster` | TeamRoster | Read-only full roster drill-down |
 | `/team/schedule` | TeamSchedule | Team-scoped game schedule drill-down |
 | `/team/season` | SeasonInfo | Season detail and team list |
