@@ -58,7 +58,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 4.1 | Home → Teams | Cloud Teams page; Create Team form |
+| 4.1 | Home → Teams | Cloud Teams page; Create Team form; no team row is pre-selected/highlighted |
+| 4.1b | Stay on Cloud Teams list (do not open Manage) | Network: no `team_players` / `get_team_members_with_profiles` for a default first team |
 | 4.2 | Create team (name, sport, season) | Opens `/team/manage?teamId=<id>` for the created team |
 | 4.3 | Team Manage → add players (number, first, last) | Players appear in Roster |
 | 4.4 | Edit team name (pencil) → change primary name → Save | Team name updates in list; reflected in Game Setup dropdown and Games page |

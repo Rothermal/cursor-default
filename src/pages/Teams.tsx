@@ -174,13 +174,17 @@ export default function Teams() {
 
       const loadedTeams = (data ?? []) as unknown as TeamRow[]
       setTeams(loadedTeams)
-      setSelectedTeamId(prev => {
-        if (requestedTeamId && loadedTeams.some(team => team.id === requestedTeamId)) {
+      // List mode never selects a team (avoids roster/member fetches the list UI does not show).
+      // Manage mode only selects the requested teamId — never falls back to the first team.
+      setSelectedTeamId(() => {
+        if (
+          isManagementRoute &&
+          requestedTeamId &&
+          loadedTeams.some(team => team.id === requestedTeamId)
+        ) {
           return requestedTeamId
         }
-        if (isManagementRoute) return ''
-        if (prev && loadedTeams.some(team => team.id === prev)) return prev
-        return loadedTeams[0]?.id ?? ''
+        return ''
       })
       setLoadingTeams(false)
     }
@@ -211,7 +215,7 @@ export default function Teams() {
   }, [isConfigured, supabaseClient, userId, mergeScopeRefresh])
 
   useEffect(() => {
-    if (!selectedTeamId || !isConfigured || !userId || !supabaseClient) {
+    if (!isManagementRoute || !selectedTeamId || !isConfigured || !userId || !supabaseClient) {
       setPlayers([])
       return
     }
@@ -249,7 +253,7 @@ export default function Teams() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, selectedTeamId, supabaseClient, userId, rosterTick])
+  }, [isConfigured, isManagementRoute, selectedTeamId, supabaseClient, userId, rosterTick])
 
   const myRole = useMemo(
     () => teamMembers.find(m => m.user_id === userId)?.role ?? null,
@@ -281,7 +285,7 @@ export default function Teams() {
   }, [supabaseClient, userId])
 
   useEffect(() => {
-    if (!selectedTeamId || !supabaseClient || !userId) {
+    if (!isManagementRoute || !selectedTeamId || !supabaseClient || !userId) {
       setTeamMembers([])
       return
     }
@@ -310,7 +314,7 @@ export default function Teams() {
 
     void loadMembers()
     return () => { cancelled = true }
-  }, [selectedTeamId, supabaseClient, userId])
+  }, [isManagementRoute, selectedTeamId, supabaseClient, userId])
 
   useEffect(() => {
     if (!isConfigured || !userId || !supabaseClient) return
@@ -365,7 +369,7 @@ export default function Teams() {
   }, [isConfigured, supabaseClient, userId])
 
   useEffect(() => {
-    if (!selectedTeamId || !userId || !supabaseClient || players.length === 0) {
+    if (!isManagementRoute || !selectedTeamId || !userId || !supabaseClient || players.length === 0) {
       setGuardianMap({})
       return
     }
@@ -386,7 +390,7 @@ export default function Teams() {
     }
     void loadGuardians()
     return () => { cancelled = true }
-  }, [selectedTeamId, supabaseClient, userId, players])
+  }, [isManagementRoute, selectedTeamId, supabaseClient, userId, players])
 
   const handleLookupInvitee = async () => {
     if (!supabaseClient || !selectedTeamId || !inviteEmail.trim()) return
@@ -492,14 +496,9 @@ export default function Teams() {
       return
     }
     setPendingInvitesList(prev => prev.filter(p => p.id !== pending.id))
+    setTeams(prev => prev.filter(t => t.id !== teamId))
     if (selectedTeamId === teamId) {
-      setTeams(prev => {
-        const next = prev.filter(t => t.id !== teamId)
-        setSelectedTeamId(next[0]?.id ?? '')
-        return next
-      })
-    } else {
-      setTeams(prev => prev.filter(t => t.id !== teamId))
+      setSelectedTeamId('')
     }
   }
 
@@ -763,14 +762,11 @@ export default function Teams() {
       gameDispatch({ type: 'RESET_GAME' })
     }
 
-    setTeams(prev => {
-      const next = prev.filter(t => t.id !== team.id)
-      if (selectedTeamId === team.id) {
-        setSelectedTeamId(next[0]?.id ?? '')
-        setPlayers([])
-      }
-      return next
-    })
+    setTeams(prev => prev.filter(t => t.id !== team.id))
+    if (selectedTeamId === team.id) {
+      setSelectedTeamId('')
+      setPlayers([])
+    }
   }
 
   const handleDeletePlayer = async (player: PlayerRow) => {
@@ -1035,11 +1031,7 @@ export default function Teams() {
                 return (
                   <div
                     key={team.id}
-                    className={`rounded-xl border px-3 py-2 transition-colors ${
-                      team.id === selectedTeamId
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-slate-200 bg-white'
-                    }`}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 transition-colors"
                   >
                     {isEditing ? (
                       <div className="flex flex-col gap-2">
