@@ -98,6 +98,14 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/tournament-stats` | TournamentStats | Tournament-scoped stats |
 | `/dev/shot-chart` | ShotChartPreview | **Dev only** — no auth, sample data |
 
+**Intentional legacy routes (keep; do not remove in unused-route sweeps):**
+
+| Legacy / dual route | Behavior | Prefer going forward |
+|---------------------|----------|----------------------|
+| `/shot-chart` | Redirects to `/game` (basketball guard) | Inline court on `/game` |
+| `/teams?teamId=` | Redirects to `/team/manage?teamId=` | `/team/manage` or Team Info → Manage |
+| `/player` + `/player-info` | Same `PlayerProfile` page; `/player-info` adds Back to Team | `playerInfoPath` / `teamInfo` helpers for team context |
+
 **Primary live-game path:** `/` → `/setup` → `/players` → `/checkout?` → `/game` → `/summary`
 
 ---

@@ -358,12 +358,3 @@ export function computePlayerScore(sport: SportConfig, stats: Record<string, num
 export function computeCategoryTotal(category: { actions: { id: string }[] }, stats: Record<string, number>): number {
   return category.actions.reduce((sum, action) => sum + (stats[action.id] || 0), 0)
 }
-
-export function computeHockeyPoints(stats: Record<string, number>): number {
-  return (stats['goal'] || 0) + (stats['h_ast'] || 0)
-}
-
-/** Ids persisted on `seasons.sport`; must match supabase migration 019 CHECK. */
-export type SportId = (typeof sports)[number]['id']
-
-export const KNOWN_SPORT_IDS: readonly SportId[] = sports.map(s => s.id)

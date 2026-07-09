@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { ActionLogEntry, GameState, ShotRecord } from '../types'
 import {
   clearEntireShotChart,
-  linkedCourtAssistEntryIds,
   linkedCourtStatEntryIds,
 } from './clearShotChart'
 
@@ -78,7 +77,7 @@ describe('linkedCourtStatEntryIds', () => {
   })
 
   it('ignores legacy positional assist without linkedShotId', () => {
-    const ids = linkedCourtAssistEntryIds(
+    const ids = linkedCourtStatEntryIds(
       [
         logEntry({ id: 'shot-log', playerId: 'p1', statId: '2pt', shotId: 's1' }),
         logEntry({ id: 'ast-log', playerId: 'p2', statId: 'ast' }),

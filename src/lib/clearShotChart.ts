@@ -34,9 +34,6 @@ export function linkedCourtStatEntryIds(
   return linked
 }
 
-/** @deprecated Use linkedCourtStatEntryIds */
-export const linkedCourtAssistEntryIds = linkedCourtStatEntryIds
-
 /** Clear every chart shot and revert linked stats/log rows (works even when non-shot actions trail the log). */
 export function clearEntireShotChart(state: GameState): GameState {
   if (state.shotChart.length === 0) return state
