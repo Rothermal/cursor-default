@@ -207,7 +207,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }, [isConfigured, isManagementRoute, requestedTeamId, supabaseClient, userId])
 
   useEffect(() => {
-    if (!isConfigured || !userId || !supabaseClient) {
+    if (!isManagementRoute || !isConfigured || !userId || !supabaseClient) {
       setMergeEligibleTeamIds([])
       setMergeCandidates([])
       return
@@ -223,7 +223,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, supabaseClient, userId, mergeScopeRefresh])
+  }, [isConfigured, isManagementRoute, supabaseClient, userId, mergeScopeRefresh])
 
   useEffect(() => {
     if (!isManagementRoute || !selectedTeamId || !isConfigured || !userId || !supabaseClient) {
