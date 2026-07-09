@@ -12,6 +12,8 @@ import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { teamDisplayName } from '../lib/display'
+import { shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { loadLegacyFinalStatsTotals } from '../lib/legacyFinalStats'
 import { supabase } from '../lib/supabase'
 import {
@@ -69,6 +71,7 @@ export default function TeamInfo() {
   const [statsTotalsByGameId, setStatsTotalsByGameId] = useState<Record<string, Record<string, number>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [startGameError, setStartGameError] = useState<string | null>(null)
   const [activeSegment, setActiveSegment] = useState<TeamInfoSegment>('overview')
 
   const sport = useMemo(
@@ -124,6 +127,11 @@ export default function TeamInfo() {
 
   const handleStartGame = () => {
     if (!team || !sport) return
+    setStartGameError(null)
+    if (shouldBlockManualCloudHydrate(gameState, getPendingSyncFlag())) {
+      setStartGameError('Finish syncing your current game before starting another.')
+      return
+    }
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
     if (
       hasActiveGame &&
@@ -304,6 +312,9 @@ export default function TeamInfo() {
               >
                 Start Game
               </button>
+            )}
+            {startGameError && (
+              <p className="text-xs text-red-600 max-w-[12rem] text-right">{startGameError}</p>
             )}
             {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
           </div>
