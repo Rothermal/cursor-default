@@ -4,7 +4,7 @@ import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
-import { teamInfoPath } from '../lib/teamInfo'
+import { playerInfoPath, teamInfoPath } from '../lib/teamInfo'
 
 interface TeamRow {
   id: string
@@ -413,7 +413,9 @@ export default function Leaderboard() {
                       type="button"
                       onClick={() =>
                         navigate(
-                          `/player?teamId=${selectedTeamId}&playerId=${row.player.id}&seasonId=${selectedSeasonId}`
+                          isTeamOrigin
+                            ? playerInfoPath(row.player.id, selectedTeamId, selectedSeasonId)
+                            : `/player?teamId=${selectedTeamId}&playerId=${row.player.id}&seasonId=${selectedSeasonId}`
                         )
                       }
                       className="flex-1 text-left px-3 py-2 hover:bg-blue-50/50 active:scale-[0.99] min-w-0"

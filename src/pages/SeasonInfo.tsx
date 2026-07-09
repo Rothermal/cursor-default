@@ -188,7 +188,7 @@ export default function SeasonInfo() {
                           {teamDisplayName(team)}
                         </Link>
                         <Link
-                          to={teamLeaderboardPath(team.id, season.id)}
+                          to={teamLeaderboardPath(team.id, season.id, true)}
                           className="shrink-0 text-xs font-semibold text-blue-600"
                         >
                           Season Stats

@@ -12,7 +12,7 @@ import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
-import { teamInfoPath } from '../lib/teamInfo'
+import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
 interface TeamRow {
   id: string
@@ -313,7 +313,7 @@ export default function PlayerProfile() {
   }
 
   const leaderboardHref = team
-    ? `/leaderboard?teamId=${team.id}&seasonId=${team.season_id}`
+    ? teamLeaderboardPath(team.id, team.season_id)
     : '/leaderboard'
   const isPlayerInfoRoute = location.pathname === '/player-info'
   const backHref = isPlayerInfoRoute && team ? teamInfoPath(team.id) : leaderboardHref
