@@ -280,6 +280,8 @@ This keeps the door open for radically different UIs per sport without over-engi
 
 ### Phase Ordering Recommendation
 
+> **Historical implementation order** (basketball V1 is shipped). Do not re-run Phases 1–9 as new work; Phase 10 (additional sports) remains optional follow-on.
+
 Start with **Phases 1–3** (types, injection, category switching) to get the core flow working locally. Then **Phase 6** (season config) so the bonus thresholds are configurable before building **Phase 4** (bonus indicators). **Phase 5** (summary) and **Phase 7** (cloud sync) can proceed in parallel. **Phase 8–9** are low-effort cleanup. **Phase 10** is ongoing as each sport is designed.
 
 ---

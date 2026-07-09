@@ -135,6 +135,7 @@ Supabase credentials (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) must be set
 
 ```bash
 pnpm build      # TypeScript check + production build
+pnpm test       # Vitest unit tests
 pnpm preview    # Serve the production build locally (port 4173)
 pnpm lint       # Run ESLint
 ```
@@ -177,12 +178,17 @@ src/
 │   ├── GameSetup.tsx      # Enter game info (teams, tournament, date)
 │   ├── PlayerSetup.tsx    # Add/remove players
 │   ├── GameCheckout.tsx   # Pre-game player checkout (cloud teams)
-│   ├── GameTracker.tsx    # Live stat tracking interface
+│   ├── GameTracker.tsx    # Live stat tracking interface (basketball: inline court)
 │   ├── GameSummary.tsx    # Post-game stat tables (resolved stats + admin corrections)
 │   ├── Games.tsx          # Cloud game history, resume/final flows, delete games
-│   ├── Teams.tsx          # Cloud team + roster management + invites + delete
+│   ├── Teams.tsx          # Cloud team list/create + /team/manage roster/members/merge
+│   ├── TeamInfo.tsx       # Team hub (/team) — overview, Start Game, stats links
+│   ├── TeamRoster.tsx     # Read-only roster drill-down (/team/roster)
+│   ├── TeamSchedule.tsx   # Team schedule drill-down (/team/schedule)
+│   ├── SeasonInfo.tsx     # Season detail (/team/season)
+│   ├── GameInfo.tsx       # Single cloud game detail (/game-info)
 │   ├── Leaderboard.tsx    # Season leaderboard (season + team scope, sortable)
-│   ├── PlayerProfile.tsx  # Player season totals, game log with inline stats, career link
+│   ├── PlayerProfile.tsx  # /player and /player-info shared profile
 │   ├── CareerStats.tsx    # Career stats (/career)
 │   ├── TeamStats.tsx      # Team season summary (/team-stats)
 │   ├── TournamentStats.tsx # Tournament stats (/tournament-stats)
@@ -192,6 +198,8 @@ src/
 │   ├── Scoreboard.tsx     # Live score display
 │   ├── StatButton.tsx     # Reusable stat increment/decrement button
 │   ├── SeasonTeamStatsEditor.tsx  # Admin: season team-stat rules (basketball)
+│   ├── shot-chart/        # Half-court SVG, CourtEventPopup, ShotChartPanel
+│   ├── team-info/         # TeamHero, overview cards, GameCard, PlayerRow
 │   └── team-stats/        # PeriodToggle, BasketballBonusIndicator, TeamStatSummary
 ├── types.ts               # TypeScript interfaces
 ├── App.tsx                # Router + providers + auth gate
@@ -239,23 +247,25 @@ supabase/scripts/
 └── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
 
 docs/
+├── AGENT_CODEBASE_OVERVIEW.md # Agent/contributor entry: routes, sync, doc workflow
 ├── INTEGRATION_PLAN.md    # Supabase architecture & phases (§1 schema summary = post-018; see migrations)
 ├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game views (living doc; progress table)
-├── DESIGN_TEAM_INFO_PAGE.md # Team hub / drill-down (implementation plan; not built)
+├── DESIGN_TEAM_INFO_PAGE.md # Team hub / drill-down (shipped V1 design reference)
+├── DESIGN_SHOT_TRACKER_UI_REVAMP.md # Court-capture program status (F1–F13)
+├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11/F13 held
+├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: multiple parked games + sync queue (not shipped)
 ├── REGRESSION_TESTING.md  # High-level test scripts for all features
 ├── completed/             # Shipped features — design & implementation references
+│   ├── PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md
+│   ├── PLAN_F1…F9, PLAN_F12  # Court-capture feature plans (implemented)
 │   ├── DESIGN_SEASONS_DATA_MODEL.md
 │   ├── STAT_TRACKING_UI_PROGRESS.md
 │   ├── DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md
 │   ├── DESIGN_TOURNAMENTS.md
 │   ├── DATA_INTEGRITY_AND_CREATION_PLAN.md
 │   ├── DESIGN_PLAYER_MERGE.md
-│   ├── DESIGN_TEAM_STATS_TRACKING.md
-│   ├── DESIGN_TEAM_STATS_BASKETBALL.md
-│   ├── DESIGN_TEAM_STATS_SEASON_CONFIG.md
-│   ├── DESIGN_TEAM_STATS_DATA_MODEL.md
-│   ├── DESIGN_TEAM_STATS_IMPLEMENTATION.md
+│   ├── DESIGN_TEAM_STATS_*.md
 │   ├── DESIGN_SHOT_CHART.md
 │   └── DESIGN_SHOT_CHART_IMPLEMENTATION.md
 └── archived/              # Future / placeholder / not-built specs
@@ -263,6 +273,8 @@ docs/
     ├── DESIGN_MULTI_PARENT_INVITE_LINKS.md
     └── DESIGN_USER_PERMISSIONS_AND_ROLES.md
 ```
+
+> Full route table and file map: [`docs/AGENT_CODEBASE_OVERVIEW.md`](docs/AGENT_CODEBASE_OVERVIEW.md).
 
 ### Testing
 
@@ -323,15 +335,16 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Team-level stat tracking (basketball)** — pseudo-players `__team_home__` / `__team_opp__`, `teamCategories` in `sports.ts`, period-scoped stat ids (`team_foul_p1`, …), bonus UI, season rules in `seasons.team_stats_config` (Admin → Seasons), cloud placeholder players + `get_game_team_stats`, checkout + Game Summary **Team stats** tab (design: [DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md))
 
 - [x] **Team Info hub + drill-downs** — canonical `/team?teamId=` route with overview, roster, schedule, player/game/season drill-downs, Start Game preselect, and `/team/manage?teamId=` management migration ([plan](docs/completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md))
+- [x] **Court capture enhancements (F5–F9, F12)** — shot-value override, in-popup player switch, assist-linking, popup stat line, rebound-after-miss prompt, recent-events undo ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md))
 
 ### What's Next
 
-- [ ] **Court capture polish** — F5 shot-value override, F6 in-popup player switching, F12 recent-events undo, F7 assist-linking, F8 popup stat line, and F9 rebound-after-miss prompt are implemented; F10 visible numbering is superseded by F13, and both F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
+- [ ] **Court capture held items** — F10 visible numbering is superseded by F13; F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
 - [ ] **Multi-game parking + sync queue** — multiple in-progress/paused games per device, offline-safe snapshots, ordered cloud sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
-- [ ] Player transfer UI: search/autocomplete for adding existing players to new teams
+- [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 
 ### Future Enhancements
 

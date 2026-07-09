@@ -1,5 +1,7 @@
 # Feature 6 Plan: In-Popup Player Confirm / Switch
 
+> **Status:** Implemented.
+>
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) and the
 > [enhancements roadmap](../PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md). **Depends on F1**

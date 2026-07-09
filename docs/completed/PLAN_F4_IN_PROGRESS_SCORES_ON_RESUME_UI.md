@@ -1,5 +1,7 @@
 # Feature 4 Plan: In-Progress Scores on the Resume Game UI
 
+> **Status:** Implemented.
+>
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
 > shared context. **Independent** of F1–F3 — can land in any order.

@@ -19,9 +19,13 @@ Detailed checklist: [completed/STAT_TRACKING_UI_PROGRESS.md](completed/STAT_TRAC
 
 ---
 
-## 1. Current State
+## 1. Historical baseline (pre-ship)
 
-### 1.1 Existing Pages
+> The tables below describe the app **before** the career/season/team/tournament views
+> shipped. All items in the Progress table above are **Done**. Use this section only as
+> context for why the redesign existed — do not treat §1.2 gaps as current backlog.
+
+### 1.1 Existing pages (at design time)
 
 | Page | Route | What it shows | Data source |
 |------|-------|---------------|-------------|
@@ -29,13 +33,13 @@ Detailed checklist: [completed/STAT_TRACKING_UI_PROGRESS.md](completed/STAT_TRAC
 | **Leaderboard** | `/leaderboard` | Team-scoped season totals; ranked by score or any stat; click → Player Profile | `get_season_stats_resolved` RPC |
 | **Player Profile** | `/player?teamId=&playerId=` | One player's season totals (grid of stat cards) + game log (list of games with "View" button) | `get_season_stats_resolved` RPC filtered to one player; `game_stats` for game log |
 
-### 1.2 Gaps
+### 1.2 Gaps (at design time — now closed)
 
-- **No career view.** A player who played on multiple teams across seasons has no way to see lifetime totals or a per-season breakdown.
-- **No season scoping.** Leaderboard and Player Profile are scoped to a team, which currently IS a season. After the seasons redesign, we need explicit season selectors.
-- **Game Summary is combined.** Player stats and team totals are in the same table. No dedicated team stats view or standalone per-player game stat line.
-- **No per-game stat detail on Player Profile.** The game log shows the game list but no inline stat lines — you have to click "View" to load the full Game Summary.
-- **No team summary page.** No single page showing aggregated team stats across a season (total points scored, total rebounds, etc. as a team).
+- **No career view.** A player who played on multiple teams across seasons has no way to see lifetime totals or a per-season breakdown. → **Shipped:** `/career`
+- **No season scoping.** Leaderboard and Player Profile are scoped to a team, which currently IS a season. After the seasons redesign, we need explicit season selectors. → **Shipped:** season selector + `seasonId` URL
+- **Game Summary is combined.** Player stats and team totals are in the same table. No dedicated team stats view or standalone per-player game stat line. → **Shipped:** Players / Team tab; team season summary
+- **No per-game stat detail on Player Profile.** The game log shows the game list but no inline stat lines — you have to click "View" to load the full Game Summary. → **Shipped:** inline game log via RPC
+- **No team summary page.** No single page showing aggregated team stats across a season (total points scored, total rebounds, etc. as a team). → **Shipped:** `/team-stats`
 
 ---
 

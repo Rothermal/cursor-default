@@ -1,5 +1,7 @@
 # Feature 3 Plan: Shot Trackers Viewable on Cloud-Saved Games
 
+> **Status:** Implemented (two-user cloud QA still recommended in REGRESSION_TESTING).
+>
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
 > shared context. Builds on **F1** (inline court, `ShotChartPanel`) and **F2**

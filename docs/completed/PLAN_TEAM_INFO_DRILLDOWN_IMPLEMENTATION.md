@@ -1,16 +1,16 @@
 # Team Info Drill-Down Implementation Plan
 
-> **For agentic workers:** Use `docs/DESIGN_TEAM_INFO_PAGE.md` as the product spec and this file as the execution guide. Work through the sections in order; each section is intended to be independently reviewable and testable.
+> **Historical — do not execute.** This plan is **shipped through TI-9**. Use
+> [`docs/DESIGN_TEAM_INFO_PAGE.md`](../DESIGN_TEAM_INFO_PAGE.md) as the living V1
+> design reference when extending Team Info. Do not re-run TI-1…TI-9 as new work.
 
-**Goal:** Build the Team Info drill-down hierarchy around a new team hub, then migrate roster, schedule, player, game, season, and stats entry points into that hierarchy without changing the current Supabase schema.
+**Goal (achieved):** Build the Team Info drill-down hierarchy around a team hub, then migrate roster, schedule, player, game, season, and stats entry points into that hierarchy without changing the Supabase schema.
 
-**Architecture:** Add a `/team?teamId=` hub route first, backed by existing Supabase tables, existing resolved-stat RPCs, and shared display helpers. Keep current stat pages (`/leaderboard`, `/player`, `/career`, `/team-stats`, `/tournament-stats`, `/summary`) working while the new drill-down pages are introduced in small slices.
+**Architecture:** `/team?teamId=` hub backed by existing Supabase tables, resolved-stat RPCs, and shared display helpers. Stat pages (`/leaderboard`, `/player`, `/career`, `/team-stats`, `/tournament-stats`, `/summary`) remain compatible.
 
 **Tech Stack:** React 18, TypeScript, Vite, Tailwind CSS, React Router `HashRouter`, Supabase client queries/RPCs, Vitest for pure helper tests, manual browser regression for route and mobile UI behavior.
 
-**Status:** Implemented through **TI-9**. TI-9 completes the final docs/regression polish slice.
-The shipped hierarchy is `/team?teamId=` plus `/team/roster`, `/team/schedule`,
-`/team/season`, `/game-info`, `/player-info`, `/team/manage`, and `/setup?teamId=`.
+**Status:** Implemented through **TI-9**. The shipped hierarchy is `/team?teamId=` plus `/team/roster`, `/team/schedule`, `/team/season`, `/game-info`, `/player-info`, `/team/manage`, and `/setup?teamId=`.
 
 ---
 
@@ -18,13 +18,13 @@ The shipped hierarchy is `/team?teamId=` plus `/team/roster`, `/team/schedule`,
 
 | Plan | Current relevance | Decision |
 |---|---|---|
-| `docs/DESIGN_TEAM_INFO_PAGE.md` | Primary feature spec for the team hub and drill-down hierarchy. | Focus here first. It is the most direct next feature and can reuse shipped stats work. |
-| `docs/DESIGN_STAT_TRACKING_UI.md` | Most prerequisite stats pages are shipped: leaderboard, player profile, career, team stats, tournament stats, compact stat helpers. | Treat as foundation. Link into these pages instead of rebuilding their data views. |
-| `docs/completed/DESIGN_SEASONS_DATA_MODEL.md` | Seasons, `team_players`, player guardians, and team-scoped games are already the current model. | Use as schema source of truth. Do not add tables for this feature. |
-| `docs/completed/DESIGN_TOURNAMENTS.md` | Tournaments are team-scoped and already feed tournament stats and game setup. | Reuse for team overview cards and schedule grouping. |
-| `docs/archived/DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md` | Broader Sport -> Season -> Team -> Tournament navigation concept. | Defer broad navigation replacement until the team hub exists. The hub becomes the team-level destination inside that larger hierarchy. |
+| `docs/DESIGN_TEAM_INFO_PAGE.md` | Shipped V1 design reference for the team hub and drill-downs. | **Reference / extend only** — do not treat as a greenfield build. |
+| `docs/DESIGN_STAT_TRACKING_UI.md` | Prerequisite stats pages are shipped: leaderboard, player profile, career, team stats, tournament stats, compact stat helpers. | Treat as foundation. Link into these pages instead of rebuilding their data views. |
+| `docs/completed/DESIGN_SEASONS_DATA_MODEL.md` | Seasons, `team_players`, player guardians, and team-scoped games are the current model. | Use as schema source of truth. Do not add tables for Team Info extensions unless required. |
+| `docs/completed/DESIGN_TOURNAMENTS.md` | Tournaments are team-scoped and feed tournament stats and game setup. | Reuse for team overview cards and schedule grouping. |
+| `docs/archived/DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md` | Broader Sport -> Season -> Team -> Tournament navigation concept. | Still deferred; Team Info is the team-level destination inside that larger hierarchy. |
 | `docs/INTEGRATION_PLAN.md` | Live integration status and regression surface for Supabase teams, games, invites, stats, shot chart, and team stats. | Use for constraints and regression coverage. |
-| `docs/REGRESSION_TESTING.md` | Manual scripts for cloud teams, games, season stats, tournaments, invites, and smoke tests. | Extend after each section that changes navigation. |
+| `docs/REGRESSION_TESTING.md` | Manual scripts including Team Info §4 / §4h smoke. | Extend when navigation or hub behavior changes. |
 
 ---
 
@@ -38,11 +38,11 @@ The feature shipped as the planned series of small PRs:
 - **TI-8:** Team Info Start Game uses `/setup?teamId=`, Game Setup preselects cloud teams, and team-context back links return to Team Info without breaking global home shortcuts.
 - **TI-9:** Final regression/docs polish and full validation.
 
-The original implementation guidance below is kept as historical execution context.
-
 ---
 
-## 2a. Original recommended focus
+## 2a. Original recommended focus (historical)
+
+> The sections below (TI-0…TI-9 task detail) are **historical execution context**. Do not treat unchecked boxes or “start with TI-1” language as current backlog.
 
 Start with **TI-1: Team Info hub MVP + minimal navigation shell**.
 

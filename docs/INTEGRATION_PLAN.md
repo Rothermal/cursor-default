@@ -429,11 +429,11 @@ CREATE POLICY "corrections_admin_update" ON stat_corrections
 7. Corrections flow through to future season/leaderboard views when those UIs call get_game_stats_resolved / get_season_stats_resolved.
 ```
 
-**Future enhancements:** Full side-by-side comparison of all parent submissions per player, explicit review queue for averaged/conflicting stats, and reassign-primary-checkout UI are still on the roadmap; the current implementation provides inline per-stat corrections from the existing summary table.
+**Shipped on Game Summary:** Primary vs All Submissions toggle, conflict indicators, "Stats needing review," reassign primary recorder (`set_primary_recorder`), and inline per-stat corrections. A dedicated full-page side-by-side review UI (beyond the All Submissions toggle) remains optional polish, not required for Phase 3.
 
 ### 3.6 UI Flow
 
-**Implemented screens:** Checkout screen → `GameCheckout.tsx` (route `/checkout`). Game Tracker → `GameTracker.tsx`. Game Summary and admin review → `GameSummary.tsx` (review mode with per-stat corrections). Full "All submissions" comparison view is still on the roadmap.
+**Implemented screens:** Checkout screen → `GameCheckout.tsx` (route `/checkout`). Game Tracker → `GameTracker.tsx`. Game Summary and admin review → `GameSummary.tsx` (Primary/All toggle, review mode with per-stat corrections, primary-recorder reassignment).
 
 **Before the game — Checkout Screen:**
 ```
@@ -462,7 +462,7 @@ CREATE POLICY "corrections_admin_update" ON stat_corrections
 **After the game — Game Summary:**
 - Shows resolved stats (primary recorder per player, or admin correction if present) for finalized cloud games via `get_game_stats_resolved`.
 - Team owner/admin can tap "Review / Correct stats" to enter review mode; pencil icon on each stat opens a correction modal (new value + optional reason).
-- "All submissions" toggle and full side-by-side comparison are planned future enhancements.
+- **Primary View** vs **All Submissions** toggle is shipped on Game Summary for finalized cloud games; a separate full-page side-by-side review remains optional polish.
 
 ### 3.7 Season Stats with Checkout + Corrections
 
@@ -504,7 +504,7 @@ This means:
 - If a primary checkout is reassigned, season totals recalculate from the new primary
 - No separate "recalculate season" step is ever needed — it's always derived
 
-**Current UI:** Season stats UI (player profiles, team leaderboards) is planned to consume `get_season_stats_resolved`; the current implementation focuses on per-game resolution in Game Summary.
+**Current UI:** Season stats UIs **shipped** and consume `get_season_stats_resolved` (and related RPCs): Leaderboard, Player Profile, Career (`get_career_stats_resolved`), Team Stats, Tournament Stats. See [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md). Per-game resolution remains on Game Summary via `get_game_stats_resolved`.
 
 ### 3.8 Edge Cases
 
@@ -623,14 +623,15 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Team invite system — invite by email (owner/admin), accept/decline, roles, member list (migration 011)
 - [x] Game Summary: "Primary View" vs "All Submissions" toggle (design: [completed/DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md](completed/DESIGN_PHASE3_GAME_SUMMARY_ADMIN.md))
 - [x] Admin: reassign primary checkout after a game (Game Summary "Primary recorder" section; RPC `set_primary_recorder`, migration 014)
-- [ ] Admin: stat review page with side-by-side parent submissions
+- [ ] Admin: dedicated full-page side-by-side parent submissions (optional; All Submissions toggle + review queue already on Game Summary)
 - [x] Admin: correct individual stats with reason (audit trail) — inline in Game Summary review mode
 - [x] Admin: review queue for unresolved discrepancies (averaged stats) — "Stats needing review" section on Game Summary with Correct / Set primary recorder links
 - [x] Player profile page with season totals and game log
 - [x] Team leaderboard page (uses resolved totals)
 - [x] Conflict indicator when multiple parents tracked same player without checkout
-- [x] **Basketball shot chart** — `/shot-chart`, migration **032**, sync in `cloudSync.ts`
+- [x] **Basketball court capture / shot chart** — inline on Game Tracker (`#/game`); legacy `#/shot-chart` redirects; migration **032**; sync in `cloudSync.ts`
 - [x] **Basketball team stats** — pseudo-players, `seasons.team_stats_config`, migrations **027–031**, Game Summary team tab
+- [x] **Team Info hub** — `/team?teamId=` plus roster/schedule/season/game/player drill-downs and `/team/manage` ([DESIGN_TEAM_INFO_PAGE.md](DESIGN_TEAM_INFO_PAGE.md))
 - [x] **Sync diagnostics** — `client_sync_errors` (**033**), `logClientSyncError.ts`, UUID validation for `playerIdMap` (`uuidValidation.ts`)
 - [ ] Invite links: shareable URL to join team (design: [archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md](archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 
@@ -687,11 +688,12 @@ The `VITE_` prefix is required by Vite to expose variables to the browser. The p
 
 > **Note:** Many items that historically lived in this backlog are **already shipped** (home score adjustment, tournaments table, minutes, notes, missed shots, deletes, seasons on games, etc.). Treat the **README** “Features / What’s Done” sections as the live checklist. What follows is a **short residual backlog**; older numbered items were archived into README where implemented.
 
-1. **Score totals in game list** — Games history list could show home vs opponent score on each card (partially improved; refine as needed).
-2. **Optional stat descriptions** — Toggle for full stat names vs abbreviations.
-3. **Bulk / archive games** — Beyond per-row delete in Games and Settings Data Management.
-4. **Multi-game parking + sync queue** — Multiple in-progress sessions per device, offline-safe; see [PLAN_MULTI_GAME_PARKING.md](PLAN_MULTI_GAME_PARKING.md).
-5. *(Add more as we go)*
+1. **Optional stat descriptions** — Toggle for full stat names vs abbreviations.
+2. **Bulk / archive games** — Beyond per-row delete in Games and Settings Data Management.
+3. **Multi-game parking + sync queue** — Multiple in-progress sessions per device, offline-safe; see [PLAN_MULTI_GAME_PARKING.md](PLAN_MULTI_GAME_PARKING.md).
+4. *(Add more as we go)*
+
+> **Shipped (removed from residual backlog):** in-progress and final scores on Cloud Games / home resume cards (F4); Team Info hub ([DESIGN_TEAM_INFO_PAGE.md](DESIGN_TEAM_INFO_PAGE.md)).
 
 ---
 
@@ -726,12 +728,14 @@ src/
 │   ├── AuthContext.tsx, GameContext.tsx, SettingsContext.tsx
 ├── pages/
 │   ├── Auth, SportSelect, GameSetup, PlayerSetup, GameCheckout, GameTracker
-│   ├── GameSummary, Games, Teams, Admin, Leaderboard, PlayerProfile
+│   ├── GameSummary, Games, Teams (/teams + /team/manage), Admin
+│   ├── TeamInfo, TeamRoster, TeamSchedule, SeasonInfo, GameInfo
+│   ├── Leaderboard, PlayerProfile (/player + /player-info)
 │   ├── CareerStats (/career), TeamStats (/team-stats), TournamentStats (/tournament-stats)
-│   ├── ShotChart (/shot-chart), ShotChartPreview (dev: /dev/shot-chart)
+│   ├── ShotChart (legacy redirect → /game), ShotChartPreview (dev: /dev/shot-chart)
 ├── App.tsx                  # HashRouter routes
 supabase/migrations/
 │   └── 001 … 033 (see README for full names: through client_sync_errors)
 ```
 
-Admin review and stat corrections live in **Game Summary**, not a separate `AdminReview` page.
+Admin review and stat corrections live in **Game Summary**, not a separate `AdminReview` page. Court capture is **inline on Game Tracker**; see [AGENT_CODEBASE_OVERVIEW.md](AGENT_CODEBASE_OVERVIEW.md) for the full route table and [DESIGN_TEAM_INFO_PAGE.md](DESIGN_TEAM_INFO_PAGE.md) for the Team Info hierarchy.

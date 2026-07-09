@@ -54,6 +54,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 **Precondition:** Signed in; migrations 002, 004–006, 011 applied.
 
+> Team Info hub smoke (overview, drill-downs, Start Game, `from=team`) is consolidated in **§4h**.
+
 | Step | Action | Expected |
 |------|--------|----------|
 | 4.1 | Home → Teams | Cloud Teams page; Create Team form |
@@ -420,7 +422,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a script fails on cloud features, confirm migrations through **019** are applied in Supabase SQL Editor when using seasons, `team_players`, and data-integrity constraints (`019_data_integrity_constraints.sql`). Run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if upgrading an existing project. For **player merge** (Teams → Merge players), apply **`024_player_merge_rpcs.sql`** ([completed/DESIGN_PLAYER_MERGE.md](completed/DESIGN_PLAYER_MERGE.md)).
+- **Migrations:** If a script fails on cloud features, confirm the migrations listed in [README.md](../README.md) (through **`033_client_sync_errors.sql`**) are applied in the Supabase SQL Editor. Seasons / `team_players` / integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` before **019** on legacy DBs). Player merge needs **024**/**025**. Team stats need **028–031**. Shot chart needs **032**. Sync diagnostics need **033**.
 
 ---
 
