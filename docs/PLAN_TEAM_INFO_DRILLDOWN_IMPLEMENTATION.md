@@ -8,10 +8,9 @@
 
 **Tech Stack:** React 18, TypeScript, Vite, Tailwind CSS, React Router `HashRouter`, Supabase client queries/RPCs, Vitest for pure helper tests, manual browser regression for route and mobile UI behavior.
 
-**Current recommendation:** Keep this as one umbrella plan, but execute it as multiple
-small features/PRs. The immediate next build is **TI-1 Team Info MVP** only: data
-contracts, shared helpers, `/team?teamId=`, hero/record/roster count, basic stat links,
-and `/teams` -> Team Info navigation.
+**Status:** Implemented through **TI-9**. TI-9 completes the final docs/regression polish slice.
+The shipped hierarchy is `/team?teamId=` plus `/team/roster`, `/team/schedule`,
+`/team/season`, `/game-info`, `/player-info`, `/team/manage`, and `/setup?teamId=`.
 
 ---
 
@@ -29,7 +28,21 @@ and `/teams` -> Team Info navigation.
 
 ---
 
-## 2. Recommended focus
+## 2. Completed implementation summary
+
+The feature shipped as the planned series of small PRs:
+
+- **TI-1 through TI-2:** Team Info hub, shared helpers, segmented shell, and overview cards.
+- **TI-3 through TI-6:** Roster, schedule, game, player, and season drill-down routes.
+- **TI-7:** `/teams` became list/create; `/team/manage?teamId=` became the management surface for roster, members, invites, and merge access.
+- **TI-8:** Team Info Start Game uses `/setup?teamId=`, Game Setup preselects cloud teams, and team-context back links return to Team Info without breaking global home shortcuts.
+- **TI-9:** Final regression/docs polish and full validation.
+
+The original implementation guidance below is kept as historical execution context.
+
+---
+
+## 2a. Original recommended focus
 
 Start with **TI-1: Team Info hub MVP + minimal navigation shell**.
 
@@ -51,7 +64,7 @@ Defer these until after the hub exists:
 
 ---
 
-## 2a. Pre-handoff design decisions
+## 2b. Final design decisions
 
 - **D1 - Route shape:** Query-param routes are canonical for this feature:
   `/team?teamId=`, `/team/roster?teamId=`, `/team/schedule?teamId=`.
@@ -60,13 +73,14 @@ Defer these until after the hub exists:
   stats RPCs.
 - **D3 - Availability:** v1 is cloud-team only. Offline/local-only teams are out of scope
   until the app has a broader local team model.
-- **D4 - Management backstop:** `/teams` remains the owner/admin management surface until
-  the later management-migration slice. TI-1 should link back to `/teams` for management.
+- **D4 - Management surface:** `/team/manage?teamId=` is the owner/admin management surface.
+  `/teams` remains the cloud team list/create entry page and hosts pending invite actions.
 - **D5 - Stats strategy:** Link into existing stat pages first; do not rebuild leaderboard,
   player profile, team stats, tournament stats, or game summary data views inside TI-1.
 - **D6 - Permissions:** Read-only/scorer users can view Team Info. Any management controls
   introduced later must reuse existing owner/admin role checks from `Teams.tsx`.
-- **D7 - Start Game:** `/setup?teamId=` is a later slice, not part of TI-1.
+- **D7 - Start Game:** Team Info links to `/setup?teamId=`. Game Setup resolves the requested
+  cloud team, preselects it, and confirms before resetting an active game when needed.
 - **D8 - Broad navigation:** This feature adds team-level routes without replacing the
   broader Sport -> Season -> Team -> Tournament navigation model.
 
@@ -182,7 +196,7 @@ Start with these existing surfaces before creating new abstractions:
 - Render hero, season/sport line, record, roster count, game count, and a small set of links to existing pages:
   - `/leaderboard?teamId=&seasonId=`
   - `/team-stats?teamId=`
-  - `/teams` as a temporary management backstop
+  - `/team/manage?teamId=` as the management surface
 - Change team cards/rows on `/teams` so the primary tap opens `/team?teamId=`.
 - Keep existing roster/member controls reachable in `/teams` until the later decomposition section.
 
@@ -201,7 +215,7 @@ Start with these existing surfaces before creating new abstractions:
   count.
 - Record calculation uses finalized games and existing score helpers.
 - Basic links to existing stat/management pages render only when their required ids exist.
-- `/teams` remains reachable as the management backstop.
+- `/team/manage?teamId=` remains reachable as the management surface.
 - `pnpm lint` and `pnpm build` pass.
 
 ---
@@ -257,7 +271,8 @@ Start with these existing surfaces before creating new abstractions:
 - Register `/team/roster`.
 - Build a shared roster list component that can render embedded in Team Info and full-page in Team Roster.
 - Link player rows to `/player-info?playerId=&teamId=` only after Section 6 creates that route; until then link to `/player?playerId=&teamId=`.
-- Keep Add Player, Merge Players, and member management in `/teams` for this section.
+- Keep Add Player, Merge Players, and member management outside the read-only roster route
+  for this section. Final TI-7 implementation moved those actions to `/team/manage?teamId=`.
 
 **Validation:**
 - Manual browser test `/team/roster?teamId=`.
@@ -301,7 +316,7 @@ Start with these existing surfaces before creating new abstractions:
 **Purpose:** Align player profile navigation with the team hub while preserving existing `/player` links.
 
 **Likely files:**
-- Create `src/pages/PlayerInfo.tsx` or refactor `src/pages/PlayerProfile.tsx`
+- Reuse/refactor `src/pages/PlayerProfile.tsx` for `/player-info`
 - Modify `src/App.tsx`
 - Modify `src/pages/Leaderboard.tsx`
 - Modify `src/pages/TournamentStats.tsx`
@@ -383,7 +398,7 @@ stable. This is a later/high-risk slice, not part of the MVP.
 **Likely files:**
 - Modify `src/pages/GameSetup.tsx`
 - Modify `src/pages/Leaderboard.tsx`
-- Modify `src/pages/PlayerProfile.tsx` or `src/pages/PlayerInfo.tsx`
+- Modify `src/pages/PlayerProfile.tsx` (`/player` and `/player-info` share it)
 - Modify `src/pages/TeamStats.tsx`
 - Modify `src/pages/TournamentStats.tsx`
 - Modify `src/pages/Games.tsx`
@@ -490,10 +505,10 @@ Use these labels when opening implementation PRs:
 | Risk | Guardrail |
 |---|---|
 | Teams page currently owns too many behaviors. | Do not decompose it until the read-only hub, roster, and schedule pages are working. |
-| Management migration scope balloons. | Treat TI-7 as later/high-risk; preserve `/teams` as the management backstop through TI-1 through TI-6. |
+| Management migration scope balloons. | TI-7 moved management into `/team/manage?teamId=` while keeping `/teams` as list/create. |
 | Record calculations drift between pages. | Reuse `resolveFinalHomeScoreFromGameRow` and test a shared record helper. |
 | Team schedule accidentally copies global `Games` user-created filtering. | Query by `games.team_id` for team schedule and overview. |
-| `/setup?teamId=` conflicts with sport selection state. | Preselect only when the team loads with a season sport; otherwise show a clear loading/error state. |
+| `/setup?teamId=` conflicts with sport selection state. | Resolve the requested team sport first; confirm before resetting an active game; otherwise show a clear loading/error state. |
 | Management actions leak to scorer-only users. | Gate Add/Edit/Delete/Invite/Merge actions with owner/admin role checks already used in Teams. |
 | Navigation churn breaks shipped stats pages. | Keep `/player`, `/leaderboard`, `/team-stats`, `/tournament-stats`, and `/games` working while adding new links. |
 | Supabase query volume grows with cards. | Start with inline queries for small limits; promote to RPC only after measuring a real bottleneck. |
@@ -514,19 +529,15 @@ Use these labels when opening implementation PRs:
 
 ---
 
-## 8. First implementation checklist
+## 8. Implementation completion checklist
 
-When starting implementation, begin with this exact first slice:
-
-- [ ] Create `src/lib/teamInfo.ts`.
-- [ ] Create `src/lib/teamInfo.test.ts`.
-- [ ] Add record and game-grouping helper tests.
-- [ ] Run `pnpm test` and confirm the new tests pass.
-- [ ] Add `src/pages/TeamInfo.tsx`.
-- [ ] Add `src/components/team-info/TeamHero.tsx`.
-- [ ] Add `src/components/team-info/RecordBadge.tsx`.
-- [ ] Register `/team` in `src/App.tsx`.
-- [ ] Link primary team rows/cards from `src/pages/Teams.tsx` to `/team?teamId=`.
-- [ ] Run `pnpm lint` and `pnpm build`.
-- [ ] Manually verify `/teams` -> `/team?teamId=` in the browser.
-- [ ] Commit the helper and hub MVP.
+- [x] Created `src/lib/teamInfo.ts` and `src/lib/teamInfo.test.ts`.
+- [x] Added record, game grouping, and route helper tests.
+- [x] Added Team Info hub, hero, record badge, segmented shell, and overview cards.
+- [x] Registered `/team`, `/team/roster`, `/team/schedule`, `/team/season`, `/game-info`, `/player-info`, and `/team/manage`.
+- [x] Linked Teams list entries to Team Info and legacy `/teams?teamId=` to Team Manage.
+- [x] Added roster, schedule, game, player, and season drill-downs with Team Info back navigation.
+- [x] Moved roster/member/invite/merge management to `/team/manage?teamId=`.
+- [x] Added Team Info Start Game via `/setup?teamId=` with cloud-team preselect.
+- [x] Updated regression docs with Team Info drill-down smoke coverage.
+- [x] Final validation for TI-9: `pnpm test`, `pnpm lint`, and `pnpm build`.

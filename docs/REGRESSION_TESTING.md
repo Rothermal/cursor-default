@@ -238,6 +238,27 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 4h. Team Info drill-down smoke
+
+**Precondition:** Signed in; at least one cloud team with active roster players, at least one scheduled or finalized game, and Supabase migrations through the current app schema applied.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 4h.1 | Home → Teams → tap a team name | Opens `/team?teamId=<id>`; hero shows display name, season, sport, record, roster count, and game count |
+| 4h.2 | Team Info → Overview | Stats, roster, schedule, recent results, tournaments, and team members cards render without horizontal overflow |
+| 4h.3 | Overview → Roster card **View roster** | Opens `/team/roster?teamId=<id>`; Back to Team returns to `/team?teamId=<id>` |
+| 4h.4 | Overview → Schedule card **View schedule** | Opens `/team/schedule?teamId=<id>`; games group into live/upcoming/final sections and link to Game Info |
+| 4h.5 | Schedule or recent result → game row | Opens `/game-info?gameId=<id>&teamId=<id>`; Back to Team returns to Team Info; finalized games can open full Summary |
+| 4h.6 | Roster → player row | Opens `/player-info?playerId=<id>&teamId=<id>`; Back to Team returns to Team Info; Career link still opens `/career` |
+| 4h.7 | Hero season link | Opens `/team/season?seasonId=<id>&teamId=<id>`; Back to Team returns to Team Info; team rows link back into Team Info |
+| 4h.8 | Overview → Season Stats | Opens `/leaderboard?teamId=<id>&seasonId=<id>&from=team`; back arrow returns to Team Info |
+| 4h.9 | Home → Season Stats | Opens global Leaderboard; back arrow returns home, even after the URL auto-fills `teamId` |
+| 4h.10 | Team Info → Start Game | Opens `/setup?teamId=<id>` with the team's sport and existing team preselected; continuing loads the team's active roster |
+| 4h.11 | Open `/setup?teamId=<id>` while another active game exists | If switching sport/team would reset the active game, confirmation appears; cancel returns home and preserves the active game |
+| 4h.12 | Scorer-only account opens Team Info | Read-only Team Info, roster, schedule, player, game, and season views are visible; owner/admin management actions stay on `/team/manage` and remain role-gated |
+
+---
+
 ## 5. Game flow (local state)
 
 **Precondition:** Any mode (offline or signed in).

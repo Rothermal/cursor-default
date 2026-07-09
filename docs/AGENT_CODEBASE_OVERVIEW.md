@@ -75,17 +75,24 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | Hash route | Page | Purpose |
 |------------|------|---------|
 | `/` | SportSelect | Home hub, resume in-progress game |
-| `/setup` | GameSetup | Team, opponent, date, season/tournament |
+| `/setup` | GameSetup | Team, opponent, date, season/tournament; `teamId` preselects a cloud team |
 | `/players` | PlayerSetup | Roster + active player |
 | `/checkout` | GameCheckout | Multi-recorder stat checkout (cloud games) |
 | `/game` | GameTracker | Live stat entry, scoreboard, undo; basketball: inline court + event popup |
 | `/shot-chart` | ShotChart | **Legacy** — redirects to `/game` (court is inline now) |
 | `/summary` | GameSummary | Post-game review, finalize, sync |
 | `/admin` | Admin | Seasons, sport toggles, data management |
-| `/teams` | Teams | Team rosters, invites |
+| `/teams` | Teams | Cloud team list/create entry, pending invites |
+| `/team` | TeamInfo | Team hub with overview, roster, schedule, stats links, Start Game |
+| `/team/manage` | Teams | Team roster/member management for one team |
+| `/team/roster` | TeamRoster | Read-only full roster drill-down |
+| `/team/schedule` | TeamSchedule | Team-scoped game schedule drill-down |
+| `/team/season` | SeasonInfo | Season detail and team list |
+| `/game-info` | GameInfo | Single cloud game detail and summary handoff |
 | `/games` | Games | Cloud game history, resume/finalize |
 | `/leaderboard` | Leaderboard | Season/team stat rankings |
-| `/player` | PlayerProfile | Single-player season stats + game log |
+| `/player` | PlayerProfile | Legacy single-player season stats + game log |
+| `/player-info` | PlayerProfile | Team-context player info with Back to Team |
 | `/career` | CareerStats | Cross-game player career |
 | `/team-stats` | TeamStats | Aggregated team-level stats |
 | `/tournament-stats` | TournamentStats | Tournament-scoped stats |

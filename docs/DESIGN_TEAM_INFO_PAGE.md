@@ -2,7 +2,7 @@
 
 A **Team Info Page** that serves as the central hub when a user taps on a team. It surfaces roster, schedule, season stats, and team metadata in a scannable, mobile-first layout, with drill-down links to dedicated Player Info, Season Info, Schedule, and Game Info screens.
 
-**Status:** Implementation plan — ready for engineering hand-off.
+**Status:** Implemented V1. This document is now the shipped Team Info design reference plus notes for future refinement.
 
 **Related docs:** [DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md](archived/DESIGN_NAVIGATION_SEASONS_TOURNAMENTS.md), [DESIGN_SEASONS_DATA_MODEL.md](completed/DESIGN_SEASONS_DATA_MODEL.md), [DESIGN_STAT_TRACKING_UI.md](DESIGN_STAT_TRACKING_UI.md), [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md).
 
@@ -36,7 +36,7 @@ Key patterns observed in GameChanger, TeamSnap, iScore, Stattie, and others:
 | **Tab or segmented control** | Top-level tabs on the team page (Overview / Roster / Schedule / Stats) | Yes — segmented control |
 | **Team-scoped context** | Once inside a team, everything (players, games, stats) is scoped | Yes |
 | **Drill-down lists** | Team → Player → Player profile/stats | Yes |
-| **Quick actions** | Prominent "Start Game", "Add Player" buttons on team page | Partial — link to existing flows |
+| **Quick actions** | Prominent "Start Game", "Add Player" buttons on team page | Yes — Start Game on Team Info, management via `/team/manage` |
 | **Avatar/jersey circles** | Player previews with jersey numbers in circles | Yes |
 | **Color-coded results** | Green/red/gray badges for W/L/T | Yes |
 | **Role-based views** | Different info for coach vs parent | No — out of scope |
@@ -50,13 +50,15 @@ All routes use query parameters (existing pattern, no `react-router` path params
 | Route | Component | Query params | Purpose |
 |-------|-----------|--------------|---------|
 | `/team` | `TeamInfo` | `teamId` | **Team hub** — hero, tabs, overview cards |
-| `/team/roster` | `TeamRoster` | `teamId` | Full roster list, add/edit/remove players, links to Player Info |
-| `/team/schedule` | `TeamSchedule` | `teamId` | All games (grouped by tournament / exhibition), links to Game Info |
-| `/team/season` | `SeasonInfo` | `seasonId` | Season detail — teams in season, date range, team stats config |
-| `/game-info` | `GameInfo` | `gameId` | Single game detail — scores, stat leaders, link to full summary |
-| `/player-info` | `PlayerInfo` | `playerId`, `teamId` | Player detail — bio, season stats, game log (superset of current `/player`) |
+| `/team/roster` | `TeamRoster` | `teamId` | Read-only full roster list, links to Player Info |
+| `/team/schedule` | `TeamSchedule` | `teamId` | All team games grouped by status, links to Game Info |
+| `/team/season` | `SeasonInfo` | `seasonId`, optional `teamId` | Season detail and teams in season |
+| `/game-info` | `GameInfo` | `gameId`, optional `teamId` | Single game detail — scores, stat leaders, link to full summary |
+| `/player-info` | `PlayerProfile` | `playerId`, `teamId`, optional `seasonId` | Team-context player detail using the shared profile page |
+| `/team/manage` | `Teams` | `teamId` | Roster/member management, invites, merge access |
+| `/setup` | `GameSetup` | `teamId` | Start Game preselect for a cloud team |
 
-> **Migration path:** The existing `/teams` page becomes a **team list** that links into `/team?teamId=X` instead of showing inline roster/member management. The existing `/player` page can either redirect to `/player-info` or be kept as a read-only alias.
+> **Implemented migration path:** `/teams` is the **team list/create** page and redirects legacy `/teams?teamId=X` links to `/team/manage?teamId=X`. `/player-info` is routed to the shared `PlayerProfile` implementation while legacy `/player` remains compatible.
 
 ---
 
@@ -125,7 +127,7 @@ Full-screen roster view. Each player row shows:
 - Compact season stat line (e.g., "12.5 PPG · 4.2 RPG") via `formatCompactGameStatLine`
 - Tap → `/player-info?playerId=Y&teamId=X`
 
-Action buttons (owner/admin only): **Add Player**, **Merge Players**.
+Management actions live in `/team/manage?teamId=X`: add/edit/remove players, invite members, and merge players for eligible owner/admin users.
 
 ### 5c. Team Schedule (`/team/schedule?teamId=X`)
 
@@ -166,7 +168,7 @@ Enhanced version of the existing `/player` page:
 - Career link → existing `/career`
 - Bio section placeholder (height, position — future)
 
-> **Decision needed:** Merge with existing `/player` page or keep separate? Recommendation: **replace** `/player` with `/player-info` and add a redirect for backward compatibility.
+> **Implemented:** `/player-info` and `/player` coexist through the shared `PlayerProfile` page. `/player-info` adds Team Info back navigation when `teamId` is present.
 
 ---
 
@@ -207,7 +209,7 @@ src/
 │   ├── TeamSchedule.tsx          # /team/schedule — full schedule (also embedded)
 │   ├── SeasonInfo.tsx            # /team/season — season detail
 │   ├── GameInfo.tsx              # /game-info — single game detail
-│   └── PlayerInfo.tsx            # /player-info — enhanced player profile
+│   └── PlayerProfile.tsx         # /player and /player-info shared profile
 ├── components/
 │   ├── team-info/
 │   │   ├── TeamHero.tsx          # Hero header with name, sport, record
@@ -227,7 +229,7 @@ src/
 
 ### Shared/reusable component guidelines
 
-- `GameCard` and `PlayerRow` are the atomic building blocks used across `TeamInfo`, `TeamSchedule`, `TeamRoster`, `GameInfo`, and `PlayerInfo`.
+- `GameCard` and `PlayerRow` are the atomic building blocks used across `TeamInfo`, `TeamSchedule`, `TeamRoster`, `GameInfo`, and player profile views.
 - `SegmentedControl` is a generic component: `<SegmentedControl tabs={[...]} active={tab} onChange={setTab} />`.
 - `TeamHero` is shared between `TeamInfo` and any sub-page that needs the team header context.
 
@@ -236,15 +238,16 @@ src/
 ## 8. Navigation map
 
 ```
-/teams (existing, becomes team list)
+/teams (team list/create)
   └── /team?teamId=X (Team Info hub)
         ├── Overview tab
         │     ├── Roster card → /team/roster?teamId=X
         │     ├── Schedule card → /team/schedule?teamId=X
         │     ├── Recent game → /game-info?gameId=Z
-        │     ├── Season Stats → /leaderboard?teamId=X&seasonId=Y (existing)
+        │     ├── Season Stats → /leaderboard?teamId=X&seasonId=Y&from=team (existing)
         │     ├── Tournament → /tournament-stats?tournamentId=T&teamId=X (existing)
-        │     └── Season name → /team/season?seasonId=Y
+        │     ├── Season name → /team/season?seasonId=Y&teamId=X
+        │     └── Start Game → /setup?teamId=X
         ├── Roster tab (inline)
         │     └── Player row → /player-info?playerId=P&teamId=X
         └── Schedule tab (inline)
@@ -256,7 +259,7 @@ src/
 /team/schedule?teamId=X (full-page schedule)
   └── Game row → /game-info?gameId=Z
 
-/team/season?seasonId=Y
+/team/season?seasonId=Y&teamId=X
   ├── Team card → /team?teamId=X
   └── Leaderboard → /leaderboard?teamId=X&seasonId=Y
 
@@ -267,6 +270,11 @@ src/
 /player-info?playerId=P&teamId=X
   ├── Game log entry → /game-info?gameId=Z
   └── Career → /career?playerId=P&sport=S (existing)
+
+/team/manage?teamId=X
+  ├── Roster add/edit/remove
+  ├── Team members + invites
+  └── Merge players (owner/admin eligible)
 ```
 
 ---
@@ -368,7 +376,7 @@ src/
 **Scope:** `/player-info` as an enhanced `/player` with team-context hero, season stats, game log, career link.
 
 **Files to create:**
-- `src/pages/PlayerInfo.tsx`
+- `src/pages/PlayerProfile.tsx` (shared `/player` and `/player-info`)
 
 **Files to modify:**
 - `src/App.tsx` — add `/player-info` route, optional redirect from `/player`
@@ -427,13 +435,13 @@ The simplest approach: query `games` rows that have `status = 'final'` and use t
 
 | # | Question | Recommendation |
 |---|----------|----------------|
-| 1 | Should `/player` redirect to `/player-info` or coexist? | Redirect with query-param mapping. Single source of truth. |
+| 1 | Should `/player` redirect to `/player-info` or coexist? | Coexist for compatibility; `/player-info` uses the shared Player Profile implementation with Team Info back links. |
 | 2 | Should the Team Info page work without Supabase (local games)? | V1: cloud only (matches existing `/teams`). V2: local team support via localStorage game list. |
 | 3 | Should we introduce nested routes (`/team/:id/roster`) vs flat (`/team/roster?teamId=X`)? | Flat with query params for consistency with the rest of the app. Avoids `react-router` path-param refactor. |
 | 4 | Should the Roster tab be the exact same component as `/team/roster` (shared) or separate? | Shared component rendered in both contexts, with a `embedded` prop that hides the page-level header when inline. |
-| 5 | Where does "Start Game" from Team Info go? | Navigate to `/setup` with `teamId` pre-filled in the URL. Existing `GameSetup` picks it up. |
-| 6 | Should Team Info have an "Edit" mode or link to the existing edit UI? | Link to the existing edit in `/teams` (or inline modal). Keep V1 simple. |
-| 7 | How to handle the Team Info page for teams the user doesn't own (scorer role)? | Show read-only view. Hide Add Player, Edit, Delete actions. Use `myRole` check from `team_members`. |
+| 5 | Where does "Start Game" from Team Info go? | `/setup?teamId=X`; Game Setup resolves/preselects the team and confirms before discarding an active game. |
+| 6 | Should Team Info have an "Edit" mode or link to the existing edit UI? | Link to `/team/manage?teamId=X` for V1 management. |
+| 7 | How to handle the Team Info page for teams the user doesn't own (scorer role)? | Team Info/drill-down views are read-only; management actions remain role-gated in `/team/manage`. |
 
 ---
 
@@ -456,8 +464,10 @@ The simplest approach: query `games` rows that have `status = 'final'` and use t
 | D3 | Roster/schedule embedding | Shared component with `embedded` prop, rendered both inline (tab) and full-page |
 | D4 | Record calculation | Derive from `games` table on client, promote to RPC in V2 if slow |
 | D5 | Phase ordering | Hub first, then cards, then drill-downs — each phase is independently shippable |
-| D6 | Player Info vs existing `/player` | Replace `/player` with `/player-info` and add redirect |
+| D6 | Player Info vs existing `/player` | Keep `/player` compatible; route `/player-info` to shared profile with Team Info back links |
+| D7 | Management location | `/team/manage?teamId=` hosts roster/member/invite/merge management; `/teams` is list/create |
+| D8 | Start Game | Team Info uses `/setup?teamId=`; Leaderboard uses `from=team` only for Team Info-origin back navigation |
 
 ---
 
-*Document version: 1.0*
+*Document version: 1.1*
