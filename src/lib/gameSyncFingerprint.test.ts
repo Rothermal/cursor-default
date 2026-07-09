@@ -3,6 +3,7 @@ import type { GameState } from '../types'
 import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
+  shouldBlockManualCloudHydrate,
   shouldDeferCloudResumeHydration,
   shouldRejectSkippedFinalSync,
   withLastSyncedGameFingerprint,
@@ -127,6 +128,20 @@ describe('gameSyncFingerprint', () => {
       cloudSync: { ...s0.cloudSync, lastSyncedGameFingerprint: fp },
     })
     expect(shouldRejectSkippedFinalSync(s)).toBe(false)
+  })
+
+  it('shouldBlockManualCloudHydrate mirrors shouldDeferCloudResumeHydration', () => {
+    const dirty = baseState({
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { pts: 5 } }],
+      cloudSync: {
+        ...baseState().cloudSync,
+        lastSyncedGameFingerprint: buildGameSyncFingerprint(baseState()),
+      },
+    })
+    expect(shouldBlockManualCloudHydrate(dirty, false)).toBe(true)
+    expect(shouldBlockManualCloudHydrate(dirty, false)).toBe(
+      shouldDeferCloudResumeHydration(dirty, false)
+    )
   })
 
   it('rejects skipped-final sync when last synced fingerprint is unknown', () => {

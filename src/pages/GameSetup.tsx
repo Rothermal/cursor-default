@@ -4,6 +4,8 @@ import { sports } from '../config/sports'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { teamInfoPath } from '../lib/teamInfo'
 import ConfirmDialog from '../components/ConfirmDialog'
 
@@ -108,6 +110,11 @@ export default function GameSetup() {
       }
 
       if (sport?.id !== requestedSport.id) {
+        if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
+          setRequestedTeamSportError('Finish syncing your current game before starting another.')
+          setLoadingRequestedTeamSport(false)
+          return
+        }
         const hasActiveGame = Boolean(state.sport && state.players.length > 0)
         if (
           hasActiveGame &&
