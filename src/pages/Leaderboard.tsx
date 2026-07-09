@@ -4,6 +4,7 @@ import { sports, computePlayerScore } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
+import { teamInfoPath } from '../lib/teamInfo'
 
 interface TeamRow {
   id: string
@@ -54,6 +55,7 @@ export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const teamIdFromUrl = searchParams.get('teamId')
   const seasonIdFromUrl = searchParams.get('seasonId')
+  const isTeamOrigin = searchParams.get('from') === 'team'
 
   const { user, isConfigured } = useAuth()
   const supabaseClient = supabase
@@ -91,9 +93,10 @@ export default function Leaderboard() {
       const next = new URLSearchParams()
       if (seasonId) next.set('seasonId', seasonId)
       if (teamId) next.set('teamId', teamId)
+      if (isTeamOrigin) next.set('from', 'team')
       setSearchParams(next, { replace: true })
     },
-    [setSearchParams]
+    [isTeamOrigin, setSearchParams]
   )
 
   useEffect(() => {
@@ -285,7 +288,9 @@ export default function Leaderboard() {
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() =>
+              navigate(isTeamOrigin && selectedTeamId ? teamInfoPath(selectedTeamId) : '/')
+            }
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
+import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
 interface TeamRow {
   id: string
@@ -278,7 +279,7 @@ export default function TeamStats() {
     return (
       <div className="min-h-screen flex flex-col px-4 py-6 max-w-lg mx-auto">
         {error && <div className="card bg-red-50 text-red-700 text-sm mb-4">{error}</div>}
-        <button type="button" onClick={() => navigate('/leaderboard')} className="btn-primary">
+        <button type="button" onClick={() => navigate(teamInfoPath(teamId))} className="btn-primary">
           Back
         </button>
       </div>
@@ -294,7 +295,7 @@ export default function TeamStats() {
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate(`/leaderboard?teamId=${teamId}&seasonId=${team.season_id}`)}
+            onClick={() => navigate(teamInfoPath(teamId))}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
           >
             ←
@@ -315,6 +316,14 @@ export default function TeamStats() {
             faster team game lines. Per-game stats unavailable.
           </p>
         )}
+
+        <button
+          type="button"
+          onClick={() => navigate(teamLeaderboardPath(teamId, team.season_id, true))}
+          className="text-sm font-semibold text-blue-600"
+        >
+          Season leaderboard →
+        </button>
 
         <section className="card space-y-2">
           <h2 className="font-semibold text-slate-700">Season record</h2>

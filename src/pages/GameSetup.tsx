@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { sports } from '../config/sports'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { teamInfoPath } from '../lib/teamInfo'
 import ConfirmDialog from '../components/ConfirmDialog'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,6 +31,8 @@ interface TournamentOption {
 
 export default function GameSetup() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestedTeamId = searchParams.get('teamId')
   const { state, dispatch } = useGame()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
@@ -42,10 +46,10 @@ export default function GameSetup() {
     state.gameInfo?.date || new Date().toISOString().split('T')[0]
   )
   const [teamMode, setTeamMode] = useState<'existing' | 'new'>(
-    state.cloudSync.teamId ? 'existing' : 'new'
+    requestedTeamId || state.cloudSync.teamId ? 'existing' : 'new'
   )
   const [teams, setTeams] = useState<CloudTeam[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState(state.cloudSync.teamId || '')
+  const [selectedTeamId, setSelectedTeamId] = useState(requestedTeamId || state.cloudSync.teamId || '')
   const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [teamsError, setTeamsError] = useState<string | null>(null)
@@ -71,6 +75,58 @@ export default function GameSetup() {
   const [loadingSeasonsForNewTeam, setLoadingSeasonsForNewTeam] = useState(false)
   const [selectedNewTeamSeasonId, setSelectedNewTeamSeasonId] = useState('')
   const [setupError, setSetupError] = useState<string | null>(null)
+  const [loadingRequestedTeamSport, setLoadingRequestedTeamSport] = useState(false)
+  const [requestedTeamSportError, setRequestedTeamSportError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!requestedTeamId || !isCloudFlow || !supabase) return
+
+    const client = supabase
+    let cancelled = false
+    const loadRequestedTeamSport = async () => {
+      setLoadingRequestedTeamSport(true)
+      setRequestedTeamSportError(null)
+      const { data, error } = await client
+        .from('teams')
+        .select('id,seasons!inner(sport)')
+        .eq('id', requestedTeamId)
+        .single()
+
+      if (cancelled) return
+      if (error || !data) {
+        setRequestedTeamSportError(error?.message ?? 'Team not found')
+        setLoadingRequestedTeamSport(false)
+        return
+      }
+
+      const row = data as unknown as { seasons: { sport: string } }
+      const requestedSport = sports.find(item => item.id === row.seasons.sport)
+      if (!requestedSport) {
+        setRequestedTeamSportError('This team uses a sport that is not available.')
+        setLoadingRequestedTeamSport(false)
+        return
+      }
+
+      if (sport?.id !== requestedSport.id) {
+        const hasActiveGame = Boolean(state.sport && state.players.length > 0)
+        if (
+          hasActiveGame &&
+          !window.confirm('Starting a new game will discard your active game. Continue?')
+        ) {
+          navigate('/')
+          return
+        }
+
+        dispatch({ type: 'SET_SPORT', sport: requestedSport })
+      }
+      setLoadingRequestedTeamSport(false)
+    }
+
+    void loadRequestedTeamSport()
+    return () => {
+      cancelled = true
+    }
+  }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, state.players.length, state.sport])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -101,17 +157,31 @@ export default function GameSetup() {
         return
       }
 
+      const requestedTeam = requestedTeamId
+        ? loadedTeams.find(team => team.id === requestedTeamId)
+        : null
+      if (requestedTeamId && !requestedTeam) {
+        setTeamMode('existing')
+        setSelectedTeamId('')
+        setTeamName('')
+        setSeasonFilter('')
+        setTeamsError('That team could not be found for this sport or you no longer have access to it.')
+        setLoadingTeams(false)
+        return
+      }
+
       const matchedById = state.cloudSync.teamId
         ? loadedTeams.find(team => team.id === state.cloudSync.teamId)
         : null
       const matchedByName = state.gameInfo?.teamName
         ? loadedTeams.find(team => team.name === state.gameInfo?.teamName)
         : null
-      const preferredTeam = matchedById || matchedByName || loadedTeams[0]
+      const preferredTeam = requestedTeam || matchedById || matchedByName || loadedTeams[0]
 
       setTeamMode('existing')
       setSelectedTeamId(preferredTeam.id)
       setTeamName(preferredTeam.name)
+      if (requestedTeam) setSeasonFilter(preferredTeam.season_id)
       setLoadingTeams(false)
     }
 
@@ -119,7 +189,7 @@ export default function GameSetup() {
     return () => {
       isCancelled = true
     }
-  }, [isCloudFlow, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
+  }, [isCloudFlow, requestedTeamId, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
 
   useEffect(() => {
     if (!isCloudFlow || !userId || !sport || !supabase) return
@@ -257,8 +327,30 @@ export default function GameSetup() {
     ? selectedTeam?.name ?? ''
     : teamName.trim()
   const canProceed = Boolean(resolvedTeamName && opponentName.trim())
+  const requestedTeamUnavailable = Boolean(
+    requestedTeamId && !loadingTeams && teams.length > 0 && !selectedTeam
+  )
 
   if (!sport) {
+    if (requestedTeamId && isCloudFlow) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center px-4">
+          <div className="card max-w-md w-full text-center space-y-3">
+            <p className="font-semibold text-slate-700">Loading team setup</p>
+            <p className="text-sm text-slate-500">
+              {loadingRequestedTeamSport
+                ? 'Finding this team sport...'
+                : requestedTeamSportError ?? 'Preparing game setup...'}
+            </p>
+            {requestedTeamSportError && (
+              <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
+                Back to Cloud Teams
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
     navigate('/')
     return null
   }
@@ -388,10 +480,12 @@ export default function GameSetup() {
                 <p className="text-sm font-semibold text-slate-700">Team Source</p>
                 <button
                   type="button"
-                  onClick={() => navigate('/teams')}
+                  onClick={() =>
+                    navigate(requestedTeamId && selectedTeam ? teamInfoPath(selectedTeam.id) : '/teams')
+                  }
                   className="text-xs text-blue-600 font-medium underline"
                 >
-                  Manage Teams
+                  {requestedTeamId && selectedTeam ? 'Back to Team' : 'Manage Teams'}
                 </button>
               </div>
 
@@ -431,6 +525,13 @@ export default function GameSetup() {
 
               {loadingTeams ? (
                 <p className="text-sm text-slate-500 animate-pulse">Loading teams...</p>
+              ) : requestedTeamUnavailable ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-semibold text-amber-900">Team unavailable</p>
+                  <p className="text-xs text-amber-800 mt-1">
+                    Choose another team from Cloud Teams before starting this game.
+                  </p>
+                </div>
               ) : teamMode === 'existing' && teams.length > 0 ? (
                 <div className="space-y-2">
                   {availableSeasons.length > 1 && (

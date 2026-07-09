@@ -81,9 +81,13 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.18 | Team Schedule → tap a scheduled/live/final game | Opens `/game-info?gameId=<id>&teamId=<id>`; shows game details, status/score, and stat leaders when resolved stats exist |
 | 4.19 | Game Info → View full summary on a finalized game | Hydrates the cloud game through the existing flow and opens `/summary`; pending local sync still blocks hydration |
 | 4.20 | Team Roster → tap a player | Opens `/player-info?playerId=<id>&teamId=<id>` with **Player Info**, season totals, game log, career link, and **Back to Team** returning to `/team?teamId=<id>` |
-| 4.21 | Leaderboard → tap a player row | Existing `/player?teamId=<id>&playerId=<id>&seasonId=<id>` route still opens **Player Profile** and backs to Leaderboard |
+| 4.21 | Team Info → Season Stats → back arrow | Opens Leaderboard with that team selected; back arrow returns to `/team?teamId=<id>` |
+| 4.21b | Leaderboard → tap a player row | Existing `/player?teamId=<id>&playerId=<id>&seasonId=<id>` route still opens **Player Profile** and backs to Leaderboard |
 | 4.22 | Team Info hero → season name | Opens `/team/season?seasonId=<id>` with season name, sport, team count, and teams in that season |
 | 4.23 | Season Info → tap a team name / Season Stats | Team name opens `/team?teamId=<id>`; Season Stats opens Leaderboard with `seasonId` and `teamId` set |
+| 4.24 | Team Info → Start Game | Opens `/setup?teamId=<id>` with the team's sport and existing team preselected |
+| 4.25 | Open `/setup?teamId=<id>` directly | Loads the team sport when possible and preselects the team; invalid/inaccessible team shows Team unavailable and does not auto-select another team |
+| 4.26 | Team Stats / Tournament Stats / Game Info / Player Info → back action | Returns to `/team?teamId=<id>` when opened with team context |
 
 ---
 
@@ -322,10 +326,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 9.5 | View (on a game) | Loads game and navigates to Summary |
 | 9.6 | Leaderboard: change "Sort by" | Order updates (e.g. by Assists) |
 | 9.7 | Leaderboard: change **Season** dropdown | Team list filters; URL updates `seasonId` |
-| 9.8 | Leaderboard: **Team stats →** | Opens `/team-stats` with W/L and game list |
+| 9.8 | Leaderboard: **Team stats →** | Opens `/team-stats` with W/L and game list; header back returns to Team Info when opened with `teamId` |
 | 9.9 | Player Profile: **Career →** | Opens `/career` with totals; migration **020** applied for RPC |
 | 9.10 | Teams → roster **Career** on a player | Same as 9.9 |
-| 9.11 | Team stats → tournament row **Stats →** | Opens tournament stats; W/L and leaderboard when games have `tournament_id` |
+| 9.11 | Team stats → tournament row **Stats →** | Opens tournament stats; W/L and leaderboard when games have `tournament_id`; header back returns to Team Info and inline Team stats returns to `/team-stats` |
 | 9.12 | Game Summary → **Team** tab | Only team totals tables + score card; **Players** shows full grid |
 | 9.13 | Team stats → **By opponent** | Table lists opponents with W-L-T and PF-PA when multiple finals exist |
 | 9.14 | Leaderboard: tap **Career** on a row (not the main row) | Opens `/career` with that `playerId` and the season’s sport |
