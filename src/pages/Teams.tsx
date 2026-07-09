@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName, playerRosterSelectLabel } from '../lib/display'
-import { teamInfoPath, teamManagementPath } from '../lib/teamInfo'
+import { teamInfoPath, teamLeaderboardPath, teamManagementPath } from '../lib/teamInfo'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -1153,7 +1153,9 @@ export default function Teams() {
                 <>
                   <button
                     type="button"
-                    onClick={() => navigate(`/leaderboard?teamId=${selectedTeam.id}`)}
+                    onClick={() =>
+                      navigate(teamLeaderboardPath(selectedTeam.id, selectedTeam.season_id, true))
+                    }
                     className="text-xs text-blue-600 font-medium hover:underline"
                   >
                     Season Stats

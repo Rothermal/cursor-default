@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
-import { teamInfoPath, teamStatsPath } from '../lib/teamInfo'
+import { playerInfoPath, teamInfoPath, teamStatsPath } from '../lib/teamInfo'
 
 interface TeamRow {
   id: string
@@ -536,9 +536,7 @@ export default function TournamentStats() {
                   <button
                     type="button"
                     onClick={() =>
-                      navigate(
-                        `/player?teamId=${teamId}&playerId=${row.player.id}&seasonId=${team.season_id}`
-                      )
+                      navigate(playerInfoPath(row.player.id, teamId, team.season_id))
                     }
                     className="flex-1 text-left px-3 py-2 hover:bg-blue-50/40 min-w-0"
                   >

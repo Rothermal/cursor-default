@@ -66,7 +66,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.5 | Edit player (pencil) → change first name, last name, jersey number → Save | Player row updates with new values; reflected in cloud roster |
 | 4.5b | Edit player nickname | Display name updates; primary name shown in parentheses if nickname set |
 | 4.6 | Remove player | Player removed from roster (soft deactivate) |
-| 4.7 | Team Manage → Season Stats link | Navigate to Leaderboard with that team pre-selected |
+| 4.7 | Team Manage → Season Stats link | Opens `/leaderboard?teamId=<id>&seasonId=<id>&from=team`; back arrow returns to Team Info |
 | 4.8 | Reload → Teams | Same teams and roster (from Supabase) |
 | 4.9 | Teams → tap a team card's primary name area | Opens `/team?teamId=<id>`; Team Info shows display name, season, sport, record, roster count, game count, and links back to Season Stats, Team Stats, and Manage Team |
 | 4.10 | Teams → tap **Manage** on a team card | Opens `/team/manage?teamId=<id>` with roster and member management for that team |
@@ -84,9 +84,9 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.19 | Game Info → View full summary on a finalized game | Hydrates the cloud game through the existing flow and opens `/summary`; pending local sync still blocks hydration |
 | 4.20 | Team Roster → tap a player | Opens `/player-info?playerId=<id>&teamId=<id>` with **Player Info**, season totals, game log, career link, and **Back to Team** returning to `/team?teamId=<id>` |
 | 4.21 | Team Info → Season Stats → back arrow | Opens Leaderboard with that team selected; back arrow returns to `/team?teamId=<id>` |
-| 4.21b | Leaderboard → tap a player row | Existing `/player?teamId=<id>&playerId=<id>&seasonId=<id>` route still opens **Player Profile** and backs to Leaderboard |
+| 4.21b | Global Leaderboard (not from team) → tap a player row | Existing `/player?teamId=<id>&playerId=<id>&seasonId=<id>` route still opens **Player Profile** and backs to Leaderboard (team-origin rows use `/player-info` — see **4h.8b**) |
 | 4.22 | Team Info hero → season name | Opens `/team/season?seasonId=<id>` with season name, sport, team count, and teams in that season |
-| 4.23 | Season Info → tap a team name / Season Stats | Team name opens `/team?teamId=<id>`; Season Stats opens Leaderboard with `seasonId` and `teamId` set |
+| 4.23 | Season Info → tap a team name / Season Stats | Team name opens `/team?teamId=<id>`; Season Stats opens `/leaderboard?teamId=<id>&seasonId=<id>&from=team`; back arrow returns to Team Info |
 | 4.24 | Team Info → Start Game | Opens `/setup?teamId=<id>` with the team's sport and existing team preselected |
 | 4.25 | Open `/setup?teamId=<id>` directly | Loads the team sport when possible and preselects the team; invalid/inaccessible team shows Team unavailable and does not auto-select another team |
 | 4.26 | Team Stats / Tournament Stats / Game Info / Player Info → back action | Returns to `/team?teamId=<id>` when opened with team context |
@@ -254,6 +254,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4h.6 | Roster → player row | Opens `/player-info?playerId=<id>&teamId=<id>`; Back to Team returns to Team Info; Career link still opens `/career` |
 | 4h.7 | Hero season link | Opens `/team/season?seasonId=<id>&teamId=<id>`; Back to Team returns to Team Info; team rows link back into Team Info |
 | 4h.8 | Overview → Season Stats | Opens `/leaderboard?teamId=<id>&seasonId=<id>&from=team`; back arrow returns to Team Info |
+| 4h.8b | Leaderboard (from team) → tap a player row | Opens `/player-info?playerId=<id>&teamId=<id>&seasonId=<id>`; **Back to Team** returns to Team Info |
 | 4h.9 | Home → Season Stats | Opens global Leaderboard; back arrow returns home, even after the URL auto-fills `teamId` |
 | 4h.10 | Team Info → Start Game | Opens `/setup?teamId=<id>` with the team's sport and existing team preselected; continuing loads the team's active roster |
 | 4h.11 | Open `/setup?teamId=<id>` while another active game exists | If the requested team has a different sport than the active game, confirmation appears; cancel returns home and preserves the active game. Same-sport team links continue into setup without that reset prompt. |
