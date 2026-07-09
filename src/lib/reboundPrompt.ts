@@ -6,7 +6,7 @@ import {
 } from './teamPlayers'
 
 export type ReboundStatId = 'oreb' | 'dreb'
-export type ReboundSide = 'home' | 'opponent'
+type ReboundSide = 'home' | 'opponent'
 
 export interface ReboundPromptOptions {
   offensiveSide: ReboundSide

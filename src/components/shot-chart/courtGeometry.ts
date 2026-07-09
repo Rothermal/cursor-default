@@ -2,7 +2,7 @@ import type { ShotZone } from '../../types'
 
 // Overall half-court dimensions (feet)
 export const COURT_WIDTH = 50
-export const HALF_COURT_DEPTH = 47
+const HALF_COURT_DEPTH = 47
 
 // NBA: rim 5.25' from baseline, backboard face 4' from baseline. For the diagram we use
 // half that rim offset so the basket sits halfway between the old position and the
@@ -27,12 +27,12 @@ export const BASKET_RADIUS = 0.75
 
 // Paint / lane: 16' wide (NBA), 19' deep from baseline to free-throw line
 export const PAINT_WIDTH = 16
-export const PAINT_DEPTH_FROM_BASELINE = 19
+const PAINT_DEPTH_FROM_BASELINE = 19
 export const FT_LINE_Y = PAINT_DEPTH_FROM_BASELINE - BASKET_CENTER_Y
 
 export const FT_CIRCLE_RADIUS = 6
 
-export const RESTRICTED_RADIUS = 4
+const RESTRICTED_RADIUS = 4
 
 export const THREE_POINT_RADIUS = 23.75
 export const CORNER_THREE_X = 22

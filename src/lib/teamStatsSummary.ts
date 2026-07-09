@@ -1,7 +1,7 @@
 import type { BasketballTeamStatsConfig, SportConfig, StatAction } from '../types'
 import { buildPeriodSegmentLabels, periodScopedStatKey } from './teamStatsPeriods'
 
-export type TeamBonusEventType = 'one_and_one' | 'double_bonus' | 'bonus_nba'
+type TeamBonusEventType = 'one_and_one' | 'double_bonus' | 'bonus_nba'
 
 export interface TeamBonusEvent {
   periodIndex: number
@@ -89,7 +89,7 @@ export function deriveBonusEvents(
   return events
 }
 
-export function sumPeriodScopedStat(stats: Record<string, number>, baseId: string): number {
+function sumPeriodScopedStat(stats: Record<string, number>, baseId: string): number {
   let sum = 0
   const prefix = `${baseId}_p`
   for (const [k, v] of Object.entries(stats)) {

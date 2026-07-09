@@ -16,7 +16,7 @@ import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 const ARMING_DELAY_MS = 300
 
 /** Stat-only events the popup can record (no court location stored). */
-export const COURT_STAT_EVENTS = [
+const COURT_STAT_EVENTS = [
   { statId: 'oreb', label: 'Off Reb' },
   { statId: 'dreb', label: 'Def Reb' },
   { statId: 'stl', label: 'Steal' },
@@ -24,7 +24,7 @@ export const COURT_STAT_EVENTS = [
   { statId: 'ast', label: 'Assist' },
 ] as const
 
-export type CourtStatEventId = (typeof COURT_STAT_EVENTS)[number]['statId']
+type CourtStatEventId = (typeof COURT_STAT_EVENTS)[number]['statId']
 
 function playerPickerLabel(player: Player): string {
   if (isTeamPseudoPlayer(player)) return `${player.number || '*'} ${player.name}`
