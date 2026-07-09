@@ -32,8 +32,8 @@ Key patterns observed in GameChanger, TeamSnap, iScore, Stattie, and others:
 | Pattern | Description | Adopt? |
 |---------|-------------|--------|
 | **Hero header** | Team name, sport icon, season, W-L record prominently at top | Yes |
-| **Card-based overview** | Roster preview, upcoming games, quick stats as tappable cards | Yes |
-| **Tab or segmented control** | Top-level tabs on the team page (Overview / Roster / Schedule / Stats) | Yes — segmented control |
+| **Card-based overview** | Roster preview, upcoming games, and stats links as tappable cards | Yes |
+| **Tab or segmented control** | Top-level tabs on the team page (Overview / Roster / Schedule) | Yes — segmented control |
 | **Team-scoped context** | Once inside a team, everything (players, games, stats) is scoped | Yes |
 | **Drill-down lists** | Team → Player → Player profile/stats | Yes |
 | **Quick actions** | Prominent "Start Game", "Add Player" buttons on team page | Yes — Start Game on Team Info, management via `/team/manage` |
@@ -92,9 +92,9 @@ All routes use query parameters (existing pattern, no `react-router` path params
 │  │ Mar 25 vs Lions   L 35-42   │   │
 │  └──────────────────────────────┘   │
 │                                      │
-│  ┌── Quick Stats ───────────────┐   │
-│  │ PPG: 48.2 · RPG: 32.1       │   │
-│  │ FG%: 42.3 · Season Stats →  │   │
+│  ┌── Stats Links ───────────────┐   │
+│  │ Season Stats →              │   │
+│  │ Team Stats →                │   │
 │  └──────────────────────────────┘   │
 │                                      │
 │  ┌── Tournaments ───────────────┐   │
@@ -105,10 +105,10 @@ All routes use query parameters (existing pattern, no `react-router` path params
 │  ┌── Team Members ──────────────┐   │
 │  │ Coach Smith (owner)          │   │
 │  │ Jane Doe (admin)             │   │
-│  │ Invite →                     │   │
+│  │ Manage →                     │   │
 │  └──────────────────────────────┘   │
 │                                      │
-│  [ Edit Team ]  [ Start Game → ]    │  ← Quick actions
+│  [ Manage ]  [ Start Game → ]       │  ← Quick actions
 └──────────────────────────────────────┘
 ```
 
@@ -124,7 +124,7 @@ Full-screen roster view. Each player row shows:
 - Jersey number badge (circle)
 - Player display name (nickname if set, else first + last)
 - Position (if available — future field)
-- Compact season stat line (e.g., "12.5 PPG · 4.2 RPG") via `formatCompactGameStatLine`
+- Optional compact season stat line remains future polish; shipped V1 keeps rows focused on identity and navigation.
 - Tap → `/player-info?playerId=Y&teamId=X`
 
 Management actions live in `/team/manage?teamId=X`: add/edit/remove players, invite members, and merge players for eligible owner/admin users.
@@ -144,11 +144,10 @@ Each game card shows:
 
 ### 5d. Season Info (`/team/season?seasonId=X`)
 
-- Season name, sport, date range
+- Season name, sport, and team count
 - List of teams in this season (each links to `/team?teamId=`)
-- Team stats config summary (basketball: foul rules, bonus thresholds)
-- Season-wide leaderboard link → existing `/leaderboard?teamId=&seasonId=`
-- Edit season (name, dates) — owner only
+- Team-scoped Season Stats link for each listed team
+- Back navigation returns to the originating Team Info page when opened with `teamId`
 
 ### 5e. Game Info (`/game-info?gameId=X`)
 
@@ -217,7 +216,7 @@ src/
 │   │   ├── RosterPreviewCard.tsx  # Compact roster preview (count + top names)
 │   │   ├── SchedulePreviewCard.tsx # Next 2-3 upcoming games
 │   │   ├── RecentResultsCard.tsx  # Last 3-5 completed games with W/L badges
-│   │   ├── QuickStatsCard.tsx     # Key team averages
+│   │   ├── QuickStatsCard.tsx     # Links to existing stat views
 │   │   ├── TournamentCard.tsx     # Tournament list with placements
 │   │   ├── TeamMembersCard.tsx    # Coach/admin list
 │   │   ├── GameCard.tsx           # Reusable game row (date, opp, score, badge)
@@ -304,7 +303,7 @@ src/
 
 ### Phase 2: Overview tab cards
 
-**Scope:** Flesh out the overview tab with interactive cards: Roster preview, Upcoming games, Recent results (with W/L badges), Quick stats, Tournaments, Team members.
+**Scope:** Flesh out the overview tab with interactive cards: Roster preview, Upcoming games, Recent results (with W/L badges), stat links, Tournaments, Team members.
 
 **Files to create:**
 - `src/components/team-info/RosterPreviewCard.tsx`
@@ -316,7 +315,7 @@ src/
 - `src/components/team-info/ResultBadge.tsx`
 
 **Data queries:**
-- `get_season_stats_resolved` for quick stats
+- Existing stat route helpers for Season Stats, Team Stats, and Tournament Stats links
 - `games` with `status = 'scheduled'` + `ORDER BY game_date ASC LIMIT 3`
 - `games` with `status = 'final'` + `ORDER BY game_date DESC LIMIT 5`
 - `tournaments` for the team
@@ -326,7 +325,7 @@ src/
 
 ### Phase 3: Roster tab + Team Roster page
 
-**Scope:** Inline roster tab on Team Info + dedicated `/team/roster` full-page route. Each player row links to Player Info. Add/edit/remove actions for owner/admin.
+**Scope:** Inline roster tab on Team Info + dedicated `/team/roster` full-page route. Each player row links to Player Info. Add/edit/remove actions stay on `/team/manage?teamId=`.
 
 **Files to create:**
 - `src/pages/TeamRoster.tsx`

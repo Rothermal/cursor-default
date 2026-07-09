@@ -151,7 +151,7 @@ Start with these existing surfaces before creating new abstractions:
 - Run `pnpm test` if helpers are added or changed.
 - Run `pnpm build` to catch type contract drift.
 
-**Commit target:** `docs/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md` stays unchanged in this section unless the data contract discovery changes the plan.
+**Commit target:** `docs/completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md` stays unchanged in this section unless the data contract discovery changes the plan.
 
 ---
 
@@ -245,7 +245,7 @@ Start with these existing surfaces before creating new abstractions:
   - recent final games
   - tournaments for team
   - team members via existing RPC
-  - quick stats from existing resolved season/team data where practical
+  - links to existing resolved stat views where practical
 - Link overview cards to existing pages first when a dedicated page is not built yet.
 
 **Validation:**
@@ -437,7 +437,7 @@ stable. This is a later/high-risk slice, not part of the MVP.
   - player/game/season drill-down
   - Start Game preselect
   - scorer read-only role
-- Record final walkthrough video for the implemented UI work.
+- Optional final walkthrough video for the implemented UI work can be recorded outside Codex.
 
 **Validation:**
 - Run `pnpm lint`, `pnpm test`, and `pnpm build`.
@@ -521,7 +521,7 @@ Use these labels when opening implementation PRs:
 - Team Info shows hero, record, roster count, schedule preview, recent results, tournaments, team members, and links to existing stats pages.
 - Roster, schedule, game, player, and season drill-downs have explicit back navigation to Team Info.
 - Owner/admin management behavior from `/teams` is preserved in the new hierarchy.
-- Scorer/read-only users can view team information without seeing management controls.
+- Scorer/read-only users can view team information without gaining management permissions; privileged writes remain gated.
 - Start Game from Team Info preselects the team.
 - Existing routes remain compatible.
 - Regression docs include the new flows.
@@ -541,3 +541,4 @@ Use these labels when opening implementation PRs:
 - [x] Added Team Info Start Game via `/setup?teamId=` with cloud-team preselect.
 - [x] Updated regression docs with Team Info drill-down smoke coverage.
 - [x] Final validation for TI-9: `pnpm test`, `pnpm lint`, and `pnpm build`.
+- [ ] Optional walkthrough video recording deferred; Codex cannot capture the signed-in cloud UI flow in this environment.

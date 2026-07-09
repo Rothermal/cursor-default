@@ -254,8 +254,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4h.8 | Overview → Season Stats | Opens `/leaderboard?teamId=<id>&seasonId=<id>&from=team`; back arrow returns to Team Info |
 | 4h.9 | Home → Season Stats | Opens global Leaderboard; back arrow returns home, even after the URL auto-fills `teamId` |
 | 4h.10 | Team Info → Start Game | Opens `/setup?teamId=<id>` with the team's sport and existing team preselected; continuing loads the team's active roster |
-| 4h.11 | Open `/setup?teamId=<id>` while another active game exists | If switching sport/team would reset the active game, confirmation appears; cancel returns home and preserves the active game |
-| 4h.12 | Scorer-only account opens Team Info | Read-only Team Info, roster, schedule, player, game, and season views are visible; owner/admin management actions stay on `/team/manage` and remain role-gated |
+| 4h.11 | Open `/setup?teamId=<id>` while another active game exists | If the requested team has a different sport than the active game, confirmation appears; cancel returns home and preserves the active game. Same-sport team links continue into setup without that reset prompt. |
+| 4h.12 | Scorer-only account opens Team Info | Team Info, roster, schedule, player, game, and season views are visible; `/team/manage` remains reachable, while invite/merge actions and roster writes stay protected by existing owner/admin checks and server/RLS enforcement. |
 
 ---
 

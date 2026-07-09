@@ -322,10 +322,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Tournament placement — `tournaments.placement` column for finish position (1st, 2nd, 3rd, etc.)
 - [x] **Team-level stat tracking (basketball)** — pseudo-players `__team_home__` / `__team_opp__`, `teamCategories` in `sports.ts`, period-scoped stat ids (`team_foul_p1`, …), bonus UI, season rules in `seasons.team_stats_config` (Admin → Seasons), cloud placeholder players + `get_game_team_stats`, checkout + Game Summary **Team stats** tab (design: [DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md))
 
+- [x] **Team Info hub + drill-downs** — canonical `/team?teamId=` route with overview, roster, schedule, player/game/season drill-downs, Start Game preselect, and `/team/manage?teamId=` management migration ([plan](docs/completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md))
+
 ### What's Next
 
 - [ ] **Court capture polish** — F5 shot-value override, F6 in-popup player switching, F12 recent-events undo, F7 assist-linking, F8 popup stat line, and F9 rebound-after-miss prompt are implemented; F10 visible numbering is superseded by F13, and both F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
-- [ ] **Team Info hub + drill-downs** — canonical `/team?teamId=` route with roster, schedule, player/game/season drill-downs ([plan](docs/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md))
 - [ ] **Multi-game parking + sync queue** — multiple in-progress/paused games per device, offline-safe snapshots, ordered cloud sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md))

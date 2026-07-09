@@ -214,7 +214,6 @@ flowchart LR
 | [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Court-capture roadmap; F10 superseded by F13 |
 | [`PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md) | Held draft plan for shot detail, linked metadata, and editing |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue |
-| [`PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md`](PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md) | Team hub drill-down routes |
 
 **Court program status:** F1-F9 and F12 are implemented; manual Supabase-heavy QA remains in
 [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). F10 standalone marker numbering is no
@@ -242,6 +241,7 @@ When shipping a feature, plans typically call for updating this overview (if arc
 | Game Summary / finalize | [`GameSummary.tsx`](../src/pages/GameSummary.tsx) + `get_game_stats_resolved` |
 | Team stats (basketball) | [`completed/DESIGN_TEAM_STATS_TRACKING.md`](completed/DESIGN_TEAM_STATS_TRACKING.md) |
 | Shot chart | [`completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md`](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md) |
+| Team Info hub | [`completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md`](completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md) |
 | DB schema change | New numbered migration in `supabase/migrations/`; update README migration list |
 | Assigned a `PLAN_F*` task | Read that plan end-to-end first — it lists exact files and dependencies |
 | Add a route | [`App.tsx`](../src/App.tsx) + new page in `src/pages/` |
