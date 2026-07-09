@@ -1,27 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
+import { useGame } from '../context/GameContext'
 import { computeCategoryTotal } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { hasTrackedTeamSide } from '../lib/teamStatsSummary'
 import TeamStatSummary from '../components/team-stats/TeamStatSummary'
-import BasketballCourt from '../components/shot-chart/BasketballCourt'
-import ShootingSummary from '../components/shot-chart/ShootingSummary'
-import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
-import {
-  shootingLine,
-  shotsForSelection,
-  shotViewEmptyCopy,
-  shotViewLabel,
-  type ShotChartSelection,
-} from '../lib/shotChartViews'
+import GameSummaryShotChartPanel from './game-summary/GameSummaryShotChartPanel'
+import StatCorrectionModal from './game-summary/StatCorrectionModal'
+import { useFinalizeGame } from '../hooks/useFinalizeGame'
+import { useReviewShotChart } from '../hooks/useReviewShotChart'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { loadGameShotChartForReview } from '../lib/cloudSync'
-import { mergeReviewAndLocalShots } from '../lib/shotChartReview'
-import type { ShotRecord } from '../types'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
 type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
@@ -43,11 +34,15 @@ type CheckoutsByPlayerMap = Record<string, CheckoutOption[]>
 
 export default function GameSummary() {
   const navigate = useNavigate()
-  const { state, dispatch, flushCloudSync } = useGame()
-  const { user, isConfigured } = useAuth()
+  const { state, dispatch } = useGame()
+  const { user } = useAuth()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, shotChart } = state
-  const [finalizing, setFinalizing] = useState(false)
-  const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const {
+    finalizing,
+    finalizeError,
+    canFinalizeCloudGame,
+    handleFinalizeCloudGame,
+  } = useFinalizeGame()
   const [resolvedStats, setResolvedStats] = useState<ResolvedStatsMap | null>(null)
   const [isTeamAdmin, setIsTeamAdmin] = useState(false)
   const [reviewMode, setReviewMode] = useState(false)
@@ -66,14 +61,6 @@ export default function GameSummary() {
   const [viewMode, setViewMode] = useState<'primary' | 'all'>('primary')
   /** Players vs scores vs team-level stat summary (fouls, timeouts) vs shot chart (basketball). */
   const [summaryTab, setSummaryTab] = useState<'players' | 'team' | 'team_stats' | 'shot_chart'>('players')
-  /** Shot chart tab view filter (F2); defaults to All for whole-game review (D12). Read-only — never changes `activePlayerId`. */
-  const [shotViewSelection, setShotViewSelection] = useState<ShotChartSelection>({ kind: 'all' })
-  /**
-   * All-recorder review shots for cloud games (F3). Display-only local state — NEVER
-   * dispatched into `GameState.shotChart` (D6: review shots must not sync). Null until
-   * loaded; falls back to the viewer's own hydrated `shotChart`.
-   */
-  const [reviewShotChart, setReviewShotChart] = useState<ShotRecord[] | null>(null)
   /** Final games: overlay from get_game_team_stats (resolved placeholder stats). */
   const [teamTrackedStatsByRemoteId, setTeamTrackedStatsByRemoteId] = useState<
     Record<string, Record<string, number>> | null
@@ -87,6 +74,20 @@ export default function GameSummary() {
   const gameId = state.cloudSync.gameId
   const teamId = state.cloudSync.teamId
   const playerIdMap = state.cloudSync.playerIdMap
+
+  const {
+    summaryShotChart,
+    isReviewShotChart,
+    showShotChartTab,
+    shotViewSelection,
+    setShotViewSelection,
+  } = useReviewShotChart({
+    gameId,
+    sportId: sport?.id,
+    playerIdMap,
+    localShotChart: shotChart,
+    resolvedKey,
+  })
 
   const summaryPlayers = useMemo(
     () => players.filter(p => !isTeamPseudoPlayer(p)),
@@ -151,36 +152,6 @@ export default function GameSummary() {
   const showTeamStatsTab = Boolean(
     sport?.teamCategories?.length &&
       (hasTrackedTeamSide(teamStatHomeStats, sport) || hasTrackedTeamSide(teamStatOppStats, sport))
-  )
-
-  // All-recorder review shots for any cloud game, final or in-progress (F3 D5). Keyed on
-  // gameId; resolvedKey refetches after a primary-recorder reassignment (D11).
-  useEffect(() => {
-    setReviewShotChart(null)
-    if (!isConfigured || !supabase || !gameId || sport?.id !== 'basketball') return
-
-    let cancelled = false
-    const load = async () => {
-      try {
-        const result = await loadGameShotChartForReview(gameId, playerIdMap)
-        if (!cancelled) setReviewShotChart(result.shotChart)
-      } catch {
-        // Review load is best-effort; fall back to the viewer's own hydrated shots.
-      }
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- playerIdMap is stable per gameId
-  }, [isConfigured, gameId, sport?.id, resolvedKey])
-
-  /** Source for the shot chart tab: review rows plus any unsynced local shots (D7). */
-  const summaryShotChart = mergeReviewAndLocalShots(shotChart, reviewShotChart)
-  const isReviewShotChart = reviewShotChart !== null && reviewShotChart.length > 0
-
-  const showShotChartTab = Boolean(
-    sport?.id === 'basketball' && (shotChart.length > 0 || summaryShotChart.length > 0)
   )
 
   useEffect(() => {
@@ -610,79 +581,6 @@ export default function GameSummary() {
     handleCloseCorrect()
   }
 
-  const canFinalizeCloudGame = Boolean(
-    isConfigured && user && supabase && state.cloudSync.gameId && !isFinalCloudGame
-  )
-  const handleFinalizeCloudGame = async () => {
-    if (!canFinalizeCloudGame || !state.cloudSync.gameId) return
-    setFinalizeError(null)
-    setFinalizing(true)
-
-    const syncResult = await flushCloudSync()
-    if (!syncResult.ok) {
-      setFinalizing(false)
-      setFinalizeError(syncResult.reason)
-      return
-    }
-
-    const initial = await supabase!
-      .from('games')
-      .update({
-        status: 'final',
-        opponent_score: opponentScore,
-        home_team_score: homeTeamScore,
-        home_score_adjustment: homeScoreAdjustment,
-      })
-      .eq('id', state.cloudSync.gameId)
-
-    let finalizeError = initial.error
-    if (
-      finalizeError &&
-      finalizeError.message?.includes('home_team_score') &&
-      finalizeError.message?.includes('column')
-    ) {
-      const retry = await supabase!
-        .from('games')
-        .update({
-          status: 'final',
-          opponent_score: opponentScore,
-          home_score_adjustment: homeScoreAdjustment,
-        })
-        .eq('id', state.cloudSync.gameId)
-      finalizeError = retry.error ?? null
-    }
-    if (
-      finalizeError &&
-      finalizeError.message?.includes('home_score_adjustment') &&
-      finalizeError.message?.includes('column')
-    ) {
-      const retry = await supabase!
-        .from('games')
-        .update({
-          status: 'final',
-          opponent_score: opponentScore,
-        })
-        .eq('id', state.cloudSync.gameId)
-      finalizeError = retry.error ?? null
-    }
-
-    setFinalizing(false)
-    if (finalizeError) {
-      setFinalizeError(finalizeError.message ?? 'Failed to finalize game')
-      return
-    }
-
-    // Clear persisted game so this game no longer appears as in progress (fixes
-    // "completed game appears as both final and in progress").
-    try {
-      localStorage.removeItem(GAME_STORAGE_KEY)
-    } catch {
-      // ignore
-    }
-    dispatch({ type: 'RESET_GAME' })
-    navigate('/games')
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-6`}>
@@ -911,48 +809,16 @@ export default function GameSummary() {
 
         {teamStatsSummaryEl}
 
-        {summaryTab === 'shot_chart' && (() => {
-          const visibleShots = shotsForSelection(summaryShotChart, players, shotViewSelection)
-          return (
-            <div className="space-y-3 mb-6">
-              <PlayerSelectorStrip
-                players={players}
-                activePlayerId={
-                  shotViewSelection.kind === 'player' ? shotViewSelection.playerId : null
-                }
-                onSelectPlayer={playerId =>
-                  setShotViewSelection({ kind: 'player', playerId })
-                }
-                activeBgClass={sport?.theme.bg ?? 'bg-orange-500'}
-                onSelectAll={() => setShotViewSelection({ kind: 'all' })}
-                allActive={shotViewSelection.kind === 'all'}
-              />
-              <div className="flex items-baseline justify-between gap-2 px-1">
-                <p className="text-sm font-semibold text-slate-600 truncate">
-                  Shot chart — {shotViewLabel(shotViewSelection, players)}
-                </p>
-                <p className="text-sm font-bold text-slate-700 shrink-0">
-                  {shootingLine(visibleShots)}
-                </p>
-              </div>
-              {isReviewShotChart && (
-                <p className="text-xs text-slate-400 px-1">
-                  Combined from all recorders — each player&apos;s shots come from their
-                  primary recorder&apos;s chart.
-                </p>
-              )}
-              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                <BasketballCourt shots={visibleShots} className="w-full" />
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                <ShootingSummary
-                  shots={visibleShots}
-                  emptyMessage={shotViewEmptyCopy(shotViewSelection, players)}
-                />
-              </div>
-            </div>
-          )
-        })()}
+        {summaryTab === 'shot_chart' && (
+          <GameSummaryShotChartPanel
+            players={players}
+            summaryShotChart={summaryShotChart}
+            isReviewShotChart={isReviewShotChart}
+            shotViewSelection={shotViewSelection}
+            onShotViewSelectionChange={setShotViewSelection}
+            activeBgClass={sport?.theme.bg ?? 'bg-orange-500'}
+          />
+        )}
 
         {summaryTab === 'team' && (
           <div className="card mb-6 border-slate-200">
@@ -1312,63 +1178,19 @@ export default function GameSummary() {
         </div>
 
         {correcting && (
-          <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10"
-            onClick={handleCloseCorrect}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="correct-stat-title"
-          >
-            <div
-              className="card max-w-sm w-full"
-              onClick={e => e.stopPropagation()}
-            >
-              <h3 id="correct-stat-title" className="font-semibold text-slate-700 mb-3">
-                Correct stat
-              </h3>
-              <p className="text-sm text-slate-600 mb-2">
-                {correcting.playerName} — {correcting.statLabel}
-              </p>
-              <p className="text-xs text-slate-500 mb-3">
-                Current value: {correcting.currentValue}
-              </p>
-              {correctError && (
-                <div className="mb-3 text-sm text-red-600">{correctError}</div>
-              )}
-              <input
-                type="number"
-                min={0}
-                value={correctValue}
-                onChange={e => setCorrectValue(e.target.value)}
-                className="input-field mb-3"
-                placeholder="New value"
-              />
-              <input
-                type="text"
-                value={correctReason}
-                onChange={e => setCorrectReason(e.target.value)}
-                className="input-field mb-4"
-                placeholder="Reason (optional)"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveCorrection}
-                  disabled={savingCorrection}
-                  className="btn-primary flex-1"
-                >
-                  {savingCorrection ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseCorrect}
-                  className="btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
+          <StatCorrectionModal
+            playerName={correcting.playerName}
+            statLabel={correcting.statLabel}
+            currentValue={correcting.currentValue}
+            correctValue={correctValue}
+            correctReason={correctReason}
+            correctError={correctError}
+            savingCorrection={savingCorrection}
+            onCorrectValueChange={setCorrectValue}
+            onCorrectReasonChange={setCorrectReason}
+            onSave={() => { void handleSaveCorrection() }}
+            onClose={handleCloseCorrect}
+          />
         )}
       </div>
     </div>

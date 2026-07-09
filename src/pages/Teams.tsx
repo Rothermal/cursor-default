@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -54,8 +54,9 @@ interface PoolPlayer {
   nickname: string | null
 }
 
-export default function Teams() {
-  const location = useLocation()
+export type TeamsPageMode = 'list' | 'manage'
+
+export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, isConfigured } = useAuth()
@@ -63,7 +64,7 @@ export default function Teams() {
   const { isSportEnabled } = useSettings()
   const userId = user?.id ?? null
   const requestedTeamId = searchParams.get('teamId')
-  const isManagementRoute = location.pathname === '/team/manage'
+  const isManagementRoute = mode === 'manage'
   const supabaseClient = supabase
   const enabledSports = useMemo(() => sports.filter(s => isSportEnabled(s.id)), [isSportEnabled])
 
