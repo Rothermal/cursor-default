@@ -211,15 +211,20 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
+| [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue (primary next roadmap item) |
+
+### Held / waiting for feedback
+
+| Doc | Topic |
+|-----|-------|
 | [`DESIGN_SHOT_TRACKER_UI_REVAMP.md`](DESIGN_SHOT_TRACKER_UI_REVAMP.md) | Court-capture program status (F1–F13) |
 | [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Court-capture roadmap; F10 superseded by F13 |
-| [`PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md) | Held draft plan for shot detail, linked metadata, and editing |
-| [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue |
+| [`PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md) | Held draft: shot detail, linked metadata, and editing |
 
 **Court program status:** F1-F9 and F12 are implemented; manual Supabase-heavy QA remains in
 [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). F10 standalone marker numbering is no
-longer needed and is superseded by F13 shot detail/edit planning. F11 and F13 are both
-held pending further user feedback. See also [`DESIGN_SHOT_TRACKER_UI_REVAMP.md`](DESIGN_SHOT_TRACKER_UI_REVAMP.md).
+longer needed and is superseded by F13. F11 and F13 are held pending further user feedback —
+do not start them without explicit go-ahead.
 
 ### Verification norms
 

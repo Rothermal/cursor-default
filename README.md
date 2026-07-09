@@ -69,10 +69,12 @@ The dev server starts at `http://localhost:5173`.
 ### Supabase Setup (optional)
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. Copy `.env.example` to `.env` and fill in your project URL and anon key:
+2. Copy `.env.example` to `.env` and fill in your project URL and key (prefer **publishable**; **anon** still works as a fallback — see `src/lib/supabase.ts`):
    ```
    VITE_SUPABASE_URL=https://your-project.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-anon-key
+   VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+   # Legacy fallback still accepted:
+   # VITE_SUPABASE_ANON_KEY=your-anon-key
    ```
 3. Run the migration SQL files in order via the Supabase SQL Editor:
    - `supabase/migrations/001_profiles.sql`
@@ -129,7 +131,7 @@ StatKeeper is deployed to **GitHub Pages** via GitHub Actions. Each push to the 
 | **Trigger** | Push to `stattracker` branch |
 | **Build** | `pnpm build` with Supabase env vars from GitHub Actions secrets |
 
-Supabase credentials (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) must be set as [GitHub repository secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) for cloud features to work in production. See [`GITHUB_PAGES_DEPLOY.md`](GITHUB_PAGES_DEPLOY.md) for setup steps.
+Supabase credentials must be set as [GitHub repository secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) for cloud features to work in production. The deploy workflow currently passes `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; locally prefer `VITE_SUPABASE_PUBLISHABLE_KEY` (anon remains accepted). See [`GITHUB_PAGES_DEPLOY.md`](GITHUB_PAGES_DEPLOY.md) for setup steps.
 
 ### Other Commands
 
@@ -339,28 +341,21 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] **Court capture held items** — F10 visible numbering is superseded by F13; F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
 - [ ] **Multi-game parking + sync queue** — multiple in-progress/paused games per device, offline-safe snapshots, ordered cloud sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
+- [ ] Optional stat descriptions — toggle full stat names vs abbreviations
+- [ ] Bulk / archive games — beyond per-row delete in Games and Settings Data Management
 
-### Future Enhancements
+### Held / waiting for feedback
 
-A backlog of ideas to iterate over:
+- **Court capture F11 / F13** — F10 visible numbering is superseded by F13; F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
 
-1. **Manual home team score** — Add the ability to update the home team score just like the away team; disconnect game score completely from player stats (home score is currently auto-computed from player stats). *Implemented: home score = computed from player stats + editable adjustment (+/− buttons on Scoreboard); adjustment persisted and synced (migration 015).*
-2. **Editable team names, player names, and tournaments** — Allow editing from the proper locations; editing and sync work for both local and cloud. *Implemented: team name + nickname editable from Teams page; player first/last name, jersey number, nickname editable from Teams roster; opponent name editable from Games history (inline edit). Tournaments as first-class entity — `tournaments` table (migration 016) with team-scoped picker in Game Setup; games reference `tournament_id`. Design: [DESIGN_TOURNAMENTS.md](docs/completed/DESIGN_TOURNAMENTS.md).*
-4. **Minutes played, game notes, missed shots** — Extend stat tracking. *Implemented: minutes played as per-player counter in basketball (stat `min`, Playmaking category); game notes with free-text field in Game Tracker and Game Summary, synced to cloud (migration 017); missed shots for basketball with [−][A][+] attempt buttons and M/A (%) columns in Game Summary.*
-5. **Delete editable entities** — Ability to delete all editable things (teams, players, tournaments, games, etc.). Every delete action shows a confirmation prompt with Yes/No buttons before proceeding. *Implemented: delete teams, players (hard delete), games, and tournaments from the Teams page, Games page, Game Setup tournament picker, and a centralized Data Management section in Settings (Admin). All deletes show a confirmation dialog. Cascading deletes handled by Supabase FK constraints (`ON DELETE CASCADE`).*
-6. **Score totals in game list** — *Implemented for final and in-progress Cloud Games cards via F4; scheduled 0-0 games hide the score.*
-7. **Optional stat descriptions** — Toggle to display full stat names (e.g., "Free Throw") instead of abbreviated labels (e.g., "FT"); or optionally show stat descriptions.
-8. **Games tied to season** — Determine how games are tied to an individual season (e.g., team has season field; games inherit or reference it; season filter in leaderboard). *Implemented: `seasons` table as top-level entity (migration 018); teams belong to a season via `season_id` FK; games inherit season through their team; season filter in Game Setup; season CRUD in Settings. Design: [DESIGN_SEASONS_DATA_MODEL.md](docs/completed/DESIGN_SEASONS_DATA_MODEL.md).*
-9. **Clean up existing games** — A way to clean up existing games (delete, archive, or bulk actions). *Partially addressed by enhancement #5 (delete games individually from Games page and Data Management in Settings). Bulk actions and archive not yet implemented.*
-10. **Data integrity & creation order** — Migration **`019` applied** on the database (sport CHECK, unique team per season, active jersey uniqueness, `games.season_id` + triggers, tournament/team validation). App aligns `cloudSync` and Game Setup / Teams. Full plan and checklist: [docs/completed/DATA_INTEGRITY_AND_CREATION_PLAN.md](docs/completed/DATA_INTEGRITY_AND_CREATION_PLAN.md). Regression: [docs/REGRESSION_TESTING.md](docs/REGRESSION_TESTING.md) §13.
-11. *(Add more as we go)*
+### Shipped history (formerly Future Enhancements)
 
+Earlier backlog items that are already done (see What’s Done above for detail): home score adjustment (015), editable names/tournaments (016), minutes/notes/missed shots (017), entity deletes, in-progress/final scores on resume UI (F4), seasons on games (018), data-integrity migration **019**.
 ### Known Issues
 
 1. **Verify historical duplicate final/in-progress listing** — Older docs noted that a completed cloud game could appear as both final and in progress after finalization. Re-test this against the current Cloud Games flow before treating it as an active bug; if it still reproduces, fix the finalization/list filtering path.
