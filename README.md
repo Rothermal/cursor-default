@@ -356,6 +356,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 ### Shipped history (formerly Future Enhancements)
 
 Earlier backlog items that are already done (see What’s Done above for detail): home score adjustment (015), editable names/tournaments (016), minutes/notes/missed shots (017), entity deletes, in-progress/final scores on resume UI (F4), seasons on games (018), data-integrity migration **019**.
+
 ### Known Issues
 
 1. **Verify historical duplicate final/in-progress listing** — Older docs noted that a completed cloud game could appear as both final and in progress after finalization. Re-test this against the current Cloud Games flow before treating it as an active bug; if it still reproduces, fix the finalization/list filtering path.
