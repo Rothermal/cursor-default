@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
+import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName, playerRosterSelectLabel } from '../lib/display'
 import { teamInfoPath, teamLeaderboardPath, teamManagementPath } from '../lib/teamInfo'
@@ -59,10 +60,12 @@ export default function Teams() {
   const [searchParams] = useSearchParams()
   const { user, isConfigured } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
+  const { isSportEnabled } = useSettings()
   const userId = user?.id ?? null
   const requestedTeamId = searchParams.get('teamId')
   const isManagementRoute = location.pathname === '/team/manage'
   const supabaseClient = supabase
+  const enabledSports = useMemo(() => sports.filter(s => isSportEnabled(s.id)), [isSportEnabled])
 
   const [teams, setTeams] = useState<TeamRow[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
@@ -82,6 +85,13 @@ export default function Teams() {
   const [newTeamName, setNewTeamName] = useState('')
   const [newTeamSport, setNewTeamSport] = useState('basketball')
   const [newTeamSeason, setNewTeamSeason] = useState(new Date().getFullYear().toString())
+
+  useEffect(() => {
+    if (enabledSports.length === 0) return
+    if (!enabledSports.some(s => s.id === newTeamSport)) {
+      setNewTeamSport(enabledSports[0]!.id)
+    }
+  }, [enabledSports, newTeamSport])
 
   const [newPlayerFirst, setNewPlayerFirst] = useState('')
   const [newPlayerLast, setNewPlayerLast] = useState('')
@@ -984,7 +994,7 @@ export default function Teams() {
                     onChange={e => setNewTeamSport(e.target.value)}
                     className="input-field"
                   >
-                    {sports.map(sport => (
+                    {enabledSports.map(sport => (
                       <option key={sport.id} value={sport.id}>
                         {sport.icon} {sport.name}
                       </option>
@@ -1006,6 +1016,7 @@ export default function Teams() {
                 disabled={
                   !newTeamName.trim()
                   || creatingTeam
+                  || enabledSports.length === 0
                   || (seasonMode === 'existing' && !selectedSeasonId)
                   || (seasonMode === 'new' && !newTeamSeason.trim())
                 }

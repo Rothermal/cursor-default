@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import type { BasketballTeamStatsConfig } from '../types'
@@ -83,7 +83,8 @@ export default function Admin() {
   const supabaseClient = supabase
   const userId = user?.id ?? null
 
-  const enabledCount = sports.filter(s => isSportEnabled(s.id)).length
+  const enabledSports = useMemo(() => sports.filter(s => isSportEnabled(s.id)), [isSportEnabled])
+  const enabledCount = enabledSports.length
 
   const [adminTeams, setAdminTeams] = useState<AdminTeamRow[]>([])
   const [adminGames, setAdminGames] = useState<AdminGameRow[]>([])
@@ -105,10 +106,19 @@ export default function Admin() {
   const [loadingSeasons, setLoadingSeasons] = useState(false)
   const [seasonsError, setSeasonsError] = useState<string | null>(null)
   const [newSeasonName, setNewSeasonName] = useState('')
-  const [newSeasonSport, setNewSeasonSport] = useState(sports[0]?.id ?? '')
+  const [newSeasonSport, setNewSeasonSport] = useState(
+    () => sports.find(s => isSportEnabled(s.id))?.id ?? sports[0]?.id ?? ''
+  )
   const [newSeasonStartDate, setNewSeasonStartDate] = useState('')
   const [newSeasonEndDate, setNewSeasonEndDate] = useState('')
   const [creatingSeason, setCreatingSeason] = useState(false)
+
+  useEffect(() => {
+    if (enabledSports.length === 0) return
+    if (!enabledSports.some(s => s.id === newSeasonSport)) {
+      setNewSeasonSport(enabledSports[0]!.id)
+    }
+  }, [enabledSports, newSeasonSport])
   const [editingSeasonId, setEditingSeasonId] = useState<string | null>(null)
   const [editSeasonName, setEditSeasonName] = useState('')
   const [editSeasonStartDate, setEditSeasonStartDate] = useState('')
@@ -581,7 +591,7 @@ export default function Admin() {
                     onChange={e => setNewSeasonSport(e.target.value)}
                     className="input-field"
                   >
-                    {sports.map(s => (
+                    {enabledSports.map(s => (
                       <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
                     ))}
                   </select>
@@ -608,7 +618,7 @@ export default function Admin() {
                   <button
                     type="button"
                     onClick={() => void handleCreateSeason()}
-                    disabled={!newSeasonName.trim() || creatingSeason}
+                    disabled={!newSeasonName.trim() || creatingSeason || enabledSports.length === 0}
                     className="btn-primary w-full"
                   >
                     {creatingSeason ? 'Creating…' : 'Create Season'}

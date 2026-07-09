@@ -12,6 +12,7 @@ import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { teamDisplayName } from '../lib/display'
+import { loadLegacyFinalStatsTotals } from '../lib/legacyFinalStats'
 import { supabase } from '../lib/supabase'
 import {
   computeTeamRecord,
@@ -239,25 +240,9 @@ export default function TeamInfo() {
         setTeamMembers(rows)
       }
 
-      const legacyFinals = loadedGames.filter(
-        game => game.status === 'final' && game.home_team_score == null
-      )
-      if (legacyFinals.length > 0) {
-        const totals: Record<string, Record<string, number>> = {}
-        await Promise.all(
-          legacyFinals.map(async game => {
-            const { data, error: statsError } = await supabaseClient.rpc('get_game_stats_resolved', {
-              p_game_id: game.id,
-            })
-            if (statsError) return
-            totals[game.id] = {}
-            for (const row of (data ?? []) as { stat_id: string; value: number }[]) {
-              totals[game.id][row.stat_id] =
-                (totals[game.id][row.stat_id] ?? 0) + Number(row.value)
-            }
-          })
-        )
-        if (!cancelled) setStatsTotalsByGameId(totals)
+      const totals = await loadLegacyFinalStatsTotals(supabaseClient, loadedGames)
+      if (!cancelled && Object.keys(totals).length > 0) {
+        setStatsTotalsByGameId(totals)
       }
 
       if (!cancelled) setLoading(false)
