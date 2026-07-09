@@ -2,7 +2,7 @@
 
 Merge two `players` rows when one was created by mistake: **reattach** all dependent data to the **survivor**, resolve uniqueness conflicts (with **user choices** where needed), then **delete** the duplicate row.
 
-**Status:** Product decisions locked (§5). Ready for implementation.
+**Status:** **Implemented.** Merge wizard ships on `/team/manage` (and Admin) via `MergePlayerWizard`; RPCs and audit table are migrations **024** / **025**.
 
 **Related:** [DATA_INTEGRITY_AND_CREATION_PLAN.md](DATA_INTEGRITY_AND_CREATION_PLAN.md), [DESIGN_SEASONS_DATA_MODEL.md](DESIGN_SEASONS_DATA_MODEL.md).
 

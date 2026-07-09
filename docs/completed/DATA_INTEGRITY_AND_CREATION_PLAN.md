@@ -2,7 +2,7 @@
 
 This document captures a planned set of database and application changes to reduce drift after schema evolution (especially migration 018: seasons, `team_players`, `players.created_by`), align team/season creation across UI paths, and enforce clearer rules for required fields and insert order.
 
-**Status:** Database Phase A audit and migration **`019` are applied** on the production-ready database. App changes (`cloudSync`, Game Setup, Teams) are in the codebase. **Next:** run a full app regression (see checklist §5 and [`REGRESSION_TESTING.md`](../REGRESSION_TESTING.md), including §13).
+**Status:** Database Phase A audit and migration **`019` are applied** on the production-ready database. App changes (`cloudSync`, Game Setup, Teams) are in the codebase. **Maintenance:** after applying **019** (or importing legacy data), re-run the integrity checklist in §5 and [`REGRESSION_TESTING.md`](../REGRESSION_TESTING.md) §13 as an on-upgrade sanity check — not open feature work.
 
 For **new** environments or clones, still run `supabase/scripts/audit_data_integrity_pre_019.sql` before `019` if you are importing legacy data that might violate constraints.
 

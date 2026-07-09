@@ -1,5 +1,7 @@
 # Feature 1 Plan: Single-Page Game Tracker + Court Event Capture (Option A)
 
+> **Status:** Implemented.
+>
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See the umbrella [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md)
 > for shared context. Follow-on enhancements live in

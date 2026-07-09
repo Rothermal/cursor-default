@@ -1,5 +1,7 @@
 # Feature 2 Plan: Per-Player Shot Tracker + Team Views
 
+> **Status:** Implemented.
+>
 > **For agentic workers:** Design + implementation plan. Steps use checkbox (`- [ ]`)
 > syntax. See [DESIGN_SHOT_TRACKER_UI_REVAMP.md](../DESIGN_SHOT_TRACKER_UI_REVAMP.md) for
 > shared context. Depends on **F1** ([PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md))
