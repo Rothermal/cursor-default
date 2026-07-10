@@ -38,6 +38,7 @@ import {
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
 import { clearEntireShotChart, statIdForShotRecord } from '../lib/clearShotChart'
+import { mergeCloudSyncState } from '../lib/cloudSyncState'
 
 import {
   GAME_OWNER_KEY,
@@ -560,10 +561,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SET_CLOUD_SYNC_STATE':
       return {
         ...state,
-        cloudSync: {
-          ...state.cloudSync,
-          ...action.cloudSync,
-        },
+        cloudSync: mergeCloudSyncState(state.cloudSync, action.cloudSync),
       }
 
     case 'SET_PERIOD': {

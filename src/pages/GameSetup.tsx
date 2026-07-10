@@ -109,13 +109,21 @@ export default function GameSetup() {
         return
       }
 
-      if (sport?.id !== requestedSport.id) {
+      const hasActiveGame = Boolean(state.sport && state.players.length > 0)
+      const sportMismatch = sport?.id !== requestedSport.id
+      // Same-sport deep links to a *different* cloud team must also reset — otherwise
+      // handleNext can re-home the prior gameId/roster onto the requested team.
+      const teamMismatch = Boolean(
+        requestedTeamId &&
+          state.cloudSync.teamId &&
+          requestedTeamId !== state.cloudSync.teamId
+      )
+      if (sportMismatch || (teamMismatch && hasActiveGame)) {
         if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
           setRequestedTeamSportError('Finish syncing your current game before starting another.')
           setLoadingRequestedTeamSport(false)
           return
         }
-        const hasActiveGame = Boolean(state.sport && state.players.length > 0)
         if (
           hasActiveGame &&
           !window.confirm('Starting a new game will discard your active game. Continue?')
@@ -133,7 +141,7 @@ export default function GameSetup() {
     return () => {
       cancelled = true
     }
-  }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, state.players.length, state.sport])
+  }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, state.cloudSync.teamId, state.players.length, state.sport])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -365,6 +373,25 @@ export default function GameSetup() {
   const handleNext = async () => {
     if (!canProceed) return
     setSetupError(null)
+
+    const nextTeamId = teamMode === 'existing' ? selectedTeamId || null : null
+    const teamIdChanging = nextTeamId !== state.cloudSync.teamId
+    const hasActiveGame = Boolean(state.sport && state.players.length > 0)
+    // Switching cloud teams must not keep the prior gameId/roster (same-name teams
+    // previously slipped past SET_GAME_INFO's teamName-only clear).
+    if (teamIdChanging && (hasActiveGame || state.cloudSync.gameId)) {
+      if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
+        setSetupError('Finish syncing your current game before switching teams.')
+        return
+      }
+      if (
+        hasActiveGame &&
+        !window.confirm('Switching teams will discard your active game. Continue?')
+      ) {
+        return
+      }
+      dispatch({ type: 'SET_SPORT', sport })
+    }
 
     // Resolve tournament: existing selection, create new, or free-text
     let resolvedTournamentId: string | null = null
