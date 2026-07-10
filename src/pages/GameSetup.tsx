@@ -141,6 +141,8 @@ export default function GameSetup() {
     return () => {
       cancelled = true
     }
+    // Re-run on sport/team/roster identity only — not every local stat tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit full `state` (fingerprint/stats)
   }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, state.cloudSync.teamId, state.players.length, state.sport])
 
   useEffect(() => {
