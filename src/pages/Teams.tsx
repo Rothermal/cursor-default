@@ -10,6 +10,7 @@ import { teamInfoPath, teamLeaderboardPath, teamManagementPath } from '../lib/te
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
+import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
 
 interface TeamRow {
   id: string
@@ -187,16 +188,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       setTeams(loadedTeams)
       // List mode never selects a team (avoids roster/member fetches the list UI does not show).
       // Manage mode only selects the requested teamId — never falls back to the first team.
-      setSelectedTeamId(() => {
-        if (
-          isManagementRoute &&
-          requestedTeamId &&
-          loadedTeams.some(team => team.id === requestedTeamId)
-        ) {
-          return requestedTeamId
-        }
-        return ''
-      })
+      setSelectedTeamId(
+        resolveTeamsPageSelectedTeamId({
+          isManagementRoute,
+          requestedTeamId,
+          loadedTeamIds: loadedTeams.map(team => team.id),
+        })
+      )
       setLoadingTeams(false)
     }
 
