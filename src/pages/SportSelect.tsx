@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
+import { shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 
 export default function SportSelect() {
@@ -11,6 +14,7 @@ export default function SportSelect() {
   const { state, dispatch } = useGame()
   const { user, signOut, isConfigured } = useAuth()
   const { isSportEnabled } = useSettings()
+  const [newGameError, setNewGameError] = useState<string | null>(null)
 
   const enabledSports = sports.filter(s => isSportEnabled(s.id))
   const syncStatusLabel = (() => {
@@ -51,17 +55,33 @@ export default function SportSelect() {
   })()
 
   const handleSelect = (sportId: string) => {
-    if (
-      hasActiveGame &&
-      !window.confirm('Starting a new game will discard your active game. Continue?')
-    ) {
-      return
+    setNewGameError(null)
+    if (hasActiveGame) {
+      if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
+        setNewGameError('Finish syncing your current game before starting another.')
+        return
+      }
+      if (!window.confirm('Starting a new game will discard your active game. Continue?')) {
+        return
+      }
     }
     const sport = sports.find(s => s.id === sportId)
     if (sport) {
       dispatch({ type: 'SET_SPORT', sport })
       navigate('/setup')
     }
+  }
+
+  const handleNewGame = () => {
+    setNewGameError(null)
+    if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
+      setNewGameError('Finish syncing your current game before starting another.')
+      return
+    }
+    if (!window.confirm('Starting a new game will discard your active game. Continue?')) {
+      return
+    }
+    dispatch({ type: 'RESET_GAME' })
   }
 
   return (
@@ -111,7 +131,7 @@ export default function SportSelect() {
                   Resume
                 </button>
                 <button
-                  onClick={() => dispatch({ type: 'RESET_GAME' })}
+                  onClick={handleNewGame}
                   className="bg-white text-blue-600 px-3 py-2 rounded-lg text-sm font-semibold
                              border border-blue-200 active:scale-95 transition-transform"
                 >
@@ -119,6 +139,9 @@ export default function SportSelect() {
                 </button>
               </div>
             </div>
+            {newGameError && (
+              <p className="text-xs text-red-600 mt-2">{newGameError}</p>
+            )}
           </div>
         )}
 
