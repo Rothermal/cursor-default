@@ -6,6 +6,8 @@ import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { hasTrackedTeamSide } from '../lib/teamStatsSummary'
+import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import TeamStatSummary from '../components/team-stats/TeamStatSummary'
 import GameSummaryShotChartPanel from './game-summary/GameSummaryShotChartPanel'
 import StatCorrectionModal from './game-summary/StatCorrectionModal'
@@ -69,6 +71,7 @@ export default function GameSummary() {
   const [checkoutsByPlayer, setCheckoutsByPlayer] = useState<CheckoutsByPlayerMap | null>(null)
   const [settingPrimaryFor, setSettingPrimaryFor] = useState<string | null>(null)
   const [primaryError, setPrimaryError] = useState<string | null>(null)
+  const [newGameError, setNewGameError] = useState<string | null>(null)
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const gameId = state.cloudSync.gameId
@@ -522,6 +525,14 @@ export default function GameSummary() {
   }
 
   const handleNewGame = () => {
+    setNewGameError(null)
+    if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
+      setNewGameError('Finish syncing your current game before starting another.')
+      return
+    }
+    if (!window.confirm('Starting a new game will discard your active game. Continue?')) {
+      return
+    }
     dispatch({ type: 'RESET_GAME' })
     navigate('/')
   }
@@ -1157,24 +1168,30 @@ export default function GameSummary() {
           {isFinalCloudGame ? (
             <button
               onClick={() => navigate('/games')}
-              className="btn-secondary w-full"
+              disabled={finalizing}
+              className="btn-secondary w-full disabled:opacity-50"
             >
               ← Back to Cloud Games
             </button>
           ) : (
             <button
               onClick={() => navigate('/game')}
-              className="btn-primary w-full"
+              disabled={finalizing}
+              className="btn-primary w-full disabled:opacity-50"
             >
               ← Back to Game
             </button>
           )}
           <button
             onClick={handleNewGame}
-            className="btn-secondary w-full"
+            disabled={finalizing}
+            className="btn-secondary w-full disabled:opacity-50"
           >
             New Game
           </button>
+          {newGameError && (
+            <p className="text-sm text-red-600 text-center">{newGameError}</p>
+          )}
         </div>
 
         {correcting && (

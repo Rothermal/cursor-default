@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
+import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 
 /**
  * Finalize an in-progress cloud game: flush sync → mark final → clear local → reset.
@@ -14,6 +16,8 @@ export function useFinalizeGame() {
   const { user, isConfigured } = useAuth()
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
   const canFinalizeCloudGame = Boolean(
@@ -32,7 +36,33 @@ export function useFinalizeGame() {
       return
     }
 
-    const { opponentScore, homeTeamScore, homeScoreAdjustment } = state
+    // Re-read after await: Back-to-Game edits during flush are re-synced by the
+    // stale loop, but edits after flush returns must not be wiped with stale scores.
+    const latest = stateRef.current
+    if (shouldBlockDiscardUnsyncedGame(latest, getPendingSyncFlag())) {
+      const retry = await flushCloudSync()
+      if (!retry.ok) {
+        setFinalizing(false)
+        setFinalizeError(retry.reason)
+        return
+      }
+    }
+
+    const afterFlush = stateRef.current
+    if (shouldBlockDiscardUnsyncedGame(afterFlush, getPendingSyncFlag())) {
+      setFinalizing(false)
+      setFinalizeError('Latest changes could not be synced. Try again.')
+      return
+    }
+
+    const gameId = afterFlush.cloudSync.gameId
+    if (!gameId) {
+      setFinalizing(false)
+      setFinalizeError('Game is no longer bound for finalize. Try again.')
+      return
+    }
+
+    const { opponentScore, homeTeamScore, homeScoreAdjustment } = afterFlush
 
     const initial = await supabase!
       .from('games')
@@ -42,7 +72,7 @@ export function useFinalizeGame() {
         home_team_score: homeTeamScore,
         home_score_adjustment: homeScoreAdjustment,
       })
-      .eq('id', state.cloudSync.gameId)
+      .eq('id', gameId)
 
     let updateError = initial.error
     if (
@@ -57,7 +87,7 @@ export function useFinalizeGame() {
           opponent_score: opponentScore,
           home_score_adjustment: homeScoreAdjustment,
         })
-        .eq('id', state.cloudSync.gameId)
+        .eq('id', gameId)
       updateError = retry.error ?? null
     }
     if (
@@ -71,7 +101,7 @@ export function useFinalizeGame() {
           status: 'final',
           opponent_score: opponentScore,
         })
-        .eq('id', state.cloudSync.gameId)
+        .eq('id', gameId)
       updateError = retry.error ?? null
     }
 

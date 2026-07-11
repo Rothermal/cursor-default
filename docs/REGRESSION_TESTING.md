@@ -279,7 +279,9 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 5.6a | On Scoreboard: tap + or − under home team score | Home score increases or decreases by 1 (stays ≥ computed from stats); Undo restores |
 | 5.7 | Tap Undo -> top-row **Undo** in Recent events | Previous value restored |
 | 5.8 | Game Summary | Tables show per-player and team totals; categories correct |
-| 5.9 | New Game (from home with active game) | Reset; can start new game |
+| 5.9 | New Game (from home with active **local** game) | Confirm → reset; can start new game (offline-only must not show a permanent "Finish syncing…" block) |
+| 5.9a | Summary → New Game with **unsynced** cloud stats | Blocked with sync message; synced/clean cloud game confirms then resets |
+| 5.9b | Summary → Finalize while in progress | Back to Game / New Game disabled until finalize finishes |
 
 ---
 
