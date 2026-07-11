@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
-import { shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
+import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 
@@ -57,7 +57,7 @@ export default function SportSelect() {
   const handleSelect = (sportId: string) => {
     setNewGameError(null)
     if (hasActiveGame) {
-      if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
+      if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
         setNewGameError('Finish syncing your current game before starting another.')
         return
       }
@@ -74,7 +74,7 @@ export default function SportSelect() {
 
   const handleNewGame = () => {
     setNewGameError(null)
-    if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
+    if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
       setNewGameError('Finish syncing your current game before starting another.')
       return
     }

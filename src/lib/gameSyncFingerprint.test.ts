@@ -3,6 +3,7 @@ import type { GameState } from '../types'
 import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
+  shouldBlockDiscardUnsyncedGame,
   shouldBlockManualCloudHydrate,
   shouldDeferCloudResumeHydration,
   shouldRejectSkippedFinalSync,
@@ -146,5 +147,53 @@ describe('gameSyncFingerprint', () => {
 
   it('rejects skipped-final sync when last synced fingerprint is unknown', () => {
     expect(shouldRejectSkippedFinalSync(baseState())).toBe(true)
+  })
+
+  it('shouldBlockDiscardUnsyncedGame allows pure local games (no cloud binding)', () => {
+    const localOnly = baseState({
+      cloudSync: {
+        ...baseState().cloudSync,
+        seasonId: null,
+        teamId: null,
+        gameId: null,
+        lastSyncedGameFingerprint: null,
+      },
+    })
+    // Hydrate defer still true (!gameId) — discard must not reuse that gate.
+    expect(shouldBlockManualCloudHydrate(localOnly, false)).toBe(true)
+    expect(shouldBlockDiscardUnsyncedGame(localOnly, false)).toBe(false)
+  })
+
+  it('shouldBlockDiscardUnsyncedGame blocks cloud team without gameId (pre-first-sync)', () => {
+    const pendingCreate = baseState({
+      cloudSync: {
+        ...baseState().cloudSync,
+        gameId: null,
+        teamId: 't1',
+        lastSyncedGameFingerprint: null,
+      },
+    })
+    expect(shouldBlockDiscardUnsyncedGame(pendingCreate, false)).toBe(true)
+  })
+
+  it('shouldBlockDiscardUnsyncedGame blocks dirty cloud games and allows clean synced ones', () => {
+    const syncedFp = buildGameSyncFingerprint(baseState())
+    const clean = baseState({
+      cloudSync: {
+        ...baseState().cloudSync,
+        lastSyncedGameFingerprint: syncedFp,
+      },
+    })
+    expect(shouldBlockDiscardUnsyncedGame(clean, false)).toBe(false)
+
+    const dirty = baseState({
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { pts: 99 } }],
+      cloudSync: {
+        ...baseState().cloudSync,
+        lastSyncedGameFingerprint: syncedFp,
+      },
+    })
+    expect(shouldBlockDiscardUnsyncedGame(dirty, false)).toBe(true)
+    expect(shouldBlockDiscardUnsyncedGame(clean, true)).toBe(true)
   })
 })
