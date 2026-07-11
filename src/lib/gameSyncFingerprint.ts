@@ -63,6 +63,38 @@ export function shouldBlockManualCloudHydrate(state: GameState, pendingDurable: 
 }
 
 /**
+ * Block discarding the active game (New Game / SET_SPORT wipe) when that would lose
+ * cloud-bound progress that has not been synced.
+ *
+ * Unlike {@link shouldBlockManualCloudHydrate}, pure local games (no `teamId` /
+ * `gameId`) are allowed — callers still confirm. Reusing the hydrate helper here
+ * permanently blocks offline-only New Game because hydrate defers on `!gameId`.
+ */
+export function shouldBlockDiscardUnsyncedGame(
+  state: GameState,
+  pendingDurable: boolean
+): boolean {
+  if (!state.sport || !state.gameInfo) return false
+  const cs = state.cloudSync
+
+  // Pure local — discard only loses device-local state; confirm is enough.
+  if (!cs.gameId && !cs.teamId) {
+    return false
+  }
+
+  // Cloud team selected but game row not created yet — local is the only copy.
+  if (!cs.gameId) {
+    return true
+  }
+
+  return Boolean(
+    pendingDurable ||
+      cs.lastSyncedGameFingerprint == null ||
+      buildGameSyncFingerprint(state) !== cs.lastSyncedGameFingerprint
+  )
+}
+
+/**
  * When the cloud game is already `final`, sync is a no-op. Reject treating that as success if
  * local edits were never uploaded — otherwise flush/finalize reports ok while stats are lost.
  */

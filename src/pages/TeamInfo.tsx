@@ -12,7 +12,7 @@ import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { teamDisplayName } from '../lib/display'
-import { shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
+import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { loadLegacyFinalStatsTotals } from '../lib/legacyFinalStats'
 import { supabase } from '../lib/supabase'
@@ -128,7 +128,7 @@ export default function TeamInfo() {
   const handleStartGame = () => {
     if (!team || !sport) return
     setStartGameError(null)
-    if (shouldBlockManualCloudHydrate(gameState, getPendingSyncFlag())) {
+    if (shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())) {
       setStartGameError('Finish syncing your current game before starting another.')
       return
     }
