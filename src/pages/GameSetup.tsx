@@ -5,6 +5,10 @@ import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
+import {
+  shouldGuardCloudTeamSwitch,
+  shouldResetActiveGameForRequestedTeam,
+} from '../lib/teamSwitchGuards'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { teamInfoPath } from '../lib/teamInfo'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -110,15 +114,17 @@ export default function GameSetup() {
       }
 
       const hasActiveGame = Boolean(state.sport && state.players.length > 0)
-      const sportMismatch = sport?.id !== requestedSport.id
       // Same-sport deep links to a *different* cloud team must also reset — otherwise
       // handleNext can re-home the prior gameId/roster onto the requested team.
-      const teamMismatch = Boolean(
-        requestedTeamId &&
-          state.cloudSync.teamId &&
-          requestedTeamId !== state.cloudSync.teamId
-      )
-      if (sportMismatch || (teamMismatch && hasActiveGame)) {
+      if (
+        shouldResetActiveGameForRequestedTeam({
+          hasActiveGame,
+          currentSportId: sport?.id,
+          requestedSportId: requestedSport.id,
+          currentTeamId: state.cloudSync.teamId,
+          requestedTeamId,
+        })
+      ) {
         if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
           setRequestedTeamSportError('Finish syncing your current game before starting another.')
           setLoadingRequestedTeamSport(false)
@@ -377,11 +383,17 @@ export default function GameSetup() {
     setSetupError(null)
 
     const nextTeamId = teamMode === 'existing' ? selectedTeamId || null : null
-    const teamIdChanging = nextTeamId !== state.cloudSync.teamId
     const hasActiveGame = Boolean(state.sport && state.players.length > 0)
     // Switching cloud teams must not keep the prior gameId/roster (same-name teams
     // previously slipped past SET_GAME_INFO's teamName-only clear).
-    if (teamIdChanging && (hasActiveGame || state.cloudSync.gameId)) {
+    if (
+      shouldGuardCloudTeamSwitch({
+        nextTeamId,
+        currentTeamId: state.cloudSync.teamId,
+        hasActiveGame,
+        currentGameId: state.cloudSync.gameId,
+      })
+    ) {
       if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
         setSetupError('Finish syncing your current game before switching teams.')
         return
