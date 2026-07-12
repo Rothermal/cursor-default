@@ -86,6 +86,9 @@ export interface ParkedGamesExportPayload {
 export interface ImportParkedGamesResult {
   imported: number
   skipped: number
+  skippedExisting: number
+  skippedAtCap: number
+  skippedInvalid: number
   summaries: ParkedGameSummary[]
 }
 
@@ -714,63 +717,108 @@ function parseImportPayload(raw: string): ParkedGamesExportPayload {
   }
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isImportableGameState(value: unknown): value is GameState {
+  if (!isPlainObject(value)) return false
+  const sport = value.sport
+  const cloudSync = value.cloudSync
+  return (
+    isPlainObject(sport) &&
+    typeof sport.id === 'string' &&
+    typeof sport.name === 'string' &&
+    Array.isArray(value.players) &&
+    Array.isArray(value.actionLog) &&
+    Array.isArray(value.shotChart) &&
+    isPlainObject(cloudSync)
+  )
+}
+
+function isImportableParkedGameRecord(value: unknown): value is ParkedGameRecord {
+  return (
+    isPlainObject(value) &&
+    typeof value.localGameId === 'string' &&
+    value.localGameId.trim().length > 0 &&
+    isImportableGameState(value.gameState)
+  )
+}
+
 export function importParkedGames(raw: string, ownerId: string | null): ImportParkedGamesResult {
   const payload = parseImportPayload(raw)
   const manifest = migrateLegacyGameStorage(ownerId)
   const summaries = { ...manifest.summaries }
   const gameIds = [...manifest.gameIds]
+  const writtenLocalGameIds: string[] = []
   let imported = 0
-  let skipped = 0
+  let skippedExisting = 0
+  let skippedAtCap = 0
+  let skippedInvalid = 0
 
-  for (const incoming of payload.records) {
-    if (!incoming?.localGameId || !incoming.gameState) {
-      skipped += 1
-      continue
-    }
-    if (!gameIds.includes(incoming.localGameId) && gameIds.length >= MAX_PARKED_GAMES) {
-      skipped += 1
-      continue
-    }
+  try {
+    for (const incoming of payload.records) {
+      if (!isImportableParkedGameRecord(incoming)) {
+        skippedInvalid += 1
+        continue
+      }
 
-    const updatedAt = typeof incoming.updatedAt === 'string' ? incoming.updatedAt : nowIso()
-    const sync = normalizeSyncState(incoming.sync, null, incoming.gameState)
-    const record: ParkedGameRecord = {
-      localGameId: incoming.localGameId,
-      ownerId,
-      createdAt: typeof incoming.createdAt === 'string' ? incoming.createdAt : updatedAt,
-      updatedAt,
-      gameState: incoming.gameState,
-      sync,
-      summary: buildSummary(incoming.localGameId, incoming.gameState, updatedAt, sync),
-    }
-    safeSetItem(gameRecordKey(record.localGameId), JSON.stringify(record))
-    if (!gameIds.includes(record.localGameId)) {
+      const localGameId = incoming.localGameId
+      if (gameIds.includes(localGameId) || readRecord(localGameId)) {
+        skippedExisting += 1
+        continue
+      }
+      if (gameIds.length >= MAX_PARKED_GAMES) {
+        skippedAtCap += 1
+        continue
+      }
+
+      const updatedAt = typeof incoming.updatedAt === 'string' ? incoming.updatedAt : nowIso()
+      const sync = normalizeSyncState(incoming.sync, null, incoming.gameState)
+      const record: ParkedGameRecord = {
+        localGameId,
+        ownerId,
+        createdAt: typeof incoming.createdAt === 'string' ? incoming.createdAt : updatedAt,
+        updatedAt,
+        gameState: incoming.gameState,
+        sync,
+        summary: buildSummary(localGameId, incoming.gameState, updatedAt, sync),
+      }
+      safeSetItem(gameRecordKey(record.localGameId), JSON.stringify(record))
+      writtenLocalGameIds.push(record.localGameId)
       gameIds.push(record.localGameId)
+      summaries[record.localGameId] = record.summary
+      imported += 1
     }
-    summaries[record.localGameId] = record.summary
-    imported += 1
+
+    if (imported > 0) {
+      writeManifest({
+        ...manifest,
+        ownerId,
+        activeLocalGameId: manifest.activeLocalGameId,
+        gameIds,
+        summaries,
+      })
+    }
+  } catch (error) {
+    for (const localGameId of writtenLocalGameIds) {
+      try {
+        localStorage.removeItem(gameRecordKey(localGameId))
+      } catch {
+        // ignore rollback cleanup failures; the original import error is rethrown
+      }
+    }
+    throw error
   }
 
-  const activeLocalGameId =
-    payload.activeLocalGameId && gameIds.includes(payload.activeLocalGameId)
-      ? payload.activeLocalGameId
-      : manifest.activeLocalGameId
-  writeManifest({
-    ...manifest,
-    ownerId,
-    activeLocalGameId,
-    gameIds,
-    summaries,
-  })
-
-  const activeRecord = activeLocalGameId ? readRecord(activeLocalGameId) : null
-  if (activeRecord) {
-    writeLegacyMirror(activeRecord.gameState, ownerId)
-  }
+  const skipped = skippedExisting + skippedAtCap + skippedInvalid
 
   return {
     imported,
     skipped,
+    skippedExisting,
+    skippedAtCap,
+    skippedInvalid,
     summaries: listParkedGames(ownerId),
   }
 }

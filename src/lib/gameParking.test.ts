@@ -63,6 +63,21 @@ class QuotaStorage extends MemoryStorage {
   }
 }
 
+class ThrowingImportManifestStorage extends MemoryStorage {
+  private shouldThrowManifest = false
+
+  failManifestWrites(): void {
+    this.shouldThrowManifest = true
+  }
+
+  setItem(key: string, value: string): void {
+    if (key === GAMES_MANIFEST_KEY && this.shouldThrowManifest) {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    }
+    super.setItem(key, value)
+  }
+}
+
 const basketball: SportConfig = {
   id: 'basketball',
   name: 'Basketball',
@@ -114,6 +129,26 @@ function gameState(sport: SportConfig, teamName: string, opponentName: string): 
     teamStatsConfig: null,
     shotChart: [],
   }
+}
+
+function importedRecord(localGameId: string, state: GameState) {
+  return {
+    localGameId,
+    ownerId: null,
+    createdAt: '2026-07-12T12:00:00.000Z',
+    updatedAt: '2026-07-12T12:00:00.000Z',
+    gameState: state,
+  }
+}
+
+function importPayload(records: unknown[], activeLocalGameId: string | null = null): string {
+  return JSON.stringify({
+    version: 1,
+    exportedAt: '2026-07-12T12:00:00.000Z',
+    ownerId: null,
+    activeLocalGameId,
+    records,
+  })
 }
 
 beforeEach(() => {
@@ -284,7 +319,7 @@ describe('gameParking', () => {
     saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
     parkActiveGame('user-1')
     beginNewActiveParkedGame('user-1')
-    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+    const [activeBeforeExport] = saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
 
     const exported = exportParkedGames('user-1')
     localStorage.clear()
@@ -293,10 +328,100 @@ describe('gameParking', () => {
 
     expect(result.imported).toBe(2)
     expect(result.skipped).toBe(0)
+    expect(result.skippedExisting).toBe(0)
+    expect(result.skippedAtCap).toBe(0)
+    expect(result.skippedInvalid).toBe(0)
+    expect(getActiveLocalGameId('user-1')).toBeNull()
+    expect(localStorage.getItem(GAME_STORAGE_KEY)).toBeNull()
+    expect(activeBeforeExport.localGameId).toBeTruthy()
     expect(listParkedGames('user-1').map(game => game.sportId).sort()).toEqual([
       'basketball',
       'soccer',
     ])
+  })
+
+  it('keeps existing games when imported records use the same local id', () => {
+    const [existing] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const payload = importPayload([
+      importedRecord(existing.localGameId, gameState(soccer, 'Imported', 'Hawks')),
+    ])
+
+    const result = importParkedGames(payload, 'user-1')
+
+    expect(result.imported).toBe(0)
+    expect(result.skipped).toBe(1)
+    expect(result.skippedExisting).toBe(1)
+    expect(result.skippedAtCap).toBe(0)
+    expect(result.skippedInvalid).toBe(0)
+    expect(getParkedGameRecord(existing.localGameId, 'user-1')?.gameState.gameInfo).toMatchObject({
+      teamName: 'Aces',
+      opponentName: 'Bears',
+    })
+  })
+
+  it('skips records that fail shallow import validation', () => {
+    const result = importParkedGames(
+      importPayload([
+        { localGameId: 'missing-state' },
+        {
+          localGameId: 'missing-sport',
+          gameState: {
+            ...gameState(basketball, 'Aces', 'Bears'),
+            sport: null,
+          },
+        },
+      ]),
+      'user-1'
+    )
+
+    expect(result.imported).toBe(0)
+    expect(result.skipped).toBe(2)
+    expect(result.skippedInvalid).toBe(2)
+    expect(listParkedGames('user-1')).toEqual([])
+  })
+
+  it('imports what fits and skips remaining valid rows at the parked-game limit', () => {
+    for (let i = 0; i < MAX_PARKED_GAMES - 1; i += 1) {
+      saveActiveGameState(gameState(basketball, `Team ${i}`, 'Bears'), 'user-1')
+      parkActiveGame('user-1')
+    }
+
+    const result = importParkedGames(
+      importPayload([
+        importedRecord('import-1', gameState(soccer, 'Import 1', 'Hawks')),
+        importedRecord('import-2', gameState(soccer, 'Import 2', 'Hawks')),
+        importedRecord('import-3', gameState(soccer, 'Import 3', 'Hawks')),
+      ]),
+      'user-1'
+    )
+
+    expect(result.imported).toBe(1)
+    expect(result.skipped).toBe(2)
+    expect(result.skippedAtCap).toBe(2)
+    expect(listParkedGames('user-1')).toHaveLength(MAX_PARKED_GAMES)
+    expect(getParkedGameRecord('import-1', 'user-1')).not.toBeNull()
+    expect(getParkedGameRecord('import-2', 'user-1')).toBeNull()
+    expect(getParkedGameRecord('import-3', 'user-1')).toBeNull()
+  })
+
+  it('rolls back records written by an import when the final manifest write fails', () => {
+    const storage = new ThrowingImportManifestStorage()
+    vi.stubGlobal('localStorage', storage)
+    storage.failManifestWrites()
+
+    expect(() =>
+      importParkedGames(
+        importPayload([
+          importedRecord('import-1', gameState(basketball, 'Aces', 'Bears')),
+          importedRecord('import-2', gameState(soccer, 'Aces', 'Hawks')),
+        ]),
+        'user-1'
+      )
+    ).toThrow(ParkedGameStorageError)
+
+    expect(localStorage.getItem(`${GAME_RECORD_KEY_PREFIX}import-1`)).toBeNull()
+    expect(localStorage.getItem(`${GAME_RECORD_KEY_PREFIX}import-2`)).toBeNull()
+    expect(localStorage.getItem(GAMES_MANIFEST_KEY)).toBeNull()
   })
 
   it('rejects invalid parked-game import files', () => {
