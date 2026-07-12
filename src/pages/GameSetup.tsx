@@ -33,7 +33,7 @@ export default function GameSetup() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedTeamId = searchParams.get('teamId')
-  const { state, dispatch, startNewGame } = useGame()
+  const { state, dispatch, startNewGame, parkingError } = useGame()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const sport = state.sport
@@ -126,7 +126,7 @@ export default function GameSetup() {
         }
 
         if (!startNewGame(requestedSport)) {
-          navigate('/')
+          setLoadingRequestedTeamSport(false)
           return
         }
       }
@@ -352,7 +352,7 @@ export default function GameSetup() {
             <p className="text-sm text-slate-500">
               {loadingRequestedTeamSport
                 ? 'Finding this team sport...'
-                : requestedTeamSportError ?? 'Preparing game setup...'}
+                : parkingError ?? requestedTeamSportError ?? 'Preparing game setup...'}
             </p>
             {requestedTeamSportError && (
               <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
@@ -384,7 +384,6 @@ export default function GameSetup() {
         return
       }
       if (!startNewGame(sport)) {
-        setSetupError('Parked games could not be saved on this device.')
         return
       }
     }
@@ -524,9 +523,9 @@ export default function GameSetup() {
                   {teamsError}
                 </p>
               )}
-              {setupError && (
+              {(setupError || parkingError) && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
-                  {setupError}
+                  {setupError ?? parkingError}
                 </p>
               )}
 

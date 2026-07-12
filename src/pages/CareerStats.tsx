@@ -38,7 +38,7 @@ export default function CareerStats() {
   const sportParam = searchParams.get('sport')
 
   const { isConfigured, user } = useAuth()
-  const { state, openGameSnapshot } = useGame()
+  const { state, openGameSnapshot, parkingError } = useGame()
   const supabaseClient = supabase
   const userId = user?.id ?? null
 
@@ -380,6 +380,12 @@ export default function CareerStats() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
+        {parkingError && (
+          <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
+            {parkingError}
+          </div>
+        )}
+
         {sportsInData.length > 1 && (
           <section className="card space-y-2">
             <h2 className="font-semibold text-slate-700 text-sm">Sport</h2>

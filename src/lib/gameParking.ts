@@ -147,9 +147,18 @@ function readManifest(ownerId: string | null): ParkedGamesManifest {
 }
 
 function isQuotaError(error: unknown): boolean {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 22
+  ) {
+    return true
+  }
+  if (!(error instanceof DOMException)) return false
   return (
-    error instanceof DOMException &&
-    (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    error.name === 'QuotaExceededError' ||
+    error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
   )
 }
 

@@ -69,7 +69,7 @@ export default function PlayerProfile() {
   const seasonIdFromUrl = searchParams.get('seasonId')
 
   const { user, isConfigured } = useAuth()
-  const { state, openGameSnapshot } = useGame()
+  const { state, openGameSnapshot, parkingError } = useGame()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -412,9 +412,9 @@ export default function PlayerProfile() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
-        {error && (
+        {(error || parkingError) && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
-            {error}
+            {error ?? parkingError}
           </div>
         )}
 

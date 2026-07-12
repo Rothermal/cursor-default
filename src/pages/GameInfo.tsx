@@ -143,7 +143,7 @@ export default function GameInfo() {
   const gameId = searchParams.get('gameId')
   const fallbackTeamId = searchParams.get('teamId')
   const { user, isConfigured } = useAuth()
-  const { state, openGameSnapshot } = useGame()
+  const { state, openGameSnapshot, parkingError } = useGame()
   const supabaseClient = supabase
 
   const [game, setGame] = useState<GameInfoGameRow | null>(null)
@@ -468,9 +468,9 @@ export default function GameInfo() {
               )}
             </section>
 
-            {error && (
+            {(error || parkingError) && (
               <section className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2">
-                <p className="text-sm font-medium text-rose-700">{error}</p>
+                <p className="text-sm font-medium text-rose-700">{error ?? parkingError}</p>
               </section>
             )}
 

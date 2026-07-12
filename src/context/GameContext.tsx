@@ -790,9 +790,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const openGameSnapshot = useCallback(
     (nextState: GameState) => {
+      let createdLocalGameId: string | null = null
+      let previousActiveLocalGameId: string | null = null
       try {
         saveActiveGameState(stateRef.current, userId)
-        beginNewActiveParkedGame(userId)
+        previousActiveLocalGameId = getActiveLocalGameId(userId)
+        createdLocalGameId = beginNewActiveParkedGame(userId)
         saveActiveGameState(nextState, userId)
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })
@@ -801,6 +804,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setParkingError(null)
         return true
       } catch (error) {
+        if (createdLocalGameId) {
+          try {
+            discardParkedGameStorage(createdLocalGameId, userId)
+          } catch {
+            // Ignore rollback cleanup failures; the original storage error is surfaced below.
+          }
+        }
+        if (previousActiveLocalGameId) {
+          try {
+            activateParkedGame(previousActiveLocalGameId, userId)
+          } catch {
+            // Ignore rollback restore failures; the in-memory game remains unchanged.
+          }
+        }
+        try {
+          setActiveLocalGameId(getActiveLocalGameId(userId))
+          setParkedGames(listParkedGames(userId))
+        } catch {
+          // ignore secondary refresh failures
+        }
         setParkingError(parkedGameStorageErrorMessage(error))
         return false
       }

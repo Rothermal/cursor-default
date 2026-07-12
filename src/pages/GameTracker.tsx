@@ -51,7 +51,7 @@ function timeoutCapForPeriod(
 
 export default function GameTracker() {
   const navigate = useNavigate()
-  const { state, dispatch, flushCloudSync } = useGame()
+  const { state, dispatch, flushCloudSync, parkingError } = useGame()
   const {
     sport,
     players,
@@ -202,6 +202,11 @@ export default function GameTracker() {
         </div>
 
         <Scoreboard />
+        {parkingError && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {parkingError}
+          </div>
+        )}
       </div>
 
       <PlayerSelectorStrip
