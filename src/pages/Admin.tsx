@@ -36,6 +36,32 @@ interface AdminTeamRow {
   seasons: AdminSeasonInfo
 }
 
+function formatCount(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+function formatParkedImportMessage(result: ReturnType<typeof importParkedGames>): string {
+  const skippedParts: string[] = []
+  if (result.skippedExisting > 0) {
+    skippedParts.push(`${formatCount(result.skippedExisting, 'existing game')} kept`)
+  }
+  if (result.skippedAtCap > 0) {
+    skippedParts.push(`${formatCount(result.skippedAtCap, 'game')} over the parked-game limit`)
+  }
+  if (result.skippedInvalid > 0) {
+    skippedParts.push(`${formatCount(result.skippedInvalid, 'invalid row')}`)
+  }
+
+  const skippedText = skippedParts.length > 0 ? `; skipped ${skippedParts.join(', ')}` : ''
+  return `${formatCount(result.imported, 'parked game')} imported${skippedText}. Reloading...`
+}
+
+function formatStorageBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`
+}
+
 interface AdminGameRow {
   id: string
   team_id: string
@@ -450,11 +476,7 @@ export default function Admin() {
     setLocalDataMessage(null)
     try {
       const result = importParkedGames(await file.text(), userId)
-      setLocalDataMessage(
-        `Imported ${result.imported} parked game${result.imported === 1 ? '' : 's'}${
-          result.skipped > 0 ? `; skipped ${result.skipped} because this device is at the parked-game limit` : ''
-        }. Reloading...`
-      )
+      setLocalDataMessage(formatParkedImportMessage(result))
       window.setTimeout(() => window.location.reload(), 700)
     } catch (error) {
       setLocalDataError(parkedGameStorageErrorMessage(error))
@@ -586,7 +608,7 @@ export default function Admin() {
           <h2 className="text-lg font-semibold text-slate-700 mb-2">Local parked games</h2>
           <p className="text-sm text-slate-500 mb-3">
             {parkedStorageInfo.parkedCount} of {parkedStorageInfo.maxParkedGames} slots used ·{' '}
-            {Math.max(1, Math.round(parkedStorageInfo.estimatedBytes / 1024))} KB local storage
+            {formatStorageBytes(parkedStorageInfo.estimatedBytes)} local storage
           </p>
           {localDataError && (
             <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">

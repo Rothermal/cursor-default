@@ -64,9 +64,12 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3a.6 | During a cloud sync failure after a new game row is inserted (simulate by forcing `game_stats` or `shot_chart` write failure in dev tools/test env) | The local parked record stays dirty/error and retryable; the just-created in-progress cloud game is best-effort deleted rather than left as a new orphan |
 | 3a.7 | Existing cloud game sync fails after the game already has a persisted `cloudSync.gameId` | Existing game is not deleted; local row remains dirty/error for retry |
 | 3a.8 | Settings -> Local parked games -> Export | Downloads a JSON file containing the parked game records for this device |
-| 3a.9 | Settings -> Local parked games -> Import the exported JSON | Parked games are restored/merged, then the app reloads from the updated manifest |
+| 3a.9 | Settings -> Local parked games -> Import the exported JSON | Parked games are restored as parked games only, then the app reloads from the updated manifest; the import result separates imported, existing/skipped, invalid, and at-limit counts |
 | 3a.10 | Fill all 12 parked-game slots, then try to start another game | App stays on the current screen and shows a storage/max-count message instead of navigating into setup |
 | 3a.11 | Simulate localStorage quota failure while saving a game | App shows a storage/quota message and does not silently discard the active game |
+| 3a.12 | Import a file that contains a game already parked on this device | Existing local game is kept; the duplicate imported row is skipped and counted as existing |
+| 3a.13 | Import a file with more valid games than open parked-game slots | The app imports what fits, skips the remaining valid rows at the cap, and does not exceed 12 parked games |
+| 3a.14 | Simulate quota failure during Settings import after some records write but before the manifest write | The attempted import batch is rolled back; pre-existing parked games remain unchanged |
 
 ---
 

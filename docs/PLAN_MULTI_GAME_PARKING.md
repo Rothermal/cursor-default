@@ -1,6 +1,6 @@
 # Plan: Multi-game parking, active game, and sync queue
 
-Living blueprint for local multi-game parking and sync queue work. **P0 local parking, P1 sync queue, P2 cloud ordering hardening, and P3a local storage guardrails are shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, saves full snapshots at `statkeeper_game:{localGameId}`, syncs dirty parked records through a local queue, resolves roster/player cloud rows before inserting a new `games` row, best-effort deletes a just-created `games` row if child writes fail before the client can persist the cloud id, caps local parked games, surfaces quota/max-count errors, and supports local parked-game export/import from Settings. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **Historical orphan cleanup, full transactional RPC sync, and IndexedDB storage are not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
+Living blueprint for local multi-game parking and sync queue work. **P0 local parking, P1 sync queue, P2 cloud ordering hardening, P3a local storage guardrails, and P3b import/quota polish are shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, saves full snapshots at `statkeeper_game:{localGameId}`, syncs dirty parked records through a local queue, resolves roster/player cloud rows before inserting a new `games` row, best-effort deletes a just-created `games` row if child writes fail before the client can persist the cloud id, caps local parked games, surfaces quota/max-count errors, supports local parked-game export/import from Settings, and imports parked games as a safe merge with reason-specific skip counts. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **Historical orphan cleanup, full transactional RPC sync, and IndexedDB storage are not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
 
 ---
 
@@ -48,7 +48,7 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 3. **Migration path:** On first load after upgrade, if legacy `statkeeper_game` exists and manifest missing → create one `ParkedGameRecord` + manifest with `activeLocalGameId` set; keep legacy read until migration succeeds, then remove or ignore legacy key.
    - Capture the legacy game's `sport` into parked-game metadata so migrated sessions render under the correct sport label.
 
-**Storage limits:** `localStorage` is ~5MB per origin. P3a caps parked games at 12, reports approximate storage use in Settings, maps quota failures to user-visible errors, and offers parked-game export/import. Many large shot charts + action logs may still require **IndexedDB** for per-game blobs in a later iteration.
+**Storage limits:** `localStorage` is ~5MB per origin. P3a caps parked games at 12, reports approximate storage use in Settings, maps quota failures to user-visible errors, and offers parked-game export/import. P3b makes import parked-only, keeps existing local records on id conflicts, skips invalid/at-cap rows with reason counts, and rolls back failed import batches. Many large shot charts + action logs may still require **IndexedDB** for per-game blobs in a later iteration.
 
 ---
 
@@ -99,11 +99,78 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 | **P2** | Cloud write ordering hardening: defer new `games` insert until after player/roster resolution and best-effort rollback just-created games on child-write failure. **Shipped.** |
 | **P2 follow-up** | Optional cleanup tooling for historical orphan games (ops-only, not automatic user data deletion) and/or a future transactional/idempotent RPC. |
 | **P3a** | Local storage guardrails: 12-game parked cap, quota/max-count errors, Settings export/import, storage estimate. **Shipped.** |
-| **P3 follow-up** | IndexedDB per-game blob storage, import conflict UI, richer quota recovery UX. |
+| **P3b** | Import/quota polish: parked-only import, keep-existing conflict behavior, shallow validation, reason-specific skip counts, at-cap partial import, import-batch rollback on quota failure. **Shipped.** |
+| **P4/P5 follow-up** | IndexedDB per-game blob storage and cloud sync ops/orphan cleanup when real usage calls for them. |
 
 ---
 
-## 8. Test matrix (acceptance)
+## 8. Recommended follow-up slices
+
+P0-P3b are enough for the current multi-game behavior to be usable. The remaining
+items are real, but they are not all the same size. Treat IndexedDB and cloud ops
+as follow-up slices instead of reopening P3 as one large feature.
+
+### P3b: Import and quota recovery polish
+
+Implemented without taking on a storage rewrite.
+
+- Add import conflict handling for duplicate `localGameId` values:
+  - keep the existing local game by default;
+  - skip imported conflicting records and report a skipped-existing count;
+  - do not overwrite a local parked game unless a future explicit replace flow is added.
+- Add shallow import validation before any writes:
+  - require `localGameId`, `gameState`, `gameState.sport`, and basic array/object fields;
+  - skip invalid rows with a row-specific reason instead of treating all skips as cap failures.
+- Make import writes safer under quota pressure:
+  - preflight the candidate manifest/count when possible;
+  - roll back records written during an import if the final manifest write fails.
+- Improve Settings import feedback:
+  - report imported count, skipped-existing count, skipped-at-cap count, and skipped-invalid count separately;
+  - when the import has more valid games than open slots, import what fits and skip the rest.
+- Add targeted tests for import conflicts, invalid-row skip reasons, import-at-cap, and mid-import quota rollback.
+- Optional tiny UI polish: show storage usage as bytes / decimal KB without forcing every nonzero value to `1 KB`.
+- Always import records as parked games; never make an imported record the active game automatically.
+- Keep quota recovery to export/import plus manual discard for now; do not add one-click clear/archive recovery in P3b.
+- Keep the fixed 12 parked-game cap for now.
+
+### P4: IndexedDB per-game payload storage
+
+Build this when localStorage pressure becomes likely in real usage or when shot/action
+history gets large enough that the 12-game cap feels artificially low.
+
+- Keep `statkeeper_games_manifest` in `localStorage` as the small boot/index record.
+- Move large `ParkedGameRecord` blobs to IndexedDB by `localGameId`.
+- Keep legacy localStorage migration and export/import compatibility.
+- Add a storage adapter boundary so `GameContext` does not care whether records live in localStorage or IndexedDB.
+- Revisit the fixed 12-game cap after measuring IndexedDB behavior; it may become a UX limit rather than a storage limit.
+
+### P5: Cloud sync ops hardening
+
+This belongs outside the local-storage follow-up unless we decide to invest in backend
+sync reliability now.
+
+- Add ops-only historical orphan detection for cloud games created by failed old sync attempts.
+- Prefer report/preview first; do not auto-delete user data.
+- Consider a future transactional/idempotent RPC for syncing one full game snapshot.
+- Keep the current client-side best-effort rollback as the browser fallback even if an RPC is added later.
+
+### Settled product decisions
+
+- Import conflicts keep the existing local game by default.
+- Imported games are always restored as parked, not active.
+- The parked-game cap stays fixed at 12 for now.
+- P3b quota recovery remains export/import plus manual discard only.
+- Import validation is shallow, not a strict full-schema validator.
+- If a file has more valid games than available slots, import what fits and skip the rest.
+- If quota fails mid-import, roll back records written by that import attempt.
+- IndexedDB/P4 waits until after P3b and real usage signals.
+- Cloud sync ops hardening/P5 remains documented and deferred until there is evidence of orphan issues.
+
+No additional product decisions are needed before implementing P3b.
+
+---
+
+## 9. Test matrix (acceptance)
 
 - Park game A, start game B, resume A → A’s stats and shots intact.
 - Park a basketball game with shots, start a soccer game, resume each one → sport-specific stats and tracker surfaces restore correctly, with no basketball court state leaking into soccer or future sport surfaces.
@@ -115,7 +182,7 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 
 ---
 
-## 9. Related code (starting points)
+## 10. Related code (starting points)
 
 - `src/context/GameContext.tsx` — reducer, `loadState`, `GAME_STORAGE_KEY`, `runCloudSync`, resume hydration.
 - `src/lib/cloudSync.ts` — `syncGameSnapshotToCloud`, `ensureGame` ordering.
@@ -124,9 +191,7 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 
 ---
 
-## 10. Open decisions
+## 11. Open decisions
 
-- IndexedDB vs localStorage for per-game payloads after the P3a localStorage guardrail slice.
-- Whether to keep the current fixed 12 parked-game cap or make it configurable.
 - Whether “New game” on home must always park vs discard with warning.
 - Multi-device: parked-only-local games remain device-specific until synced.
