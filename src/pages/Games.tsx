@@ -4,8 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
-import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
-import { getPendingSyncFlag } from '../lib/gameStorageKeys'
+import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate } from '../lib/gameSyncFingerprint'
 import { sports } from '../config/sports'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
@@ -63,7 +62,7 @@ function statusBadge(status: string): string {
 export default function Games() {
   const navigate = useNavigate()
   const { user, isConfigured } = useAuth()
-  const { state, dispatch } = useGame()
+  const { state, dispatch, openGameSnapshot } = useGame()
   const userId = user?.id ?? null
   const supabaseClient = supabase
 
@@ -256,8 +255,8 @@ export default function Games() {
 
   const handleOpenGame = async (gameId: string) => {
     if (!userId) return
-    if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
-      setError('Finish syncing your current game before opening another.')
+    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+    if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
       return
     }
     setError(null)
@@ -308,7 +307,7 @@ export default function Games() {
       },
     }
 
-    dispatch({ type: 'HYDRATE_STATE', state: withLastSyncedGameFingerprint(nextState) })
+    openGameSnapshot(withLastSyncedGameFingerprint(nextState))
     setLoadingGameId(null)
     navigate(cloudGame.status === 'final' ? '/summary' : '/game')
   }

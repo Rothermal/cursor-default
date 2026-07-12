@@ -12,8 +12,6 @@ import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { teamDisplayName } from '../lib/display'
-import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
-import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { loadLegacyFinalStatsTotals } from '../lib/legacyFinalStats'
 import { supabase } from '../lib/supabase'
 import {
@@ -58,7 +56,7 @@ export default function TeamInfo() {
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
   const { isConfigured } = useAuth()
-  const { state: gameState, dispatch: gameDispatch } = useGame()
+  const { state: gameState, dispatch: gameDispatch, startNewGame } = useGame()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -128,19 +126,15 @@ export default function TeamInfo() {
   const handleStartGame = () => {
     if (!team || !sport) return
     setStartGameError(null)
-    if (shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())) {
-      setStartGameError('Finish syncing your current game before starting another.')
-      return
-    }
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
     if (
       hasActiveGame &&
-      !window.confirm('Starting a new game will discard your active game. Continue?')
+      !window.confirm('Park your current game and start this team game?')
     ) {
       return
     }
 
-    gameDispatch({ type: 'SET_SPORT', sport })
+    startNewGame(sport)
     gameDispatch({
       type: 'SET_CLOUD_SYNC_STATE',
       cloudSync: {

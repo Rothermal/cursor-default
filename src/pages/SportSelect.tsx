@@ -5,13 +5,19 @@ import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import { sports } from '../config/sports'
 import { getDisplayedHomeScore } from '../lib/gameScore'
-import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
-import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 
 export default function SportSelect() {
   const navigate = useNavigate()
-  const { state, dispatch } = useGame()
+  const {
+    state,
+    activeLocalGameId,
+    parkedGames,
+    startNewGame,
+    parkCurrentGame,
+    resumeParkedGame,
+    discardParkedGame,
+  } = useGame()
   const { user, signOut, isConfigured } = useAuth()
   const { isSportEnabled } = useSettings()
   const [newGameError, setNewGameError] = useState<string | null>(null)
@@ -39,6 +45,7 @@ export default function SportSelect() {
   })()
 
   const hasActiveGame = state.sport && state.players.length > 0
+  const parkedOnly = parkedGames.filter(game => game.localGameId !== activeLocalGameId)
 
   // Live score, mirroring Scoreboard.tsx exactly: roster players only (no team
   // pseudo-players) so the card always matches the in-game scoreboard (F4 D1).
@@ -56,32 +63,48 @@ export default function SportSelect() {
 
   const handleSelect = (sportId: string) => {
     setNewGameError(null)
-    if (hasActiveGame) {
-      if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
-        setNewGameError('Finish syncing your current game before starting another.')
-        return
-      }
-      if (!window.confirm('Starting a new game will discard your active game. Continue?')) {
-        return
-      }
+    if (hasActiveGame && !window.confirm('Park your current game and start a new one?')) {
+      return
     }
     const sport = sports.find(s => s.id === sportId)
     if (sport) {
-      dispatch({ type: 'SET_SPORT', sport })
+      startNewGame(sport)
       navigate('/setup')
     }
   }
 
   const handleNewGame = () => {
     setNewGameError(null)
-    if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
-      setNewGameError('Finish syncing your current game before starting another.')
+    if (!hasActiveGame) return
+    if (!window.confirm('Park your current game and choose another sport?')) {
       return
     }
-    if (!window.confirm('Starting a new game will discard your active game. Continue?')) {
+    parkCurrentGame()
+  }
+
+  const routeForResumedGame = (resumed: typeof state) => {
+    if (!resumed.sport) return '/'
+    if (!resumed.gameInfo) return '/setup'
+    if (resumed.players.length === 0) return '/players'
+    return '/game'
+  }
+
+  const handleResumeParked = (localGameId: string) => {
+    setNewGameError(null)
+    const resumed = resumeParkedGame(localGameId)
+    if (!resumed) {
+      setNewGameError('That parked game could not be loaded.')
       return
     }
-    dispatch({ type: 'RESET_GAME' })
+    navigate(routeForResumedGame(resumed))
+  }
+
+  const handleDiscardParked = (localGameId: string) => {
+    setNewGameError(null)
+    if (!window.confirm('Discard this parked game? This cannot be undone.')) {
+      return
+    }
+    discardParkedGame(localGameId)
   }
 
   return (
@@ -142,6 +165,46 @@ export default function SportSelect() {
             {newGameError && (
               <p className="text-xs text-red-600 mt-2">{newGameError}</p>
             )}
+          </div>
+        )}
+
+        {parkedOnly.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-slate-700 mb-3">Parked Games</h2>
+            <div className="space-y-2">
+              {parkedOnly.map(game => (
+                <div key={game.localGameId} className="card flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-700 truncate">
+                      {game.sportIcon} {game.teamName} vs {game.opponentName}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {game.sportName}
+                      {game.gameDate ? ` · ${game.gameDate}` : ''}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Sync: {game.syncStatus}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleResumeParked(game.localGameId)}
+                      className="bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-semibold
+                                 active:scale-95 transition-transform"
+                    >
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => handleDiscardParked(game.localGameId)}
+                      className="bg-white text-slate-600 px-3 py-2 rounded-lg text-sm font-semibold
+                                 border border-slate-200 active:scale-95 transition-transform"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

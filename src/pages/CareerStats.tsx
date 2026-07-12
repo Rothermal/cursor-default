@@ -5,8 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
-import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockManualCloudHydrate } from '../lib/gameSyncFingerprint'
-import { getPendingSyncFlag } from '../lib/gameStorageKeys'
+import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate } from '../lib/gameSyncFingerprint'
 import { playerDisplayName } from '../lib/display'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
@@ -39,7 +38,7 @@ export default function CareerStats() {
   const sportParam = searchParams.get('sport')
 
   const { isConfigured, user } = useAuth()
-  const { state, dispatch } = useGame()
+  const { state, openGameSnapshot } = useGame()
   const supabaseClient = supabase
   const userId = user?.id ?? null
 
@@ -273,8 +272,8 @@ export default function CareerStats() {
   const openGameSummary = useCallback(
     async (gameId: string) => {
       if (!userId || !sportConfig || !supabaseClient) return
-      if (shouldBlockManualCloudHydrate(state, getPendingSyncFlag())) {
-        setError('Finish syncing your current game before opening another.')
+      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
         return
       }
       const cloudGame = await loadCloudGameById(userId, gameId).catch(() => null)
@@ -306,10 +305,10 @@ export default function CareerStats() {
           lastSyncedGameFingerprint: null,
         },
       }
-      dispatch({ type: 'HYDRATE_STATE', state: withLastSyncedGameFingerprint(nextState) })
+      openGameSnapshot(withLastSyncedGameFingerprint(nextState))
       navigate('/summary')
     },
-    [userId, sportConfig, supabaseClient, state, dispatch, navigate]
+    [userId, sportConfig, supabaseClient, state, openGameSnapshot, navigate]
   )
 
   if (!playerId) {
