@@ -54,6 +54,11 @@ Living blueprint for local multi-game parking and the future sync queue. **P0 lo
 
 ## 4. Sync queue (behavior)
 
+**Known P0 debt**
+
+- Cloud sync is still active-game scoped. If a sync result returns after the user parks/switches games, `GameContext` treats it as stale and does not merge returned ids into the parked record. P1 should either flush before switching or merge sync results by captured `localGameId`.
+- `statkeeper_pending_sync` is still global. P1 should move dirty/pending state onto each `ParkedGameRecord` so one dirty parked game cannot mask or clear another game's retry state.
+
 **Producer**
 
 - On state change for a given `localGameId`: mark record dirty, **enqueue** one job per `localGameId` (coalesce: single pending job per id, refresh payload revision when merging).

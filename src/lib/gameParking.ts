@@ -170,6 +170,7 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
     return emptyManifest(ownerId)
   }
 
+  let localGameId: string | null = null
   try {
     const gameState = JSON.parse(legacyRaw) as GameState
     if (!hasPersistableGameState(gameState) || gameState.cloudSync?.gameStatus === 'final') {
@@ -177,7 +178,7 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
       return emptyManifest(ownerId)
     }
 
-    const localGameId = createLocalGameId()
+    localGameId = createLocalGameId()
     const updatedAt = nowIso()
     const summary = buildSummary(localGameId, gameState, updatedAt)
     const manifest: ParkedGamesManifest = {
@@ -199,7 +200,13 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
     writeManifest(manifest)
     return manifest
   } catch {
-    removeLegacyMirror()
+    if (localGameId) {
+      try {
+        localStorage.removeItem(gameRecordKey(localGameId))
+      } catch {
+        // ignore rollback failure; preserving legacy is the important part
+      }
+    }
     return emptyManifest(ownerId)
   }
 }

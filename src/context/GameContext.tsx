@@ -648,6 +648,7 @@ interface GameContextType {
   activeLocalGameId: string | null
   parkedGames: ParkedGameSummary[]
   startNewGame: (sport: SportConfig) => void
+  openGameSnapshot: (state: GameState) => void
   parkCurrentGame: () => void
   resumeParkedGame: (localGameId: string) => GameState | null
   discardParkedGame: (localGameId: string) => void
@@ -761,6 +762,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setActiveLocalGameId(getActiveLocalGameId(userId))
       setParkedGames(listParkedGames(userId))
       dispatch({ type: 'SET_SPORT', sport })
+    },
+    [userId]
+  )
+
+  const openGameSnapshot = useCallback(
+    (nextState: GameState) => {
+      saveActiveGameState(stateRef.current, userId)
+      beginNewActiveParkedGame(userId)
+      saveActiveGameState(nextState, userId)
+      stateRef.current = nextState
+      dispatch({ type: 'HYDRATE_STATE', state: nextState })
+      setActiveLocalGameId(getActiveLocalGameId(userId))
+      setParkedGames(listParkedGames(userId))
     },
     [userId]
   )
@@ -1085,6 +1099,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         activeLocalGameId,
         parkedGames,
         startNewGame,
+        openGameSnapshot,
         parkCurrentGame,
         resumeParkedGame,
         discardParkedGame,

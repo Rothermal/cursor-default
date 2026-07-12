@@ -16,7 +16,7 @@ import {
 } from './gameParking'
 
 class MemoryStorage {
-  private store = new Map<string, string>()
+  protected store = new Map<string, string>()
 
   getItem(key: string): string | null {
     return this.store.get(key) ?? null
@@ -32,6 +32,18 @@ class MemoryStorage {
 
   clear(): void {
     this.store.clear()
+  }
+}
+
+class ThrowingManifestStorage extends MemoryStorage {
+  private failed = false
+
+  setItem(key: string, value: string): void {
+    if (key === GAMES_MANIFEST_KEY && !this.failed) {
+      this.failed = true
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    }
+    super.setItem(key, value)
   }
 }
 
@@ -109,6 +121,21 @@ describe('gameParking', () => {
       opponentName: 'Tigers',
     })
     expect(getActiveLocalGameId('user-1')).toBe(summaries[0].localGameId)
+  })
+
+  it('preserves the legacy game if migration cannot write the manifest', () => {
+    vi.stubGlobal('localStorage', new ThrowingManifestStorage())
+    const legacy = gameState(basketball, 'Wildcats', 'Tigers')
+    localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(legacy))
+
+    const restored = loadActiveParkedGameState('user-1')
+
+    expect(restored).toBeNull()
+    expect(JSON.parse(localStorage.getItem(GAME_STORAGE_KEY) ?? '{}')).toMatchObject({
+      gameInfo: { teamName: 'Wildcats', opponentName: 'Tigers' },
+    })
+    expect(localStorage.getItem(GAMES_MANIFEST_KEY)).toBeNull()
+    expect(listParkedGames('user-1')).toHaveLength(1)
   })
 
   it('keeps parked games for different sports as separate records', () => {
