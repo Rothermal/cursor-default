@@ -4,6 +4,7 @@ import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './t
 import { hasMappableChartShot } from './shotChartSyncMapping'
 import { pickRecorderPerPlayer } from './shotChartReview'
 import { isValidRemotePlayerUuid } from './uuidValidation'
+import { logClientSyncError } from './logClientSyncError'
 
 interface SyncGameSnapshotInput {
   state: GameState
@@ -70,6 +71,11 @@ type CloudGameRow = {
   created_at: string
   home_team_player_id?: string | null
   opp_team_player_id?: string | null
+}
+
+type EnsuredGame = {
+  gameId: string
+  created: boolean
 }
 
 function isMissingLastOpenedColumnError(error: { message?: string } | null): boolean {
@@ -365,7 +371,7 @@ async function ensureGame(
   userId: string,
   teamId: string,
   seasonIdForGame: string | null
-): Promise<string> {
+): Promise<EnsuredGame> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
   }
@@ -499,10 +505,26 @@ async function ensureGame(
 
   if (state.cloudSync.gameId) {
     await upsertWithFallback('update', gameUpdatePayload, state.cloudSync.gameId)
-    return state.cloudSync.gameId
+    return { gameId: state.cloudSync.gameId, created: false }
   }
 
-  return upsertWithFallback('insert', gameInsertPayload)
+  return { gameId: await upsertWithFallback('insert', gameInsertPayload), created: true }
+}
+
+async function deleteNewlyCreatedGameAfterFailedSync(
+  gameId: string,
+  userId: string
+): Promise<string | null> {
+  if (!supabase) return null
+
+  const { error } = await supabase
+    .from('games')
+    .delete()
+    .eq('id', gameId)
+    .eq('created_by', userId)
+    .eq('status', 'in_progress')
+
+  return error?.message ?? null
 }
 
 /**
@@ -882,8 +904,10 @@ export async function syncGameSnapshotToCloud({
 
   const seasonId = await ensureSeason(state, userId)
   const teamId = await ensureTeam(state, userId, seasonId)
-  const gameId = await ensureGame(state, userId, teamId, seasonId)
 
+  // Resolve players and roster links before inserting a brand-new `games` row.
+  // This shrinks the orphan window: failures in player/team-player setup no longer
+  // leave an in-progress cloud game without stats.
   const nextPlayerIdMap: Record<string, string> = {}
   for (const player of state.players) {
     const remotePlayerId = await ensurePlayerId(
@@ -895,15 +919,44 @@ export async function syncGameSnapshotToCloud({
     nextPlayerIdMap[player.id] = remotePlayerId
   }
 
-  await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
+  const ensuredGame = await ensureGame(state, userId, teamId, seasonId)
+  const gameId = ensuredGame.gameId
+  let shotChartCloudSync: ShotChartCloudSyncMode = 'synced'
 
-  const shotChartCloudSync = await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
+  // Only thrown child-write failures trigger rollback. Shot-chart partial/skipped modes
+  // intentionally keep the game row because stats may have synced and local chart state is incomplete.
+  try {
+    await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
 
-  await linkGameTeamPlaceholderIds(
-    gameId,
-    nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
-    nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
-  )
+    shotChartCloudSync = await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
+
+    await linkGameTeamPlaceholderIds(
+      gameId,
+      nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
+      nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
+    )
+  } catch (error) {
+    if (ensuredGame.created) {
+      const rollbackError = await deleteNewlyCreatedGameAfterFailedSync(gameId, userId).catch(
+        err => (err instanceof Error ? err.message : 'unknown rollback failure')
+      )
+      if (rollbackError) {
+        await logClientSyncError(
+          userId,
+          `Rollback failed for just-created game ${gameId}: ${rollbackError}`,
+          state,
+          {
+            bypassThrottle: true,
+            extraContext: {
+              rollbackGameId: gameId,
+              originalSyncError: error instanceof Error ? error.message : String(error),
+            },
+          }
+        ).catch(() => {})
+      }
+    }
+    throw error
+  }
 
   // Best-effort metadata touch for deterministic resume selection across devices.
   // If the optional migration adding games.last_opened_at is not applied yet,
