@@ -307,7 +307,10 @@ export default function Games() {
       },
     }
 
-    openGameSnapshot(withLastSyncedGameFingerprint(nextState))
+    if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
+      setLoadingGameId(null)
+      return
+    }
     setLoadingGameId(null)
     navigate(cloudGame.status === 'final' ? '/summary' : '/game')
   }

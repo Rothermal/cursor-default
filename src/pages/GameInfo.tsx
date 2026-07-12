@@ -327,7 +327,10 @@ export default function GameInfo() {
       },
     }
 
-    openGameSnapshot(withLastSyncedGameFingerprint(nextState))
+    if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
+      setOpeningGame(false)
+      return
+    }
     setOpeningGame(false)
     navigate(cloudGame.status === 'final' ? '/summary' : '/game')
   }

@@ -134,7 +134,10 @@ export default function TeamInfo() {
       return
     }
 
-    startNewGame(sport)
+    if (!startNewGame(sport)) {
+      setStartGameError('Parked games could not be saved on this device.')
+      return
+    }
     gameDispatch({
       type: 'SET_CLOUD_SYNC_STATE',
       cloudSync: {

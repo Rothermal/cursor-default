@@ -306,7 +306,10 @@ export default function PlayerProfile() {
       },
     }
 
-    openGameSnapshot(withLastSyncedGameFingerprint(nextState))
+    if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
+      setLoadingGameId(null)
+      return
+    }
     setLoadingGameId(null)
     navigate('/summary')
   }

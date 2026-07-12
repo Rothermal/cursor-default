@@ -52,6 +52,7 @@ import {
   listParkedGames,
   loadActiveParkedGameState,
   parkActiveGame,
+  parkedGameStorageErrorMessage,
   saveActiveGameState,
   saveParkedGameRecordState,
   type ParkedGameRecord,
@@ -653,9 +654,11 @@ interface GameContextType {
   dispatch: React.Dispatch<GameAction>
   activeLocalGameId: string | null
   parkedGames: ParkedGameSummary[]
-  startNewGame: (sport: SportConfig) => void
-  openGameSnapshot: (state: GameState) => void
-  parkCurrentGame: () => void
+  parkingError: string | null
+  clearParkingError: () => void
+  startNewGame: (sport: SportConfig) => boolean
+  openGameSnapshot: (state: GameState) => boolean
+  parkCurrentGame: () => boolean
   resumeParkedGame: (localGameId: string) => GameState | null
   discardParkedGame: (localGameId: string) => void
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
@@ -679,6 +682,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [activeLocalGameId, setActiveLocalGameId] = useState<string | null>(() =>
     getActiveLocalGameId(userId)
   )
+  const [parkingError, setParkingError] = useState<string | null>(null)
   const [syncRetryTick, setSyncRetryTick] = useState(0)
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
@@ -733,8 +737,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
   ])
 
   useEffect(() => {
-    setParkedGames(saveActiveGameState(state, userId))
-    setActiveLocalGameId(getActiveLocalGameId(userId))
+    try {
+      setParkedGames(saveActiveGameState(state, userId))
+      setActiveLocalGameId(getActiveLocalGameId(userId))
+    } catch (error) {
+      setParkingError(parkedGameStorageErrorMessage(error))
+    }
   }, [state, userId])
 
   useEffect(() => {
@@ -764,45 +772,72 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const startNewGame = useCallback(
     (sport: SportConfig) => {
-      saveActiveGameState(stateRef.current, userId)
-      beginNewActiveParkedGame(userId)
-      setActiveLocalGameId(getActiveLocalGameId(userId))
-      setParkedGames(listParkedGames(userId))
-      dispatch({ type: 'SET_SPORT', sport })
+      try {
+        saveActiveGameState(stateRef.current, userId)
+        beginNewActiveParkedGame(userId)
+        setActiveLocalGameId(getActiveLocalGameId(userId))
+        setParkedGames(listParkedGames(userId))
+        setParkingError(null)
+        dispatch({ type: 'SET_SPORT', sport })
+        return true
+      } catch (error) {
+        setParkingError(parkedGameStorageErrorMessage(error))
+        return false
+      }
     },
     [userId]
   )
 
   const openGameSnapshot = useCallback(
     (nextState: GameState) => {
-      saveActiveGameState(stateRef.current, userId)
-      beginNewActiveParkedGame(userId)
-      saveActiveGameState(nextState, userId)
-      stateRef.current = nextState
-      dispatch({ type: 'HYDRATE_STATE', state: nextState })
-      setActiveLocalGameId(getActiveLocalGameId(userId))
-      setParkedGames(listParkedGames(userId))
+      try {
+        saveActiveGameState(stateRef.current, userId)
+        beginNewActiveParkedGame(userId)
+        saveActiveGameState(nextState, userId)
+        stateRef.current = nextState
+        dispatch({ type: 'HYDRATE_STATE', state: nextState })
+        setActiveLocalGameId(getActiveLocalGameId(userId))
+        setParkedGames(listParkedGames(userId))
+        setParkingError(null)
+        return true
+      } catch (error) {
+        setParkingError(parkedGameStorageErrorMessage(error))
+        return false
+      }
     },
     [userId]
   )
 
   const parkCurrentGame = useCallback(() => {
-    saveActiveGameState(stateRef.current, userId)
-    setParkedGames(parkActiveGame(userId))
-    setActiveLocalGameId(null)
-    dispatch({ type: 'RESET_GAME' })
+    try {
+      saveActiveGameState(stateRef.current, userId)
+      setParkedGames(parkActiveGame(userId))
+      setActiveLocalGameId(null)
+      setParkingError(null)
+      dispatch({ type: 'RESET_GAME' })
+      return true
+    } catch (error) {
+      setParkingError(parkedGameStorageErrorMessage(error))
+      return false
+    }
   }, [userId])
 
   const resumeParkedGame = useCallback(
     (localGameId: string) => {
-      saveActiveGameState(stateRef.current, userId)
-      const nextState = activateParkedGame(localGameId, userId)
-      if (!nextState) return null
-      stateRef.current = nextState
-      dispatch({ type: 'HYDRATE_STATE', state: nextState })
-      setActiveLocalGameId(localGameId)
-      setParkedGames(listParkedGames(userId))
-      return nextState
+      try {
+        saveActiveGameState(stateRef.current, userId)
+        const nextState = activateParkedGame(localGameId, userId)
+        if (!nextState) return null
+        stateRef.current = nextState
+        dispatch({ type: 'HYDRATE_STATE', state: nextState })
+        setActiveLocalGameId(localGameId)
+        setParkedGames(listParkedGames(userId))
+        setParkingError(null)
+        return nextState
+      } catch (error) {
+        setParkingError(parkedGameStorageErrorMessage(error))
+        return null
+      }
     },
     [userId]
   )
@@ -810,10 +845,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const discardParkedGame = useCallback(
     (localGameId: string) => {
       const wasActive = getActiveLocalGameId(userId) === localGameId
-      setParkedGames(discardParkedGameStorage(localGameId, userId))
-      setActiveLocalGameId(getActiveLocalGameId(userId))
-      if (wasActive) {
-        dispatch({ type: 'RESET_GAME' })
+      try {
+        setParkedGames(discardParkedGameStorage(localGameId, userId))
+        setActiveLocalGameId(getActiveLocalGameId(userId))
+        setParkingError(null)
+        if (wasActive) {
+          dispatch({ type: 'RESET_GAME' })
+        }
+      } catch (error) {
+        setParkingError(parkedGameStorageErrorMessage(error))
       }
     },
     [userId]
@@ -1230,6 +1270,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch,
         activeLocalGameId,
         parkedGames,
+        parkingError,
+        clearParkingError: () => setParkingError(null),
         startNewGame,
         openGameSnapshot,
         parkCurrentGame,

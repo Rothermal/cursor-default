@@ -9,12 +9,16 @@ import {
 import {
   activateParkedGame,
   beginNewActiveParkedGame,
+  exportParkedGames,
   getActiveLocalGameId,
   getParkedGameRecord,
+  importParkedGames,
   listDirtyParkedGameRecords,
   listParkedGames,
   loadActiveParkedGameState,
+  MAX_PARKED_GAMES,
   parkActiveGame,
+  ParkedGameStorageError,
   saveActiveGameState,
   saveParkedGameRecordState,
 } from './gameParking'
@@ -48,6 +52,14 @@ class ThrowingManifestStorage extends MemoryStorage {
       throw new DOMException('Quota exceeded', 'QuotaExceededError')
     }
     super.setItem(key, value)
+  }
+}
+
+class QuotaStorage extends MemoryStorage {
+  setItem(key: string, value: string): void {
+    void key
+    void value
+    throw new DOMException('Quota exceeded', 'QuotaExceededError')
   }
 }
 
@@ -266,5 +278,46 @@ describe('gameParking', () => {
     expect(parked.syncDirty).toBe(true)
     expect(parked.syncStatus).toBe('error')
     expect(parked.syncLastError).toBe('Cloud sync failed')
+  })
+
+  it('exports and imports parked games', () => {
+    saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    parkActiveGame('user-1')
+    beginNewActiveParkedGame('user-1')
+    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+
+    const exported = exportParkedGames('user-1')
+    localStorage.clear()
+
+    const result = importParkedGames(exported, 'user-1')
+
+    expect(result.imported).toBe(2)
+    expect(result.skipped).toBe(0)
+    expect(listParkedGames('user-1').map(game => game.sportId).sort()).toEqual([
+      'basketball',
+      'soccer',
+    ])
+  })
+
+  it('rejects invalid parked-game import files', () => {
+    expect(() => importParkedGames('{"nope":true}', 'user-1')).toThrow(ParkedGameStorageError)
+  })
+
+  it('enforces the parked game limit before creating another local slot', () => {
+    for (let i = 0; i < MAX_PARKED_GAMES; i += 1) {
+      beginNewActiveParkedGame('user-1')
+      saveActiveGameState(gameState(basketball, `Team ${i}`, 'Bears'), 'user-1')
+      parkActiveGame('user-1')
+    }
+
+    expect(() => beginNewActiveParkedGame('user-1')).toThrow(ParkedGameStorageError)
+  })
+
+  it('maps quota failures to a parked-game storage error', () => {
+    vi.stubGlobal('localStorage', new QuotaStorage())
+
+    expect(() => saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')).toThrow(
+      ParkedGameStorageError
+    )
   })
 })

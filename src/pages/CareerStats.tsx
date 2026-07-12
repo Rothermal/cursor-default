@@ -305,7 +305,9 @@ export default function CareerStats() {
           lastSyncedGameFingerprint: null,
         },
       }
-      openGameSnapshot(withLastSyncedGameFingerprint(nextState))
+      if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
+        return
+      }
       navigate('/summary')
     },
     [userId, sportConfig, supabaseClient, state, openGameSnapshot, navigate]

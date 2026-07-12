@@ -125,7 +125,10 @@ export default function GameSetup() {
           return
         }
 
-        startNewGame(requestedSport)
+        if (!startNewGame(requestedSport)) {
+          navigate('/')
+          return
+        }
       }
       setLoadingRequestedTeamSport(false)
     }
@@ -380,7 +383,10 @@ export default function GameSetup() {
       ) {
         return
       }
-      startNewGame(sport)
+      if (!startNewGame(sport)) {
+        setSetupError('Parked games could not be saved on this device.')
+        return
+      }
     }
 
     // Resolve tournament: existing selection, create new, or free-text

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import type { BasketballTeamStatsConfig } from '../types'
@@ -16,6 +16,12 @@ import { teamDisplayName } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
+import {
+  exportParkedGames,
+  getParkedGameStorageInfo,
+  importParkedGames,
+  parkedGameStorageErrorMessage,
+} from '../lib/gameParking'
 
 interface AdminSeasonInfo {
   name: string
@@ -94,6 +100,9 @@ export default function Admin() {
   const [loadingAdmin, setLoadingAdmin] = useState(false)
   const [adminError, setAdminError] = useState<string | null>(null)
   const [showDataMgmt, setShowDataMgmt] = useState(false)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
+  const [localDataMessage, setLocalDataMessage] = useState<string | null>(null)
+  const [localDataError, setLocalDataError] = useState<string | null>(null)
 
   const [confirmDeleteTeam, setConfirmDeleteTeam] = useState<AdminTeamRow | null>(null)
   const [confirmDeleteGame, setConfirmDeleteGame] = useState<AdminGameRow | null>(null)
@@ -130,6 +139,7 @@ export default function Admin() {
   const [savingTeamStatsId, setSavingTeamStatsId] = useState<string | null>(null)
 
   const basketballSport = sports.find(s => s.id === 'basketball') ?? null
+  const parkedStorageInfo = getParkedGameStorageInfo(userId)
 
   const [showMergeTools, setShowMergeTools] = useState(false)
   const [mergeWizardOpen, setMergeWizardOpen] = useState(false)
@@ -415,6 +425,46 @@ export default function Admin() {
     void loadSeasons()
   }
 
+  const handleExportParkedGames = () => {
+    setLocalDataError(null)
+    try {
+      const json = exportParkedGames(userId)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `statkeeper-parked-games-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setLocalDataMessage('Parked games export created.')
+    } catch (error) {
+      setLocalDataError(parkedGameStorageErrorMessage(error))
+    }
+  }
+
+  const handleImportParkedGames = async (file: File | undefined) => {
+    if (!file) return
+    setLocalDataError(null)
+    setLocalDataMessage(null)
+    try {
+      const result = importParkedGames(await file.text(), userId)
+      setLocalDataMessage(
+        `Imported ${result.imported} parked game${result.imported === 1 ? '' : 's'}${
+          result.skipped > 0 ? `; skipped ${result.skipped} because this device is at the parked-game limit` : ''
+        }. Reloading...`
+      )
+      window.setTimeout(() => window.location.reload(), 700)
+    } catch (error) {
+      setLocalDataError(parkedGameStorageErrorMessage(error))
+    } finally {
+      if (importInputRef.current) {
+        importInputRef.current.value = ''
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
@@ -530,6 +580,43 @@ export default function Admin() {
               />
             </button>
           </div>
+        </section>
+
+        <section className="card mt-6">
+          <h2 className="text-lg font-semibold text-slate-700 mb-2">Local parked games</h2>
+          <p className="text-sm text-slate-500 mb-3">
+            {parkedStorageInfo.parkedCount} of {parkedStorageInfo.maxParkedGames} slots used ·{' '}
+            {Math.max(1, Math.round(parkedStorageInfo.estimatedBytes / 1024))} KB local storage
+          </p>
+          {localDataError && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">
+              {localDataError}
+            </p>
+          )}
+          {localDataMessage && (
+            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mb-3">
+              {localDataMessage}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className="btn-secondary" onClick={handleExportParkedGames}>
+              Export
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => importInputRef.current?.click()}
+            >
+              Import
+            </button>
+          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={event => void handleImportParkedGames(event.target.files?.[0])}
+          />
         </section>
 
         {isConfigured && user && (

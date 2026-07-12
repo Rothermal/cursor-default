@@ -9,6 +9,20 @@ import {
 } from './gameStorageKeys'
 
 const MANIFEST_VERSION = 1
+const EXPORT_VERSION = 1
+export const MAX_PARKED_GAMES = 12
+
+export type ParkedGameStorageErrorCode = 'quota' | 'max_parked_games' | 'invalid_import'
+
+export class ParkedGameStorageError extends Error {
+  code: ParkedGameStorageErrorCode
+
+  constructor(code: ParkedGameStorageErrorCode, message: string) {
+    super(message)
+    this.name = 'ParkedGameStorageError'
+    this.code = code
+  }
+}
 
 export interface ParkedGameSyncState {
   dirty: boolean
@@ -52,6 +66,27 @@ export interface ParkedGameRecord {
   gameState: GameState
   summary: ParkedGameSummary
   sync: ParkedGameSyncState
+}
+
+export interface ParkedGameStorageInfo {
+  parkedCount: number
+  maxParkedGames: number
+  canCreateParkedGame: boolean
+  estimatedBytes: number
+}
+
+export interface ParkedGamesExportPayload {
+  version: number
+  exportedAt: string
+  ownerId: string | null
+  activeLocalGameId: string | null
+  records: ParkedGameRecord[]
+}
+
+export interface ImportParkedGamesResult {
+  imported: number
+  skipped: number
+  summaries: ParkedGameSummary[]
 }
 
 function gameRecordKey(localGameId: string): string {
@@ -111,8 +146,50 @@ function readManifest(ownerId: string | null): ParkedGamesManifest {
   }
 }
 
+function isQuotaError(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+  )
+}
+
+function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch (error) {
+    if (isQuotaError(error)) {
+      throw new ParkedGameStorageError(
+        'quota',
+        'Local storage is full. Export or discard a parked game before continuing.'
+      )
+    }
+    throw error
+  }
+}
+
 function writeManifest(manifest: ParkedGamesManifest): void {
-  localStorage.setItem(GAMES_MANIFEST_KEY, JSON.stringify(manifest))
+  safeSetItem(GAMES_MANIFEST_KEY, JSON.stringify(manifest))
+}
+
+function canCreateLocalGameId(manifest: ParkedGamesManifest): boolean {
+  return manifest.gameIds.length < MAX_PARKED_GAMES
+}
+
+function assertCanCreateLocalGameId(manifest: ParkedGamesManifest): void {
+  if (canCreateLocalGameId(manifest)) return
+  throw new ParkedGameStorageError(
+    'max_parked_games',
+    `This device can park up to ${MAX_PARKED_GAMES} games. Resume, export, or discard one before starting another.`
+  )
+}
+
+function estimatedStorageBytes(manifest: ParkedGamesManifest): number {
+  let total = (localStorage.getItem(GAMES_MANIFEST_KEY) ?? '').length
+  for (const id of manifest.gameIds) {
+    total += (localStorage.getItem(gameRecordKey(id)) ?? '').length
+  }
+  total += (localStorage.getItem(GAME_STORAGE_KEY) ?? '').length
+  return total * 2
 }
 
 function readRecord(localGameId: string): ParkedGameRecord | null {
@@ -255,9 +332,9 @@ function buildSummary(
 }
 
 function writeLegacyMirror(state: GameState, ownerId: string | null): void {
-  localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
+  safeSetItem(GAME_STORAGE_KEY, JSON.stringify(state))
   if (ownerId) {
-    localStorage.setItem(GAME_OWNER_KEY, ownerId)
+    safeSetItem(GAME_OWNER_KEY, ownerId)
   }
 }
 
@@ -308,7 +385,7 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
       sync,
     }
 
-    localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
+    safeSetItem(gameRecordKey(localGameId), JSON.stringify(record))
     writeManifest(manifest)
     return manifest
   } catch {
@@ -344,6 +421,16 @@ export function listParkedGames(ownerId: string | null): ParkedGameSummary[] {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
+export function getParkedGameStorageInfo(ownerId: string | null): ParkedGameStorageInfo {
+  const manifest = migrateLegacyGameStorage(ownerId)
+  return {
+    parkedCount: manifest.gameIds.length,
+    maxParkedGames: MAX_PARKED_GAMES,
+    canCreateParkedGame: canCreateLocalGameId(manifest),
+    estimatedBytes: estimatedStorageBytes(manifest),
+  }
+}
+
 export function getActiveLocalGameId(ownerId: string | null): string | null {
   return migrateLegacyGameStorage(ownerId).activeLocalGameId
 }
@@ -361,6 +448,10 @@ export function saveActiveGameState(
     return listParkedGames(ownerId)
   }
 
+  const hasActiveId = Boolean(manifest.activeLocalGameId)
+  if (!hasActiveId) {
+    assertCanCreateLocalGameId(manifest)
+  }
   const localGameId = manifest.activeLocalGameId ?? createLocalGameId()
   const existing = readRecord(localGameId)
   const updatedAt = nowIso()
@@ -376,7 +467,7 @@ export function saveActiveGameState(
     sync,
   }
 
-  localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
+  safeSetItem(gameRecordKey(localGameId), JSON.stringify(record))
   writeLegacyMirror(state, ownerId)
 
   const gameIds = manifest.gameIds.includes(localGameId)
@@ -448,6 +539,9 @@ export function saveParkedGameRecordState(
 ): ParkedGameSummary[] {
   const manifest = migrateLegacyGameStorage(ownerId)
   const existing = readRecord(localGameId)
+  if (!existing && !manifest.gameIds.includes(localGameId)) {
+    assertCanCreateLocalGameId(manifest)
+  }
   const createdAt = existing?.createdAt ?? nowIso()
   const updatedAt = nowIso()
   const sync = buildSyncState(existing, state, syncPatch)
@@ -461,7 +555,7 @@ export function saveParkedGameRecordState(
     summary,
     sync,
   }
-  localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
+  safeSetItem(gameRecordKey(localGameId), JSON.stringify(record))
 
   const gameIds = manifest.gameIds.includes(localGameId)
     ? manifest.gameIds
@@ -485,6 +579,7 @@ export function saveParkedGameRecordState(
 
 export function beginNewActiveParkedGame(ownerId: string | null): string {
   const manifest = migrateLegacyGameStorage(ownerId)
+  assertCanCreateLocalGameId(manifest)
   const localGameId = createLocalGameId()
   writeManifest({
     ...manifest,
@@ -581,4 +676,97 @@ export function clearAllParkedGames(): void {
   } catch {
     // ignore
   }
+}
+
+export function exportParkedGames(ownerId: string | null): string {
+  const manifest = migrateLegacyGameStorage(ownerId)
+  const payload: ParkedGamesExportPayload = {
+    version: EXPORT_VERSION,
+    exportedAt: nowIso(),
+    ownerId: manifest.ownerId ?? ownerId,
+    activeLocalGameId: manifest.activeLocalGameId,
+    records: listParkedGameRecords(ownerId),
+  }
+  return JSON.stringify(payload, null, 2)
+}
+
+function parseImportPayload(raw: string): ParkedGamesExportPayload {
+  try {
+    const parsed = JSON.parse(raw) as Partial<ParkedGamesExportPayload>
+    if (!parsed || parsed.version !== EXPORT_VERSION || !Array.isArray(parsed.records)) {
+      throw new Error('Invalid export file')
+    }
+    return parsed as ParkedGamesExportPayload
+  } catch {
+    throw new ParkedGameStorageError(
+      'invalid_import',
+      'This file is not a valid StatKeeper parked games export.'
+    )
+  }
+}
+
+export function importParkedGames(raw: string, ownerId: string | null): ImportParkedGamesResult {
+  const payload = parseImportPayload(raw)
+  const manifest = migrateLegacyGameStorage(ownerId)
+  const summaries = { ...manifest.summaries }
+  const gameIds = [...manifest.gameIds]
+  let imported = 0
+  let skipped = 0
+
+  for (const incoming of payload.records) {
+    if (!incoming?.localGameId || !incoming.gameState) {
+      skipped += 1
+      continue
+    }
+    if (!gameIds.includes(incoming.localGameId) && gameIds.length >= MAX_PARKED_GAMES) {
+      skipped += 1
+      continue
+    }
+
+    const updatedAt = typeof incoming.updatedAt === 'string' ? incoming.updatedAt : nowIso()
+    const sync = normalizeSyncState(incoming.sync, null, incoming.gameState)
+    const record: ParkedGameRecord = {
+      localGameId: incoming.localGameId,
+      ownerId,
+      createdAt: typeof incoming.createdAt === 'string' ? incoming.createdAt : updatedAt,
+      updatedAt,
+      gameState: incoming.gameState,
+      sync,
+      summary: buildSummary(incoming.localGameId, incoming.gameState, updatedAt, sync),
+    }
+    safeSetItem(gameRecordKey(record.localGameId), JSON.stringify(record))
+    if (!gameIds.includes(record.localGameId)) {
+      gameIds.push(record.localGameId)
+    }
+    summaries[record.localGameId] = record.summary
+    imported += 1
+  }
+
+  const activeLocalGameId =
+    payload.activeLocalGameId && gameIds.includes(payload.activeLocalGameId)
+      ? payload.activeLocalGameId
+      : manifest.activeLocalGameId
+  writeManifest({
+    ...manifest,
+    ownerId,
+    activeLocalGameId,
+    gameIds,
+    summaries,
+  })
+
+  const activeRecord = activeLocalGameId ? readRecord(activeLocalGameId) : null
+  if (activeRecord) {
+    writeLegacyMirror(activeRecord.gameState, ownerId)
+  }
+
+  return {
+    imported,
+    skipped,
+    summaries: listParkedGames(ownerId),
+  }
+}
+
+export function parkedGameStorageErrorMessage(error: unknown): string {
+  if (error instanceof ParkedGameStorageError) return error.message
+  return 'Parked games could not be saved on this device.'
 }

@@ -17,6 +17,8 @@ export default function SportSelect() {
     parkCurrentGame,
     resumeParkedGame,
     discardParkedGame,
+    parkingError,
+    clearParkingError,
   } = useGame()
   const { user, signOut, isConfigured } = useAuth()
   const { isSportEnabled } = useSettings()
@@ -63,18 +65,20 @@ export default function SportSelect() {
 
   const handleSelect = (sportId: string) => {
     setNewGameError(null)
+    clearParkingError()
     if (hasActiveGame && !window.confirm('Park your current game and start a new one?')) {
       return
     }
     const sport = sports.find(s => s.id === sportId)
     if (sport) {
-      startNewGame(sport)
+      if (!startNewGame(sport)) return
       navigate('/setup')
     }
   }
 
   const handleNewGame = () => {
     setNewGameError(null)
+    clearParkingError()
     if (!hasActiveGame) return
     if (!window.confirm('Park your current game and choose another sport?')) {
       return
@@ -104,6 +108,7 @@ export default function SportSelect() {
 
   const handleResumeParked = (localGameId: string) => {
     setNewGameError(null)
+    clearParkingError()
     const resumed = resumeParkedGame(localGameId)
     if (!resumed) {
       setNewGameError('That parked game could not be loaded.')
@@ -114,6 +119,7 @@ export default function SportSelect() {
 
   const handleDiscardParked = (localGameId: string) => {
     setNewGameError(null)
+    clearParkingError()
     if (!window.confirm('Discard this parked game? This cannot be undone.')) {
       return
     }
@@ -138,6 +144,12 @@ export default function SportSelect() {
           <h1 className="text-3xl font-bold text-slate-800">📊 StatKeeper</h1>
           <p className="text-slate-500 mt-2">Track game stats in real time</p>
         </div>
+
+        {parkingError && (
+          <div className="card mb-4 bg-amber-50 border-amber-200 text-amber-800 text-sm">
+            {parkingError}
+          </div>
+        )}
 
         {hasActiveGame && (
           <div className="card mb-6 border-blue-200 bg-blue-50">
