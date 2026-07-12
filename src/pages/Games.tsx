@@ -62,7 +62,7 @@ function statusBadge(status: string): string {
 export default function Games() {
   const navigate = useNavigate()
   const { user, isConfigured } = useAuth()
-  const { state, dispatch, openGameSnapshot } = useGame()
+  const { state, dispatch, openGameSnapshot, parkingError } = useGame()
   const userId = user?.id ?? null
   const supabaseClient = supabase
 
@@ -307,7 +307,10 @@ export default function Games() {
       },
     }
 
-    openGameSnapshot(withLastSyncedGameFingerprint(nextState))
+    if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
+      setLoadingGameId(null)
+      return
+    }
     setLoadingGameId(null)
     navigate(cloudGame.status === 'final' ? '/summary' : '/game')
   }
@@ -493,9 +496,9 @@ export default function Games() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
-        {error && (
+        {(error || parkingError) && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
-            {error}
+            {error ?? parkingError}
           </div>
         )}
 

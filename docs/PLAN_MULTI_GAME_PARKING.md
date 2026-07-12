@@ -1,6 +1,6 @@
 # Plan: Multi-game parking, active game, and sync queue
 
-Living blueprint for local multi-game parking and sync queue work. **P0 local parking, P1 sync queue, and P2 cloud ordering hardening are shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, saves full snapshots at `statkeeper_game:{localGameId}`, syncs dirty parked records through a local queue, resolves roster/player cloud rows before inserting a new `games` row, and best-effort deletes a just-created `games` row if child writes fail before the client can persist the cloud id. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **Historical orphan cleanup, full transactional RPC sync, and IndexedDB/quota work are not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
+Living blueprint for local multi-game parking and sync queue work. **P0 local parking, P1 sync queue, P2 cloud ordering hardening, and P3a local storage guardrails are shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, saves full snapshots at `statkeeper_game:{localGameId}`, syncs dirty parked records through a local queue, resolves roster/player cloud rows before inserting a new `games` row, best-effort deletes a just-created `games` row if child writes fail before the client can persist the cloud id, caps local parked games, surfaces quota/max-count errors, and supports local parked-game export/import from Settings. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **Historical orphan cleanup, full transactional RPC sync, and IndexedDB storage are not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
 
 ---
 
@@ -48,7 +48,7 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 3. **Migration path:** On first load after upgrade, if legacy `statkeeper_game` exists and manifest missing → create one `ParkedGameRecord` + manifest with `activeLocalGameId` set; keep legacy read until migration succeeds, then remove or ignore legacy key.
    - Capture the legacy game's `sport` into parked-game metadata so migrated sessions render under the correct sport label.
 
-**Storage limits:** `localStorage` is ~5MB per origin; many shot charts + action logs may require **IndexedDB** for per-game blobs in a later iteration.
+**Storage limits:** `localStorage` is ~5MB per origin. P3a caps parked games at 12, reports approximate storage use in Settings, maps quota failures to user-visible errors, and offers parked-game export/import. Many large shot charts + action logs may still require **IndexedDB** for per-game blobs in a later iteration.
 
 ---
 
@@ -98,7 +98,8 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 | **P1** | Sync queue worker; dirty flags; enqueue/dequeue for all dirty parked games; offline drain. **Shipped.** |
 | **P2** | Cloud write ordering hardening: defer new `games` insert until after player/roster resolution and best-effort rollback just-created games on child-write failure. **Shipped.** |
 | **P2 follow-up** | Optional cleanup tooling for historical orphan games (ops-only, not automatic user data deletion) and/or a future transactional/idempotent RPC. |
-| **P3** | IndexedDB, export/import, max parked count, quota UX. |
+| **P3a** | Local storage guardrails: 12-game parked cap, quota/max-count errors, Settings export/import, storage estimate. **Shipped.** |
+| **P3 follow-up** | IndexedDB per-game blob storage, import conflict UI, richer quota recovery UX. |
 
 ---
 
@@ -125,7 +126,7 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 
 ## 10. Open decisions
 
-- IndexedDB vs localStorage for per-game payloads.
-- Max number of parked games; eviction policy.
+- IndexedDB vs localStorage for per-game payloads after the P3a localStorage guardrail slice.
+- Whether to keep the current fixed 12 parked-game cap or make it configurable.
 - Whether “New game” on home must always park vs discard with warning.
 - Multi-device: parked-only-local games remain device-specific until synced.

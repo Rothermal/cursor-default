@@ -34,7 +34,7 @@ type CheckoutsByPlayerMap = Record<string, CheckoutOption[]>
 
 export default function GameSummary() {
   const navigate = useNavigate()
-  const { state, parkCurrentGame } = useGame()
+  const { state, parkCurrentGame, parkingError } = useGame()
   const { user } = useAuth()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, shotChart } = state
   const {
@@ -527,7 +527,9 @@ export default function GameSummary() {
     if (!window.confirm('Park this game and start another?')) {
       return
     }
-    parkCurrentGame()
+    if (!parkCurrentGame()) {
+      return
+    }
     navigate('/')
   }
 
@@ -1183,8 +1185,8 @@ export default function GameSummary() {
           >
             New Game
           </button>
-          {newGameError && (
-            <p className="text-sm text-red-600 text-center">{newGameError}</p>
+          {(newGameError || parkingError) && (
+            <p className="text-sm text-red-600 text-center">{newGameError ?? parkingError}</p>
           )}
         </div>
 

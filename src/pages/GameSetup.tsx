@@ -33,7 +33,7 @@ export default function GameSetup() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedTeamId = searchParams.get('teamId')
-  const { state, dispatch, startNewGame } = useGame()
+  const { state, dispatch, startNewGame, parkingError } = useGame()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const sport = state.sport
@@ -125,7 +125,10 @@ export default function GameSetup() {
           return
         }
 
-        startNewGame(requestedSport)
+        if (!startNewGame(requestedSport)) {
+          setLoadingRequestedTeamSport(false)
+          return
+        }
       }
       setLoadingRequestedTeamSport(false)
     }
@@ -349,7 +352,7 @@ export default function GameSetup() {
             <p className="text-sm text-slate-500">
               {loadingRequestedTeamSport
                 ? 'Finding this team sport...'
-                : requestedTeamSportError ?? 'Preparing game setup...'}
+                : parkingError ?? requestedTeamSportError ?? 'Preparing game setup...'}
             </p>
             {requestedTeamSportError && (
               <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
@@ -380,7 +383,9 @@ export default function GameSetup() {
       ) {
         return
       }
-      startNewGame(sport)
+      if (!startNewGame(sport)) {
+        return
+      }
     }
 
     // Resolve tournament: existing selection, create new, or free-text
@@ -518,9 +523,9 @@ export default function GameSetup() {
                   {teamsError}
                 </p>
               )}
-              {setupError && (
+              {(setupError || parkingError) && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
-                  {setupError}
+                  {setupError ?? parkingError}
                 </p>
               )}
 

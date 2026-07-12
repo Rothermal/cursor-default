@@ -56,7 +56,12 @@ export default function TeamInfo() {
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
   const { isConfigured } = useAuth()
-  const { state: gameState, dispatch: gameDispatch, startNewGame } = useGame()
+  const {
+    state: gameState,
+    dispatch: gameDispatch,
+    startNewGame,
+    parkingError,
+  } = useGame()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -134,7 +139,9 @@ export default function TeamInfo() {
       return
     }
 
-    startNewGame(sport)
+    if (!startNewGame(sport)) {
+      return
+    }
     gameDispatch({
       type: 'SET_CLOUD_SYNC_STATE',
       cloudSync: {
@@ -307,8 +314,10 @@ export default function TeamInfo() {
                 Start Game
               </button>
             )}
-            {startGameError && (
-              <p className="text-xs text-red-600 max-w-[12rem] text-right">{startGameError}</p>
+            {(startGameError || parkingError) && (
+              <p className="text-xs text-red-600 max-w-[12rem] text-right">
+                {startGameError ?? parkingError}
+              </p>
             )}
             {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
           </div>
