@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
 import { playerInfoPath, teamInfoPath } from '../lib/teamInfo'
+import { sportDashboardPath } from '../lib/sportNavigation'
 
 interface TeamRow {
   id: string
@@ -55,10 +56,15 @@ export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const teamIdFromUrl = searchParams.get('teamId')
   const seasonIdFromUrl = searchParams.get('seasonId')
+  const sportIdFromUrl = searchParams.get('sport')
   const isTeamOrigin = searchParams.get('from') === 'team'
 
   const { user, isConfigured } = useAuth()
   const supabaseClient = supabase
+  const scopedSport = useMemo(
+    () => sports.find(item => item.id === sportIdFromUrl) ?? null,
+    [sportIdFromUrl]
+  )
 
   const [teams, setTeams] = useState<TeamRow[]>([])
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('')
@@ -93,10 +99,11 @@ export default function Leaderboard() {
       const next = new URLSearchParams()
       if (seasonId) next.set('seasonId', seasonId)
       if (teamId) next.set('teamId', teamId)
+      if (scopedSport) next.set('sport', scopedSport.id)
       if (isTeamOrigin) next.set('from', 'team')
       setSearchParams(next, { replace: true })
     },
-    [isTeamOrigin, setSearchParams]
+    [isTeamOrigin, scopedSport, setSearchParams]
   )
 
   useEffect(() => {
@@ -118,7 +125,10 @@ export default function Leaderboard() {
         return
       }
 
-      const loadedTeams = (data ?? []) as unknown as TeamRow[]
+      const loadedTeamsAll = (data ?? []) as unknown as TeamRow[]
+      const loadedTeams = scopedSport
+        ? loadedTeamsAll.filter(team => team.seasons.sport === scopedSport.id)
+        : loadedTeamsAll
       setTeams(loadedTeams)
 
       const seasons = uniqueSeasonsFromTeams(loadedTeams)
@@ -148,7 +158,7 @@ export default function Leaderboard() {
     return () => {
       cancelled = true
     }
-  }, [isConfigured, supabaseClient, user, teamIdFromUrl, seasonIdFromUrl, pushLeaderboardParams])
+  }, [isConfigured, supabaseClient, user, teamIdFromUrl, seasonIdFromUrl, pushLeaderboardParams, scopedSport])
 
   useEffect(() => {
     if (!selectedTeamId || !supabaseClient) {
@@ -289,7 +299,13 @@ export default function Leaderboard() {
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={() =>
-              navigate(isTeamOrigin && selectedTeamId ? teamInfoPath(selectedTeamId) : '/')
+              navigate(
+                isTeamOrigin && selectedTeamId
+                  ? teamInfoPath(selectedTeamId)
+                  : scopedSport
+                    ? sportDashboardPath(scopedSport.id)
+                    : '/'
+              )
             }
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
@@ -297,7 +313,9 @@ export default function Leaderboard() {
             ←
           </button>
           <div>
-            <h1 className="text-lg font-bold">Season Leaderboard</h1>
+            <h1 className="text-lg font-bold">
+              {scopedSport ? `${scopedSport.name} Season Stats` : 'Season Leaderboard'}
+            </h1>
             <p className="text-sm opacity-80">Resolved stats across finalized games</p>
           </div>
         </div>

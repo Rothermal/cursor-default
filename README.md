@@ -4,7 +4,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 
 ## Features
 
-- **Sport Selection** — configurable sports roster; enable/disable via the Settings page
+- **Sport Selection & Dashboards** — configurable sports roster; choose a sport from `/` or `/sports`, then manage that sport's active game, parked games, teams, cloud games, and season stats from `/sport/:sportId`
 - **Seasons** — first-class entity at the top of the hierarchy; teams, games, and tournaments belong to a season; season CRUD in Settings; season picker on team creation and game setup
 - **Game Setup** — select season, pick/create team, enter opponent, tournament/league, and date
 - **Cloud Team & Roster Management** — create teams within seasons; manage rosters via `team_players` junction (players can span multiple teams/seasons); edit team names, player names, and jersey numbers inline
@@ -16,7 +16,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Live Stat Tracking** — tap-friendly increment/decrement buttons organized by stat category; missed-shot tracking with made/attempted display
 - **Minutes Played** — per-player minute counter for sports that track playing time (basketball, hockey, soccer, football)
 - **Game Notes** — free-text notes field in Game Tracker and Game Summary; synced to cloud
-- **Live Scoreboard** — home total can be a standalone scoreboard value or computed from player scoring stats + optional adjustment; manual opponent score; the score also shows on the home active-game card (live) and on Cloud Games cards for in-progress games (last synced) — see [F4 plan](docs/completed/PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md)
+- **Live Scoreboard** — home total can be a standalone scoreboard value or computed from player scoring stats + optional adjustment; manual opponent score; the score also shows on the sport dashboard active-game card (live) and on Cloud Games cards for in-progress games (last synced) — see [F4 plan](docs/completed/PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md)
 - **Basketball team stats** — home/opponent “team” rows in Game Tracker for fouls (per period), timeouts, techs, turnovers; period toggle, bonus indicators, and season rules from `seasons.team_stats_config` (edit under **Settings → Seasons**). Cloud games sync placeholder `players` + `game_stats`; **Game Summary** includes a **Team stats** tab (fouls by period, bonus events, other team stats). See [docs/completed/DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md)
 - **Basketball court capture** — half-court SVG **inline on Game Tracker** (single scroll page, sticky player strip); tapping the court opens an event popup that records made/miss shots (with location + player switcher + live stat line + auto 2/3, manual 2PT/3PT override, optional made-shot assist linking, optional missed-shot rebound prompt, and zone classification) or rebounds/steals/blocks/assists (stat only) for the selected player; the full stat grid stays below the court for direct entry and corrections; the chart filters by the selected player/team chip with an **All** view (recording always targets the active player); **Game Summary** tab when chart shots exist (same filter, defaults to All); for cloud games the Summary shows **all recorders'** shots (one recorder per player — primary recorder, then game creator — so nothing double-plots) and Cloud Games cards flag chart availability; cloud persistence via migration **`032_shot_chart.sql`** ([design](docs/completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md), [F1 plan](docs/completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md), [F2 plan](docs/completed/PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md), [F3 plan](docs/completed/PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md))
 - **Undo Support** — review the last few tracked events, then undo the newest action
@@ -38,7 +38,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 | Hockey | Configured (disabled) | Goals, Assists, Shots, Hits, Blocks, Penalties, Goaltending |
 | Soccer | Configured (disabled) | Goals, Assists, Shots, Tackles, Cards, Goalkeeping |
 
-Sports can be enabled/disabled from the **Settings** page (gear icon on the home screen). Adding a new sport requires only a new entry in `src/config/sports.ts` — the UI discovers it automatically.
+Sports can be enabled/disabled from the **Settings** page in the app shell. Adding a new sport requires only a new entry in `src/config/sports.ts` — the UI discovers it automatically.
 
 ## Tech Stack
 
@@ -176,7 +176,8 @@ src/
 │   └── SettingsContext.tsx # App settings (enabled sports, persisted)
 ├── pages/
 │   ├── Auth.tsx           # Sign in / sign up page
-│   ├── SportSelect.tsx    # Home page — choose a sport
+│   ├── SportSelect.tsx    # Sport choice page
+│   ├── SportDashboard.tsx # Sport-scoped active/parked/manage dashboard
 │   ├── GameSetup.tsx      # Enter game info (teams, tournament, date)
 │   ├── PlayerSetup.tsx    # Add/remove players
 │   ├── GameCheckout.tsx   # Pre-game player checkout (cloud teams)
