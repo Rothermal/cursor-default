@@ -1,4 +1,5 @@
 import type { CloudSyncStatus, GameState } from '../types'
+import { buildGameSyncFingerprint } from './gameSyncFingerprint'
 import {
   GAME_OWNER_KEY,
   GAME_RECORD_KEY_PREFIX,
@@ -8,6 +9,16 @@ import {
 } from './gameStorageKeys'
 
 const MANIFEST_VERSION = 1
+
+export interface ParkedGameSyncState {
+  dirty: boolean
+  revision: number
+  lastEnqueuedRevision: number | null
+  lastSuccessfulSyncRevision: number | null
+  attempts: number
+  lastError: string | null
+  nextAttemptAt: string | null
+}
 
 export interface ParkedGameSummary {
   localGameId: string
@@ -21,6 +32,8 @@ export interface ParkedGameSummary {
   updatedAt: string
   cloudGameId: string | null
   syncStatus: CloudSyncStatus
+  syncDirty: boolean
+  syncLastError: string | null
 }
 
 export interface ParkedGamesManifest {
@@ -38,6 +51,7 @@ export interface ParkedGameRecord {
   updatedAt: string
   gameState: GameState
   summary: ParkedGameSummary
+  sync: ParkedGameSyncState
 }
 
 function gameRecordKey(localGameId: string): string {
@@ -107,10 +121,95 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as ParkedGameRecord
     if (!parsed || parsed.localGameId !== localGameId || !parsed.gameState) return null
-    return parsed
+    const sync = normalizeSyncState(parsed.sync, null, parsed.gameState)
+    const updatedAt =
+      typeof parsed.updatedAt === 'string'
+        ? parsed.updatedAt
+        : parsed.summary?.updatedAt ?? nowIso()
+    return {
+      ...parsed,
+      updatedAt,
+      summary: buildSummary(localGameId, parsed.gameState, updatedAt, sync),
+      sync,
+    }
   } catch {
     return null
   }
+}
+
+function hasSyncablePayload(state: GameState): boolean {
+  return Boolean(state.sport && state.gameInfo && state.cloudSync.gameStatus !== 'final')
+}
+
+function normalizeSyncState(
+  value: Partial<ParkedGameSyncState> | null | undefined,
+  existing: ParkedGameRecord | null,
+  state: GameState
+): ParkedGameSyncState {
+  const revision =
+    typeof value?.revision === 'number'
+      ? Math.max(0, Math.floor(value.revision))
+      : existing?.sync.revision ?? 0
+  const fingerprint = hasSyncablePayload(state) ? buildGameSyncFingerprint(state) : null
+  const dirty = Boolean(
+    hasSyncablePayload(state) &&
+      fingerprint &&
+      state.cloudSync.lastSyncedGameFingerprint !== fingerprint
+  )
+
+  return {
+    dirty: typeof value?.dirty === 'boolean' ? value.dirty : dirty,
+    revision,
+    lastEnqueuedRevision:
+      typeof value?.lastEnqueuedRevision === 'number'
+        ? Math.max(0, Math.floor(value.lastEnqueuedRevision))
+        : existing?.sync.lastEnqueuedRevision ?? null,
+    lastSuccessfulSyncRevision:
+      typeof value?.lastSuccessfulSyncRevision === 'number'
+        ? Math.max(0, Math.floor(value.lastSuccessfulSyncRevision))
+        : existing?.sync.lastSuccessfulSyncRevision ?? (dirty ? null : revision),
+    attempts:
+      typeof value?.attempts === 'number'
+        ? Math.max(0, Math.floor(value.attempts))
+        : existing?.sync.attempts ?? 0,
+    lastError:
+      typeof value?.lastError === 'string'
+        ? value.lastError
+        : existing?.sync.lastError ?? null,
+    nextAttemptAt:
+      typeof value?.nextAttemptAt === 'string'
+        ? value.nextAttemptAt
+        : existing?.sync.nextAttemptAt ?? null,
+  }
+}
+
+function buildSyncState(
+  existing: ParkedGameRecord | null,
+  state: GameState,
+  patch: Partial<ParkedGameSyncState> = {}
+): ParkedGameSyncState {
+  const fingerprint = hasSyncablePayload(state) ? buildGameSyncFingerprint(state) : null
+  const previousFingerprint = existing ? buildGameSyncFingerprint(existing.gameState) : null
+  const payloadChanged = fingerprint !== previousFingerprint
+  const revision = (existing?.sync.revision ?? 0) + (payloadChanged ? 1 : 0)
+  const dirty = Boolean(
+    hasSyncablePayload(state) &&
+      fingerprint &&
+      state.cloudSync.lastSyncedGameFingerprint !== fingerprint
+  )
+  const base: ParkedGameSyncState = {
+    dirty,
+    revision,
+    lastEnqueuedRevision: dirty ? revision : existing?.sync.lastEnqueuedRevision ?? null,
+    lastSuccessfulSyncRevision: dirty
+      ? existing?.sync.lastSuccessfulSyncRevision ?? null
+      : revision,
+    attempts: dirty ? (payloadChanged ? 0 : existing?.sync.attempts ?? 0) : 0,
+    lastError: dirty ? (payloadChanged ? null : existing?.sync.lastError ?? null) : null,
+    nextAttemptAt: dirty ? (payloadChanged ? null : existing?.sync.nextAttemptAt ?? null) : null,
+  }
+
+  return normalizeSyncState({ ...base, ...patch }, existing, state)
 }
 
 function hasPersistableGameState(state: GameState): boolean {
@@ -127,8 +226,17 @@ function hasPersistableGameState(state: GameState): boolean {
 function buildSummary(
   localGameId: string,
   state: GameState,
-  updatedAt: string
+  updatedAt: string,
+  sync: ParkedGameSyncState
 ): ParkedGameSummary {
+  const syncStatus: CloudSyncStatus = sync.dirty
+    ? sync.lastError || state.cloudSync.status === 'error'
+      ? 'error'
+      : state.cloudSync.status === 'offline' || state.cloudSync.status === 'syncing'
+        ? state.cloudSync.status
+        : 'idle'
+    : state.cloudSync.status
+
   return {
     localGameId,
     sportId: state.sport?.id ?? null,
@@ -140,7 +248,9 @@ function buildSummary(
     status: state.cloudSync.gameStatus,
     updatedAt,
     cloudGameId: state.cloudSync.gameId,
-    syncStatus: state.cloudSync.status,
+    syncStatus,
+    syncDirty: sync.dirty,
+    syncLastError: sync.lastError,
   }
 }
 
@@ -180,7 +290,8 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
 
     localGameId = createLocalGameId()
     const updatedAt = nowIso()
-    const summary = buildSummary(localGameId, gameState, updatedAt)
+    const sync = buildSyncState(null, gameState)
+    const summary = buildSummary(localGameId, gameState, updatedAt, sync)
     const manifest: ParkedGamesManifest = {
       ...emptyManifest(ownerId),
       activeLocalGameId: localGameId,
@@ -194,6 +305,7 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
       updatedAt,
       gameState,
       summary,
+      sync,
     }
 
     localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
@@ -227,7 +339,7 @@ export function loadActiveParkedGameState(ownerId: string | null): GameState | n
 export function listParkedGames(ownerId: string | null): ParkedGameSummary[] {
   const manifest = migrateLegacyGameStorage(ownerId)
   return manifest.gameIds
-    .map(id => manifest.summaries[id])
+    .map(id => readRecord(id)?.summary ?? manifest.summaries[id])
     .filter((summary): summary is ParkedGameSummary => Boolean(summary))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
@@ -252,7 +364,8 @@ export function saveActiveGameState(
   const localGameId = manifest.activeLocalGameId ?? createLocalGameId()
   const existing = readRecord(localGameId)
   const updatedAt = nowIso()
-  const summary = buildSummary(localGameId, state, updatedAt)
+  const sync = buildSyncState(existing, state)
+  const summary = buildSummary(localGameId, state, updatedAt, sync)
   const record: ParkedGameRecord = {
     localGameId,
     ownerId,
@@ -260,6 +373,7 @@ export function saveActiveGameState(
     updatedAt,
     gameState: state,
     summary,
+    sync,
   }
 
   localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
@@ -278,6 +392,93 @@ export function saveActiveGameState(
       [localGameId]: summary,
     },
   })
+
+  return listParkedGames(ownerId)
+}
+
+export function getParkedGameRecord(
+  localGameId: string,
+  ownerId: string | null
+): ParkedGameRecord | null {
+  migrateLegacyGameStorage(ownerId)
+  const record = readRecord(localGameId)
+  if (!record) return null
+  if (record.ownerId && ownerId && record.ownerId !== ownerId) return null
+  return record
+}
+
+export function listParkedGameRecords(ownerId: string | null): ParkedGameRecord[] {
+  const manifest = migrateLegacyGameStorage(ownerId)
+  return manifest.gameIds
+    .map(id => readRecord(id))
+    .filter((record): record is ParkedGameRecord => Boolean(record))
+    .filter(record => !record.ownerId || !ownerId || record.ownerId === ownerId)
+}
+
+export function hasDirtyParkedGames(ownerId: string | null): boolean {
+  return listParkedGameRecords(ownerId).some(record => record.sync.dirty)
+}
+
+export function listDirtyParkedGameRecords(
+  ownerId: string | null,
+  now: Date = new Date()
+): ParkedGameRecord[] {
+  const nowMs = now.getTime()
+  const manifest = migrateLegacyGameStorage(ownerId)
+  const activeId = manifest.activeLocalGameId
+  return listParkedGameRecords(ownerId)
+    .filter(record => {
+      if (!record.sync.dirty) return false
+      if (!record.sync.nextAttemptAt) return true
+      const nextMs = Date.parse(record.sync.nextAttemptAt)
+      return Number.isNaN(nextMs) || nextMs <= nowMs
+    })
+    .sort((a, b) => {
+      if (a.localGameId === activeId) return -1
+      if (b.localGameId === activeId) return 1
+      return a.updatedAt.localeCompare(b.updatedAt)
+    })
+}
+
+export function saveParkedGameRecordState(
+  localGameId: string,
+  state: GameState,
+  ownerId: string | null,
+  syncPatch: Partial<ParkedGameSyncState> = {}
+): ParkedGameSummary[] {
+  const manifest = migrateLegacyGameStorage(ownerId)
+  const existing = readRecord(localGameId)
+  const createdAt = existing?.createdAt ?? nowIso()
+  const updatedAt = nowIso()
+  const sync = buildSyncState(existing, state, syncPatch)
+  const summary = buildSummary(localGameId, state, updatedAt, sync)
+  const record: ParkedGameRecord = {
+    localGameId,
+    ownerId,
+    createdAt,
+    updatedAt,
+    gameState: state,
+    summary,
+    sync,
+  }
+  localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
+
+  const gameIds = manifest.gameIds.includes(localGameId)
+    ? manifest.gameIds
+    : [localGameId, ...manifest.gameIds]
+  writeManifest({
+    ...manifest,
+    ownerId,
+    gameIds,
+    summaries: {
+      ...manifest.summaries,
+      [localGameId]: summary,
+    },
+  })
+
+  if (manifest.activeLocalGameId === localGameId) {
+    writeLegacyMirror(state, ownerId)
+  }
 
   return listParkedGames(ownerId)
 }

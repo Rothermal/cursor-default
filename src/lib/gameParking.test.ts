@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../types'
+import { withLastSyncedGameFingerprint } from './gameSyncFingerprint'
 import {
   GAME_RECORD_KEY_PREFIX,
   GAME_STORAGE_KEY,
@@ -9,10 +10,13 @@ import {
   activateParkedGame,
   beginNewActiveParkedGame,
   getActiveLocalGameId,
+  getParkedGameRecord,
+  listDirtyParkedGameRecords,
   listParkedGames,
   loadActiveParkedGameState,
   parkActiveGame,
   saveActiveGameState,
+  saveParkedGameRecordState,
 } from './gameParking'
 
 class MemoryStorage {
@@ -184,5 +188,83 @@ describe('gameParking', () => {
     expect(activeId).not.toBeNull()
     expect(listParkedGames(null)).toEqual([])
     expect(localStorage.getItem(GAMES_MANIFEST_KEY)).not.toContain(activeId!)
+  })
+
+  it('marks unsynced records dirty and clears dirty when the snapshot fingerprint is synced', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const dirtyRecord = getParkedGameRecord(summary.localGameId, 'user-1')
+
+    expect(dirtyRecord?.sync.dirty).toBe(true)
+    expect(listDirtyParkedGameRecords('user-1').map(record => record.localGameId)).toEqual([
+      summary.localGameId,
+    ])
+
+    const syncedState = withLastSyncedGameFingerprint(dirtyRecord!.gameState)
+    saveParkedGameRecordState(summary.localGameId, syncedState, 'user-1')
+
+    expect(getParkedGameRecord(summary.localGameId, 'user-1')?.sync.dirty).toBe(false)
+    expect(listDirtyParkedGameRecords('user-1')).toEqual([])
+  })
+
+  it('orders dirty sync records active first, then older parked records', () => {
+    const [first] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    parkActiveGame('user-1')
+    beginNewActiveParkedGame('user-1')
+    const [active] = saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+
+    expect(listDirtyParkedGameRecords('user-1').map(record => record.localGameId)).toEqual([
+      active.localGameId,
+      first.localGameId,
+    ])
+  })
+
+  it('hides dirty records from the due list until their next attempt time', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const record = getParkedGameRecord(summary.localGameId, 'user-1')!
+    saveParkedGameRecordState(summary.localGameId, record.gameState, 'user-1', {
+      dirty: true,
+      nextAttemptAt: '2026-07-12T12:01:00.000Z',
+    })
+
+    expect(
+      listDirtyParkedGameRecords('user-1', new Date('2026-07-12T12:00:00.000Z'))
+    ).toEqual([])
+    expect(
+      listDirtyParkedGameRecords('user-1', new Date('2026-07-12T12:01:00.000Z'))
+    ).toHaveLength(1)
+  })
+
+  it('shows parked summaries as pending when the latest snapshot is still dirty', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const record = getParkedGameRecord(summary.localGameId, 'user-1')!
+    const staleSyncedState: GameState = {
+      ...record.gameState,
+      cloudSync: {
+        ...record.gameState.cloudSync,
+        status: 'synced',
+        lastSyncedGameFingerprint: 'older-snapshot',
+      },
+    }
+
+    saveParkedGameRecordState(summary.localGameId, staleSyncedState, 'user-1')
+
+    const [parked] = listParkedGames('user-1')
+    expect(parked.syncDirty).toBe(true)
+    expect(parked.syncStatus).toBe('idle')
+  })
+
+  it('surfaces per-record sync errors on parked summaries', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const record = getParkedGameRecord(summary.localGameId, 'user-1')!
+
+    saveParkedGameRecordState(summary.localGameId, record.gameState, 'user-1', {
+      dirty: true,
+      lastError: 'Cloud sync failed',
+    })
+
+    const [parked] = listParkedGames('user-1')
+    expect(parked.syncDirty).toBe(true)
+    expect(parked.syncStatus).toBe('error')
+    expect(parked.syncLastError).toBe('Cloud sync failed')
   })
 })

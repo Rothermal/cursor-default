@@ -45,10 +45,16 @@ import {
   beginNewActiveParkedGame,
   discardParkedGame as discardParkedGameStorage,
   getActiveLocalGameId,
+  getParkedGameRecord,
+  hasDirtyParkedGames,
+  listDirtyParkedGameRecords,
+  listParkedGameRecords,
   listParkedGames,
   loadActiveParkedGameState,
   parkActiveGame,
   saveActiveGameState,
+  saveParkedGameRecordState,
+  type ParkedGameRecord,
   type ParkedGameSummary,
 } from '../lib/gameParking'
 
@@ -673,6 +679,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [activeLocalGameId, setActiveLocalGameId] = useState<string | null>(() =>
     getActiveLocalGameId(userId)
   )
+  const [syncRetryTick, setSyncRetryTick] = useState(0)
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
   const queueAnotherSyncRef = useRef(false)
@@ -914,12 +921,197 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, isOnline, state.cloudSync.status])
 
-  const runCloudSync = useCallback(async () => {
-    if (!canSyncState(stateRef.current, isConfigured, userId, isOnline)) {
-      if (!isOnline && hasSyncPrereqs(stateRef.current, isConfigured, userId)) {
-        pendingSyncRef.current = true
-        setPendingSyncFlag(true)
+  const refreshParkingState = useCallback(() => {
+    setParkedGames(listParkedGames(userId))
+    setActiveLocalGameId(getActiveLocalGameId(userId))
+    pendingSyncRef.current = hasDirtyParkedGames(userId)
+    setPendingSyncFlag(pendingSyncRef.current)
+  }, [userId])
+
+  const syncParkedRecord = useCallback(
+    async (record: ParkedGameRecord) => {
+      const snapshot = record.gameState
+      const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
+      const snapshotUserId = userId
+      if (!getParkedGameRecord(record.localGameId, snapshotUserId)) return
+
+      const isActiveRecord = getActiveLocalGameId(snapshotUserId) === record.localGameId
+
+      if (!canSyncState(snapshot, isConfigured, snapshotUserId, isOnline)) {
+        if (!isOnline && hasSyncPrereqs(snapshot, isConfigured, snapshotUserId)) {
+          const offlineState: GameState = {
+            ...snapshot,
+            cloudSync: {
+              ...snapshot.cloudSync,
+              status: 'offline',
+              lastError: null,
+            },
+          }
+          saveParkedGameRecordState(record.localGameId, offlineState, snapshotUserId, {
+            dirty: true,
+            lastError: null,
+            nextAttemptAt: null,
+          })
+          if (isActiveRecord) {
+            dispatch({
+              type: 'SET_CLOUD_SYNC_STATE',
+              cloudSync: {
+                status: 'offline',
+                lastError: null,
+              },
+            })
+          }
+        }
+        return
       }
+
+      const syncingState: GameState = {
+        ...snapshot,
+        cloudSync: {
+          ...snapshot.cloudSync,
+          status: 'syncing',
+          lastError: null,
+        },
+      }
+      saveParkedGameRecordState(record.localGameId, syncingState, snapshotUserId, {
+        dirty: true,
+        lastError: null,
+        nextAttemptAt: null,
+      })
+      refreshParkingState()
+      if (isActiveRecord) {
+        dispatch({
+          type: 'SET_CLOUD_SYNC_STATE',
+          cloudSync: {
+            status: 'syncing',
+            lastError: null,
+          },
+        })
+      }
+
+      try {
+        const synced = await syncGameSnapshotToCloud({
+          state: snapshot,
+          userId: snapshotUserId!,
+        })
+        const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
+        if (!latestRecord) return
+
+        const latestState = latestRecord.gameState
+        const isStillActiveRecord = getActiveLocalGameId(snapshotUserId) === record.localGameId
+
+        if (synced.skippedFinalGame && shouldRejectSkippedFinalSync(snapshot)) {
+          const errorState: GameState = {
+            ...latestState,
+            cloudSync: {
+              ...latestState.cloudSync,
+              gameStatus: 'final',
+              status: 'error',
+              lastError: 'Game was finalized elsewhere. Unsynced stats could not be saved.',
+            },
+          }
+          saveParkedGameRecordState(record.localGameId, errorState, snapshotUserId, {
+            attempts: latestRecord.sync.attempts + 1,
+            lastError: errorState.cloudSync.lastError,
+            nextAttemptAt: null,
+          })
+          if (isStillActiveRecord) {
+            dispatch({
+              type: 'SET_CLOUD_SYNC_STATE',
+              cloudSync: {
+                gameStatus: 'final',
+                status: 'error',
+                lastError: errorState.cloudSync.lastError,
+              },
+            })
+          }
+          return
+        }
+
+        const cloudSyncPatch: Partial<CloudSyncState> = {
+          seasonId: synced.seasonId,
+          teamId: synced.teamId,
+          gameId: synced.gameId,
+          gameStatus: synced.skippedFinalGame ? 'final' : 'in_progress',
+          playerIdMap: synced.playerIdMap,
+          status: 'synced',
+          lastSyncedAt: synced.syncedAt,
+          lastError: null,
+          shotChartHydrationDroppedRows:
+            synced.shotChartCloudSync === 'synced'
+              ? 0
+              : snapshot.cloudSync.shotChartHydrationDroppedRows,
+          lastSyncedGameFingerprint: snapshotFingerprint,
+        }
+        const nextState: GameState = {
+          ...latestState,
+          cloudSync: {
+            ...latestState.cloudSync,
+            ...cloudSyncPatch,
+          },
+        }
+        saveParkedGameRecordState(record.localGameId, nextState, snapshotUserId, {
+          attempts: 0,
+          lastError: null,
+          nextAttemptAt: null,
+        })
+        if (snapshotUserId && isStillActiveRecord) {
+          setResumeTarget(snapshotUserId, synced.gameId)
+        }
+        if (isStillActiveRecord) {
+          dispatch({
+            type: 'SET_CLOUD_SYNC_STATE',
+            cloudSync: cloudSyncPatch,
+          })
+        }
+      } catch (error) {
+        const networkish = isLikelyNetworkError(error)
+        const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
+        const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
+        if (!latestRecord) return
+
+        const latestState = latestRecord.gameState
+        const attempts = latestRecord.sync.attempts + 1
+        const retryMs = Math.min(30_000, 1000 * 2 ** Math.min(attempts, 5))
+        const errorState: GameState = {
+          ...latestState,
+          cloudSync: {
+            ...latestState.cloudSync,
+            status: networkish ? 'offline' : 'error',
+            lastError: networkish ? null : errMsg,
+          },
+        }
+        saveParkedGameRecordState(record.localGameId, errorState, snapshotUserId, {
+          dirty: true,
+          attempts,
+          lastError: networkish ? null : errMsg,
+          nextAttemptAt: retryMs > 0 ? new Date(Date.now() + retryMs).toISOString() : null,
+        })
+        if (getActiveLocalGameId(snapshotUserId) === record.localGameId) {
+          dispatch({
+            type: 'SET_CLOUD_SYNC_STATE',
+            cloudSync: {
+              status: networkish ? 'offline' : 'error',
+              lastError: networkish ? null : errMsg,
+            },
+          })
+        }
+        if (!networkish && snapshotUserId) {
+          void logClientSyncError(snapshotUserId, errMsg, latestState)
+        }
+      } finally {
+        refreshParkingState()
+      }
+    },
+    [isConfigured, isOnline, refreshParkingState, userId]
+  )
+
+  const runCloudSync = useCallback(async () => {
+    if (!isConfigured || !userId || !supabase) return
+
+    if (!isOnline) {
+      pendingSyncRef.current = hasDirtyParkedGames(userId)
+      setPendingSyncFlag(pendingSyncRef.current)
       return
     }
 
@@ -932,110 +1124,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     try {
       do {
         queueAnotherSyncRef.current = false
+        const dirtyRecords = listDirtyParkedGameRecords(userId)
+        if (dirtyRecords.length === 0) break
 
-        const snapshot = stateRef.current
-        const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
-        const snapshotUserId = userId
-
-        if (!canSyncState(snapshot, isConfigured, snapshotUserId, isOnline)) {
-          dispatch({
-            type: 'SET_CLOUD_SYNC_STATE',
-            cloudSync: {
-              status: !isConfigured || !isOnline ? 'offline' : 'idle',
-            },
-          })
-          if (!isOnline && hasSyncPrereqs(snapshot, isConfigured, snapshotUserId)) {
-            pendingSyncRef.current = true
-            setPendingSyncFlag(true)
-          }
-          break
+        for (const record of dirtyRecords) {
+          await syncParkedRecord(record)
         }
-
-        dispatch({
-          type: 'SET_CLOUD_SYNC_STATE',
-          cloudSync: {
-            status: 'syncing',
-            lastError: null,
-          },
-        })
-
-        const synced = await syncGameSnapshotToCloud({
-          state: snapshot,
-          userId: snapshotUserId!,
-        })
-
-        const isStale = snapshotFingerprint !== buildGameSyncFingerprint(stateRef.current)
-        if (isStale) {
-          queueAnotherSyncRef.current = true
-          continue
-        }
-
-        if (synced.skippedFinalGame && shouldRejectSkippedFinalSync(snapshot)) {
-          pendingSyncRef.current = true
-          setPendingSyncFlag(true)
-          dispatch({
-            type: 'SET_CLOUD_SYNC_STATE',
-            cloudSync: {
-              gameStatus: 'final',
-              status: 'error',
-              lastError: 'Game was finalized elsewhere. Unsynced stats could not be saved.',
-            },
-          })
-          break
-        }
-
-        dispatch({
-          type: 'SET_CLOUD_SYNC_STATE',
-          cloudSync: {
-            seasonId: synced.seasonId,
-            teamId: synced.teamId,
-            gameId: synced.gameId,
-            gameStatus: synced.skippedFinalGame ? 'final' : 'in_progress',
-            playerIdMap: synced.playerIdMap,
-            status: 'synced',
-            lastSyncedAt: synced.syncedAt,
-            lastError: null,
-            shotChartHydrationDroppedRows:
-              synced.shotChartCloudSync === 'synced' ? 0 : snapshot.cloudSync.shotChartHydrationDroppedRows,
-            lastSyncedGameFingerprint: buildGameSyncFingerprint(snapshot),
-          },
-        })
-        if (snapshotUserId) {
-          setResumeTarget(snapshotUserId, synced.gameId)
-        }
-        pendingSyncRef.current = false
-        setPendingSyncFlag(false)
       } while (queueAnotherSyncRef.current)
-    } catch (error) {
-      if (isLikelyNetworkError(error)) {
-        pendingSyncRef.current = true
-        setPendingSyncFlag(true)
-        dispatch({
-          type: 'SET_CLOUD_SYNC_STATE',
-          cloudSync: {
-            status: 'offline',
-            lastError: null,
-          },
-        })
-        return
-      }
-      const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
-      pendingSyncRef.current = true
-      setPendingSyncFlag(true)
-      dispatch({
-        type: 'SET_CLOUD_SYNC_STATE',
-        cloudSync: {
-          status: 'error',
-          lastError: errMsg,
-        },
-      })
-      if (userId) {
-        void logClientSyncError(userId, errMsg, stateRef.current)
-      }
     } finally {
       syncInFlightRef.current = false
+      refreshParkingState()
     }
-  }, [isConfigured, isOnline, userId])
+  }, [isConfigured, isOnline, refreshParkingState, syncParkedRecord, userId])
 
   const flushCloudSync = useCallback(async (): Promise<FlushCloudSyncResult> => {
     if (debounceTimerRef.current !== null) {
@@ -1043,34 +1143,66 @@ export function GameProvider({ children }: { children: ReactNode }) {
       debounceTimerRef.current = null
     }
     await runCloudSync()
-    const s = stateRef.current
+    const activeId = getActiveLocalGameId(userId)
+    const activeRecord = activeId ? getParkedGameRecord(activeId, userId) : null
+    const s = activeRecord?.gameState ?? stateRef.current
     if (s.cloudSync.status === 'error') {
       return { ok: false, reason: s.cloudSync.lastError ?? 'Cloud sync failed' }
     }
     if (!isOnline || s.cloudSync.status === 'offline') {
       return { ok: false, reason: 'Offline — connect to sync before continuing' }
     }
-    if (getPendingSyncFlag() || shouldDeferCloudResumeHydration(s, getPendingSyncFlag())) {
+    if (activeRecord?.sync.dirty || shouldDeferCloudResumeHydration(s, getPendingSyncFlag())) {
       return { ok: false, reason: 'Latest changes could not be synced. Try again.' }
     }
     return { ok: true }
-  }, [isOnline, runCloudSync])
+  }, [isOnline, runCloudSync, userId])
 
   const syncFingerprint = buildGameSyncFingerprint(state)
-  const shouldSync = canSyncState(state, isConfigured, userId, isOnline)
+  const queueFingerprint = parkedGames
+    .map(
+      game =>
+        `${game.localGameId}:${game.updatedAt}:${game.syncStatus}:${game.syncDirty}:${game.syncLastError ?? ''}`
+    )
+    .join('|')
+  const shouldSync = Boolean(
+    isConfigured &&
+      userId &&
+      supabase &&
+      isOnline &&
+      hasDirtyParkedGames(userId)
+  )
 
   // Restore durable pending-sync flag on load so we sync after reopen when user had been offline
   useEffect(() => {
-    if (isConfigured && userId && isOnline && getPendingSyncFlag()) {
-      pendingSyncRef.current = true
-    }
-  }, [isConfigured, isOnline, userId])
+    pendingSyncRef.current = hasDirtyParkedGames(userId)
+    setPendingSyncFlag(pendingSyncRef.current)
+  }, [isConfigured, isOnline, queueFingerprint, userId])
 
   useEffect(() => {
-    if (!isOnline || !pendingSyncRef.current) return
-    if (!canSyncState(stateRef.current, isConfigured, userId, isOnline)) return
+    if (!isOnline || !hasDirtyParkedGames(userId)) return
+    if (!isConfigured || !userId || !supabase) return
     void runCloudSync()
-  }, [isConfigured, isOnline, runCloudSync, userId])
+  }, [isConfigured, isOnline, queueFingerprint, runCloudSync, syncRetryTick, userId])
+
+  useEffect(() => {
+    if (!isConfigured || !isOnline || !userId || !supabase) return
+    const nextAttemptMs = listParkedGameRecords(userId)
+      .filter(record => record.sync.dirty && record.sync.nextAttemptAt)
+      .map(record => Date.parse(record.sync.nextAttemptAt!))
+      .filter(ms => !Number.isNaN(ms))
+      .sort((a, b) => a - b)[0]
+    if (nextAttemptMs == null) return
+
+    const delay = Math.max(0, nextAttemptMs - Date.now())
+    const timer = window.setTimeout(() => {
+      setSyncRetryTick(tick => tick + 1)
+    }, Math.min(delay, 30_000))
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [isConfigured, isOnline, queueFingerprint, userId])
 
   useEffect(() => {
     if (!shouldSync) return
@@ -1089,7 +1221,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         debounceTimerRef.current = null
       }
     }
-  }, [runCloudSync, shouldSync, syncFingerprint])
+  }, [runCloudSync, shouldSync, syncFingerprint, queueFingerprint])
 
   return (
     <GameContext.Provider

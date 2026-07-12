@@ -89,6 +89,19 @@ export default function SportSelect() {
     return '/game'
   }
 
+  const parkedSyncLabel = (game: (typeof parkedGames)[number]) => {
+    if (game.syncDirty) {
+      if (game.syncStatus === 'error') {
+        return game.syncLastError ? `Sync: error - ${game.syncLastError}` : 'Sync: error'
+      }
+      if (game.syncStatus === 'offline') return 'Sync: offline changes pending'
+      if (game.syncStatus === 'syncing') return 'Sync: syncing...'
+      return 'Sync: pending'
+    }
+    if (game.syncStatus === 'synced') return 'Sync: saved'
+    return `Sync: ${game.syncStatus}`
+  }
+
   const handleResumeParked = (localGameId: string) => {
     setNewGameError(null)
     const resumed = resumeParkedGame(localGameId)
@@ -182,8 +195,8 @@ export default function SportSelect() {
                       {game.sportName}
                       {game.gameDate ? ` · ${game.gameDate}` : ''}
                     </p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Sync: {game.syncStatus}
+                    <p className="text-xs text-slate-400 mt-0.5 truncate" title={parkedSyncLabel(game)}>
+                      {parkedSyncLabel(game)}
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">

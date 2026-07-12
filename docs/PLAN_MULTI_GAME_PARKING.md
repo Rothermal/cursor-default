@@ -1,6 +1,6 @@
 # Plan: Multi-game parking, active game, and sync queue
 
-Living blueprint for local multi-game parking and the future sync queue. **P0 local parking is shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, and saves full snapshots at `statkeeper_game:{localGameId}`. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **P1+ sync queue work is not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
+Living blueprint for local multi-game parking and sync queue work. **P0 local parking and P1 sync queue are shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, saves full snapshots at `statkeeper_game:{localGameId}`, and syncs dirty parked records through a local queue. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **P2+ cloud hardening is not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
 
 ---
 
@@ -54,11 +54,6 @@ Living blueprint for local multi-game parking and the future sync queue. **P0 lo
 
 ## 4. Sync queue (behavior)
 
-**Known P0 debt**
-
-- Cloud sync is still active-game scoped. If a sync result returns after the user parks/switches games, `GameContext` treats it as stale and does not merge returned ids into the parked record. P1 should either flush before switching or merge sync results by captured `localGameId`.
-- `statkeeper_pending_sync` is still global. P1 should move dirty/pending state onto each `ParkedGameRecord` so one dirty parked game cannot mask or clear another game's retry state.
-
 **Producer**
 
 - On state change for a given `localGameId`: mark record dirty, **enqueue** one job per `localGameId` (coalesce: single pending job per id, refresh payload revision when merging).
@@ -100,7 +95,7 @@ Living blueprint for local multi-game parking and the future sync queue. **P0 lo
 | Phase | Deliverable |
 |-------|-------------|
 | **P0** | Manifest + per-game keys + migrate legacy key; park-on-switch; parked list UI; still one debounced sync for **active** game only (behavioral win without full queue). **Shipped.** |
-| **P1** | Sync queue worker; dirty flags; enqueue/dequeue for all dirty parked games; offline drain. |
+| **P1** | Sync queue worker; dirty flags; enqueue/dequeue for all dirty parked games; offline drain. **Shipped.** |
 | **P2** | Cloud write ordering / transactional safety; optional cleanup tooling for historical orphan games (ops-only, not automatic user data deletion). |
 | **P3** | IndexedDB, export/import, max parked count, quota UX. |
 
