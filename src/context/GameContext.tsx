@@ -780,7 +780,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   )
 
   const parkCurrentGame = useCallback(() => {
-    setParkedGames(saveActiveGameState(stateRef.current, userId))
+    saveActiveGameState(stateRef.current, userId)
     setParkedGames(parkActiveGame(userId))
     setActiveLocalGameId(null)
     dispatch({ type: 'RESET_GAME' })
