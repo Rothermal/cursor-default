@@ -72,6 +72,11 @@ type CloudGameRow = {
   opp_team_player_id?: string | null
 }
 
+type EnsuredGame = {
+  gameId: string
+  created: boolean
+}
+
 function isMissingLastOpenedColumnError(error: { message?: string } | null): boolean {
   if (!error?.message) return false
   return error.message.includes('last_opened_at') && error.message.includes('column')
@@ -365,7 +370,7 @@ async function ensureGame(
   userId: string,
   teamId: string,
   seasonIdForGame: string | null
-): Promise<string> {
+): Promise<EnsuredGame> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
   }
@@ -499,10 +504,21 @@ async function ensureGame(
 
   if (state.cloudSync.gameId) {
     await upsertWithFallback('update', gameUpdatePayload, state.cloudSync.gameId)
-    return state.cloudSync.gameId
+    return { gameId: state.cloudSync.gameId, created: false }
   }
 
-  return upsertWithFallback('insert', gameInsertPayload)
+  return { gameId: await upsertWithFallback('insert', gameInsertPayload), created: true }
+}
+
+async function deleteNewlyCreatedGameAfterFailedSync(gameId: string, userId: string): Promise<void> {
+  if (!supabase) return
+
+  await supabase
+    .from('games')
+    .delete()
+    .eq('id', gameId)
+    .eq('created_by', userId)
+    .eq('status', 'in_progress')
 }
 
 /**
@@ -882,8 +898,10 @@ export async function syncGameSnapshotToCloud({
 
   const seasonId = await ensureSeason(state, userId)
   const teamId = await ensureTeam(state, userId, seasonId)
-  const gameId = await ensureGame(state, userId, teamId, seasonId)
 
+  // Resolve players and roster links before inserting a brand-new `games` row.
+  // This shrinks the orphan window: failures in player/team-player setup no longer
+  // leave an in-progress cloud game without stats.
   const nextPlayerIdMap: Record<string, string> = {}
   for (const player of state.players) {
     const remotePlayerId = await ensurePlayerId(
@@ -895,15 +913,26 @@ export async function syncGameSnapshotToCloud({
     nextPlayerIdMap[player.id] = remotePlayerId
   }
 
-  await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
+  const ensuredGame = await ensureGame(state, userId, teamId, seasonId)
+  const gameId = ensuredGame.gameId
+  let shotChartCloudSync: ShotChartCloudSyncMode = 'synced'
 
-  const shotChartCloudSync = await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
+  try {
+    await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
 
-  await linkGameTeamPlaceholderIds(
-    gameId,
-    nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
-    nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
-  )
+    shotChartCloudSync = await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
+
+    await linkGameTeamPlaceholderIds(
+      gameId,
+      nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
+      nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
+    )
+  } catch (error) {
+    if (ensuredGame.created) {
+      await deleteNewlyCreatedGameAfterFailedSync(gameId, userId).catch(() => {})
+    }
+    throw error
+  }
 
   // Best-effort metadata touch for deterministic resume selection across devices.
   // If the optional migration adding games.last_opened_at is not applied yet,

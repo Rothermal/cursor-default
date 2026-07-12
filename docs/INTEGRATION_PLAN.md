@@ -609,7 +609,7 @@ To enable cross-device deterministic active-game preference, apply `007_games_la
 - [x] Save stat actions to `game_stats` in real time (debounced snapshot sync + flush on leave Game Tracker)
 - [x] Game finalization flow (status → final)
 - [x] Nickname/relabel UI for teams and players (Cloud Teams page: team and player display names)
-- [ ] Offline stat tracking with **multi-game parking + explicit per-game sync queue** (reconnect-triggered sync and durable pending-sync flag exist today for **one** active game — see [PLAN_MULTI_GAME_PARKING.md](PLAN_MULTI_GAME_PARKING.md))
+- [x] Offline stat tracking with **multi-game parking + explicit per-game sync queue** (local parked records can mix sports; dirty records drain when online; cloud sync now resolves roster/player rows before inserting new `games` rows and best-effort rolls back a just-created game if child writes fail — see [PLAN_MULTI_GAME_PARKING.md](PLAN_MULTI_GAME_PARKING.md))
 
 ### Phase 3: Season Stats + Multi-Parent Checkout + Admin Review
 > **Goal**: Accumulated stats, leaderboards, player checkout, and admin stat corrections.

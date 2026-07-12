@@ -50,6 +50,22 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 3a. Multi-game parking, queue, and cloud hardening
+
+**Precondition:** Signed in with Supabase configured for cloud checks. For local-only checks, repeat 3a.1-3a.5 with Supabase disabled.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 3a.1 | Start a basketball game, add two players, record several stats and at least one court shot | Game is active; home score, stats, action log, and shot marker persist |
+| 3a.2 | Return home, choose another enabled sport or start another basketball game, and confirm parking the current game | First game appears under Parked Games with sport/team/opponent/date and a pending/offline/saved sync label; new setup flow starts with a different local game id |
+| 3a.3 | Record stats in game B, then resume game A from Parked Games | Game A restores its own sport, players, stats, shots, score, and action log; game B remains parked and unchanged |
+| 3a.4 | With network offline or Supabase unreachable, dirty both games | Each parked row remains dirty/offline; neither record overwrites the other |
+| 3a.5 | Restore network and wait for sync | Dirty records drain through the queue: active game first, then parked games by older update time; each record keeps its own cloud `gameId` / `playerIdMap` |
+| 3a.6 | During a cloud sync failure after a new game row is inserted (simulate by forcing `game_stats` or `shot_chart` write failure in dev tools/test env) | The local parked record stays dirty/error and retryable; the just-created in-progress cloud game is best-effort deleted rather than left as a new orphan |
+| 3a.7 | Existing cloud game sync fails after the game already has a persisted `cloudSync.gameId` | Existing game is not deleted; local row remains dirty/error for retry |
+
+---
+
 ## 4. Cloud Teams & Roster
 
 **Precondition:** Signed in; migrations 002, 004–006, 011 applied.

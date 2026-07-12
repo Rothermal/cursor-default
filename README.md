@@ -256,7 +256,7 @@ docs/
 ├── DESIGN_SHOT_TRACKER_UI_REVAMP.md # Court-capture program status (F1–F13)
 ├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11/F13 held
 ├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
-├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue shipped; cloud hardening next
+├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── REGRESSION_TESTING.md  # High-level test scripts for all features
 ├── completed/             # Shipped features — design & implementation references
 │   ├── PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md
@@ -340,10 +340,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Court capture enhancements (F5–F9, F12)** — shot-value override, in-popup player switch, assist-linking, popup stat line, rebound-after-miss prompt, recent-events undo ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md))
 - [x] **Multi-game parking P0** — local manifest + per-game records, legacy migration, park-on-new-game, parked list resume/discard, and multi-sport summaries ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game sync queue P1** — dirty/revision metadata per parked game, ordered queue drain across dirty records, offline/retry handling, and cloud-id merges by `localGameId` ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
+- [x] **Multi-game cloud hardening P2** — roster/player resolution now happens before new cloud `games` inserts, and just-created games are best-effort rolled back if child stat/shot writes fail before the cloud id is persisted locally ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 
 ### What's Next
 
-- [ ] **Multi-game cloud hardening P2** — transactional/idempotent cloud write safety and optional orphan cleanup tooling ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
+- [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, export/import, max parked count, and quota UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
 - [ ] Team collaboration invites: multi-parent workflows, invite links (design: [DESIGN_MULTI_PARENT_INVITE_LINKS.md](docs/archived/DESIGN_MULTI_PARENT_INVITE_LINKS.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
