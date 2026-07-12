@@ -43,7 +43,7 @@ flowchart TB
 
 **Provider nesting:** `AuthProvider` → (auth gate) → `SettingsProvider` → `GameProvider` → routes.
 
-**Key invariant:** One active game is mounted in `GameContext` at a time, but the device can park multiple local games across sports. The active id lives in `statkeeper_games_manifest`; full snapshots live at `statkeeper_game:{localGameId}`; `statkeeper_game` remains a legacy/active mirror. The full sync queue is still planned — see [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md).
+**Key invariant:** One active game is mounted in `GameContext` at a time, but the device can park multiple local games across sports. The active id lives in `statkeeper_games_manifest`; full snapshots plus per-record sync metadata live at `statkeeper_game:{localGameId}`; `statkeeper_game` remains a legacy/active mirror. Dirty parked records drain through the local sync queue — see [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md).
 
 ---
 
@@ -112,7 +112,7 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 
 ## 5. State and cloud sync
 
-**GameContext** is the runtime heart. Every stat tap → reducer → `localStorage` → debounced `syncGameSnapshotToCloud`.
+**GameContext** is the runtime heart. Every stat tap updates the reducer, persists to the parked `localStorage` record, and drains through the debounced sync queue into `syncGameSnapshotToCloud`.
 
 ### localStorage keys
 
@@ -121,10 +121,10 @@ Defined in [`src/lib/gameStorageKeys.ts`](../src/lib/gameStorageKeys.ts):
 | Key | Contents |
 |-----|----------|
 | `statkeeper_games_manifest` | Active local id, parked local ids, and row summaries |
-| `statkeeper_game:{localGameId}` | Full parked `GameState` record |
+| `statkeeper_game:{localGameId}` | Full parked `GameState` record + dirty/revision sync metadata |
 | `statkeeper_game` | Legacy / active `GameState` mirror for migration compatibility |
 | `statkeeper_game_owner` | User id — prevents cross-account bleed for the legacy mirror |
-| `statkeeper_pending_sync` | Dirty flag after offline/network failure |
+| `statkeeper_pending_sync` | Legacy/derived dirty flag for hydration guards; per-game dirty state lives on parked records |
 | `statkeeper_settings` | Enabled sports map |
 
 ### Cloud upload chain
@@ -221,7 +221,7 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue (primary next roadmap item) |
+| [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue; P2 cloud hardening remains |
 
 ### Held / waiting for feedback
 
@@ -267,7 +267,7 @@ When shipping a feature, plans typically call for updating this overview (if arc
 ## 10. Pitfalls
 
 - **HashRouter** — paths are `/#/game`, not `/game`
-- **One mounted active game** — new game flow parks the current record and creates a new active `localGameId`; P1 sync queue is not shipped yet
+- **One mounted active game** — new game flow parks the current record and creates a new active `localGameId`; dirty parked games sync by local id
 - **Supabase optional** — `isConfigured` gates auth; app works fully offline without env vars
 - **Migration 018** is destructive (drops old columns); backup first
 - **Migration 019** aborts on bad data — run audit script first
