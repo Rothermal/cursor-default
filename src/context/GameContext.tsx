@@ -933,6 +933,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const snapshot = record.gameState
       const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
       const snapshotUserId = userId
+      if (!getParkedGameRecord(record.localGameId, snapshotUserId)) return
+
       const isActiveRecord = getActiveLocalGameId(snapshotUserId) === record.localGameId
 
       if (!canSyncState(snapshot, isConfigured, snapshotUserId, isOnline)) {
@@ -993,7 +995,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           userId: snapshotUserId!,
         })
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
-        const latestState = latestRecord?.gameState ?? snapshot
+        if (!latestRecord) return
+
+        const latestState = latestRecord.gameState
+        const isStillActiveRecord = getActiveLocalGameId(snapshotUserId) === record.localGameId
 
         if (synced.skippedFinalGame && shouldRejectSkippedFinalSync(snapshot)) {
           const errorState: GameState = {
@@ -1006,11 +1011,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
             },
           }
           saveParkedGameRecordState(record.localGameId, errorState, snapshotUserId, {
-            attempts: record.sync.attempts + 1,
+            attempts: latestRecord.sync.attempts + 1,
             lastError: errorState.cloudSync.lastError,
             nextAttemptAt: null,
           })
-          if (getActiveLocalGameId(snapshotUserId) === record.localGameId) {
+          if (isStillActiveRecord) {
             dispatch({
               type: 'SET_CLOUD_SYNC_STATE',
               cloudSync: {
@@ -1050,10 +1055,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           lastError: null,
           nextAttemptAt: null,
         })
-        if (snapshotUserId) {
+        if (snapshotUserId && isStillActiveRecord) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
-        if (getActiveLocalGameId(snapshotUserId) === record.localGameId) {
+        if (isStillActiveRecord) {
           dispatch({
             type: 'SET_CLOUD_SYNC_STATE',
             cloudSync: cloudSyncPatch,
@@ -1063,8 +1068,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const networkish = isLikelyNetworkError(error)
         const errMsg = error instanceof Error ? error.message : 'Cloud sync failed'
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
-        const latestState = latestRecord?.gameState ?? snapshot
-        const attempts = (latestRecord?.sync.attempts ?? record.sync.attempts) + 1
+        if (!latestRecord) return
+
+        const latestState = latestRecord.gameState
+        const attempts = latestRecord.sync.attempts + 1
         const retryMs = Math.min(30_000, 1000 * 2 ** Math.min(attempts, 5))
         const errorState: GameState = {
           ...latestState,
@@ -1153,7 +1160,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const syncFingerprint = buildGameSyncFingerprint(state)
   const queueFingerprint = parkedGames
-    .map(game => `${game.localGameId}:${game.updatedAt}:${game.syncStatus}`)
+    .map(
+      game =>
+        `${game.localGameId}:${game.updatedAt}:${game.syncStatus}:${game.syncDirty}:${game.syncLastError ?? ''}`
+    )
     .join('|')
   const shouldSync = Boolean(
     isConfigured &&

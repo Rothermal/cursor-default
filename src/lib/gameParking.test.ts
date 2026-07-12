@@ -233,4 +233,38 @@ describe('gameParking', () => {
       listDirtyParkedGameRecords('user-1', new Date('2026-07-12T12:01:00.000Z'))
     ).toHaveLength(1)
   })
+
+  it('shows parked summaries as pending when the latest snapshot is still dirty', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const record = getParkedGameRecord(summary.localGameId, 'user-1')!
+    const staleSyncedState: GameState = {
+      ...record.gameState,
+      cloudSync: {
+        ...record.gameState.cloudSync,
+        status: 'synced',
+        lastSyncedGameFingerprint: 'older-snapshot',
+      },
+    }
+
+    saveParkedGameRecordState(summary.localGameId, staleSyncedState, 'user-1')
+
+    const [parked] = listParkedGames('user-1')
+    expect(parked.syncDirty).toBe(true)
+    expect(parked.syncStatus).toBe('idle')
+  })
+
+  it('surfaces per-record sync errors on parked summaries', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const record = getParkedGameRecord(summary.localGameId, 'user-1')!
+
+    saveParkedGameRecordState(summary.localGameId, record.gameState, 'user-1', {
+      dirty: true,
+      lastError: 'Cloud sync failed',
+    })
+
+    const [parked] = listParkedGames('user-1')
+    expect(parked.syncDirty).toBe(true)
+    expect(parked.syncStatus).toBe('error')
+    expect(parked.syncLastError).toBe('Cloud sync failed')
+  })
 })

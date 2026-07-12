@@ -32,6 +32,8 @@ export interface ParkedGameSummary {
   updatedAt: string
   cloudGameId: string | null
   syncStatus: CloudSyncStatus
+  syncDirty: boolean
+  syncLastError: string | null
 }
 
 export interface ParkedGamesManifest {
@@ -119,9 +121,16 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as ParkedGameRecord
     if (!parsed || parsed.localGameId !== localGameId || !parsed.gameState) return null
+    const sync = normalizeSyncState(parsed.sync, null, parsed.gameState)
+    const updatedAt =
+      typeof parsed.updatedAt === 'string'
+        ? parsed.updatedAt
+        : parsed.summary?.updatedAt ?? nowIso()
     return {
       ...parsed,
-      sync: normalizeSyncState(parsed.sync, null, parsed.gameState),
+      updatedAt,
+      summary: buildSummary(localGameId, parsed.gameState, updatedAt, sync),
+      sync,
     }
   } catch {
     return null
@@ -217,8 +226,17 @@ function hasPersistableGameState(state: GameState): boolean {
 function buildSummary(
   localGameId: string,
   state: GameState,
-  updatedAt: string
+  updatedAt: string,
+  sync: ParkedGameSyncState
 ): ParkedGameSummary {
+  const syncStatus: CloudSyncStatus = sync.dirty
+    ? sync.lastError || state.cloudSync.status === 'error'
+      ? 'error'
+      : state.cloudSync.status === 'offline' || state.cloudSync.status === 'syncing'
+        ? state.cloudSync.status
+        : 'idle'
+    : state.cloudSync.status
+
   return {
     localGameId,
     sportId: state.sport?.id ?? null,
@@ -230,7 +248,9 @@ function buildSummary(
     status: state.cloudSync.gameStatus,
     updatedAt,
     cloudGameId: state.cloudSync.gameId,
-    syncStatus: state.cloudSync.status,
+    syncStatus,
+    syncDirty: sync.dirty,
+    syncLastError: sync.lastError,
   }
 }
 
@@ -270,7 +290,8 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
 
     localGameId = createLocalGameId()
     const updatedAt = nowIso()
-    const summary = buildSummary(localGameId, gameState, updatedAt)
+    const sync = buildSyncState(null, gameState)
+    const summary = buildSummary(localGameId, gameState, updatedAt, sync)
     const manifest: ParkedGamesManifest = {
       ...emptyManifest(ownerId),
       activeLocalGameId: localGameId,
@@ -284,7 +305,7 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
       updatedAt,
       gameState,
       summary,
-      sync: buildSyncState(null, gameState),
+      sync,
     }
 
     localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
@@ -318,7 +339,7 @@ export function loadActiveParkedGameState(ownerId: string | null): GameState | n
 export function listParkedGames(ownerId: string | null): ParkedGameSummary[] {
   const manifest = migrateLegacyGameStorage(ownerId)
   return manifest.gameIds
-    .map(id => manifest.summaries[id])
+    .map(id => readRecord(id)?.summary ?? manifest.summaries[id])
     .filter((summary): summary is ParkedGameSummary => Boolean(summary))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
@@ -343,7 +364,8 @@ export function saveActiveGameState(
   const localGameId = manifest.activeLocalGameId ?? createLocalGameId()
   const existing = readRecord(localGameId)
   const updatedAt = nowIso()
-  const summary = buildSummary(localGameId, state, updatedAt)
+  const sync = buildSyncState(existing, state)
+  const summary = buildSummary(localGameId, state, updatedAt, sync)
   const record: ParkedGameRecord = {
     localGameId,
     ownerId,
@@ -351,7 +373,7 @@ export function saveActiveGameState(
     updatedAt,
     gameState: state,
     summary,
-    sync: buildSyncState(existing, state),
+    sync,
   }
 
   localStorage.setItem(gameRecordKey(localGameId), JSON.stringify(record))
@@ -390,6 +412,7 @@ export function listParkedGameRecords(ownerId: string | null): ParkedGameRecord[
   return manifest.gameIds
     .map(id => readRecord(id))
     .filter((record): record is ParkedGameRecord => Boolean(record))
+    .filter(record => !record.ownerId || !ownerId || record.ownerId === ownerId)
 }
 
 export function hasDirtyParkedGames(ownerId: string | null): boolean {
@@ -427,8 +450,8 @@ export function saveParkedGameRecordState(
   const existing = readRecord(localGameId)
   const createdAt = existing?.createdAt ?? nowIso()
   const updatedAt = nowIso()
-  const summary = buildSummary(localGameId, state, updatedAt)
   const sync = buildSyncState(existing, state, syncPatch)
+  const summary = buildSummary(localGameId, state, updatedAt, sync)
   const record: ParkedGameRecord = {
     localGameId,
     ownerId,
