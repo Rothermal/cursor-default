@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sports } from '../config/sports'
+import type { SportConfig } from '../types'
 import { formatCompactGameStatLine } from './statDisplay'
 
 const basketball = sports.find(s => s.id === 'basketball')!
@@ -29,7 +30,7 @@ describe('formatCompactGameStatLine', () => {
   })
 
   it('uses sport scoreLabel when not Points', () => {
-    const soccerish = {
+    const soccerish: SportConfig = {
       ...basketball,
       id: 'soccer',
       scoreLabel: 'Goals',
