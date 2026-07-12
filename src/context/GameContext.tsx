@@ -15,6 +15,7 @@ import type {
   ActionLogEntry,
   CloudSyncState,
   CloudSyncStatus,
+  SportConfig,
 } from '../types'
 import { useAuth } from './AuthContext'
 import {
@@ -39,11 +40,20 @@ import {
 } from '../lib/gameSyncFingerprint'
 import { clearEntireShotChart, statIdForShotRecord } from '../lib/clearShotChart'
 import { mergeCloudSyncState } from '../lib/cloudSyncState'
+import {
+  activateParkedGame,
+  beginNewActiveParkedGame,
+  discardParkedGame as discardParkedGameStorage,
+  getActiveLocalGameId,
+  listParkedGames,
+  loadActiveParkedGameState,
+  parkActiveGame,
+  saveActiveGameState,
+  type ParkedGameSummary,
+} from '../lib/gameParking'
 
 import {
-  GAME_OWNER_KEY,
   GAME_STORAGE_KEY,
-  PENDING_SYNC_KEY,
   getPendingSyncFlag,
   setPendingSyncFlag,
 } from '../lib/gameStorageKeys'
@@ -580,16 +590,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
 function loadState(userId: string | null): GameState {
   try {
-    if (userId) {
-      const owner = localStorage.getItem(GAME_OWNER_KEY)
-      if (owner && owner !== userId) {
-        localStorage.removeItem(GAME_STORAGE_KEY)
-        localStorage.removeItem(PENDING_SYNC_KEY)
-        return createInitialState()
-      }
-    }
-
-    const saved = localStorage.getItem(GAME_STORAGE_KEY)
+    const parkedState = loadActiveParkedGameState(userId)
+    const saved = parkedState ? JSON.stringify(parkedState) : localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
       // Don't restore a game that was already finalized (fixes existing stale "in progress" state).
@@ -643,6 +645,12 @@ function loadState(userId: string | null): GameState {
 interface GameContextType {
   state: GameState
   dispatch: React.Dispatch<GameAction>
+  activeLocalGameId: string | null
+  parkedGames: ParkedGameSummary[]
+  startNewGame: (sport: SportConfig) => void
+  parkCurrentGame: () => void
+  resumeParkedGame: (localGameId: string) => GameState | null
+  discardParkedGame: (localGameId: string) => void
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
 }
@@ -658,6 +666,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const userId = user?.id ?? null
   const [state, dispatch] = useReducer(gameReducer, userId, loadState)
   const [isOnline, setIsOnline] = useState(getInitialOnlineState)
+  const [parkedGames, setParkedGames] = useState<ParkedGameSummary[]>(() =>
+    listParkedGames(userId)
+  )
+  const [activeLocalGameId, setActiveLocalGameId] = useState<string | null>(() =>
+    getActiveLocalGameId(userId)
+  )
   const stateRef = useRef(state)
   const syncInFlightRef = useRef(false)
   const queueAnotherSyncRef = useRef(false)
@@ -711,10 +725,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   ])
 
   useEffect(() => {
-    localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(state))
-    if (userId) {
-      localStorage.setItem(GAME_OWNER_KEY, userId)
-    }
+    setParkedGames(saveActiveGameState(state, userId))
+    setActiveLocalGameId(getActiveLocalGameId(userId))
   }, [state, userId])
 
   useEffect(() => {
@@ -735,10 +747,56 @@ export function GameProvider({ children }: { children: ReactNode }) {
       stateRef.current = resetState
       pendingSyncRef.current = false
       dispatch({ type: 'HYDRATE_STATE', state: resetState })
+      setParkedGames(listParkedGames(userId))
+      setActiveLocalGameId(getActiveLocalGameId(userId))
       hydratedUserRef.current = null
       prevUserIdRef.current = userId
     }
   }, [isConfigured, isOnline, userId])
+
+  const startNewGame = useCallback(
+    (sport: SportConfig) => {
+      saveActiveGameState(stateRef.current, userId)
+      beginNewActiveParkedGame(userId)
+      setActiveLocalGameId(getActiveLocalGameId(userId))
+      setParkedGames(listParkedGames(userId))
+      dispatch({ type: 'SET_SPORT', sport })
+    },
+    [userId]
+  )
+
+  const parkCurrentGame = useCallback(() => {
+    setParkedGames(saveActiveGameState(stateRef.current, userId))
+    setParkedGames(parkActiveGame(userId))
+    setActiveLocalGameId(null)
+    dispatch({ type: 'RESET_GAME' })
+  }, [userId])
+
+  const resumeParkedGame = useCallback(
+    (localGameId: string) => {
+      saveActiveGameState(stateRef.current, userId)
+      const nextState = activateParkedGame(localGameId, userId)
+      if (!nextState) return null
+      stateRef.current = nextState
+      dispatch({ type: 'HYDRATE_STATE', state: nextState })
+      setActiveLocalGameId(localGameId)
+      setParkedGames(listParkedGames(userId))
+      return nextState
+    },
+    [userId]
+  )
+
+  const discardParkedGame = useCallback(
+    (localGameId: string) => {
+      const wasActive = getActiveLocalGameId(userId) === localGameId
+      setParkedGames(discardParkedGameStorage(localGameId, userId))
+      setActiveLocalGameId(getActiveLocalGameId(userId))
+      if (wasActive) {
+        dispatch({ type: 'RESET_GAME' })
+      }
+    },
+    [userId]
+  )
 
   useEffect(() => {
     if (!isConfigured || !userId || !supabase) return
@@ -1020,7 +1078,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [runCloudSync, shouldSync, syncFingerprint])
 
   return (
-    <GameContext.Provider value={{ state, dispatch, flushCloudSync }}>
+    <GameContext.Provider
+      value={{
+        state,
+        dispatch,
+        activeLocalGameId,
+        parkedGames,
+        startNewGame,
+        parkCurrentGame,
+        resumeParkedGame,
+        discardParkedGame,
+        flushCloudSync,
+      }}
+    >
       {children}
     </GameContext.Provider>
   )

@@ -30,7 +30,7 @@ flowchart TB
     GameCtx["GameContext — reducer + localStorage + cloud sync"]
   end
   subgraph data [Data Layer]
-    Local["localStorage statkeeper_game"]
+    Local["localStorage manifest + parked game records"]
     Supa["Supabase — teams, games, stats, RPCs"]
     Config["config/sports.ts — stat definitions"]
   end
@@ -43,7 +43,7 @@ flowchart TB
 
 **Provider nesting:** `AuthProvider` → (auth gate) → `SettingsProvider` → `GameProvider` → routes.
 
-**Key invariant:** One active game per device in `localStorage` key `statkeeper_game`. Starting a new game overwrites the snapshot. Multi-game parking is planned but not shipped — see [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md).
+**Key invariant:** One active game is mounted in `GameContext` at a time, but the device can park multiple local games across sports. The active id lives in `statkeeper_games_manifest`; full snapshots live at `statkeeper_game:{localGameId}`; `statkeeper_game` remains a legacy/active mirror. The full sync queue is still planned — see [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md).
 
 ---
 
@@ -120,8 +120,10 @@ Defined in [`src/lib/gameStorageKeys.ts`](../src/lib/gameStorageKeys.ts):
 
 | Key | Contents |
 |-----|----------|
-| `statkeeper_game` | Full `GameState` JSON |
-| `statkeeper_game_owner` | User id — prevents cross-account bleed |
+| `statkeeper_games_manifest` | Active local id, parked local ids, and row summaries |
+| `statkeeper_game:{localGameId}` | Full parked `GameState` record |
+| `statkeeper_game` | Legacy / active `GameState` mirror for migration compatibility |
+| `statkeeper_game_owner` | User id — prevents cross-account bleed for the legacy mirror |
 | `statkeeper_pending_sync` | Dirty flag after offline/network failure |
 | `statkeeper_settings` | Enabled sports map |
 
@@ -265,7 +267,7 @@ When shipping a feature, plans typically call for updating this overview (if arc
 ## 10. Pitfalls
 
 - **HashRouter** — paths are `/#/game`, not `/game`
-- **Single active game** — new game flow overwrites `statkeeper_game`
+- **One mounted active game** — new game flow parks the current record and creates a new active `localGameId`; P1 sync queue is not shipped yet
 - **Supabase optional** — `isConfigured` gates auth; app works fully offline without env vars
 - **Migration 018** is destructive (drops old columns); backup first
 - **Migration 019** aborts on bad data — run audit script first

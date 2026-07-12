@@ -6,8 +6,6 @@ import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { hasTrackedTeamSide } from '../lib/teamStatsSummary'
-import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
-import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import TeamStatSummary from '../components/team-stats/TeamStatSummary'
 import GameSummaryShotChartPanel from './game-summary/GameSummaryShotChartPanel'
 import StatCorrectionModal from './game-summary/StatCorrectionModal'
@@ -36,7 +34,7 @@ type CheckoutsByPlayerMap = Record<string, CheckoutOption[]>
 
 export default function GameSummary() {
   const navigate = useNavigate()
-  const { state, dispatch } = useGame()
+  const { state, parkCurrentGame } = useGame()
   const { user } = useAuth()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, shotChart } = state
   const {
@@ -526,14 +524,10 @@ export default function GameSummary() {
 
   const handleNewGame = () => {
     setNewGameError(null)
-    if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
-      setNewGameError('Finish syncing your current game before starting another.')
+    if (!window.confirm('Park this game and start another?')) {
       return
     }
-    if (!window.confirm('Starting a new game will discard your active game. Continue?')) {
-      return
-    }
-    dispatch({ type: 'RESET_GAME' })
+    parkCurrentGame()
     navigate('/')
   }
 

@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useGame, GAME_STORAGE_KEY } from '../context/GameContext'
+import { useGame } from '../context/GameContext'
+import { clearActiveParkedGame } from '../lib/gameParking'
 import { supabase } from '../lib/supabase'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
@@ -111,11 +112,7 @@ export function useFinalizeGame() {
       return
     }
 
-    try {
-      localStorage.removeItem(GAME_STORAGE_KEY)
-    } catch {
-      // ignore
-    }
+    clearActiveParkedGame(user?.id ?? null)
     dispatch({ type: 'RESET_GAME' })
     navigate('/games')
   }

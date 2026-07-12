@@ -4,8 +4,6 @@ import { sports } from '../config/sports'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
-import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { teamInfoPath } from '../lib/teamInfo'
 import ConfirmDialog from '../components/ConfirmDialog'
 
@@ -35,7 +33,7 @@ export default function GameSetup() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedTeamId = searchParams.get('teamId')
-  const { state, dispatch } = useGame()
+  const { state, dispatch, startNewGame } = useGame()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const sport = state.sport
@@ -119,20 +117,15 @@ export default function GameSetup() {
           requestedTeamId !== state.cloudSync.teamId
       )
       if (sportMismatch || (teamMismatch && hasActiveGame)) {
-        if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
-          setRequestedTeamSportError('Finish syncing your current game before starting another.')
-          setLoadingRequestedTeamSport(false)
-          return
-        }
         if (
           hasActiveGame &&
-          !window.confirm('Starting a new game will discard your active game. Continue?')
+          !window.confirm('Park your current game and start this team game?')
         ) {
           navigate('/')
           return
         }
 
-        dispatch({ type: 'SET_SPORT', sport: requestedSport })
+        startNewGame(requestedSport)
       }
       setLoadingRequestedTeamSport(false)
     }
@@ -142,8 +135,7 @@ export default function GameSetup() {
       cancelled = true
     }
     // Re-run on sport/team/roster identity only — not every local stat tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit full `state` (fingerprint/stats)
-  }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, state.cloudSync.teamId, state.players.length, state.sport])
+  }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -382,17 +374,13 @@ export default function GameSetup() {
     // Switching cloud teams must not keep the prior gameId/roster (same-name teams
     // previously slipped past SET_GAME_INFO's teamName-only clear).
     if (teamIdChanging && (hasActiveGame || state.cloudSync.gameId)) {
-      if (shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) {
-        setSetupError('Finish syncing your current game before switching teams.')
-        return
-      }
       if (
         hasActiveGame &&
-        !window.confirm('Switching teams will discard your active game. Continue?')
+        !window.confirm('Park your current game and switch teams?')
       ) {
         return
       }
-      dispatch({ type: 'SET_SPORT', sport })
+      startNewGame(sport)
     }
 
     // Resolve tournament: existing selection, create new, or free-text
