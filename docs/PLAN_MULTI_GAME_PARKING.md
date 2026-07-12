@@ -75,7 +75,7 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 ## 5. Cloud alignment
 
 - **`syncGameSnapshotToCloud`** should accept a **`GameState` snapshot** (already mostly true) and return ids/maps; caller updates **only** the targeted parked record.
-- **Phase 2 (hardening, shipped):** `syncGameSnapshotToCloud` resolves placeholder/player ids and team roster links before inserting a new `games` row. If stats, shot chart, or team-placeholder linking fails after a new game is inserted, the client attempts to delete that just-created in-progress row and then rethrows so the local parked record stays dirty. This is not a full database transaction; existing-game updates are never deleted on child-write failure.
+- **Phase 2 (hardening, shipped):** `syncGameSnapshotToCloud` resolves placeholder/player ids and team roster links before inserting a new `games` row. If stats, shot chart, or team-placeholder linking throws after a new game is inserted, the client attempts to delete that just-created in-progress row and then rethrows so the local parked record stays dirty. This is not a full database transaction: a browser/process crash between insert and rollback can still leave an orphan, and non-throwing shot-chart partial/skipped outcomes keep the game row by design because stats may already be synced and local chart state may be incomplete. Existing-game updates are never deleted on child-write failure.
 - **`statkeeper_cloud_resume_targets`:** today one `gameId` per user; consider either keeping “last opened cloud game” for hydration **or** storing preferred cloud id **inside** each `ParkedGameRecord` so multiple cloud games map cleanly.
 
 ---

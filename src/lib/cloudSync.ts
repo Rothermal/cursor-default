@@ -4,6 +4,7 @@ import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './t
 import { hasMappableChartShot } from './shotChartSyncMapping'
 import { pickRecorderPerPlayer } from './shotChartReview'
 import { isValidRemotePlayerUuid } from './uuidValidation'
+import { logClientSyncError } from './logClientSyncError'
 
 interface SyncGameSnapshotInput {
   state: GameState
@@ -510,15 +511,20 @@ async function ensureGame(
   return { gameId: await upsertWithFallback('insert', gameInsertPayload), created: true }
 }
 
-async function deleteNewlyCreatedGameAfterFailedSync(gameId: string, userId: string): Promise<void> {
-  if (!supabase) return
+async function deleteNewlyCreatedGameAfterFailedSync(
+  gameId: string,
+  userId: string
+): Promise<string | null> {
+  if (!supabase) return null
 
-  await supabase
+  const { error } = await supabase
     .from('games')
     .delete()
     .eq('id', gameId)
     .eq('created_by', userId)
     .eq('status', 'in_progress')
+
+  return error?.message ?? null
 }
 
 /**
@@ -917,6 +923,8 @@ export async function syncGameSnapshotToCloud({
   const gameId = ensuredGame.gameId
   let shotChartCloudSync: ShotChartCloudSyncMode = 'synced'
 
+  // Only thrown child-write failures trigger rollback. Shot-chart partial/skipped modes
+  // intentionally keep the game row because stats may have synced and local chart state is incomplete.
   try {
     await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
 
@@ -929,7 +937,23 @@ export async function syncGameSnapshotToCloud({
     )
   } catch (error) {
     if (ensuredGame.created) {
-      await deleteNewlyCreatedGameAfterFailedSync(gameId, userId).catch(() => {})
+      const rollbackError = await deleteNewlyCreatedGameAfterFailedSync(gameId, userId).catch(
+        err => (err instanceof Error ? err.message : 'unknown rollback failure')
+      )
+      if (rollbackError) {
+        await logClientSyncError(
+          userId,
+          `Rollback failed for just-created game ${gameId}: ${rollbackError}`,
+          state,
+          {
+            bypassThrottle: true,
+            extraContext: {
+              rollbackGameId: gameId,
+              originalSyncError: error instanceof Error ? error.message : String(error),
+            },
+          }
+        ).catch(() => {})
+      }
     }
     throw error
   }

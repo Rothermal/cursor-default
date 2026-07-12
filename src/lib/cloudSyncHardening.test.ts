@@ -1,8 +1,13 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../types'
+import { TEAM_PLAYER_HOME_ID } from './teamPlayers'
 
 const mock = vi.hoisted(() => ({
   ops: [] as string[],
+  gameStatsError: 'boom' as string | null,
+  shotChartDeleteError: null as string | null,
+  linkUpdateError: null as string | null,
+  gameDeleteError: null as string | null,
 }))
 
 vi.mock('./supabase', () => ({
@@ -39,9 +44,18 @@ vi.mock('./supabase', () => ({
               eq: () => ({
                 eq: () => ({
                   eq: () => ({
-                    limit: () => Promise.resolve({ data: [{ id: 'remote-player-1' }], error: null }),
+                    limit: () =>
+                      Promise.resolve({ data: [{ id: 'remote-player-1' }], error: null }),
                   }),
                 }),
+              }),
+            }
+          },
+          insert: () => {
+            mock.ops.push('players.insert')
+            return {
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: 'remote-team-player' }, error: null }),
               }),
             }
           },
@@ -50,12 +64,26 @@ vi.mock('./supabase', () => ({
 
       if (table === 'games') {
         return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({ data: { status: 'in_progress' }, error: null }),
+            }),
+          }),
           insert: () => {
             mock.ops.push('games.insert')
             return {
               select: () => ({
                 single: () => Promise.resolve({ data: { id: 'game-1' }, error: null }),
               }),
+            }
+          },
+          update: () => {
+            mock.ops.push('games.update')
+            return {
+              eq: () =>
+                Promise.resolve({
+                  error: mock.linkUpdateError ? { message: mock.linkUpdateError } : null,
+                }),
             }
           },
           delete: () => {
@@ -68,7 +96,9 @@ vi.mock('./supabase', () => ({
                     eq: (column3: string, value3: string) => {
                       mock.ops.push(`games.delete.eq:${column2}=${value2}`)
                       mock.ops.push(`games.delete.eq:${column3}=${value3}`)
-                      return Promise.resolve({ error: null })
+                      return Promise.resolve({
+                        error: mock.gameDeleteError ? { message: mock.gameDeleteError } : null,
+                      })
                     },
                   }),
                 }
@@ -82,7 +112,40 @@ vi.mock('./supabase', () => ({
         return {
           upsert: () => {
             mock.ops.push('game_stats.upsert')
-            return Promise.resolve({ error: { message: 'boom' } })
+            return Promise.resolve({
+              error: mock.gameStatsError ? { message: mock.gameStatsError } : null,
+            })
+          },
+        }
+      }
+
+      if (table === 'shot_chart') {
+        return {
+          delete: () => {
+            mock.ops.push('shot_chart.delete')
+            return {
+              eq: () => ({
+                eq: () =>
+                  Promise.resolve({
+                    error: mock.shotChartDeleteError
+                      ? { message: mock.shotChartDeleteError }
+                      : null,
+                  }),
+              }),
+            }
+          },
+          insert: () => {
+            mock.ops.push('shot_chart.insert')
+            return Promise.resolve({ error: null })
+          },
+        }
+      }
+
+      if (table === 'client_sync_errors') {
+        return {
+          insert: () => {
+            mock.ops.push('client_sync_errors.insert')
+            return Promise.resolve({ error: null })
           },
         }
       }
@@ -103,7 +166,7 @@ const basketball: SportConfig = {
   scoreLabel: 'PTS',
 }
 
-function state(): GameState {
+function state(overrides: Partial<GameState> = {}): GameState {
   return {
     sport: basketball,
     gameInfo: {
@@ -135,12 +198,17 @@ function state(): GameState {
     currentPeriod: 1,
     teamStatsConfig: null,
     shotChart: [],
+    ...overrides,
   }
 }
 
 describe('syncGameSnapshotToCloud hardening', () => {
   beforeEach(() => {
     mock.ops.length = 0
+    mock.gameStatsError = 'boom'
+    mock.shotChartDeleteError = null
+    mock.linkUpdateError = null
+    mock.gameDeleteError = null
   })
 
   it('resolves roster before inserting a new game and rolls that game back on child write failure', async () => {
@@ -159,5 +227,85 @@ describe('syncGameSnapshotToCloud hardening', () => {
     expect(mock.ops).toContain('games.delete.eq:id=game-1')
     expect(mock.ops).toContain('games.delete.eq:created_by=user-1')
     expect(mock.ops).toContain('games.delete.eq:status=in_progress')
+  })
+
+  it('rolls back a just-created game when shot chart sync throws', async () => {
+    mock.gameStatsError = null
+    mock.shotChartDeleteError = 'shot chart delete failed'
+
+    await expect(
+      syncGameSnapshotToCloud({
+        state: state({
+          shotChart: [
+            {
+              id: 'shot-1',
+              playerId: 'local-1',
+              x: 1,
+              y: 2,
+              made: true,
+              shotType: '2pt',
+              zone: 'paint',
+              timestamp: 1,
+            },
+          ],
+        }),
+        userId: 'user-1',
+      })
+    ).rejects.toThrow('Shot chart sync (delete) failed: shot chart delete failed')
+
+    expect(mock.ops).toContain('shot_chart.delete')
+    expect(mock.ops).toContain('games.delete')
+  })
+
+  it('rolls back a just-created game when team placeholder linking throws', async () => {
+    mock.gameStatsError = null
+    mock.linkUpdateError = 'link failed'
+
+    await expect(
+      syncGameSnapshotToCloud({
+        state: state({
+          players: [
+            {
+              id: TEAM_PLAYER_HOME_ID,
+              name: 'Aces Team',
+              number: '',
+              stats: { team_foul_p1: 1 },
+            },
+          ],
+        }),
+        userId: 'user-1',
+      })
+    ).rejects.toThrow('Game team placeholder link failed: link failed')
+
+    expect(mock.ops).toContain('games.update')
+    expect(mock.ops).toContain('games.delete')
+  })
+
+  it('does not delete an existing cloud game when child writes fail', async () => {
+    await expect(
+      syncGameSnapshotToCloud({
+        state: state({
+          cloudSync: {
+            ...state().cloudSync,
+            gameId: 'existing-game',
+          },
+        }),
+        userId: 'user-1',
+      })
+    ).rejects.toThrow('Stats sync failed: boom')
+
+    expect(mock.ops).toContain('games.update')
+    expect(mock.ops).not.toContain('games.delete')
+  })
+
+  it('logs when rollback of a just-created game fails', async () => {
+    mock.gameDeleteError = 'delete denied'
+
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Stats sync failed: boom'
+    )
+
+    expect(mock.ops).toContain('games.delete')
+    expect(mock.ops).toContain('client_sync_errors.insert')
   })
 })
