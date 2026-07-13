@@ -32,7 +32,6 @@ export default function AccountSettings() {
   const [message, setMessage] = useState<string | null>(null)
 
   const googleConnected = useMemo(() => hasAuthProvider(identities, 'google'), [identities])
-  const emailConnected = useMemo(() => hasAuthProvider(identities, 'email'), [identities])
   const displayEmail = profile?.email ?? user?.email ?? null
   const validationError = validateDisplayName(displayNameDraft)
   const savedDisplayName = profile?.displayName ?? ''
@@ -110,6 +109,9 @@ export default function AccountSettings() {
     if (result.error) {
       setError(result.error)
       setMessage(null)
+      setLinkingGoogle(false)
+    } else {
+      setMessage('Google linking started. Complete the provider flow to finish.')
       setLinkingGoogle(false)
     }
   }
@@ -234,13 +236,6 @@ export default function AccountSettings() {
         </div>
 
         <div className="space-y-2">
-          {!emailConnected && displayEmail && (
-            <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-              <span className="text-sm font-medium text-slate-700">Email/password</span>
-              <span className="text-xs font-semibold text-emerald-700">Connected</span>
-            </div>
-          )}
-
           {identities.map(identity => (
             <div
               key={identity.id}
@@ -259,6 +254,9 @@ export default function AccountSettings() {
           ))}
 
           {loading && <p className="text-sm text-slate-500">Loading sign-in methods...</p>}
+          {!loading && identities.length === 0 && (
+            <p className="text-sm text-slate-500">No connected sign-in methods were returned.</p>
+          )}
         </div>
 
         {!googleConnected && (

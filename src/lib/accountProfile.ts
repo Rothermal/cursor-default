@@ -41,6 +41,17 @@ function rowToProfile(row: ProfileRow, user: User): AccountProfile {
   }
 }
 
+function accountErrorMessage(message: string): string {
+  const normalized = message.toLowerCase()
+  if (normalized.includes('manual') && normalized.includes('link')) {
+    return 'Google linking is not enabled for this Supabase project yet.'
+  }
+  if (normalized.includes('identity') && normalized.includes('link')) {
+    return 'Google linking could not start. Check the Supabase identity-linking settings.'
+  }
+  return message
+}
+
 export async function loadCurrentAccountProfile(user: User): Promise<{
   profile: AccountProfile | null
   error: string | null
@@ -93,17 +104,19 @@ export async function updateCurrentAccountDisplayName(
   const validationError = validateDisplayName(displayName)
   if (validationError) return { profile: null, error: validationError }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
-    .update({
+    .upsert({
+      id: user.id,
       display_name: displayName.trim(),
       email: user.email ?? null,
-    })
-    .eq('id', user.id)
+    }, { onConflict: 'id' })
+    .select('id, display_name, email, avatar_url')
+    .single()
 
   if (error) return { profile: null, error: error.message }
 
-  return loadCurrentAccountProfile(user)
+  return { profile: rowToProfile(data as ProfileRow, user), error: null }
 }
 
 export async function linkGoogleIdentity(): Promise<{ error: string | null }> {
@@ -122,5 +135,5 @@ export async function linkGoogleIdentity(): Promise<{ error: string | null }> {
     clearOAuthReturnPath()
   }
 
-  return { error: error?.message ?? null }
+  return { error: error ? accountErrorMessage(error.message) : null }
 }
