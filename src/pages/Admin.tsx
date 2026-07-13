@@ -17,6 +17,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard from '../components/MergePlayerWizard'
 import AccountSettings from '../components/settings/AccountSettings'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
+import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import {
   exportParkedGames,
   getParkedGameStorageInfo,
@@ -302,6 +304,15 @@ export default function Admin() {
   const handleAdminDeleteTeam = async (team: AdminTeamRow) => {
     if (!supabaseClient) return
     setAdminError(null)
+    if (
+      gameState.cloudSync.teamId === team.id &&
+      shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())
+    ) {
+      setAdminError(
+        'The active local game for this team has unsynced stats. Sync or park them before deleting the team.'
+      )
+      return
+    }
     setDeletingId(team.id)
     const { error } = await supabaseClient.from('teams').delete().eq('id', team.id)
     setDeletingId(null)
@@ -319,6 +330,15 @@ export default function Admin() {
   const handleAdminDeleteGame = async (game: AdminGameRow) => {
     if (!supabaseClient) return
     setAdminError(null)
+    if (
+      gameState.cloudSync.gameId === game.id &&
+      shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())
+    ) {
+      setAdminError(
+        'This game has unsynced local stats. Sync or park them before deleting the cloud game.'
+      )
+      return
+    }
     setDeletingId(game.id)
     const { error } = await supabaseClient.from('games').delete().eq('id', game.id)
     setDeletingId(null)

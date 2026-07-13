@@ -107,7 +107,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3b.9 | Basketball dashboard -> Season Stats | Opens `/#/leaderboard?sport=basketball`; season/team choices are basketball-scoped |
 | 3b.10 | Open `/#/game` | Live tracker does not show the compact app shell header |
 | 3b.11 | Enable another sport, park one game for each sport, then open `/#/sport/basketball` | Only basketball parked games appear; the other sport remains visible only on its own dashboard |
-| 3b.12 | Basketball dashboard -> Discard on a parked game -> confirm | Parked row is removed; other parked games remain |
+| 3b.12 | Basketball dashboard -> Discard on a parked **local-only** game -> confirm | Parked row is removed; other parked games remain |
+| 3b.12a | Park a cloud-team game with unsynced stats (or pre-first-sync) -> Discard -> confirm | Discard is blocked with sync message; parked row remains |
 | 3b.13 | Supabase unconfigured/local mode -> open `/#/sport/basketball` | Dashboard works locally; cloud management actions are disabled with local-mode copy |
 | 3b.14 | Open `/#/teams?sport=soccer` while Soccer is disabled | Teams list is soccer-scoped; create flow is blocked with a Settings CTA instead of falling back to another enabled sport |
 

@@ -126,7 +126,11 @@ export default function SportDashboard() {
     if (!window.confirm('Discard this parked game? This cannot be undone.')) {
       return
     }
-    discardParkedGame(localGameId)
+    if (!discardParkedGame(localGameId)) {
+      setDashboardError(
+        'This parked game has unsynced cloud stats. Resume and sync it before discarding.'
+      )
+    }
   }
 
   if (!sport) {
