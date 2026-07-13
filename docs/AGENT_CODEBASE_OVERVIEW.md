@@ -43,7 +43,7 @@ flowchart TB
 
 **Provider nesting:** `AuthProvider` → (auth gate) → `SettingsProvider` → `GameProvider` → routes.
 
-**Key invariant:** One active game is mounted in `GameContext` at a time, but the device can park multiple local games across sports. The active id lives in `statkeeper_games_manifest`; full snapshots plus per-record sync metadata live at `statkeeper_game:{localGameId}`; `statkeeper_game` remains a legacy/active mirror. Dirty parked records drain through the local sync queue, new cloud `games` rows are created only after roster/player resolution succeeds, and local parking has a 12-game cap with Settings export/import plus parked-only, keep-existing import merge behavior — see [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md).
+**Key invariant:** One active game is mounted in `GameContext` at a time, but the device can park multiple local games across sports. The active id lives in `statkeeper_games_manifest`; full snapshots plus per-record sync metadata live at `statkeeper_game:{localGameId}`; `statkeeper_game` remains a legacy/active mirror. Dirty parked records drain through the local sync queue, new cloud `games` rows are created only after roster/player resolution succeeds, and local parking has a 12-game cap with Settings export/import plus parked-only, keep-existing import merge behavior. Discard/hydrate/skipped-final guards in [`gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprint.ts) block silent overwrite or deletion of cloud-bound unsynced work — see [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md).
 
 ---
 
@@ -58,6 +58,7 @@ flowchart TB
 | [`src/config/sports.ts`](../src/config/sports.ts) | Sport stat schema (`SportConfig`) | New sport or stat category |
 | [`src/types.ts`](../src/types.ts) | Core domain types | Type changes |
 | [`src/lib/cloudSync.ts`](../src/lib/cloudSync.ts) | Upload/download game snapshots | Cloud sync bugs |
+| [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprint.ts) | Sync fingerprint + discard/hydrate/skipped-final guards | Preventing silent local data loss |
 | [`src/lib/`](../src/lib/) | Pure helpers (scoring, team stats, shot chart, display) | Business logic without UI |
 | [`src/pages/`](../src/pages/) | One screen per route | UI for a feature |
 | [`src/components/`](../src/components/) | Shared UI (Scoreboard, StatButton, shot-chart/, team-stats/) | Reusable widgets |
@@ -153,9 +154,20 @@ Most sync is **direct table CRUD**, not RPCs.
 - **Finalized games** and analytics read via resolved RPCs.
 - Multi-recorder resolution order: **correction > primary > sole > averaged**.
 
-Hydration guards in `GameContext`: won't overwrite local state if pending sync, local fingerprint is newer, or local changed mid-fetch.
+### Sync integrity guards
 
-**Deep dives:** Schema and RLS → [`INTEGRATION_PLAN.md`](INTEGRATION_PLAN.md) §1.2 · Migration list → [`README.md`](../README.md) Supabase Setup.
+Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprint.ts); `GameContext` and UI callers enforce them.
+
+| Guard | When it fires | Effect |
+|-------|---------------|--------|
+| `shouldDeferCloudResumeHydration` / `shouldBlockManualCloudHydrate` | Pending durable sync, missing fingerprint, or local fingerprint ≠ last synced | Blocks auto/manual hydrate that would overwrite newer local progress |
+| `shouldSkipAutoHydrateForDifferentCloudGame` | Active local session already has a different `cloudSync.gameId` | Auto "resume latest cloud game" skips; manual open parks first via `openGameSnapshot` |
+| `shouldBlockDiscardUnsyncedGame` | Cloud-bound game (`teamId` and/or `gameId`) with dirty flag, missing fingerprint, or fingerprint mismatch; also blocks pre-first-sync (`teamId` without `gameId`) | Discard / New Game wipe / finalize reset is blocked until sync; pure local games (`!teamId && !gameId`) are allowed |
+| `shouldRejectSkippedFinalSync` | Cloud returns `skippedFinalGame` but snapshot **or** post-await latest local state still has unsynced edits | Sync does not report success; dirty cleared to stop auto-retry (cloud is final) while fingerprint mismatch still blocks discard |
+
+**Constraint:** Checking only the sync-start snapshot for skipped-final used to mark success while mid-sync edits remained local and `gameStatus: 'final'` cleared the dirty queue forever. Always evaluate both snapshot and latest parked state.
+
+**Deep dives:** Schema and RLS → [`INTEGRATION_PLAN.md`](INTEGRATION_PLAN.md) §1.2 · Parking plan → [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) · Migration list → [`README.md`](../README.md) Supabase Setup.
 
 ---
 
@@ -231,7 +243,9 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | Multiple parked games + sync queue + cloud ordering hardening + P3a/P3b storage/import guardrails; IndexedDB/ops follow-ups remain |
+| [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | Access model, roles, invites, guardianship, audit — start with SEC-0 |
+| [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
+| [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | NAV/AUTH foundation shipped; soccer planning still gated on remaining foundation work |
 
 ### Held / waiting for feedback
 
@@ -263,7 +277,7 @@ When shipping a feature, plans typically call for updating this overview (if arc
 |-----------------|------------|
 | Add a stat or sport | [`sports.ts`](../src/config/sports.ts) + [`types.ts`](../src/types.ts) — UI auto-discovers |
 | Change game tracker behavior | [`GameContext.tsx`](../src/context/GameContext.tsx) + [`GameTracker.tsx`](../src/pages/GameTracker.tsx) |
-| Fix cloud sync | [`cloudSync.ts`](../src/lib/cloudSync.ts) + `GameContext` hydration guards |
+| Fix cloud sync | [`cloudSync.ts`](../src/lib/cloudSync.ts) + [`gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprint.ts) + `GameContext` hydration guards |
 | Game Summary / finalize | [`GameSummary.tsx`](../src/pages/GameSummary.tsx) + `get_game_stats_resolved` |
 | Team stats (basketball) | [`completed/DESIGN_TEAM_STATS_TRACKING.md`](completed/DESIGN_TEAM_STATS_TRACKING.md) |
 | Shot chart | [`completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md`](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md) |
@@ -278,6 +292,9 @@ When shipping a feature, plans typically call for updating this overview (if arc
 
 - **HashRouter** — paths are `/#/game`, not `/game`
 - **One mounted active game** — new game flow parks the current record and creates a new active `localGameId`; dirty parked games sync by local id
+- **Unsynced cloud discard is blocked** — parked Discard / New Game wipe / finalize reset refuse cloud-bound dirty games; resume and sync first (`shouldBlockDiscardUnsyncedGame`)
+- **Auto-hydrate will not steal another cloud game** — if the active local session is already bound to a different `cloudSync.gameId`, sign-in resume skips overwrite
+- **Skipped-final is not success with local edits** — when cloud game is already `final`, mid-sync local edits must not clear the queue as a successful sync
 - **Supabase optional** — `isConfigured` gates auth; app works fully offline without env vars
 - **Migration 018** is destructive (drops old columns); backup first
 - **Migration 019** aborts on bad data — run audit script first

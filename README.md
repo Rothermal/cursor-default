@@ -356,6 +356,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Multi-game sync queue P1** — dirty/revision metadata per parked game, ordered queue drain across dirty records, offline/retry handling, and cloud-id merges by `localGameId` ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game cloud hardening P2** — roster/player resolution now happens before new cloud `games` inserts, and just-created games are best-effort rolled back if child stat/shot writes fail before the cloud id is persisted locally ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game storage guardrails P3a/P3b** — 12 parked-game cap, storage/quota error UX, local parked-game export/import, parked-only keep-existing import merge behavior, reason-specific import skips, and storage estimate in Settings -> Data & Sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
+- [x] **Multi-game sync race guards** — block discard of cloud-bound unsynced games, skip auto-hydrate when the active session is bound to a different cloud game, and reject skipped-final sync success when mid-sync/local edits remain ([`gameSyncFingerprint.ts`](src/lib/gameSyncFingerprint.ts), [plan](docs/PLAN_MULTI_GAME_PARKING.md) §5a)
 
 ### What's Next
 
