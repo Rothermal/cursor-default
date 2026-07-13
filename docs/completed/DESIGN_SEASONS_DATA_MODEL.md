@@ -560,7 +560,7 @@ The migration is destructive (drops columns). Before running, recommend a Supaba
 | Phase | What | Status |
 |-------|------|--------|
 | **1. Schema** | Migration 018: `seasons`, `team_players`, `player_guardians` tables; alter `teams` and `players`; display views; RLS | **Done** |
-| **2. Season UI** | Season CRUD in Settings/Admin; season selector in Game Setup; season picker on team creation | **Done** |
+| **2. Season UI** | Season CRUD in Settings -> Data & Sync; season selector in Game Setup; season picker on team creation | **Done** |
 | **3. Roster Refactor** | Teams page uses `team_players` junction; "Add Existing" player pool mode; PlayerSetup updated | **Done** |
 | **4. Guardian Claim** | "Claim" button on roster players; guardian status indicator; auto-guardian on player creation | **Done** |
 | **5. Cloud Sync** | `cloudSync.ts` handles season context, junction-based player lookup, auto-create guardian link | **Done** |
@@ -575,7 +575,7 @@ The migration is destructive (drops columns). Before running, recommend a Supaba
 
 2. **Player ownership model** — **`created_by` + `player_guardians` junction.** The `created_by` field tracks who created the player record but does not imply exclusive ownership. A `player_guardians` junction table links players to their parents/guardians. Any guardian (or creator) can edit the player's name and add them to future teams. This supports the scenario where a coach creates all the players, then individual parents claim their kids. Stat tracking remains fully fluid — any team member can track any player on the team regardless of guardianship.
 
-3. **Season selector UX** — **Both places.** Season CRUD in Settings/Admin; season picker in Game Setup (like the existing team selector). Users manage seasons in one place, pick them in another.
+3. **Season selector UX** — **Both places.** Season CRUD in Settings -> Data & Sync; season picker in Game Setup (like the existing team selector). Users manage seasons in one place, pick them in another.
 
 4. **Team member re-invites** — **Re-invite per season is fine.** `team_members` stays per-team. When a new season starts and a new team is created, collaborators are re-invited. Simple and acceptable for now; season-level collaboration could come later.
 

@@ -83,7 +83,14 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/game` | GameTracker | Live stat entry, scoreboard, undo; basketball: inline court + event popup |
 | `/shot-chart` | ShotChart | **Legacy** — redirects to `/game` (court is inline now) |
 | `/summary` | GameSummary | Post-game review, finalize, sync |
-| `/admin` | Admin | Seasons, sport toggles, data management |
+| `/settings` | Admin | Settings default/account section |
+| `/settings/account` | Admin | Account status, sign out, future connected account controls |
+| `/settings/app` | Admin | App/general settings, enabled sport toggles |
+| `/settings/sports` | Admin | Sport-specific settings index |
+| `/settings/sports/:sportId` | Admin | Sport-specific settings, e.g. basketball rebound prompt |
+| `/settings/data` | Admin | Parked-game import/export, cloud shortcuts, Seasons |
+| `/settings/advanced` | Admin | Player merge and destructive data-management tools |
+| `/admin` | Navigate | **Legacy** redirect to `/settings` |
 | `/teams` | TeamsList | Cloud team list/create entry, pending invites; `sport` narrows list/create context |
 | `/team` | TeamInfo | Team hub with overview, roster, schedule, stats links, Start Game |
 | `/team/manage` | TeamManage | Team roster/member management for one team |
@@ -104,6 +111,7 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 
 | Legacy / dual route | Behavior | Prefer going forward |
 |---------------------|----------|----------------------|
+| `/admin` | Redirects to `/settings` | `/settings/...` section routes |
 | `/shot-chart` | Redirects to `/game` (basketball guard) | Inline court on `/game` |
 | `/teams?teamId=` | Redirects to `/team/manage?teamId=` | `/team/manage` or Team Info → Manage |
 | `/player` + `/player-info` | Same `PlayerProfile` page; `/player-info` adds Back to Team | `playerInfoPath` / `teamInfo` helpers for team context |

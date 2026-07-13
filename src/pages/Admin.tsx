@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import type { BasketballTeamStatsConfig } from '../types'
 import {
@@ -22,6 +22,13 @@ import {
   importParkedGames,
   parkedGameStorageErrorMessage,
 } from '../lib/gameParking'
+import {
+  resolveSettingsSection,
+  settingsNavItems,
+  settingsPath,
+  settingsSportIdFromPath,
+  sportSettingsPath,
+} from '../lib/settingsNavigation'
 
 interface AdminSeasonInfo {
   name: string
@@ -109,14 +116,22 @@ interface MergeAuditListRow {
 
 export default function Admin() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { settings, isSportEnabled, toggleSport, setReboundPromptAfterMissEnabled } = useSettings()
-  const { isConfigured, user } = useAuth()
+  const { isConfigured, user, signOut } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const supabaseClient = supabase
   const userId = user?.id ?? null
 
   const enabledSports = useMemo(() => sports.filter(s => isSportEnabled(s.id)), [isSportEnabled])
   const enabledCount = enabledSports.length
+  const settingsSection = resolveSettingsSection(location.pathname)
+  const settingsSportId = settingsSportIdFromPath(location.pathname)
+  const selectedSettingsSport = sports.find(s => s.id === settingsSportId) ?? null
+  const sectionTitle =
+    settingsSection === 'sport' && selectedSettingsSport
+      ? selectedSettingsSport.name
+      : settingsNavItems.find(item => item.id === settingsSection)?.label ?? 'Settings'
 
   const [adminTeams, setAdminTeams] = useState<AdminTeamRow[]>([])
   const [adminGames, setAdminGames] = useState<AdminGameRow[]>([])
@@ -125,7 +140,6 @@ export default function Admin() {
   const [selectedAdminTeamId, setSelectedAdminTeamId] = useState('')
   const [loadingAdmin, setLoadingAdmin] = useState(false)
   const [adminError, setAdminError] = useState<string | null>(null)
-  const [showDataMgmt, setShowDataMgmt] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const [localDataMessage, setLocalDataMessage] = useState<string | null>(null)
   const [localDataError, setLocalDataError] = useState<string | null>(null)
@@ -136,7 +150,6 @@ export default function Admin() {
   const [confirmDeletePlayer, setConfirmDeletePlayer] = useState<AdminPlayerRow | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const [showSeasons, setShowSeasons] = useState(false)
   const [seasonsList, setSeasonsList] = useState<AdminSeasonRow[]>([])
   const [loadingSeasons, setLoadingSeasons] = useState(false)
   const [seasonsError, setSeasonsError] = useState<string | null>(null)
@@ -167,16 +180,18 @@ export default function Admin() {
   const basketballSport = sports.find(s => s.id === 'basketball') ?? null
   const parkedStorageInfo = getParkedGameStorageInfo(userId)
 
-  const [showMergeTools, setShowMergeTools] = useState(false)
   const [mergeWizardOpen, setMergeWizardOpen] = useState(false)
   const [mergeCandidates, setMergeCandidates] = useState<MergePlayerCandidate[]>([])
   const [mergeAuditRefresh, setMergeAuditRefresh] = useState(0)
   const [mergeAuditRows, setMergeAuditRows] = useState<MergeAuditListRow[]>([])
   const [loadingMergeAudit, setLoadingMergeAudit] = useState(false)
   const [mergeAuditError, setMergeAuditError] = useState<string | null>(null)
+  const seasonsActive = settingsSection === 'data'
+  const mergeToolsActive = settingsSection === 'advanced'
+  const dataMgmtActive = settingsSection === 'advanced'
 
   useEffect(() => {
-    if (!showDataMgmt || !isConfigured || !userId || !supabaseClient) return
+    if (!dataMgmtActive || !isConfigured || !userId || !supabaseClient) return
     let cancelled = false
     const load = async () => {
       setLoadingAdmin(true)
@@ -201,10 +216,10 @@ export default function Admin() {
     }
     void load()
     return () => { cancelled = true }
-  }, [showDataMgmt, isConfigured, userId, supabaseClient])
+  }, [dataMgmtActive, isConfigured, userId, supabaseClient])
 
   useEffect(() => {
-    if (!showMergeTools || !isConfigured || !userId || !supabaseClient) return
+    if (!mergeToolsActive || !isConfigured || !userId || !supabaseClient) return
     let cancelled = false
     const load = async () => {
       const { candidates } = await fetchMergePlayerScope(supabaseClient, userId)
@@ -213,10 +228,10 @@ export default function Admin() {
     }
     void load()
     return () => { cancelled = true }
-  }, [showMergeTools, isConfigured, userId, supabaseClient, mergeAuditRefresh])
+  }, [mergeToolsActive, isConfigured, userId, supabaseClient, mergeAuditRefresh])
 
   useEffect(() => {
-    if (!showMergeTools || !isConfigured || !userId || !supabaseClient) return
+    if (!mergeToolsActive || !isConfigured || !userId || !supabaseClient) return
     let cancelled = false
     const loadAudit = async () => {
       setLoadingMergeAudit(true)
@@ -243,10 +258,10 @@ export default function Admin() {
     }
     void loadAudit()
     return () => { cancelled = true }
-  }, [showMergeTools, isConfigured, userId, supabaseClient, mergeAuditRefresh])
+  }, [mergeToolsActive, isConfigured, userId, supabaseClient, mergeAuditRefresh])
 
   useEffect(() => {
-    if (!showDataMgmt || !selectedAdminTeamId || !supabaseClient) {
+    if (!dataMgmtActive || !selectedAdminTeamId || !supabaseClient) {
       setAdminGames([])
       setAdminTournaments([])
       setAdminPlayers([])
@@ -281,7 +296,7 @@ export default function Admin() {
     }
     void load()
     return () => { cancelled = true }
-  }, [showDataMgmt, selectedAdminTeamId, supabaseClient])
+  }, [dataMgmtActive, selectedAdminTeamId, supabaseClient])
 
   const handleAdminDeleteTeam = async (team: AdminTeamRow) => {
     if (!supabaseClient) return
@@ -363,10 +378,10 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    if (!showSeasons || !isConfigured || !userId || !supabaseClient) return
+    if (!seasonsActive || !isConfigured || !userId || !supabaseClient) return
     void loadSeasons()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSeasons, isConfigured, userId, supabaseClient])
+  }, [seasonsActive, isConfigured, userId, supabaseClient])
 
   const handleCreateSeason = async () => {
     if (!supabaseClient || !newSeasonName.trim()) return
@@ -500,111 +515,243 @@ export default function Admin() {
           </button>
           <div>
             <h1 className="text-lg font-bold">Settings</h1>
-            <p className="text-sm opacity-80">Configure available sports</p>
+            <p className="text-sm opacity-80">{sectionTitle}</p>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full">
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-700">Sports</h2>
-            <span className="text-sm text-slate-400">
-              {enabledCount} of {sports.length} enabled
-            </span>
-          </div>
+      <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-5">
+        <nav className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Settings sections">
+          {settingsNavItems.map(item => {
+            const active =
+              item.id === settingsSection ||
+              (item.id === 'sports' && settingsSection === 'sport')
+            return (
+              <Link
+                key={item.id}
+                to={item.path}
+                className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                  active
+                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
 
-          <div className="space-y-2">
-            {sports.map(sport => {
-              const enabled = isSportEnabled(sport.id)
-              return (
-                <div
-                  key={sport.id}
-                  className={`
-                    card flex items-center justify-between py-3 transition-colors
-                    ${enabled ? '' : 'opacity-60'}
-                  `}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{sport.icon}</span>
-                    <div>
-                      <span className="font-medium text-slate-700">{sport.name}</span>
-                      <p className="text-xs text-slate-400">
-                        {sport.categories.reduce((n, c) => n + c.actions.length, 0)} stats
-                        across {sport.categories.length} categories
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => toggleSport(sport.id)}
-                    className={`
-                      relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
-                      ${enabled ? 'bg-blue-600' : 'bg-slate-300'}
-                    `}
-                    role="switch"
-                    aria-checked={enabled}
-                    aria-label={`Toggle ${sport.name}`}
-                  >
-                    <span
-                      className={`
-                        absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow
-                        transition-transform duration-200
-                        ${enabled ? 'translate-x-5' : 'translate-x-0'}
-                      `}
-                    />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
-          {enabledCount === 0 && (
-            <p className="text-center text-sm text-amber-600 mt-4 bg-amber-50 rounded-xl p-3">
-              Enable at least one sport to start tracking games.
-            </p>
-          )}
-        </section>
-
-        <section className="mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-700">Game tracker</h2>
-          </div>
-
-          <div className="card flex items-center justify-between gap-3 py-3">
+        {settingsSection === 'account' && (
+          <section className="space-y-3">
             <div>
-              <span className="font-medium text-slate-700">Missed-shot rebound prompt</span>
-              <p className="text-xs text-slate-400">
-                After a court miss, ask whether to add an offensive or defensive rebound.
-              </p>
+              <h2 className="text-lg font-semibold text-slate-700">Account</h2>
+              <p className="text-sm text-slate-500">Sign-in status and account controls.</p>
             </div>
 
-            <button
-              onClick={() =>
-                setReboundPromptAfterMissEnabled(
-                  !settings.courtCapture.reboundPromptAfterMiss
-                )
-              }
-              className={`
-                relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
-                ${settings.courtCapture.reboundPromptAfterMiss ? 'bg-blue-600' : 'bg-slate-300'}
-              `}
-              role="switch"
-              aria-checked={settings.courtCapture.reboundPromptAfterMiss}
-              aria-label="Toggle missed-shot rebound prompt"
-            >
-              <span
-                className={`
-                  absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow
-                  transition-transform duration-200
-                  ${settings.courtCapture.reboundPromptAfterMiss ? 'translate-x-5' : 'translate-x-0'}
-                `}
-              />
-            </button>
-          </div>
-        </section>
+            <div className="card space-y-3">
+              {isConfigured && user ? (
+                <>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Signed in</p>
+                    <p className="text-sm text-slate-500 break-all">{user.email}</p>
+                  </div>
+                  <button type="button" onClick={signOut} className="btn-primary w-full">
+                    Sign Out
+                  </button>
+                </>
+              ) : isConfigured ? (
+                <p className="text-sm text-slate-500">No active account session.</p>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Supabase is not configured. StatKeeper is running in local/offline mode.
+                </p>
+              )}
+            </div>
 
-        <section className="card mt-6">
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <p className="text-sm font-semibold text-slate-700">Coming with AUTH-2</p>
+              <p className="text-sm text-slate-500 mt-1">
+                Google sign-in linking, profile details, and connected account controls will live here.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {settingsSection === 'app' && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-700">Enabled sports</h2>
+              <span className="text-sm text-slate-400">
+                {enabledCount} of {sports.length} enabled
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {sports.map(sport => {
+                const enabled = isSportEnabled(sport.id)
+                return (
+                  <div
+                    key={sport.id}
+                    className={`
+                      card flex items-center justify-between py-3 transition-colors
+                      ${enabled ? '' : 'opacity-60'}
+                    `}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{sport.icon}</span>
+                      <div>
+                        <span className="font-medium text-slate-700">{sport.name}</span>
+                        <p className="text-xs text-slate-400">
+                          {sport.categories.reduce((n, c) => n + c.actions.length, 0)} stats
+                          across {sport.categories.length} categories
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => toggleSport(sport.id)}
+                      className={`
+                        relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
+                        ${enabled ? 'bg-blue-600' : 'bg-slate-300'}
+                      `}
+                      role="switch"
+                      aria-checked={enabled}
+                      aria-label={`Toggle ${sport.name}`}
+                    >
+                      <span
+                        className={`
+                          absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow
+                          transition-transform duration-200
+                          ${enabled ? 'translate-x-5' : 'translate-x-0'}
+                        `}
+                      />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {enabledCount === 0 && (
+              <p className="text-center text-sm text-amber-600 mt-4 bg-amber-50 rounded-xl p-3">
+                Enable at least one sport to start tracking games.
+              </p>
+            )}
+          </section>
+        )}
+
+        {settingsSection === 'sports' && (
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-700">Sports</h2>
+              <p className="text-sm text-slate-500">Sport-specific settings and future configuration.</p>
+            </div>
+            <div className="space-y-2">
+              {sports.map(sport => {
+                const hasSettings = sport.id === 'basketball'
+                return (
+                  <Link
+                    key={sport.id}
+                    to={sportSettingsPath(sport.id)}
+                    className={`card flex items-center justify-between py-3 transition-colors ${
+                      hasSettings ? 'hover:border-blue-200' : 'opacity-70'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="text-2xl">{sport.icon}</span>
+                      <span>
+                        <span className="block font-medium text-slate-700">{sport.name}</span>
+                        <span className="block text-xs text-slate-400">
+                          {hasSettings ? 'Settings available' : 'No sport-specific settings yet'}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="text-xs font-semibold text-slate-400">
+                      {isSportEnabled(sport.id) ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {settingsSection === 'sport' && selectedSettingsSport?.id !== 'basketball' && (
+          <section className="card space-y-2">
+            <p className="text-lg font-semibold text-slate-700">
+              {selectedSettingsSport ? `${selectedSettingsSport.icon} ${selectedSettingsSport.name}` : 'Sport'} settings
+            </p>
+            <p className="text-sm text-slate-500">
+              {selectedSettingsSport
+                ? 'No sport-specific settings are defined for this sport yet.'
+                : 'That sport settings route is not recognized.'}
+            </p>
+            <Link to={settingsPath('sports')} className="btn-secondary inline-block text-center">
+              Back to Sports
+            </Link>
+          </section>
+        )}
+
+        {settingsSection === 'sport' && selectedSettingsSport?.id === 'basketball' && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-700">Basketball</h2>
+            </div>
+
+            <div className="card flex items-center justify-between gap-3 py-3">
+              <div>
+                <span className="font-medium text-slate-700">Missed-shot rebound prompt</span>
+                <p className="text-xs text-slate-400">
+                  After a court miss, ask whether to add an offensive or defensive rebound.
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setReboundPromptAfterMissEnabled(
+                    !settings.courtCapture.reboundPromptAfterMiss
+                  )
+                }
+                className={`
+                  relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
+                  ${settings.courtCapture.reboundPromptAfterMiss ? 'bg-blue-600' : 'bg-slate-300'}
+                `}
+                role="switch"
+                aria-checked={settings.courtCapture.reboundPromptAfterMiss}
+                aria-label="Toggle missed-shot rebound prompt"
+              >
+                <span
+                  className={`
+                    absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow
+                    transition-transform duration-200
+                    ${settings.courtCapture.reboundPromptAfterMiss ? 'translate-x-5' : 'translate-x-0'}
+                  `}
+                />
+              </button>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 mt-3">
+              <p className="text-sm font-semibold text-slate-700">Team stat rules</p>
+              <p className="text-sm text-slate-500 mt-1">
+                Basketball team fouls, timeouts, and bonus rules are configured per season.
+              </p>
+              <Link
+                to={settingsPath('data')}
+                className="text-sm font-semibold text-blue-600 underline mt-2 inline-block"
+              >
+                Open Seasons
+              </Link>
+            </div>
+
+            <Link to={settingsPath('sports')} className="btn-secondary inline-block text-center mt-3">
+              Back to Sports
+            </Link>
+          </section>
+        )}
+
+        {settingsSection === 'data' && (
+          <>
+        <section className="card">
           <h2 className="text-lg font-semibold text-slate-700 mb-2">Local parked games</h2>
           <p className="text-sm text-slate-500 mb-3">
             {parkedStorageInfo.parkedCount} of {parkedStorageInfo.maxParkedGames} slots used ·{' '}
@@ -666,21 +813,16 @@ export default function Admin() {
 
         {isConfigured && user && (
           <section className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowSeasons(!showSeasons)}
-              className="card w-full text-left"
-            >
+            <div className="card w-full text-left">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-700">Seasons</h2>
                   <p className="text-sm text-slate-500">Create & manage seasons</p>
                 </div>
-                <span className="text-slate-400 text-lg">{showSeasons ? '▲' : '▼'}</span>
               </div>
-            </button>
+            </div>
 
-            {showSeasons && (
+            {seasonsActive && (
               <div className="mt-3 space-y-3">
                 {seasonsError && (
                   <div className="card bg-red-50 border-red-200 text-red-700 text-sm">{seasonsError}</div>
@@ -972,14 +1114,12 @@ export default function Admin() {
             />
           </section>
         )}
+          </>
+        )}
 
-        {isConfigured && user && (
+        {settingsSection === 'advanced' && isConfigured && user && (
           <section className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowMergeTools(!showMergeTools)}
-              className="card w-full text-left border-amber-100 bg-amber-50/40"
-            >
+            <div className="card w-full text-left border-amber-100 bg-amber-50/40">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-700">Player merge (advanced)</h2>
@@ -987,11 +1127,10 @@ export default function Admin() {
                     Combine duplicate player profiles (same flow as Teams). View merges you performed.
                   </p>
                 </div>
-                <span className="text-slate-400 text-lg">{showMergeTools ? '▲' : '▼'}</span>
               </div>
-            </button>
+            </div>
 
-            {showMergeTools && (
+            {mergeToolsActive && (
               <div className="mt-3 space-y-4">
                 <p className="text-sm text-slate-600 card">
                   You must be owner or admin on every team both players are on. Irreversible — use test data when
@@ -1059,23 +1198,18 @@ export default function Admin() {
           </section>
         )}
 
-        {isConfigured && user && (
+        {settingsSection === 'advanced' && isConfigured && user && (
           <section className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowDataMgmt(!showDataMgmt)}
-              className="card w-full text-left"
-            >
+            <div className="card w-full text-left">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-700">Data Management</h2>
                   <p className="text-sm text-slate-500">Delete teams, games, players, tournaments</p>
                 </div>
-                <span className="text-slate-400 text-lg">{showDataMgmt ? '▲' : '▼'}</span>
               </div>
-            </button>
+            </div>
 
-            {showDataMgmt && (
+            {dataMgmtActive && (
               <div className="mt-3 space-y-3">
                 {adminError && (
                   <div className="card bg-red-50 border-red-200 text-red-700 text-sm">{adminError}</div>
@@ -1270,11 +1404,20 @@ export default function Admin() {
           </section>
         )}
 
+        {settingsSection === 'advanced' && (!isConfigured || !user) && (
+          <section className="card space-y-2">
+            <h2 className="text-lg font-semibold text-slate-700">Advanced</h2>
+            <p className="text-sm text-slate-500">
+              Advanced cloud tools require a configured Supabase project and signed-in account.
+            </p>
+          </section>
+        )}
+
         <button
           onClick={() => navigate('/')}
           className="btn-primary w-full mt-8"
         >
-          ← Back to Home
+          Back to Sports
         </button>
       </div>
     </div>

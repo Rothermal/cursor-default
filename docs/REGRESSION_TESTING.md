@@ -21,17 +21,23 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
-## 2. Settings / Admin
+## 2. Settings
 
 **Precondition:** App loaded (signed in if Supabase configured).
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 2.1 | From sport choice or a sport dashboard, tap Settings in the app shell | Admin page with sport toggles |
-| 2.2 | Disable a sport (e.g. Basketball) | Toggle off |
-| 2.3 | Return to sport choice | Disabled sport no longer in grid |
-| 2.4 | Re-enable sport | Sport reappears on sport choice |
-| 2.5 | Reload | Settings persist (localStorage) |
+| 2.1 | From sport choice or a sport dashboard, tap Settings in the app shell | `/#/settings` opens the Account section |
+| 2.2 | Open `/#/settings/app` | App/general settings show enabled sport toggles |
+| 2.3 | Disable a sport (e.g. Basketball) | Toggle off |
+| 2.4 | Return to sport choice | Disabled sport no longer in grid |
+| 2.5 | Re-enable sport | Sport reappears on sport choice |
+| 2.6 | Open `/#/settings/sports` | Sport settings index lists every configured sport |
+| 2.7 | Open `/#/settings/sports/basketball` | Basketball-specific settings show the missed-shot rebound prompt toggle |
+| 2.8 | Open `/#/settings/data` | Local parked games, cloud shortcuts, and Seasons are available |
+| 2.9 | Open `/#/settings/advanced` | Player merge and destructive data-management tools are available when signed in/configured, otherwise an unavailable-state card is shown |
+| 2.10 | Open legacy `/#/admin` | Redirects to `/#/settings` |
+| 2.11 | Reload | Settings persist (localStorage) |
 
 ---
 
@@ -63,8 +69,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3a.5 | Restore network and wait for sync | Dirty records drain through the queue: active game first, then parked games by older update time; each record keeps its own cloud `gameId` / `playerIdMap` |
 | 3a.6 | During a cloud sync failure after a new game row is inserted (simulate by forcing `game_stats` or `shot_chart` write failure in dev tools/test env) | The local parked record stays dirty/error and retryable; the just-created in-progress cloud game is best-effort deleted rather than left as a new orphan |
 | 3a.7 | Existing cloud game sync fails after the game already has a persisted `cloudSync.gameId` | Existing game is not deleted; local row remains dirty/error for retry |
-| 3a.8 | Settings -> Local parked games -> Export | Downloads a JSON file containing the parked game records for this device |
-| 3a.9 | Settings -> Local parked games -> Import the exported JSON | Parked games are restored as parked games only, then the app reloads from the updated manifest; the import result separates imported, existing/skipped, invalid, and at-limit counts |
+| 3a.8 | Settings -> Data & Sync -> Local parked games -> Export | Downloads a JSON file containing the parked game records for this device |
+| 3a.9 | Settings -> Data & Sync -> Local parked games -> Import the exported JSON | Parked games are restored as parked games only, then the app reloads from the updated manifest; the import result separates imported, existing/skipped, invalid, and at-limit counts |
 | 3a.10 | Fill all 12 parked-game slots, then try to start another game | App stays on the current screen and shows a storage/max-count message instead of navigating into setup |
 | 3a.11 | Simulate localStorage quota failure while saving a game | App shows a storage/quota message and does not silently discard the active game |
 | 3a.12 | Import a file that contains a game already parked on this device | Existing local game is kept; the duplicate imported row is skipped and counted as existing |
@@ -106,7 +112,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 |------|--------|----------|
 | 4.1 | Home → Teams | Cloud Teams page; Create Team form; no team row is pre-selected/highlighted |
 | 4.1b | Stay on Cloud Teams list (do not open Manage) | Network: no `team_players` / `get_team_members_with_profiles` for a default first team |
-| 4.1c | Settings → disable a sport → Teams Create Team / Settings → Seasons New Season | Sport dropdown lists only enabled sports (same filter as Home SportSelect) |
+| 4.1c | Settings -> App -> disable a sport -> Teams Create Team / Settings -> Data & Sync -> Seasons New Season | Sport dropdown lists only enabled sports (same filter as Home SportSelect) |
 | 4.2 | Create team (name, sport, season) | Opens `/team/manage?teamId=<id>` for the created team |
 | 4.3 | Team Manage → add players (number, first, last) | Players appear in Roster |
 | 4.4 | Edit team name (pencil) → change primary name → Save | Team name updates in list; reflected in Game Setup dropdown and Games page |
@@ -157,12 +163,12 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4a.8 | Type **MERGE** (all caps) → **Merge players** | Success: modal closes; duplicate gone from candidate pool / roster lists after refresh |
 | 4a.9 | Team Manage roster / Leaderboard / Player profile for **survivor** | Stats and games that belonged to duplicate now attribute to survivor (where applicable) |
 | 4a.10 | (Optional) Supabase Table Editor → `player_merge_audit` | New row with `duplicate_player_id`, `survivor_player_id`, `merged_by`, `resolutions` json |
-| 4a.11 | Settings (Admin) → expand **Player merge (advanced)** | Section opens; **Your recent merges** loads or shows migration **025** hint if RLS blocks reads |
-| 4a.12 | **Open merge wizard** from Admin (with ≥2 candidates) | Same modal as Teams; complete a test merge → row appears under **Your recent merges** (after **025** applied) |
+| 4a.11 | Settings -> Advanced -> **Player merge (advanced)** | Section opens; **Your recent merges** loads or shows migration **025** hint if RLS blocks reads |
+| 4a.12 | **Open merge wizard** from Settings -> Advanced (with ≥2 candidates) | Same modal as Teams; complete a test merge → row appears under **Your recent merges** (after **025** applied) |
 
 **Negative / edge:** If another user edits roster or stats between **Load conflicts** and **Merge players**, execute may error (resolution counts mismatch); run **Load conflicts** again from the pick step.
 
-**Migrations:** Merge UI works with **024** only; **Admin → recent merges** needs **025** (`player_merge_audit` readable for own `merged_by`).
+**Migrations:** Merge UI works with **024** only; **Settings -> Advanced -> recent merges** needs **025** (`player_merge_audit` readable for own `merged_by`).
 
 ---
 
@@ -221,7 +227,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.2 | Scroll down to the stat grid | Player-select strip stays **pinned** at the top (score scrolls away); active player always visible |
 | 4e.3 | Tap the court (inside the paint) | `CourtEventPopup` opens: Log for player switcher with compact live stat line, **2PT / 3PT** shot-value segmented control defaulted to **2PT**, **Made / Missed** buttons, Off Reb · Def Reb · Steal · Block · Assist, Cancel. Nothing is logged yet |
 | 4e.4 | Tap **Made** | Popup closes; green marker at tap point; selected player's `2PT` +1; scoreboard +2 |
-| 4e.5 | With **Settings → Game tracker → Missed-shot rebound prompt** off, tap the court beyond the arc → **Missed** | "Detected: 3-pointer"; red ✕ marker; `3 Miss` +1; score unchanged |
+| 4e.5 | With **Settings -> Sports -> Basketball -> Missed-shot rebound prompt** off, tap the court beyond the arc → **Missed** | "Detected: 3-pointer"; red ✕ marker; `3 Miss` +1; score unchanged |
 | 4e.6 | Tap court → **Off Reb** (repeat for Def Reb / Steal / Block / Assist) | Popup closes; the matching stat (`OFF`/`DEF`/`STL`/`BLK`/`AST`) +1; **no marker** on the court |
 | 4e.7 | Tap court → **Cancel** (or tap outside the popup) | Popup dismisses; no stat, no marker |
 | 4e.8 | Start a scroll gesture with the finger **on the court** | Page scrolls; no popup opens (tap-vs-scroll discrimination, ~18px tolerance — slightly wobbly taps still count as taps) |
@@ -244,7 +250,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4e.25 | Tap court → **Missed**, Off Reb, Def Reb, Steal, Block, or standalone Assist | No **Assisted by?** step appears |
 | 4e.26 | Tap court as #A → **Made** | The **Assisted by?** choices exclude #A; opponent pseudo-player shots skip the assist step |
 | 4e.27 | Tap court for a player with stats, then use **Log for** to switch players | The compact stat line under the player name updates with the selected player's live stats |
-| 4e.28 | Settings → Game tracker → turn **Missed-shot rebound prompt** on; return to Game Tracker; tap court as #A → **Missed** | Popup advances to **Rebound?**; the Log for picker and shot-value controls are read-only for the pending miss |
+| 4e.28 | Settings -> Sports -> Basketball -> turn **Missed-shot rebound prompt** on; return to Game Tracker; tap court as #A → **Missed** | Popup advances to **Rebound?**; the Log for picker and shot-value controls are read-only for the pending miss |
 | 4e.29 | On the Rebound? step after #A misses, leave the offensive row on the home team default → **Off Reb** | Popup closes; red miss marker is saved for #A; home team pseudo-player gets `OFF +1`; score unchanged |
 | 4e.30 | Repeat #A miss → choose a player chip in the offensive row → **Off Reb** | Popup closes; red miss marker is saved for #A; selected player gets `OFF +1` |
 | 4e.31 | Select the opponent team chip → tap court → **Missed** → **Off Reb** | Opponent miss marker is saved; opponent team pseudo-player gets `OFF +1` |

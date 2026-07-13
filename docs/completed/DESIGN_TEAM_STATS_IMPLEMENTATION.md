@@ -361,12 +361,12 @@ Add `isTeamPlayer` filters to prevent team pseudo-players from corrupting indivi
 
 3. **`src/App.tsx`** — Route `/season-settings` was **not** added (use Admin instead).
 
-4. **Navigation** — Team stat rules are reached from **Settings → Seasons**, not from Teams/Game Setup as originally sketched.
+4. **Navigation** — Team stat rules are reached from **Settings -> Data & Sync -> Seasons**, not from Teams/Game Setup as originally sketched.
 
 **Files touched (actual):** `src/components/SeasonTeamStatsEditor.tsx`, `src/pages/Admin.tsx`
 
 **Test breakpoint:**
-- **Settings (Admin) → Seasons** → expand basketball season → open team stat rules
+- **Settings -> Data & Sync -> Seasons** → expand basketball season → open team stat rules
 - Select "NBA" preset → fields show: 4 quarters, no 1-and-1, bonus at 5
 - Save → reload → config persists on the season row
 - *(Optional / future: strict validation double bonus < bonus is not necessarily enforced in UI.)*

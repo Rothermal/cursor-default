@@ -192,7 +192,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }, [isManagementRoute, loadingTeams, requestedTeamId, selectedTeam])
   const backPath = isManagementRoute
     ? selectedTeam ? teamInfoPath(selectedTeam.id) : '/teams'
-    : scopedSport ? sportDashboardPath(scopedSport.id) : '/admin'
+    : scopedSport ? sportDashboardPath(scopedSport.id) : '/settings'
 
   useEffect(() => {
     if (!isManagementRoute && requestedTeamId) {
@@ -566,7 +566,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           <p className="text-sm text-slate-500 mb-4">
             Configure Supabase credentials to manage cloud teams and rosters.
           </p>
-          <button onClick={() => navigate('/admin')} className="btn-primary w-full">
+          <button onClick={() => navigate('/settings/data')} className="btn-primary w-full">
             Back to Settings
           </button>
         </div>
@@ -1015,7 +1015,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                   <span>{scopedSport!.name} is disabled. Enable it before creating teams in this sport.</span>
                   <button
                     type="button"
-                    onClick={() => navigate('/admin')}
+                    onClick={() => navigate('/settings/app')}
                     className="font-semibold underline shrink-0"
                   >
                     Settings

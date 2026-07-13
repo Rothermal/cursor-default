@@ -31,7 +31,7 @@ export default function SportSelect() {
             <p className="text-slate-500 mb-4">No sports enabled yet.</p>
             <button
               type="button"
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/settings/app')}
               className="btn-primary"
             >
               Go to Settings

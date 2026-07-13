@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider } from './context/GameContext'
 import { SettingsProvider } from './context/SettingsContext'
@@ -68,7 +68,14 @@ function AppRoutes() {
             <Route path="/game" element={<GameTracker />} />
             <Route path="/shot-chart" element={<ShotChart />} />
             <Route path="/summary" element={<GameSummary />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/settings" element={<Admin />} />
+            <Route path="/settings/account" element={<Admin />} />
+            <Route path="/settings/app" element={<Admin />} />
+            <Route path="/settings/sports" element={<Admin />} />
+            <Route path="/settings/sports/:sportId" element={<Admin />} />
+            <Route path="/settings/data" element={<Admin />} />
+            <Route path="/settings/advanced" element={<Admin />} />
+            <Route path="/admin" element={<Navigate to="/settings" replace />} />
             <Route path="/teams" element={<TeamsList />} />
             <Route path="/team" element={<TeamInfo />} />
             <Route path="/team/manage" element={<TeamManage />} />

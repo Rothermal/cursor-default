@@ -5,7 +5,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 ## Features
 
 - **Sport Selection & Dashboards** — configurable sports roster; choose a sport from `/` or `/sports`, then manage that sport's active game, parked games, teams, cloud games, and season stats from `/sport/:sportId`
-- **Seasons** — first-class entity at the top of the hierarchy; teams, games, and tournaments belong to a season; season CRUD in Settings; season picker on team creation and game setup
+- **Seasons** — first-class entity at the top of the hierarchy; teams, games, and tournaments belong to a season; season CRUD in Settings -> Data & Sync; season picker on team creation and game setup
 - **Game Setup** — select season, pick/create team, enter opponent, tournament/league, and date
 - **Cloud Team & Roster Management** — create teams within seasons; manage rosters via `team_players` junction (players can span multiple teams/seasons); edit team names, player names, and jersey numbers inline
 - **Player Pool** — players are persistent person records; add existing players from your pool (players you created or are guardian of) to new teams without re-entering names
@@ -17,11 +17,11 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Minutes Played** — per-player minute counter for sports that track playing time (basketball, hockey, soccer, football)
 - **Game Notes** — free-text notes field in Game Tracker and Game Summary; synced to cloud
 - **Live Scoreboard** — home total can be a standalone scoreboard value or computed from player scoring stats + optional adjustment; manual opponent score; the score also shows on the sport dashboard active-game card (live) and on Cloud Games cards for in-progress games (last synced) — see [F4 plan](docs/completed/PLAN_F4_IN_PROGRESS_SCORES_ON_RESUME_UI.md)
-- **Basketball team stats** — home/opponent “team” rows in Game Tracker for fouls (per period), timeouts, techs, turnovers; period toggle, bonus indicators, and season rules from `seasons.team_stats_config` (edit under **Settings → Seasons**). Cloud games sync placeholder `players` + `game_stats`; **Game Summary** includes a **Team stats** tab (fouls by period, bonus events, other team stats). See [docs/completed/DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md)
+- **Basketball team stats** — home/opponent “team” rows in Game Tracker for fouls (per period), timeouts, techs, turnovers; period toggle, bonus indicators, and season rules from `seasons.team_stats_config` (edit under **Settings -> Data & Sync -> Seasons**). Cloud games sync placeholder `players` + `game_stats`; **Game Summary** includes a **Team stats** tab (fouls by period, bonus events, other team stats). See [docs/completed/DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md)
 - **Basketball court capture** — half-court SVG **inline on Game Tracker** (single scroll page, sticky player strip); tapping the court opens an event popup that records made/miss shots (with location + player switcher + live stat line + auto 2/3, manual 2PT/3PT override, optional made-shot assist linking, optional missed-shot rebound prompt, and zone classification) or rebounds/steals/blocks/assists (stat only) for the selected player; the full stat grid stays below the court for direct entry and corrections; the chart filters by the selected player/team chip with an **All** view (recording always targets the active player); **Game Summary** tab when chart shots exist (same filter, defaults to All); for cloud games the Summary shows **all recorders'** shots (one recorder per player — primary recorder, then game creator — so nothing double-plots) and Cloud Games cards flag chart availability; cloud persistence via migration **`032_shot_chart.sql`** ([design](docs/completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md), [F1 plan](docs/completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md), [F2 plan](docs/completed/PLAN_F2_PER_PLAYER_AND_TEAM_SHOT_VIEWS.md), [F3 plan](docs/completed/PLAN_F3_CLOUD_GAME_SHOT_CHARTS.md))
 - **Undo Support** — review the last few tracked events, then undo the newest action
 - **Game Summary** — per-player and team totals in organized tables; M/A (%) columns for shooting stats
-- **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; centralized Data Management in Settings
+- **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; destructive tools live in Settings -> Advanced
 - **Supabase Admin Views** — human-readable SQL views for all tables (JOINs FK UUIDs to names) in the Supabase table browser
 - **PWA** — installable on Android/iOS home screens, works offline with service worker caching
 - **Auth** — Supabase email/password authentication (optional; app works offline without it)
@@ -38,7 +38,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 | Hockey | Configured (disabled) | Goals, Assists, Shots, Hits, Blocks, Penalties, Goaltending |
 | Soccer | Configured (disabled) | Goals, Assists, Shots, Tackles, Cards, Goalkeeping |
 
-Sports can be enabled/disabled from the **Settings** page in the app shell. Adding a new sport requires only a new entry in `src/config/sports.ts` — the UI discovers it automatically.
+Sports can be enabled/disabled from **Settings -> App** in the app shell. Sport-specific preferences live under **Settings -> Sports**. Adding a new sport requires only a new entry in `src/config/sports.ts` — the UI discovers it automatically.
 
 ## Tech Stack
 
@@ -195,7 +195,7 @@ src/
 │   ├── CareerStats.tsx    # Career stats (/career)
 │   ├── TeamStats.tsx      # Team season summary (/team-stats)
 │   ├── TournamentStats.tsx # Tournament stats (/tournament-stats)
-│   └── Admin.tsx          # Settings — sports, seasons CRUD, cloud links, data management
+│   └── Admin.tsx          # Settings sections: account, app, sports, data/sync, advanced
 ├── components/
 │   ├── ConfirmDialog.tsx  # Reusable confirmation modal (delete prompts)
 │   ├── Scoreboard.tsx     # Live score display
@@ -299,7 +299,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 - [x] Mobile-first React + TypeScript + Vite + Tailwind app
 - [x] Sport-specific stat tracking (basketball fully built; 4 others configured)
-- [x] Configurable sports (admin settings page with toggles)
+- [x] Configurable sports (Settings -> App toggles)
 - [x] PWA support (installable, offline-capable, service worker)
 - [x] Supabase client integration with graceful offline fallback
 - [x] Auth UI (sign in / sign up / sign out)
@@ -326,23 +326,23 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] Missed shots for basketball — attempt buttons on scoring cards; [−][A][+] UI; M/A (%) columns in Game Summary
 - [x] Minutes played — per-player minute counter for basketball (stat `min`; layout: Playmaking category)
 - [x] Game notes — free-text notes in Game Tracker and Game Summary; synced to cloud (migration 017)
-- [x] Delete editable entities — delete teams, players (hard delete), games, tournaments with confirmation dialogs; centralized Data Management section in Settings; cascading deletes via Supabase FK constraints
+- [x] Delete editable entities — delete teams, players (hard delete), games, tournaments with confirmation dialogs; Settings -> Advanced data-management tools; cascading deletes via Supabase FK constraints
 - [x] Graceful fallbacks for optional DB columns (`home_score_adjustment`, `tournament_id`, `notes`, `last_opened_at`) — app works with any subset of migrations applied
 - [x] Bug fixes: leaderboard sorting/navigation, game stats review display, team list cleanup, finalize fallback, RLS policy caching (migration 013)
-- [x] Seasons as first-class entity — `seasons` table (migration 018); teams belong to a season; season CRUD in Settings (create, edit, delete with cascade); season picker on team creation; season filter in Game Setup
+- [x] Seasons as first-class entity — `seasons` table (migration 018); teams belong to a season; season CRUD in Settings -> Data & Sync (create, edit, delete with cascade); season picker on team creation; season filter in Game Setup
 - [x] Roster junction table — `team_players` replaces `players.team_id`; players can be on multiple teams across seasons; jersey number and active status are per-team
 - [x] Player guardians — `player_guardians` junction; parents claim guardianship of players; guardians can edit player info and find players in their pool
 - [x] Player pool — "Add Existing" mode on roster: pick from players you created or are guardian of; no duplicate player records when moving between teams/seasons
 - [x] Supabase admin display views — 9 human-readable SQL views (`_display` suffix) with `security_invoker = true` for safe FK browsing in Supabase table browser
 - [x] Tournament placement — `tournaments.placement` column for finish position (1st, 2nd, 3rd, etc.)
-- [x] **Team-level stat tracking (basketball)** — pseudo-players `__team_home__` / `__team_opp__`, `teamCategories` in `sports.ts`, period-scoped stat ids (`team_foul_p1`, …), bonus UI, season rules in `seasons.team_stats_config` (Admin → Seasons), cloud placeholder players + `get_game_team_stats`, checkout + Game Summary **Team stats** tab (design: [DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md))
+- [x] **Team-level stat tracking (basketball)** — pseudo-players `__team_home__` / `__team_opp__`, `teamCategories` in `sports.ts`, period-scoped stat ids (`team_foul_p1`, …), bonus UI, season rules in `seasons.team_stats_config` (Settings -> Data & Sync -> Seasons), cloud placeholder players + `get_game_team_stats`, checkout + Game Summary **Team stats** tab (design: [DESIGN_TEAM_STATS_TRACKING.md](docs/completed/DESIGN_TEAM_STATS_TRACKING.md))
 
 - [x] **Team Info hub + drill-downs** — canonical `/team?teamId=` route with overview, roster, schedule, player/game/season drill-downs, Start Game preselect, and `/team/manage?teamId=` management migration ([plan](docs/completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md))
 - [x] **Court capture enhancements (F5–F9, F12)** — shot-value override, in-popup player switch, assist-linking, popup stat line, rebound-after-miss prompt, recent-events undo ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md))
 - [x] **Multi-game parking P0** — local manifest + per-game records, legacy migration, park-on-new-game, parked list resume/discard, and multi-sport summaries ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game sync queue P1** — dirty/revision metadata per parked game, ordered queue drain across dirty records, offline/retry handling, and cloud-id merges by `localGameId` ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game cloud hardening P2** — roster/player resolution now happens before new cloud `games` inserts, and just-created games are best-effort rolled back if child stat/shot writes fail before the cloud id is persisted locally ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
-- [x] **Multi-game storage guardrails P3a/P3b** — 12 parked-game cap, storage/quota error UX, local parked-game export/import, parked-only keep-existing import merge behavior, reason-specific import skips, and storage estimate in Settings ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
+- [x] **Multi-game storage guardrails P3a/P3b** — 12 parked-game cap, storage/quota error UX, local parked-game export/import, parked-only keep-existing import merge behavior, reason-specific import skips, and storage estimate in Settings -> Data & Sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 
 ### What's Next
 
@@ -352,7 +352,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations
-- [ ] Bulk / archive games — beyond per-row delete in Games and Settings Data Management
+- [ ] Bulk / archive games — beyond per-row delete in Games and Settings -> Advanced data management
 
 ### Held / waiting for feedback
 

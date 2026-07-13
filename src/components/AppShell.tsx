@@ -40,7 +40,7 @@ export default function AppShell({ children }: AppShellProps) {
               Sports
             </Link>
             <Link
-              to="/admin"
+              to="/settings"
               className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
             >
               Settings
