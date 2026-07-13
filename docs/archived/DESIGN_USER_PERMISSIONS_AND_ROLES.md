@@ -1,6 +1,8 @@
 # Design (placeholder): User permissions & roles
 
-**Status:** Placeholder for **fine-grained** permissions beyond today’s **`team_members.role`** (`owner` | `admin` | `scorer`). Those coarse roles **are implemented** (invites, RLS, merge authorization, etc.). This doc is for a future permission matrix (read vs CRUD per resource).
+**Status:** Superseded by [`PLAN_ADMIN_SECURITY_ROADMAP.md`](../PLAN_ADMIN_SECURITY_ROADMAP.md) and the `PLAN_SEC_*.md` phase plans. This archived placeholder is retained for historical context.
+
+Original placeholder scope: fine-grained permissions beyond today’s **`team_members.role`** (`owner` | `admin` | `scorer`). Those coarse roles **are implemented** (invites, RLS, merge authorization, etc.). The active roadmap now covers the future permission matrix (read vs CRUD per resource).
 
 ## Intent
 
