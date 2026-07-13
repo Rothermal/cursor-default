@@ -30,13 +30,17 @@ export function clearPersistedGameStorage(): void {
   try {
     const manifestRaw = localStorage.getItem(GAMES_MANIFEST_KEY)
     if (manifestRaw) {
-      const parsed = JSON.parse(manifestRaw) as unknown
-      if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { gameIds?: unknown }).gameIds)) {
-        for (const id of (parsed as { gameIds: unknown[] }).gameIds) {
-          if (typeof id === 'string') {
-            localStorage.removeItem(`${GAME_RECORD_KEY_PREFIX}${id}`)
+      try {
+        const parsed = JSON.parse(manifestRaw) as unknown
+        if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { gameIds?: unknown }).gameIds)) {
+          for (const id of (parsed as { gameIds: unknown[] }).gameIds) {
+            if (typeof id === 'string') {
+              localStorage.removeItem(`${GAME_RECORD_KEY_PREFIX}${id}`)
+            }
           }
         }
+      } catch {
+        // Corrupt manifest: still drop known keys below.
       }
     }
     localStorage.removeItem(GAMES_MANIFEST_KEY)
