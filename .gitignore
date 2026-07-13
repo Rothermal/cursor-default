@@ -10,6 +10,7 @@ dist
 .env.production
 .env.staging
 .env*.local
+.creds/
 
 # Embedded / local clone (do not commit)
 cursor-default/

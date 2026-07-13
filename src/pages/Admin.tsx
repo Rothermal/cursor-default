@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase'
 import { teamDisplayName } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard from '../components/MergePlayerWizard'
+import AccountSettings from '../components/settings/AccountSettings'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import {
   exportParkedGames,
@@ -118,7 +119,7 @@ export default function Admin() {
   const navigate = useNavigate()
   const location = useLocation()
   const { settings, isSportEnabled, toggleSport, setReboundPromptAfterMissEnabled } = useSettings()
-  const { isConfigured, user, signOut } = useAuth()
+  const { isConfigured, user } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const supabaseClient = supabase
   const userId = user?.id ?? null
@@ -542,41 +543,7 @@ export default function Admin() {
           })}
         </nav>
 
-        {settingsSection === 'account' && (
-          <section className="space-y-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-700">Account</h2>
-              <p className="text-sm text-slate-500">Sign-in status and account controls.</p>
-            </div>
-
-            <div className="card space-y-3">
-              {isConfigured && user ? (
-                <>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-700">Signed in</p>
-                    <p className="text-sm text-slate-500 break-all">{user.email}</p>
-                  </div>
-                  <button type="button" onClick={signOut} className="btn-primary w-full">
-                    Sign Out
-                  </button>
-                </>
-              ) : isConfigured ? (
-                <p className="text-sm text-slate-500">No active account session.</p>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  Supabase is not configured. StatKeeper is running in local/offline mode.
-                </p>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm font-semibold text-slate-700">Coming with AUTH-2</p>
-              <p className="text-sm text-slate-500 mt-1">
-                Google sign-in linking, profile details, and connected account controls will live here.
-              </p>
-            </div>
-          </section>
-        )}
+        {settingsSection === 'account' && <AccountSettings />}
 
         {settingsSection === 'app' && (
           <section>

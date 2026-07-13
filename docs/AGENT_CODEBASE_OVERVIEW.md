@@ -84,7 +84,7 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/shot-chart` | ShotChart | **Legacy** — redirects to `/game` (court is inline now) |
 | `/summary` | GameSummary | Post-game review, finalize, sync |
 | `/settings` | Admin | Settings default/account section |
-| `/settings/account` | Admin | Account status, sign out, future connected account controls |
+| `/settings/account` | Admin | Account profile, display-name edit, connected sign-in methods, Google linking, sign out |
 | `/settings/app` | Admin | App/general settings, enabled sport toggles |
 | `/settings/sports` | Admin | Sport-specific settings index |
 | `/settings/sports/:sportId` | Admin | Sport-specific settings, e.g. basketball rebound prompt |
@@ -181,7 +181,7 @@ Hydration guards in `GameContext`: won't overwrite local state if pending sync, 
 |------|--------|
 | Migrations | 34 files (`001`–`034`) in [`supabase/migrations/`](../supabase/migrations/) |
 | Tables | 17 core tables (profiles, teams, players, games, stats, seasons, tournaments, shot_chart, …) |
-| Auth | Email/password + Google OAuth (PKCE); RLS scoped via `team_members` roles (owner / admin / scorer) |
+| Auth | Email/password + Google OAuth (PKCE), Account display-name editing, connected identities; RLS scoped via `team_members` roles (owner / admin / scorer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
 | Destructive | Migration **018** redesigned seasons/roster — backup before applying on existing DBs |
 | Pre-flight | Run `supabase/scripts/audit_data_integrity_pre_019.sql` before migration **019** |

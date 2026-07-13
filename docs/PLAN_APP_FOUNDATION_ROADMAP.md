@@ -262,7 +262,7 @@ Expected scope will be defined by SOC-0, but likely starting points include:
 | **NAV-1** | App shell + sport choice/dashboard structure | Best first foundation slice; gives every later feature a cleaner home. |
 | **NAV-2** | Settings/Admin split | Reduces scrolling and creates Account/Sports/Data/Advanced destinations. |
 | **AUTH-1** | Google sign-in/sign-up | Must precede AUTH-2; can follow navigation because auth entry does not depend on soccer. |
-| **AUTH-2** | Account management | Uses the Account destination created by NAV-2. |
+| **AUTH-2** | Account management | Implemented; uses the Account destination created by NAV-2 for profile editing, connected methods, and Google linking. |
 | **SOC-0** | Soccer product/technical plan | Define soccer stat model and tracker UI approach. |
 | **SOC-1** | First soccer implementation | Build on the sport dashboard and sport-specific settings structure. |
 
@@ -308,8 +308,7 @@ These do not block this high-level roadmap.
 - AUTH-1: Which deployment URLs need to be configured in Supabase/Google at launch
   (localhost, GitHub Pages, custom domain)?
 - AUTH-1: What exact user-facing copy should explain existing account linking?
-- AUTH-2: Should avatar display be read-only from Google at first, editable in StatKeeper,
-  or deferred?
+- AUTH-2: Avatar display is read-only from Google/profile defaults for now; upload/edit remains a future account phase.
 - SOC-0: What soccer stats and event flow define the first useful soccer tracker?
 - SOC-0: Should the first soccer tracker include a field UI immediately or ship a smaller
   non-field first pass?

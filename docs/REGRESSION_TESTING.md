@@ -27,7 +27,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 2.1 | From sport choice or a sport dashboard, tap Settings in the app shell | `/#/settings` opens the Account section |
+| 2.1 | From sport choice or a sport dashboard, tap Settings in the app shell | `/#/settings` opens the Account section with profile/session controls |
 | 2.2 | Open `/#/settings/app` | App/general settings show enabled sport toggles |
 | 2.3 | Disable a sport (e.g. Basketball) | Toggle off |
 | 2.4 | Return to sport choice | Disabled sport no longer in grid |
@@ -59,6 +59,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3.10 | Cancel or fail Google OAuth | Auth page shows the returned provider error once and cleans the URL back to the app base |
 | 3.11 | New Google user after migration 034 | `profiles.display_name` uses Google/display metadata fallback, `profiles.email` is populated, `profiles.avatar_url` uses Google avatar metadata when present |
 | 3.12 | Existing confirmed email/password Gmail account -> sign out -> Continue with Google using same Gmail | Existing teams/games remain visible; verify Supabase kept/linked the same user/profile ownership |
+| 3.12a | Open `/#/settings/account` while signed in | Signed-in email, StatKeeper display name, connected sign-in methods, and Sign Out are visible |
+| 3.12b | Edit display name on `/#/settings/account`, save, refresh | `profiles.display_name` persists and remains independent from the Google profile name |
+| 3.12c | Email/password account without Google identity -> Settings -> Account -> Link Google | Browser starts Google linking; after OAuth, app returns to Account and Google appears connected. Supabase manual identity linking must be enabled. |
+| 3.12d | Supabase configured but no active session | Auth gate appears; Account page remains unavailable until sign-in |
 | 3.13 | Console | "[StatKeeper] Supabase connected: … | key length: …" (key length >> 40) |
 
 ---

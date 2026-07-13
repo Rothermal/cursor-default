@@ -1,5 +1,7 @@
 # Plan: AUTH-2 Account management
 
+Status: implemented.
+
 Execution plan for the second authentication slice from
 [PLAN_APP_FOUNDATION_ROADMAP.md](PLAN_APP_FOUNDATION_ROADMAP.md). AUTH-2 fills in the
 Account section created by NAV-2 with profile editing, connected sign-in method display, and
@@ -160,12 +162,12 @@ Unlinking:
 
 ### D1: Account profile service
 
-- [ ] Add a small helper module for current-user profile load/update/repair.
-- [ ] Load `profiles.id`, `display_name`, `email`, and `avatar_url` for `auth.user.id`.
-- [ ] Repair missing profile row if needed.
-- [ ] Update `profiles.display_name` with trim/validation.
-- [ ] Optionally mirror display name to `auth.user.user_metadata` with `updateUser`.
-- [ ] Keep errors user-visible but concise.
+- [x] Add a small helper module for current-user profile load/update/repair.
+- [x] Load `profiles.id`, `display_name`, `email`, and `avatar_url` for `auth.user.id`.
+- [x] Repair missing profile row if needed.
+- [x] Update `profiles.display_name` with trim/validation.
+- [x] Defer auth metadata mirroring; `profiles.display_name` remains the app source of truth.
+- [x] Keep errors user-visible but concise.
 
 Suggested file:
 
@@ -173,13 +175,13 @@ Suggested file:
 
 ### D2: Auth context account helpers
 
-- [ ] Add or expose account methods only if they are broadly useful:
+- [x] Add or expose account methods only if they are broadly useful:
   - `getUserIdentities()`
   - `linkGoogleIdentity()`
   - `refreshUser()` if needed after metadata changes.
-- [ ] Keep low-level profile CRUD outside `AuthContext` unless the existing architecture
+- [x] Keep low-level profile CRUD outside `AuthContext` unless the existing architecture
   clearly favors context methods.
-- [ ] Reuse AUTH-1 redirect helper for manual Google linking.
+- [x] Reuse AUTH-1 redirect helper for manual Google linking.
 
 Potential APIs:
 
@@ -194,33 +196,33 @@ Implementation should confirm exact `linkIdentity` option typing against the ins
 
 ### D3: Account settings UI
 
-- [ ] Expand the NAV-2 Account section/page.
-- [ ] Show signed-in email.
-- [ ] Show editable display name field.
-- [ ] Save display name with loading/success/error states.
-- [ ] Show avatar only if available and it does not complicate layout.
-- [ ] Show connected methods from `getUserIdentities()`.
-- [ ] Show "Link Google" when Google is not connected.
-- [ ] Show "Google connected" when present.
-- [ ] Keep Sign Out on the Account page.
-- [ ] Show local/offline mode message when Supabase is not configured.
+- [x] Expand the NAV-2 Account section/page.
+- [x] Show signed-in email.
+- [x] Show editable display name field.
+- [x] Save display name with loading/success/error states.
+- [x] Show avatar only if available and it does not complicate layout.
+- [x] Show connected methods from `getUserIdentities()`.
+- [x] Show "Link Google" when Google is not connected.
+- [x] Show "Google connected" when present.
+- [x] Keep Sign Out on the Account page.
+- [x] Show local/offline mode message when Supabase is not configured.
 
 ### D4: Manual Google linking flow
 
-- [ ] Add "Link Google" action for logged-in users.
-- [ ] Use Supabase `linkIdentity({ provider: 'google' })`.
-- [ ] Ensure manual linking is enabled in Supabase project auth configuration.
-- [ ] Return to the Account page when possible.
-- [ ] Reload identities after return.
-- [ ] Show clear failure messaging if linking is disabled or provider setup is incomplete.
+- [x] Add "Link Google" action for logged-in users.
+- [x] Use Supabase `linkIdentity({ provider: 'google' })`.
+- [x] Ensure manual linking is enabled in Supabase project auth configuration.
+- [x] Return to the Account page when possible.
+- [x] Reload identities after return.
+- [x] Show clear failure messaging if linking is disabled or provider setup is incomplete.
 
 ### D5: Documentation
 
-- [ ] Update README auth/account feature notes.
-- [ ] Update `docs/REGRESSION_TESTING.md` with account management checks.
-- [ ] Update `docs/AGENT_CODEBASE_OVERVIEW.md` auth/account route notes.
-- [ ] Update `AGENTS.md` only if there is an operational gotcha agents should see quickly.
-- [ ] Update `docs/PLAN_APP_FOUNDATION_ROADMAP.md` if AUTH-2 decisions change.
+- [x] Update README auth/account feature notes.
+- [x] Update `docs/REGRESSION_TESTING.md` with account management checks.
+- [x] Update `docs/AGENT_CODEBASE_OVERVIEW.md` auth/account route notes.
+- [x] Update `AGENTS.md` only if there is an operational gotcha agents should see quickly.
+- [x] Update `docs/PLAN_APP_FOUNDATION_ROADMAP.md` if AUTH-2 decisions change.
 
 ---
 
