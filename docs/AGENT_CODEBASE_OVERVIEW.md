@@ -181,7 +181,7 @@ Hydration guards in `GameContext`: won't overwrite local state if pending sync, 
 |------|--------|
 | Migrations | 34 files (`001`–`034`) in [`supabase/migrations/`](../supabase/migrations/) |
 | Tables | 17 core tables (profiles, teams, players, games, stats, seasons, tournaments, shot_chart, …) |
-| Auth | Email/password + Google OAuth; RLS scoped via `team_members` roles (owner / admin / scorer) |
+| Auth | Email/password + Google OAuth (PKCE); RLS scoped via `team_members` roles (owner / admin / scorer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
 | Destructive | Migration **018** redesigned seasons/roster — backup before applying on existing DBs |
 | Pre-flight | Run `supabase/scripts/audit_data_integrity_pre_019.sql` before migration **019** |

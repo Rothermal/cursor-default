@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { getOAuthRedirectUrl, getOAuthReturnError } from '../lib/authRedirect'
 
 export default function Auth() {
   const { signUp, signIn, signInWithGoogle, isConfigured } = useAuth()
@@ -12,6 +13,14 @@ export default function Auth() {
   const [signUpSuccess, setSignUpSuccess] = useState(false)
   const loading = loadingAction !== null
 
+  useEffect(() => {
+    const oauthError = getOAuthReturnError()
+    if (!oauthError) return
+
+    setError(oauthError)
+    window.history.replaceState(null, document.title, getOAuthRedirectUrl())
+  }, [])
+
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
@@ -22,8 +31,11 @@ export default function Auth() {
             <p className="font-semibold mb-1">Supabase not configured</p>
             <p>
               Add <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code> and{' '}
-              <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> to your{' '}
+              <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_PUBLISHABLE_KEY</code> to your{' '}
               <code className="bg-amber-100 px-1 rounded">.env</code> file to enable cloud features.
+              <span className="block mt-1">
+                Legacy <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> still works.
+              </span>
             </p>
           </div>
         </div>
@@ -119,6 +131,12 @@ export default function Auth() {
             {loadingAction === 'google' ? 'Opening Google...' : 'Continue with Google'}
           </button>
 
+          {error && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200" />
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -191,12 +209,6 @@ export default function Auth() {
                 required
               />
             </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
 
             <button
               type="submit"

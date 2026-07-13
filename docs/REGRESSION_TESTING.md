@@ -56,9 +56,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3.7 | With Google provider configured: tap **Continue with Google** | Browser starts Supabase Google OAuth flow |
 | 3.8 | Complete Google OAuth locally | Redirect returns to `http://localhost:5173/`; signed-in app loads |
 | 3.9 | Complete Google OAuth on GitHub Pages | Redirect returns to `https://rothermal.github.io/cursor-default/`; signed-in app loads |
-| 3.10 | New Google user after migration 034 | `profiles.display_name` uses Google/display metadata fallback, `profiles.email` is populated, `profiles.avatar_url` uses Google avatar metadata when present |
-| 3.11 | Existing confirmed email/password Gmail account -> sign out -> Continue with Google using same Gmail | Existing teams/games remain visible; verify Supabase kept/linked the same user/profile ownership |
-| 3.12 | Console | "[StatKeeper] Supabase connected: … | key length: …" (key length >> 40) |
+| 3.10 | Cancel or fail Google OAuth | Auth page shows the returned provider error once and cleans the URL back to the app base |
+| 3.11 | New Google user after migration 034 | `profiles.display_name` uses Google/display metadata fallback, `profiles.email` is populated, `profiles.avatar_url` uses Google avatar metadata when present |
+| 3.12 | Existing confirmed email/password Gmail account -> sign out -> Continue with Google using same Gmail | Existing teams/games remain visible; verify Supabase kept/linked the same user/profile ownership |
+| 3.13 | Console | "[StatKeeper] Supabase connected: … | key length: …" (key length >> 40) |
 
 ---
 

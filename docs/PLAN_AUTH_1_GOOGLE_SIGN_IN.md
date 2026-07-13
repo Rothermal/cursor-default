@@ -84,6 +84,17 @@ await supabase.auth.signInWithOAuth({
 })
 ```
 
+Configure the Supabase browser client for PKCE:
+
+```ts
+createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    flowType: 'pkce',
+    detectSessionInUrl: true,
+  },
+})
+```
+
 Recommended redirect helper:
 
 ```ts
@@ -99,6 +110,8 @@ Why:
 - HashRouter will treat a no-hash return as the root route, which should be sport choice
   after NAV-1.
 - Avoid hard-coding `/`, which would be wrong for GitHub Pages project hosting.
+- PKCE returns with a query `code` instead of token fragments in `window.location.hash`,
+  avoiding HashRouter token-fragment races.
 
 Do not request Google offline access/provider refresh tokens in AUTH-1. StatKeeper only
 needs the Supabase session, not access to Google APIs.
@@ -309,8 +322,8 @@ Manual:
 
 ## 11. Risks and guardrails
 
-- **HashRouter and OAuth fragments:** avoid hash-specific redirect URLs in AUTH-1. Redirect
-  to the app base path and let HashRouter load sport choice.
+- **HashRouter and OAuth fragments:** use PKCE and avoid hash-specific redirect URLs in
+  AUTH-1. Redirect to the app base path and let HashRouter load sport choice.
 - **GitHub Pages base path:** do not hard-code `/`; production needs `/cursor-default/`.
 - **Provider setup outside code:** OAuth will not work until Supabase and Google Console are
   configured correctly. Document this clearly in README/regression tests.
