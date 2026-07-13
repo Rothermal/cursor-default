@@ -41,7 +41,7 @@ rebound is a separate stat attribution choice.
 - [x] Add pure rebound-prompt helper for side/default/candidate resolution.
 - [x] Add helper tests for home and opponent missed-shot defaults.
 - [x] Extend settings with `courtCapture.reboundPromptAfterMiss` defaulting to `false`.
-- [x] Expose a Settings toggle under Admin / Settings.
+- [x] Expose a Settings toggle under Settings -> Sports -> Basketball.
 - [x] Extend `CourtEventPopup` with the optional missed-shot rebound step.
 - [x] Extend `ShotChartPanel` dispatch flow to record miss first, then optional rebound.
 - [x] Update roadmap and regression docs.

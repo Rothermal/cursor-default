@@ -285,7 +285,7 @@ export default function Leaderboard() {
           <p className="text-sm text-slate-500 mb-4">
             Configure Supabase to view season stats and leaderboards.
           </p>
-          <button onClick={() => navigate('/admin')} className="btn-primary w-full">
+          <button onClick={() => navigate('/settings/data')} className="btn-primary w-full">
             Back to Settings
           </button>
         </div>

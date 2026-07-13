@@ -4,7 +4,7 @@ Season-level configuration for team stat rules: timeout limits, bonus thresholds
 
 **Parent doc:** [DESIGN_TEAM_STATS_TRACKING.md](DESIGN_TEAM_STATS_TRACKING.md)
 
-**Status:** **Implemented** — rules are edited under **Settings (Admin) → Seasons** for basketball seasons (`team_stats_config` JSON). There is no separate `/season-settings` route.
+**Status:** **Implemented** — rules are edited under **Settings -> Data & Sync -> Seasons** for basketball seasons (`team_stats_config` JSON). There is no separate `/season-settings` route.
 
 ---
 
@@ -136,7 +136,7 @@ For **offline / non-cloud games**, the default config applies unless the user ha
 The season config screen is accessible from:
 
 1. **Teams page** → Season section → "Season Settings" or gear icon.
-2. **Admin page** → Under the season management section.
+2. **Settings -> Data & Sync** → Under the season management section.
 3. **Game Setup** → Small "League Rules" link below the season/team selector (for quick access).
 
 ### 5.2 Screen Layout

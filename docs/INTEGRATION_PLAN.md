@@ -689,7 +689,7 @@ The `VITE_` prefix is required by Vite to expose variables to the browser. The p
 > **Note:** Many items that historically lived in this backlog are **already shipped** (home score adjustment, tournaments table, minutes, notes, missed shots, deletes, seasons on games, etc.). Treat the **README** “Features / What’s Done” sections as the live checklist. What follows is a **short residual backlog**; older numbered items were archived into README where implemented.
 
 1. **Optional stat descriptions** — Toggle for full stat names vs abbreviations.
-2. **Bulk / archive games** — Beyond per-row delete in Games and Settings Data Management.
+2. **Bulk / archive games** — Beyond per-row delete in Games and Settings -> Advanced data management.
 3. **Multi-game parking + sync queue** — Multiple in-progress sessions per device, offline-safe; see [PLAN_MULTI_GAME_PARKING.md](PLAN_MULTI_GAME_PARKING.md).
 4. *(Add more as we go)*
 

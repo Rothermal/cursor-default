@@ -152,7 +152,7 @@ export default function SportDashboard() {
           <p className="text-sm text-slate-500 mb-4">
             Enable this sport in Settings before starting or managing games.
           </p>
-          <button type="button" onClick={() => navigate('/admin')} className="btn-primary w-full">
+          <button type="button" onClick={() => navigate('/settings/app')} className="btn-primary w-full">
             Open Settings
           </button>
         </section>

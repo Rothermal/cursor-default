@@ -343,7 +343,7 @@ export default function GameInfo() {
           <p className="text-sm text-slate-500 mb-4">
             Configure Supabase credentials to view cloud game info.
           </p>
-          <button type="button" onClick={() => navigate('/admin')} className="btn-primary w-full">
+          <button type="button" onClick={() => navigate('/settings/data')} className="btn-primary w-full">
             Back to Settings
           </button>
         </div>
