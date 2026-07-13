@@ -7,6 +7,8 @@ import { useSettings } from '../context/SettingsContext'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import {
   isKnownSportId,
+  isGameStateForSport,
+  isParkedGameForSport,
   parkedSyncLabel,
   routeForResumedGame,
   sportGamesPath,
@@ -61,13 +63,17 @@ export default function SportDashboard() {
   const parkedForSport = useMemo(
     () =>
       sport
-        ? parkedGames.filter(game => game.localGameId !== activeLocalGameId && game.sportId === sport.id)
+        ? parkedGames.filter(
+            game => game.localGameId !== activeLocalGameId && isParkedGameForSport(game, sport.id)
+          )
         : [],
     [activeLocalGameId, parkedGames, sport]
   )
 
   const hasActiveGame = Boolean(state.sport && activeLocalGameId)
-  const hasActiveForSport = Boolean(sport && state.sport?.id === sport.id && activeLocalGameId)
+  const hasActiveForSport = Boolean(
+    sport && activeLocalGameId && isGameStateForSport(state, sport.id)
+  )
   const activeOtherSport = hasActiveGame && sport && state.sport?.id !== sport.id ? state.sport : null
 
   const liveScoreLine = useMemo(() => {

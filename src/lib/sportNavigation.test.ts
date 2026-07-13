@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   isKnownSportId,
+  isGameStateForSport,
+  isParkedGameForSport,
   parkedSyncLabel,
   routeForResumedGame,
   sportDashboardPath,
@@ -21,6 +23,16 @@ describe('sportNavigation', () => {
     expect(isKnownSportId('basketball', ['basketball', 'soccer'])).toBe(true)
     expect(isKnownSportId('lacrosse', ['basketball', 'soccer'])).toBe(false)
     expect(isKnownSportId(null, ['basketball'])).toBe(false)
+  })
+
+  it('checks active and parked sport matches', () => {
+    expect(isGameStateForSport({ sport: { id: 'basketball' } as never }, 'basketball')).toBe(true)
+    expect(isGameStateForSport({ sport: { id: 'soccer' } as never }, 'basketball')).toBe(false)
+    expect(isGameStateForSport({ sport: null }, 'basketball')).toBe(false)
+
+    expect(isParkedGameForSport({ sportId: 'basketball' }, 'basketball')).toBe(true)
+    expect(isParkedGameForSport({ sportId: 'soccer' }, 'basketball')).toBe(false)
+    expect(isParkedGameForSport({ sportId: null }, 'basketball')).toBe(false)
   })
 
   it('routes resumed games to the first incomplete game-flow step', () => {

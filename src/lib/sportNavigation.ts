@@ -26,6 +26,20 @@ export function isKnownSportId(
   return Boolean(sportId && knownSportIds.includes(sportId))
 }
 
+export function isGameStateForSport(
+  state: Pick<GameState, 'sport'>,
+  sportId: string
+): boolean {
+  return state.sport?.id === sportId
+}
+
+export function isParkedGameForSport(
+  game: Pick<ParkedGameSummary, 'sportId'>,
+  sportId: string
+): boolean {
+  return game.sportId === sportId
+}
+
 export function routeForResumedGame(state: ResumableGameState): string {
   if (!state.sport) return '/'
   if (!state.gameInfo) return '/setup'

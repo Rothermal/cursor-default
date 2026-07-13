@@ -2,7 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useGame } from '../context/GameContext'
 import { useSettings } from '../context/SettingsContext'
-import { sportDashboardPath } from '../lib/sportNavigation'
+import {
+  isGameStateForSport,
+  isParkedGameForSport,
+  sportDashboardPath,
+} from '../lib/sportNavigation'
 
 export default function SportSelect() {
   const navigate = useNavigate()
@@ -36,8 +40,10 @@ export default function SportSelect() {
         ) : (
           <div className="grid grid-cols-1 gap-3">
             {enabledSports.map(sport => {
-              const hasActiveGame = state.sport?.id === sport.id
-              const parkedForSport = parkedOnly.filter(game => game.sportId === sport.id)
+              const hasActiveGame = Boolean(
+                activeLocalGameId && isGameStateForSport(state, sport.id)
+              )
+              const parkedForSport = parkedOnly.filter(game => isParkedGameForSport(game, sport.id))
               const needsSync = parkedForSport.some(game => game.syncDirty || game.syncStatus === 'error')
               const statCount = sport.categories.reduce((n, c) => n + c.actions.length, 0)
 

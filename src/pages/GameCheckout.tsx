@@ -4,6 +4,7 @@ import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { isTeamPseudoPlayer, playersWithTeamPlaceholders } from '../lib/teamPlayers'
+import { sportDashboardPath } from '../lib/sportNavigation'
 
 interface CheckoutRow {
   player_id: string
@@ -131,7 +132,7 @@ export default function GameCheckout() {
   }
 
   if (!sport || !gameInfo || players.length === 0) {
-    navigate('/')
+    navigate(sport ? sportDashboardPath(sport.id) : '/')
     return null
   }
 

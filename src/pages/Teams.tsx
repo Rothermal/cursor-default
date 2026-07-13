@@ -74,12 +74,18 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     () => sports.find(sport => sport.id === requestedSportId) ?? null,
     [requestedSportId]
   )
+  const scopedSportEnabled = Boolean(
+    scopedSport && enabledSports.some(sport => sport.id === scopedSport.id)
+  )
+  const scopedSportDisabled = Boolean(scopedSport && !scopedSportEnabled)
   const formSports = useMemo(
     () =>
-      scopedSport && enabledSports.some(sport => sport.id === scopedSport.id)
+      scopedSport && scopedSportEnabled
         ? enabledSports.filter(sport => sport.id === scopedSport.id)
+        : scopedSport
+          ? []
         : enabledSports,
-    [enabledSports, scopedSport]
+    [enabledSports, scopedSport, scopedSportEnabled]
   )
 
   const [teams, setTeams] = useState<TeamRow[]>([])
@@ -571,6 +577,10 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const handleCreateTeam = async () => {
     if (!userId || !supabaseClient || !newTeamName.trim()) return
     setError(null)
+    if (scopedSportDisabled) {
+      setError(`${scopedSport!.name} is disabled. Enable it in Settings before creating teams.`)
+      return
+    }
     setCreatingTeam(true)
 
     let seasonData: SeasonRow
@@ -1000,6 +1010,18 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 placeholder="Team name"
                 className="input-field"
               />
+              {scopedSportDisabled && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center justify-between gap-2">
+                  <span>{scopedSport!.name} is disabled. Enable it before creating teams in this sport.</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin')}
+                    className="font-semibold underline shrink-0"
+                  >
+                    Settings
+                  </button>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Season</label>
                 <select
@@ -1053,6 +1075,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                   !newTeamName.trim()
                   || creatingTeam
                   || formSports.length === 0
+                  || scopedSportDisabled
                   || (seasonMode === 'existing' && !selectedSeasonId)
                   || (seasonMode === 'new' && !newTeamSeason.trim())
                 }
