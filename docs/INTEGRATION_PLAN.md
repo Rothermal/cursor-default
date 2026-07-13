@@ -18,7 +18,7 @@ A parent opens StatKeeper, signs in, and manages their kids' teams with rosters 
 
 | Aspect | Detail |
 |---|---|
-| Provider | Supabase Auth (email/password; OAuth can be enabled in Supabase Dashboard) |
+| Provider | Supabase Auth (email/password + Google OAuth; provider setup lives in Supabase/Google dashboards) |
 | Client | `@supabase/supabase-js` only (no separate auth-helpers package in this repo) |
 | Session | JWT stored automatically by Supabase client; refresh handled transparently |
 | RLS | Row Level Security on cloud tables; see each `supabase/migrations/*.sql` for policies |

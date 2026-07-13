@@ -48,11 +48,17 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | Step | Action | Expected |
 |------|--------|----------|
 | 3.1 | Open app (no session) | Auth page (sign in / sign up) |
-| 3.2 | Sign up with email + password (+ optional display name) | Success message or redirect; check email if confirmation enabled |
-| 3.3 | Sign in with same credentials | Sport choice appears; Basketball dashboard exposes Cloud Games / Teams / Season Stats |
-| 3.4 | Sign out (app shell) | Back to Auth page |
-| 3.5 | Sign in again | Home; session restored |
-| 3.6 | Console | "[StatKeeper] Supabase connected: … | key length: …" (key length >> 40) |
+| 3.2 | Auth page | **Continue with Google** is the primary CTA above email/password fallback |
+| 3.3 | Sign up with email + password (+ optional display name) | Success message or redirect; check email if confirmation enabled |
+| 3.4 | Sign in with same credentials | Sport choice appears; Basketball dashboard exposes Cloud Games / Teams / Season Stats |
+| 3.5 | Sign out (app shell) | Back to Auth page |
+| 3.6 | Sign in again | Home; session restored |
+| 3.7 | With Google provider configured: tap **Continue with Google** | Browser starts Supabase Google OAuth flow |
+| 3.8 | Complete Google OAuth locally | Redirect returns to `http://localhost:5173/`; signed-in app loads |
+| 3.9 | Complete Google OAuth on GitHub Pages | Redirect returns to `https://rothermal.github.io/cursor-default/`; signed-in app loads |
+| 3.10 | New Google user after migration 034 | `profiles.display_name` uses Google/display metadata fallback, `profiles.email` is populated, `profiles.avatar_url` uses Google avatar metadata when present |
+| 3.11 | Existing confirmed email/password Gmail account -> sign out -> Continue with Google using same Gmail | Existing teams/games remain visible; verify Supabase kept/linked the same user/profile ownership |
+| 3.12 | Console | "[StatKeeper] Supabase connected: … | key length: …" (key length >> 40) |
 
 ---
 
@@ -479,7 +485,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a script fails on cloud features, confirm the migrations listed in [README.md](../README.md) (through **`033_client_sync_errors.sql`**) are applied in the Supabase SQL Editor. Seasons / `team_players` / integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` before **019** on legacy DBs). Player merge needs **024**/**025**. Team stats need **028–031**. Shot chart needs **032**. Sync diagnostics need **033**.
+- **Migrations:** If a script fails on cloud features, confirm the migrations listed in [README.md](../README.md) (through **`034_google_auth_profile_defaults.sql`**) are applied in the Supabase SQL Editor. Seasons / `team_players` / integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` before **019** on legacy DBs). Player merge needs **024**/**025**. Team stats need **028–031**. Shot chart needs **032**. Sync diagnostics need **033**. Google profile defaults need **034**.
 
 ---
 

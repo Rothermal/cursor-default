@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { clearPersistedGameStorage } from '../lib/gameStorageKeys'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { getOAuthRedirectUrl } from '../lib/authRedirect'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -10,6 +11,7 @@ interface AuthContextType {
   isConfigured: boolean
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signInWithGoogle: () => Promise<{ error: string | null }>
   signOut: () => Promise<void>
 }
 
@@ -57,6 +59,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null }
   }, [])
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) return { error: 'Supabase not configured' }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: getOAuthRedirectUrl(),
+      },
+    })
+    return { error: error?.message ?? null }
+  }, [])
+
   const signOut = useCallback(async () => {
     if (!supabase) return
     clearPersistedGameStorage()
@@ -64,7 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isConfigured: configured, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        isConfigured: configured,
+        signUp,
+        signIn,
+        signInWithGoogle,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

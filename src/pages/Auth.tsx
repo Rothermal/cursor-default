@@ -2,14 +2,15 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Auth() {
-  const { signUp, signIn, isConfigured } = useAuth()
+  const { signUp, signIn, signInWithGoogle, isConfigured } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loadingAction, setLoadingAction] = useState<'email' | 'google' | null>(null)
   const [signUpSuccess, setSignUpSuccess] = useState(false)
+  const loading = loadingAction !== null
 
   if (!isConfigured) {
     return (
@@ -33,7 +34,7 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setLoading(true)
+    setLoadingAction('email')
 
     if (mode === 'signup') {
       const { error: err } = await signUp(email, password, displayName)
@@ -47,7 +48,17 @@ export default function Auth() {
       if (err) setError(err)
     }
 
-    setLoading(false)
+    setLoadingAction(null)
+  }
+
+  const handleGoogleSignIn = async () => {
+    setError(null)
+    setLoadingAction('google')
+    const { error: err } = await signInWithGoogle()
+    if (err) {
+      setError(err)
+      setLoadingAction(null)
+    }
   }
 
   if (signUpSuccess) {
@@ -81,8 +92,45 @@ export default function Auth() {
         </div>
 
         <div className="card">
+          <button
+            type="button"
+            onClick={() => void handleGoogleSignIn()}
+            disabled={loading}
+            className="w-full min-h-12 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60 flex items-center justify-center gap-3"
+          >
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            {loadingAction === 'google' ? 'Opening Google...' : 'Continue with Google'}
+          </button>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Email fallback
+            </span>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+
           <div className="flex rounded-xl bg-slate-100 p-1 mb-6">
             <button
+              type="button"
+              disabled={loading}
               onClick={() => { setMode('signin'); setError(null) }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 mode === 'signin' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
@@ -91,6 +139,8 @@ export default function Auth() {
               Sign In
             </button>
             <button
+              type="button"
+              disabled={loading}
               onClick={() => { setMode('signup'); setError(null) }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 mode === 'signup' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
@@ -153,7 +203,7 @@ export default function Auth() {
               disabled={loading}
               className="btn-primary w-full"
             >
-              {loading ? 'Loading...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+              {loadingAction === 'email' ? 'Loading...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
         </div>

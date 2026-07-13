@@ -178,44 +178,44 @@ No RLS behavior should need to change.
 
 ### D1: Auth context API
 
-- [ ] Add `signInWithGoogle()` to `AuthContextType`.
-- [ ] Implement it with `supabase.auth.signInWithOAuth({ provider: 'google', options })`.
-- [ ] Return `{ error: string | null }` for consistency with `signIn`/`signUp`.
-- [ ] Use a redirect helper based on `window.location.origin + window.location.pathname`.
-- [ ] Preserve current `getSession` and `onAuthStateChange` session handling.
-- [ ] Preserve `isConfigured` behavior when Supabase env vars are absent.
+- [x] Add `signInWithGoogle()` to `AuthContextType`.
+- [x] Implement it with `supabase.auth.signInWithOAuth({ provider: 'google', options })`.
+- [x] Return `{ error: string | null }` for consistency with `signIn`/`signUp`.
+- [x] Use a redirect helper based on `window.location.origin + window.location.pathname`.
+- [x] Preserve current `getSession` and `onAuthStateChange` session handling.
+- [x] Preserve `isConfigured` behavior when Supabase env vars are absent.
 
 ### D2: Auth page UI
 
-- [ ] Add a "Continue with Google" button above email/password fields.
-- [ ] Make Google the primary visual CTA.
-- [ ] Keep Sign In / Sign Up email/password tabs.
-- [ ] Add clear loading/error behavior for Google click failures.
-- [ ] Follow Google sign-in button branding rules closely enough for verification:
+- [x] Add a "Continue with Google" button above email/password fields.
+- [x] Make Google the primary visual CTA.
+- [x] Keep Sign In / Sign Up email/password tabs.
+- [x] Add clear loading/error behavior for Google click failures.
+- [x] Follow Google sign-in button branding rules closely enough for verification:
   - recognizable Google mark.
   - standard wording such as "Continue with Google" or "Sign in with Google".
   - button at least as prominent as other third-party providers.
-- [ ] Do not add a large redesign beyond this auth surface.
+- [x] Do not add a large redesign beyond this auth surface.
 
 ### D3: Profile trigger migration
 
-- [ ] Add a new numbered migration updating `public.handle_new_user()`.
-- [ ] Preserve email/password `display_name` behavior.
-- [ ] Add Google-friendly fallbacks for `full_name`, `name`, and avatar metadata.
-- [ ] Preserve/backfill `profiles.email` if the current schema includes it.
-- [ ] Confirm the migration is safe to apply after existing migrations.
-- [ ] Update README migration list.
+- [x] Add a new numbered migration updating `public.handle_new_user()`.
+- [x] Preserve email/password `display_name` behavior.
+- [x] Add Google-friendly fallbacks for `full_name`, `name`, and avatar metadata.
+- [x] Preserve/backfill `profiles.email` if the current schema includes it.
+- [x] Confirm the migration is safe to apply after existing migrations.
+- [x] Update README migration list.
 
 ### D4: Setup documentation
 
-- [ ] Update README Supabase setup with Google OAuth steps.
-- [ ] Document local and production redirect URLs.
-- [ ] Document Google authorized JavaScript origins.
-- [ ] Document Supabase callback URL placement in Google OAuth client.
-- [ ] Document consent screen/test-user requirements.
-- [ ] Update `docs/REGRESSION_TESTING.md` auth section with Google OAuth checks.
-- [ ] Update `docs/AGENT_CODEBASE_OVERVIEW.md` auth row.
-- [ ] Update `AGENTS.md` if operational auth gotchas are worth capturing.
+- [x] Update README Supabase setup with Google OAuth steps.
+- [x] Document local and production redirect URLs.
+- [x] Document Google authorized JavaScript origins.
+- [x] Document Supabase callback URL placement in Google OAuth client.
+- [x] Document consent screen/test-user requirements.
+- [x] Update `docs/REGRESSION_TESTING.md` auth section with Google OAuth checks.
+- [x] Update `docs/AGENT_CODEBASE_OVERVIEW.md` auth row.
+- [x] Update `AGENTS.md` if operational auth gotchas are worth capturing.
 
 ### D5: Account-linking QA
 
