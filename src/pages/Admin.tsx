@@ -140,7 +140,6 @@ export default function Admin() {
   const [selectedAdminTeamId, setSelectedAdminTeamId] = useState('')
   const [loadingAdmin, setLoadingAdmin] = useState(false)
   const [adminError, setAdminError] = useState<string | null>(null)
-  const [showDataMgmt, setShowDataMgmt] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const [localDataMessage, setLocalDataMessage] = useState<string | null>(null)
   const [localDataError, setLocalDataError] = useState<string | null>(null)
@@ -151,7 +150,6 @@ export default function Admin() {
   const [confirmDeletePlayer, setConfirmDeletePlayer] = useState<AdminPlayerRow | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const [showSeasons, setShowSeasons] = useState(false)
   const [seasonsList, setSeasonsList] = useState<AdminSeasonRow[]>([])
   const [loadingSeasons, setLoadingSeasons] = useState(false)
   const [seasonsError, setSeasonsError] = useState<string | null>(null)
@@ -182,16 +180,15 @@ export default function Admin() {
   const basketballSport = sports.find(s => s.id === 'basketball') ?? null
   const parkedStorageInfo = getParkedGameStorageInfo(userId)
 
-  const [showMergeTools, setShowMergeTools] = useState(false)
   const [mergeWizardOpen, setMergeWizardOpen] = useState(false)
   const [mergeCandidates, setMergeCandidates] = useState<MergePlayerCandidate[]>([])
   const [mergeAuditRefresh, setMergeAuditRefresh] = useState(0)
   const [mergeAuditRows, setMergeAuditRows] = useState<MergeAuditListRow[]>([])
   const [loadingMergeAudit, setLoadingMergeAudit] = useState(false)
   const [mergeAuditError, setMergeAuditError] = useState<string | null>(null)
-  const seasonsActive = settingsSection === 'data' || showSeasons
-  const mergeToolsActive = settingsSection === 'advanced' || showMergeTools
-  const dataMgmtActive = settingsSection === 'advanced' || showDataMgmt
+  const seasonsActive = settingsSection === 'data'
+  const mergeToolsActive = settingsSection === 'advanced'
+  const dataMgmtActive = settingsSection === 'advanced'
 
   useEffect(() => {
     if (!dataMgmtActive || !isConfigured || !userId || !supabaseClient) return
@@ -584,7 +581,7 @@ export default function Admin() {
         {settingsSection === 'app' && (
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-700">Sports</h2>
+              <h2 className="text-lg font-semibold text-slate-700">Enabled sports</h2>
               <span className="text-sm text-slate-400">
                 {enabledCount} of {sports.length} enabled
               </span>
@@ -745,6 +742,10 @@ export default function Admin() {
                 Open Seasons
               </Link>
             </div>
+
+            <Link to={settingsPath('sports')} className="btn-secondary inline-block text-center mt-3">
+              Back to Sports
+            </Link>
           </section>
         )}
 
@@ -812,19 +813,14 @@ export default function Admin() {
 
         {isConfigured && user && (
           <section className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowSeasons(!showSeasons)}
-              className="card w-full text-left"
-            >
+            <div className="card w-full text-left">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-700">Seasons</h2>
                   <p className="text-sm text-slate-500">Create & manage seasons</p>
                 </div>
-                <span className="text-slate-400 text-lg">{seasonsActive ? '▲' : '▼'}</span>
               </div>
-            </button>
+            </div>
 
             {seasonsActive && (
               <div className="mt-3 space-y-3">
@@ -1123,11 +1119,7 @@ export default function Admin() {
 
         {settingsSection === 'advanced' && isConfigured && user && (
           <section className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowMergeTools(!showMergeTools)}
-              className="card w-full text-left border-amber-100 bg-amber-50/40"
-            >
+            <div className="card w-full text-left border-amber-100 bg-amber-50/40">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-700">Player merge (advanced)</h2>
@@ -1135,9 +1127,8 @@ export default function Admin() {
                     Combine duplicate player profiles (same flow as Teams). View merges you performed.
                   </p>
                 </div>
-                <span className="text-slate-400 text-lg">{mergeToolsActive ? '▲' : '▼'}</span>
               </div>
-            </button>
+            </div>
 
             {mergeToolsActive && (
               <div className="mt-3 space-y-4">
@@ -1207,21 +1198,16 @@ export default function Admin() {
           </section>
         )}
 
-        {isConfigured && user && (
+        {settingsSection === 'advanced' && isConfigured && user && (
           <section className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowDataMgmt(!showDataMgmt)}
-              className="card w-full text-left"
-            >
+            <div className="card w-full text-left">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-700">Data Management</h2>
                   <p className="text-sm text-slate-500">Delete teams, games, players, tournaments</p>
                 </div>
-                <span className="text-slate-400 text-lg">{dataMgmtActive ? '▲' : '▼'}</span>
               </div>
-            </button>
+            </div>
 
             {dataMgmtActive && (
               <div className="mt-3 space-y-3">
