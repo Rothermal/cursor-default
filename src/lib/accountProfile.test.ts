@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@supabase/supabase-js'
 import {
+  linkGoogleIdentity,
   loadCurrentAccountProfile,
   updateCurrentAccountDisplayName,
   validateDisplayName,
 } from './accountProfile'
+import { consumeOAuthReturnPath } from './oauthReturnPath'
 
 const mock = vi.hoisted(() => ({
   selectData: null as Record<string, unknown> | null,
@@ -12,6 +14,8 @@ const mock = vi.hoisted(() => ({
   upsertData: null as Record<string, unknown> | null,
   upsertError: null as { message: string } | null,
   upsertRows: [] as Array<Record<string, unknown>>,
+  linkIdentityError: null as { message: string } | null,
+  linkIdentityCalls: [] as Array<Record<string, unknown>>,
 }))
 
 vi.mock('./supabase', () => ({
@@ -35,7 +39,17 @@ vi.mock('./supabase', () => ({
         }
       },
     }),
+    auth: {
+      linkIdentity: (args: Record<string, unknown>) => {
+        mock.linkIdentityCalls.push(args)
+        return Promise.resolve({ data: null, error: mock.linkIdentityError })
+      },
+    },
   },
+}))
+
+vi.mock('./authRedirect', () => ({
+  getOAuthRedirectUrl: () => 'http://localhost:5173/',
 }))
 
 const user = {
@@ -53,6 +67,29 @@ beforeEach(() => {
   mock.upsertData = null
   mock.upsertError = null
   mock.upsertRows = []
+  mock.linkIdentityError = null
+  mock.linkIdentityCalls = []
+  const values = new Map<string, string>()
+  vi.stubGlobal('window', {
+    localStorage: {
+      get length() {
+        return values.size
+      },
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      key: (index: number) => Array.from(values.keys())[index] ?? null,
+      removeItem: (key: string) => {
+        values.delete(key)
+      },
+      setItem: (key: string, value: string) => {
+        values.set(key, value)
+      },
+    },
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('validateDisplayName', () => {
@@ -91,5 +128,29 @@ describe('updateCurrentAccountDisplayName', () => {
       display_name: 'Coach Taylor',
     })
     expect(result.profile?.displayName).toBe('Coach Taylor')
+  })
+})
+
+describe('linkGoogleIdentity', () => {
+  it('starts Google linking with the OAuth redirect and account return path', async () => {
+    const result = await linkGoogleIdentity()
+
+    expect(result.error).toBeNull()
+    expect(mock.linkIdentityCalls[0]).toEqual({
+      provider: 'google',
+      options: { redirectTo: 'http://localhost:5173/' },
+    })
+    expect(consumeOAuthReturnPath()).toBe('/settings/account')
+  })
+
+  it('maps manual identity-linking errors and clears the return path', async () => {
+    mock.linkIdentityError = {
+      message: 'Manual linking is disabled for this project',
+    }
+
+    const result = await linkGoogleIdentity()
+
+    expect(result.error).toBe('Google linking is not enabled for this Supabase project yet.')
+    expect(consumeOAuthReturnPath()).toBeNull()
   })
 })
