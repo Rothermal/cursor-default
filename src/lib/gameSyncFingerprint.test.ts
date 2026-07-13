@@ -7,6 +7,7 @@ import {
   shouldBlockManualCloudHydrate,
   shouldDeferCloudResumeHydration,
   shouldRejectSkippedFinalSync,
+  shouldSkipAutoHydrateForDifferentCloudGame,
   withLastSyncedGameFingerprint,
 } from './gameSyncFingerprint'
 
@@ -195,5 +196,44 @@ describe('gameSyncFingerprint', () => {
     })
     expect(shouldBlockDiscardUnsyncedGame(dirty, false)).toBe(true)
     expect(shouldBlockDiscardUnsyncedGame(clean, true)).toBe(true)
+  })
+
+  it('shouldSkipAutoHydrateForDifferentCloudGame when local is bound to another game', () => {
+    const local = baseState({
+      cloudSync: {
+        ...baseState().cloudSync,
+        gameId: 'game-a',
+        lastSyncedGameFingerprint: buildGameSyncFingerprint(baseState()),
+      },
+    })
+    expect(shouldSkipAutoHydrateForDifferentCloudGame(local, 'game-b')).toBe(true)
+    expect(shouldSkipAutoHydrateForDifferentCloudGame(local, 'game-a')).toBe(false)
+    expect(shouldSkipAutoHydrateForDifferentCloudGame(local, null)).toBe(false)
+
+    const empty = baseState({
+      sport: null,
+      gameInfo: null,
+      cloudSync: { ...baseState().cloudSync, gameId: 'game-a' },
+    })
+    expect(shouldSkipAutoHydrateForDifferentCloudGame(empty, 'game-b')).toBe(false)
+  })
+
+  it('shouldRejectSkippedFinalSync still catches mid-sync edits on latest state', () => {
+    const syncedFp = buildGameSyncFingerprint(baseState())
+    const cleanSnapshot = baseState({
+      cloudSync: {
+        ...baseState().cloudSync,
+        lastSyncedGameFingerprint: syncedFp,
+      },
+    })
+    const latestWithEdits = baseState({
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { pts: 7 } }],
+      cloudSync: {
+        ...baseState().cloudSync,
+        lastSyncedGameFingerprint: syncedFp,
+      },
+    })
+    expect(shouldRejectSkippedFinalSync(cleanSnapshot)).toBe(false)
+    expect(shouldRejectSkippedFinalSync(latestWithEdits)).toBe(true)
   })
 })

@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
-import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate } from '../lib/gameSyncFingerprint'
+import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { sports } from '../config/sports'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
@@ -365,6 +366,17 @@ export default function Games() {
   const handleDeleteGame = async (game: GameRow) => {
     if (!supabaseClient) return
     setError(null)
+
+    if (
+      state.cloudSync.gameId === game.id &&
+      shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())
+    ) {
+      setError(
+        'This game has unsynced local stats. Sync or park them before deleting the cloud game.'
+      )
+      return
+    }
+
     setDeletingGameId(game.id)
 
     const { error: deleteError } = await supabaseClient

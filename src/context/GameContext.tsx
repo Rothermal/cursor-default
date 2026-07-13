@@ -34,8 +34,10 @@ import { getDisplayedHomeScore } from '../lib/gameScore'
 import {
   buildGameSyncFingerprint,
   currentPeriodForCloudHydrate,
+  shouldBlockDiscardUnsyncedGame,
   shouldDeferCloudResumeHydration,
   shouldRejectSkippedFinalSync,
+  shouldSkipAutoHydrateForDifferentCloudGame,
   withLastSyncedGameFingerprint,
 } from '../lib/gameSyncFingerprint'
 import { clearEntireShotChart, statIdForShotRecord } from '../lib/clearShotChart'
@@ -660,7 +662,7 @@ interface GameContextType {
   openGameSnapshot: (state: GameState) => boolean
   parkCurrentGame: () => boolean
   resumeParkedGame: (localGameId: string) => GameState | null
-  discardParkedGame: (localGameId: string) => void
+  discardParkedGame: (localGameId: string) => boolean
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
 }
@@ -867,6 +869,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const discardParkedGame = useCallback(
     (localGameId: string) => {
+      const record = getParkedGameRecord(localGameId, userId)
+      if (
+        record &&
+        shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+      ) {
+        setParkingError(
+          'This parked game has unsynced cloud stats. Resume and sync it before discarding.'
+        )
+        return false
+      }
+
       const wasActive = getActiveLocalGameId(userId) === localGameId
       try {
         setParkedGames(discardParkedGameStorage(localGameId, userId))
@@ -875,8 +888,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (wasActive) {
           dispatch({ type: 'RESET_GAME' })
         }
+        return true
       } catch (error) {
         setParkingError(parkedGameStorageErrorMessage(error))
+        return false
       }
     },
     [userId]
@@ -920,6 +935,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
           if (cloudGame === null) {
             hydratedUserRef.current = userId
           }
+          return
+        }
+
+        if (
+          shouldSkipAutoHydrateForDifferentCloudGame(
+            stateRef.current,
+            nextState.cloudSync.gameId
+          )
+        ) {
+          // Local session is already bound to a different cloud game. Manual open parks first;
+          // auto-hydrate must not overwrite that active localStorage slot.
+          hydratedUserRef.current = userId
           return
         }
 
@@ -1063,7 +1090,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const latestState = latestRecord.gameState
         const isStillActiveRecord = getActiveLocalGameId(snapshotUserId) === record.localGameId
 
-        if (synced.skippedFinalGame && shouldRejectSkippedFinalSync(snapshot)) {
+        // Reject when either the sync-start snapshot OR post-await local state still has
+        // unsynced edits. Checking only `snapshot` let mid-sync edits report success while
+        // cloud stayed final and `gameStatus: 'final'` cleared the dirty queue forever.
+        if (
+          synced.skippedFinalGame &&
+          (shouldRejectSkippedFinalSync(snapshot) ||
+            shouldRejectSkippedFinalSync(latestState))
+        ) {
           const errorState: GameState = {
             ...latestState,
             cloudSync: {
@@ -1074,6 +1108,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
             },
           }
           saveParkedGameRecordState(record.localGameId, errorState, snapshotUserId, {
+            // Stop auto-retry (cloud is final / hasSyncPrereqs false). Fingerprint mismatch
+            // still blocks discard via shouldBlockDiscardUnsyncedGame.
+            dirty: false,
             attempts: latestRecord.sync.attempts + 1,
             lastError: errorState.cloudSync.lastError,
             nextAttemptAt: null,

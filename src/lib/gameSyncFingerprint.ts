@@ -107,6 +107,25 @@ export function shouldRejectSkippedFinalSync(state: GameState): boolean {
 }
 
 /**
+ * Auto cloud-resume must not replace a local session already bound to a different cloud game.
+ * Manual open paths park first via `openGameSnapshot`; auto-hydrate used to overwrite the
+ * active localStorage slot and silently drop the prior binding.
+ */
+export function shouldSkipAutoHydrateForDifferentCloudGame(
+  localState: GameState,
+  cloudGameId: string | null | undefined
+): boolean {
+  const localId = localState.cloudSync.gameId
+  return Boolean(
+    localState.sport &&
+      localState.gameInfo &&
+      localId &&
+      cloudGameId &&
+      localId !== cloudGameId
+  )
+}
+
+/**
  * When true, automatic "resume latest cloud game" hydration must not replace `state` — local
  * progress is ahead of the last known synced snapshot, or the durable pending-sync flag is set.
  */

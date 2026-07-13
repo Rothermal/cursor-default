@@ -12,6 +12,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
+import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 
 interface TeamRow {
   id: string
@@ -799,6 +801,15 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const handleDeleteTeam = async (team: TeamRow) => {
     if (!supabaseClient) return
     setError(null)
+    if (
+      gameState.cloudSync.teamId === team.id &&
+      shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())
+    ) {
+      setError(
+        'The active local game for this team has unsynced stats. Sync or park them before deleting the team.'
+      )
+      return
+    }
     setDeletingTeamId(team.id)
 
     const { error: deleteError } = await supabaseClient
