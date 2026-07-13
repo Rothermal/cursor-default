@@ -9,9 +9,13 @@ import {
 import {
   activateParkedGame,
   beginNewActiveParkedGame,
+  clearActiveParkedGame,
+  discardParkedGame,
   exportParkedGames,
   getActiveLocalGameId,
   getParkedGameRecord,
+  getParkedGameStorageInfo,
+  hasDirtyParkedGames,
   importParkedGames,
   listDirtyParkedGameRecords,
   listParkedGames,
@@ -19,6 +23,7 @@ import {
   MAX_PARKED_GAMES,
   parkActiveGame,
   ParkedGameStorageError,
+  parkedGameStorageErrorMessage,
   saveActiveGameState,
   saveParkedGameRecordState,
 } from './gameParking'
@@ -443,6 +448,57 @@ describe('gameParking', () => {
 
     expect(() => saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')).toThrow(
       ParkedGameStorageError
+    )
+  })
+
+  it('reports parked storage capacity for Settings', () => {
+    saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    parkActiveGame('user-1')
+    beginNewActiveParkedGame('user-1')
+    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+
+    const info = getParkedGameStorageInfo('user-1')
+
+    expect(info.parkedCount).toBe(2)
+    expect(info.maxParkedGames).toBe(MAX_PARKED_GAMES)
+    expect(info.canCreateParkedGame).toBe(true)
+    expect(info.estimatedBytes).toBeGreaterThan(0)
+  })
+
+  it('discards a parked game and clears the active slot when needed', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const localGameId = summary.localGameId
+
+    expect(discardParkedGame(localGameId, 'user-1')).toEqual([])
+    expect(getActiveLocalGameId('user-1')).toBeNull()
+    expect(localStorage.getItem(`${GAME_RECORD_KEY_PREFIX}${localGameId}`)).toBeNull()
+    expect(localStorage.getItem(GAME_STORAGE_KEY)).toBeNull()
+  })
+
+  it('clearActiveParkedGame removes only the active record', () => {
+    saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    parkActiveGame('user-1')
+    const parkedId = listParkedGames('user-1')[0].localGameId
+    beginNewActiveParkedGame('user-1')
+    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+    const activeId = getActiveLocalGameId('user-1')
+
+    const remaining = clearActiveParkedGame('user-1')
+
+    expect(activeId).not.toBeNull()
+    expect(remaining.map(summary => summary.localGameId)).toEqual([parkedId])
+    expect(getActiveLocalGameId('user-1')).toBeNull()
+    expect(hasDirtyParkedGames('user-1')).toBe(true)
+  })
+
+  it('maps storage errors for Settings and GameContext banners', () => {
+    expect(
+      parkedGameStorageErrorMessage(
+        new ParkedGameStorageError('max_parked_games', 'Too many parked games on this device.')
+      )
+    ).toBe('Too many parked games on this device.')
+    expect(parkedGameStorageErrorMessage(new Error('boom'))).toBe(
+      'Parked games could not be saved on this device.'
     )
   })
 })
