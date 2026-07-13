@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
@@ -10,6 +10,7 @@ import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { teamDisplayName } from '../lib/display'
+import { sportDashboardPath } from '../lib/sportNavigation'
 
 interface GameRow {
   id: string
@@ -61,10 +62,16 @@ function statusBadge(status: string): string {
 
 export default function Games() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user, isConfigured } = useAuth()
   const { state, dispatch, openGameSnapshot, parkingError } = useGame()
   const userId = user?.id ?? null
   const supabaseClient = supabase
+  const requestedSportId = searchParams.get('sport')
+  const scopedSport = useMemo(
+    () => sports.find(sport => sport.id === requestedSportId) ?? null,
+    [requestedSportId]
+  )
 
   const [games, setGames] = useState<GameRow[]>([])
   const [teamMap, setTeamMap] = useState<Record<string, TeamRow>>({})
@@ -81,6 +88,13 @@ export default function Games() {
   const [savingOpponentName, setSavingOpponentName] = useState(false)
   const [confirmDeleteGame, setConfirmDeleteGame] = useState<GameRow | null>(null)
   const [deletingGameId, setDeletingGameId] = useState<string | null>(null)
+  const visibleGames = useMemo(
+    () =>
+      scopedSport
+        ? games.filter(game => teamMap[game.team_id]?.seasons?.sport === scopedSport.id)
+        : games,
+    [games, scopedSport, teamMap]
+  )
 
   useEffect(() => {
     if (!isConfigured || !userId || !supabaseClient) return
@@ -155,7 +169,7 @@ export default function Games() {
   // `game_stats` sum otherwise (D6; this list only shows the viewer's own games).
   useEffect(() => {
     if (!supabaseClient) return
-    if (games.length === 0) {
+    if (visibleGames.length === 0) {
       setScoreLines({})
       return
     }
@@ -163,7 +177,7 @@ export default function Games() {
     let cancelled = false
     const loadScores = async () => {
       const next: Record<string, string> = {}
-      for (const g of games) {
+      for (const g of visibleGames) {
         if (g.home_team_score != null) {
           next[g.id] = `${g.home_team_score}–${g.opponent_score}`
           continue
@@ -204,12 +218,12 @@ export default function Games() {
     return () => {
       cancelled = true
     }
-  }, [games, teamMap, supabaseClient, userId])
+  }, [teamMap, supabaseClient, userId, visibleGames])
 
   // One batched existence check for shot-chart availability on basketball games (F3 D12).
   useEffect(() => {
     if (!supabaseClient) return
-    const basketballIds = games
+    const basketballIds = visibleGames
       .filter(g => teamMap[g.team_id]?.seasons?.sport === 'basketball')
       .map(g => g.id)
     if (basketballIds.length === 0) {
@@ -232,20 +246,23 @@ export default function Games() {
     return () => {
       cancelled = true
     }
-  }, [games, teamMap, supabaseClient])
+  }, [teamMap, supabaseClient, visibleGames])
 
   const grouped = useMemo(() => {
-    const finalGames = games.filter(game => game.status === 'final')
-    const activeGames = games.filter(game => game.status !== 'final')
+    const finalGames = visibleGames.filter(game => game.status === 'final')
+    const activeGames = visibleGames.filter(game => game.status !== 'final')
     return { activeGames, finalGames }
-  }, [games])
+  }, [visibleGames])
 
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
           <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
-          <button onClick={() => navigate('/')} className="btn-primary w-full mt-3">
+          <button
+            onClick={() => navigate(scopedSport ? sportDashboardPath(scopedSport.id) : '/')}
+            className="btn-primary w-full mt-3"
+          >
             Back Home
           </button>
         </div>
@@ -482,14 +499,16 @@ export default function Games() {
       <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(scopedSport ? sportDashboardPath(scopedSport.id) : '/')}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
           </button>
           <div>
-            <h1 className="text-lg font-bold">Cloud Games</h1>
+            <h1 className="text-lg font-bold">
+              {scopedSport ? `${scopedSport.name} Cloud Games` : 'Cloud Games'}
+            </h1>
             <p className="text-sm opacity-80">Resume or review saved games</p>
           </div>
         </div>
@@ -504,10 +523,12 @@ export default function Games() {
 
         {loading ? (
           <div className="card text-sm text-slate-500 animate-pulse">Loading games...</div>
-        ) : games.length === 0 ? (
+        ) : visibleGames.length === 0 ? (
           <div className="card text-center py-10">
             <p className="text-3xl mb-2">📚</p>
-            <p className="text-slate-500">No cloud games yet.</p>
+            <p className="text-slate-500">
+              {scopedSport ? `No ${scopedSport.name} cloud games yet.` : 'No cloud games yet.'}
+            </p>
           </div>
         ) : (
           <>

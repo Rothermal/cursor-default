@@ -2,8 +2,10 @@ import { Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider } from './context/GameContext'
 import { SettingsProvider } from './context/SettingsContext'
+import AppShell from './components/AppShell'
 import Auth from './pages/Auth'
 import SportSelect from './pages/SportSelect'
+import SportDashboard from './pages/SportDashboard'
 import GameSetup from './pages/GameSetup'
 import PlayerSetup from './pages/PlayerSetup'
 import GameTracker from './pages/GameTracker'
@@ -55,33 +57,37 @@ function AppRoutes() {
   return (
     <SettingsProvider>
       <GameProvider>
-        <Routes>
-          <Route path="/" element={<SportSelect />} />
-          <Route path="/setup" element={<GameSetup />} />
-          <Route path="/players" element={<PlayerSetup />} />
-          <Route path="/checkout" element={<GameCheckout />} />
-          <Route path="/game" element={<GameTracker />} />
-          <Route path="/shot-chart" element={<ShotChart />} />
-          <Route path="/summary" element={<GameSummary />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/teams" element={<TeamsList />} />
-          <Route path="/team" element={<TeamInfo />} />
-          <Route path="/team/manage" element={<TeamManage />} />
-          <Route path="/team/roster" element={<TeamRoster />} />
-          <Route path="/team/schedule" element={<TeamSchedule />} />
-          <Route path="/team/season" element={<SeasonInfo />} />
-          <Route path="/game-info" element={<GameInfo />} />
-          <Route path="/games" element={<Games />} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route path="/player" element={<PlayerProfile />} />
-          <Route path="/player-info" element={<PlayerProfile />} />
-          <Route path="/career" element={<CareerStats />} />
-          <Route path="/team-stats" element={<TeamStats />} />
-          <Route path="/tournament-stats" element={<TournamentStats />} />
-          {import.meta.env.DEV && (
-            <Route path="/dev/shot-chart" element={<ShotChartPreview />} />
-          )}
-        </Routes>
+        <AppShell>
+          <Routes>
+            <Route path="/" element={<SportSelect />} />
+            <Route path="/sports" element={<SportSelect />} />
+            <Route path="/sport/:sportId" element={<SportDashboard />} />
+            <Route path="/setup" element={<GameSetup />} />
+            <Route path="/players" element={<PlayerSetup />} />
+            <Route path="/checkout" element={<GameCheckout />} />
+            <Route path="/game" element={<GameTracker />} />
+            <Route path="/shot-chart" element={<ShotChart />} />
+            <Route path="/summary" element={<GameSummary />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/teams" element={<TeamsList />} />
+            <Route path="/team" element={<TeamInfo />} />
+            <Route path="/team/manage" element={<TeamManage />} />
+            <Route path="/team/roster" element={<TeamRoster />} />
+            <Route path="/team/schedule" element={<TeamSchedule />} />
+            <Route path="/team/season" element={<SeasonInfo />} />
+            <Route path="/game-info" element={<GameInfo />} />
+            <Route path="/games" element={<Games />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/player" element={<PlayerProfile />} />
+            <Route path="/player-info" element={<PlayerProfile />} />
+            <Route path="/career" element={<CareerStats />} />
+            <Route path="/team-stats" element={<TeamStats />} />
+            <Route path="/tournament-stats" element={<TournamentStats />} />
+            {import.meta.env.DEV && (
+              <Route path="/dev/shot-chart" element={<ShotChartPreview />} />
+            )}
+          </Routes>
+        </AppShell>
       </GameProvider>
     </SettingsProvider>
   )

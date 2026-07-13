@@ -13,6 +13,7 @@ import { useFinalizeGame } from '../hooks/useFinalizeGame'
 import { useReviewShotChart } from '../hooks/useReviewShotChart'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { sportDashboardPath } from '../lib/sportNavigation'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
 type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
@@ -473,7 +474,7 @@ export default function GameSummary() {
   }, [sport, isFinalCloudGame, resolvedStats, summaryPlayers, playerIdMap])
 
   if (!sport || !gameInfo) {
-    navigate('/')
+    navigate(sport ? sportDashboardPath(sport.id) : '/')
     return null
   }
 

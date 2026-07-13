@@ -7,6 +7,7 @@ import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName, playerRosterSelectLabel } from '../lib/display'
 import { teamInfoPath, teamLeaderboardPath, teamManagementPath } from '../lib/teamInfo'
+import { sportDashboardPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -65,9 +66,27 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const { isSportEnabled } = useSettings()
   const userId = user?.id ?? null
   const requestedTeamId = searchParams.get('teamId')
+  const requestedSportId = searchParams.get('sport')
   const isManagementRoute = mode === 'manage'
   const supabaseClient = supabase
   const enabledSports = useMemo(() => sports.filter(s => isSportEnabled(s.id)), [isSportEnabled])
+  const scopedSport = useMemo(
+    () => sports.find(sport => sport.id === requestedSportId) ?? null,
+    [requestedSportId]
+  )
+  const scopedSportEnabled = Boolean(
+    scopedSport && enabledSports.some(sport => sport.id === scopedSport.id)
+  )
+  const scopedSportDisabled = Boolean(scopedSport && !scopedSportEnabled)
+  const formSports = useMemo(
+    () =>
+      scopedSport && scopedSportEnabled
+        ? enabledSports.filter(sport => sport.id === scopedSport.id)
+        : scopedSport
+          ? []
+        : enabledSports,
+    [enabledSports, scopedSport, scopedSportEnabled]
+  )
 
   const [teams, setTeams] = useState<TeamRow[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
@@ -89,11 +108,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [newTeamSeason, setNewTeamSeason] = useState(new Date().getFullYear().toString())
 
   useEffect(() => {
-    if (enabledSports.length === 0) return
-    if (!enabledSports.some(s => s.id === newTeamSport)) {
-      setNewTeamSport(enabledSports[0]!.id)
+    if (formSports.length === 0) return
+    if (!formSports.some(s => s.id === newTeamSport)) {
+      setNewTeamSport(formSports[0]!.id)
     }
-  }, [enabledSports, newTeamSport])
+  }, [formSports, newTeamSport])
 
   const [newPlayerFirst, setNewPlayerFirst] = useState('')
   const [newPlayerLast, setNewPlayerLast] = useState('')
@@ -143,6 +162,28 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [teams, selectedTeamId]
   )
+  const visibleTeams = useMemo(
+    () =>
+      !isManagementRoute && scopedSport
+        ? teams.filter(team => team.seasons.sport === scopedSport.id)
+        : teams,
+    [isManagementRoute, scopedSport, teams]
+  )
+  const visibleExistingSeasons = useMemo(
+    () =>
+      !isManagementRoute && scopedSport
+        ? existingSeasons.filter(season => season.sport === scopedSport.id)
+        : existingSeasons,
+    [existingSeasons, isManagementRoute, scopedSport]
+  )
+
+  useEffect(() => {
+    if (seasonMode !== 'existing' || !selectedSeasonId) return
+    if (!visibleExistingSeasons.some(season => season.id === selectedSeasonId)) {
+      setSeasonMode('new')
+      setSelectedSeasonId('')
+    }
+  }, [seasonMode, selectedSeasonId, visibleExistingSeasons])
 
   const managementRouteMessage = useMemo(() => {
     if (!isManagementRoute || loadingTeams || selectedTeam) return null
@@ -151,7 +192,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }, [isManagementRoute, loadingTeams, requestedTeamId, selectedTeam])
   const backPath = isManagementRoute
     ? selectedTeam ? teamInfoPath(selectedTeam.id) : '/teams'
-    : '/admin'
+    : scopedSport ? sportDashboardPath(scopedSport.id) : '/admin'
 
   useEffect(() => {
     if (!isManagementRoute && requestedTeamId) {
@@ -536,6 +577,10 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const handleCreateTeam = async () => {
     if (!userId || !supabaseClient || !newTeamName.trim()) return
     setError(null)
+    if (scopedSportDisabled) {
+      setError(`${scopedSport!.name} is disabled. Enable it in Settings before creating teams.`)
+      return
+    }
     setCreatingTeam(true)
 
     let seasonData: SeasonRow
@@ -897,7 +942,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
             <p className="text-sm opacity-80">
               {isManagementRoute && selectedTeam
                 ? teamDisplayName(selectedTeam)
-                : 'Create teams and review your cloud teams'}
+                : scopedSport
+                  ? `${scopedSport.name} teams`
+                  : 'Create teams and review your cloud teams'}
             </p>
           </div>
         </div>
@@ -963,6 +1010,18 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 placeholder="Team name"
                 className="input-field"
               />
+              {scopedSportDisabled && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center justify-between gap-2">
+                  <span>{scopedSport!.name} is disabled. Enable it before creating teams in this sport.</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin')}
+                    className="font-semibold underline shrink-0"
+                  >
+                    Settings
+                  </button>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Season</label>
                 <select
@@ -979,7 +1038,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                   className="input-field"
                 >
                   <option value="__new__">Create new season...</option>
-                  {existingSeasons.map(s => (
+                  {visibleExistingSeasons.map(s => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({s.sport})
                     </option>
@@ -993,7 +1052,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     onChange={e => setNewTeamSport(e.target.value)}
                     className="input-field"
                   >
-                    {enabledSports.map(sport => (
+                    {formSports.map(sport => (
                       <option key={sport.id} value={sport.id}>
                         {sport.icon} {sport.name}
                       </option>
@@ -1015,7 +1074,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 disabled={
                   !newTeamName.trim()
                   || creatingTeam
-                  || enabledSports.length === 0
+                  || formSports.length === 0
+                  || scopedSportDisabled
                   || (seasonMode === 'existing' && !selectedSeasonId)
                   || (seasonMode === 'new' && !newTeamSeason.trim())
                 }
@@ -1031,11 +1091,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 {loadingTeams && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
               </div>
 
-          {teams.length === 0 && !loadingTeams ? (
+          {visibleTeams.length === 0 && !loadingTeams ? (
             <p className="text-sm text-slate-500">No teams yet. Create one above.</p>
           ) : (
             <div className="space-y-2">
-              {teams.map(team => {
+              {visibleTeams.map(team => {
                 const sport = sports.find(item => item.id === team.seasons.sport)
                 const isEditing = editingTeamId === team.id
                 return (

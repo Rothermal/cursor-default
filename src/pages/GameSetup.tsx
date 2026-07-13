@@ -5,6 +5,7 @@ import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamInfoPath } from '../lib/teamInfo'
+import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -37,6 +38,7 @@ export default function GameSetup() {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const sport = state.sport
+  const sportHomePath = sport ? sportDashboardPath(sport.id) : '/'
   const isCloudFlow = Boolean(isConfigured && user && supabase)
 
   const [teamName, setTeamName] = useState(state.gameInfo?.teamName || '')
@@ -121,7 +123,7 @@ export default function GameSetup() {
           hasActiveGame &&
           !window.confirm('Park your current game and start this team game?')
         ) {
-          navigate('/')
+          navigate(sportDashboardPath(requestedSport.id))
           return
         }
 
@@ -488,7 +490,7 @@ export default function GameSetup() {
       <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-4`}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(sportHomePath)}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >
@@ -510,7 +512,11 @@ export default function GameSetup() {
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(requestedTeamId && selectedTeam ? teamInfoPath(selectedTeam.id) : '/teams')
+                    navigate(
+                      requestedTeamId && selectedTeam
+                        ? teamInfoPath(selectedTeam.id)
+                        : sportTeamsPath(sport.id)
+                    )
                   }
                   className="text-xs text-blue-600 font-medium underline"
                 >

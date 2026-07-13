@@ -74,7 +74,9 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 
 | Hash route | Page | Purpose |
 |------------|------|---------|
-| `/` | SportSelect | Home hub, resume in-progress game |
+| `/` | SportSelect | Sport choice |
+| `/sports` | SportSelect | Sport choice alias |
+| `/sport/:sportId` | SportDashboard | Sport-scoped dashboard: active game, parked games, New Game, Teams, Cloud Games, Season Stats |
 | `/setup` | GameSetup | Team, opponent, date, season/tournament; `teamId` preselects a cloud team |
 | `/players` | PlayerSetup | Roster + active player |
 | `/checkout` | GameCheckout | Multi-recorder stat checkout (cloud games) |
@@ -82,15 +84,15 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/shot-chart` | ShotChart | **Legacy** — redirects to `/game` (court is inline now) |
 | `/summary` | GameSummary | Post-game review, finalize, sync |
 | `/admin` | Admin | Seasons, sport toggles, data management |
-| `/teams` | TeamsList | Cloud team list/create entry, pending invites |
+| `/teams` | TeamsList | Cloud team list/create entry, pending invites; `sport` narrows list/create context |
 | `/team` | TeamInfo | Team hub with overview, roster, schedule, stats links, Start Game |
 | `/team/manage` | TeamManage | Team roster/member management for one team |
 | `/team/roster` | TeamRoster | Read-only full roster drill-down |
 | `/team/schedule` | TeamSchedule | Team-scoped game schedule drill-down |
 | `/team/season` | SeasonInfo | Season detail and team list |
 | `/game-info` | GameInfo | Single cloud game detail and summary handoff |
-| `/games` | Games | Cloud game history, resume/finalize |
-| `/leaderboard` | Leaderboard | Season/team stat rankings |
+| `/games` | Games | Cloud game history, resume/finalize; `sport` narrows list context |
+| `/leaderboard` | Leaderboard | Season/team stat rankings; `sport` narrows season/team choices |
 | `/player` | PlayerProfile | Legacy single-player season stats + game log |
 | `/player-info` | PlayerProfile | Team-context player info with Back to Team |
 | `/career` | CareerStats | Cross-game player career |
@@ -106,7 +108,7 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/teams?teamId=` | Redirects to `/team/manage?teamId=` | `/team/manage` or Team Info → Manage |
 | `/player` + `/player-info` | Same `PlayerProfile` page; `/player-info` adds Back to Team | `playerInfoPath` / `teamInfo` helpers for team context |
 
-**Primary live-game path:** `/` → `/setup` → `/players` → `/checkout?` → `/game` → `/summary`
+**Primary live-game path:** `/` -> `/sport/:sportId` -> `/setup` -> `/players` -> `/checkout?` -> `/game` -> `/summary`
 
 ---
 

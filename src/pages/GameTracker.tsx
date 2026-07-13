@@ -15,6 +15,7 @@ import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIn
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
 import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
+import { sportDashboardPath } from '../lib/sportNavigation'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -135,7 +136,7 @@ export default function GameTracker() {
   )
 
   if (!sport || !gameInfo || players.length === 0) {
-    navigate('/')
+    navigate(sport ? sportDashboardPath(sport.id) : '/')
     return null
   }
 
@@ -188,10 +189,10 @@ export default function GameTracker() {
       <div className="px-3 pt-3 pb-2 max-w-lg mx-auto w-full">
         <div className="flex items-center justify-between mb-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(sportDashboardPath(sport.id))}
             className="text-sm text-slate-500 font-medium active:scale-95 transition-transform"
           >
-            ← Home
+            Dashboard
           </button>
           <button
             onClick={() => navigate('/summary')}

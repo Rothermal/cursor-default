@@ -10,9 +10,9 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 1.1 | Open app | No auth screen; home shows sport selection |
+| 1.1 | Open app | No auth screen; sport choice page shows enabled sports |
 | 1.2 | Open console | Warning: "Supabase credentials not found... Running in offline-only mode." |
-| 1.3 | Choose sport → Game Setup → enter team, opponent, date → Continue | Player setup |
+| 1.3 | Choose Basketball -> New Game -> Game Setup -> enter team, opponent, date -> Continue | Player setup |
 | 1.4 | Add 2+ players → Start Game | Game Tracker loads; scoreboard shows 0–0 |
 | 1.5 | Tap stat buttons (e.g. 2PT, AST) | Home score updates; opponent can be adjusted manually |
 | 1.6 | Tap Undo -> top-row **Undo** in Recent events | Last action reverted |
@@ -27,10 +27,10 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 2.1 | From home, tap Settings (gear) | Admin page with sport toggles |
+| 2.1 | From sport choice or a sport dashboard, tap Settings in the app shell | Admin page with sport toggles |
 | 2.2 | Disable a sport (e.g. Basketball) | Toggle off |
-| 2.3 | Return home | Disabled sport no longer in grid |
-| 2.4 | Re-enable sport | Sport reappears on home |
+| 2.3 | Return to sport choice | Disabled sport no longer in grid |
+| 2.4 | Re-enable sport | Sport reappears on sport choice |
 | 2.5 | Reload | Settings persist (localStorage) |
 
 ---
@@ -43,8 +43,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 |------|--------|----------|
 | 3.1 | Open app (no session) | Auth page (sign in / sign up) |
 | 3.2 | Sign up with email + password (+ optional display name) | Success message or redirect; check email if confirmation enabled |
-| 3.3 | Sign in with same credentials | Home with sport selection; Cloud Games / Teams / Season Stats visible |
-| 3.4 | Sign out (home footer) | Back to Auth page |
+| 3.3 | Sign in with same credentials | Sport choice appears; Basketball dashboard exposes Cloud Games / Teams / Season Stats |
+| 3.4 | Sign out (app shell) | Back to Auth page |
 | 3.5 | Sign in again | Home; session restored |
 | 3.6 | Console | "[StatKeeper] Supabase connected: … | key length: …" (key length >> 40) |
 
@@ -57,7 +57,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | Step | Action | Expected |
 |------|--------|----------|
 | 3a.1 | Start a basketball game, add two players, record several stats and at least one court shot | Game is active; home score, stats, action log, and shot marker persist |
-| 3a.2 | Return home, choose another enabled sport or start another basketball game, and confirm parking the current game | First game appears under Parked Games with sport/team/opponent/date and a pending/offline/saved sync label; new setup flow starts with a different local game id |
+| 3a.2 | Return to a sport dashboard, choose another enabled sport or start another basketball game, and confirm parking the current game | First game appears under Parked Games with sport/team/opponent/date and a pending/offline/saved sync label; new setup flow starts with a different local game id |
 | 3a.3 | Record stats in game B, then resume game A from Parked Games | Game A restores its own sport, players, stats, shots, score, and action log; game B remains parked and unchanged |
 | 3a.4 | With network offline or Supabase unreachable, dirty both games | Each parked row remains dirty/offline; neither record overwrites the other |
 | 3a.5 | Restore network and wait for sync | Dirty records drain through the queue: active game first, then parked games by older update time; each record keeps its own cloud `gameId` / `playerIdMap` |
@@ -70,6 +70,29 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3a.12 | Import a file that contains a game already parked on this device | Existing local game is kept; the duplicate imported row is skipped and counted as existing |
 | 3a.13 | Import a file with more valid games than open parked-game slots | The app imports what fits, skips the remaining valid rows at the cap, and does not exceed 12 parked games |
 | 3a.14 | Simulate quota failure during Settings import after some records write but before the manifest write | The attempted import batch is rolled back; pre-existing parked games remain unchanged |
+
+---
+
+## 3b. Navigation shell and sport dashboards
+
+**Precondition:** App loaded (signed in if Supabase configured). Basketball enabled.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 3b.1 | Open `/#/` | Sport choice page appears; Basketball is a tile/card; Settings is available in the app shell |
+| 3b.2 | Open `/#/sports` | Same sport choice page appears |
+| 3b.3 | Tap Basketball | Opens `/#/sport/basketball` |
+| 3b.4 | Basketball dashboard -> New Game | Existing setup flow opens at `/#/setup` |
+| 3b.5 | Return to `/#/sport/basketball` with an active basketball game | Dashboard shows the active game and Resume returns to the correct game-flow route |
+| 3b.6 | Park at least one basketball game | Basketball dashboard lists only basketball parked games; Resume restores setup/players/game based on saved progress |
+| 3b.7 | Basketball dashboard -> Teams | Opens `/#/teams?sport=basketball`; list/create context is basketball-scoped |
+| 3b.8 | Basketball dashboard -> Cloud Games | Opens `/#/games?sport=basketball`; non-basketball games are hidden from the list |
+| 3b.9 | Basketball dashboard -> Season Stats | Opens `/#/leaderboard?sport=basketball`; season/team choices are basketball-scoped |
+| 3b.10 | Open `/#/game` | Live tracker does not show the compact app shell header |
+| 3b.11 | Enable another sport, park one game for each sport, then open `/#/sport/basketball` | Only basketball parked games appear; the other sport remains visible only on its own dashboard |
+| 3b.12 | Basketball dashboard -> Discard on a parked game -> confirm | Parked row is removed; other parked games remain |
+| 3b.13 | Supabase unconfigured/local mode -> open `/#/sport/basketball` | Dashboard works locally; cloud management actions are disabled with local-mode copy |
+| 3b.14 | Open `/#/teams?sport=soccer` while Soccer is disabled | Teams list is soccer-scoped; create flow is blocked with a Settings CTA instead of falling back to another enabled sport |
 
 ---
 
@@ -280,9 +303,9 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4h.7 | Hero season link | Opens `/team/season?seasonId=<id>&teamId=<id>`; Back to Team returns to Team Info; team rows link back into Team Info |
 | 4h.8 | Overview → Season Stats | Opens `/leaderboard?teamId=<id>&seasonId=<id>&from=team`; back arrow returns to Team Info |
 | 4h.8b | Leaderboard (from team) → tap a player row | Opens `/player-info?playerId=<id>&teamId=<id>&seasonId=<id>`; **Back to Team** returns to Team Info |
-| 4h.9 | Home → Season Stats | Opens global Leaderboard; back arrow returns home, even after the URL auto-fills `teamId` |
+| 4h.9 | Basketball dashboard -> Season Stats | Opens `/leaderboard?sport=basketball`; back arrow returns to the Basketball dashboard, even after the URL auto-fills `teamId` |
 | 4h.10 | Team Info → Start Game | Opens `/setup?teamId=<id>` with the team's sport and existing team preselected; continuing loads the team's active roster |
-| 4h.11 | Open `/setup?teamId=<id>` while another active game exists | If the requested team has a different sport **or a different cloud team** than the active game, confirmation appears (and unsynced local progress is blocked until sync finishes); cancel returns home and preserves the active game. Same-team links continue into setup without that reset prompt. |
+| 4h.11 | Open `/setup?teamId=<id>` while another active game exists | If the requested team has a different sport **or a different cloud team** than the active game, confirmation appears (and unsynced local progress is blocked until sync finishes); cancel returns to that sport dashboard and preserves the active game. Same-team links continue into setup without that reset prompt. |
 | 4h.12 | Scorer-only account opens Team Info | Team Info, roster, schedule, player, game, and season views are visible; `/team/manage` remains reachable, while invite/merge actions and roster writes stay protected by existing owner/admin checks and server/RLS enforcement. |
 
 ---
@@ -302,7 +325,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 5.6a | On Scoreboard: tap + or − under home team score | Home score increases or decreases by 1 (stays ≥ computed from stats); Undo restores |
 | 5.7 | Tap Undo -> top-row **Undo** in Recent events | Previous value restored |
 | 5.8 | Game Summary | Tables show per-player and team totals; categories correct |
-| 5.9 | New Game (from home with active **local** game) | Confirm → reset; can start new game (offline-only must not show a permanent "Finish syncing…" block) |
+| 5.9 | New Game (from sport dashboard with active **local** game) | Confirm -> reset; can start new game (offline-only must not show a permanent "Finish syncing..." block) |
 | 5.9a | Summary → New Game with **unsynced** cloud stats | Blocked with sync message; synced/clean cloud game confirms then resets |
 | 5.9b | Summary → Finalize while in progress | Back to Game / New Game disabled until finalize finishes |
 
@@ -317,7 +340,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 6.1 | Home → Cloud Games | List of games (or empty) |
 | 6.2 | Start new game: Game Setup → choose existing team → Continue | Roster preloaded from cloud |
 | 6.3 | Complete Player Setup → Start Game | Game Tracker; scoreboard shows sync status (e.g. "Cloud Sync: saved" after actions) |
-| 6.4 | Record some stats; leave Game Tracker (e.g. back to home) | Sync runs; game saved to cloud |
+| 6.4 | Record some stats; leave Game Tracker (e.g. back to the sport dashboard) | Sync runs; game saved to cloud |
 | 6.5 | Cloud Games | Game appears (e.g. "In Progress") |
 | 6.6 | Open same game → Resume | Game Tracker with same state |
 | 6.7 | Game Summary → Finalize Game (if available) | Game status → Final |

@@ -4,6 +4,7 @@ import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
+import { sportDashboardPath } from '../lib/sportNavigation'
 
 function generateLocalId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -261,7 +262,7 @@ export default function PlayerSetup() {
   const canStart = state.players.length > 0
 
   if (!sport || !state.gameInfo) {
-    navigate('/')
+    navigate(sport ? sportDashboardPath(sport.id) : '/')
     return null
   }
 
