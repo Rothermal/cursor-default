@@ -61,7 +61,7 @@ flowchart TB
 | [`src/lib/`](../src/lib/) | Pure helpers (scoring, team stats, shot chart, display) | Business logic without UI |
 | [`src/pages/`](../src/pages/) | One screen per route | UI for a feature |
 | [`src/components/`](../src/components/) | Shared UI (Scoreboard, StatButton, shot-chart/, team-stats/) | Reusable widgets |
-| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001–033) | Any DB change |
+| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001–034) | Any DB change |
 | [`docs/`](.) | Design specs and plans | Before building a feature |
 
 **Convention:** Pages orchestrate; heavy logic lives in `lib/` and the `GameContext` reducer.
@@ -179,9 +179,9 @@ Hydration guards in `GameContext`: won't overwrite local state if pending sync, 
 
 | Item | Detail |
 |------|--------|
-| Migrations | 33 files (`001`–`033`) in [`supabase/migrations/`](../supabase/migrations/) |
+| Migrations | 34 files (`001`–`034`) in [`supabase/migrations/`](../supabase/migrations/) |
 | Tables | 17 core tables (profiles, teams, players, games, stats, seasons, tournaments, shot_chart, …) |
-| Auth | Email/password; RLS scoped via `team_members` roles (owner / admin / scorer) |
+| Auth | Email/password + Google OAuth (PKCE); RLS scoped via `team_members` roles (owner / admin / scorer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
 | Destructive | Migration **018** redesigned seasons/roster — backup before applying on existing DBs |
 | Pre-flight | Run `supabase/scripts/audit_data_integrity_pre_019.sql` before migration **019** |

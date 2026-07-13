@@ -24,7 +24,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; destructive tools live in Settings -> Advanced
 - **Supabase Admin Views** — human-readable SQL views for all tables (JOINs FK UUIDs to names) in the Supabase table browser
 - **PWA** — installable on Android/iOS home screens, works offline with service worker caching
-- **Auth** — Supabase email/password authentication (optional; app works offline without it)
+- **Auth** — Supabase email/password plus Google OAuth authentication (optional; app works offline without it)
 - **Cloud Database** — Supabase PostgreSQL with Row Level Security (migrations + in-app game snapshot sync for signed-in users)
 - **Persistent State** — game and settings saved locally with incremental cloud sync when Supabase is configured
 
@@ -110,11 +110,20 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/031_get_game_team_stats.sql` — repair: `get_game_team_stats` only if needed
    - `supabase/migrations/032_shot_chart.sql` — `shot_chart` per-game shot locations (cloud sync from the shot chart; see `docs/completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md` SC-6)
    - `supabase/migrations/033_client_sync_errors.sql` — `client_sync_errors` for failed cloud sync attempts (debugging; RLS: own rows only)
+   - `supabase/migrations/034_google_auth_profile_defaults.sql` — profile defaults for Google OAuth users (`display_name`, `avatar_url`, `email`)
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
    > If migrations are missing or outdated, the in-app scoreboard will show a cloud sync warning/error status.
-4. Restart the dev server — the auth page will appear
+4. Optional Google OAuth setup:
+   - In Supabase Auth, enable the Google provider and add the Google Client ID/Secret.
+   - Set Supabase Site URL to `https://rothermal.github.io/cursor-default/`.
+   - Add Supabase redirect URLs: `http://localhost:5173/` and `https://rothermal.github.io/cursor-default/`.
+   - In Google Cloud / Google Auth Platform, create a Web application OAuth client.
+   - Add authorized JavaScript origins: `http://localhost:5173` and `https://rothermal.github.io`.
+   - Add the Supabase callback URI as the authorized redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`.
+   - Configure the OAuth consent screen and add test users while the Google app is in test mode.
+5. Restart the dev server — the auth page will appear
 
 Without Supabase configured, the app runs in offline-only mode using localStorage.
 
@@ -243,7 +252,8 @@ supabase/
     ├── 030_team_stats_schema.sql
     ├── 031_get_game_team_stats.sql
     ├── 032_shot_chart.sql
-    └── 033_client_sync_errors.sql
+    ├── 033_client_sync_errors.sql
+    └── 034_google_auth_profile_defaults.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql

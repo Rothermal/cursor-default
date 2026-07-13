@@ -14,7 +14,12 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = supabaseUrl && supabaseKey
-  ? createClient(supabaseUrl, supabaseKey)
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        flowType: 'pkce',
+        detectSessionInUrl: true,
+      },
+    })
   : null
 
 export const isSupabaseConfigured = (): boolean => supabase !== null
