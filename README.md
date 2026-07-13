@@ -24,7 +24,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Delete Entities** — delete seasons, teams, players, games, and tournaments with confirmation prompts; destructive tools live in Settings -> Advanced
 - **Supabase Admin Views** — human-readable SQL views for all tables (JOINs FK UUIDs to names) in the Supabase table browser
 - **PWA** — installable on Android/iOS home screens, works offline with service worker caching
-- **Auth** — Supabase email/password plus Google OAuth authentication (optional; app works offline without it)
+- **Auth & Account** — Supabase email/password plus Google OAuth authentication, editable StatKeeper display name, connected sign-in methods, and manual Google linking from Settings -> Account (optional; app works offline without it)
 - **Cloud Database** — Supabase PostgreSQL with Row Level Security (migrations + in-app game snapshot sync for signed-in users)
 - **Persistent State** — game and settings saved locally with incremental cloud sync when Supabase is configured
 
@@ -122,6 +122,7 @@ The dev server starts at `http://localhost:5173`.
    - In Google Cloud / Google Auth Platform, create a Web application OAuth client.
    - Add authorized JavaScript origins: `http://localhost:5173` and `https://rothermal.github.io`.
    - Add the Supabase callback URI as the authorized redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`.
+   - Enable manual identity linking in Supabase Auth if you want **Settings -> Account -> Link Google** to connect Google to an already signed-in email/password account.
    - Configure the OAuth consent screen and add test users while the Google app is in test mode.
 5. Restart the dev server — the auth page will appear
 

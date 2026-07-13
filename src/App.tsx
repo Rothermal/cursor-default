@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider } from './context/GameContext'
 import { SettingsProvider } from './context/SettingsContext'
@@ -27,9 +28,20 @@ import TeamStats from './pages/TeamStats'
 import TournamentStats from './pages/TournamentStats'
 import ShotChart from './pages/ShotChart'
 import ShotChartPreview from './pages/ShotChartPreview'
+import { consumeOAuthReturnPath } from './lib/oauthReturnPath'
 
 function AppRoutes() {
   const { user, loading, isConfigured } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!user) return
+
+    const returnPath = consumeOAuthReturnPath()
+    if (returnPath) {
+      navigate(returnPath, { replace: true })
+    }
+  }, [navigate, user])
 
   if (
     import.meta.env.DEV &&
