@@ -1,6 +1,6 @@
 # Plan: Multi-game parking, active game, and sync queue
 
-Living blueprint for local multi-game parking and sync queue work. **P0 local parking, P1 sync queue, P2 cloud ordering hardening, P3a local storage guardrails, and P3b import/quota polish are shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, saves full snapshots at `statkeeper_game:{localGameId}`, syncs dirty parked records through a local queue, resolves roster/player cloud rows before inserting a new `games` row, best-effort deletes a just-created `games` row if child writes fail before the client can persist the cloud id, caps local parked games, surfaces quota/max-count errors, supports local parked-game export/import from Settings, and imports parked games as a safe merge with reason-specific skip counts. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **Historical orphan cleanup, full transactional RPC sync, and IndexedDB storage are not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
+Living blueprint for local multi-game parking and sync queue work. **P0 local parking, P1 sync queue, P2 cloud ordering hardening, P3a local storage guardrails, and P3b import/quota polish are shipped**: the app keeps one mounted `GameState`, stores the active local id in `statkeeper_games_manifest`, saves full snapshots at `statkeeper_game:{localGameId}`, syncs dirty parked records through a local queue, resolves roster/player cloud rows before inserting a new `games` row, best-effort deletes a just-created `games` row if child writes fail before the client can persist the cloud id, caps local parked games, surfaces quota/max-count errors, supports local parked-game export/import from Settings, and imports parked games as a safe merge with reason-specific skip counts. `statkeeper_game` remains a legacy/active mirror for migration compatibility. **Client race guards for unsynced discard, skipped-final sync, and auto-hydrate across different cloud games are also shipped** (see §5a). **Historical orphan cleanup, full transactional RPC sync, and IndexedDB storage are not shipped yet.** See also [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md) (cloud model) and **README** (migrations, features).
 
 ---
 
@@ -77,6 +77,18 @@ Living blueprint for local multi-game parking and sync queue work. **P0 local pa
 - **`syncGameSnapshotToCloud`** should accept a **`GameState` snapshot** (already mostly true) and return ids/maps; caller updates **only** the targeted parked record.
 - **Phase 2 (hardening, shipped):** `syncGameSnapshotToCloud` resolves placeholder/player ids and team roster links before inserting a new `games` row. If stats, shot chart, or team-placeholder linking throws after a new game is inserted, the client attempts to delete that just-created in-progress row and then rethrows so the local parked record stays dirty. This is not a full database transaction: a browser/process crash between insert and rollback can still leave an orphan, and non-throwing shot-chart partial/skipped outcomes keep the game row by design because stats may already be synced and local chart state may be incomplete. Existing-game updates are never deleted on child-write failure.
 - **`statkeeper_cloud_resume_targets`:** today one `gameId` per user; consider either keeping “last opened cloud game” for hydration **or** storing preferred cloud id **inside** each `ParkedGameRecord` so multiple cloud games map cleanly.
+
+### 5a. Shipped client integrity guards (post-P3b)
+
+These live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprint.ts) and are enforced from `GameContext` plus discard/New Game callers (`SportDashboard`, `Admin`, `Games`, `Teams`, `useFinalizeGame`).
+
+| Scenario | Guard | Behavior |
+|----------|-------|----------|
+| Discard / wipe cloud-bound unsynced work | `shouldBlockDiscardUnsyncedGame` | Blocks when `teamId`/`gameId` binding exists and dirty flag, missing fingerprint, or fingerprint mismatch; also blocks pre-first-sync (`teamId` without `gameId`). Pure local games stay discardable after confirm. |
+| Sign-in auto-resume vs another active cloud game | `shouldSkipAutoHydrateForDifferentCloudGame` | If the mounted local session already has a different `cloudSync.gameId`, auto-hydrate returns without overwriting. Manual open still parks via `openGameSnapshot` first. |
+| Cloud game already `final` during sync | `shouldRejectSkippedFinalSync` | When `syncGameSnapshotToCloud` returns `skippedFinalGame`, reject success if **either** the sync-start snapshot **or** the post-await latest parked state still has unsynced edits. Mark dirty `false` to stop auto-retry (cloud cannot accept writes) while fingerprint mismatch continues to block discard. |
+
+**Developer pitfall:** Do not treat `skippedFinalGame` as a clean success path. Mid-sync edits used to clear `dirty` forever while local stats never reached cloud.
 
 ---
 
@@ -179,14 +191,18 @@ No additional product decisions are needed before implementing P3b.
 - Finalize A from summary while B is active → A finalized on cloud; B unchanged.
 - Legacy migration: existing `statkeeper_game` → one parked record, no loss.
 - Large shot chart on multiple parked games → storage / performance acceptable or falls back to IndexedDB.
+- Discard a cloud-bound parked game with unsynced stats → blocked with sync message; row remains.
+- While game A is active and bound to cloud id A, auto-hydrate targeting cloud id B → skipped; A remains mounted.
+- Sync against an already-final cloud game while local (or mid-sync) edits exist → flush does not report success; discard remains blocked until the user resolves (resume/export) rather than silently clearing local edits.
 
 ---
 
 ## 10. Related code (starting points)
 
-- `src/context/GameContext.tsx` — reducer, `loadState`, `GAME_STORAGE_KEY`, `runCloudSync`, resume hydration.
-- `src/lib/cloudSync.ts` — `syncGameSnapshotToCloud`, `ensureGame` ordering.
-- `src/lib/logClientSyncError.ts` — optional logging per failed job.
+- `src/context/GameContext.tsx` — reducer, `loadState`, `GAME_STORAGE_KEY`, `runCloudSync`, resume hydration, discard/skipped-final enforcement.
+- `src/lib/gameSyncFingerprint.ts` — fingerprint builder + discard / hydrate / skipped-final guards.
+- `src/lib/cloudSync.ts` — `syncGameSnapshotToCloud`, `ensureGame` ordering, `skippedFinalGame` return.
+- `src/lib/logClientSyncError.ts` — optional logging per failed job; `isPersistedSyncLastErrorNetworkish` filters noisy network messages.
 - [completed/DATA_INTEGRITY_AND_CREATION_PLAN.md](completed/DATA_INTEGRITY_AND_CREATION_PLAN.md) — broader integrity context.
 
 ---
