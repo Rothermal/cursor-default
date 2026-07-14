@@ -1,47 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-
-const STORAGE_KEY = 'statkeeper_settings'
-
-interface Settings {
-  enabledSports: Record<string, boolean>
-  courtCapture: {
-    reboundPromptAfterMiss: boolean
-  }
-}
-
-const defaultSettings: Settings = {
-  enabledSports: {
-    basketball: true,
-    baseball: false,
-    football: false,
-    hockey: false,
-    soccer: false,
-  },
-  courtCapture: {
-    reboundPromptAfterMiss: false,
-  },
-}
-
-function loadSettings(): Settings {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved) as Settings
-      return {
-        ...defaultSettings,
-        ...parsed,
-        enabledSports: { ...defaultSettings.enabledSports, ...parsed.enabledSports },
-        courtCapture: { ...defaultSettings.courtCapture, ...parsed.courtCapture },
-      }
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return defaultSettings
-}
+import {
+  loadSettingsFromStorage,
+  SETTINGS_STORAGE_KEY,
+  type AppSettings,
+} from '../lib/settingsStorage'
 
 interface SettingsContextType {
-  settings: Settings
+  settings: AppSettings
   isSportEnabled: (sportId: string) => boolean
   toggleSport: (sportId: string) => void
   setSportEnabled: (sportId: string, enabled: boolean) => void
@@ -51,10 +16,10 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | null>(null)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<Settings>(loadSettings)
+  const [settings, setSettings] = useState<AppSettings>(loadSettingsFromStorage)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
   }, [settings])
 
   const isSportEnabled = useCallback(

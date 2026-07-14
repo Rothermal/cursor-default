@@ -87,7 +87,9 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3a.12 | Import a file that contains a game already parked on this device | Existing local game is kept; the duplicate imported row is skipped and counted as existing |
 | 3a.13 | Import a file with more valid games than open parked-game slots | The app imports what fits, skips the remaining valid rows at the cap, and does not exceed 12 parked games |
 | 3a.14 | Simulate quota failure during Settings import after some records write but before the manifest write | The attempted import batch is rolled back; pre-existing parked games remain unchanged |
-| 3a.15 | Cloud game finalized elsewhere while local still has edits (skippedFinal sync error) → reload or start/park another game | Local unsynced stats remain in the active/parked record with the error status; they are not auto-purged just because `gameStatus` is `final` |
+| 3a.15 | Park a cloud-team game with unsynced stats (or pre-first-sync `teamId` without `gameId`) → Discard → confirm | Discard is blocked with a sync message; parked row remains (same guard as dashboard 3b.12a) |
+| 3a.16 | With an active local game bound to cloud game A, trigger sign-in auto-hydrate that would resume cloud game B | Auto-hydrate is skipped; game A stays mounted and is not overwritten |
+| 3a.17 | While syncing a cloud game that is already `final`, edit stats mid-flight (or leave unsynced local edits) | Flush/sync does **not** report success; local edits are not treated as uploaded; discard of that cloud-bound game remains blocked |
 
 ---
 
