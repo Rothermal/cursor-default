@@ -19,6 +19,7 @@ import AccountSettings from '../components/settings/AccountSettings'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
+import { isMissingTeamStatsConfigColumnError } from '../lib/cloudSyncHelpers'
 import {
   exportParkedGames,
   getParkedGameStorageInfo,
@@ -83,10 +84,6 @@ interface AdminSeasonRow {
   team_stats_config?: unknown
 }
 
-function isMissingTeamStatsConfigColumnError(error: { message?: string } | null): boolean {
-  if (!error?.message) return false
-  return error.message.includes('team_stats_config') && error.message.includes('column')
-}
 
 interface MergeAuditListRow {
   id: string
