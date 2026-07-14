@@ -87,6 +87,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3a.12 | Import a file that contains a game already parked on this device | Existing local game is kept; the duplicate imported row is skipped and counted as existing |
 | 3a.13 | Import a file with more valid games than open parked-game slots | The app imports what fits, skips the remaining valid rows at the cap, and does not exceed 12 parked games |
 | 3a.14 | Simulate quota failure during Settings import after some records write but before the manifest write | The attempted import batch is rolled back; pre-existing parked games remain unchanged |
+| 3a.15 | Cloud game finalized elsewhere while local still has edits (skippedFinal sync error) → reload or start/park another game | Local unsynced stats remain in the active/parked record with the error status; they are not auto-purged just because `gameStatus` is `final` |
 
 ---
 
