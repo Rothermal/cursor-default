@@ -8,6 +8,7 @@ const mock = vi.hoisted(() => ({
   shotChartDeleteError: null as string | null,
   linkUpdateError: null as string | null,
   gameDeleteError: null as string | null,
+  existingGameStatus: 'in_progress' as string,
 }))
 
 vi.mock('./supabase', () => ({
@@ -66,7 +67,11 @@ vi.mock('./supabase', () => ({
         return {
           select: () => ({
             eq: () => ({
-              maybeSingle: () => Promise.resolve({ data: { status: 'in_progress' }, error: null }),
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: { status: mock.existingGameStatus },
+                  error: null,
+                }),
             }),
           }),
           insert: () => {
@@ -209,6 +214,33 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.shotChartDeleteError = null
     mock.linkUpdateError = null
     mock.gameDeleteError = null
+    mock.existingGameStatus = 'in_progress'
+  })
+
+  it('returns skippedFinalGame without writing when the cloud game is already final', async () => {
+    mock.existingGameStatus = 'final'
+    mock.gameStatsError = null
+
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'existing-final',
+          seasonId: 'season-1',
+          teamId: 'team-1',
+          playerIdMap: { 'local-1': 'remote-player-1' },
+        },
+        players: [{ id: 'local-1', name: 'One Player', number: '1', stats: { pts: 9 } }],
+      }),
+      userId: 'user-1',
+    })
+
+    expect(result.skippedFinalGame).toBe(true)
+    expect(result.gameId).toBe('existing-final')
+    expect(mock.ops).not.toContain('games.insert')
+    expect(mock.ops).not.toContain('games.update')
+    expect(mock.ops).not.toContain('game_stats.upsert')
+    expect(mock.ops).not.toContain('games.delete')
   })
 
   it('resolves roster before inserting a new game and rolls that game back on child write failure', async () => {
