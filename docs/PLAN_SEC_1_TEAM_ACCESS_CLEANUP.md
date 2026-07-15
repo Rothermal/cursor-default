@@ -44,7 +44,8 @@ the current behavior before expanding the access model.
   and reject normal raw writes after game finalization.
 - Add a limited accepted-member summary path that does not expose member email to
   scorers.
-- Confirm admin member removal/changing behavior is intentional.
+- Add role-safe member management operations: admins can remove scorers, owners can
+  manage admins/scorers, and no generic self-delete path can remove the owner row.
 - Improve unavailable/error copy when an action is denied by RLS.
 - Add targeted tests for pure permission helpers.
 - Update regression docs.
@@ -113,9 +114,11 @@ each policy contract can be reviewed against `ACCESS_MATRIX.md`.
 
 Ask these one at a time before implementation.
 
-1. Should SEC-1 include RLS changes if pending invites currently see too much?
-   - Recommended: Yes, if the mismatch is confirmed and can be fixed narrowly.
-   - Option B: Document only and defer RLS to SEC-2.
+1. How should the mandatory SEC-1 database hardening be packaged?
+   - Resolved: One new reviewable migration with separate membership/RPC and
+     game/stat-policy sections.
+   - Option B: Two sequential migrations, one for membership/RPCs and one for
+     game/stat policies.
 
 2. Should admins be allowed to remove other admins?
    - Recommended: No, owner-only for removing/changing admin roles.
@@ -138,8 +141,11 @@ Ask these one at a time before implementation.
 
 ## 7. Resolved Decisions
 
-- Include narrow RLS fixes if audit confirms pending invites see too much.
+- SEC-0 confirmed the RLS/RPC mismatch. Ship the hardening in one new migration with
+  separate membership/RPC and game/stat-policy sections.
 - Admins cannot remove other admins; admins remove scorers/viewers only.
+- Owners cannot leave or delete their own membership row until a future ownership
+  transfer flow exists.
 - Owner transfer is not part of SEC-1.
 - Scorers reaching `/team/manage` get read-only/unavailable behavior or redirect to Team
   Info.
@@ -155,6 +161,8 @@ Ask these one at a time before implementation.
 - Bypassing UI still fails server-side for privileged writes.
 - Pending invite behavior is documented and tested.
 - Direct self-join/self-promotion and protected-member mutation paths are denied.
+- Admin scorer-removal succeeds through a role-safe server action; admin/owner targets
+  remain protected, and owner self-removal is denied.
 - Stat/checkout/shot writes require the correct accepted team/game/player relationship,
   and normal raw writes cannot change finalized games.
 - Non-manager member summaries do not expose email.

@@ -192,8 +192,8 @@ Supabase API directly.
 The audit makes a migration mandatory for SEC-1. UI helpers alone cannot close findings
 SEC0-01 through SEC0-08. SEC-1 should, at minimum:
 
-1. Replace direct self-insert/update member policies with narrow invite acceptance and
-   decline/member-management RPCs.
+1. Replace direct self-insert/update/delete member policies with narrow invite acceptance,
+   decline, leave, and role-safe member-management RPCs; owner self-removal is denied.
 2. Require accepted membership in every team-derived policy and privileged RPC.
 3. Enforce target-role hierarchy for invite, role-change, and removal operations.
 4. Bind stat, checkout, and shot writes to an accepted team member, the referenced game,

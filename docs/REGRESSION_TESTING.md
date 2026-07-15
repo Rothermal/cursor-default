@@ -471,6 +471,7 @@ tagged SEC-1 may fail until SEC-1 ships.
 | 10a.8 | Scorer attempts stat correction, primary-recorder reassignment, player merge, team delete, or game delete | UI does not offer action and server denies direct call |
 | 10a.9 | Accepted scorer views the team member summary | Names and roles are visible; member email addresses are not exposed (SEC-1) |
 | 10a.10 | Recorder attempts to write a stat or shot to an unrelated or final game | Server denies the write (SEC-1) |
+| 10a.11 | Owner attempts Leave Team or directly deletes their own membership row | Denied until a future ownership-transfer flow exists (SEC-1) |
 
 ---
 
