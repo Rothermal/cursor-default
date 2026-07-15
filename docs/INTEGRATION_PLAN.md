@@ -33,7 +33,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 
 ### 1.2 Database schema (canonical, migrations 018+)
 
-The **ASCII diagram below is historical (pre–018)** and shows `players.team_id` and sport on `teams` — **that is not the current schema**. Use **`supabase/migrations/`** and the **README** migration list (001–**033**) as the source of truth.
+The **ASCII diagram below is historical (pre–018)** and shows `players.team_id` and sport on `teams` — **that is not the current schema**. Use **`supabase/migrations/`** and the **README** migration list (001–**035**) as the source of truth.
 
 **Current product model (summary):**
 
@@ -63,7 +63,7 @@ Migrations **`008`–`010`** implement checkouts, corrections, and resolved-stat
 
 ### 1.3 Row Level Security
 
-Policies are defined **per migration** (not duplicated here). Patterns: team-scoped read on games/stats; recorders write their own `game_stats` / `shot_chart` rows; stricter rules for admin corrections and player merge. See `003`, `004`–`006`, `008`, `009`, `032`, `033`, etc.
+Policies are defined **per migration** (not duplicated here). Migration `035` is the current team-access authority: team-derived access requires accepted membership, recorder writes are bound to a non-final team game and valid player, and corrections remain owner/admin actions. See `035_team_access_hardening.sql` and `docs/ACCESS_MATRIX.md`.
 
 ### 1.4 Indexes
 

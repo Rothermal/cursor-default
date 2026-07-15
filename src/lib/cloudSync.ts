@@ -416,13 +416,8 @@ async function ensureTeamPlaceholderPlayer(
     existingRemoteId && isValidRemotePlayerUuid(existingRemoteId) ? existingRemoteId : undefined
 
   if (remoteId) {
-    const { error: updateError } = await supabase
-      .from('players')
-      .update({ first_name: firstName, last_name: lastName || null, nickname: null })
-      .eq('id', remoteId)
-    if (updateError) {
-      throw new Error(`Team placeholder update failed: ${updateError.message}`)
-    }
+    // The game mapping is authoritative. Another accepted recorder may not own
+    // the shared placeholder row and should not need to rewrite it to sync stats.
     return remoteId
   }
 
@@ -504,22 +499,8 @@ async function ensurePlayerId(
   const jerseyNumber = player.number.trim()
 
   if (remoteId) {
-    const { error: updateError } = await supabase
-      .from('players')
-      .update({ first_name: firstName, last_name: lastName, nickname: null })
-      .eq('id', remoteId)
-
-    if (updateError) {
-      throw new Error(`Player update failed: ${updateError.message}`)
-    }
-
-    await supabase
-      .from('team_players')
-      .upsert(
-        { team_id: teamId, player_id: remoteId, jersey_number: jerseyNumber, is_active: true },
-        { onConflict: 'team_id,player_id' }
-      )
-
+    // Existing mappings can belong to a player created by another team member.
+    // Roster and identity changes go through their dedicated management screens.
     return remoteId
   }
 
@@ -796,15 +777,17 @@ export async function syncGameSnapshotToCloud({
   // Only thrown child-write failures trigger rollback. Shot-chart partial/skipped modes
   // intentionally keep the game row because stats may have synced and local chart state is incomplete.
   try {
-    await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
-
-    shotChartCloudSync = await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
-
+    // SEC-1 RLS validates team pseudo-player stats against these game FKs, so link them
+    // before any stat or shot rows are written.
     await linkGameTeamPlaceholderIds(
       gameId,
       nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
       nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
     )
+
+    await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
+
+    shotChartCloudSync = await syncShotChartToCloud(state, userId, gameId, nextPlayerIdMap)
   } catch (error) {
     if (ensuredGame.created) {
       const rollbackError = await deleteNewlyCreatedGameAfterFailedSync(gameId, userId).catch(

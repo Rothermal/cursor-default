@@ -155,15 +155,30 @@ Ask these one at a time before implementation.
 
 ## 8. Acceptance Criteria
 
-- Shared permission helper exists and is tested.
-- Owner/admin/scorer gates use the helper on key pages.
-- Scorer cannot see privileged controls.
-- Bypassing UI still fails server-side for privileged writes.
-- Pending invite behavior is documented and tested.
-- Direct self-join/self-promotion and protected-member mutation paths are denied.
-- Admin scorer-removal succeeds through a role-safe server action; admin/owner targets
+- [x] Shared permission helper exists and is tested.
+- [x] Owner/admin/scorer gates use the helper on key pages.
+- [x] Scorer cannot see privileged controls.
+- [x] Bypassing UI still fails server-side for privileged writes.
+- [x] Pending invite behavior is documented and tested.
+- [x] Direct self-join/self-promotion and protected-member mutation paths are denied.
+- [x] Admin scorer-removal succeeds through a role-safe server action; admin/owner targets
   remain protected, and owner self-removal is denied.
-- Stat/checkout/shot writes require the correct accepted team/game/player relationship,
+- [x] Stat/checkout/shot writes require the correct accepted team/game/player relationship,
   and normal raw writes cannot change finalized games.
-- Non-manager member summaries do not expose email.
-- Existing owner/admin/scorer happy paths still work.
+- [x] Non-manager member summaries do not expose email.
+- [x] Existing owner/admin/scorer happy paths still work.
+
+---
+
+## 9. Implementation Result
+
+- Added migration `035_team_access_hardening.sql` with accepted-membership helpers,
+  narrow invite/member RPCs, private profile reads, and bounded game/stat policies.
+- Added shared `teamPermissions` helpers and a reusable `AccessUnavailable` state.
+- Aligned Teams, Team Info, Cloud Games, Game Summary, Tournament Stats, merge scope,
+  and Advanced settings with the owner/admin/scorer matrix.
+- Made Cloud Games discover all accepted-team games and removed incidental roster/player
+  rewrites when another accepted recorder resumes an already-mapped game.
+- Added focused permission and cloud-sync ordering tests. Database role scenarios remain
+  part of the manual regression checklist because the repository has no local Supabase
+  integration-test harness.

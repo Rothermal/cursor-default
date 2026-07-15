@@ -23,6 +23,7 @@ import {
   teamSeasonPath,
   type TeamInfoGame,
 } from '../lib/teamInfo'
+import { acceptedTeamRole, canTrackGames } from '../lib/teamPermissions'
 
 interface TeamRow {
   id: string
@@ -55,7 +56,7 @@ export default function TeamInfo() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
-  const { isConfigured } = useAuth()
+  const { user, isConfigured } = useAuth()
   const {
     state: gameState,
     dispatch: gameDispatch,
@@ -76,6 +77,10 @@ export default function TeamInfo() {
   const [error, setError] = useState<string | null>(null)
   const [startGameError, setStartGameError] = useState<string | null>(null)
   const [activeSegment, setActiveSegment] = useState<TeamInfoSegment>('overview')
+  const myRole = useMemo(() => {
+    const member = teamMembers.find(candidate => candidate.user_id === user?.id)
+    return member ? acceptedTeamRole(member.role, member.accepted_at) : null
+  }, [teamMembers, user?.id])
 
   const sport = useMemo(
     () => (team ? sports.find(item => item.id === team.seasons.sport) ?? null : null),
@@ -129,7 +134,7 @@ export default function TeamInfo() {
   )
 
   const handleStartGame = () => {
-    if (!team || !sport) return
+    if (!team || !sport || !canTrackGames(myRole)) return
     setStartGameError(null)
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
     if (
@@ -305,7 +310,7 @@ export default function TeamInfo() {
             Back to Teams
           </button>
           <div className="flex items-center gap-3">
-            {team && sport && !loading && (
+            {team && sport && !loading && canTrackGames(myRole) && (
               <button
                 type="button"
                 onClick={handleStartGame}

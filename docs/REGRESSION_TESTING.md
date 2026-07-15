@@ -452,12 +452,12 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
-## 10a. Security role baseline (SEC-0 target)
+## 10a. Security role baseline (SEC-1)
 
 **Precondition:** Four accounts: team owner, accepted admin, accepted scorer, and a user
 with a pending invite. Use test data only. The full approved contract and API-level cases
-live in [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md). SEC-0 documents these expectations; cases
-tagged SEC-1 may fail until SEC-1 ships.
+live in [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md). Apply migration
+`035_team_access_hardening.sql` before running these cases.
 
 | Step | Action | Expected |
 |---|---|---|

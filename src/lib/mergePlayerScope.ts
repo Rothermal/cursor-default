@@ -22,6 +22,7 @@ export async function fetchMergePlayerScope(
     .select('team_id')
     .eq('user_id', userId)
     .in('role', ['owner', 'admin'])
+    .not('accepted_at', 'is', null)
   for (const row of (memRows ?? []) as { team_id: string }[]) {
     adminTeamIds.add(row.team_id)
   }

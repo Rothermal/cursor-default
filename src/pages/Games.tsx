@@ -12,6 +12,12 @@ import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { teamDisplayName } from '../lib/display'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import {
+  acceptedTeamRole,
+  canDeleteGame,
+  canTrackGames,
+  type TeamRole,
+} from '../lib/teamPermissions'
 
 interface GameRow {
   id: string
@@ -29,6 +35,7 @@ interface GameRow {
 
 interface TeamRow {
   id: string
+  owner_id: string
   name: string
   nickname: string | null
   season_id: string
@@ -76,6 +83,7 @@ export default function Games() {
 
   const [games, setGames] = useState<GameRow[]>([])
   const [teamMap, setTeamMap] = useState<Record<string, TeamRow>>({})
+  const [teamRolesById, setTeamRolesById] = useState<Record<string, TeamRole>>({})
   /** Score line per game id, all statuses (F4): synced row snapshot or stats aggregate. */
   const [scoreLines, setScoreLines] = useState<Record<string, string>>({})
   /** Basketball games that have any `shot_chart` rows (F3 discoverability pill). */
@@ -110,7 +118,6 @@ export default function Games() {
         .select(
           'id,team_id,opponent_name,opponent_score,tournament_name,tournament_id,home_team_score,home_score_adjustment,game_date,status,created_at'
         )
-        .eq('created_by', userId)
         .order('created_at', { ascending: false })
 
       if (cancelled) return
@@ -130,14 +137,23 @@ export default function Games() {
         return
       }
 
-      const { data: teams, error: teamsError } = await supabaseClient
-        .from('teams')
-        .select('id,name,nickname,season_id,seasons!inner(sport)')
-        .in('id', teamIds)
+      const [{ data: teams, error: teamsError }, { data: memberships, error: membershipsError }] =
+        await Promise.all([
+          supabaseClient
+            .from('teams')
+            .select('id,owner_id,name,nickname,season_id,seasons!inner(sport)')
+            .in('id', teamIds),
+          supabaseClient
+            .from('team_members')
+            .select('team_id,role,accepted_at')
+            .eq('user_id', userId)
+            .in('team_id', teamIds)
+            .not('accepted_at', 'is', null),
+        ])
 
       if (cancelled) return
-      if (teamsError) {
-        setError(teamsError.message)
+      if (teamsError || membershipsError) {
+        setError(teamsError?.message ?? membershipsError?.message ?? 'Unable to load team access.')
         setLoading(false)
         return
       }
@@ -147,6 +163,7 @@ export default function Games() {
         const seasons = Array.isArray(row.seasons) ? row.seasons[0] : row.seasons
         map[row.id] = {
           id: row.id,
+          owner_id: row.owner_id,
           name: row.name,
           nickname: row.nickname ?? null,
           season_id: row.season_id,
@@ -154,7 +171,20 @@ export default function Games() {
         }
         return map
       }, {})
+      const nextRoles: Record<string, TeamRole> = {}
+      for (const team of Object.values(nextTeamMap)) {
+        if (team.owner_id === userId) nextRoles[team.id] = 'owner'
+      }
+      for (const membership of (memberships ?? []) as Array<{
+        team_id: string
+        role: string
+        accepted_at: string | null
+      }>) {
+        const role = acceptedTeamRole(membership.role, membership.accepted_at)
+        if (role) nextRoles[membership.team_id] = role
+      }
       setTeamMap(nextTeamMap)
+      setTeamRolesById(nextRoles)
       setLoading(false)
     }
 
@@ -344,7 +374,14 @@ export default function Games() {
   }
 
   const handleSaveOpponentName = async () => {
-    if (!supabaseClient || !editingGameId || !editingOpponentName.trim()) return
+    const game = games.find(candidate => candidate.id === editingGameId)
+    if (
+      !supabaseClient ||
+      !game ||
+      game.status === 'final' ||
+      !canTrackGames(teamRolesById[game.team_id] ?? null) ||
+      !editingOpponentName.trim()
+    ) return
     setError(null)
     setSavingOpponentName(true)
     const name = editingOpponentName.trim()
@@ -364,7 +401,7 @@ export default function Games() {
   }
 
   const handleDeleteGame = async (game: GameRow) => {
-    if (!supabaseClient) return
+    if (!supabaseClient || !canDeleteGame(teamRolesById[game.team_id] ?? null)) return
     setError(null)
 
     if (
@@ -399,6 +436,7 @@ export default function Games() {
 
   const renderGameCard = (game: GameRow) => {
     const team = teamMap[game.team_id]
+    const teamRole = teamRolesById[game.team_id] ?? null
     const sport = sports.find(item => item.id === team?.seasons?.sport)
     // All statuses show a score (F4 D7), except a scheduled game still at 0–0.
     const scoreLine = scoreLines[game.id] ?? null
@@ -449,14 +487,16 @@ export default function Games() {
             {scoreHint && (
               <span className="text-sm font-semibold text-slate-800 tabular-nums">{scoreHint}</span>
             )}
-            <button
-              onClick={() => startEditOpponentName(game)}
-              className="text-slate-300 hover:text-slate-500 transition-colors p-0.5"
-              title="Edit opponent name"
-              aria-label="Edit opponent name"
-            >
-              ✏️
-            </button>
+            {game.status !== 'final' && canTrackGames(teamRole) && (
+              <button
+                onClick={() => startEditOpponentName(game)}
+                className="text-slate-300 hover:text-slate-500 transition-colors p-0.5"
+                title="Edit opponent name"
+                aria-label="Edit opponent name"
+              >
+                ✏️
+              </button>
+            )}
           </div>
         )}
         {game.tournament_name && (
@@ -491,16 +531,18 @@ export default function Games() {
           >
             {loadingGameId === game.id ? 'Loading...' : game.status === 'final' ? 'View Summary' : 'Resume Game'}
           </button>
-          <button
-            onClick={() => setConfirmDeleteGame(game)}
-            disabled={deletingGameId === game.id}
-            className="border border-red-200 text-red-600 rounded-xl px-3 py-2 text-sm font-semibold
-                       hover:bg-red-50 active:scale-95 transition-all disabled:opacity-40"
-            title="Delete game"
-            aria-label="Delete game"
-          >
-            {deletingGameId === game.id ? '...' : '🗑️'}
-          </button>
+          {canDeleteGame(teamRole) && (
+            <button
+              onClick={() => setConfirmDeleteGame(game)}
+              disabled={deletingGameId === game.id}
+              className="border border-red-200 text-red-600 rounded-xl px-3 py-2 text-sm font-semibold
+                         hover:bg-red-50 active:scale-95 transition-all disabled:opacity-40"
+              title="Delete game"
+              aria-label="Delete game"
+            >
+              {deletingGameId === game.id ? '...' : '🗑️'}
+            </button>
+          )}
         </div>
       </div>
     )
