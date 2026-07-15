@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { useTeamRole } from './useTeamRole'
+import { canTrackGames } from '../lib/teamPermissions'
 
 /**
  * Finalize an in-progress cloud game: flush sync → mark final → clear local → reset.
@@ -16,7 +17,7 @@ export function useFinalizeGame() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync } = useGame()
   const { user, isConfigured } = useAuth()
-  const teamRole = useTeamRole(state.cloudSync.teamId)
+  const teamAccess = useTeamRole(state.cloudSync.teamId)
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
   const stateRef = useRef(state)
@@ -29,7 +30,7 @@ export function useFinalizeGame() {
       supabase &&
       state.cloudSync.gameId &&
       !isFinalCloudGame &&
-      teamRole !== 'viewer'
+      canTrackGames(teamAccess.role)
   )
 
   const handleFinalizeCloudGame = async () => {

@@ -18,6 +18,7 @@ import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
+import { canTrackGames } from '../lib/teamPermissions'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -55,7 +56,7 @@ function timeoutCapForPeriod(
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync, parkingError } = useGame()
-  const teamRole = useTeamRole(state.cloudSync.teamId)
+  const teamAccess = useTeamRole(state.cloudSync.teamId)
   const {
     sport,
     players,
@@ -122,13 +123,14 @@ export default function GameTracker() {
   }, [notes])
 
   useEffect(() => {
+    if (state.cloudSync.teamId && !canTrackGames(teamAccess.role)) return
     if (!sport?.teamCategories?.length || !gameInfo) return
 
     const nextPlayers = playersWithTeamPlaceholders(players, gameInfo.teamName, gameInfo.opponentName)
     if (!nextPlayers) return
 
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
-  }, [sport, gameInfo, players, dispatch])
+  }, [sport, gameInfo, players, dispatch, state.cloudSync.teamId, teamAccess.role])
 
   const handleSelectPlayer = useCallback(
     (playerId: string) => {
@@ -138,18 +140,21 @@ export default function GameTracker() {
     [dispatch]
   )
 
-  if (teamRole === 'viewer') {
+  if (state.cloudSync.teamId && !canTrackGames(teamAccess.role)) {
+    const checkingAccess = teamAccess.loading && !teamAccess.error
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-8">
         <div className="max-w-lg mx-auto">
           <AccessUnavailable
-            title="Game tracking unavailable"
-            message="Viewer access is read-only. You can review this game from Team Info without changing its stats."
-            actionLabel="Back to Team"
-            onAction={() => navigate(
-              state.cloudSync.teamId
-                ? `/team?teamId=${encodeURIComponent(state.cloudSync.teamId)}`
-                : sport ? sportDashboardPath(sport.id) : '/'
+            title={checkingAccess ? 'Checking game access' : 'Game tracking unavailable'}
+            message={
+              checkingAccess
+                ? 'Confirming your role for this team...'
+                : teamAccess.error ?? 'Viewer access is read-only. You can review this game from Team Info without changing its stats.'
+            }
+            actionLabel={checkingAccess ? undefined : 'Back to Team'}
+            onAction={checkingAccess ? undefined : () => navigate(
+              `/team?teamId=${encodeURIComponent(state.cloudSync.teamId!)}`
             )}
           />
         </div>
