@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState } from '../types'
 
-const insertMock = vi.hoisted(() =>
-  vi.fn(async (_row: unknown) => ({ error: null as { message?: string } | null }))
-)
+const insertMock = vi.hoisted(() => {
+  const fn = vi.fn()
+  fn.mockResolvedValue({ error: null as { message?: string } | null })
+  return fn
+})
 
 vi.mock('./supabase', () => ({
   supabase: {
