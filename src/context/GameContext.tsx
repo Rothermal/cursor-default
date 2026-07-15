@@ -603,8 +603,13 @@ function loadState(userId: string | null): GameState {
     const saved = parkedState ? JSON.stringify(parkedState) : localStorage.getItem(GAME_STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<GameState>
-      // Don't restore a game that was already finalized (fixes existing stale "in progress" state).
-      if (parsed.cloudSync?.gameStatus === 'final') {
+      // Drop cleanly synced finals. Keep skipped-final / fingerprint-ahead locals so reload
+      // cannot wipe stats that discard guards are meant to protect. Use pendingDurable=false
+      // so a dirty *other* parked game does not force restoring a clean final.
+      if (
+        parsed.cloudSync?.gameStatus === 'final' &&
+        !shouldBlockDiscardUnsyncedGame(parsed as GameState, false)
+      ) {
         return createInitialState()
       }
       const fallbackStatus = normalizeCloudStatus(parsed.cloudSync?.status, 'idle')
