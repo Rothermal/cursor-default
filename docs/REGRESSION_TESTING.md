@@ -452,6 +452,29 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 ---
 
+## 10a. Security role baseline (SEC-0 target)
+
+**Precondition:** Four accounts: team owner, accepted admin, accepted scorer, and a user
+with a pending invite. Use test data only. The full approved contract and API-level cases
+live in [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md). SEC-0 documents these expectations; cases
+tagged SEC-1 may fail until SEC-1 ships.
+
+| Step | Action | Expected |
+|---|---|---|
+| 10a.1 | Pending invitee opens direct Team Info, roster, game, and stats URLs | Invite summary remains visible, but all team data is denied until acceptance (SEC-1) |
+| 10a.2 | Pending invitee attempts a direct team member, game, stat, correction, or merge write | Server denies every write (SEC-1) |
+| 10a.3 | Owner invites an admin and a scorer | Both invites are created without changing any existing owner/admin membership |
+| 10a.4 | Admin invites and then removes a scorer | Both actions succeed; the scorer loses team access (SEC-1) |
+| 10a.5 | Admin attempts to remove or change owner/admin membership | Controls are absent and direct API calls are denied (SEC-1) |
+| 10a.6 | Accepted scorer opens Team Info and starts, resumes, tracks, and finalizes a game | Game workflow succeeds |
+| 10a.7 | Accepted scorer opens Team Manage and Advanced settings | Read-only/unavailable state; roster/member/destructive controls are absent (SEC-1) |
+| 10a.8 | Scorer attempts stat correction, primary-recorder reassignment, player merge, team delete, or game delete | UI does not offer action and server denies direct call |
+| 10a.9 | Accepted scorer views the team member summary | Names and roles are visible; member email addresses are not exposed (SEC-1) |
+| 10a.10 | Recorder attempts to write a stat or shot to an unrelated or final game | Server denies the write (SEC-1) |
+| 10a.11 | Owner attempts Leave Team or directly deletes their own membership row | Denied until a future ownership-transfer flow exists (SEC-1) |
+
+---
+
 ## 11. PWA & offline
 
 **Precondition:** Production build or deployed site (HTTPS or localhost).
