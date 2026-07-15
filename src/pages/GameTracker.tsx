@@ -16,6 +16,8 @@ import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
 import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import AccessUnavailable from '../components/AccessUnavailable'
+import { useTeamRole } from '../hooks/useTeamRole'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -53,6 +55,7 @@ function timeoutCapForPeriod(
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync, parkingError } = useGame()
+  const teamRole = useTeamRole(state.cloudSync.teamId)
   const {
     sport,
     players,
@@ -134,6 +137,25 @@ export default function GameTracker() {
     },
     [dispatch]
   )
+
+  if (teamRole === 'viewer') {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4 py-8">
+        <div className="max-w-lg mx-auto">
+          <AccessUnavailable
+            title="Game tracking unavailable"
+            message="Viewer access is read-only. You can review this game from Team Info without changing its stats."
+            actionLabel="Back to Team"
+            onAction={() => navigate(
+              state.cloudSync.teamId
+                ? `/team?teamId=${encodeURIComponent(state.cloudSync.teamId)}`
+                : sport ? sportDashboardPath(sport.id) : '/'
+            )}
+          />
+        </div>
+      </div>
+    )
+  }
 
   if (!sport || !gameInfo || players.length === 0) {
     navigate(sport ? sportDashboardPath(sport.id) : '/')

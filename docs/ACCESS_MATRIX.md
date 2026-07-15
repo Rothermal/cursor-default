@@ -138,7 +138,8 @@ current team policies treat any `team_members` row as membership and do not requ
 `accepted_at`.
 
 SEC-1 closed findings SEC0-01 through SEC0-12 in migration 035 and the corresponding
-client permission cleanup. SEC0-13 remains assigned to SEC-4.
+client permission cleanup. SEC-2 closed SEC0-14 in migration 036. SEC0-13 remains
+assigned to SEC-4, with viewer claims narrowly denied until that phase ships.
 
 | Resource | Current effective access | Primary source |
 |---|---|---|

@@ -112,6 +112,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/033_client_sync_errors.sql` — `client_sync_errors` for failed cloud sync attempts (debugging; RLS: own rows only)
    - `supabase/migrations/034_google_auth_profile_defaults.sql` — profile defaults for Google OAuth users (`display_name`, `avatar_url`, `email`)
    - `supabase/migrations/035_team_access_hardening.sql` — accepted team membership, role-safe member RPCs, member privacy, and final-game/stat write hardening
+   - `supabase/migrations/036_viewer_team_role.sql` — read-only viewer role, viewer-aware member RPCs, and tracker-only game/stat writes
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -256,7 +257,8 @@ supabase/
     ├── 032_shot_chart.sql
     ├── 033_client_sync_errors.sql
     ├── 034_google_auth_profile_defaults.sql
-    └── 035_team_access_hardening.sql
+    ├── 035_team_access_hardening.sql
+    └── 036_viewer_team_role.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -365,7 +367,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
-- [ ] Admin/security/access roadmap — SEC-0 access matrix/audit complete; team access cleanup, viewer role, invite links, guardianship review, app-level access, and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
+- [ ] Admin/security/access roadmap — SEC-0 through SEC-2 complete; invite links, guardianship review, app-level access, and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations

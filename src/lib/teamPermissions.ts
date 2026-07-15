@@ -1,6 +1,6 @@
-export type TeamRole = 'owner' | 'admin' | 'scorer'
+export type TeamRole = 'owner' | 'admin' | 'scorer' | 'viewer'
 
-const TEAM_ROLES = new Set<TeamRole>(['owner', 'admin', 'scorer'])
+const TEAM_ROLES = new Set<TeamRole>(['owner', 'admin', 'scorer', 'viewer'])
 
 export function parseTeamRole(value: unknown): TeamRole | null {
   return typeof value === 'string' && TEAM_ROLES.has(value as TeamRole)
@@ -20,7 +20,7 @@ export function canViewTeam(role: TeamRole | null): boolean {
 }
 
 export function canTrackGames(role: TeamRole | null): boolean {
-  return role !== null
+  return role === 'owner' || role === 'admin' || role === 'scorer'
 }
 
 export function canManageTeam(role: TeamRole | null): boolean {
@@ -42,7 +42,7 @@ export function canDeleteGame(role: TeamRole | null): boolean {
 }
 
 export function canLeaveTeam(role: TeamRole | null): boolean {
-  return role === 'admin' || role === 'scorer'
+  return role === 'admin' || role === 'scorer' || role === 'viewer'
 }
 
 export function canInviteTeamRole(
@@ -50,8 +50,8 @@ export function canInviteTeamRole(
   invitedRole: TeamRole
 ): boolean {
   if (invitedRole === 'owner') return false
-  if (actorRole === 'owner') return invitedRole === 'admin' || invitedRole === 'scorer'
-  return actorRole === 'admin' && invitedRole === 'scorer'
+  if (actorRole === 'owner') return true
+  return actorRole === 'admin' && (invitedRole === 'scorer' || invitedRole === 'viewer')
 }
 
 export function canRemoveTeamMember(
@@ -60,8 +60,8 @@ export function canRemoveTeamMember(
   isSelf: boolean
 ): boolean {
   if (!actorRole || !targetRole || isSelf || targetRole === 'owner') return false
-  if (actorRole === 'owner') return targetRole === 'admin' || targetRole === 'scorer'
-  return actorRole === 'admin' && targetRole === 'scorer'
+  if (actorRole === 'owner') return true
+  return actorRole === 'admin' && (targetRole === 'scorer' || targetRole === 'viewer')
 }
 
 export function canChangeTeamMemberRole(
@@ -69,12 +69,17 @@ export function canChangeTeamMemberRole(
   targetRole: TeamRole | null,
   nextRole: TeamRole
 ): boolean {
+  if (!targetRole || targetRole === 'owner' || nextRole === 'owner') return false
+  if (actorRole === 'owner') return true
   return (
-    actorRole === 'owner' &&
-    targetRole !== null &&
-    targetRole !== 'owner' &&
-    (nextRole === 'admin' || nextRole === 'scorer')
+    actorRole === 'admin' &&
+    (targetRole === 'scorer' || targetRole === 'viewer') &&
+    (nextRole === 'scorer' || nextRole === 'viewer')
   )
+}
+
+export function canClaimPlayerGuardianship(role: TeamRole | null): boolean {
+  return role === 'owner' || role === 'admin' || role === 'scorer'
 }
 
 export function canEditPlayerIdentity(

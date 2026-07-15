@@ -17,6 +17,7 @@ import {
   teamInfoPath,
   type TeamInfoGame,
 } from '../lib/teamInfo'
+import { acceptedTeamRole, canTrackGames, type TeamRole } from '../lib/teamPermissions'
 import type { GameState, SportConfig, StatAction } from '../types'
 
 interface GameInfoGameRow extends TeamInfoGame {
@@ -31,6 +32,7 @@ interface GameInfoGameRow extends TeamInfoGame {
 
 interface GameInfoTeamRow {
   id: string
+  owner_id: string
   name: string
   nickname: string | null
   season_id: string
@@ -143,11 +145,13 @@ export default function GameInfo() {
   const gameId = searchParams.get('gameId')
   const fallbackTeamId = searchParams.get('teamId')
   const { user, isConfigured } = useAuth()
+  const userId = user?.id ?? null
   const { state, openGameSnapshot, parkingError } = useGame()
   const supabaseClient = supabase
 
   const [game, setGame] = useState<GameInfoGameRow | null>(null)
   const [team, setTeam] = useState<GameInfoTeamRow | null>(null)
+  const [teamRole, setTeamRole] = useState<TeamRole | null>(null)
   const [leaders, setLeaders] = useState<StatLeader[]>([])
   const [statTotals, setStatTotals] = useState<Record<string, number>>({})
   const [statsError, setStatsError] = useState<string | null>(null)
@@ -189,6 +193,7 @@ export default function GameInfo() {
       setStatsError(null)
       setGame(null)
       setTeam(null)
+      setTeamRole(null)
       setLeaders([])
       setStatTotals({})
 
@@ -209,10 +214,10 @@ export default function GameInfo() {
       }
 
       const loadedGame = gameData as GameInfoGameRow
-      const [teamRes, rosterRes, statsRes] = await Promise.all([
+      const [teamRes, rosterRes, statsRes, membershipRes] = await Promise.all([
         supabaseClient
           .from('teams')
-          .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
+          .select('id,owner_id,name,nickname,season_id,seasons!inner(id,name,sport)')
           .eq('id', loadedGame.team_id)
           .single(),
         supabaseClient
@@ -223,6 +228,14 @@ export default function GameInfo() {
         supabaseClient.rpc('get_game_stats_resolved', {
           p_game_id: loadedGame.id,
         }),
+        userId
+          ? supabaseClient
+              .from('team_members')
+              .select('role,accepted_at')
+              .eq('team_id', loadedGame.team_id)
+              .eq('user_id', userId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ])
 
       if (cancelled) return
@@ -239,6 +252,7 @@ export default function GameInfo() {
       }
 
       const loadedTeam = teamRes.data as unknown as GameInfoTeamRow
+      const membership = membershipRes.data as { role: string; accepted_at: string | null } | null
       const loadedSport = sports.find(item => item.id === loadedTeam.seasons.sport) ?? null
       type TeamPlayerJoin = {
         players: GameInfoRosterPlayer
@@ -255,6 +269,11 @@ export default function GameInfo() {
 
       setGame(loadedGame)
       setTeam(loadedTeam)
+      setTeamRole(
+        loadedTeam.owner_id === userId
+          ? 'owner'
+          : acceptedTeamRole(membership?.role, membership?.accepted_at)
+      )
       setStatTotals(nextStatTotals)
       if (statsRes.error) {
         setStatsError(statsRes.error.message)
@@ -268,10 +287,10 @@ export default function GameInfo() {
     return () => {
       cancelled = true
     }
-  }, [gameId, isConfigured, supabaseClient])
+  }, [gameId, isConfigured, supabaseClient, userId])
 
   const openFullGame = async () => {
-    if (!game || !user) return
+    if (!game || !user || (game.status !== 'final' && !canTrackGames(teamRole))) return
     const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
     if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
       return
@@ -474,18 +493,26 @@ export default function GameInfo() {
               </section>
             )}
 
-            <button
-              type="button"
-              onClick={openFullGame}
-              disabled={openingGame}
-              className="btn-primary w-full disabled:opacity-60"
-            >
-              {openingGame
-                ? 'Opening...'
-                : game.status === 'final'
-                  ? 'View full summary'
-                  : 'Open game'}
-            </button>
+            {game.status === 'final' || canTrackGames(teamRole) ? (
+              <button
+                type="button"
+                onClick={openFullGame}
+                disabled={openingGame}
+                className="btn-primary w-full disabled:opacity-60"
+              >
+                {openingGame
+                  ? 'Opening...'
+                  : game.status === 'final'
+                    ? 'View full summary'
+                    : 'Open game'}
+              </button>
+            ) : (
+              <section className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-sm font-medium text-slate-600">
+                  Viewer access is read-only. Live game tracking is available to scorers, admins, and owners.
+                </p>
+              </section>
+            )}
           </>
         ) : loading ? (
           <section className="card">

@@ -475,6 +475,25 @@ live in [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md). Apply migration
 
 ---
 
+## 10b. Viewer role (SEC-2)
+
+**Precondition:** Apply `036_viewer_team_role.sql`. Use owner, admin, scorer, and viewer
+accounts on the same test team, with one in-progress and one finalized cloud game.
+
+| Step | Action | Expected |
+|---|---|---|
+| 10b.1 | Owner or admin invites Viewer by email; invitee accepts | Viewer appears accepted in the shared member list |
+| 10b.2 | Viewer opens Team Info, roster, schedule, season/player/team stats, and member list | Reads load; member emails remain hidden |
+| 10b.3 | Viewer opens Cloud Games and selects an in-progress game | Read-only Game Info opens with no Resume/Open Game action |
+| 10b.4 | Viewer selects a finalized game | Full summary loads; correction and primary-recorder controls are absent |
+| 10b.5 | Viewer opens direct setup or live-tracker URLs for the accepted team | Start/tracking controls are unavailable; the tracker shows a read-only access state |
+| 10b.6 | Viewer directly calls game/stat/checkout/shot/tournament-create writes | RLS denies each write |
+| 10b.7 | Viewer opens Team Manage | Roster/member controls and Claim guardianship are absent; Leave Team remains available |
+| 10b.8 | Admin changes scorer to viewer, viewer to scorer, and removes a viewer | All succeed; admin still cannot change/remove owner or admin |
+| 10b.9 | Viewer directly attempts a guardian claim for a player on the viewed team | RLS denies the insert pending SEC-4 |
+
+---
+
 ## 11. PWA & offline
 
 **Precondition:** Production build or deployed site (HTTPS or localhost).
@@ -517,7 +536,7 @@ live in [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md). Apply migration
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a script fails on cloud features, confirm the migrations listed in [README.md](../README.md) (through **`034_google_auth_profile_defaults.sql`**) are applied in the Supabase SQL Editor. Seasons / `team_players` / integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` before **019** on legacy DBs). Player merge needs **024**/**025**. Team stats need **028–031**. Shot chart needs **032**. Sync diagnostics need **033**. Google profile defaults need **034**.
+- **Migrations:** If a script fails on cloud features, confirm the migrations listed in [README.md](../README.md) (through **`036_viewer_team_role.sql`**) are applied in the Supabase SQL Editor. Seasons / `team_players` / integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` before **019** on legacy DBs). Player merge needs **024**/**025**. Team stats need **028–031**. Shot chart needs **032**. Sync diagnostics need **033**. Google profile defaults need **034**. Team access roles need **035**/**036** in order.
 
 ---
 

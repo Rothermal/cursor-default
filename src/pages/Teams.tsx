@@ -17,6 +17,7 @@ import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import {
   acceptedTeamRole,
+  canClaimPlayerGuardianship,
   canChangeTeamMemberRole,
   canDeleteTeam,
   canEditPlayerIdentity,
@@ -165,7 +166,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [pendingInvitesList, setPendingInvitesList] = useState<PendingTeamInvite[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'scorer' | 'admin'>('scorer')
+  const [inviteRole, setInviteRole] = useState<'viewer' | 'scorer' | 'admin'>('scorer')
   const [inviting, setInviting] = useState(false)
   const [lookupResult, setLookupResult] = useState<{ id: string; display_name: string } | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
@@ -579,7 +580,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
   const handleChangeMemberRole = async (member: TeamMemberRow, nextRole: TeamRole) => {
     const targetRole = acceptedTeamRole(member.role, member.accepted_at) ??
-      (member.role === 'admin' || member.role === 'scorer' ? member.role : null)
+      parseTeamRole(member.role)
     if (
       !supabaseClient ||
       !selectedTeamId ||
@@ -891,7 +892,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleClaimGuardian = async (playerId: string) => {
-    if (!supabaseClient || !userId) return
+    if (!supabaseClient || !userId || !canClaimPlayerGuardianship(myRole)) return
     setError(null)
     setClaimingPlayerId(playerId)
 
@@ -1378,7 +1379,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         {isManagementRoute && !managementRouteMessage && selectedTeam && !mayManageRoster && (
           <AccessUnavailable
             title="Roster is read-only"
-            message="Scorers can review this team and track games, but roster and member management require an owner or admin."
+            message={
+              myRole === 'viewer'
+                ? 'Viewers can review this team, roster, schedule, and stats. Tracking and management require a scorer, admin, or owner.'
+                : 'Scorers can review this team and track games, but roster and member management require an owner or admin.'
+            }
           />
         )}
 
@@ -1651,7 +1656,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 <span className="text-xs text-green-600 ml-1" title="You are a guardian">
                                   Guardian ✓
                                 </span>
-                              ) : (
+                              ) : canClaimPlayerGuardianship(myRole) ? (
                                 <button
                                   type="button"
                                   onClick={() => { void handleClaimGuardian(player.id) }}
@@ -1661,7 +1666,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 >
                                   {claimingPlayerId === player.id ? 'Claiming...' : 'Claim'}
                                 </button>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         )}
@@ -1717,11 +1722,16 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
             ) : (
               <>
                 <div className="space-y-2">
-                  {teamMembers.map(m => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2"
-                    >
+                  {teamMembers.map(m => {
+                    const targetRole = parseTeamRole(m.role)
+                    const roleOptions = (['scorer', 'viewer', 'admin'] as TeamRole[]).filter(
+                      role => role === targetRole || canChangeTeamMemberRole(myRole, targetRole, role)
+                    )
+                    return (
+                      <div
+                        key={m.id}
+                        className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2"
+                      >
                       <div>
                         <p className="font-medium text-slate-700">
                           {memberDisplayName(m)}
@@ -1734,7 +1744,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           {m.accepted_at ? ' · Accepted' : ' · Pending'}
                         </p>
                       </div>
-                      {myRole === 'owner' && m.role !== 'owner' && m.user_id !== userId && (
+                      {roleOptions.length > 1 && m.user_id !== userId && (
                         <select
                           value={m.role}
                           onChange={event => {
@@ -1744,8 +1754,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           className="input-field w-auto py-1 text-xs"
                           aria-label={`Role for ${memberDisplayName(m)}`}
                         >
-                          <option value="scorer">Scorer</option>
-                          <option value="admin">Admin</option>
+                          {roleOptions.map(role => (
+                            <option key={role} value={role}>
+                              {role.charAt(0).toUpperCase() + role.slice(1)}
+                            </option>
+                          ))}
                         </select>
                       )}
                       {canRemoveTeamMember(
@@ -1764,8 +1777,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                             : m.accepted_at ? 'Remove' : 'Cancel invite'}
                         </button>
                       )}
-                    </div>
-                  ))}
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {canLeaveTeam(myRole) && (
@@ -1807,9 +1821,10 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                         <div className="flex gap-2 items-center">
                           <select
                             value={inviteRole}
-                            onChange={e => setInviteRole(e.target.value as 'scorer' | 'admin')}
+                            onChange={e => setInviteRole(e.target.value as 'viewer' | 'scorer' | 'admin')}
                             className="input-field text-sm py-2 w-auto"
                           >
+                            <option value="viewer">Viewer</option>
                             <option value="scorer">Scorer</option>
                             {canInviteTeamRole(myRole, 'admin') && (
                               <option value="admin">Admin</option>

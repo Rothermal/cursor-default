@@ -129,9 +129,26 @@ Ask these one at a time before implementation.
 
 ## 8. Acceptance Criteria
 
-- Owner/admin can invite a viewer.
-- Viewer can accept invite and see team read-only pages.
-- Viewer cannot track/start/resume/finalize games.
-- Viewer cannot manage roster/members/invites.
-- Viewer cannot correct stats, merge players, or reassign primary.
-- Server-side checks deny viewer writes even if UI is bypassed.
+- [x] Owner/admin can invite a viewer.
+- [x] Viewer can accept invite and see team read-only pages.
+- [x] Viewer cannot track/start/resume/finalize games.
+- [x] Viewer cannot manage roster/members/invites.
+- [x] Viewer cannot correct stats, merge players, or reassign primary.
+- [x] Server-side checks deny viewer writes even if UI is bypassed.
+
+---
+
+## 9. Implementation Result
+
+- Added migration `036_viewer_team_role.sql`: viewer role constraint and membership RPC
+  support, a shared `can_track_team_games` server predicate, and viewer-denying game,
+  stat, checkout, shot-chart, tournament-create, and guardian-claim policies.
+- Owner/admin can invite viewers; admins can remove viewers and switch scorer/viewer
+  roles without gaining authority over admins or owners.
+- Cloud Games sends viewers to read-only Game Info for live/scheduled games. Final games
+  remain available through the full read-only summary.
+- Team Info, roster, schedule, stats, and member summaries retain accepted-member read
+  access, while setup, live tracking, finalization, corrections, and management controls
+  remain unavailable.
+- Added viewer permission tests and manual regression cases. Database role scenarios
+  remain manual because the repository has no local Supabase integration-test harness.

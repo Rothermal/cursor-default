@@ -10,6 +10,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import {
   acceptedTeamRole,
   canManageTeam,
+  canTrackGames,
+  parseTeamRole,
   type TeamRole,
 } from '../lib/teamPermissions'
 
@@ -95,15 +97,24 @@ export default function GameSetup() {
     const loadRequestedTeamSport = async () => {
       setLoadingRequestedTeamSport(true)
       setRequestedTeamSportError(null)
-      const { data, error } = await client
-        .from('teams')
-        .select('id,seasons!inner(sport)')
-        .eq('id', requestedTeamId)
-        .single()
+      const [{ data, error }, { data: roleData, error: roleError }] = await Promise.all([
+        client
+          .from('teams')
+          .select('id,seasons!inner(sport)')
+          .eq('id', requestedTeamId)
+          .single(),
+        client.rpc('current_team_role', { p_team_id: requestedTeamId }),
+      ])
 
       if (cancelled) return
       if (error || !data) {
         setRequestedTeamSportError(error?.message ?? 'Team not found')
+        setLoadingRequestedTeamSport(false)
+        return
+      }
+      const requestedRole = roleError ? null : parseTeamRole(roleData)
+      if (!canTrackGames(requestedRole)) {
+        setRequestedTeamSportError('Viewer access is read-only. A scorer, admin, or owner can start team games.')
         setLoadingRequestedTeamSport(false)
         return
       }
@@ -187,17 +198,11 @@ export default function GameSetup() {
         if (role) roleByTeamId.set(row.team_id, role)
       }
       type LoadedCloudTeam = Omit<CloudTeam, 'accessRole'>
-      const loadedTeams = ((data ?? []) as unknown as LoadedCloudTeam[]).map(team => ({
-        ...team,
-        accessRole: team.owner_id === userId ? 'owner' : roleByTeamId.get(team.id) ?? 'scorer',
-      }))
+      const loadedTeams = ((data ?? []) as unknown as LoadedCloudTeam[]).flatMap(team => {
+        const accessRole = team.owner_id === userId ? 'owner' : roleByTeamId.get(team.id) ?? null
+        return accessRole && canTrackGames(accessRole) ? [{ ...team, accessRole }] : []
+      })
       setTeams(loadedTeams)
-      if (loadedTeams.length === 0) {
-        setTeamMode('new')
-        setSelectedTeamId('')
-        setLoadingTeams(false)
-        return
-      }
 
       const requestedTeam = requestedTeamId
         ? loadedTeams.find(team => team.id === requestedTeamId)
@@ -207,7 +212,13 @@ export default function GameSetup() {
         setSelectedTeamId('')
         setTeamName('')
         setSeasonFilter('')
-        setTeamsError('That team could not be found for this sport or you no longer have access to it.')
+        setTeamsError('That team is unavailable for tracking. Viewer access is read-only.')
+        setLoadingTeams(false)
+        return
+      }
+      if (loadedTeams.length === 0) {
+        setTeamMode('new')
+        setSelectedTeamId('')
         setLoadingTeams(false)
         return
       }
@@ -371,7 +382,7 @@ export default function GameSetup() {
     : teamName.trim()
   const canProceed = Boolean(resolvedTeamName && opponentName.trim())
   const requestedTeamUnavailable = Boolean(
-    requestedTeamId && !loadingTeams && teams.length > 0 && !selectedTeam
+    requestedTeamId && !loadingTeams && !selectedTeam
   )
 
   if (!sport) {
@@ -400,6 +411,10 @@ export default function GameSetup() {
 
   const handleNext = async () => {
     if (!canProceed) return
+    if (isCloudFlow && teamMode === 'existing' && !canTrackGames(selectedTeam?.accessRole ?? null)) {
+      setSetupError('Viewer access is read-only. Choose a team you can track.')
+      return
+    }
     setSetupError(null)
 
     const nextTeamId = teamMode === 'existing' ? selectedTeamId || null : null

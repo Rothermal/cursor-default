@@ -243,7 +243,7 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0/SEC-1 complete; SEC-2 viewer role is next |
+| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-2 complete; SEC-3 invite links are next |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | NAV/AUTH foundation shipped; soccer planning still gated on remaining foundation work |
 
