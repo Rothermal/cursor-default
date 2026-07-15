@@ -9,6 +9,7 @@ function chainable(result: QueryResult) {
   api.select = vi.fn(self)
   api.eq = vi.fn(self)
   api.in = vi.fn(self)
+  api.not = vi.fn(self)
   // thenable so `await supabase.from(...).select...` resolves
   api.then = (resolve: (v: QueryResult) => unknown) => Promise.resolve(result).then(resolve)
   return api

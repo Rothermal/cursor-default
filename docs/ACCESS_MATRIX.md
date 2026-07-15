@@ -131,11 +131,14 @@ turn app-admin status into broad team-data access.
 
 ---
 
-## 5. Current implementation inventory
+## 5. Pre-SEC-1 implementation inventory
 
-The table below describes the effective model before SEC-1. Unless stated otherwise,
+This retained audit snapshot describes the effective model before SEC-1. Unless stated otherwise,
 current team policies treat any `team_members` row as membership and do not require
 `accepted_at`.
+
+SEC-1 closed findings SEC0-01 through SEC0-12 in migration 035 and the corresponding
+client permission cleanup. SEC0-13 remains assigned to SEC-4.
 
 | Resource | Current effective access | Primary source |
 |---|---|---|

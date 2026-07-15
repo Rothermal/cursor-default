@@ -111,6 +111,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/032_shot_chart.sql` — `shot_chart` per-game shot locations (cloud sync from the shot chart; see `docs/completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md` SC-6)
    - `supabase/migrations/033_client_sync_errors.sql` — `client_sync_errors` for failed cloud sync attempts (debugging; RLS: own rows only)
    - `supabase/migrations/034_google_auth_profile_defaults.sql` — profile defaults for Google OAuth users (`display_name`, `avatar_url`, `email`)
+   - `supabase/migrations/035_team_access_hardening.sql` — accepted team membership, role-safe member RPCs, member privacy, and final-game/stat write hardening
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -254,7 +255,8 @@ supabase/
     ├── 031_get_game_team_stats.sql
     ├── 032_shot_chart.sql
     ├── 033_client_sync_errors.sql
-    └── 034_google_auth_profile_defaults.sql
+    ├── 034_google_auth_profile_defaults.sql
+    └── 035_team_access_hardening.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql

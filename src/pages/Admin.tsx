@@ -37,6 +37,13 @@ import {
   settingsSportIdFromPath,
   sportSettingsPath,
 } from '../lib/settingsNavigation'
+import {
+  acceptedTeamRole,
+  canDeleteGame,
+  canDeleteTeam,
+  canManageTeam,
+  type TeamRole,
+} from '../lib/teamPermissions'
 
 interface AdminSeasonInfo {
   name: string
@@ -45,6 +52,8 @@ interface AdminSeasonInfo {
 
 interface AdminTeamRow {
   id: string
+  owner_id: string
+  accessRole: TeamRole
   name: string
   nickname: string | null
   season_id: string
@@ -73,6 +82,7 @@ interface AdminPlayerRow {
   last_name: string | null
   jersey_number: string | null
   is_active: boolean
+  created_by: string | null
 }
 
 interface AdminSeasonRow {
@@ -175,17 +185,44 @@ export default function Admin() {
     const load = async () => {
       setLoadingAdmin(true)
       setAdminError(null)
-      const { data: teams, error: tErr } = await supabaseClient
-        .from('teams')
-        .select('id,name,nickname,season_id,seasons!inner(name,sport)')
-        .order('created_at', { ascending: false })
+      const [{ data: teams, error: tErr }, { data: memberships, error: membershipError }] =
+        await Promise.all([
+          supabaseClient
+            .from('teams')
+            .select('id,owner_id,name,nickname,season_id,seasons!inner(name,sport)')
+            .order('created_at', { ascending: false }),
+          supabaseClient
+            .from('team_members')
+            .select('team_id,role,accepted_at')
+            .eq('user_id', userId)
+            .not('accepted_at', 'is', null),
+        ])
       if (cancelled) return
-      if (tErr) { setAdminError(tErr.message); setLoadingAdmin(false); return }
-      type RawTeamRow = { id: string; name: string; nickname: string | null; season_id: string; seasons: AdminSeasonInfo | AdminSeasonInfo[] }
-      const loaded = ((teams ?? []) as unknown as RawTeamRow[]).map(t => ({
-        ...t,
-        seasons: Array.isArray(t.seasons) ? t.seasons[0] : t.seasons,
-      })) as AdminTeamRow[]
+      if (tErr || membershipError) {
+        setAdminError(tErr?.message ?? membershipError?.message ?? 'Unable to load team access.')
+        setLoadingAdmin(false)
+        return
+      }
+      const roleByTeamId = new Map<string, TeamRole>()
+      for (const row of (memberships ?? []) as Array<{
+        team_id: string
+        role: string
+        accepted_at: string | null
+      }>) {
+        const role = acceptedTeamRole(row.role, row.accepted_at)
+        if (role) roleByTeamId.set(row.team_id, role)
+      }
+      type RawTeamRow = { id: string; owner_id: string; name: string; nickname: string | null; season_id: string; seasons: AdminSeasonInfo | AdminSeasonInfo[] }
+      const loaded = ((teams ?? []) as unknown as RawTeamRow[])
+        .map(t => {
+          const accessRole = t.owner_id === userId ? 'owner' : roleByTeamId.get(t.id) ?? null
+          return {
+            ...t,
+            accessRole,
+            seasons: Array.isArray(t.seasons) ? t.seasons[0] : t.seasons,
+          }
+        })
+        .filter((team): team is AdminTeamRow => canManageTeam(team.accessRole))
       setAdminTeams(loaded)
       setSelectedAdminTeamId(prev => {
         if (prev && loaded.some(t => t.id === prev)) return prev
@@ -253,7 +290,7 @@ export default function Admin() {
           .eq('team_id', selectedAdminTeamId).order('created_at', { ascending: false }),
         supabaseClient.from('tournaments').select('id,team_id,name')
           .eq('team_id', selectedAdminTeamId).order('name', { ascending: true }),
-        supabaseClient.from('team_players').select('id,player_id,jersey_number,is_active,players!inner(id,first_name,last_name)')
+        supabaseClient.from('team_players').select('id,player_id,jersey_number,is_active,players!inner(id,created_by,first_name,last_name)')
           .eq('team_id', selectedAdminTeamId).order('joined_at', { ascending: true }),
       ])
       if (cancelled) return
@@ -262,7 +299,7 @@ export default function Admin() {
       setAdminPlayers(
         ((playersRes.data ?? []) as unknown as Array<{
           id: string; player_id: string; jersey_number: string | null; is_active: boolean;
-          players: { id: string; first_name: string; last_name: string | null }
+          players: { id: string; created_by: string | null; first_name: string; last_name: string | null }
         }>).map(r => ({
           id: r.id,
           player_id: r.player_id,
@@ -270,6 +307,7 @@ export default function Admin() {
           last_name: r.players.last_name,
           jersey_number: r.jersey_number,
           is_active: r.is_active,
+          created_by: r.players.created_by,
         }))
       )
     }
@@ -278,7 +316,7 @@ export default function Admin() {
   }, [dataMgmtActive, selectedAdminTeamId, supabaseClient])
 
   const handleAdminDeleteTeam = async (team: AdminTeamRow) => {
-    if (!supabaseClient) return
+    if (!supabaseClient || !canDeleteTeam(team.accessRole)) return
     setAdminError(null)
     if (
       gameState.cloudSync.teamId === team.id &&
@@ -304,7 +342,8 @@ export default function Admin() {
   }
 
   const handleAdminDeleteGame = async (game: AdminGameRow) => {
-    if (!supabaseClient) return
+    const team = adminTeams.find(candidate => candidate.id === game.team_id)
+    if (!supabaseClient || !canDeleteGame(team?.accessRole ?? null)) return
     setAdminError(null)
     if (
       gameState.cloudSync.gameId === game.id &&
@@ -324,7 +363,8 @@ export default function Admin() {
   }
 
   const handleAdminDeleteTournament = async (tournament: AdminTournamentRow) => {
-    if (!supabaseClient) return
+    const team = adminTeams.find(candidate => candidate.id === tournament.team_id)
+    if (!supabaseClient || !canManageTeam(team?.accessRole ?? null)) return
     setAdminError(null)
     setDeletingId(tournament.id)
     const { error } = await supabaseClient.from('tournaments').delete().eq('id', tournament.id)
@@ -334,7 +374,7 @@ export default function Admin() {
   }
 
   const handleAdminDeletePlayer = async (player: AdminPlayerRow) => {
-    if (!supabaseClient) return
+    if (!supabaseClient || player.created_by !== userId) return
     setAdminError(null)
     setDeletingId(player.id)
     const { error } = await supabaseClient.from('players').delete().eq('id', player.player_id)
@@ -350,12 +390,14 @@ export default function Admin() {
     const withConfig = await supabaseClient
       .from('seasons')
       .select('id,name,sport,start_date,end_date,team_stats_config')
+      .eq('owner_id', userId)
       .order('created_at', { ascending: false })
     if (withConfig.error && isMissingTeamStatsConfigColumnError(withConfig.error)) {
       setSeasonsTeamStatsColumnMissing(true)
       const { data, error } = await supabaseClient
         .from('seasons')
         .select('id,name,sport,start_date,end_date')
+        .eq('owner_id', userId)
         .order('created_at', { ascending: false })
       setLoadingSeasons(false)
       if (error) {
@@ -1200,17 +1242,21 @@ export default function Admin() {
                           )
                         })}
                       </select>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const team = adminTeams.find(t => t.id === selectedAdminTeamId)
-                          if (team) setConfirmDeleteTeam(team)
-                        }}
-                        disabled={!selectedAdminTeamId || deletingId === selectedAdminTeamId}
-                        className="text-sm text-red-600 font-semibold underline disabled:opacity-40"
-                      >
-                        Delete this team (and all its data)
-                      </button>
+                      {canDeleteTeam(
+                        adminTeams.find(team => team.id === selectedAdminTeamId)?.accessRole ?? null
+                      ) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const team = adminTeams.find(t => t.id === selectedAdminTeamId)
+                            if (team) setConfirmDeleteTeam(team)
+                          }}
+                          disabled={!selectedAdminTeamId || deletingId === selectedAdminTeamId}
+                          className="text-sm text-red-600 font-semibold underline disabled:opacity-40"
+                        >
+                          Delete this team (and all its data)
+                        </button>
+                      )}
                     </div>
 
                     {selectedAdminTeamId && (
@@ -1256,15 +1302,17 @@ export default function Admin() {
                                     </p>
                                     <p className="text-xs text-slate-400">{p.is_active ? 'Active' : 'Inactive'}</p>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmDeletePlayer(p)}
-                                    disabled={deletingId === p.id}
-                                    className="text-slate-400 hover:text-red-500 p-1 shrink-0"
-                                    title="Delete player"
-                                  >
-                                    🗑️
-                                  </button>
+                                  {p.created_by === userId && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmDeletePlayer(p)}
+                                      disabled={deletingId === p.id}
+                                      className="text-slate-400 hover:text-red-500 p-1 shrink-0"
+                                      title="Delete player"
+                                    >
+                                      🗑️
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>

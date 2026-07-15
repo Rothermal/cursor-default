@@ -313,6 +313,27 @@ describe('syncGameSnapshotToCloud hardening', () => {
     expect(mock.ops).toContain('games.delete')
   })
 
+  it('links team placeholder ids before writing their stats', async () => {
+    mock.gameStatsError = null
+
+    await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          {
+            id: TEAM_PLAYER_HOME_ID,
+            name: 'Aces Team',
+            number: '',
+            stats: { team_foul_p1: 1 },
+          },
+        ],
+      }),
+      userId: 'user-1',
+    })
+
+    expect(mock.ops.indexOf('games.update')).toBeGreaterThan(-1)
+    expect(mock.ops.indexOf('games.update')).toBeLessThan(mock.ops.indexOf('game_stats.upsert'))
+  })
+
   it('does not delete an existing cloud game when child writes fail', async () => {
     await expect(
       syncGameSnapshotToCloud({
@@ -328,6 +349,25 @@ describe('syncGameSnapshotToCloud hardening', () => {
 
     expect(mock.ops).toContain('games.update')
     expect(mock.ops).not.toContain('games.delete')
+  })
+
+  it('does not rewrite player or roster rows for an existing shared-game mapping', async () => {
+    mock.gameStatsError = null
+
+    await syncGameSnapshotToCloud({
+      state: state({
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'existing-game',
+          playerIdMap: { 'local-1': '11111111-1111-4111-8111-111111111111' },
+        },
+      }),
+      userId: 'user-2',
+    })
+
+    expect(mock.ops).not.toContain('players.update')
+    expect(mock.ops).not.toContain('team_players.upsert')
+    expect(mock.ops).toContain('game_stats.upsert')
   })
 
   it('logs when rollback of a just-created game fails', async () => {

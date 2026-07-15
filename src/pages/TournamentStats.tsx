@@ -5,6 +5,7 @@ import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
+import { acceptedTeamRole, canManageTeam } from '../lib/teamPermissions'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import { playerInfoPath, teamInfoPath, teamStatsPath } from '../lib/teamInfo'
 
@@ -259,13 +260,13 @@ export default function TournamentStats() {
     const loadRole = async () => {
       const { data } = await supabaseClient
         .from('team_members')
-        .select('role')
+        .select('role,accepted_at')
         .eq('team_id', teamId)
         .eq('user_id', user.id)
         .maybeSingle()
       if (cancelled) return
-      const role = (data as { role?: string } | null)?.role
-      setCanEditPlacement(role === 'owner' || role === 'admin')
+      const member = data as { role?: string; accepted_at?: string | null } | null
+      setCanEditPlacement(canManageTeam(acceptedTeamRole(member?.role, member?.accepted_at)))
     }
     void loadRole()
     return () => {

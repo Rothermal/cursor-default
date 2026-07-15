@@ -14,6 +14,7 @@ import { useReviewShotChart } from '../hooks/useReviewShotChart'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { acceptedTeamRole, canCorrectStats } from '../lib/teamPermissions'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
 type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
@@ -284,6 +285,25 @@ export default function GameSummary() {
     return byPlayer
   }, [gameId, state.players, playerIdMap])
 
+  const loadTeamMemberNameMap = useCallback(async (): Promise<Record<string, string>> => {
+    const client = supabase
+    if (!teamId || !client) return {}
+
+    const { data, error } = await client.rpc('get_team_members_with_profiles', {
+      p_team_id: teamId,
+    })
+    if (error) return {}
+
+    const names: Record<string, string> = {}
+    for (const member of (data ?? []) as Array<{
+      user_id: string
+      display_name: string | null
+    }>) {
+      names[member.user_id] = member.display_name?.trim() || 'Unknown'
+    }
+    return names
+  }, [teamId])
+
   useEffect(() => {
     if (!isFinalCloudGame || !gameId || !supabase) return
 
@@ -313,16 +333,7 @@ export default function GameSummary() {
 
     if (statsError || !statsRows?.length) return {}
 
-    const recorderIds = [...new Set((statsRows as Array<{ recorded_by: string }>).map(r => r.recorded_by))]
-    const { data: profilesRows } = await client
-      .from('profiles')
-      .select('id, display_name')
-      .in('id', recorderIds)
-
-    const nameByUserId: Record<string, string> = {}
-    for (const p of (profilesRows ?? []) as Array<{ id: string; display_name: string | null }>) {
-      nameByUserId[p.id] = p.display_name?.trim() || 'Unknown'
-    }
+    const nameByUserId = await loadTeamMemberNameMap()
 
     const byPlayer: AllSubmissionsMap = {}
     for (const row of statsRows as Array<{ player_id: string; stat_id: string; recorded_by: string; value: number }>) {
@@ -336,7 +347,7 @@ export default function GameSummary() {
       })
     }
     return byPlayer
-  }, [gameId, state.players, playerIdMap])
+  }, [gameId, state.players, playerIdMap, loadTeamMemberNameMap])
 
   useEffect(() => {
     if (!isFinalCloudGame || !gameId || viewMode !== 'all') return
@@ -362,16 +373,7 @@ export default function GameSummary() {
 
     if (error || !rows?.length) return {}
 
-    const userIds = [...new Set((rows as Array<{ user_id: string }>).map(r => r.user_id))]
-    const { data: profilesRows } = await client
-      .from('profiles')
-      .select('id, display_name')
-      .in('id', userIds)
-
-    const nameByUserId: Record<string, string> = {}
-    for (const p of (profilesRows ?? []) as Array<{ id: string; display_name: string | null }>) {
-      nameByUserId[p.id] = p.display_name?.trim() || 'Unknown'
-    }
+    const nameByUserId = await loadTeamMemberNameMap()
 
     const byPlayer: CheckoutsByPlayerMap = {}
     for (const row of rows as Array<{ player_id: string; user_id: string; is_primary: boolean }>) {
@@ -384,7 +386,7 @@ export default function GameSummary() {
       })
     }
     return byPlayer
-  }, [gameId, state.players, playerIdMap])
+  }, [gameId, state.players, playerIdMap, loadTeamMemberNameMap])
 
   useEffect(() => {
     if (!isFinalCloudGame || !gameId || !isTeamAdmin) return
@@ -420,14 +422,14 @@ export default function GameSummary() {
     const loadRole = async () => {
       const { data } = await client
         .from('team_members')
-        .select('role')
+        .select('role,accepted_at')
         .eq('team_id', teamId)
         .eq('user_id', user.id)
         .maybeSingle()
 
       if (cancelled) return
-      const role = (data as { role?: string } | null)?.role
-      setIsTeamAdmin(role === 'owner' || role === 'admin')
+      const member = data as { role?: string; accepted_at?: string | null } | null
+      setIsTeamAdmin(canCorrectStats(acceptedTeamRole(member?.role, member?.accepted_at)))
     }
 
     void loadRole()

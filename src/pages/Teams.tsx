@@ -9,14 +9,31 @@ import { teamDisplayName, playerDisplayName, playerRosterSelectLabel } from '../
 import { teamInfoPath, teamLeaderboardPath, teamManagementPath } from '../lib/teamInfo'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
+import AccessUnavailable from '../components/AccessUnavailable'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
+import {
+  acceptedTeamRole,
+  canChangeTeamMemberRole,
+  canDeleteTeam,
+  canEditPlayerIdentity,
+  canInviteMembers,
+  canInviteTeamRole,
+  canLeaveTeam,
+  canManageMembers,
+  canManageRoster,
+  canMergePlayers,
+  canRemoveTeamMember,
+  parseTeamRole,
+  type TeamRole,
+} from '../lib/teamPermissions'
 
 interface TeamRow {
   id: string
+  owner_id: string
   name: string
   nickname: string | null
   season_id: string
@@ -29,6 +46,7 @@ interface TeamRow {
 
 interface PlayerRow {
   id: string
+  created_by: string | null
   first_name: string
   last_name: string | null
   jersey_number: string | null
@@ -53,9 +71,21 @@ interface SeasonRow {
 
 interface PoolPlayer {
   id: string
+  created_by: string | null
   first_name: string
   last_name: string | null
   nickname: string | null
+}
+
+interface PendingTeamInvite {
+  id: string
+  team_id: string
+  role: TeamRole
+  invited_at: string
+  team_name: string
+  team_nickname: string | null
+  season_name: string
+  sport: string
 }
 
 export type TeamsPageMode = 'list' | 'manage'
@@ -91,6 +121,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   )
 
   const [teams, setTeams] = useState<TeamRow[]>([])
+  const [teamRolesById, setTeamRolesById] = useState<Record<string, TeamRole>>({})
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
   const [players, setPlayers] = useState<PlayerRow[]>([])
 
@@ -131,13 +162,15 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [savingNickname, setSavingNickname] = useState(false)
 
   const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([])
-  const [pendingInvitesList, setPendingInvitesList] = useState<Array<{ id: string; team_id: string }>>([])
+  const [pendingInvitesList, setPendingInvitesList] = useState<PendingTeamInvite[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<'scorer' | 'admin'>('scorer')
   const [inviting, setInviting] = useState(false)
   const [lookupResult, setLookupResult] = useState<{ id: string; display_name: string } | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [changingMemberId, setChangingMemberId] = useState<string | null>(null)
+  const [leavingTeam, setLeavingTeam] = useState(false)
   const [acceptingTeamId, setAcceptingTeamId] = useState<string | null>(null)
   const [decliningTeamId, setDecliningTeamId] = useState<string | null>(null)
 
@@ -215,20 +248,41 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     const loadTeams = async () => {
       setLoadingTeams(true)
       setError(null)
-      const { data, error: queryError } = await supabaseClient
-        .from('teams')
-        .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
-        .order('created_at', { ascending: false })
+      const [{ data, error: queryError }, { data: membershipData, error: membershipError }] =
+        await Promise.all([
+          supabaseClient
+            .from('teams')
+            .select('id,owner_id,name,nickname,season_id,seasons!inner(id,name,sport)')
+            .order('created_at', { ascending: false }),
+          supabaseClient
+            .from('team_members')
+            .select('team_id,role,accepted_at')
+            .eq('user_id', userId)
+            .not('accepted_at', 'is', null),
+        ])
 
       if (cancelled) return
-      if (queryError) {
-        setError(queryError.message)
+      if (queryError || membershipError) {
+        setError(queryError?.message ?? membershipError?.message ?? 'Unable to load teams.')
         setLoadingTeams(false)
         return
       }
 
       const loadedTeams = (data ?? []) as unknown as TeamRow[]
+      const roles: Record<string, TeamRole> = {}
+      for (const team of loadedTeams) {
+        if (team.owner_id === userId) roles[team.id] = 'owner'
+      }
+      for (const row of (membershipData ?? []) as Array<{
+        team_id: string
+        role: string
+        accepted_at: string | null
+      }>) {
+        const role = acceptedTeamRole(row.role, row.accepted_at)
+        if (role) roles[row.team_id] = role
+      }
       setTeams(loadedTeams)
+      setTeamRolesById(roles)
       // List mode never selects a team (avoids roster/member fetches the list UI does not show).
       // Manage mode only selects the requested teamId — never falls back to the first team.
       setSelectedTeamId(
@@ -278,7 +332,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('team_players')
-        .select('jersey_number,players!inner(id,first_name,last_name,nickname)')
+        .select('jersey_number,players!inner(id,created_by,first_name,last_name,nickname)')
         .eq('team_id', selectedTeamId)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -290,9 +344,10 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         return
       }
 
-      type TeamPlayerJoin = { jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null; nickname: string | null } }
+      type TeamPlayerJoin = { jersey_number: string | null; players: { id: string; created_by: string | null; first_name: string; last_name: string | null; nickname: string | null } }
       setPlayers(((data ?? []) as unknown as TeamPlayerJoin[]).map(row => ({
         id: row.players.id,
+        created_by: row.players.created_by,
         first_name: row.players.first_name,
         last_name: row.players.last_name,
         jersey_number: row.jersey_number,
@@ -307,12 +362,18 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     }
   }, [isConfigured, isManagementRoute, selectedTeamId, supabaseClient, userId, rosterTick])
 
-  const myRole = useMemo(
-    () => teamMembers.find(m => m.user_id === userId)?.role ?? null,
-    [teamMembers, userId]
-  )
-  const canManageMembers = myRole === 'owner' || myRole === 'admin'
+  const myRole = useMemo(() => {
+    const member = teamMembers.find(m => m.user_id === userId)
+    return member
+      ? acceptedTeamRole(member.role, member.accepted_at)
+      : selectedTeamId
+        ? teamRolesById[selectedTeamId] ?? null
+        : null
+  }, [selectedTeamId, teamMembers, teamRolesById, userId])
+  const mayManageRoster = canManageRoster(myRole)
+  const mayManageMembers = canManageMembers(myRole)
   const canOpenMergeWizard =
+    canMergePlayers(myRole) &&
     Boolean(supabaseClient && userId) &&
     mergeCandidates.length >= 2 &&
     Boolean(selectedTeamId && mergeEligibleTeamIds.includes(selectedTeamId))
@@ -324,13 +385,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     }
     let cancelled = false
     const load = async () => {
-      const { data } = await supabaseClient
-        .from('team_members')
-        .select('id, team_id')
-        .eq('user_id', userId)
-        .is('accepted_at', null)
+      const { data, error: rpcError } = await supabaseClient.rpc('get_my_pending_team_invites')
       if (cancelled) return
-      setPendingInvitesList((data ?? []) as Array<{ id: string; team_id: string }>)
+      if (rpcError) {
+        setError(rpcError.message)
+        return
+      }
+      setPendingInvitesList((data ?? []) as PendingTeamInvite[])
     }
     void load()
     return () => { cancelled = true }
@@ -393,7 +454,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     const loadPool = async () => {
       const { data: createdPlayers } = await supabaseClient
         .from('players')
-        .select('id,first_name,last_name,nickname')
+        .select('id,created_by,first_name,last_name,nickname')
         .eq('created_by', userId)
       const { data: guardedLinks } = await supabaseClient
         .from('player_guardians')
@@ -408,7 +469,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       if (guardedIds.length > 0) {
         const { data: guardedPlayers } = await supabaseClient
           .from('players')
-          .select('id,first_name,last_name,nickname')
+          .select('id,created_by,first_name,last_name,nickname')
           .in('id', guardedIds)
         if (!cancelled && guardedPlayers) {
           pool.push(...(guardedPlayers as PoolPlayer[]))
@@ -445,7 +506,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }, [isManagementRoute, selectedTeamId, supabaseClient, userId, players])
 
   const handleLookupInvitee = async () => {
-    if (!supabaseClient || !selectedTeamId || !inviteEmail.trim()) return
+    if (!supabaseClient || !selectedTeamId || !inviteEmail.trim() || !canInviteMembers(myRole)) return
     setError(null)
     setLookupResult(null)
     const { data, error: rpcError } = await supabaseClient.rpc('lookup_user_by_email', {
@@ -465,7 +526,12 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleInvite = async () => {
-    if (!supabaseClient || !selectedTeamId || !lookupResult) return
+    if (
+      !supabaseClient ||
+      !selectedTeamId ||
+      !lookupResult ||
+      !canInviteTeamRole(myRole, inviteRole)
+    ) return
     setError(null)
     setInviting(true)
     const { error: rpcError } = await supabaseClient.rpc('invite_team_member', {
@@ -489,19 +555,75 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!supabaseClient) return
+    const member = teamMembers.find(candidate => candidate.id === memberId)
+    const targetRole = member ? parseTeamRole(member.role) : null
+    if (
+      !supabaseClient ||
+      !selectedTeamId ||
+      !member ||
+      !canRemoveTeamMember(myRole, targetRole, member.user_id === userId)
+    ) return
     setError(null)
     setRemovingMemberId(memberId)
-    const { error: delError } = await supabaseClient
-      .from('team_members')
-      .delete()
-      .eq('id', memberId)
+    const { error: delError } = await supabaseClient.rpc('remove_team_member', {
+      p_team_id: selectedTeamId,
+      p_member_id: memberId,
+    })
     setRemovingMemberId(null)
     if (delError) {
       setError(delError.message)
       return
     }
     setTeamMembers(prev => prev.filter(m => m.id !== memberId))
+  }
+
+  const handleChangeMemberRole = async (member: TeamMemberRow, nextRole: TeamRole) => {
+    const targetRole = acceptedTeamRole(member.role, member.accepted_at) ??
+      (member.role === 'admin' || member.role === 'scorer' ? member.role : null)
+    if (
+      !supabaseClient ||
+      !selectedTeamId ||
+      !canChangeTeamMemberRole(myRole, targetRole, nextRole)
+    ) return
+
+    setError(null)
+    setChangingMemberId(member.id)
+    const { error: rpcError } = await supabaseClient.rpc('set_team_member_role', {
+      p_team_id: selectedTeamId,
+      p_member_id: member.id,
+      p_role: nextRole,
+    })
+    setChangingMemberId(null)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    setTeamMembers(prev =>
+      prev.map(candidate => candidate.id === member.id ? { ...candidate, role: nextRole } : candidate)
+    )
+  }
+
+  const handleLeaveTeam = async () => {
+    if (!supabaseClient || !selectedTeamId || !canLeaveTeam(myRole)) return
+    if (!window.confirm('Leave this team and remove your access?')) return
+
+    setError(null)
+    setLeavingTeam(true)
+    const { error: rpcError } = await supabaseClient.rpc('leave_team', {
+      p_team_id: selectedTeamId,
+    })
+    setLeavingTeam(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    setTeams(prev => prev.filter(team => team.id !== selectedTeamId))
+    setTeamRolesById(prev => {
+      const next = { ...prev }
+      delete next[selectedTeamId]
+      return next
+    })
+    navigate('/teams')
   }
 
   const handleAcceptInvite = async (teamId: string) => {
@@ -513,16 +635,27 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       setAcceptingTeamId(null)
       return
     }
-    const { error: updError } = await supabaseClient
-      .from('team_members')
-      .update({ accepted_at: new Date().toISOString() })
-      .eq('id', pending.id)
+    const { error: updError } = await supabaseClient.rpc('accept_team_invite', {
+      p_team_id: teamId,
+    })
     setAcceptingTeamId(null)
     if (updError) {
       setError(updError.message)
       return
     }
-    setPendingInvitesList(prev => prev.filter(p => p.id !== pending.id))
+    setPendingInvitesList(prev => prev.filter(p => p.team_id !== teamId))
+    setTeamRolesById(prev => ({ ...prev, [teamId]: pending.role }))
+    const { data: acceptedTeam } = await supabaseClient
+      .from('teams')
+      .select('id,owner_id,name,nickname,season_id,seasons!inner(id,name,sport)')
+      .eq('id', teamId)
+      .maybeSingle()
+    if (acceptedTeam) {
+      setTeams(prev => [
+        acceptedTeam as unknown as TeamRow,
+        ...prev.filter(team => team.id !== teamId),
+      ])
+    }
     if (selectedTeamId === teamId) {
       const { data } = await supabaseClient.rpc('get_team_members_with_profiles', {
         p_team_id: teamId,
@@ -536,18 +669,19 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     if (!supabaseClient) return
     setError(null)
     setDecliningTeamId(teamId)
-    const pending = pendingInvitesList.find(p => p.team_id === teamId)
-    if (!pending) {
+    if (!pendingInvitesList.some(p => p.team_id === teamId)) {
       setDecliningTeamId(null)
       return
     }
-    const { error: delError } = await supabaseClient.from('team_members').delete().eq('id', pending.id)
+    const { error: delError } = await supabaseClient.rpc('decline_team_invite', {
+      p_team_id: teamId,
+    })
     setDecliningTeamId(null)
     if (delError) {
       setError(delError.message)
       return
     }
-    setPendingInvitesList(prev => prev.filter(p => p.id !== pending.id))
+    setPendingInvitesList(prev => prev.filter(p => p.team_id !== teamId))
     setTeams(prev => prev.filter(t => t.id !== teamId))
     if (selectedTeamId === teamId) {
       setSelectedTeamId('')
@@ -642,6 +776,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
     const createdTeam: TeamRow = {
       id: data.id as string,
+      owner_id: userId,
       name: data.name as string,
       nickname: (data.nickname as string | null) ?? null,
       season_id: seasonData.id as string,
@@ -652,6 +787,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       },
     }
     setTeams(prev => [createdTeam, ...prev])
+    setTeamRolesById(prev => ({ ...prev, [createdTeam.id]: 'owner' }))
     setSelectedTeamId(createdTeam.id)
     setNewTeamName('')
     setNewPlayerFirst('')
@@ -661,7 +797,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleAddPlayer = async () => {
-    if (!supabaseClient || !selectedTeamId || !newPlayerFirst.trim() || !userId) return
+    if (!supabaseClient || !selectedTeamId || !newPlayerFirst.trim() || !userId || !mayManageRoster) return
     setError(null)
     setSavingPlayer(true)
 
@@ -703,6 +839,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
     setPlayers(prev => [...prev, {
       id: playerData.id as string,
+      created_by: userId,
       first_name: playerData.first_name as string,
       last_name: (playerData.last_name as string | null) ?? null,
       jersey_number: jerseyNumber,
@@ -714,7 +851,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleAddExistingPlayer = async () => {
-    if (!supabaseClient || !selectedTeamId || !selectedExistingPlayerId || !userId) return
+    if (!supabaseClient || !selectedTeamId || !selectedExistingPlayerId || !userId || !mayManageRoster) return
     setError(null)
     setAddingExistingPlayer(true)
 
@@ -742,6 +879,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     if (poolPlayer) {
       setPlayers(prev => [...prev, {
         id: poolPlayer.id,
+        created_by: poolPlayer.created_by,
         first_name: poolPlayer.first_name,
         last_name: poolPlayer.last_name,
         jersey_number: jerseyNumber,
@@ -779,7 +917,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleDeactivatePlayer = async (playerId: string) => {
-    if (!supabaseClient || !selectedTeamId) return
+    if (!supabaseClient || !selectedTeamId || !mayManageRoster) return
     setError(null)
     setDeletingPlayerId(playerId)
 
@@ -799,7 +937,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleDeleteTeam = async (team: TeamRow) => {
-    if (!supabaseClient) return
+    if (!supabaseClient || !canDeleteTeam(teamRolesById[team.id] ?? null)) return
     setError(null)
     if (
       gameState.cloudSync.teamId === team.id &&
@@ -835,7 +973,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleDeletePlayer = async (player: PlayerRow) => {
-    if (!supabaseClient) return
+    if (!supabaseClient || player.created_by !== userId) return
     setError(null)
     setDeletingPlayerId(player.id)
 
@@ -866,7 +1004,12 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleSaveTeam = async () => {
-    if (!supabaseClient || !editingTeamId || !editingTeamName.trim()) return
+    if (
+      !supabaseClient ||
+      !editingTeamId ||
+      !editingTeamName.trim() ||
+      !canManageRoster(teamRolesById[editingTeamId] ?? null)
+    ) return
     setError(null)
     setSavingNickname(true)
     const name = editingTeamName.trim()
@@ -903,24 +1046,27 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleSavePlayer = async () => {
-    if (!supabaseClient || !editingPlayerId || !editingPlayerFirst.trim() || !selectedTeamId) return
+    const player = players.find(candidate => candidate.id === editingPlayerId)
+    if (!supabaseClient || !editingPlayerId || !selectedTeamId || !player || !mayManageRoster) return
+    const mayEditIdentity = canEditPlayerIdentity(userId, player.created_by, Boolean(guardianMap[player.id]))
+    if (mayEditIdentity && !editingPlayerFirst.trim()) return
     setError(null)
     setSavingNickname(true)
     const first_name = editingPlayerFirst.trim()
     const last_name = editingPlayerLast.trim() || null
     const jersey_number = editingPlayerNumber.trim() || null
     const nickname = editingPlayerNickname.trim() || null
-    const [playerRes, junctionRes] = await Promise.all([
-      supabaseClient
-        .from('players')
-        .update({ first_name, last_name, nickname })
-        .eq('id', editingPlayerId),
-      supabaseClient
-        .from('team_players')
-        .update({ jersey_number })
-        .eq('team_id', selectedTeamId)
-        .eq('player_id', editingPlayerId),
-    ])
+    const playerRes = mayEditIdentity
+      ? await supabaseClient
+          .from('players')
+          .update({ first_name, last_name, nickname })
+          .eq('id', editingPlayerId)
+      : { error: null }
+    const junctionRes = await supabaseClient
+      .from('team_players')
+      .update({ jersey_number })
+      .eq('team_id', selectedTeamId)
+      .eq('player_id', editingPlayerId)
     setSavingNickname(false)
     const updateError = playerRes.error || junctionRes.error
     if (updateError) {
@@ -930,7 +1076,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setPlayers(prev =>
       prev.map(p =>
         p.id === editingPlayerId
-          ? { ...p, first_name, last_name, jersey_number, nickname }
+          ? {
+              ...p,
+              ...(mayEditIdentity ? { first_name, last_name, nickname } : {}),
+              jersey_number,
+            }
           : p
       )
     )
@@ -966,10 +1116,12 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           <div className="card bg-blue-50 border-blue-200 space-y-2">
             <p className="font-semibold text-blue-800">Pending invites</p>
             {pendingInvitesList.map(inv => {
-              const team = teams.find(t => t.id === inv.team_id)
+              const inviteTeamName = inv.team_nickname?.trim() || inv.team_name
               return (
                 <div key={inv.id} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-blue-700">{team ? teamDisplayName(team) : 'Team'}</span>
+                  <span className="text-sm text-blue-700">
+                    {inviteTeamName} <span className="text-blue-500">({inv.role})</span>
+                  </span>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -1109,6 +1261,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
               {visibleTeams.map(team => {
                 const sport = sports.find(item => item.id === team.seasons.sport)
                 const isEditing = editingTeamId === team.id
+                const teamRole = teamRolesById[team.id] ?? null
+                const mayManageThisTeam = canManageRoster(teamRole)
                 return (
                   <div
                     key={team.id}
@@ -1184,27 +1338,31 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                             className="text-xs font-semibold text-blue-600 px-1.5 py-1"
                             title="Manage roster and members"
                           >
-                            Manage
+                            {mayManageThisTeam ? 'Manage' : 'View'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); startEditTeam(team) }}
-                            className="text-slate-400 hover:text-slate-600 p-1"
-                            title="Edit team name"
-                            aria-label="Edit team name"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); setConfirmDeleteTeam(team) }}
-                            disabled={deletingTeamId === team.id}
-                            className="text-slate-400 hover:text-red-500 p-1"
-                            title="Delete team"
-                            aria-label="Delete team"
-                          >
-                            🗑️
-                          </button>
+                          {mayManageThisTeam && (
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); startEditTeam(team) }}
+                              className="text-slate-400 hover:text-slate-600 p-1"
+                              title="Edit team name"
+                              aria-label="Edit team name"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                          {canDeleteTeam(teamRole) && (
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); setConfirmDeleteTeam(team) }}
+                              disabled={deletingTeamId === team.id}
+                              className="text-slate-400 hover:text-red-500 p-1"
+                              title="Delete team"
+                              aria-label="Delete team"
+                            >
+                              🗑️
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1215,6 +1373,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           )}
             </section>
           </>
+        )}
+
+        {isManagementRoute && !managementRouteMessage && selectedTeam && !mayManageRoster && (
+          <AccessUnavailable
+            title="Roster is read-only"
+            message="Scorers can review this team and track games, but roster and member management require an owner or admin."
+          />
         )}
 
         {isManagementRoute && !managementRouteMessage && selectedTeam && (
@@ -1233,7 +1398,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                   >
                     Season Stats
                   </button>
-                  {canManageMembers && canOpenMergeWizard && (
+                  {canOpenMergeWizard && (
                     <button
                       type="button"
                       onClick={() => setMergeWizardOpen(true)}
@@ -1252,7 +1417,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
           {selectedTeam ? (
             <>
-              <div className="flex gap-1 mb-1">
+              {mayManageRoster && (
+                <div className="space-y-2">
+              <div className="flex gap-1">
                 <button
                   type="button"
                   onClick={() => setPlayerAddMode('new')}
@@ -1346,6 +1513,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                   </button>
                 </>
               )}
+                </div>
+              )}
 
               {loadingPlayers ? (
                 <p className="text-sm text-slate-500 animate-pulse">Loading roster...</p>
@@ -1355,6 +1524,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 <div className="space-y-2">
                   {players.map(player => {
                     const isEditing = editingPlayerId === player.id
+                    const mayEditIdentity = canEditPlayerIdentity(
+                      userId,
+                      player.created_by,
+                      Boolean(guardianMap[player.id])
+                    )
                     return (
                       <div key={player.id} className="border border-slate-100 rounded-xl px-3 py-2">
                         {isEditing ? (
@@ -1374,6 +1548,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 onChange={e => setEditingPlayerFirst(e.target.value)}
                                 placeholder="First name *"
                                 className="input-field col-span-5 text-sm"
+                                disabled={!mayEditIdentity}
                               />
                               <input
                                 type="text"
@@ -1381,6 +1556,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 onChange={e => setEditingPlayerLast(e.target.value)}
                                 placeholder="Last name"
                                 className="input-field col-span-5 text-sm"
+                                disabled={!mayEditIdentity}
                               />
                             </div>
                             <input
@@ -1389,12 +1565,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               onChange={e => setEditingPlayerNickname(e.target.value)}
                               placeholder="Display name (optional)"
                               className="input-field text-sm"
+                              disabled={!mayEditIdentity}
                             />
                             <div className="flex gap-2">
                               <button
                                 type="button"
                                 onClick={() => { void handleSavePlayer() }}
-                                disabled={savingNickname || !editingPlayerFirst.trim()}
+                                disabled={savingNickname || (mayEditIdentity && !editingPlayerFirst.trim())}
                                 className="btn-primary flex-1 text-sm py-1"
                               >
                                 {savingNickname ? 'Saving...' : 'Save'}
@@ -1437,33 +1614,39 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                   Career
                                 </button>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => startEditPlayer(player)}
-                                className="text-slate-400 hover:text-slate-600 p-1"
-                                title="Edit player"
-                                aria-label="Edit player"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { void handleDeactivatePlayer(player.id) }}
-                                disabled={deletingPlayerId === player.id}
-                                className="text-xs text-slate-500 underline disabled:opacity-40"
-                              >
-                                {deletingPlayerId === player.id ? 'Removing...' : 'Remove'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeletePlayer(player)}
-                                disabled={deletingPlayerId === player.id}
-                                className="text-slate-400 hover:text-red-500 p-1"
-                                title="Delete player permanently"
-                                aria-label="Delete player permanently"
-                              >
-                                🗑️
-                              </button>
+                              {mayManageRoster && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditPlayer(player)}
+                                    className="text-slate-400 hover:text-slate-600 p-1"
+                                    title={mayEditIdentity ? 'Edit player' : 'Edit jersey number'}
+                                    aria-label={mayEditIdentity ? 'Edit player' : 'Edit jersey number'}
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { void handleDeactivatePlayer(player.id) }}
+                                    disabled={deletingPlayerId === player.id}
+                                    className="text-xs text-slate-500 underline disabled:opacity-40"
+                                  >
+                                    {deletingPlayerId === player.id ? 'Removing...' : 'Remove'}
+                                  </button>
+                                </>
+                              )}
+                              {player.created_by === userId && (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeletePlayer(player)}
+                                  disabled={deletingPlayerId === player.id}
+                                  className="text-slate-400 hover:text-red-500 p-1"
+                                  title="Delete player permanently"
+                                  aria-label="Delete player permanently"
+                                >
+                                  🗑️
+                                </button>
+                              )}
                               {guardianMap[player.id] ? (
                                 <span className="text-xs text-green-600 ml-1" title="You are a guardian">
                                   Guardian ✓
@@ -1551,21 +1734,52 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           {m.accepted_at ? ' · Accepted' : ' · Pending'}
                         </p>
                       </div>
-                      {canManageMembers && m.user_id !== userId && (
+                      {myRole === 'owner' && m.role !== 'owner' && m.user_id !== userId && (
+                        <select
+                          value={m.role}
+                          onChange={event => {
+                            void handleChangeMemberRole(m, event.target.value as TeamRole)
+                          }}
+                          disabled={changingMemberId === m.id}
+                          className="input-field w-auto py-1 text-xs"
+                          aria-label={`Role for ${memberDisplayName(m)}`}
+                        >
+                          <option value="scorer">Scorer</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      )}
+                      {canRemoveTeamMember(
+                        myRole,
+                        parseTeamRole(m.role),
+                        m.user_id === userId
+                      ) && (
                         <button
                           type="button"
                           onClick={() => handleRemoveMember(m.id)}
                           disabled={removingMemberId === m.id}
                           className="text-xs text-red-600 underline disabled:opacity-40"
                         >
-                          {removingMemberId === m.id ? 'Removing...' : 'Remove'}
+                          {removingMemberId === m.id
+                            ? m.accepted_at ? 'Removing...' : 'Canceling...'
+                            : m.accepted_at ? 'Remove' : 'Cancel invite'}
                         </button>
                       )}
                     </div>
                   ))}
                 </div>
 
-                {canManageMembers && (
+                {canLeaveTeam(myRole) && (
+                  <button
+                    type="button"
+                    onClick={() => { void handleLeaveTeam() }}
+                    disabled={leavingTeam}
+                    className="text-sm text-red-600 font-semibold underline disabled:opacity-40"
+                  >
+                    {leavingTeam ? 'Leaving...' : 'Leave team'}
+                  </button>
+                )}
+
+                {mayManageMembers && (
                   <div className="pt-2 border-t border-slate-100 space-y-2">
                     <p className="text-sm font-medium text-slate-600">Invite by email</p>
                     <div className="flex gap-2">
@@ -1597,7 +1811,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                             className="input-field text-sm py-2 w-auto"
                           >
                             <option value="scorer">Scorer</option>
-                            <option value="admin">Admin</option>
+                            {canInviteTeamRole(myRole, 'admin') && (
+                              <option value="admin">Admin</option>
+                            )}
                           </select>
                           <button
                             type="button"

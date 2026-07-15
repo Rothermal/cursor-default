@@ -7,6 +7,11 @@ import { supabase } from '../lib/supabase'
 import { teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
+import {
+  acceptedTeamRole,
+  canManageTeam,
+  type TeamRole,
+} from '../lib/teamPermissions'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -14,6 +19,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 interface CloudTeam {
   id: string
+  owner_id: string
+  accessRole: TeamRole
   name: string
   season_id: string
   seasons: {
@@ -149,20 +156,41 @@ export default function GameSetup() {
     const loadTeams = async () => {
       setLoadingTeams(true)
       setTeamsError(null)
-      const { data, error } = await supabase!
-        .from('teams')
-        .select('id,name,season_id,seasons!inner(id,name,sport,team_stats_config)')
-        .eq('seasons.sport', sport.id)
-        .order('created_at', { ascending: false })
+      const [{ data, error }, { data: memberships, error: membershipError }] =
+        await Promise.all([
+          supabase!
+            .from('teams')
+            .select('id,owner_id,name,season_id,seasons!inner(id,name,sport,team_stats_config)')
+            .eq('seasons.sport', sport.id)
+            .order('created_at', { ascending: false }),
+          supabase!
+            .from('team_members')
+            .select('team_id,role,accepted_at')
+            .eq('user_id', userId)
+            .not('accepted_at', 'is', null),
+        ])
 
       if (isCancelled) return
-      if (error) {
-        setTeamsError(error.message)
+      if (error || membershipError) {
+        setTeamsError(error?.message ?? membershipError?.message ?? 'Unable to load team access.')
         setLoadingTeams(false)
         return
       }
 
-      const loadedTeams = (data ?? []) as unknown as CloudTeam[]
+      const roleByTeamId = new Map<string, TeamRole>()
+      for (const row of (memberships ?? []) as Array<{
+        team_id: string
+        role: string
+        accepted_at: string | null
+      }>) {
+        const role = acceptedTeamRole(row.role, row.accepted_at)
+        if (role) roleByTeamId.set(row.team_id, role)
+      }
+      type LoadedCloudTeam = Omit<CloudTeam, 'accessRole'>
+      const loadedTeams = ((data ?? []) as unknown as LoadedCloudTeam[]).map(team => ({
+        ...team,
+        accessRole: team.owner_id === userId ? 'owner' : roleByTeamId.get(team.id) ?? 'scorer',
+      }))
       setTeams(loadedTeams)
       if (loadedTeams.length === 0) {
         setTeamMode('new')
@@ -235,6 +263,7 @@ export default function GameSetup() {
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [teams, selectedTeamId]
   )
+  const mayManageSelectedTeam = canManageTeam(selectedTeam?.accessRole ?? null)
   const selectedNewTeamSeasonRow = useMemo(
     () => seasonsForNewTeam.find(s => s.id === selectedNewTeamSeasonId) ?? null,
     [seasonsForNewTeam, selectedNewTeamSeasonId]
@@ -310,7 +339,7 @@ export default function GameSetup() {
   }, [selectedTournamentId, tournaments])
 
   const handleDeleteTournament = async (tournament: TournamentOption) => {
-    if (!supabase) return
+    if (!supabase || !mayManageSelectedTeam) return
     setDeletingTournamentId(tournament.id)
     const { error } = await supabase
       .from('tournaments')
@@ -434,7 +463,7 @@ export default function GameSetup() {
         if (supabase) {
           const canonical = (found?.url ?? '').trim()
           const draft = existingTournamentUrlDraft.trim()
-          if (draft !== canonical) {
+          if (mayManageSelectedTeam && draft !== canonical) {
             setCreatingTournament(true)
             const { error: urlErr } = await supabase
               .from('tournaments')
@@ -726,22 +755,27 @@ export default function GameSetup() {
                             placeholder="https://…"
                             className="input-field"
                             autoComplete="off"
+                            disabled={!mayManageSelectedTeam}
                           />
-                          <p className="text-xs text-slate-400 mt-1">
-                            Saved when you continue to add players.
-                          </p>
+                          {mayManageSelectedTeam && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              Saved when you continue to add players.
+                            </p>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const t = tournaments.find(item => item.id === selectedTournamentId)
-                            if (t) setConfirmDeleteTournament(t)
-                          }}
-                          disabled={deletingTournamentId === selectedTournamentId}
-                          className="text-xs text-red-600 underline disabled:opacity-40"
-                        >
-                          {deletingTournamentId === selectedTournamentId ? 'Deleting...' : 'Delete this tournament'}
-                        </button>
+                        {mayManageSelectedTeam && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const t = tournaments.find(item => item.id === selectedTournamentId)
+                              if (t) setConfirmDeleteTournament(t)
+                            }}
+                            disabled={deletingTournamentId === selectedTournamentId}
+                            className="text-xs text-red-600 underline disabled:opacity-40"
+                          >
+                            {deletingTournamentId === selectedTournamentId ? 'Deleting...' : 'Delete this tournament'}
+                          </button>
+                        )}
                       </>
                     )}
                   </>
