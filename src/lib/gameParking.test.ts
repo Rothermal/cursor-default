@@ -475,6 +475,79 @@ describe('gameParking', () => {
     expect(localStorage.getItem(GAME_STORAGE_KEY)).toBeNull()
   })
 
+  it('preserves skipped-final games whose fingerprint is still ahead of last sync', () => {
+    const base = gameState(basketball, 'Aces', 'Bears')
+    const synced = withLastSyncedGameFingerprint({
+      ...base,
+      cloudSync: {
+        ...base.cloudSync,
+        teamId: 'team-1',
+        gameId: 'game-1',
+        gameStatus: 'in_progress',
+      },
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { '2pt': 1 } }],
+    })
+    const [summary] = saveActiveGameState(synced, 'user-1')
+
+    // Mid-session edits after last sync, then cloud is finalized elsewhere (skippedFinal path).
+    const unsyncedFinal: GameState = {
+      ...synced,
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { '2pt': 3 } }],
+      cloudSync: {
+        ...synced.cloudSync,
+        gameStatus: 'final',
+        status: 'error',
+        lastError: 'Game was finalized elsewhere. Unsynced stats could not be saved.',
+      },
+    }
+    saveParkedGameRecordState(summary.localGameId, unsyncedFinal, 'user-1', {
+      dirty: false,
+      lastError: unsyncedFinal.cloudSync.lastError,
+    })
+
+    expect(loadActiveParkedGameState('user-1')?.players[0]?.stats['2pt']).toBe(3)
+    expect(getParkedGameRecord(summary.localGameId, 'user-1')).not.toBeNull()
+
+    // Persist effect / New Game / park all call saveActiveGameState with the final status.
+    saveActiveGameState(unsyncedFinal, 'user-1')
+
+    expect(getParkedGameRecord(summary.localGameId, 'user-1')?.gameState.players[0]?.stats['2pt']).toBe(
+      3
+    )
+    expect(loadActiveParkedGameState('user-1')?.cloudSync.gameStatus).toBe('final')
+  })
+
+  it('still auto-discards cleanly synced final games from active storage', () => {
+    const base = gameState(basketball, 'Aces', 'Bears')
+    const syncedFinal = withLastSyncedGameFingerprint({
+      ...base,
+      cloudSync: {
+        ...base.cloudSync,
+        teamId: 'team-1',
+        gameId: 'game-1',
+        gameStatus: 'final',
+        status: 'synced',
+      },
+    })
+    const [summary] = saveActiveGameState(
+      { ...syncedFinal, cloudSync: { ...syncedFinal.cloudSync, gameStatus: 'in_progress' } },
+      'user-1'
+    )
+    saveParkedGameRecordState(summary.localGameId, syncedFinal, 'user-1', { dirty: false })
+
+    expect(loadActiveParkedGameState('user-1')).toBeNull()
+    expect(getParkedGameRecord(summary.localGameId, 'user-1')).toBeNull()
+
+    beginNewActiveParkedGame('user-1')
+    saveParkedGameRecordState(getActiveLocalGameId('user-1')!, syncedFinal, 'user-1', {
+      dirty: false,
+    })
+    // Direct save of a clean final must clear the active slot (post-finalize path).
+    const remaining = saveActiveGameState(syncedFinal, 'user-1')
+    expect(remaining).toEqual([])
+    expect(getActiveLocalGameId('user-1')).toBeNull()
+  })
+
   it('clearActiveParkedGame removes only the active record', () => {
     saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
     parkActiveGame('user-1')
