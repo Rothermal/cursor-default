@@ -4,6 +4,10 @@ SEC-1 cleans up the current owner/admin/scorer model before adding new roles.
 
 Depends on: SEC-0.
 
+SEC-0 input: [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md), especially findings SEC0-01 through
+SEC0-12. The audit confirms SEC-1 requires a server-side migration; app permission helpers
+alone are not sufficient.
+
 ---
 
 ## 1. Goal
@@ -33,6 +37,13 @@ the current behavior before expanding the access model.
 - Make member-management UI use the same permission helper.
 - Review `team_members.accepted_at` behavior in client queries and RLS.
 - Ensure pending invites do not accidentally grant full accepted-member visibility.
+- Replace broad direct self-insert/update membership policies with narrow acceptance,
+  decline, role-change, and removal operations.
+- Require accepted membership in team-derived policies and privileged RPCs.
+- Bind recorder-owned stat, checkout, and shot writes to the referenced team/game/player
+  and reject normal raw writes after game finalization.
+- Add a limited accepted-member summary path that does not expose member email to
+  scorers.
 - Confirm admin member removal/changing behavior is intentional.
 - Improve unavailable/error copy when an action is denied by RLS.
 - Add targeted tests for pure permission helpers.
@@ -75,16 +86,26 @@ Potential files:
 - `src/pages/TeamManage.tsx`
 - `src/pages/TeamInfo.tsx`
 - `src/pages/GameSummary.tsx`
+- `src/pages/Games.tsx`
+- `src/pages/Admin.tsx`
 - `docs/REGRESSION_TESTING.md`
 
 Potential migration/RLS review:
 
+- new migration `035_team_access_hardening.sql`
+- `008_player_checkouts.sql`
+- `009_stat_corrections.sql`
 - `011_team_invites.sql`
 - `013_rls_auth_uid_cached.sql`
+- `014_set_primary_recorder.sql`
+- `016_tournaments.sql`
 - `018_seasons_and_roster_junction.sql`
+- `024_player_merge_rpcs.sql`
+- `032_shot_chart.sql`
 
-If SEC-1 reveals that accepted-member filtering must change in RLS, split the SQL change
-into a small migration rather than burying it in a broad UI cleanup.
+Add a new, reviewable migration rather than editing applied migration history. Keep
+membership/RPC hardening and game/stat write hardening in clearly separated sections so
+each policy contract can be reviewed against `ACCESS_MATRIX.md`.
 
 ---
 
@@ -133,4 +154,8 @@ Ask these one at a time before implementation.
 - Scorer cannot see privileged controls.
 - Bypassing UI still fails server-side for privileged writes.
 - Pending invite behavior is documented and tested.
+- Direct self-join/self-promotion and protected-member mutation paths are denied.
+- Stat/checkout/shot writes require the correct accepted team/game/player relationship,
+  and normal raw writes cannot change finalized games.
+- Non-manager member summaries do not expose email.
 - Existing owner/admin/scorer happy paths still work.

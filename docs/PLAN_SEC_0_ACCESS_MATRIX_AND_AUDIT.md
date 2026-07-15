@@ -1,5 +1,7 @@
 # Plan: SEC-0 Access matrix and audit
 
+Status: Complete. Approved baseline: [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md).
+
 SEC-0 is a planning and audit phase. It should produce the role/action matrix that later
 phases implement.
 
@@ -179,8 +181,19 @@ Ask these one at a time before implementation.
 
 ## 9. Acceptance Criteria
 
-- A reviewed matrix exists.
-- Every later SEC phase has stable dependencies and deferrals.
-- Current mismatches are listed with file/RLS references.
-- Regression checklist includes owner/admin/scorer/pending invite cases.
-- No runtime behavior changes are made in SEC-0.
+- [x] A reviewed matrix exists.
+- [x] Every later SEC phase has stable dependencies and deferrals.
+- [x] Current mismatches are listed with file/RLS references.
+- [x] Regression checklist includes owner/admin/scorer/pending invite cases.
+- [x] No runtime behavior changes are made in SEC-0.
+
+---
+
+## 10. Implementation Result
+
+- Added `docs/ACCESS_MATRIX.md` as the stable target contract.
+- Audited app source and migrations through `034_google_auth_profile_defaults.sql`.
+- Confirmed SEC-1 requires a narrow security migration; UI permission helpers alone are
+  insufficient.
+- Assigned guardian, viewer, app-access, and audit work to SEC-2 through SEC-6 without
+  expanding SEC-0 into runtime changes.

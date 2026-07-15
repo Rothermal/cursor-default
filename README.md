@@ -269,6 +269,7 @@ docs/
 ├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11/F13 held
 ├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
+├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
 ├── PLAN_ADMIN_SECURITY_ROADMAP.md # Admin/security/access roadmap
 ├── PLAN_SEC_*.md        # Admin/security/access phase plans with Q&A sections
 ├── REGRESSION_TESTING.md  # High-level test scripts for all features
@@ -362,7 +363,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
-- [ ] Admin/security/access roadmap — role matrix, team access cleanup, viewer role, invite links, guardianship review, app-level access, and audit trail ([roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
+- [ ] Admin/security/access roadmap — SEC-0 access matrix/audit complete; team access cleanup, viewer role, invite links, guardianship review, app-level access, and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations
