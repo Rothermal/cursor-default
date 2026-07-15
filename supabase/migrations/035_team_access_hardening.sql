@@ -372,7 +372,11 @@ begin
     tm.user_id,
     tm.role,
     tm.accepted_at,
-    coalesce(p.display_name, u.email)::text,
+    case
+      when nullif(trim(p.display_name), '') is not null then trim(p.display_name)
+      when v_role in ('owner', 'admin') then u.email::text
+      else 'Unnamed team member'::text
+    end,
     case when v_role in ('owner', 'admin') then u.email::text else null end
   from public.team_members tm
   left join public.profiles p on p.id = tm.user_id
@@ -676,6 +680,14 @@ create policy "checkouts_update_own" on public.player_checkouts
       where g.id = game_id
         and g.status <> 'final'
         and public.is_accepted_team_member(g.team_id)
+        and (
+          exists (
+            select 1 from public.team_players tp
+            where tp.team_id = g.team_id and tp.player_id = player_id
+          )
+          or player_id = g.home_team_player_id
+          or player_id = g.opp_team_player_id
+        )
     )
   )
   with check (
@@ -685,6 +697,14 @@ create policy "checkouts_update_own" on public.player_checkouts
       where g.id = game_id
         and g.status <> 'final'
         and public.is_accepted_team_member(g.team_id)
+        and (
+          exists (
+            select 1 from public.team_players tp
+            where tp.team_id = g.team_id and tp.player_id = player_id
+          )
+          or player_id = g.home_team_player_id
+          or player_id = g.opp_team_player_id
+        )
     )
   );
 

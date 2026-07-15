@@ -27,6 +27,7 @@ import {
   canManageRoster,
   canMergePlayers,
   canRemoveTeamMember,
+  parseTeamRole,
   type TeamRole,
 } from '../lib/teamPermissions'
 
@@ -555,7 +556,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
   const handleRemoveMember = async (memberId: string) => {
     const member = teamMembers.find(candidate => candidate.id === memberId)
-    const targetRole = member ? acceptedTeamRole(member.role, member.accepted_at) : null
+    const targetRole = member ? parseTeamRole(member.role) : null
     if (
       !supabaseClient ||
       !selectedTeamId ||
@@ -1749,7 +1750,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       )}
                       {canRemoveTeamMember(
                         myRole,
-                        acceptedTeamRole(m.role, m.accepted_at),
+                        parseTeamRole(m.role),
                         m.user_id === userId
                       ) && (
                         <button
@@ -1758,7 +1759,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           disabled={removingMemberId === m.id}
                           className="text-xs text-red-600 underline disabled:opacity-40"
                         >
-                          {removingMemberId === m.id ? 'Removing...' : 'Remove'}
+                          {removingMemberId === m.id
+                            ? m.accepted_at ? 'Removing...' : 'Canceling...'
+                            : m.accepted_at ? 'Remove' : 'Cancel invite'}
                         </button>
                       )}
                     </div>

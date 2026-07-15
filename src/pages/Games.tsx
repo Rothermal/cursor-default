@@ -196,8 +196,8 @@ export default function Games() {
 
   // Score lines for all statuses (F4). Precedence per D5: the synced `games` row
   // (`home_team_score`) is authoritative and needs no query; only legacy null-home games
-  // fall back to a stats aggregate — resolved RPC for finals, a creator-scoped
-  // `game_stats` sum otherwise (D6; this list only shows the viewer's own games).
+  // fall back to a stats aggregate: resolved RPC for finals, current-recorder
+  // `game_stats` rows otherwise.
   useEffect(() => {
     if (!supabaseClient) return
     if (visibleGames.length === 0) {
