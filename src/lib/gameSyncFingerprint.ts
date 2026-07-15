@@ -106,6 +106,11 @@ export function shouldRejectSkippedFinalSync(state: GameState): boolean {
   return buildGameSyncFingerprint(state) !== cs.lastSyncedGameFingerprint
 }
 
+/** Only in-progress / scheduled cloud games may replace the active local session on hydrate. */
+export function canHydrateAsActiveGame(status: string): boolean {
+  return status === 'in_progress' || status === 'scheduled'
+}
+
 /**
  * Auto cloud-resume must not replace a local session already bound to a different cloud game.
  * Manual open paths park first via `openGameSnapshot`; auto-hydrate used to overwrite the

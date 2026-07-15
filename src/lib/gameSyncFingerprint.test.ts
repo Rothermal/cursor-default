@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState } from '../types'
 import {
   buildGameSyncFingerprint,
+  canHydrateAsActiveGame,
   currentPeriodForCloudHydrate,
   shouldBlockDiscardUnsyncedGame,
   shouldBlockManualCloudHydrate,
@@ -235,5 +236,12 @@ describe('gameSyncFingerprint', () => {
     })
     expect(shouldRejectSkippedFinalSync(cleanSnapshot)).toBe(false)
     expect(shouldRejectSkippedFinalSync(latestWithEdits)).toBe(true)
+  })
+
+  it('canHydrateAsActiveGame only allows in_progress and scheduled', () => {
+    expect(canHydrateAsActiveGame('in_progress')).toBe(true)
+    expect(canHydrateAsActiveGame('scheduled')).toBe(true)
+    expect(canHydrateAsActiveGame('final')).toBe(false)
+    expect(canHydrateAsActiveGame('')).toBe(false)
   })
 })
