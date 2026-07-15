@@ -18,6 +18,12 @@ let lastLogKey = ''
 let lastLogAt = 0
 const THROTTLE_MS = 45_000
 
+/** Test-only: clear in-memory throttle so cases stay independent. */
+export function resetClientSyncErrorThrottleForTests(): void {
+  lastLogKey = ''
+  lastLogAt = 0
+}
+
 export type LogClientSyncErrorOptions = {
   /** When true, skip the in-memory throttle (e.g. one-shot backfill of a stored error). */
   bypassThrottle?: boolean
