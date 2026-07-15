@@ -1,5 +1,8 @@
 import type { CloudSyncStatus, GameState } from '../types'
-import { buildGameSyncFingerprint } from './gameSyncFingerprint'
+import {
+  buildGameSyncFingerprint,
+  shouldBlockDiscardUnsyncedGame,
+} from './gameSyncFingerprint'
 import {
   GAME_OWNER_KEY,
   GAME_RECORD_KEY_PREFIX,
@@ -372,7 +375,15 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
   let localGameId: string | null = null
   try {
     const gameState = JSON.parse(legacyRaw) as GameState
-    if (!hasPersistableGameState(gameState) || gameState.cloudSync?.gameStatus === 'final') {
+    if (!hasPersistableGameState(gameState)) {
+      removeLegacyMirror()
+      return emptyManifest(ownerId)
+    }
+    // Synced finals can be dropped; skipped-final / fingerprint-ahead finals must migrate.
+    if (
+      gameState.cloudSync?.gameStatus === 'final' &&
+      !shouldBlockDiscardUnsyncedGame(gameState, false)
+    ) {
       removeLegacyMirror()
       return emptyManifest(ownerId)
     }
@@ -418,7 +429,18 @@ export function loadActiveParkedGameState(ownerId: string | null): GameState | n
   if (!activeId) return null
 
   const record = readRecord(activeId)
-  if (!record || record.gameState.cloudSync?.gameStatus === 'final') {
+  if (!record) {
+    discardParkedGame(activeId, ownerId)
+    return null
+  }
+  // Clean synced finals are safe to drop. Skipped-final / fingerprint-ahead games must
+  // survive reload — UI discard already uses shouldBlockDiscardUnsyncedGame (PR #194).
+  if (record.gameState.cloudSync?.gameStatus === 'final') {
+    if (
+      shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+    ) {
+      return record.gameState
+    }
     discardParkedGame(activeId, ownerId)
     return null
   }
@@ -452,12 +474,28 @@ export function saveActiveGameState(
   ownerId: string | null
 ): ParkedGameSummary[] {
   const manifest = migrateLegacyGameStorage(ownerId)
-  if (!hasPersistableGameState(state) || state.cloudSync.gameStatus === 'final') {
+  if (!hasPersistableGameState(state)) {
     if (manifest.activeLocalGameId) {
       return discardParkedGame(manifest.activeLocalGameId, ownerId)
     }
     removeLegacyMirror()
     return listParkedGames(ownerId)
+  }
+  // Persist effect + New Game/park call this with gameStatus final after skippedFinal
+  // rejection. Do not delete fingerprint-ahead locals — that undoes PR #194's guard.
+  if (state.cloudSync.gameStatus === 'final') {
+    const existing = manifest.activeLocalGameId
+      ? readRecord(manifest.activeLocalGameId)
+      : null
+    if (
+      !shouldBlockDiscardUnsyncedGame(state, existing?.sync.dirty ?? false)
+    ) {
+      if (manifest.activeLocalGameId) {
+        return discardParkedGame(manifest.activeLocalGameId, ownerId)
+      }
+      removeLegacyMirror()
+      return listParkedGames(ownerId)
+    }
   }
 
   const hasActiveId = Boolean(manifest.activeLocalGameId)
