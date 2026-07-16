@@ -560,6 +560,27 @@ accounts; keep one team that the app admin does not belong to.
 
 ---
 
+## 10f. Access audit trail (SEC-6)
+
+**Precondition:** Apply `040_access_audit_trail.sql`. Use team owner, admin, scorer, viewer,
+pending, unrelated, and app-admin accounts. New history starts after migration 040; no earlier
+actions are backfilled.
+
+| Step | Action | Expected |
+|---|---|---|
+| 10f.1 | Owner/admin opens Team Manage -> Access activity | Recent events for only that team load; scorer/viewer users do not see the panel |
+| 10f.2 | Invite by email, accept/decline an invite, cancel a pending invite, remove/leave, and change an accepted role | Each successful mutation creates one appropriately labeled event with actor, target, role metadata, and timestamp |
+| 10f.2a | Change the role on a pending email invite without resending it | One role-change event records previous/new roles and `pending: true` |
+| 10f.3 | Create, redeem, and revoke invite links | Each action creates an event containing link id/role but no invite token |
+| 10f.4 | Attempt a member/link action that server authorization rejects | The action fails and no audit event is committed |
+| 10f.5 | Scorer, viewer, pending, or unrelated user calls `get_access_audit_events` for the team | RPC denies every call; direct audit-table writes are also denied |
+| 10f.6 | Team owner/admin requests audit history for another team | RPC and table RLS deny access unless the account is also owner/admin there |
+| 10f.7 | App admin opens Settings -> Advanced -> Audit activity | Global member, invite-link, and app-access events load across teams |
+| 10f.8 | App admin changes an account status or app role | A global `app_access_changed` event appears without granting team access |
+| 10f.9 | Inspect `access_audit_events.metadata` after all scenarios | No email secrets, invite tokens, access tokens, or refresh tokens are stored |
+
+---
+
 ## 11. PWA & offline
 
 **Precondition:** Production build or deployed site (HTTPS or localhost).
@@ -600,10 +621,11 @@ accounts; keep one team that the app admin does not belong to.
 ## Notes
 
 - **App access migration:** SEC-5 requires `039_app_level_access.sql` plus one manual run of `supabase/scripts/bootstrap_app_admin.sql` with an existing profile email.
+- **Access audit migration:** SEC-6 requires `040_access_audit_trail.sql`; history begins when the migration is applied.
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a script fails on cloud features, confirm the migrations listed in [README.md](../README.md) (through **`036_viewer_team_role.sql`**) are applied in the Supabase SQL Editor. Seasons / `team_players` / integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` before **019** on legacy DBs). Player merge needs **024**/**025**. Team stats need **028–031**. Shot chart needs **032**. Sync diagnostics need **033**. Google profile defaults need **034**. Team access roles need **035**/**036** in order.
+- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`040_access_audit_trail.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**.
 
 ---
 

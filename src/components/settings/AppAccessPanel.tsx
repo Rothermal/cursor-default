@@ -81,7 +81,13 @@ function AccountEditor({ account, currentUserId, saving, onSave }: AccountEditor
   )
 }
 
-export default function AppAccessPanel({ currentUserId }: { currentUserId: string }) {
+export default function AppAccessPanel({
+  currentUserId,
+  onAccessChanged,
+}: {
+  currentUserId: string
+  onAccessChanged?: () => void
+}) {
   const [accounts, setAccounts] = useState<AccountAccessRow[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
@@ -130,6 +136,7 @@ export default function AppAccessPanel({ currentUserId }: { currentUserId: strin
     }
 
     setMessage(`Updated access for ${account.displayName}.`)
+    onAccessChanged?.()
     await loadAccounts(activeSearch)
   }
 

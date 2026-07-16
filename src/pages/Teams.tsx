@@ -11,6 +11,7 @@ import { sportDashboardPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AccessUnavailable from '../components/AccessUnavailable'
 import TeamInviteLinksPanel from '../components/TeamInviteLinksPanel'
+import AuditTrailPanel from '../components/AuditTrailPanel'
 import PlayerGuardiansDialog from '../components/PlayerGuardiansDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -197,6 +198,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [mergeEligibleTeamIds, setMergeEligibleTeamIds] = useState<string[]>([])
   const [mergeScopeRefresh, setMergeScopeRefresh] = useState(0)
   const [rosterTick, setRosterTick] = useState(0)
+  const [auditRefresh, setAuditRefresh] = useState(0)
 
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
@@ -557,6 +559,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     })
     const rows = (data ?? []) as Array<TeamMemberRow & { team_id?: string }>
     setTeamMembers(rows.map(r => ({ ...r, team_id: r.team_id ?? selectedTeamId })))
+    setAuditRefresh(value => value + 1)
   }
 
   const handleRemoveMember = async (memberId: string) => {
@@ -580,6 +583,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       return
     }
     setTeamMembers(prev => prev.filter(m => m.id !== memberId))
+    setAuditRefresh(value => value + 1)
   }
 
   const handleChangeMemberRole = async (member: TeamMemberRow, nextRole: TeamRole) => {
@@ -606,6 +610,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setTeamMembers(prev =>
       prev.map(candidate => candidate.id === member.id ? { ...candidate, role: nextRole } : candidate)
     )
+    setAuditRefresh(value => value + 1)
   }
 
   const handleLeaveTeam = async () => {
@@ -1942,11 +1947,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                         </div>
                       )}
                     </div>
-                    <TeamInviteLinksPanel teamId={selectedTeamId} />
+                    <TeamInviteLinksPanel
+                      teamId={selectedTeamId}
+                      onAuditChange={() => setAuditRefresh(value => value + 1)}
+                    />
                   </>
                 )}
               </>
             )}
+          </section>
+        )}
+
+        {isManagementRoute && selectedTeam && mayManageMembers && (
+          <section className="card">
+            <AuditTrailPanel teamId={selectedTeamId} refreshKey={auditRefresh} />
           </section>
         )}
       </div>

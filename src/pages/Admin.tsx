@@ -17,6 +17,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard from '../components/MergePlayerWizard'
 import AccountSettings from '../components/settings/AccountSettings'
 import AppAccessPanel from '../components/settings/AppAccessPanel'
+import AuditTrailPanel from '../components/AuditTrailPanel'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
@@ -176,6 +177,7 @@ export default function Admin() {
   const [mergeAuditRows, setMergeAuditRows] = useState<MergeAuditListRow[]>([])
   const [loadingMergeAudit, setLoadingMergeAudit] = useState(false)
   const [mergeAuditError, setMergeAuditError] = useState<string | null>(null)
+  const [accessAuditRefresh, setAccessAuditRefresh] = useState(0)
   const seasonsActive = settingsSection === 'data'
   const mergeToolsActive = settingsSection === 'advanced'
   const dataMgmtActive = settingsSection === 'advanced'
@@ -1124,7 +1126,18 @@ export default function Admin() {
         )}
 
         {settingsSection === 'advanced' && isConfigured && user && appAccess?.appRole === 'app_admin' && (
-          <AppAccessPanel currentUserId={user.id} />
+          <>
+            <AppAccessPanel
+              currentUserId={user.id}
+              onAccessChanged={() => setAccessAuditRefresh(value => value + 1)}
+            />
+            <div className="mt-6">
+              <AuditTrailPanel
+                refreshKey={accessAuditRefresh}
+                title="Audit activity"
+              />
+            </div>
+          </>
         )}
 
         {settingsSection === 'advanced' && isConfigured && user && (
