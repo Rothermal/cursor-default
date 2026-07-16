@@ -1,6 +1,6 @@
 # StatKeeper access matrix
 
-Status: SEC-0 approved baseline with implementation through SEC-5 (2026-07-16).
+Status: SEC-0 approved baseline with implementation through SEC-6 (2026-07-16).
 
 This document is the product and security contract for SEC-1 through SEC-6. It records
 the intended access model separately from the current implementation so later phases can
@@ -123,7 +123,7 @@ grant team management, stat correction, or game tracking rights.
 | Manage owned seasons | Deny | Own seasons | Deny | Own seasons unless an explicit support RPC exists |
 | Manage app access state | Deny | Deny | Deny | Allow through narrow RPCs |
 | Bypass team RLS | Deny | Deny | Deny | Deny |
-| Read all audit events | Deny | Team-scoped owner/admin only (SEC-6) | Deny | Allow (SEC-6) |
+| Read all audit events | Deny | Team-scoped owner/admin only | Deny | Allow |
 
 When Supabase is not configured, StatKeeper's existing local-only mode remains available
 without an account. SEC-5 applies to authenticated cloud sessions and must not silently
@@ -167,6 +167,7 @@ closed SEC0-15 in migration 039 with a PostgREST request gate and app-admin-only
 | Authenticated app shell | Any authenticated Supabase user enters; no app status exists | `src/App.tsx`, `src/context/AuthContext.tsx` |
 | Local parked games | Device-local records scoped by stored owner id | `src/lib/gameParking.ts` |
 | App-level access | Active accounts enter; pending/suspended accounts stop before app providers; app-admin changes use narrow RPCs | Migration 039, `src/App.tsx`, `src/lib/appAccess.ts` |
+| Access audit history | Team owner/admin reads own team events; app admin reads all; direct writes denied | Migration 040, `src/components/AuditTrailPanel.tsx` |
 
 ---
 
@@ -192,7 +193,7 @@ Supabase API directly.
 | SEC0-13 | Medium | Guardian self-insert requires only `user_id = auth.uid()` and can target any known player UUID; team owner/admin removal is not implemented. | Closed by RPC-only guardian writes in migration 038. | SEC-4 (closed) |
 | SEC0-14 | Planned | There is no read-only viewer role, and existing policies assume every member may write games. | Team role check and game policies in migrations 002/013. | SEC-2 |
 | SEC0-15 | Closed | Active/pending/suspended status and a separate app-admin role are enforced at the Data API boundary and app shell. | Migration 039, `App.tsx`, `AuthContext.tsx`. | SEC-5 (closed) |
-| SEC0-16 | Planned | Sensitive access changes do not have a unified durable audit trail; player merge has its own limited audit table. | Migrations 024/025. | SEC-6 |
+| SEC0-16 | Closed for approved first scope | Member, invite-link, and app-access changes now have a unified durable trail; player merge remains separate and other event families are documented follow-ups. | Migration 040. | SEC-6 (closed) |
 
 ### SEC-1 minimum server-side scope
 

@@ -191,8 +191,8 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 
 | Item | Detail |
 |------|--------|
-| Migrations | 39 files (`001`–`039`) in [`supabase/migrations/`](../supabase/migrations/) |
-| Tables | 19 core tables (profiles, account_access, teams, players, games, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
+| Migrations | 40 files (`001`–`040`) in [`supabase/migrations/`](../supabase/migrations/) |
+| Tables | 20 core tables (profiles, account_access, access_audit_events, teams, players, games, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
 | Auth | Email/password + Google OAuth (PKCE), account profile/identities, app access status; team RLS scoped via `team_members` roles (owner / admin / scorer / viewer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
 | Destructive | Migration **018** redesigned seasons/roster — backup before applying on existing DBs |
@@ -213,6 +213,7 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 | `invite_team_member` / `lookup_user_by_email` | Team invites |
 | `create_team_invite_link` / `redeem_team_invite_link` | Single-use team invite links |
 | `claim_player_guardianship` / `remove_player_guardian` | Bounded player guardian management |
+| `get_access_audit_events` | Team-scoped or app-admin-global access history |
 | `update_player_identity` | Creator/guardian identity-only player editing |
 | `merge_players_preview` / `merge_players_execute` | Player merge wizard |
 
@@ -246,7 +247,7 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-5 complete; SEC-6 audit trail is next |
+| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | NAV/AUTH foundation shipped; soccer planning still gated on remaining foundation work |
 

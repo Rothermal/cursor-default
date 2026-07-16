@@ -57,7 +57,8 @@ Shipped today:
 - Owner/admin/scorer UI gates are repeated in several files.
 - Admin member-management behavior should be made explicit across UI, RPCs, and RLS.
 - Guardianship is managed and field-bounded, but changes are not yet durably audited.
-- No unified audit trail for role changes, invite activity, guardian changes, or access changes.
+- The unified trail covers member, invite-link, and app-access changes; guardian, stat,
+  recorder, and game-lifecycle event families remain follow-ups.
 
 ---
 
@@ -86,7 +87,7 @@ Shipped today:
 | SEC-3 | `PLAN_SEC_3_INVITE_LINKS.md` | Implement DB-backed invite links and join flow. | Complete; migration 037 |
 | SEC-4 | `PLAN_SEC_4_GUARDIANSHIP_REVIEW.md` | Make player guardianship clearer, safer, and manageable. | Complete; migration 038 |
 | SEC-5 | `PLAN_SEC_5_APP_LEVEL_ACCESS.md` | Add optional app-level access controls such as active/pending/suspended and app admin. | Complete; migration 039 |
-| SEC-6 | `PLAN_SEC_6_AUDIT_TRAIL.md` | Add durable audit records and an admin/support view for sensitive changes. | Planned |
+| SEC-6 | `PLAN_SEC_6_AUDIT_TRAIL.md` | Add durable audit records and an admin/support view for sensitive changes. | Complete; migration 040 |
 
 Recommended order:
 

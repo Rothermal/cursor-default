@@ -17,7 +17,13 @@ function roleLabel(role: TeamInviteLinkRole): string {
   return role === 'scorer' ? 'Scorer' : 'Viewer'
 }
 
-export default function TeamInviteLinksPanel({ teamId }: { teamId: string }) {
+export default function TeamInviteLinksPanel({
+  teamId,
+  onAuditChange,
+}: {
+  teamId: string
+  onAuditChange?: () => void
+}) {
   const [links, setLinks] = useState<TeamInviteLinkRow[]>([])
   const [role, setRole] = useState<TeamInviteLinkRole>('viewer')
   const [loading, setLoading] = useState(true)
@@ -73,6 +79,7 @@ export default function TeamInviteLinksPanel({ teamId }: { teamId: string }) {
 
     const created = ((data ?? [])[0] as TeamInviteLinkRow | undefined) ?? null
     if (created) setLinks(current => [created, ...current])
+    onAuditChange?.()
   }
 
   const handleCopy = async (link: TeamInviteLinkRow) => {
@@ -99,6 +106,7 @@ export default function TeamInviteLinksPanel({ teamId }: { teamId: string }) {
       return
     }
     setLinks(current => current.filter(candidate => candidate.id !== link.id))
+    onAuditChange?.()
   }
 
   return (

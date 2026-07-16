@@ -131,8 +131,30 @@ Ask these one at a time before implementation.
 
 ## 8. Acceptance Criteria
 
-- Sensitive actions write audit events.
-- Authorized users can read the intended audit scope.
-- Unauthorized users cannot read other teams' audit events.
-- Audit metadata is useful but does not expose secrets or invite tokens.
-- Existing feature flows still work.
+- [x] Selected sensitive actions write audit events.
+- [x] Authorized users can read the intended audit scope.
+- [x] Unauthorized users cannot read other teams' audit events.
+- [x] Audit metadata is useful but does not expose secrets or invite tokens.
+- [x] Existing feature flows still work.
+
+---
+
+## 9. Implementation Result
+
+- Added migration `040_access_audit_trail.sql` with immutable `access_audit_events`,
+  team/app-admin read policy, a bounded scoped read RPC, and indexes for recent global and
+  team activity.
+- Database triggers record successful member invites, reinvites, acceptance, decline,
+  cancellation, leave/removal, and accepted-member role changes in the same transaction as
+  the authoritative table mutation.
+- Invite-link triggers record create/redeem/revoke events without storing the secret token.
+  Metadata accepts only JSON objects and explicitly rejects token-key fields.
+- SEC-5 account status/role changes are also recorded. SQL-editor changes have a null/System
+  actor rather than inheriting a previous `updated_by` value.
+- Team owner/admin users see their selected team's Access activity under Team Manage. Active
+  app admins see the global Audit activity under Settings -> Advanced. Scorers, viewers,
+  pending users, and unrelated users have no read path.
+- `player_merge_audit` remains separate. Guardian, stat-correction, primary-recorder, and
+  game lifecycle events are intentionally deferred event-family expansions; SEC-6 ships the
+  approved member/invite-link foundation plus app-access changes.
+- No historical rows are synthesized. The trail begins when migration 040 is applied.
