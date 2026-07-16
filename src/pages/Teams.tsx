@@ -10,6 +10,7 @@ import { teamInfoPath, teamLeaderboardPath, teamManagementPath } from '../lib/te
 import { sportDashboardPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AccessUnavailable from '../components/AccessUnavailable'
+import TeamInviteLinksPanel from '../components/TeamInviteLinksPanel'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
@@ -1794,54 +1795,57 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 )}
 
                 {mayManageMembers && (
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <p className="text-sm font-medium text-slate-600">Invite by email</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="email"
-                        value={inviteEmail}
-                        onChange={e => { setInviteEmail(e.target.value); setLookupResult(null) }}
-                        placeholder="Email address"
-                        className="input-field flex-1 text-sm py-2"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void handleLookupInvitee()}
-                        disabled={!inviteEmail.trim()}
-                        className="btn-secondary py-2 px-3 text-sm"
-                      >
-                        Lookup
-                      </button>
-                    </div>
-                    {lookupResult && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-2">
-                        <p className="text-sm text-slate-700">
-                          Invite <strong>{lookupResult.display_name || inviteEmail}</strong> as
-                        </p>
-                        <div className="flex gap-2 items-center">
-                          <select
-                            value={inviteRole}
-                            onChange={e => setInviteRole(e.target.value as 'viewer' | 'scorer' | 'admin')}
-                            className="input-field text-sm py-2 w-auto"
-                          >
-                            <option value="viewer">Viewer</option>
-                            <option value="scorer">Scorer</option>
-                            {canInviteTeamRole(myRole, 'admin') && (
-                              <option value="admin">Admin</option>
-                            )}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => void handleInvite()}
-                            disabled={inviting}
-                            className="btn-primary py-2 px-4 text-sm"
-                          >
-                            {inviting ? 'Sending...' : 'Send Invite'}
-                          </button>
-                        </div>
+                  <>
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <p className="text-sm font-medium text-slate-600">Invite by email</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={inviteEmail}
+                          onChange={e => { setInviteEmail(e.target.value); setLookupResult(null) }}
+                          placeholder="Email address"
+                          className="input-field flex-1 text-sm py-2"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleLookupInvitee()}
+                          disabled={!inviteEmail.trim()}
+                          className="btn-secondary py-2 px-3 text-sm"
+                        >
+                          Lookup
+                        </button>
                       </div>
-                    )}
-                  </div>
+                      {lookupResult && (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-2">
+                          <p className="text-sm text-slate-700">
+                            Invite <strong>{lookupResult.display_name || inviteEmail}</strong> as
+                          </p>
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={inviteRole}
+                              onChange={e => setInviteRole(e.target.value as 'viewer' | 'scorer' | 'admin')}
+                              className="input-field text-sm py-2 w-auto"
+                            >
+                              <option value="viewer">Viewer</option>
+                              <option value="scorer">Scorer</option>
+                              {canInviteTeamRole(myRole, 'admin') && (
+                                <option value="admin">Admin</option>
+                              )}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => void handleInvite()}
+                              disabled={inviting}
+                              className="btn-primary py-2 px-4 text-sm"
+                            >
+                              {inviting ? 'Sending...' : 'Send Invite'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <TeamInviteLinksPanel teamId={selectedTeamId} />
+                  </>
                 )}
               </>
             )}

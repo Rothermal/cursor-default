@@ -33,13 +33,13 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 
 ### 1.2 Database schema (canonical, migrations 018+)
 
-The **ASCII diagram below is historical (pre–018)** and shows `players.team_id` and sport on `teams` — **that is not the current schema**. Use **`supabase/migrations/`** and the **README** migration list (001–**036**) as the source of truth.
+The **ASCII diagram below is historical (pre–018)** and shows `players.team_id` and sport on `teams` — **that is not the current schema**. Use **`supabase/migrations/`** and the **README** migration list (001–**037**) as the source of truth.
 
 **Current product model (summary):**
 
 | Area | Notes |
 |------|--------|
-| **Seasons & teams** | `seasons` (sport CHECK, optional `team_stats_config`), `teams` (`season_id` required), `team_members`, `team_invites` |
+| **Seasons & teams** | `seasons` (sport CHECK, optional `team_stats_config`), `teams` (`season_id` required), `team_members`, email invites, and single-use `team_invite_links` (**037**) |
 | **Roster** | `players` (global; `created_by`; optional `is_team_placeholder`); **`team_players`** junction — **no** `players.team_id` |
 | **Games** | `games`: `team_id`, **`season_id`** (denormalized, trigger per **019**), `tournament_id`, scores, notes, `last_opened_at`, team placeholder FKs (**030**), `created_by`, status |
 | **Stats & chart** | `game_stats`, RPCs **010**, `stat_corrections`, `player_checkouts`, **`shot_chart` (032)** |

@@ -28,6 +28,7 @@ import TeamStats from './pages/TeamStats'
 import TournamentStats from './pages/TournamentStats'
 import ShotChart from './pages/ShotChart'
 import ShotChartPreview from './pages/ShotChartPreview'
+import TeamInvite from './pages/TeamInvite'
 import { consumeOAuthReturnPath } from './lib/oauthReturnPath'
 
 function AppRoutes() {
@@ -63,7 +64,12 @@ function AppRoutes() {
   }
 
   if (isConfigured && !user) {
-    return <Auth />
+    return (
+      <Routes>
+        <Route path="/invite/:token" element={<TeamInvite />} />
+        <Route path="*" element={<Auth />} />
+      </Routes>
+    )
   }
 
   return (
@@ -91,6 +97,7 @@ function AppRoutes() {
             <Route path="/teams" element={<TeamsList />} />
             <Route path="/team" element={<TeamInfo />} />
             <Route path="/team/manage" element={<TeamManage />} />
+            <Route path="/invite/:token" element={<TeamInvite />} />
             <Route path="/team/roster" element={<TeamRoster />} />
             <Route path="/team/schedule" element={<TeamSchedule />} />
             <Route path="/team/season" element={<SeasonInfo />} />

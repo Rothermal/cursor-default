@@ -2,7 +2,7 @@
 
 SEC-3 implements shareable team invite links.
 
-Depends on: SEC-0, SEC-1. Ideally follows SEC-2 if `viewer` should be a link role.
+Depends on: SEC-0, SEC-1, SEC-2.
 
 ---
 
@@ -135,9 +135,28 @@ Ask these one at a time before implementation.
 
 ## 8. Acceptance Criteria
 
-- Owner/admin can create and copy an invite link.
-- Unauthorized users cannot create/revoke links.
-- Signed-out invitee can authenticate and return to invite.
-- Signed-in invitee can redeem link and join team.
-- Redeemed/expired/revoked links cannot be reused.
-- Existing email invite flow still works.
+- [x] Owner/admin can create and copy an invite link.
+- [x] Unauthorized users cannot create/revoke links.
+- [x] Signed-out invitee can authenticate and return to invite.
+- [x] Signed-in invitee can redeem link and join team.
+- [x] Redeemed/expired/revoked links cannot be reused.
+- [x] Existing email invite flow still works.
+
+---
+
+## 9. Implementation Result
+
+- Added migration `037_team_invite_links.sql` with a direct-access-denied token table and
+  narrow create, list, resolve, redeem, and revoke RPCs.
+- Links are cryptographically random, single-use, scorer/viewer only, and expire after
+  7 days in the UI. The create RPC bounds expiry to 1-30 days.
+- Team Manage lists active links with role, expiry, Copy, and Revoke controls while
+  preserving the existing email-invite flow.
+- `/#/invite/:token` resolves limited team context before authentication, preserves the
+  invite route through email/password or Google OAuth, and asks the signed-in user to
+  confirm before joining.
+- Redemption locks the link row and creates accepted membership atomically. Existing
+  owners, accepted members, and users with a pending email invite cannot consume a link.
+- Added focused token/URL/auth-return tests and manual regression cases. Database role and
+  concurrency scenarios remain manual because the repository has no local Supabase
+  integration-test harness.

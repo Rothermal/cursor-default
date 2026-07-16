@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { getOAuthRedirectUrl, getOAuthReturnError } from '../lib/authRedirect'
 
-export default function Auth() {
+interface AuthProps {
+  contextTitle?: string
+  contextMessage?: string
+}
+
+export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
   const { signUp, signIn, signInWithGoogle, isConfigured } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
@@ -104,6 +109,14 @@ export default function Auth() {
         </div>
 
         <div className="card">
+          {contextTitle && (
+            <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+              <p className="text-sm font-semibold text-blue-800">{contextTitle}</p>
+              {contextMessage && (
+                <p className="mt-1 text-xs text-blue-700">{contextMessage}</p>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => void handleGoogleSignIn()}
