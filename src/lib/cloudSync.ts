@@ -550,13 +550,6 @@ async function ensurePlayerId(
     }
 
     playerId = createdPlayer.id as string
-
-    await supabase
-      .from('player_guardians')
-      .upsert(
-        { player_id: playerId, user_id: userId, relationship: 'parent' },
-        { onConflict: 'player_id,user_id' }
-      )
   }
 
   await supabase

@@ -12,6 +12,7 @@ import {
   canManageRoster,
   canRemoveTeamMember,
   canTrackGames,
+  canViewPlayerGuardians,
   parseTeamRole,
 } from './teamPermissions'
 
@@ -102,5 +103,14 @@ describe('teamPermissions', () => {
     expect(canEditPlayerIdentity('user-1', 'user-2', true)).toBe(true)
     expect(canEditPlayerIdentity('user-1', 'user-2', false)).toBe(false)
     expect(canEditPlayerIdentity(null, 'user-1', true)).toBe(false)
+  })
+
+  it('shows guardian management through team authority or a player relationship', () => {
+    expect(canViewPlayerGuardians('owner', false, false)).toBe(true)
+    expect(canViewPlayerGuardians('admin', false, false)).toBe(true)
+    expect(canViewPlayerGuardians('scorer', false, false)).toBe(false)
+    expect(canViewPlayerGuardians('scorer', false, true)).toBe(true)
+    expect(canViewPlayerGuardians('viewer', true, false)).toBe(true)
+    expect(canViewPlayerGuardians('viewer', false, false)).toBe(false)
   })
 })

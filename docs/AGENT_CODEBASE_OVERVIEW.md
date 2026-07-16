@@ -62,7 +62,7 @@ flowchart TB
 | [`src/lib/`](../src/lib/) | Pure helpers (scoring, team stats, shot chart, display) | Business logic without UI |
 | [`src/pages/`](../src/pages/) | One screen per route | UI for a feature |
 | [`src/components/`](../src/components/) | Shared UI (Scoreboard, StatButton, shot-chart/, team-stats/) | Reusable widgets |
-| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001–037) | Any DB change |
+| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001–038) | Any DB change |
 | [`docs/`](.) | Design specs and plans | Before building a feature |
 
 **Convention:** Pages orchestrate; heavy logic lives in `lib/` and the `GameContext` reducer.
@@ -191,7 +191,7 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 
 | Item | Detail |
 |------|--------|
-| Migrations | 37 files (`001`–`037`) in [`supabase/migrations/`](../supabase/migrations/) |
+| Migrations | 38 files (`001`–`038`) in [`supabase/migrations/`](../supabase/migrations/) |
 | Tables | 18 core tables (profiles, teams, players, games, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
 | Auth | Email/password + Google OAuth (PKCE), Account display-name editing, connected identities; RLS scoped via `team_members` roles (owner / admin / scorer / viewer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
@@ -212,6 +212,8 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 | `set_primary_recorder` | Admin on Game Summary |
 | `invite_team_member` / `lookup_user_by_email` | Team invites |
 | `create_team_invite_link` / `redeem_team_invite_link` | Single-use team invite links |
+| `claim_player_guardianship` / `remove_player_guardian` | Bounded player guardian management |
+| `update_player_identity` | Creator/guardian identity-only player editing |
 | `merge_players_preview` / `merge_players_execute` | Player merge wizard |
 
 Without Supabase env vars, `supabase.ts` returns `null` and the app skips auth (`isConfigured === false`).
@@ -244,7 +246,7 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-3 complete; SEC-4 guardianship review is next |
+| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-4 complete; SEC-5 app-level access is next |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | NAV/AUTH foundation shipped; soccer planning still gated on remaining foundation work |
 

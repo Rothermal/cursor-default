@@ -89,3 +89,11 @@ export function canEditPlayerIdentity(
 ): boolean {
   return Boolean(userId && (createdBy === userId || isGuardian))
 }
+
+export function canViewPlayerGuardians(
+  role: TeamRole | null,
+  isCreator: boolean,
+  isGuardian: boolean
+): boolean {
+  return canManageRoster(role) || isCreator || isGuardian
+}

@@ -198,13 +198,6 @@ export default function PlayerSetup() {
         return
       }
 
-      await supabase!
-        .from('player_guardians')
-        .upsert(
-          { player_id: playerId, user_id: user.id, relationship: 'parent' },
-          { onConflict: 'player_id,user_id' }
-        )
-
       dispatch({
         type: 'SET_CLOUD_SYNC_STATE',
         cloudSync: {

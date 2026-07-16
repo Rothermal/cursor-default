@@ -11,6 +11,7 @@ import { sportDashboardPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AccessUnavailable from '../components/AccessUnavailable'
 import TeamInviteLinksPanel from '../components/TeamInviteLinksPanel'
+import PlayerGuardiansDialog from '../components/PlayerGuardiansDialog'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
@@ -29,6 +30,7 @@ import {
   canManageRoster,
   canMergePlayers,
   canRemoveTeamMember,
+  canViewPlayerGuardians,
   parseTeamRole,
   type TeamRole,
 } from '../lib/teamPermissions'
@@ -188,6 +190,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
   const [guardianMap, setGuardianMap] = useState<Record<string, boolean>>({})
   const [claimingPlayerId, setClaimingPlayerId] = useState<string | null>(null)
+  const [guardianPlayer, setGuardianPlayer] = useState<PlayerRow | null>(null)
 
   const [mergeWizardOpen, setMergeWizardOpen] = useState(false)
   const [mergeCandidates, setMergeCandidates] = useState<MergePlayerOption[]>([])
@@ -893,29 +896,40 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   }
 
   const handleClaimGuardian = async (playerId: string) => {
-    if (!supabaseClient || !userId || !canClaimPlayerGuardianship(myRole)) return
+    if (
+      !supabaseClient ||
+      !userId ||
+      !selectedTeamId ||
+      !canClaimPlayerGuardianship(myRole)
+    ) return
     setError(null)
     setClaimingPlayerId(playerId)
 
-    const { error: insertError } = await supabaseClient
-      .from('player_guardians')
-      .insert({
-        player_id: playerId,
-        user_id: userId,
-        relationship: 'parent',
-      })
+    const { error: claimError } = await supabaseClient.rpc('claim_player_guardianship', {
+      p_player_id: playerId,
+      p_team_id: selectedTeamId,
+    })
 
     setClaimingPlayerId(null)
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setGuardianMap(prev => ({ ...prev, [playerId]: true }))
-        return
-      }
-      setError(insertError.message)
+    if (claimError) {
+      setError(claimError.message)
       return
     }
 
     setGuardianMap(prev => ({ ...prev, [playerId]: true }))
+    const player = players.find(candidate => candidate.id === playerId)
+    if (player) {
+      setPlayerPool(current => {
+        if (current.some(candidate => candidate.id === playerId)) return current
+        return [...current, {
+          id: player.id,
+          created_by: player.created_by,
+          first_name: player.first_name,
+          last_name: player.last_name,
+          nickname: player.nickname,
+        }]
+      })
+    }
   }
 
   const handleDeactivatePlayer = async (playerId: string) => {
@@ -1049,8 +1063,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
   const handleSavePlayer = async () => {
     const player = players.find(candidate => candidate.id === editingPlayerId)
-    if (!supabaseClient || !editingPlayerId || !selectedTeamId || !player || !mayManageRoster) return
-    const mayEditIdentity = canEditPlayerIdentity(userId, player.created_by, Boolean(guardianMap[player.id]))
+    if (!supabaseClient || !editingPlayerId || !selectedTeamId || !player) return
+    const mayEditIdentity = canEditPlayerIdentity(
+      userId,
+      player.created_by,
+      Boolean(guardianMap[player.id])
+    )
+    if (!mayManageRoster && !mayEditIdentity) return
     if (mayEditIdentity && !editingPlayerFirst.trim()) return
     setError(null)
     setSavingNickname(true)
@@ -1059,16 +1078,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     const jersey_number = editingPlayerNumber.trim() || null
     const nickname = editingPlayerNickname.trim() || null
     const playerRes = mayEditIdentity
-      ? await supabaseClient
-          .from('players')
-          .update({ first_name, last_name, nickname })
-          .eq('id', editingPlayerId)
+      ? await supabaseClient.rpc('update_player_identity', {
+          p_player_id: editingPlayerId,
+          p_first_name: first_name,
+          p_last_name: last_name,
+          p_nickname: nickname,
+        })
       : { error: null }
-    const junctionRes = await supabaseClient
-      .from('team_players')
-      .update({ jersey_number })
-      .eq('team_id', selectedTeamId)
-      .eq('player_id', editingPlayerId)
+    const junctionRes = mayManageRoster
+      ? await supabaseClient
+          .from('team_players')
+          .update({ jersey_number })
+          .eq('team_id', selectedTeamId)
+          .eq('player_id', editingPlayerId)
+      : { error: null }
     setSavingNickname(false)
     const updateError = playerRes.error || junctionRes.error
     if (updateError) {
@@ -1081,12 +1104,30 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           ? {
               ...p,
               ...(mayEditIdentity ? { first_name, last_name, nickname } : {}),
-              jersey_number,
+              ...(mayManageRoster ? { jersey_number } : {}),
             }
           : p
       )
     )
+    if (mayEditIdentity) {
+      setPlayerPool(current => current.map(candidate =>
+        candidate.id === editingPlayerId
+          ? { ...candidate, first_name, last_name, nickname }
+          : candidate
+      ))
+    }
     cancelEditPlayer()
+  }
+
+  const handleCurrentGuardianRemoved = (player: PlayerRow) => {
+    setGuardianMap(current => {
+      const next = { ...current }
+      delete next[player.id]
+      return next
+    })
+    if (player.created_by !== userId) {
+      setPlayerPool(current => current.filter(candidate => candidate.id !== player.id))
+    }
   }
 
   return (
@@ -1535,6 +1576,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       player.created_by,
                       Boolean(guardianMap[player.id])
                     )
+                    const mayViewGuardians = canViewPlayerGuardians(
+                      myRole,
+                      player.created_by === userId,
+                      Boolean(guardianMap[player.id])
+                    )
                     return (
                       <div key={player.id} className="border border-slate-100 rounded-xl px-3 py-2">
                         {isEditing ? (
@@ -1546,7 +1592,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 onChange={e => setEditingPlayerNumber(e.target.value)}
                                 placeholder="#"
                                 className="input-field col-span-2 text-center text-sm"
-                                autoFocus
+                                disabled={!mayManageRoster}
+                                autoFocus={mayManageRoster}
                               />
                               <input
                                 type="text"
@@ -1555,6 +1602,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 placeholder="First name *"
                                 className="input-field col-span-5 text-sm"
                                 disabled={!mayEditIdentity}
+                                autoFocus={!mayManageRoster && mayEditIdentity}
                               />
                               <input
                                 type="text"
@@ -1592,7 +1640,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="text-slate-500 shrink-0">
                                 #{player.jersey_number || '—'}
@@ -1606,7 +1654,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 )}
                               </p>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex max-w-[60%] flex-wrap items-center justify-end gap-1">
                               {selectedTeam && (
                                 <button
                                   type="button"
@@ -1620,17 +1668,31 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                   Career
                                 </button>
                               )}
+                              {(mayManageRoster || mayEditIdentity) && (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditPlayer(player)}
+                                  className="text-slate-400 hover:text-slate-600 p-1"
+                                  title={
+                                    mayManageRoster && mayEditIdentity
+                                      ? 'Edit player identity and jersey number'
+                                      : mayEditIdentity
+                                        ? 'Edit player identity'
+                                        : 'Edit jersey number'
+                                  }
+                                  aria-label={
+                                    mayManageRoster && mayEditIdentity
+                                      ? 'Edit player identity and jersey number'
+                                      : mayEditIdentity
+                                        ? 'Edit player identity'
+                                        : 'Edit jersey number'
+                                  }
+                                >
+                                  ✏️
+                                </button>
+                              )}
                               {mayManageRoster && (
                                 <>
-                                  <button
-                                    type="button"
-                                    onClick={() => startEditPlayer(player)}
-                                    className="text-slate-400 hover:text-slate-600 p-1"
-                                    title={mayEditIdentity ? 'Edit player' : 'Edit jersey number'}
-                                    aria-label={mayEditIdentity ? 'Edit player' : 'Edit jersey number'}
-                                  >
-                                    ✏️
-                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => { void handleDeactivatePlayer(player.id) }}
@@ -1653,10 +1715,24 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                   🗑️
                                 </button>
                               )}
-                              {guardianMap[player.id] ? (
-                                <span className="text-xs text-green-600 ml-1" title="You are a guardian">
-                                  Guardian ✓
-                                </span>
+                              {player.created_by === userId ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setGuardianPlayer(player)}
+                                  className="text-xs font-semibold text-green-700 ml-1"
+                                  title="View guardian relationships"
+                                >
+                                  Creator
+                                </button>
+                              ) : guardianMap[player.id] ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setGuardianPlayer(player)}
+                                  className="text-xs font-semibold text-green-700 ml-1"
+                                  title="View guardian relationships"
+                                >
+                                  Guardian
+                                </button>
                               ) : canClaimPlayerGuardianship(myRole) ? (
                                 <button
                                   type="button"
@@ -1668,6 +1744,17 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                   {claimingPlayerId === player.id ? 'Claiming...' : 'Claim'}
                                 </button>
                               ) : null}
+                              {!guardianMap[player.id] &&
+                                player.created_by !== userId &&
+                                mayViewGuardians && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setGuardianPlayer(player)}
+                                    className="text-xs font-semibold text-slate-600 ml-1"
+                                  >
+                                    Guardians
+                                  </button>
+                                )}
                             </div>
                           </div>
                         )}
@@ -1714,6 +1801,17 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           }}
           onCancel={() => setConfirmDeletePlayer(null)}
         />
+
+        {selectedTeamId && guardianPlayer && (
+          <PlayerGuardiansDialog
+            open
+            playerId={guardianPlayer.id}
+            playerName={playerDisplayName(guardianPlayer)}
+            teamId={selectedTeamId}
+            onClose={() => setGuardianPlayer(null)}
+            onCurrentUserRemoved={() => handleCurrentGuardianRemoved(guardianPlayer)}
+          />
+        )}
 
         {isManagementRoute && selectedTeam && (
           <section className="card space-y-3">
