@@ -514,6 +514,29 @@ pending-invite, and unrelated signed-out/signed-in test accounts.
 
 ---
 
+## 10d. Player guardianship (SEC-4)
+
+**Precondition:** Apply `038_guardianship_hardening.sql`. Use creator, unrelated guardian,
+team owner, admin, scorer, viewer, pending-member, and non-member test accounts. Include an
+active roster player and a removed/inactive roster player.
+
+| Step | Action | Expected |
+|---|---|---|
+| 10d.1 | Create players through Team Manage, Player Setup, and first cloud sync | Each non-placeholder player gets one creator guardian link; no duplicate links appear |
+| 10d.2 | Accepted scorer claims an active roster player from Team Manage | Claim succeeds, Guardian status appears, and the player is immediately available in the scorer's player pool |
+| 10d.3 | Viewer, pending member, non-member, or accepted member using an unrelated team/player pair calls the claim RPC | Every claim is denied; knowing player and team UUIDs is insufficient |
+| 10d.4 | Accepted scorer calls claim for an inactive roster entry | Claim is denied because the player is not active in that team context |
+| 10d.5 | Creator/guardian opens Edit on a roster where they are only scorer or viewer | First name, last name, and nickname are editable; jersey remains disabled |
+| 10d.6 | Guardian calls direct `players` UPDATE or attempts to change `created_by` / `is_team_placeholder` | Direct update is denied; identity changes succeed only through `update_player_identity` |
+| 10d.7 | Owner/admin without a player relationship edits the roster row | Jersey edit succeeds; identity fields remain disabled and direct identity RPC is denied |
+| 10d.8 | Creator opens Guardians and removes another guardian | Removal succeeds and the creator retains identity/pool access |
+| 10d.9 | Owner/admin of a team containing the player removes a guardian | Removal succeeds; a scorer, viewer, or unrelated manager cannot remove another guardian |
+| 10d.10 | Current guardian removes their own relationship | Relationship disappears and a non-creator player leaves their pool; team membership and roster entry are unchanged |
+| 10d.11 | Existing guardian is changed to viewer | Guardian identity/pool rights remain relationship-based, but the viewer cannot claim another player |
+| 10d.12 | Open the guardian dialog as manager, creator, or guardian | Guardian display names and Creator/you labels appear; no guardian email is returned or shown |
+
+---
+
 ## 11. PWA & offline
 
 **Precondition:** Production build or deployed site (HTTPS or localhost).

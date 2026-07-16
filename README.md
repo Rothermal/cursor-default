@@ -9,7 +9,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 - **Game Setup** — select season, pick/create team, enter opponent, tournament/league, and date
 - **Cloud Team & Roster Management** — create teams within seasons; manage rosters via `team_players` junction (players can span multiple teams/seasons); edit team names, player names, and jersey numbers inline
 - **Player Pool** — players are persistent person records; add existing players from your pool (players you created or are guardian of) to new teams without re-entering names
-- **Guardian System** — parents can claim guardianship of players on their team; guardians can edit player info and find players in their pool for future rosters
+- **Guardian System** — accepted non-viewer members can claim active-roster players; creators, guardians, and team managers can review/remove relationships; creator/guardian edits are limited to player identity fields; guarded players remain available in the player pool
 - **Cloud Game Lifecycle** — resume in-progress games, finalize games, and review cloud game history; finalized games show **resolved stats** (checkout + admin corrections) in Game Summary
 - **Tournaments** — first-class tournament entities scoped to teams; games reference tournaments via FK; tournament picker in Game Setup (select existing or create new); placement tracking (1st, 2nd, 3rd)
 - **Player Management** — add new or existing players with name and jersey number; add more mid-game
@@ -114,6 +114,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/035_team_access_hardening.sql` — accepted team membership, role-safe member RPCs, member privacy, and final-game/stat write hardening
    - `supabase/migrations/036_viewer_team_role.sql` — read-only viewer role, viewer-aware member RPCs, and tracker-only game/stat writes
    - `supabase/migrations/037_team_invite_links.sql` — expiring single-use scorer/viewer invite links with create/list/resolve/redeem/revoke RPCs
+   - `supabase/migrations/038_guardianship_hardening.sql` — contextual guardian claims, manager/creator/self removal, and identity-only player update RPC
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -260,7 +261,8 @@ supabase/
     ├── 034_google_auth_profile_defaults.sql
     ├── 035_team_access_hardening.sql
     ├── 036_viewer_team_role.sql
-    └── 037_team_invite_links.sql
+    ├── 037_team_invite_links.sql
+    └── 038_guardianship_hardening.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -365,12 +367,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Multi-game storage guardrails P3a/P3b** — 12 parked-game cap, storage/quota error UX, local parked-game export/import, parked-only keep-existing import merge behavior, reason-specific import skips, and storage estimate in Settings -> Data & Sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game sync race guards** — block discard of cloud-bound unsynced games, skip auto-hydrate when the active session is bound to a different cloud game, and reject skipped-final sync success when mid-sync/local edits remain ([`gameSyncFingerprint.ts`](src/lib/gameSyncFingerprint.ts), [plan](docs/PLAN_MULTI_GAME_PARKING.md) §5a)
 - [x] **Team invite links (SEC-3)** — owner/admin-created single-use scorer/viewer links, 7-day expiry, signed-out auth return, join confirmation, and active-link Copy/Revoke controls ([plan](docs/PLAN_SEC_3_INVITE_LINKS.md))
+- [x] **Guardianship hardening (SEC-4)** — contextual self-service claims, creator/manager/self removal, identity-only editing, guardian visibility, and consistent creator-link creation ([plan](docs/PLAN_SEC_4_GUARDIANSHIP_REVIEW.md))
 
 ### What's Next
 
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
-- [ ] Admin/security/access roadmap — SEC-0 through SEC-3 complete; guardianship review, app-level access, and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
+- [ ] Admin/security/access roadmap — SEC-0 through SEC-4 complete; app-level access and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations

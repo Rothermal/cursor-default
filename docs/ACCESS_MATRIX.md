@@ -139,8 +139,8 @@ current team policies treat any `team_members` row as membership and do not requ
 
 SEC-1 closed findings SEC0-01 through SEC0-12 in migration 035 and the corresponding
 client permission cleanup. SEC-2 closed SEC0-14 in migration 036. SEC-3 shipped the
-approved invite-link contract in migration 037. SEC0-13 remains assigned to SEC-4,
-with viewer claims narrowly denied until that phase ships.
+approved invite-link contract in migration 037. SEC-4 closed SEC0-13 in migration 038
+with contextual claims, bounded identity edits, and authorized guardian removal.
 
 | Resource | Current effective access | Primary source |
 |---|---|---|
@@ -187,7 +187,7 @@ Supabase API directly.
 | SEC0-10 | Medium | `/team/manage` shows add/edit/remove roster controls to scorers even though roster RLS rejects them; team list and Advanced settings similarly show edit/delete controls beyond the caller's authority. | `Teams.tsx`, `Admin.tsx`. | SEC-1 |
 | SEC0-11 | Medium | Cloud Games lists only games created by the current user, so accepted scorers/admins cannot discover and resume teammates' games from that page. Other team pages can display those games. | `Games.tsx` filters `created_by`; `TeamInfo.tsx` loads by `team_id`. | SEC-1 |
 | SEC0-12 | Medium | Team Info asks an owner/admin-only RPC for member data for every role; scorers receive an unavailable member card instead of an accepted-member-safe summary. | `TeamInfo.tsx`; `get_team_members_with_profiles` in migration 011. | SEC-1 |
-| SEC0-13 | Medium | Guardian self-insert requires only `user_id = auth.uid()` and can target any known player UUID; team owner/admin removal is not implemented. | `player_guardians_insert/delete` in migration 018; `Teams.tsx`. | SEC-4, with narrow SEC-1 containment if needed |
+| SEC0-13 | Medium | Guardian self-insert requires only `user_id = auth.uid()` and can target any known player UUID; team owner/admin removal is not implemented. | Closed by RPC-only guardian writes in migration 038. | SEC-4 (closed) |
 | SEC0-14 | Planned | There is no read-only viewer role, and existing policies assume every member may write games. | Team role check and game policies in migrations 002/013. | SEC-2 |
 | SEC0-15 | Planned | There is no app-level active/pending/suspended state or app-admin role. | `App.tsx`, `AuthContext.tsx`, `profiles` schema. | SEC-5 |
 | SEC0-16 | Planned | Sensitive access changes do not have a unified durable audit trail; player merge has its own limited audit table. | Migrations 024/025. | SEC-6 |
