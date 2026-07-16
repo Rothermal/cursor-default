@@ -191,9 +191,9 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 
 | Item | Detail |
 |------|--------|
-| Migrations | 38 files (`001`–`038`) in [`supabase/migrations/`](../supabase/migrations/) |
-| Tables | 18 core tables (profiles, teams, players, games, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
-| Auth | Email/password + Google OAuth (PKCE), Account display-name editing, connected identities; RLS scoped via `team_members` roles (owner / admin / scorer / viewer) |
+| Migrations | 39 files (`001`–`039`) in [`supabase/migrations/`](../supabase/migrations/) |
+| Tables | 19 core tables (profiles, account_access, teams, players, games, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
+| Auth | Email/password + Google OAuth (PKCE), account profile/identities, app access status; team RLS scoped via `team_members` roles (owner / admin / scorer / viewer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
 | Destructive | Migration **018** redesigned seasons/roster — backup before applying on existing DBs |
 | Pre-flight | Run `supabase/scripts/audit_data_integrity_pre_019.sql` before migration **019** |
@@ -246,7 +246,7 @@ flowchart LR
 
 | Doc | Topic |
 |-----|-------|
-| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-4 complete; SEC-5 app-level access is next |
+| [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-5 complete; SEC-6 audit trail is next |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | NAV/AUTH foundation shipped; soccer planning still gated on remaining foundation work |
 

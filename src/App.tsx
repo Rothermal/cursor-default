@@ -29,20 +29,30 @@ import TournamentStats from './pages/TournamentStats'
 import ShotChart from './pages/ShotChart'
 import ShotChartPreview from './pages/ShotChartPreview'
 import TeamInvite from './pages/TeamInvite'
+import AppAccessGate from './pages/AppAccessGate'
 import { consumeOAuthReturnPath } from './lib/oauthReturnPath'
 
 function AppRoutes() {
-  const { user, loading, isConfigured } = useAuth()
+  const {
+    user,
+    loading,
+    isConfigured,
+    appAccess,
+    appAccessLoading,
+    appAccessError,
+    refreshAppAccess,
+    signOut,
+  } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!user) return
+    if (!user || (isConfigured && appAccess?.status !== 'active')) return
 
     const returnPath = consumeOAuthReturnPath()
     if (returnPath) {
       navigate(returnPath, { replace: true })
     }
-  }, [navigate, user])
+  }, [appAccess?.status, isConfigured, navigate, user])
 
   if (
     import.meta.env.DEV &&
@@ -69,6 +79,27 @@ function AppRoutes() {
         <Route path="/invite/:token" element={<TeamInvite />} />
         <Route path="*" element={<Auth />} />
       </Routes>
+    )
+  }
+
+  if (isConfigured && user && appAccessLoading && !appAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-slate-500 animate-pulse">Checking account access...</p>
+      </div>
+    )
+  }
+
+  if (isConfigured && user && (!appAccess || appAccess.status !== 'active')) {
+    return (
+      <AppAccessGate
+        status={appAccess?.status ?? 'unavailable'}
+        email={user.email ?? null}
+        error={appAccessError}
+        checking={appAccessLoading}
+        onRefresh={() => void refreshAppAccess()}
+        onSignOut={() => void signOut()}
+      />
     )
   }
 

@@ -1,17 +1,22 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { clearPersistedGameStorage } from '../lib/gameStorageKeys'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { getOAuthRedirectUrl } from '../lib/authRedirect'
+import { loadCurrentAppAccess, type AppAccess } from '../lib/appAccess'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  appAccess: AppAccess | null
+  appAccessLoading: boolean
+  appAccessError: string | null
   isConfigured: boolean
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithGoogle: () => Promise<{ error: string | null }>
+  refreshAppAccess: () => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -21,6 +26,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [appAccess, setAppAccess] = useState<AppAccess | null>(null)
+  const [appAccessLoading, setAppAccessLoading] = useState(false)
+  const [appAccessError, setAppAccessError] = useState<string | null>(null)
+  const appAccessRequest = useRef(0)
   const configured = isSupabaseConfigured()
 
   useEffect(() => {
@@ -42,6 +51,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  const refreshAppAccess = useCallback(async () => {
+    const requestId = ++appAccessRequest.current
+    if (!configured || !user) {
+      setAppAccess(null)
+      setAppAccessError(null)
+      setAppAccessLoading(false)
+      return
+    }
+
+    setAppAccessLoading(true)
+    setAppAccessError(null)
+    const result = await loadCurrentAppAccess()
+    if (requestId !== appAccessRequest.current) return
+
+    setAppAccess(result.access)
+    setAppAccessError(result.error)
+    setAppAccessLoading(false)
+  }, [configured, user])
+
+  useEffect(() => {
+    void refreshAppAccess()
+  }, [refreshAppAccess])
+
+  useEffect(() => {
+    if (!configured || !user || typeof window === 'undefined') return
+
+    const refresh = () => void refreshAppAccess()
+    const intervalId = window.setInterval(refresh, 5 * 60 * 1000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+    }
+  }, [configured, refreshAppAccess, user])
 
   const signUp = useCallback(async (email: string, password: string, displayName: string) => {
     if (!supabase) return { error: 'Supabase not configured' }
@@ -72,6 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (!supabase) return
+    ++appAccessRequest.current
+    setAppAccess(null)
+    setAppAccessError(null)
+    setAppAccessLoading(false)
     clearPersistedGameStorage()
     await supabase.auth.signOut()
   }, [])
@@ -82,10 +133,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         loading,
+        appAccess,
+        appAccessLoading,
+        appAccessError,
         isConfigured: configured,
         signUp,
         signIn,
         signInWithGoogle,
+        refreshAppAccess,
         signOut,
       }}
     >

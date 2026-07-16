@@ -16,6 +16,7 @@ import { teamDisplayName } from '../lib/display'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard from '../components/MergePlayerWizard'
 import AccountSettings from '../components/settings/AccountSettings'
+import AppAccessPanel from '../components/settings/AppAccessPanel'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
@@ -107,7 +108,7 @@ export default function Admin() {
   const navigate = useNavigate()
   const location = useLocation()
   const { settings, isSportEnabled, toggleSport, setReboundPromptAfterMissEnabled } = useSettings()
-  const { isConfigured, user } = useAuth()
+  const { appAccess, isConfigured, user } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const supabaseClient = supabase
   const userId = user?.id ?? null
@@ -1120,6 +1121,10 @@ export default function Admin() {
           </section>
         )}
           </>
+        )}
+
+        {settingsSection === 'advanced' && isConfigured && user && appAccess?.appRole === 'app_admin' && (
+          <AppAccessPanel currentUserId={user.id} />
         )}
 
         {settingsSection === 'advanced' && isConfigured && user && (
