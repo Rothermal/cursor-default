@@ -85,7 +85,7 @@ Shipped today:
 |---|---|---|---|
 | SEC-0 | `PLAN_SEC_0_ACCESS_MATRIX_AND_AUDIT.md` | Define the role/action matrix and inspect current UI/RLS behavior. | Complete; see [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) |
 | SEC-1 | `PLAN_SEC_1_TEAM_ACCESS_CLEANUP.md` | Clean up current owner/admin/scorer behavior without adding new roles. | Complete; migration 035 |
-| SEC-2 | `PLAN_SEC_2_VIEWER_ROLE.md` | Add a true read-only `viewer` team role. | Planned |
+| SEC-2 | `PLAN_SEC_2_VIEWER_ROLE.md` | Add a true read-only `viewer` team role. | Complete; migration 036 |
 | SEC-3 | `PLAN_SEC_3_INVITE_LINKS.md` | Implement DB-backed invite links and join flow. | Planned |
 | SEC-4 | `PLAN_SEC_4_GUARDIANSHIP_REVIEW.md` | Make player guardianship clearer, safer, and manageable. | Planned |
 | SEC-5 | `PLAN_SEC_5_APP_LEVEL_ACCESS.md` | Add optional app-level access controls such as active/pending/suspended and app admin. | Planned |

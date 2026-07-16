@@ -12,6 +12,7 @@ import type { GameState } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { teamDisplayName } from '../lib/display'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { gameInfoPath } from '../lib/teamInfo'
 import {
   acceptedTeamRole,
   canDeleteGame,
@@ -301,15 +302,20 @@ export default function Games() {
     )
   }
 
-  const handleOpenGame = async (gameId: string) => {
+  const handleOpenGame = async (game: GameRow) => {
     if (!userId) return
+    const teamRole = teamRolesById[game.team_id] ?? null
+    if (game.status !== 'final' && !canTrackGames(teamRole)) {
+      navigate(gameInfoPath(game.id, game.team_id))
+      return
+    }
     const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
     if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
       return
     }
     setError(null)
-    setLoadingGameId(gameId)
-    const cloudGame = await loadCloudGameById(userId, gameId).catch(err => {
+    setLoadingGameId(game.id)
+    const cloudGame = await loadCloudGameById(userId, game.id).catch(err => {
       setError(err instanceof Error ? err.message : 'Could not load game')
       setLoadingGameId(null)
       return null
@@ -525,11 +531,17 @@ export default function Games() {
         </p>
         <div className="flex gap-2 mt-3">
           <button
-            onClick={() => { void handleOpenGame(game.id) }}
+            onClick={() => { void handleOpenGame(game) }}
             disabled={loadingGameId === game.id}
             className="btn-primary flex-1 py-2"
           >
-            {loadingGameId === game.id ? 'Loading...' : game.status === 'final' ? 'View Summary' : 'Resume Game'}
+            {loadingGameId === game.id
+              ? 'Loading...'
+              : game.status === 'final'
+                ? 'View Summary'
+                : canTrackGames(teamRole)
+                  ? 'Resume Game'
+                  : 'View Details'}
           </button>
           {canDeleteGame(teamRole) && (
             <button
