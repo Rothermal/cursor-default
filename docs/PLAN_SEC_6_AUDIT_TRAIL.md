@@ -145,8 +145,8 @@ Ask these one at a time before implementation.
   team/app-admin read policy, a bounded scoped read RPC, and indexes for recent global and
   team activity.
 - Database triggers record successful member invites, reinvites, acceptance, decline,
-  cancellation, leave/removal, and accepted-member role changes in the same transaction as
-  the authoritative table mutation.
+  cancellation, leave/removal, and accepted or pending member role changes in the same
+  transaction as the authoritative table mutation.
 - Invite-link triggers record create/redeem/revoke events without storing the secret token.
   Metadata accepts only JSON objects and explicitly rejects token-key fields.
 - SEC-5 account status/role changes are also recorded. SQL-editor changes have a null/System

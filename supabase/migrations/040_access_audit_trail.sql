@@ -131,9 +131,7 @@ begin
           'reinvited', true
         )
       );
-    elsif old.accepted_at is not null
-       and new.accepted_at is not null
-       and old.role is distinct from new.role then
+    elsif old.role is distinct from new.role then
       perform public.record_access_audit_event(
         p_event_type => 'team_member_role_changed',
         p_actor_user_id => v_actor_id,
@@ -142,7 +140,8 @@ begin
         p_metadata => jsonb_build_object(
           'membership_id', new.id,
           'previous_role', old.role,
-          'role', new.role
+          'role', new.role,
+          'pending', new.accepted_at is null
         )
       );
     end if;
