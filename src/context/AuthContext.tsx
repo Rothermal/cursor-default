@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import { clearPersistedGameStorage } from '../lib/gameStorageKeys'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { getOAuthRedirectUrl } from '../lib/authRedirect'
-import { loadCurrentAppAccess, type AppAccess } from '../lib/appAccess'
+import { applyAppAccessDenial, loadCurrentAppAccess, type AppAccess } from '../lib/appAccess'
 import {
   APP_ACCESS_DENIED_EVENT,
   type AppAccessDenial,
@@ -99,17 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const handleAccessDenied = (event: Event) => {
       const denial = (event as CustomEvent<AppAccessDenial>).detail
-      if (denial === 'APP_ACCESS_PENDING' || denial === 'APP_ACCESS_SUSPENDED') {
-        setAppAccess(previous => ({
-          status: denial === 'APP_ACCESS_PENDING' ? 'pending' : 'suspended',
-          appRole: previous?.appRole ?? 'user',
-          updatedAt: null,
-        }))
-        setAppAccessError(null)
-      } else {
-        setAppAccess(null)
-        setAppAccessError('Account access could not be verified.')
-      }
+      setAppAccess(previous => applyAppAccessDenial(previous, denial).access)
+      setAppAccessError(applyAppAccessDenial(null, denial).error)
       setAppAccessLoading(false)
       void refreshAppAccess()
     }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyAppAccessDenial,
   isMissingAppAccessRpcError,
   parseAccountAccessRows,
   parseAppAccess,
@@ -51,6 +52,37 @@ describe('isMissingAppAccessRpcError', () => {
   it('recognizes PostgREST schema-cache and PostgreSQL missing-function errors', () => {
     expect(isMissingAppAccessRpcError({ code: 'PGRST202' })).toBe(true)
     expect(isMissingAppAccessRpcError({ code: '42883' })).toBe(true)
+    expect(isMissingAppAccessRpcError({
+      message: 'Could not find the function public.get_my_app_access without parameters in the schema cache',
+    })).toBe(true)
     expect(isMissingAppAccessRpcError({ code: '42501', message: 'denied' })).toBe(false)
+    expect(isMissingAppAccessRpcError(null)).toBe(false)
+  })
+})
+
+describe('applyAppAccessDenial', () => {
+  it('locks the UI to pending/suspended while preserving the prior app role', () => {
+    expect(applyAppAccessDenial(
+      { status: 'active', appRole: 'app_admin', updatedAt: '2026-07-16T12:00:00Z' },
+      'APP_ACCESS_PENDING'
+    )).toEqual({
+      access: { status: 'pending', appRole: 'app_admin', updatedAt: null },
+      error: null,
+    })
+
+    expect(applyAppAccessDenial(null, 'APP_ACCESS_SUSPENDED')).toEqual({
+      access: { status: 'suspended', appRole: 'user', updatedAt: null },
+      error: null,
+    })
+  })
+
+  it('clears access when verification is unavailable', () => {
+    expect(applyAppAccessDenial(
+      { status: 'active', appRole: 'user', updatedAt: null },
+      'APP_ACCESS_UNAVAILABLE'
+    )).toEqual({
+      access: null,
+      error: 'Account access could not be verified.',
+    })
   })
 })
