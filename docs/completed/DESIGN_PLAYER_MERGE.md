@@ -124,9 +124,10 @@ Because conflicts need **human choice**, use **two** database entry points:
   4. **`stat_corrections`**: for each conflict, apply `choice` (keep one row and delete the other, or delete both); then `UPDATE` remaining corrections for duplicate → survivor.
   5. **`team_players`**: for each team with both players, `DELETE` both rows, `INSERT` one row for survivor with user-chosen `jersey_number`, `is_active`, `position`; for teams with only duplicate, `UPDATE player_id`; for only survivor, leave as-is.
   6. **`player_checkouts`**: `UPDATE` duplicate → survivor; resolve duplicate `(game_id, user_id)` by **earliest `checked_out_at`**, delete others; **tie** → delete one row (deterministic e.g. `ORDER BY id LIMIT 1` keep).
-  7. **`players`**: `UPDATE` survivor SET `first_name` / `last_name` / `nickname` = COALESCE(survivor.field, duplicate.field) where appropriate (copy from duplicate only where survivor is null/blank per §5).
-  8. **`DELETE FROM players WHERE id = p_duplicate_id`**.
-  9. **`player_merge_audit`** insert.
+  7. **`shot_chart`** (migration **041**): remount duplicate → survivor **before** deleting the player. Prefer survivor when `(game_id, recorded_by, client_shot_id)` collides; otherwise `UPDATE player_id`. Required because `shot_chart.player_id` is `ON DELETE CASCADE` (032).
+  8. **`players`**: `UPDATE` survivor SET `first_name` / `last_name` / `nickname` = COALESCE(survivor.field, duplicate.field) where appropriate (copy from duplicate only where survivor is null/blank per §5).
+  9. **`DELETE FROM players WHERE id = p_duplicate_id`**.
+  10. **`player_merge_audit`** insert.
 
 ### 4.2 Audit table (migration)
 
