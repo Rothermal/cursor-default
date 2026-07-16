@@ -1,6 +1,6 @@
 # StatKeeper access matrix
 
-Status: SEC-0 approved baseline (2026-07-15).
+Status: SEC-0 approved baseline with implementation through SEC-5 (2026-07-16).
 
 This document is the product and security contract for SEC-1 through SEC-6. It records
 the intended access model separately from the current implementation so later phases can
@@ -116,12 +116,12 @@ grant team management, stat correction, or game tracking rights.
 | Resource or action | Signed out | Active user | Suspended user | App admin |
 |---|---|---|---|---|
 | Authenticate or recover account | Allow | Allow | Allow | Allow |
-| Use configured cloud app routes | Deny | Allow subject to relationships | Deny (SEC-5) | Allow subject to relationships |
+| Use configured cloud app routes | Deny | Allow subject to relationships | Deny | Allow subject to relationships |
 | Edit account profile and identities | Deny | Own account | Own account access flow only | Own account |
-| Use local app/sport preferences | Local-only mode only | Allow | Deny during authenticated suspended session (SEC-5) | Allow |
-| Export/import device parked games | Local-only mode only | Own device data | Deny during authenticated suspended session (SEC-5) | Own device data |
+| Use local app/sport preferences | Local-only mode only | Allow | Deny during authenticated suspended session | Allow |
+| Export/import device parked games | Local-only mode only | Own device data | Deny during authenticated suspended session | Own device data |
 | Manage owned seasons | Deny | Own seasons | Deny | Own seasons unless an explicit support RPC exists |
-| Manage app access state | Deny | Deny | Deny | Allow through narrow SEC-5 RPCs |
+| Manage app access state | Deny | Deny | Deny | Allow through narrow RPCs |
 | Bypass team RLS | Deny | Deny | Deny | Deny |
 | Read all audit events | Deny | Team-scoped owner/admin only (SEC-6) | Deny | Allow (SEC-6) |
 
@@ -140,7 +140,8 @@ current team policies treat any `team_members` row as membership and do not requ
 SEC-1 closed findings SEC0-01 through SEC0-12 in migration 035 and the corresponding
 client permission cleanup. SEC-2 closed SEC0-14 in migration 036. SEC-3 shipped the
 approved invite-link contract in migration 037. SEC-4 closed SEC0-13 in migration 038
-with contextual claims, bounded identity edits, and authorized guardian removal.
+with contextual claims, bounded identity edits, and authorized guardian removal. SEC-5
+closed SEC0-15 in migration 039 with a PostgREST request gate and app-admin-only RPCs.
 
 | Resource | Current effective access | Primary source |
 |---|---|---|
@@ -165,6 +166,7 @@ with contextual claims, bounded identity edits, and authorized guardian removal.
 | `client_sync_errors` | User inserts/reads own rows | `033_client_sync_errors.sql` |
 | Authenticated app shell | Any authenticated Supabase user enters; no app status exists | `src/App.tsx`, `src/context/AuthContext.tsx` |
 | Local parked games | Device-local records scoped by stored owner id | `src/lib/gameParking.ts` |
+| App-level access | Active accounts enter; pending/suspended accounts stop before app providers; app-admin changes use narrow RPCs | Migration 039, `src/App.tsx`, `src/lib/appAccess.ts` |
 
 ---
 
@@ -189,7 +191,7 @@ Supabase API directly.
 | SEC0-12 | Medium | Team Info asks an owner/admin-only RPC for member data for every role; scorers receive an unavailable member card instead of an accepted-member-safe summary. | `TeamInfo.tsx`; `get_team_members_with_profiles` in migration 011. | SEC-1 |
 | SEC0-13 | Medium | Guardian self-insert requires only `user_id = auth.uid()` and can target any known player UUID; team owner/admin removal is not implemented. | Closed by RPC-only guardian writes in migration 038. | SEC-4 (closed) |
 | SEC0-14 | Planned | There is no read-only viewer role, and existing policies assume every member may write games. | Team role check and game policies in migrations 002/013. | SEC-2 |
-| SEC0-15 | Planned | There is no app-level active/pending/suspended state or app-admin role. | `App.tsx`, `AuthContext.tsx`, `profiles` schema. | SEC-5 |
+| SEC0-15 | Closed | Active/pending/suspended status and a separate app-admin role are enforced at the Data API boundary and app shell. | Migration 039, `App.tsx`, `AuthContext.tsx`. | SEC-5 (closed) |
 | SEC0-16 | Planned | Sensitive access changes do not have a unified durable audit trail; player merge has its own limited audit table. | Migrations 024/025. | SEC-6 |
 
 ### SEC-1 minimum server-side scope

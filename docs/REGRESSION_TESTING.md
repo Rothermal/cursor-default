@@ -537,6 +537,29 @@ active roster player and a removed/inactive roster player.
 
 ---
 
+## 10e. App-level access (SEC-5)
+
+**Precondition:** Apply `039_app_level_access.sql`. Replace the email placeholder and run
+`supabase/scripts/bootstrap_app_admin.sql`. Use active regular, pending, suspended, and app-admin
+accounts; keep one team that the app admin does not belong to.
+
+| Step | Action | Expected |
+|---|---|---|
+| 10e.1 | Existing active account signs in after migration 039 | App routes load normally; existing profile/team access is unchanged |
+| 10e.2 | App admin opens Settings -> Advanced -> App access and searches by name/email | Matching accounts load with status and app role; ordinary users do not see this section |
+| 10e.3 | App admin sets a test account to Pending; that account signs in or selects Check again | Access pending replaces the app shell; parked-game/settings providers and normal routes do not mount |
+| 10e.4 | Pending account directly calls a table or any RPC except `get_my_app_access` through the Data API | Request fails with `APP_ACCESS_PENDING` before the table/RPC operation runs |
+| 10e.5 | App admin changes the test account to Suspended; account checks again | Suspended gate appears; cloud routes and authenticated local/offline continuation remain unavailable |
+| 10e.6 | App admin reactivates the test account; account selects Check again | Normal sport/app shell loads without signing in again |
+| 10e.6a | Change an open active session to Pending, then refocus its window | The access gate replaces the app without a full page reload |
+| 10e.6b | While the changed account remains focused, trigger any cloud read/write | The first `APP_ACCESS_*` response immediately replaces the mounted app with the access gate |
+| 10e.7 | Ordinary user calls `list_account_access` or `set_account_access` directly | RPC denies the request; direct `account_access` table access is also denied |
+| 10e.8 | App admin tries to suspend/demote self or opens a team without membership | Self-lockout is denied; unrelated team data remains denied by team RLS |
+| 10e.9 | Create a new email or Google account | Account access row is created as active/user and the app loads normally |
+| 10e.10 | Run without Supabase configuration | Existing local-only mode remains available without app-access checks |
+
+---
+
 ## 11. PWA & offline
 
 **Precondition:** Production build or deployed site (HTTPS or localhost).
@@ -576,6 +599,7 @@ active roster player and a removed/inactive roster player.
 
 ## Notes
 
+- **App access migration:** SEC-5 requires `039_app_level_access.sql` plus one manual run of `supabase/scripts/bootstrap_app_admin.sql` with an existing profile email.
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  

@@ -45,8 +45,7 @@ Shipped today:
 - `player_guardians` links users to players and allows player pool reuse and player
   profile editing.
 - Email invites and expiring single-use invite links exist.
-- App-level account management exists, but app-level approval/suspension/admin support
-  does not.
+- App-level account profile management and SEC-5 approval/suspension/admin controls exist.
 
 ---
 
@@ -58,7 +57,6 @@ Shipped today:
 - Owner/admin/scorer UI gates are repeated in several files.
 - Admin member-management behavior should be made explicit across UI, RPCs, and RLS.
 - Guardianship is managed and field-bounded, but changes are not yet durably audited.
-- No app-level access status for private beta, suspensions, support users, or global admins.
 - No unified audit trail for role changes, invite activity, guardian changes, or access changes.
 
 ---
@@ -87,7 +85,7 @@ Shipped today:
 | SEC-2 | `PLAN_SEC_2_VIEWER_ROLE.md` | Add a true read-only `viewer` team role. | Complete; migration 036 |
 | SEC-3 | `PLAN_SEC_3_INVITE_LINKS.md` | Implement DB-backed invite links and join flow. | Complete; migration 037 |
 | SEC-4 | `PLAN_SEC_4_GUARDIANSHIP_REVIEW.md` | Make player guardianship clearer, safer, and manageable. | Complete; migration 038 |
-| SEC-5 | `PLAN_SEC_5_APP_LEVEL_ACCESS.md` | Add optional app-level access controls such as active/pending/suspended and app admin. | Planned |
+| SEC-5 | `PLAN_SEC_5_APP_LEVEL_ACCESS.md` | Add optional app-level access controls such as active/pending/suspended and app admin. | Complete; migration 039 |
 | SEC-6 | `PLAN_SEC_6_AUDIT_TRAIL.md` | Add durable audit records and an admin/support view for sensitive changes. | Planned |
 
 Recommended order:

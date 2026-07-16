@@ -368,12 +368,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Multi-game sync race guards** — block discard of cloud-bound unsynced games, skip auto-hydrate when the active session is bound to a different cloud game, and reject skipped-final sync success when mid-sync/local edits remain ([`gameSyncFingerprint.ts`](src/lib/gameSyncFingerprint.ts), [plan](docs/PLAN_MULTI_GAME_PARKING.md) §5a)
 - [x] **Team invite links (SEC-3)** — owner/admin-created single-use scorer/viewer links, 7-day expiry, signed-out auth return, join confirmation, and active-link Copy/Revoke controls ([plan](docs/PLAN_SEC_3_INVITE_LINKS.md))
 - [x] **Guardianship hardening (SEC-4)** — contextual self-service claims, creator/manager/self removal, identity-only editing, guardian visibility, and consistent creator-link creation ([plan](docs/PLAN_SEC_4_GUARDIANSHIP_REVIEW.md))
+- [x] **App-level access (SEC-5)** — active/pending/suspended account states, early authenticated-session gate, PostgREST request enforcement, and narrow app-admin management RPCs/UI ([plan](docs/PLAN_SEC_5_APP_LEVEL_ACCESS.md))
 
 ### What's Next
 
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
-- [ ] Admin/security/access roadmap — SEC-0 through SEC-4 complete; app-level access and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
+- [ ] Admin/security/access roadmap — SEC-0 through SEC-5 complete; durable audit trail remains in SEC-6 ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations

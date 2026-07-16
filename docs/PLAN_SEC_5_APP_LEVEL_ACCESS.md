@@ -123,8 +123,34 @@ Ask these one at a time before implementation.
 
 ## 8. Acceptance Criteria
 
-- Active users can use the app normally.
-- Pending users see a pending/access message.
-- Suspended users see a suspended/access message and cannot access cloud app routes.
-- App admins can view/manage access state if the UI ships.
-- Team roles remain unchanged and separate.
+- [x] Active users can use the app normally.
+- [x] Pending users see a pending/access message.
+- [x] Suspended users see a suspended/access message and cannot access cloud app routes.
+- [x] App admins can view/manage access state.
+- [x] Team roles remain unchanged and separate.
+
+---
+
+## 9. Implementation Result
+
+- Added migration `039_app_level_access.sql` with a separate `account_access` table,
+  active-by-default profile trigger, status/role helpers, self-access RPC, and narrow
+  app-admin list/update RPCs.
+- Registered `enforce_app_access_request` as the PostgREST pre-request hook. It blocks
+  pending, suspended, and missing access records before current Data API table or RPC
+  requests run while leaving the self-access RPC available to render the gate.
+- Added `supabase/scripts/bootstrap_app_admin.sql` as the reviewed manual path for the
+  first app administrator. The public API has no first-user or first-caller promotion path.
+- `AuthContext` loads app access after authentication. Pending, suspended, or unverifiable
+  sessions stop before `SettingsProvider`, `GameProvider`, the app shell, and OAuth return
+  navigation mount. A shared Data API response interceptor locks an open session as soon as
+  any request returns `APP_ACCESS_*`; sessions also recheck on focus, reconnect, and every
+  minute as a bounded fallback.
+- Settings -> Advanced shows App access only to active app admins. Admins can search up to
+  200 accounts and set status/role; the server prevents self-suspension or self-demotion.
+- App-admin authority does not alter team roles or bypass team RLS. The pre-request hook
+  covers the current PostgREST Data API; adding Supabase Realtime, Storage, or another API
+  requires equivalent access enforcement in that service.
+- The client treats a missing `get_my_app_access` RPC as active/user only to preserve the
+  deployment window before migration 039 is applied. Once 039 exists, all other access
+  verification errors fail closed.
