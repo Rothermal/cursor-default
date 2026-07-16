@@ -143,7 +143,9 @@ Ask these one at a time before implementation.
   first app administrator. The public API has no first-user or first-caller promotion path.
 - `AuthContext` loads app access after authentication. Pending, suspended, or unverifiable
   sessions stop before `SettingsProvider`, `GameProvider`, the app shell, and OAuth return
-  navigation mount. Open sessions recheck on focus, reconnect, and every five minutes.
+  navigation mount. A shared Data API response interceptor locks an open session as soon as
+  any request returns `APP_ACCESS_*`; sessions also recheck on focus, reconnect, and every
+  minute as a bounded fallback.
 - Settings -> Advanced shows App access only to active app admins. Admins can search up to
   200 accounts and set status/role; the server prevents self-suspension or self-demotion.
 - App-admin authority does not alter team roles or bypass team RLS. The pre-request hook

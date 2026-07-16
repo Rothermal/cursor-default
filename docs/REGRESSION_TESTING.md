@@ -552,6 +552,7 @@ accounts; keep one team that the app admin does not belong to.
 | 10e.5 | App admin changes the test account to Suspended; account checks again | Suspended gate appears; cloud routes and authenticated local/offline continuation remain unavailable |
 | 10e.6 | App admin reactivates the test account; account selects Check again | Normal sport/app shell loads without signing in again |
 | 10e.6a | Change an open active session to Pending, then refocus its window | The access gate replaces the app without a full page reload |
+| 10e.6b | While the changed account remains focused, trigger any cloud read/write | The first `APP_ACCESS_*` response immediately replaces the mounted app with the access gate |
 | 10e.7 | Ordinary user calls `list_account_access` or `set_account_access` directly | RPC denies the request; direct `account_access` table access is also denied |
 | 10e.8 | App admin tries to suspend/demote self or opens a team without membership | Self-lockout is denied; unrelated team data remains denied by team RLS |
 | 10e.9 | Create a new email or Google account | Account access row is created as active/user and the app loads normally |

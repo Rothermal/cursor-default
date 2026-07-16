@@ -3,6 +3,10 @@ import { clearPersistedGameStorage } from '../lib/gameStorageKeys'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { getOAuthRedirectUrl } from '../lib/authRedirect'
 import { loadCurrentAppAccess, type AppAccess } from '../lib/appAccess'
+import {
+  APP_ACCESS_DENIED_EVENT,
+  type AppAccessDenial,
+} from '../lib/appAccessSignal'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -79,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!configured || !user || typeof window === 'undefined') return
 
     const refresh = () => void refreshAppAccess()
-    const intervalId = window.setInterval(refresh, 5 * 60 * 1000)
+    const intervalId = window.setInterval(refresh, 60 * 1000)
     window.addEventListener('focus', refresh)
     window.addEventListener('online', refresh)
 
@@ -88,6 +92,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refresh)
     }
+  }, [configured, refreshAppAccess, user])
+
+  useEffect(() => {
+    if (!configured || !user || typeof window === 'undefined') return
+
+    const handleAccessDenied = (event: Event) => {
+      const denial = (event as CustomEvent<AppAccessDenial>).detail
+      if (denial === 'APP_ACCESS_PENDING' || denial === 'APP_ACCESS_SUSPENDED') {
+        setAppAccess(previous => ({
+          status: denial === 'APP_ACCESS_PENDING' ? 'pending' : 'suspended',
+          appRole: previous?.appRole ?? 'user',
+          updatedAt: null,
+        }))
+        setAppAccessError(null)
+      } else {
+        setAppAccess(null)
+        setAppAccessError('Account access could not be verified.')
+      }
+      setAppAccessLoading(false)
+      void refreshAppAccess()
+    }
+
+    window.addEventListener(APP_ACCESS_DENIED_EVENT, handleAccessDenied)
+    return () => window.removeEventListener(APP_ACCESS_DENIED_EVENT, handleAccessDenied)
   }, [configured, refreshAppAccess, user])
 
   const signUp = useCallback(async (email: string, password: string, displayName: string) => {
