@@ -494,6 +494,26 @@ accounts on the same test team, with one in-progress and one finalized cloud gam
 
 ---
 
+## 10c. Team invite links (SEC-3)
+
+**Precondition:** Apply `037_team_invite_links.sql`. Use owner, admin, scorer, viewer,
+pending-invite, and unrelated signed-out/signed-in test accounts.
+
+| Step | Action | Expected |
+|---|---|---|
+| 10c.1 | Owner creates Viewer and Scorer links in Team Manage | Both active links appear with role, expiry, Copy, and Revoke |
+| 10c.2 | Admin creates and revokes a link | Both actions succeed; opening the revoked link shows unavailable |
+| 10c.3 | Scorer/viewer calls create, list, or revoke RPCs directly | Server denies each call |
+| 10c.4 | Signed-out user opens a valid link, signs in with email/password, and confirms | User returns to the invite, joins with the fixed role, and reaches Team Info |
+| 10c.5 | Signed-out user opens a valid link and signs in with Google | OAuth returns to the same invite for confirmation |
+| 10c.6 | A second user opens an already redeemed link | Link is unavailable and cannot create another membership |
+| 10c.7 | Invitee opens an expired link or a manager revokes it before redemption | Link is unavailable and redemption is denied |
+| 10c.8 | Existing accepted member or team owner tries an active link | Redemption is denied and the link remains available for its intended recipient |
+| 10c.9 | User with a pending email invite tries a link for the same team | Redemption is denied with direction to resolve the pending email invite; link remains active |
+| 10c.10 | Owner/admin continues using Invite by email | Existing lookup, invite, accept, and decline flow still works |
+
+---
+
 ## 11. PWA & offline
 
 **Precondition:** Production build or deployed site (HTTPS or localhost).

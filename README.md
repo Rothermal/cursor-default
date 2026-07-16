@@ -113,6 +113,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/034_google_auth_profile_defaults.sql` — profile defaults for Google OAuth users (`display_name`, `avatar_url`, `email`)
    - `supabase/migrations/035_team_access_hardening.sql` — accepted team membership, role-safe member RPCs, member privacy, and final-game/stat write hardening
    - `supabase/migrations/036_viewer_team_role.sql` — read-only viewer role, viewer-aware member RPCs, and tracker-only game/stat writes
+   - `supabase/migrations/037_team_invite_links.sql` — expiring single-use scorer/viewer invite links with create/list/resolve/redeem/revoke RPCs
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -258,7 +259,8 @@ supabase/
     ├── 033_client_sync_errors.sql
     ├── 034_google_auth_profile_defaults.sql
     ├── 035_team_access_hardening.sql
-    └── 036_viewer_team_role.sql
+    ├── 036_viewer_team_role.sql
+    └── 037_team_invite_links.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -362,12 +364,13 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Multi-game cloud hardening P2** — roster/player resolution now happens before new cloud `games` inserts, and just-created games are best-effort rolled back if child stat/shot writes fail before the cloud id is persisted locally ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game storage guardrails P3a/P3b** — 12 parked-game cap, storage/quota error UX, local parked-game export/import, parked-only keep-existing import merge behavior, reason-specific import skips, and storage estimate in Settings -> Data & Sync ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [x] **Multi-game sync race guards** — block discard of cloud-bound unsynced games, skip auto-hydrate when the active session is bound to a different cloud game, and reject skipped-final sync success when mid-sync/local edits remain ([`gameSyncFingerprint.ts`](src/lib/gameSyncFingerprint.ts), [plan](docs/PLAN_MULTI_GAME_PARKING.md) §5a)
+- [x] **Team invite links (SEC-3)** — owner/admin-created single-use scorer/viewer links, 7-day expiry, signed-out auth return, join confirmation, and active-link Copy/Revoke controls ([plan](docs/PLAN_SEC_3_INVITE_LINKS.md))
 
 ### What's Next
 
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
-- [ ] Admin/security/access roadmap — SEC-0 through SEC-2 complete; invite links, guardianship review, app-level access, and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
+- [ ] Admin/security/access roadmap — SEC-0 through SEC-3 complete; guardianship review, app-level access, and audit trail remain ([matrix](docs/ACCESS_MATRIX.md), [roadmap](docs/PLAN_ADMIN_SECURITY_ROADMAP.md))
 - [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations

@@ -38,6 +38,14 @@ describe('OAuth return path helpers', () => {
     expect(consumeOAuthReturnPath()).toBeNull()
   })
 
+  it('preserves a team invite path through authentication', () => {
+    const invitePath = `/invite/${'a'.repeat(64)}`
+
+    saveOAuthReturnPath(invitePath)
+
+    expect(consumeOAuthReturnPath()).toBe(invitePath)
+  })
+
   it('rejects unsafe paths', () => {
     saveOAuthReturnPath('//example.com')
 
