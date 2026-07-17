@@ -117,6 +117,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/038_guardianship_hardening.sql` — contextual guardian claims, manager/creator/self removal, and identity-only player update RPC
    - `supabase/migrations/039_app_level_access.sql` — active/pending/suspended accounts, app-admin RPCs, and PostgREST request enforcement
    - `supabase/migrations/040_access_audit_trail.sql` — immutable member/invite-link/app-access audit events and scoped read RPC
+   - `supabase/migrations/041_merge_preserve_shot_chart.sql` — `merge_players_execute` remounts `shot_chart` before deleting the duplicate (avoids ON DELETE CASCADE wipe)
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
