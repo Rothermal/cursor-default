@@ -95,6 +95,18 @@ export function shouldBlockDiscardUnsyncedGame(
 }
 
 /**
+ * After cloud `status=final` succeeds, skip clearing local parking when newer edits
+ * arrived during the update await (e.g. header back → tracker). Those edits cannot
+ * upload to a finalized game; wiping would permanently lose them.
+ */
+export function shouldPreserveLocalAfterFinalizeSuccess(
+  state: GameState,
+  pendingDurable: boolean
+): boolean {
+  return shouldBlockDiscardUnsyncedGame(state, pendingDurable)
+}
+
+/**
  * When the cloud game is already `final`, sync is a no-op. Reject treating that as success if
  * local edits were never uploaded — otherwise flush/finalize reports ok while stats are lost.
  */
