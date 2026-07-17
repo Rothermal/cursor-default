@@ -180,10 +180,11 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4a.10 | (Optional) Supabase Table Editor → `player_merge_audit` | New row with `duplicate_player_id`, `survivor_player_id`, `merged_by`, `resolutions` json |
 | 4a.11 | Settings -> Advanced -> **Player merge (advanced)** | Section opens; **Your recent merges** loads or shows migration **025** hint if RLS blocks reads |
 | 4a.12 | **Open merge wizard** from Settings -> Advanced (with ≥2 candidates) | Same modal as Teams; complete a test merge → row appears under **Your recent merges** (after **025** applied) |
+| 4a.13 | Basketball: duplicate player has ≥1 `shot_chart` row; merge into survivor (migration **041** applied) | After merge, those shots remain under survivor (`player_id` remounted); Cloud Games / Summary shot chart still shows them. Without **041**, CASCADE delete wiped shots silently. |
 
 **Negative / edge:** If another user edits roster or stats between **Load conflicts** and **Merge players**, execute may error (resolution counts mismatch); run **Load conflicts** again from the pick step.
 
-**Migrations:** Merge UI works with **024** only; **Settings -> Advanced -> recent merges** needs **025** (`player_merge_audit` readable for own `merged_by`).
+**Migrations:** Merge UI works with **024** only; **Settings -> Advanced -> recent merges** needs **025** (`player_merge_audit` readable for own `merged_by`). Shot-chart preservation on merge needs **041**.
 
 ---
 
