@@ -8,6 +8,7 @@ import { logClientSyncError } from './logClientSyncError'
 import {
   getSeasonFromDate,
   invertPlayerIdMap,
+  isMissingGameTeamPlaceholderColumnError,
   isMissingHomeScoreAdjustmentColumnError,
   isMissingHomeTeamScoreColumnError,
   isMissingIsTeamPlaceholderColumnError,
