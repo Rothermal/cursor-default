@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { appAccessDenialFromText, dispatchAppAccessDenied } from './appAccessSignal'
+import { createAppAccessAwareFetch } from './appAccessSignal'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey =
@@ -10,21 +10,7 @@ const dataApiPrefix = supabaseUrl
   ? `${supabaseUrl.replace(/\/$/, '')}/rest/v1/`
   : null
 
-async function appAccessAwareFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const response = await fetch(input, init)
-  const requestUrl = input instanceof Request ? input.url : String(input)
-
-  if (!response.ok && dataApiPrefix && requestUrl.startsWith(dataApiPrefix)) {
-    try {
-      const denial = appAccessDenialFromText(await response.clone().text())
-      if (denial) dispatchAppAccessDenied(denial)
-    } catch {
-      return response
-    }
-  }
-
-  return response
-}
+const appAccessAwareFetch = createAppAccessAwareFetch(dataApiPrefix)
 
 if (!supabaseUrl || !supabaseKey) {
   console.warn(

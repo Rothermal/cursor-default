@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { AppAccessDenial } from './appAccessSignal'
 
 export type AppAccessStatus = 'active' | 'pending' | 'suspended'
 export type AppRole = 'user' | 'app_admin'
@@ -68,6 +69,31 @@ export function isMissingAppAccessRpcError(error: SupabaseLikeError | null): boo
     error.code === '42883' ||
     (message.includes('get_my_app_access') && message.includes('not') && message.includes('find'))
   )
+}
+
+/**
+ * Immediate UI lock when the Data API fetch wrapper reports an access denial.
+ * Pending/suspended keep the prior app role; unavailable clears access until refresh.
+ */
+export function applyAppAccessDenial(
+  previous: AppAccess | null,
+  denial: AppAccessDenial
+): { access: AppAccess | null; error: string | null } {
+  if (denial === 'APP_ACCESS_PENDING' || denial === 'APP_ACCESS_SUSPENDED') {
+    return {
+      access: {
+        status: denial === 'APP_ACCESS_PENDING' ? 'pending' : 'suspended',
+        appRole: previous?.appRole ?? 'user',
+        updatedAt: null,
+      },
+      error: null,
+    }
+  }
+
+  return {
+    access: null,
+    error: 'Account access could not be verified.',
+  }
 }
 
 export async function loadCurrentAppAccess(): Promise<{
