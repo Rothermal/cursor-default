@@ -114,9 +114,10 @@ export default function SoccerShotCaptureDialog({
   if (!draft || !projection) return null
 
   const creatorsAllowed = !ownGoal && situation !== 'penalty' && situation !== 'direct_free_kick'
+  const ownGoalNeedsGoalkeeper = ownGoal && draft.teamSide === 'opponent'
   const saveDisabled = busy || outcome === null || (
     ownGoal && draft.teamSide === 'opponent' && !ownGoalParticipantId
-  )
+  ) || (ownGoalNeedsGoalkeeper && !goalkeeper)
 
   const save = () => {
     if (!outcome) return
@@ -286,6 +287,12 @@ export default function SoccerShotCaptureDialog({
                 {SITUATIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </FieldGroup>
+          )}
+
+          {ownGoalNeedsGoalkeeper && !goalkeeper && (
+            <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              An on-field tracked goalkeeper is required for this own goal.
+            </p>
           )}
 
           {!ownGoal && creatorsAllowed && (

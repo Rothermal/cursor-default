@@ -46,7 +46,7 @@ export default function SoccerField({
       <div className="relative aspect-[100/64] w-full overflow-hidden rounded-md border-2 border-white bg-emerald-700 shadow-sm">
         <svg
           viewBox="0 0 100 64"
-          className={`block h-full w-full ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
+          className={`block h-full w-full origin-center transition-transform motion-reduce:transition-none ${flipped ? 'rotate-180' : ''} ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
           role="img"
           aria-label="Soccer field"
           onClick={event => {
