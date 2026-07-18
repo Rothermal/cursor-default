@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useGame } from '../context/GameContext'
+import { useSettings } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 import {
   acceptedTeamRole,
   canManageTeam,
@@ -44,6 +46,7 @@ export default function GameSetup() {
   const [searchParams] = useSearchParams()
   const requestedTeamId = searchParams.get('teamId')
   const { state, dispatch, startNewGame, parkingError } = useGame()
+  const { isSportEnabled } = useSettings()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const sport = state.sport
@@ -126,6 +129,11 @@ export default function GameSetup() {
         setLoadingRequestedTeamSport(false)
         return
       }
+      if (!isSportWorkspaceAvailable(requestedSport.id, isSportEnabled(requestedSport.id))) {
+        setRequestedTeamSportError(`${requestedSport.name} game tracking is not available.`)
+        setLoadingRequestedTeamSport(false)
+        return
+      }
 
       const hasActiveGame = Boolean(state.sport && state.players.length > 0)
       const sportMismatch = sport?.id !== requestedSport.id
@@ -158,7 +166,7 @@ export default function GameSetup() {
       cancelled = true
     }
     // Re-run on sport/team/roster identity only — not every local stat tick.
-  }, [dispatch, isCloudFlow, navigate, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport])
+  }, [dispatch, isCloudFlow, isSportEnabled, navigate, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return

@@ -7,6 +7,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import {
   createSoccerSportGameState,
+  createSoccerUuid,
   prepareSoccerKickoff,
   validateSoccerMatchSetup,
   type SoccerMatchParticipant,
@@ -56,6 +57,11 @@ export default function SoccerPlayerSetup() {
   useEffect(() => {
     if (state.eventStream?.events.length) navigate('/game', { replace: true })
   }, [navigate, state.eventStream?.events.length])
+
+  const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !setup
+  useEffect(() => {
+    if (invalidRoute) navigate(state.sport?.id === 'soccer' ? '/setup' : '/', { replace: true })
+  }, [invalidRoute, navigate, state.sport?.id])
 
   useEffect(() => {
     if (!setup?.sourceTeamId || !supabase || cloudRosterLoaded.current) return
@@ -135,10 +141,7 @@ export default function SoccerPlayerSetup() {
     })
   }, [dispatch, drafts, setup, state.eventStream?.events.length])
 
-  if (!state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !setup) {
-    navigate(state.sport?.id === 'soccer' ? '/setup' : '/')
-    return null
-  }
+  if (invalidRoute || !state.gameInfo || !setup) return null
 
   const selected = drafts.filter(draft => draft.selected)
   const starters = selected.filter(draft => draft.initialStatus === 'starter')
@@ -148,7 +151,7 @@ export default function SoccerPlayerSetup() {
   const addParticipant = () => {
     if (!name.trim()) return
     const gameOnly = Boolean(setup.sourceTeamId)
-    const id = createUuid()
+    const id = createSoccerUuid()
     if (!gameOnly) {
       dispatch({
         type: 'ADD_PLAYER',
@@ -180,7 +183,7 @@ export default function SoccerPlayerSetup() {
       return
     }
     setDrafts(current => [...current, {
-      id: `soccer-anonymous:${createUuid()}`,
+      id: `soccer-anonymous:${createSoccerUuid()}`,
       kind: 'anonymous',
       playerId: null,
       displayName: 'Goalkeeper unknown',
@@ -218,6 +221,9 @@ export default function SoccerPlayerSetup() {
     if (starters.length === 0) return 'Select at least one starter.'
     if (starters.length > maxPlayers) return `The lineup can have at most ${maxPlayers} starters.`
     if (startingGoalkeepers.length !== 1) return 'The opening lineup requires exactly one goalkeeper.'
+    if (selected.some(draft => draft.initialRole.group === 'custom' && !draft.initialRole.label?.trim())) {
+      return 'Enter a label for every custom role.'
+    }
     return null
   }
 
@@ -418,11 +424,4 @@ function selectedParticipants(drafts: ParticipantDraft[]): SoccerMatchParticipan
     initialStatus: draft.initialStatus,
     initialRole: draft.initialRole,
   }))
-}
-
-function createUuid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
 }

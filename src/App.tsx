@@ -50,7 +50,10 @@ function PlayerSetupRoute() {
 function GameTrackerRoute() {
   const { state } = useGame()
   if (state.sport?.id !== 'soccer') return <GameTracker />
-  return import.meta.env.DEV ? <SoccerGameStaging /> : <Navigate to="/" replace />
+  if (!import.meta.env.DEV) return <Navigate to="/" replace />
+  return state.eventStream?.events.length
+    ? <SoccerGameStaging />
+    : <Navigate to="/players" replace />
 }
 
 function GameCheckoutRoute() {

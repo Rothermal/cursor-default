@@ -75,8 +75,13 @@ export default function SoccerGameSetup() {
     if (state.eventStream?.events.length) navigate('/game', { replace: true })
   }, [navigate, state.eventStream?.events.length])
 
+  const invalidRoute = !state.sport || state.sport.id !== 'soccer'
   useEffect(() => {
-    if (!cloudAvailable || !user || !supabase) return
+    if (invalidRoute) navigate('/', { replace: true })
+  }, [invalidRoute, navigate])
+
+  useEffect(() => {
+    if (invalidRoute || !cloudAvailable || !user || !supabase) return
     let cancelled = false
 
     const loadTeams = async () => {
@@ -134,7 +139,7 @@ export default function SoccerGameSetup() {
 
     void loadTeams()
     return () => { cancelled = true }
-  }, [cloudAvailable, existingSetup?.sourceTeamId, requestedTeamId, teamSource, user])
+  }, [cloudAvailable, existingSetup?.sourceTeamId, invalidRoute, requestedTeamId, teamSource, user])
 
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
@@ -142,10 +147,7 @@ export default function SoccerGameSetup() {
   )
   const regulationPreset = detectRegulationPreset(rules)
 
-  if (!state.sport || state.sport.id !== 'soccer') {
-    navigate('/')
-    return null
-  }
+  if (invalidRoute) return null
 
   const updateRules = (update: (current: SoccerMatchRules) => SoccerMatchRules) => {
     setRules(current => reorderSoccerSegments(update(current)))

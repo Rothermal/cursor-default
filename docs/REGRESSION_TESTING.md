@@ -649,7 +649,7 @@ checks.
 | 11c.7 | Add or assign exactly one starting goalkeeper, leave the lineup below the maximum, and choose Start Match | A short-handed confirmation appears before kickoff |
 | 11c.8 | Confirm kickoff | Opening lineup, first period, and running clock begin together; `/game` shows `MM:SS`, direction, On Field, and Bench without the legacy stat grid |
 | 11c.9 | Background the tab briefly, return, park the match, then resume it | The displayed clock advances from its persisted anchor and resume returns to `/game` |
-| 11c.10 | Build for production and attempt to reach a stale/imported active soccer setup through `/setup`, `/players`, `/checkout`, `/game`, or `/summary` | Soccer cards are absent and soccer route surfaces redirect to the sport chooser |
+| 11c.10 | Build for production, open an existing soccer Team Info page or `/#/setup?teamId=<soccer-team>`, and attempt to reach a stale/imported active soccer setup through `/setup`, `/players`, `/checkout`, `/game`, or `/summary` | Team Info hides Start Game, the team deep-link does not create or bind a soccer session, Soccer cards are absent, and active soccer route surfaces redirect to the sport chooser |
 | 11c.11 | Start and track a basketball game | Existing setup, roster, checkout, tracker, parking, and cloud behavior are unchanged |
 
 ---

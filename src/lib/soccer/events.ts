@@ -19,6 +19,7 @@ import type {
   SoccerRoleChangedPayload,
   SoccerSubstitutionWindowPayload,
 } from './types'
+import { createSoccerUuid } from './id'
 import { SOCCER_EVENT_SCHEMA_VERSION } from './types'
 
 export type SoccerEventPayloadByType = {
@@ -53,7 +54,7 @@ export function createSoccerEvent<TType extends keyof SoccerEventPayloadByType>(
   input: CreateSoccerEventInput<TType>
 ): Extract<SoccerMatchEvent, { eventType: TType }> {
   return {
-    id: input.id ?? createUuid(),
+    id: input.id ?? createSoccerUuid(),
     sportId: 'soccer',
     eventType: input.eventType,
     schemaVersion: SOCCER_EVENT_SCHEMA_VERSION,
@@ -208,12 +209,4 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0
-}
-
-function createUuid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  const random = Math.random().toString(16).slice(2).padEnd(12, '0').slice(0, 12)
-  return `00000000-0000-4000-8000-${random}`
 }

@@ -2,6 +2,7 @@ import type { GameState } from '../../types'
 import { addGameEvents, initializeGameEventStream } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createSoccerEvent, nextSoccerEventSequence } from './events'
+import { createSoccerUuid } from './id'
 import { orderedSoccerSegments } from './rules'
 import { createSoccerSportGameState, validateSoccerMatchSetup } from './state'
 import type { SoccerMatchSetup } from './types'
@@ -58,7 +59,7 @@ export function prepareSoccerKickoff(
     initialized.state.eventStream?.events ?? [],
     options.recorderUserId
   )
-  const ids = options.eventIds ?? [createUuid(), createUuid(), createUuid()]
+  const ids = options.eventIds ?? [createSoccerUuid(), createSoccerUuid(), createSoccerUuid()]
   const period = { id: firstPeriod.id, order: firstPeriod.order }
   const appended = addGameEvents(
     initialized.state,
@@ -105,12 +106,4 @@ export function prepareSoccerKickoff(
   return appended.ok
     ? { ok: true, state: appended.state }
     : { ok: false, message: appended.error.message }
-}
-
-function createUuid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  const random = Math.random().toString(16).slice(2).padEnd(12, '0').slice(0, 12)
-  return `00000000-0000-4000-8000-${random}`
 }

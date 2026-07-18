@@ -11,6 +11,7 @@ import TournamentCard, { type TeamInfoTournament } from '../components/team-info
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
+import { useSettings } from '../context/SettingsContext'
 import { teamDisplayName } from '../lib/display'
 import { loadLegacyFinalStatsTotals } from '../lib/legacyFinalStats'
 import { supabase } from '../lib/supabase'
@@ -24,6 +25,7 @@ import {
   type TeamInfoGame,
 } from '../lib/teamInfo'
 import { acceptedTeamRole, canTrackGames } from '../lib/teamPermissions'
+import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 
 interface TeamRow {
   id: string
@@ -57,6 +59,7 @@ export default function TeamInfo() {
   const [searchParams] = useSearchParams()
   const teamId = searchParams.get('teamId')
   const { user, isConfigured } = useAuth()
+  const { isSportEnabled } = useSettings()
   const {
     state: gameState,
     dispatch: gameDispatch,
@@ -85,6 +88,9 @@ export default function TeamInfo() {
   const sport = useMemo(
     () => (team ? sports.find(item => item.id === team.seasons.sport) ?? null : null),
     [team]
+  )
+  const sportAvailable = Boolean(
+    sport && isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
   )
 
   const record = useMemo(
@@ -136,6 +142,10 @@ export default function TeamInfo() {
   const handleStartGame = () => {
     if (!team || !sport || !canTrackGames(myRole)) return
     setStartGameError(null)
+    if (!sportAvailable) {
+      setStartGameError(`${sport.name} game tracking is not available.`)
+      return
+    }
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
     if (
       hasActiveGame &&
@@ -310,7 +320,7 @@ export default function TeamInfo() {
             Back to Teams
           </button>
           <div className="flex items-center gap-3">
-            {team && sport && !loading && canTrackGames(myRole) && (
+            {team && sport && sportAvailable && !loading && canTrackGames(myRole) && (
               <button
                 type="button"
                 onClick={handleStartGame}

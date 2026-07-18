@@ -20,6 +20,11 @@ export default function SoccerGameStaging() {
     return () => window.clearInterval(timer)
   }, [projection?.clock.running])
 
+  const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
+  useEffect(() => {
+    if (invalidRoute) navigate('/setup', { replace: true })
+  }, [invalidRoute, navigate])
+
   const period = useMemo(() => {
     if (!soccerState) return null
     const rules = soccerState.setup.rulesSnapshot
@@ -27,10 +32,7 @@ export default function SoccerGameStaging() {
       .find(segment => segment.id === projection?.currentPeriodId) ?? null
   }, [projection?.currentPeriodId, soccerState])
 
-  if (!state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection) {
-    navigate('/setup')
-    return null
-  }
+  if (invalidRoute || !state.gameInfo || !soccerState || !projection) return null
 
   const elapsedMs = elapsedSoccerClockMs(projection, nowMs)
   const onField = Object.values(projection.participants).filter(participant => participant.status === 'on_field')
