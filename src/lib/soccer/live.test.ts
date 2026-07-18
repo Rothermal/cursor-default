@@ -8,12 +8,18 @@ import {
   endSoccerPeriod,
   inspectSoccerHistory,
   isSoccerHalftimeBreak,
+  recordHistoricalSoccerShot,
+  recordSoccerScoreAdjustment,
   recordSoccerRoleChange,
   recordSoccerOwnGoal,
   recordSoccerShot,
   recordSoccerSubstitution,
   reopenSoccerMatch,
+  reviseSoccerScoreAdjustment,
+  reviseSoccerShot,
+  soccerAttackingDirectionAt,
   soccerClockDisplayValue,
+  soccerPeriodTimings,
   startNextSoccerPeriod,
   toggleSoccerClock,
   updateSoccerHistoryEvent,
@@ -198,6 +204,108 @@ describe('soccer live match actions', () => {
     })
   })
 
+  it('adds and revises a historical shot within recorded period bounds', () => {
+    const ended = endSoccerPeriod(kickedOffState(), {
+      recorderUserId,
+      nowMs: kickoffAt + 60_000,
+      eventIds: [uuid(4), uuid(5)],
+    })
+    expect(ended.ok).toBe(true)
+    if (!ended.ok) return
+    expect(soccerPeriodTimings(ended.state, kickoffAt + 90_000)).toEqual([{
+      period: { id: 'regulation-1', order: 1 },
+      label: 'First Half',
+      startElapsedMs: 0,
+      endElapsedMs: 60_000,
+    }])
+
+    const added = recordHistoricalSoccerShot(ended.state, {
+      teamSide: 'tracked',
+      outcome: 'goal',
+      situation: 'open_play',
+      location: null,
+      shooter: { kind: 'participant', participantId: 'match-defender' },
+    }, {
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 30_000,
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 90_000,
+      eventIds: [uuid(6)],
+    })
+    expect(added.ok).toBe(true)
+    if (!added.ok) return
+    expect(added.state.homeTeamScore).toBe(1)
+
+    const shot = inspectSoccerHistory(added.state).activeEvents.find(event => event.id === uuid(6))
+    if (!shot) throw new Error('historical shot missing')
+    const revised = reviseSoccerShot(added.state, shot.id, {
+      teamSide: 'opponent',
+      outcome: 'saved',
+      situation: 'open_play',
+      location: null,
+      shooter: { kind: 'unknown', label: 'Opponent 10' },
+      goalkeeper: { kind: 'participant', participantId: 'match-keeper' },
+    }, {
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 40_000,
+    }, '2026-07-18T12:02:00.000Z')
+    expect(revised.ok).toBe(true)
+    if (!revised.ok) return
+    expect(revised.inspection.complete).toBe(true)
+    expect(revised.state.homeTeamScore).toBe(0)
+    expect(revised.state.players.find(player => player.id === 'keeper')?.stats.soc_gk_save).toBe(1)
+  })
+
+  it('records signed historical score adjustments and rejects out-of-bounds time', () => {
+    const ended = endSoccerPeriod(kickedOffState(), {
+      recorderUserId,
+      nowMs: kickoffAt + 60_000,
+      eventIds: [uuid(4), uuid(5)],
+    })
+    expect(ended.ok).toBe(true)
+    if (!ended.ok) return
+    const moment = { period: { id: 'regulation-1', order: 1 }, elapsedMs: 45_000 }
+    const adjusted = recordSoccerScoreAdjustment(ended.state, {
+      teamSide: 'tracked',
+      delta: 1,
+      reason: 'Official scoring correction',
+    }, moment, {
+      recorderUserId,
+      nowMs: kickoffAt + 90_000,
+      eventIds: [uuid(6)],
+    })
+    expect(adjusted.ok).toBe(true)
+    if (!adjusted.ok) return
+    expect(adjusted.state.homeTeamScore).toBe(1)
+
+    const adjustment = inspectSoccerHistory(adjusted.state).activeEvents.find(event => event.id === uuid(6))
+    if (!adjustment) throw new Error('score adjustment missing')
+    const revised = reviseSoccerScoreAdjustment(adjusted.state, adjustment.id, {
+      teamSide: 'tracked',
+      delta: 1,
+      reason: 'Updated official correction',
+    }, moment, '2026-07-18T12:03:00.000Z')
+    expect(revised.ok).toBe(true)
+    if (!revised.ok) return
+    expect(revised.inspection.activeEvents.find(event => event.id === adjustment.id)).toMatchObject({
+      revision: 2,
+      payload: { delta: 1, reason: 'Updated official correction' },
+    })
+
+    const rejected = recordHistoricalSoccerShot(revised.state, {
+      teamSide: 'tracked',
+      outcome: 'off_target',
+      situation: 'open_play',
+      location: null,
+      shooter: { kind: 'team', label: 'Aces' },
+    }, {
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 61_000,
+    }, { recorderUserId, nowMs: kickoffAt + 90_000, eventIds: [uuid(7)] })
+    expect(rejected).toMatchObject({ ok: false, message: 'The selected time is outside the recorded period bounds.' })
+  })
+
   it('pauses, ends a period atomically, and starts the next period with its clock', () => {
     const before = kickedOffState()
     const ended = endSoccerPeriod(before, {
@@ -232,6 +340,10 @@ describe('soccer live match actions', () => {
       attackingDirection: 'right_to_left',
       clock: { running: true, elapsedMs: 60_000 },
     })
+    expect(soccerAttackingDirectionAt(started.state, {
+      period: { id: 'regulation-2', order: 2 },
+      elapsedMs: 65_000,
+    })).toBe('right_to_left')
 
     const secondBreak = endSoccerPeriod(started.state, {
       recorderUserId,

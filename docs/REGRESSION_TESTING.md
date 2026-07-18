@@ -695,8 +695,29 @@ on-field goalkeeper and at least one outfield participant.
 | 11e.6 | Use each side's quick Goal action | A normal goal event is created with unknown location and team/unknown attribution; no raw score mutation occurs |
 | 11e.7 | Park and resume after changing capture side and tracked participant | The eligible selection and capture side return; a participant removed from the field clears instead of silently selecting another |
 | 11e.8 | End the period or match, then tap the field | The field remains available for review but live capture is disabled outside an active period |
-| 11e.9 | Open History after recording attacking events | Attacking rows are readable and removable/restorable; editing remains disabled until SOC-3C |
+| 11e.9 | Open Timeline after recording attacking events | Attacking rows are readable, revisioned, and removable/restorable |
 | 11e.10 | Resume and track a basketball game | Basketball court capture, stat actions, parking, summary, and cloud behavior are unchanged |
+
+---
+
+## 11f. Soccer Timeline, correction, and field review (SOC-3C)
+
+**Precondition:** Start a development soccer match and record located tracked/opponent shots,
+at least one goal, one own goal, and events in more than one period.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11f.1 | Open Field with Marker side All and Marker period Current | Only active located shots/own goals from the review period appear; tracked/opponent colors and outcome shapes are distinguishable |
+| 11f.2 | Switch marker side and Current/Match filters, then flip the field | Markers filter without changing events and rotate with the display while recorder coordinates remain unchanged |
+| 11f.3 | Select a marker and correct outcome, side, actors, goalkeeper/blocker, time, and location | The shared editor is prefilled; save creates one revision and score/stat/marker projections rebuild |
+| 11f.4 | Open Timeline and switch All, Attacking, and Match Control | Events remain newest first with period-local `MM:SS`; each filter shows only its event family |
+| 11f.5 | Remove an event, expand Removed Events, then restore it | Removed rows are collapsed by default; removal and restoration update score, totals, and markers through revisions |
+| 11f.6 | Choose Add missed event, select a started period and time, then record a shot/own goal | The event appends at canonical period time without moving the live clock and projects only when historical lineup/role rules pass |
+| 11f.7 | Attempt a historical add outside the period bounds or with an ineligible tracked participant | Save is blocked or rejected without appending partial history |
+| 11f.8 | Tap either score, inspect scoring history, and add `+1` then `-1` with reasons | Only goals, own goals, and adjustments appear; score changes without inventing shot/player stats and cannot be adjusted below zero on append |
+| 11f.9 | Revise an event into a semantic conflict, then repair it from Timeline | The revision remains stored, diagnostics identify the issue, live/add controls lock, and repair restores a complete projection |
+| 11f.10 | Park/resume and repeat at 390px mobile plus desktop width | Raw revisions, filters' source data, scores, markers, and Timeline survive; controls do not overlap or create page-level horizontal scrolling |
+| 11f.11 | Resume and track a basketball game | Basketball capture, action log, parking, summary, and cloud paths are unchanged |
 
 ---
 

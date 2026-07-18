@@ -1,17 +1,22 @@
-import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { Pencil, RotateCcw, Trash2, X } from 'lucide-react'
+import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import { ChevronDown, ChevronUp, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
 import {
   deleteSoccerHistoryEvent,
   formatSoccerDuration,
   restoreSoccerHistoryEvent,
+  soccerPeriodTimings,
   updateSoccerHistoryEvent,
   type SoccerLiveResult,
   type SoccerMatchEvent,
+  type SoccerOwnGoalEvent,
+  type SoccerPeriodTiming,
   type SoccerMatchRules,
   type SoccerRole,
   type SoccerRoleGroup,
+  type SoccerScoreAdjustmentEvent,
+  type SoccerShotEvent,
 } from '../../lib/soccer'
 import type { GameEvent, GameEventInspection } from '../../lib/gameEvents/types'
 
@@ -20,7 +25,12 @@ interface SoccerMatchHistoryProps {
   inspection: GameEventInspection
   busy: boolean
   onApply: (result: SoccerLiveResult) => boolean
+  onAddMissed: () => void
+  onEditAttacking: (event: SoccerShotEvent | SoccerOwnGoalEvent) => void
+  onEditScoreAdjustment: (event: SoccerScoreAdjustmentEvent) => void
 }
+
+type TimelineFilter = 'all' | 'attacking' | 'match_control'
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
   { value: 'goalkeeper', label: 'Goalkeeper' },
@@ -30,17 +40,40 @@ const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
   { value: 'custom', label: 'Custom' },
 ]
 
-export default function SoccerMatchHistory({ state, inspection, busy, onApply }: SoccerMatchHistoryProps) {
+export default function SoccerMatchHistory({
+  state,
+  inspection,
+  busy,
+  onApply,
+  onAddMissed,
+  onEditAttacking,
+  onEditScoreAdjustment,
+}: SoccerMatchHistoryProps) {
   const [editing, setEditing] = useState<SoccerMatchEvent | null>(null)
   const [deleting, setDeleting] = useState<GameEvent | null>(null)
-  const active = [...inspection.activeEvents].reverse()
-  const deleted = [...inspection.deletedEvents].reverse()
+  const [filter, setFilter] = useState<TimelineFilter>('all')
+  const [removedOpen, setRemovedOpen] = useState(false)
+  const timings = useMemo(() => soccerPeriodTimings(state), [state])
+  const active = [...inspection.activeEvents].reverse().filter(event => eventMatchesFilter(event, filter))
+  const deleted = [...inspection.deletedEvents].reverse().filter(event => eventMatchesFilter(event, filter))
+
+  const editEvent = (event: GameEvent) => {
+    if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
+      onEditAttacking(event as SoccerShotEvent | SoccerOwnGoalEvent)
+      return
+    }
+    if (event.eventType === 'soccer.score_adjustment') {
+      onEditScoreAdjustment(event as SoccerScoreAdjustmentEvent)
+      return
+    }
+    setEditing(event as SoccerMatchEvent)
+  }
 
   return (
     <div className={busy ? 'space-y-5 pointer-events-none opacity-60' : 'space-y-5'} aria-busy={busy}>
       {!inspection.complete && (
         <section className="border border-red-200 bg-red-50 rounded-md px-3 py-3 space-y-2">
-          <h2 className="text-sm font-bold text-red-800">Match history needs correction</h2>
+          <h2 className="text-sm font-bold text-red-800">Match timeline needs correction</h2>
           {inspection.diagnostics.map((item, index) => (
             <p key={`${item.eventId ?? 'stream'}-${index}`} className="text-xs text-red-700">
               {item.message}
@@ -49,41 +82,53 @@ export default function SoccerMatchHistory({ state, inspection, busy, onApply }:
         </section>
       )}
 
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Match Events</h2>
-          <span className="text-xs text-slate-400">{active.length}</span>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold uppercase text-slate-500">Timeline</h2>
+            <p className="text-xs text-slate-400">Newest first</p>
+          </div>
+          <button type="button" onClick={onAddMissed} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add missed event</button>
+        </div>
+        <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
+          <FilterButton active={filter === 'all'} label="All" onClick={() => setFilter('all')} />
+          <FilterButton active={filter === 'attacking'} label="Attacking" onClick={() => setFilter('attacking')} />
+          <FilterButton active={filter === 'match_control'} label="Match Control" onClick={() => setFilter('match_control')} />
         </div>
         <div className="divide-y divide-slate-200 border-y border-slate-200">
           {active.map(event => (
             <HistoryRow
               key={event.id}
               event={event}
-              onEdit={isAttackingEventType(event.eventType)
-                ? undefined
-                : () => setEditing(event as SoccerMatchEvent)}
+              timeLabel={timelineTimeLabel(event, timings)}
+              onEdit={() => editEvent(event)}
               onDelete={() => setDeleting(event)}
             />
           ))}
+          {active.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No events in this view.</p>}
         </div>
       </section>
 
-      {deleted.length > 0 && (
+      {inspection.deletedEvents.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold uppercase text-slate-500">Removed Events</h2>
-            <span className="text-xs text-slate-400">{deleted.length}</span>
-          </div>
-          <div className="divide-y divide-slate-200 border-y border-slate-200 opacity-70">
-            {deleted.map(event => (
-              <HistoryRow
-                key={event.id}
-                event={event}
-                deleted
-                onRestore={() => onApply(restoreSoccerHistoryEvent(state, event.id))}
-              />
-            ))}
-          </div>
+          <button type="button" onClick={() => setRemovedOpen(value => !value)} className="flex min-h-10 w-full items-center justify-between border-y border-slate-200 text-sm font-bold text-slate-600">
+            <span>Removed Events ({inspection.deletedEvents.length})</span>
+            {removedOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+          </button>
+          {removedOpen && (
+            <div className="divide-y divide-slate-200 border-b border-slate-200 opacity-70">
+              {deleted.map(event => (
+                <HistoryRow
+                  key={event.id}
+                  event={event}
+                  timeLabel={timelineTimeLabel(event, timings)}
+                  deleted
+                  onRestore={() => onApply(restoreSoccerHistoryEvent(state, event.id))}
+                />
+              ))}
+              {deleted.length === 0 && <p className="py-5 text-center text-xs text-slate-500">No removed events in this filter.</p>}
+            </div>
+          )}
         </section>
       )}
 
@@ -102,7 +147,7 @@ export default function SoccerMatchHistory({ state, inspection, busy, onApply }:
       <ConfirmDialog
         open={Boolean(deleting)}
         title="Remove match event?"
-        message="The event remains in history and can be restored. Later events may need correction."
+        message="The event remains in the Timeline and can be restored. Later events may need correction."
         confirmLabel="Remove Event"
         cancelLabel="Cancel"
         onConfirm={() => {
@@ -115,8 +160,9 @@ export default function SoccerMatchHistory({ state, inspection, busy, onApply }:
   )
 }
 
-function HistoryRow({ event, deleted = false, onEdit, onDelete, onRestore }: {
+function HistoryRow({ event, timeLabel, deleted = false, onEdit, onDelete, onRestore }: {
   event: GameEvent
+  timeLabel: string
   deleted?: boolean
   onEdit?: () => void
   onDelete?: () => void
@@ -128,7 +174,7 @@ function HistoryRow({ event, deleted = false, onEdit, onDelete, onRestore }: {
         <p className="text-sm font-semibold text-slate-800 truncate">{eventTitle(event.eventType)}</p>
         <p className="text-xs text-slate-500 truncate">{eventDetail(event)}</p>
         <p className="text-[11px] text-slate-400 mt-0.5">
-          {event.elapsedMs === null ? 'No match time' : formatSoccerDuration(event.elapsedMs)} · rev {event.revision}
+          {timeLabel} · rev {event.revision}
         </p>
       </div>
       <div className="flex gap-1 shrink-0">
@@ -371,10 +417,29 @@ function eventDetail(event: GameEvent): string {
       const shooter = event.actors.find(actor => actor.role === 'shooter')
       return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} · ${String(payload.outcome ?? 'shot').replace('_', ' ')} · ${shooter?.label ?? 'Team'}`
     }
-    case 'soccer.own_goal': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} benefits`
-    case 'soccer.score_adjustment': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} ${Number(payload.delta) > 0 ? '+' : ''}${String(payload.delta ?? '')}`
+    case 'soccer.own_goal': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} benefits · ${event.actors.find(actor => actor.role === 'own_goal_by')?.label ?? 'Unknown'}`
+    case 'soccer.score_adjustment': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} ${Number(payload.delta) > 0 ? '+' : ''}${String(payload.delta ?? '')} · ${String(payload.reason ?? 'No reason')}`
     default: return event.period.id
   }
+}
+
+function FilterButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`min-h-9 rounded px-1 text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
+}
+
+function eventMatchesFilter(event: GameEvent, filter: TimelineFilter): boolean {
+  if (filter === 'all') return true
+  return filter === 'attacking'
+    ? isAttackingEventType(event.eventType)
+    : !isAttackingEventType(event.eventType)
+}
+
+function timelineTimeLabel(event: GameEvent, timings: SoccerPeriodTiming[]): string {
+  if (event.elapsedMs === null) return 'No match time'
+  const timing = timings.find(item => item.period.id === event.period.id)
+  return timing
+    ? `${timing.label} · ${formatSoccerDuration(Math.max(0, event.elapsedMs - timing.startElapsedMs))}`
+    : formatSoccerDuration(event.elapsedMs)
 }
 
 function isAttackingEventType(eventType: string): boolean {

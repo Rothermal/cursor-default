@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { soccerFieldLocation } from '../../lib/soccer/field'
+import { soccerFieldLocation, soccerFieldReviewEvents } from '../../lib/soccer/field'
 
 describe('soccer field coordinates', () => {
   it('stores normalized recorder-view coordinates without a display flip', () => {
@@ -24,4 +24,38 @@ describe('soccer field coordinates', () => {
       attackingDirection: 'right_to_left',
     })
   })
+
+  it('filters located attacking events by side and current period', () => {
+    const events = [
+      candidate('shot-1', 'soccer.shot', 'tracked', 'first'),
+      candidate('shot-2', 'soccer.shot', 'opponent', 'first'),
+      candidate('own-1', 'soccer.own_goal', 'tracked', 'second'),
+      { ...candidate('control', 'soccer.clock_paused', 'tracked', 'first'), location: null },
+    ]
+    expect(soccerFieldReviewEvents(events, {
+      side: 'tracked',
+      scope: 'current',
+      periodId: 'first',
+    }).map(event => event.id)).toEqual(['shot-1'])
+    expect(soccerFieldReviewEvents(events, {
+      side: 'all',
+      scope: 'match',
+      periodId: 'first',
+    }).map(event => event.id)).toEqual(['shot-1', 'shot-2', 'own-1'])
+  })
 })
+
+function candidate(
+  id: string,
+  eventType: string,
+  teamSide: 'tracked' | 'opponent',
+  periodId: string
+) {
+  return {
+    id,
+    eventType,
+    teamSide,
+    period: { id: periodId },
+    location: { x: 0.5, y: 0.5, attackingDirection: 'left_to_right' as const },
+  }
+}
