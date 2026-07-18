@@ -15,11 +15,20 @@ export function createSoccerMatchProjection(setup: SoccerMatchSetup): SoccerMatc
     status: 'not_started',
     openingLineupRecorded: false,
     currentPeriodId: null,
+    startedPeriodIds: [],
     completedPeriodIds: [],
+    periodEndElapsedMsById: {},
     clock: { running: false, elapsedMs: 0, anchorOccurredAt: null },
     participants: Object.fromEntries(
       setup.participants.map(participant => [participant.id, projectedParticipant(participant)])
     ),
+    participantStats: Object.fromEntries(
+      setup.participants.map(participant => [participant.id, emptyParticipantStats()])
+    ),
+    sideTotals: {
+      tracked: emptySideTotals(),
+      opponent: emptySideTotals(),
+    },
     currentRules: structuredClone(setup.rulesSnapshot),
     firstPeriodAttackingDirection: setup.firstPeriodAttackingDirection,
     attackingDirection: setup.firstPeriodAttackingDirection,
@@ -126,7 +135,47 @@ function projectedParticipant(participant: SoccerMatchParticipant): SoccerProjec
     appearances: 0,
     totalActiveMs: 0,
     activeSinceElapsedMs: null,
+    onFieldIntervals: [],
+    roleIntervals: [],
     hasExited: false,
+  }
+}
+
+export function emptyParticipantStats(): SoccerMatchProjection['participantStats'][string] {
+  return {
+    goals: 0,
+    ownGoals: 0,
+    primaryAssists: 0,
+    secondaryAssists: 0,
+    shots: 0,
+    shotsOnTarget: 0,
+    keyPasses: 0,
+    penaltyAttempts: 0,
+    penaltyGoals: 0,
+    directFreeKickAttempts: 0,
+    directFreeKickGoals: 0,
+    goalkeeperSaves: 0,
+    goalkeeperGoalsAllowed: 0,
+    goalkeeperShotsOnTargetFaced: 0,
+    goalkeeperPenaltiesFaced: 0,
+    goalkeeperPenaltySaves: 0,
+  }
+}
+
+function emptySideTotals(): SoccerMatchProjection['sideTotals']['tracked'] {
+  return {
+    score: 0,
+    shots: 0,
+    shotsOnTarget: 0,
+    goals: 0,
+    saved: 0,
+    blocked: 0,
+    offTarget: 0,
+    woodwork: 0,
+    penaltyAttempts: 0,
+    penaltyGoals: 0,
+    directFreeKickAttempts: 0,
+    directFreeKickGoals: 0,
   }
 }
 

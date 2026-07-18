@@ -55,6 +55,7 @@ function isLocation(value: unknown): value is GameEventLocation {
 
 function isActor(value: unknown): value is GameEventActor {
   if (!isPlainObject(value) || !isNonEmptyString(value.role)) return false
+  if (value.participantId !== undefined && !isNonEmptyString(value.participantId)) return false
   if (value.kind === 'player') return isNonEmptyString(value.playerId)
   return (
     (value.kind === 'staff' || value.kind === 'team' || value.kind === 'unknown') &&

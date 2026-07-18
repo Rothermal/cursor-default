@@ -386,10 +386,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Soccer match-state foundation (SOC-2A)** - resolved rule/setup snapshots, production soccer event schemas, semantic projector diagnostics, atomic event batches, exact participation projection, and local-only sync guards ([plan](docs/PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md))
 - [x] **Soccer setup and kickoff (SOC-2B)** - development-only soccer workspace, per-match rules, local/cloud roster sources, match roster and role assignment, goalkeeper/short-handed validation, and atomic kickoff ([plan](docs/PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md))
 - [x] **Soccer live match controls (SOC-2C)** - anchored live clock, periods, lineup and substitution controls, exact participant time, role/direction/rule changes, revisioned history corrections, diagnostics, and match end/reopen ([plan](docs/PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md))
+- [x] **Soccer attacking event domain (SOC-3A)** - typed shot/own-goal/score-adjustment events, stable participant actors, historical lineup/role validation, and event-derived attacking, goalkeeper, and score totals ([plan](docs/PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md))
 
 ### What's Next
 
-- [ ] **Soccer implementation (SOC-3 through SOC-6)** - soccer field and attacking events, defense/discipline/team events, cloud sync, summaries, and release ([roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer implementation (SOC-3B through SOC-6)** - soccer field capture and correction UI, defense/discipline/team events, cloud sync, summaries, and release ([SOC-3 plan](docs/PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
