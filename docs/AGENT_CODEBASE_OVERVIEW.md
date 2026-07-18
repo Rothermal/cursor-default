@@ -134,9 +134,9 @@ resolved setup and rebuildable runtime projection. Semantic failures preserve ra
 project through the last coherent event, and expose diagnostics.
 
 The `game_events` repository remains isolated and is **not** part of the automatic cloud
-queue until SOC-5. Aggregate reducer mutations and aggregate cloud sync are disabled once
-an event stream is initialized; do not mark event streams cloud-synced through snapshot
-sync.
+queue until SOC-5. Aggregate cloud sync is disabled as soon as sport-owned setup exists;
+aggregate reducer mutations are disabled once an event stream is initialized. Do not mark
+soccer setup or event streams cloud-synced through snapshot sync.
 
 ### localStorage keys
 

@@ -117,6 +117,8 @@ export interface SportGameEventProjectionResult {
 
 export interface SportGameEventProjector<TEvent extends GameEvent = GameEvent> {
   sportId: string
+  /** Require matching sport-owned setup before an authoritative stream can be initialized. */
+  requiresSportGameState?: boolean
   project: (
     state: GameState,
     events: TEvent[]
@@ -131,6 +133,7 @@ export type GameEventEditableFields = Pick<
 export type GameEventMutationErrorCode =
   | 'legacy_activity_present'
   | 'unsupported_event_sport'
+  | 'sport_setup_required'
   | 'stream_not_initialized'
   | 'event_not_found'
   | 'duplicate_event_id'
@@ -138,6 +141,7 @@ export type GameEventMutationErrorCode =
   | 'sport_mismatch'
   | 'already_deleted'
   | 'not_deleted'
+  | 'incomplete_projection'
 
 export interface GameEventMutationError {
   code: GameEventMutationErrorCode

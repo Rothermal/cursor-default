@@ -186,7 +186,7 @@ function validateRosterAdded(payload: JsonObject): boolean {
 }
 
 function validateParticipantResolved(payload: JsonObject): boolean {
-  return isId(payload.participantId) && isId(payload.playerId) && isId(payload.displayName) &&
+  return isId(payload.participantId) && isId(payload.playerId) && isNonEmptyString(payload.displayName) &&
     (payload.number === null || typeof payload.number === 'string')
 }
 
@@ -199,6 +199,10 @@ function validateMatchReopened(payload: JsonObject): boolean {
 }
 
 function isId(value: unknown): value is string {
+  return isNonEmptyString(value)
+}
+
+function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
 

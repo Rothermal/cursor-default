@@ -35,11 +35,22 @@ export function initializeGameEventStream<TEvent extends GameEvent>(
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
   if (state.eventStream) return rebuildAsSuccess(state, registry, projectors)
-  if (!state.sport || !projectors.get(state.sport.id)) {
+  const projector = state.sport ? projectors.get(state.sport.id) : undefined
+  if (!state.sport || !projector) {
     return failed(
       state,
       'unsupported_event_sport',
       'The active sport does not have an installed event projector.'
+    )
+  }
+  if (
+    projector.requiresSportGameState &&
+    state.sportGameState?.sportId !== state.sport.id
+  ) {
+    return failed(
+      state,
+      'sport_setup_required',
+      'Configure the sport-specific game setup before initializing its event stream.'
     )
   }
   if (hasLegacyAggregateActivity(state)) {
@@ -75,7 +86,8 @@ export function addGameEvent<TEvent extends GameEvent>(
   if (state.eventStream.events.some(raw => isGameEventEnvelope(raw) && raw.id === event.id)) {
     return failed(state, 'duplicate_event_id', 'An event with this id already exists.')
   }
-  return rebuildAsSuccess(
+  return appendAndRequireComplete(
+    state,
     {
       ...state,
       eventStream: {
@@ -125,7 +137,8 @@ export function addGameEvents<TEvent extends GameEvent>(
     batchIds.add(event.id)
   }
 
-  return rebuildAsSuccess(
+  return appendAndRequireComplete(
+    state,
     {
       ...state,
       eventStream: {
@@ -249,5 +262,22 @@ function rebuildAsSuccess<TEvent extends GameEvent>(
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
   const rebuilt = rebuildGameEventProjection(state, registry, projectors)
+  return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
+}
+
+function appendAndRequireComplete<TEvent extends GameEvent>(
+  originalState: GameState,
+  appendedState: GameState,
+  registry: GameEventRegistry<TEvent>,
+  projectors: GameEventProjectorRegistry<TEvent>
+): GameEventMutationResult {
+  const rebuilt = rebuildGameEventProjection(appendedState, registry, projectors)
+  if (!rebuilt.inspection.complete) {
+    return failed(
+      originalState,
+      'incomplete_projection',
+      'The event append would create invalid or incomplete match history.'
+    )
+  }
   return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
 }

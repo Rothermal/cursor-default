@@ -332,8 +332,8 @@ export default function GameInfo() {
       teamStatsConfig: cloudGame.teamStatsConfig ?? null,
       actionLog: [],
       shotChart: cloudGame.shotChart ?? [],
-          eventStream: null,
-          sportGameState: null,
+      eventStream: null,
+      sportGameState: null,
       cloudSync: {
         seasonId: cloudGame.seasonId ?? null,
         teamId: cloudGame.teamId,

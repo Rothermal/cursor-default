@@ -28,9 +28,9 @@ export function buildGameSyncFingerprint(state: GameState): string {
   })
 }
 
-/** Event-backed games use the event repository and cannot enter legacy aggregate auto-sync. */
+/** Sport-owned setup/events use their repository and cannot enter legacy aggregate auto-sync. */
 export function isAggregateCloudSyncEligible(state: GameState): boolean {
-  return state.eventStream === null
+  return state.eventStream === null && state.sportGameState === null
 }
 
 /**

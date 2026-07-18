@@ -31,7 +31,7 @@ Those remain in later soccer phases.
 - Add atomic batch event mutations and reducer support.
 - Project soccer starts, appearances, and exact participation time into local state.
 - Preserve soccer setup and raw events through persistence, parking, import, and hydration.
-- Explicitly exclude event-backed games from aggregate automatic cloud sync until SOC-5.
+- Explicitly exclude soccer setup and event-backed games from aggregate automatic cloud sync until SOC-5.
 - Add focused unit and persistence tests. No user-facing soccer workflow ships in this slice.
 
 ### SOC-2B: Setup, roster, lineup, and kickoff
@@ -355,9 +355,10 @@ to `null`.
 The local dirty fingerprint includes the authoritative setup snapshot and raw events. It
 excludes the rebuildable soccer projection and derived diagnostics.
 
-Until SOC-5, any game with an initialized event stream is local-only for automatic cloud
-sync. It must not enter the legacy aggregate snapshot queue, create a cloud game, or be
-marked synced through that path. Source roster ids in soccer setup do not change this rule.
+Until SOC-5, any game with sport-owned setup or an initialized event stream is local-only
+for automatic cloud sync. It must not enter the legacy aggregate snapshot queue, create a
+cloud game, or be marked synced through that path. Source roster ids in soccer setup do not
+change this rule. The aggregate sync function also enforces this boundary for direct callers.
 
 ---
 
@@ -377,7 +378,7 @@ marked synced through that path. Source roster ids in soccer setup do not change
 - Starts, appearances, and seconds project into player compatibility stats.
 - Soccer state and raw events survive hydrate, parking, export, and import.
 - Legacy saves normalize without changing basketball behavior.
-- Event-backed games are excluded from aggregate auto-sync and queue dirtying.
+- Setup-only and event-backed soccer games are excluded from aggregate auto-sync and queue dirtying.
 
 ### Later slice checks
 

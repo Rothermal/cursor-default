@@ -626,6 +626,7 @@ navigation; these checks primarily protect persistence and event authority befor
 | 11b.2 | Initialize a soccer event stream in a test/dev state with a resolved `sportGameState` setup | Opening lineup, period start, and clock start can append as one batch and produce one coherent projection |
 | 11b.3 | Introduce an invalid historical substitution followed by later events | Raw events remain stored; projection stops before the invalid substitution; the offending and later rows have diagnostics |
 | 11b.4 | Park, export, import, and resume an event-backed soccer state | Setup and raw events survive; projection rebuilds; the parked record is not queued for aggregate cloud sync |
+| 11b.4a | Configure soccer setup before stream initialization, then allow persistence/sync processing to run | The setup-only game remains local and aggregate sync does not create a cloud game |
 | 11b.5 | Dispatch a legacy stat, score, shot, undo, or period action after event-stream initialization | Reducer returns the unchanged event-backed state |
 | 11b.6 | Resume a legacy basketball game and track/sync normally | `sportGameState` normalizes to `null`; aggregate reducer and cloud behavior remain unchanged |
 

@@ -161,6 +161,8 @@ vi.mock('./supabase', () => ({
 }))
 
 import { syncGameSnapshotToCloud } from './cloudSync'
+import { resolveSoccerMatchRules } from './soccer/rules'
+import { createSoccerSportGameState } from './soccer/state'
 
 const basketball: SportConfig = {
   id: 'basketball',
@@ -217,6 +219,26 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.linkUpdateError = null
     mock.gameDeleteError = null
     mock.existingGameStatus = 'in_progress'
+  })
+
+  it('rejects setup-only sport state before aggregate cloud writes', async () => {
+    const soccerState = state({
+      sport: { ...basketball, id: 'soccer', name: 'Soccer', scoreLabel: 'G' },
+      sportGameState: createSoccerSportGameState({
+        version: 1,
+        trackedTeamDesignation: 'home',
+        firstPeriodAttackingDirection: 'left_to_right',
+        sourceTeamId: null,
+        sourceSeasonId: null,
+        rulesSnapshot: resolveSoccerMatchRules(),
+        participants: [],
+      }),
+    })
+
+    await expect(
+      syncGameSnapshotToCloud({ state: soccerState, userId: 'user-1' })
+    ).rejects.toThrow('cannot use aggregate cloud sync')
+    expect(mock.ops).toEqual([])
   })
 
   it('returns skippedFinalGame without writing when the cloud game is already final', async () => {

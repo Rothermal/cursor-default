@@ -20,6 +20,7 @@ import type {
 
 export const soccerGameEventProjector: SportGameEventProjector<GameEvent> = {
   sportId: 'soccer',
+  requiresSportGameState: true,
   project: projectSoccerMatchEvents,
 }
 
@@ -108,6 +109,9 @@ function applySoccerEvent(
     case 'soccer.role_changed':
       return applyRoleChanges(projection, event.payload.changes)
     case 'soccer.attacking_direction_changed':
+      if (projection.status !== 'in_progress' && projection.status !== 'period_break') {
+        return 'Attacking direction can only change during an active match.'
+      }
       projection.attackingDirection = event.payload.direction
       return null
     case 'soccer.match_roster_added':
@@ -491,7 +495,7 @@ function onFieldParticipants(projection: SoccerMatchProjection): SoccerProjected
 function validateOnFieldGoalkeeper(projection: SoccerMatchProjection): string | null {
   const onField = onFieldParticipants(projection)
   const goalkeepers = onField.filter(participant => participant.role.group === 'goalkeeper')
-  return onField.length > 0 && goalkeepers.length !== 1
+  return goalkeepers.length !== 1
     ? 'The on-field lineup must contain exactly one goalkeeper.'
     : null
 }

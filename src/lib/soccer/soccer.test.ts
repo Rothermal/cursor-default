@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '../gameEvents/types'
-import { addGameEvents, initializeGameEventStream } from '../gameEvents/mutations'
+import {
+  addGameEvent,
+  addGameEvents,
+  initializeGameEventStream,
+  updateGameEvent,
+} from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState, gameReducer } from '../gameReducer'
 import type { GameState, SportConfig } from '../../types'
@@ -235,7 +240,7 @@ describe('soccer match projection', () => {
     })
   })
 
-  it('preserves invalid and later events while projecting only through the last valid point', () => {
+  it('rolls back a semantically invalid event batch', () => {
     const events: GameEvent[] = [
       ...kickoffEvents(),
       matchEvent(3, 'soccer.clock_paused', { elapsedMs: 60_000 }, 60_000),
@@ -250,16 +255,57 @@ describe('soccer match projection', () => {
       matchEvent(5, 'soccer.period_ended', { periodId: 'regulation-1' }, 60_000),
     ]
 
-    const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
-    if (!result.ok) throw new Error(result.error.message)
+    const before = initializedState()
+    const result = addGameEvents(before, events, gameEventRegistry, gameEventProjectors)
 
-    expect(result.state.eventStream?.events).toHaveLength(events.length)
-    expect(result.inspection.complete).toBe(false)
-    expect(result.inspection.diagnostics.map(item => item.code)).toEqual([
+    expect(result).toMatchObject({ ok: false, error: { code: 'incomplete_projection' } })
+    expect(result.state).toBe(before)
+    expect(result.state.eventStream?.events).toEqual([])
+  })
+
+  it('preserves incomplete history after an existing event is edited', () => {
+    const events: GameEvent[] = [
+      ...kickoffEvents(),
+      matchEvent(3, 'soccer.clock_paused', { elapsedMs: 60_000 }, 60_000),
+      matchEvent(4, 'soccer.substitution_window', {
+        changes: [{
+          playerOutParticipantId: 'match-p2',
+          playerInParticipantId: 'match-p3',
+          playerInRole: { group: 'midfielder', label: null },
+        }],
+        halftime: false,
+      }, 60_000),
+      matchEvent(5, 'soccer.period_ended', { periodId: 'regulation-1' }, 60_000),
+    ]
+    const valid = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
+    if (!valid.ok) throw new Error(valid.error.message)
+
+    const edited = updateGameEvent(
+      valid.state,
+      events[4].id,
+      {
+        payload: {
+          changes: [{
+            playerOutParticipantId: 'match-p1',
+            playerInParticipantId: 'match-p3',
+            playerInRole: { group: 'midfielder', label: null },
+          }],
+          halftime: false,
+        },
+      },
+      '2026-07-18T12:10:00.000Z',
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    if (!edited.ok) throw new Error(edited.error.message)
+
+    expect(edited.state.eventStream?.events).toHaveLength(events.length)
+    expect(edited.inspection.complete).toBe(false)
+    expect(edited.inspection.diagnostics.map(item => item.code)).toEqual([
       'semantic_validation_failed',
       'unprojected_event',
     ])
-    const projection = result.state.sportGameState?.projection
+    const projection = edited.state.sportGameState?.projection
     expect(projection?.clock.running).toBe(false)
     expect(projection?.currentPeriodId).toBe('regulation-1')
     expect(projection?.participants['match-p1'].status).toBe('on_field')
@@ -274,6 +320,27 @@ describe('soccer match projection', () => {
 
     expect(result).toMatchObject({ ok: false, error: { code: 'duplicate_event_id' } })
     expect(result.state.eventStream?.events).toEqual([])
+  })
+
+  it('rolls back a semantically invalid single append', () => {
+    const before = initializedState()
+    const result = addGameEvent(
+      before,
+      matchEvent(0, 'soccer.period_started', { periodId: 'regulation-1' }, 0),
+      gameEventRegistry,
+      gameEventProjectors
+    )
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'incomplete_projection' } })
+    expect(result.state).toBe(before)
+  })
+
+  it('requires resolved soccer setup before initializing the authoritative stream', () => {
+    const withoutSetup = { ...state(), sportGameState: null }
+    const result = initializeGameEventStream(withoutSetup, gameEventRegistry, gameEventProjectors)
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'sport_setup_required' } })
+    expect(result.state.eventStream).toBeNull()
   })
 
   it('derives a running clock from its persisted anchor without mutating state', () => {
@@ -291,8 +358,9 @@ describe('soccer match projection', () => {
     expect(projection.clock.elapsedMs).toBe(0)
   })
 
-  it('keeps event-backed matches out of legacy aggregate cloud sync', () => {
-    expect(isAggregateCloudSyncEligible(state())).toBe(true)
+  it('keeps setup-only and event-backed matches out of legacy aggregate cloud sync', () => {
+    expect(isAggregateCloudSyncEligible({ ...state(), sportGameState: null })).toBe(true)
+    expect(isAggregateCloudSyncEligible(state())).toBe(false)
     expect(isAggregateCloudSyncEligible(initializedState())).toBe(false)
   })
 
