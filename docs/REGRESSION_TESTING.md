@@ -654,6 +654,30 @@ checks.
 
 ---
 
+## 11d. Soccer live match controls and correction history (SOC-2C)
+
+**Precondition:** Run the Vite development server and start a soccer match with starters,
+bench players, at least one backup goalkeeper, and extra time enabled.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11d.1 | Leave the clock running, background the tab, then return | Match time and each on-field participant's exact `MM:SS` advance from the persisted anchor without a stream of reducer events |
+| 11d.2 | Pause, resume, and correct the clock while stopped and while running | Display and canonical elapsed time use the correction; a running correction resumes automatically and history records the transition |
+| 11d.3 | Exercise continuous/per-period and count-up/count-down rules through nominal period time | Display follows the selected mode; count-down clocks show zero plus overrun, and no period ends automatically |
+| 11d.4 | End a running period, inspect the break, then start the next period | Pause and period end are atomic; the completed period remains visible; the next period and clock start together only after confirmation |
+| 11d.5 | Record paired, exit-only, entry-only, multi-player, and halftime substitutions | On Field/Bench membership, substitution/window counts, roles, appearances, and exact minutes rebuild correctly; halftime does not consume a window |
+| 11d.6 | Attempt a disallowed return, exceed a configured limit, or create zero/multiple on-field goalkeepers | The entire action is rejected without partial lineup or history changes; a valid simultaneous goalkeeper handoff succeeds |
+| 11d.7 | Change one or several roles, attacking direction, and mid-match rules | Each accepted change appears in history and immediately updates the projected tracker state |
+| 11d.8 | Add a late roster or anonymous participant to the bench/on field, then resolve an anonymous participant | Stable identity, role, appearance, and minutes remain coherent after projection rebuild |
+| 11d.9 | Edit a historical event so a later event becomes semantically invalid | The edit remains revisioned, diagnostics identify unprojected history, and dependent live controls lock until repaired |
+| 11d.10 | Repair the event, then remove and restore another history row | Projection becomes healthy after repair; removal and restore remain visible and revisioned |
+| 11d.11 | Complete regulation, optionally play configured extra time, then end the match | Completed is offered only after the configured playable periods; suspended/abandoned remain available; controls lock on end |
+| 11d.12 | Review the ended match and choose Reopen Match | Clock, lineup, minutes, history, corrections, and diagnostics remain readable; reopen returns to the break after the last completed period |
+| 11d.13 | Repeat the tracker at narrow mobile and desktop widths | Clock, tabs, cards, dialogs, and action controls remain usable without overlap or clipped text |
+| 11d.14 | Resume and track a basketball game | Basketball tracker, stat actions, parking, summary, and cloud paths are unchanged |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.
