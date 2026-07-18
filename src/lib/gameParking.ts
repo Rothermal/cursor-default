@@ -587,6 +587,59 @@ export function listParkedGameRecords(ownerId: string | null): ParkedGameRecord[
     .filter(record => !record.ownerId || !ownerId || record.ownerId === ownerId)
 }
 
+/**
+ * True when any parked (or active-persisted) local game is bound to this cloud game and
+ * still has unsynced progress. Cloud Games/Admin delete must check this — the active
+ * GameContext gate alone misses dirty parked bindings for a different local slot.
+ */
+export function hasUnsyncedParkedBindingForCloudGame(
+  ownerId: string | null,
+  cloudGameId: string
+): boolean {
+  return listParkedGameRecords(ownerId).some(
+    record =>
+      record.gameState.cloudSync.gameId === cloudGameId &&
+      shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+  )
+}
+
+/**
+ * True when any parked local game is bound to this cloud team and still has unsynced
+ * progress (including pre-first-sync `teamId` without `gameId`).
+ */
+export function hasUnsyncedParkedBindingForCloudTeam(
+  ownerId: string | null,
+  cloudTeamId: string
+): boolean {
+  return listParkedGameRecords(ownerId).some(
+    record =>
+      record.gameState.cloudSync.teamId === cloudTeamId &&
+      shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+  )
+}
+
+/**
+ * True when any parked local game is bound to this cloud season (directly or through one
+ * of its teams) and still has unsynced progress. The team fallback protects legacy/imported
+ * states created before `CloudSyncState.seasonId` existed.
+ */
+export function hasUnsyncedParkedBindingForCloudSeason(
+  ownerId: string | null,
+  cloudSeasonId: string,
+  cloudTeamIds: ReadonlySet<string> = new Set()
+): boolean {
+  return listParkedGameRecords(ownerId).some(
+    record => {
+      const binding = record.gameState.cloudSync
+      return (
+        binding.seasonId === cloudSeasonId ||
+        (binding.teamId !== null && cloudTeamIds.has(binding.teamId))
+      ) &&
+      shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+    }
+  )
+}
+
 export function hasDirtyParkedGames(ownerId: string | null): boolean {
   return listParkedGameRecords(ownerId).some(record => record.sync.dirty)
 }

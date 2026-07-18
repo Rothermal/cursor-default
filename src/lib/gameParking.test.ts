@@ -16,6 +16,9 @@ import {
   getParkedGameRecord,
   getParkedGameStorageInfo,
   hasDirtyParkedGames,
+  hasUnsyncedParkedBindingForCloudGame,
+  hasUnsyncedParkedBindingForCloudSeason,
+  hasUnsyncedParkedBindingForCloudTeam,
   importParkedGames,
   listDirtyParkedGameRecords,
   listParkedGames,
@@ -258,6 +261,73 @@ describe('gameParking', () => {
 
     expect(getParkedGameRecord(summary.localGameId, 'user-1')?.sync.dirty).toBe(false)
     expect(listDirtyParkedGameRecords('user-1')).toEqual([])
+  })
+
+  it('blocks cloud game/team/season deletes when a parked (non-active) binding is still unsynced', () => {
+    const dirtyCloud: GameState = {
+      ...gameState(basketball, 'Aces', 'Bears'),
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { '2pt': 2 } }],
+      cloudSync: {
+        ...gameState(basketball, 'Aces', 'Bears').cloudSync,
+        seasonId: 'season-parked',
+        teamId: 'team-parked',
+        gameId: 'game-parked',
+        gameStatus: 'in_progress',
+        lastSyncedGameFingerprint: 'stale',
+      },
+    }
+    saveActiveGameState(dirtyCloud, 'user-1')
+    parkActiveGame('user-1')
+    beginNewActiveParkedGame('user-1')
+    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+
+    expect(hasUnsyncedParkedBindingForCloudGame('user-1', 'game-parked')).toBe(true)
+    expect(hasUnsyncedParkedBindingForCloudTeam('user-1', 'team-parked')).toBe(true)
+    expect(hasUnsyncedParkedBindingForCloudSeason('user-1', 'season-parked')).toBe(true)
+    expect(hasUnsyncedParkedBindingForCloudGame('user-1', 'game-other')).toBe(false)
+    expect(hasUnsyncedParkedBindingForCloudTeam('user-1', 'team-other')).toBe(false)
+    expect(hasUnsyncedParkedBindingForCloudSeason('user-1', 'season-other')).toBe(false)
+
+    const parked = listParkedGames('user-1').find(game => game.cloudGameId === 'game-parked')
+    expect(parked).toBeTruthy()
+    const syncedParked = withLastSyncedGameFingerprint(
+      getParkedGameRecord(parked!.localGameId, 'user-1')!.gameState
+    )
+    saveParkedGameRecordState(parked!.localGameId, syncedParked, 'user-1')
+
+    expect(hasUnsyncedParkedBindingForCloudGame('user-1', 'game-parked')).toBe(false)
+    expect(hasUnsyncedParkedBindingForCloudTeam('user-1', 'team-parked')).toBe(false)
+    expect(hasUnsyncedParkedBindingForCloudSeason('user-1', 'season-parked')).toBe(false)
+  })
+
+  it('matches a legacy unsynced season binding through its cloud team id', () => {
+    const legacyCloud: GameState = {
+      ...gameState(basketball, 'Aces', 'Bears'),
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { '2pt': 2 } }],
+      cloudSync: {
+        ...gameState(basketball, 'Aces', 'Bears').cloudSync,
+        seasonId: null,
+        teamId: 'team-legacy',
+        gameId: 'game-legacy',
+        gameStatus: 'in_progress',
+        lastSyncedGameFingerprint: 'stale',
+      },
+    }
+    saveActiveGameState(legacyCloud, 'user-1')
+    parkActiveGame('user-1')
+    beginNewActiveParkedGame('user-1')
+    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+
+    expect(hasUnsyncedParkedBindingForCloudSeason(
+      'user-1',
+      'season-legacy',
+      new Set(['team-legacy'])
+    )).toBe(true)
+    expect(hasUnsyncedParkedBindingForCloudSeason(
+      'user-1',
+      'season-legacy',
+      new Set(['team-other'])
+    )).toBe(false)
   })
 
   it('clears inherited aggregate retry state for event-backed parked games', () => {

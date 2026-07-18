@@ -17,6 +17,7 @@ import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePl
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { hasUnsyncedParkedBindingForCloudTeam } from '../lib/gameParking'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 import {
@@ -965,11 +966,12 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     if (!supabaseClient || !canDeleteTeam(teamRolesById[team.id] ?? null)) return
     setError(null)
     if (
-      gameState.cloudSync.teamId === team.id &&
-      shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())
+      (gameState.cloudSync.teamId === team.id &&
+        shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())) ||
+      hasUnsyncedParkedBindingForCloudTeam(userId, team.id)
     ) {
       setError(
-        'The active local game for this team has unsynced stats. Sync or park them before deleting the team.'
+        'A local game for this team has unsynced stats. Sync them before deleting the team.'
       )
       return
     }

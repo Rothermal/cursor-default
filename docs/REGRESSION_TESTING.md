@@ -90,6 +90,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 3a.15 | Park a cloud-team game with unsynced stats (or pre-first-sync `teamId` without `gameId`) → Discard → confirm | Discard is blocked with a sync message; parked row remains (same guard as dashboard 3b.12a) |
 | 3a.16 | With an active local game bound to cloud game A, trigger sign-in auto-hydrate that would resume cloud game B | Auto-hydrate is skipped; game A stays mounted and is not overwritten |
 | 3a.17 | While syncing a cloud game that is already `final`, edit stats mid-flight (or leave unsynced local edits) | Flush/sync does **not** report success; local edits are not treated as uploaded; discard of that cloud-bound game remains blocked |
+| 3a.18 | Park a dirty cloud-bound game A, start/open another local game B, then Cloud Games/Settings Advanced → Delete game A (or its team/season) | Delete is blocked with an unsynced-local message; parked A remains; cloud row is not deleted |
+| 3a.18a | Repeat season delete with a migrated/imported dirty game whose cloud `seasonId` is absent but whose cloud `teamId` belongs to that season | Delete is still blocked by the team-to-season relationship; the local and cloud game remain |
 
 ---
 
