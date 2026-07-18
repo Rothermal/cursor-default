@@ -16,6 +16,7 @@ import {
   sportTeamsPath,
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
+import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 
 function activeSyncStatusLabel(status: string, lastError: string | null): string | null {
   switch (status) {
@@ -58,7 +59,9 @@ export default function SportDashboard() {
   const knownSportIds = sports.map(sport => sport.id)
   const validSportId = isKnownSportId(sportId, knownSportIds) ? sportId : null
   const sport = sports.find(item => item.id === validSportId) ?? null
-  const sportEnabled = sport ? isSportEnabled(sport.id) : false
+  const sportEnabled = sport
+    ? isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
+    : false
 
   const parkedForSport = useMemo(
     () =>

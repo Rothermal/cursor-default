@@ -133,6 +133,13 @@ the projector in `src/lib/soccer/`. `GameState.sportGameState` holds soccer's im
 resolved setup and rebuildable runtime projection. Semantic failures preserve raw events,
 project through the last coherent event, and expose diagnostics.
 
+SOC-2B adds a development-only Soccer workspace through the normal chooser and dashboard.
+The shared `/setup`, `/players`, and `/game` routes select soccer-specific setup, roster,
+kickoff, and staging pages while a soccer game is active. Production builds redirect those
+soccer route surfaces to the sport chooser until SOC-6. Cloud teams are read-only roster
+sources in this phase; soccer setup and kickoff remain local-only. Legacy `/checkout` and
+`/summary` surfaces redirect active soccer games back into the soccer flow.
+
 The `game_events` repository remains isolated and is **not** part of the automatic cloud
 queue until SOC-5. Aggregate cloud sync is disabled as soon as sport-owned setup exists;
 aggregate reducer mutations are disabled once an event stream is initialized. Do not mark
@@ -263,7 +270,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md`](PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-2A domain/event foundation complete; SOC-2B setup, roster, lineup, and kickoff UI is next |
+| [`PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md`](PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-2A/B complete; SOC-2C live clock, periods, lineup, and correction UI is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

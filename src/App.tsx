@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { GameProvider } from './context/GameContext'
+import { GameProvider, useGame } from './context/GameContext'
 import { SettingsProvider } from './context/SettingsContext'
 import AppShell from './components/AppShell'
 import Auth from './pages/Auth'
@@ -31,6 +31,39 @@ import ShotChartPreview from './pages/ShotChartPreview'
 import TeamInvite from './pages/TeamInvite'
 import AppAccessGate from './pages/AppAccessGate'
 import { consumeOAuthReturnPath } from './lib/oauthReturnPath'
+import SoccerGameSetup from './pages/SoccerGameSetup'
+import SoccerPlayerSetup from './pages/SoccerPlayerSetup'
+import SoccerGameStaging from './pages/SoccerGameStaging'
+
+function GameSetupRoute() {
+  const { state } = useGame()
+  if (state.sport?.id !== 'soccer') return <GameSetup />
+  return import.meta.env.DEV ? <SoccerGameSetup /> : <Navigate to="/" replace />
+}
+
+function PlayerSetupRoute() {
+  const { state } = useGame()
+  if (state.sport?.id !== 'soccer') return <PlayerSetup />
+  return import.meta.env.DEV ? <SoccerPlayerSetup /> : <Navigate to="/" replace />
+}
+
+function GameTrackerRoute() {
+  const { state } = useGame()
+  if (state.sport?.id !== 'soccer') return <GameTracker />
+  return import.meta.env.DEV ? <SoccerGameStaging /> : <Navigate to="/" replace />
+}
+
+function GameCheckoutRoute() {
+  const { state } = useGame()
+  if (state.sport?.id !== 'soccer') return <GameCheckout />
+  return <Navigate to={import.meta.env.DEV ? '/players' : '/'} replace />
+}
+
+function GameSummaryRoute() {
+  const { state } = useGame()
+  if (state.sport?.id !== 'soccer') return <GameSummary />
+  return <Navigate to={import.meta.env.DEV ? '/game' : '/'} replace />
+}
 
 function AppRoutes() {
   const {
@@ -111,12 +144,12 @@ function AppRoutes() {
             <Route path="/" element={<SportSelect />} />
             <Route path="/sports" element={<SportSelect />} />
             <Route path="/sport/:sportId" element={<SportDashboard />} />
-            <Route path="/setup" element={<GameSetup />} />
-            <Route path="/players" element={<PlayerSetup />} />
-            <Route path="/checkout" element={<GameCheckout />} />
-            <Route path="/game" element={<GameTracker />} />
+            <Route path="/setup" element={<GameSetupRoute />} />
+            <Route path="/players" element={<PlayerSetupRoute />} />
+            <Route path="/checkout" element={<GameCheckoutRoute />} />
+            <Route path="/game" element={<GameTrackerRoute />} />
             <Route path="/shot-chart" element={<ShotChart />} />
-            <Route path="/summary" element={<GameSummary />} />
+            <Route path="/summary" element={<GameSummaryRoute />} />
             <Route path="/settings" element={<Admin />} />
             <Route path="/settings/account" element={<Admin />} />
             <Route path="/settings/app" element={<Admin />} />
