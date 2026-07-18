@@ -33,7 +33,7 @@ import AppAccessGate from './pages/AppAccessGate'
 import { consumeOAuthReturnPath } from './lib/oauthReturnPath'
 import SoccerGameSetup from './pages/SoccerGameSetup'
 import SoccerPlayerSetup from './pages/SoccerPlayerSetup'
-import SoccerGameStaging from './pages/SoccerGameStaging'
+import SoccerGameTracker from './pages/SoccerGameTracker'
 
 function GameSetupRoute() {
   const { state } = useGame()
@@ -52,7 +52,7 @@ function GameTrackerRoute() {
   if (state.sport?.id !== 'soccer') return <GameTracker />
   if (!import.meta.env.DEV) return <Navigate to="/" replace />
   return state.eventStream?.events.length
-    ? <SoccerGameStaging />
+    ? <SoccerGameTracker />
     : <Navigate to="/players" replace />
 }
 

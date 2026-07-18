@@ -36,4 +36,26 @@ describe('soccer setup rules', () => {
     })
     expect(reordered.extraTimeSegments.map(segment => segment.order)).toEqual([5, 6])
   })
+
+  it('clamps custom segment counts and treats non-matching rules as custom', () => {
+    expect(resizeSoccerSegments([], 'regulation', 0, 10)).toHaveLength(1)
+    expect(resizeSoccerSegments([], 'extra_time', 99, 15, 2)).toHaveLength(8)
+    expect(resizeSoccerSegments([], 'extra_time', 99, 15, 2)[0]).toMatchObject({
+      id: 'extra-time-1',
+      order: 3,
+      durationMs: 900_000,
+    })
+
+    const custom = reorderSoccerSegments({
+      ...resolveSoccerMatchRules(),
+      regulationSegments: [
+        { id: 'regulation-1', label: 'Odd Half', kind: 'regulation', order: 1, durationMs: 40 * 60_000 },
+      ],
+    })
+    expect(detectRegulationPreset(custom)).toBe('custom')
+    expect(detectRegulationPreset({
+      ...resolveSoccerMatchRules(),
+      regulationSegments: regulationSegmentsForPreset('youth'),
+    })).toBe('youth')
+  })
 })

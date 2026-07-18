@@ -4,7 +4,7 @@ Detailed implementation plan for soccer match setup, participation, timing, and 
 history. SOC-2 builds on the shared event foundation from SOC-1 and is intentionally split
 into three sequential pull requests so each change remains reviewable and testable.
 
-Status: Product decisions resolved; SOC-2A and SOC-2B implementation complete; SOC-2C is next.
+Status: Complete. SOC-2A, SOC-2B, and SOC-2C are implemented.
 
 ---
 
@@ -44,7 +44,7 @@ Those remain in later soccer phases.
 - Validate player-count and goalkeeper rules, with an explicit short-handed confirmation.
 - Start a match by atomically recording opening lineup, period start, and clock start events.
 
-### SOC-2C: Live clock, periods, lineup, and correction UI
+### SOC-2C: Live clock, periods, lineup, and correction UI (complete)
 
 - Add the soccer `/game` clock, period, lineup, substitution, role, and direction controls.
 - Add live elapsed time and participation time without per-second reducer writes.
@@ -388,11 +388,18 @@ change this rule. The aggregate sync function also enforces this boundary for di
 - Kickoff rejects invalid goalkeeper lineups without mutating the existing state.
 - Soccer resume routing distinguishes match setup, lineup, and started-match stages.
 
-### Later slice checks
+### SOC-2C automated coverage
 
-SOC-2C adds focused automated coverage plus manual regression passes for narrow mobile,
-desktop, background/resume clock behavior, substitutions, history correction, extra time,
-end, and reopen.
+- Atomic clock pause/period end and next-period/clock start transitions.
+- Running and stopped clock corrections with canonical `MM:SS` display behavior.
+- Count-down overrun display for per-period clocks.
+- Substitution windows, exact participation time, and substitution counts.
+- Atomic rejection of invalid goalkeeper role changes.
+- Clock start/pause toggling, match end, and explicit reopen.
+- Revisioned history corrections that preserve invalid raw events and expose diagnostics.
+
+Manual narrow-mobile, desktop, background/resume, lineup, correction, extra-time, end,
+and reopen checks live in `docs/REGRESSION_TESTING.md` section 11d.
 
 ---
 
