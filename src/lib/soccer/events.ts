@@ -1,5 +1,12 @@
 import { isPlainObject } from '../gameEvents/envelope'
-import type { GameEvent, GameEventPeriod, JsonObject } from '../gameEvents/types'
+import type {
+  GameEvent,
+  GameEventActor,
+  GameEventLocation,
+  GameEventPeriod,
+  GameEventTeamSide,
+  JsonObject,
+} from '../gameEvents/types'
 import type { GameEventDefinition } from '../gameEvents/registry'
 import { validateSoccerMatchRules, validateSoccerRole } from './rules'
 import { isSoccerMatchParticipant } from './state'
@@ -14,9 +21,12 @@ import type {
   SoccerMatchRosterAddedPayload,
   SoccerMatchRulesChangedPayload,
   SoccerOpeningLineupPayload,
+  SoccerOwnGoalPayload,
   SoccerParticipantResolvedPayload,
   SoccerPeriodPayload,
   SoccerRoleChangedPayload,
+  SoccerScoreAdjustmentPayload,
+  SoccerShotPayload,
   SoccerSubstitutionWindowPayload,
 } from './types'
 import { createSoccerUuid } from './id'
@@ -37,6 +47,9 @@ export type SoccerEventPayloadByType = {
   'soccer.participant_resolved': SoccerParticipantResolvedPayload
   'soccer.match_ended': SoccerMatchEndedPayload
   'soccer.match_reopened': SoccerMatchReopenedPayload
+  'soccer.shot': SoccerShotPayload
+  'soccer.own_goal': SoccerOwnGoalPayload
+  'soccer.score_adjustment': SoccerScoreAdjustmentPayload
 }
 
 export interface CreateSoccerEventInput<TType extends keyof SoccerEventPayloadByType> {
@@ -48,6 +61,9 @@ export interface CreateSoccerEventInput<TType extends keyof SoccerEventPayloadBy
   period: GameEventPeriod
   elapsedMs: number | null
   occurredAt: string
+  teamSide?: GameEventTeamSide
+  location?: GameEventLocation | null
+  actors?: GameEventActor[]
 }
 
 export function createSoccerEvent<TType extends keyof SoccerEventPayloadByType>(
@@ -63,9 +79,9 @@ export function createSoccerEvent<TType extends keyof SoccerEventPayloadByType>(
     period: input.period,
     elapsedMs: input.elapsedMs,
     occurredAt: input.occurredAt,
-    teamSide: 'tracked',
-    location: null,
-    actors: [],
+    teamSide: input.teamSide ?? 'tracked',
+    location: input.location ?? null,
+    actors: input.actors ?? [],
     payload: input.payload,
     revision: 1,
     createdAt: input.occurredAt,
@@ -87,23 +103,26 @@ export function nextSoccerEventSequence(
 }
 
 export const soccerEventDefinitions: GameEventDefinition<GameEvent>[] = [
-  definition('soccer.opening_lineup', validateOpeningLineup),
-  definition('soccer.period_started', validatePeriod),
-  definition('soccer.period_ended', validatePeriod),
-  definition('soccer.clock_started', validateClockStarted),
-  definition('soccer.clock_paused', validateClockPaused),
-  definition('soccer.clock_adjusted', validateClockAdjusted),
-  definition('soccer.match_rules_changed', validateRulesChanged),
-  definition('soccer.substitution_window', validateSubstitutionWindow),
-  definition('soccer.role_changed', validateRoleChanged),
-  definition('soccer.attacking_direction_changed', validateDirectionChanged),
-  definition('soccer.match_roster_added', validateRosterAdded),
-  definition('soccer.participant_resolved', validateParticipantResolved),
-  definition('soccer.match_ended', validateMatchEnded),
-  definition('soccer.match_reopened', validateMatchReopened),
+  matchStateDefinition('soccer.opening_lineup', validateOpeningLineup),
+  matchStateDefinition('soccer.period_started', validatePeriod),
+  matchStateDefinition('soccer.period_ended', validatePeriod),
+  matchStateDefinition('soccer.clock_started', validateClockStarted),
+  matchStateDefinition('soccer.clock_paused', validateClockPaused),
+  matchStateDefinition('soccer.clock_adjusted', validateClockAdjusted),
+  matchStateDefinition('soccer.match_rules_changed', validateRulesChanged),
+  matchStateDefinition('soccer.substitution_window', validateSubstitutionWindow),
+  matchStateDefinition('soccer.role_changed', validateRoleChanged),
+  matchStateDefinition('soccer.attacking_direction_changed', validateDirectionChanged),
+  matchStateDefinition('soccer.match_roster_added', validateRosterAdded),
+  matchStateDefinition('soccer.participant_resolved', validateParticipantResolved),
+  matchStateDefinition('soccer.match_ended', validateMatchEnded),
+  matchStateDefinition('soccer.match_reopened', validateMatchReopened),
+  attackingDefinition('soccer.shot', validateShot, ['shooter', 'creator_primary', 'creator_secondary', 'goalkeeper', 'blocker']),
+  attackingDefinition('soccer.own_goal', validateOwnGoal, ['own_goal_by', 'goalkeeper']),
+  attackingDefinition('soccer.score_adjustment', validateScoreAdjustment, []),
 ]
 
-function definition(
+function matchStateDefinition(
   eventType: keyof SoccerEventPayloadByType,
   validatePayload: (payload: JsonObject) => boolean
 ): GameEventDefinition<GameEvent> {
@@ -119,6 +138,38 @@ function definition(
         event.teamSide !== 'tracked' ||
         event.location !== null ||
         event.actors.length !== 0 ||
+        !validatePayload(event.payload)
+      ) {
+        return { ok: false, message: `${eventType} has an invalid soccer payload.` }
+      }
+      return { ok: true, event }
+    },
+  }
+}
+
+function attackingDefinition(
+  eventType: 'soccer.shot' | 'soccer.own_goal' | 'soccer.score_adjustment',
+  validatePayload: (payload: JsonObject) => boolean,
+  allowedRoles: string[]
+): GameEventDefinition<GameEvent> {
+  return {
+    sportId: 'soccer',
+    eventType,
+    currentSchemaVersion: SOCCER_EVENT_SCHEMA_VERSION,
+    validate: event => {
+      const roles = event.actors.map(actor => actor.role)
+      const validActors = roles.every(role => allowedRoles.includes(role)) &&
+        new Set(roles).size === roles.length
+      const locationIsAllowed = eventType !== 'soccer.score_adjustment'
+        ? true
+        : event.location === null
+      if (
+        event.sportId !== 'soccer' ||
+        event.eventType !== eventType ||
+        event.schemaVersion !== SOCCER_EVENT_SCHEMA_VERSION ||
+        event.elapsedMs === null ||
+        !validActors ||
+        !locationIsAllowed ||
         !validatePayload(event.payload)
       ) {
         return { ok: false, message: `${eventType} has an invalid soccer payload.` }
@@ -197,6 +248,20 @@ function validateMatchEnded(payload: JsonObject): boolean {
 
 function validateMatchReopened(payload: JsonObject): boolean {
   return payload.reason === null || typeof payload.reason === 'string'
+}
+
+function validateShot(payload: JsonObject): boolean {
+  return ['goal', 'saved', 'blocked', 'off_target', 'woodwork'].includes(String(payload.outcome)) &&
+    ['open_play', 'penalty', 'direct_free_kick', 'corner_sequence', 'other_set_piece']
+      .includes(String(payload.situation))
+}
+
+function validateOwnGoal(payload: JsonObject): boolean {
+  return Object.keys(payload).length === 0
+}
+
+function validateScoreAdjustment(payload: JsonObject): boolean {
+  return (payload.delta === 1 || payload.delta === -1) && isNonEmptyString(payload.reason)
 }
 
 function isId(value: unknown): value is string {

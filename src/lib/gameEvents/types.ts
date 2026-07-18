@@ -15,6 +15,8 @@ interface GameEventActorBase {
   role: string
   kind: GameEventActorKind
   label?: string
+  /** Stable sport-owned match participant identity, when the actor belongs to a match roster. */
+  participantId?: string
 }
 
 export interface GameEventPlayerActor extends GameEventActorBase {

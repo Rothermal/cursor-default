@@ -129,9 +129,16 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 for event-authoritative games. SOC-1 infrastructure lives in `src/lib/gameEvents/`: the
 generic engine validates, migrates, quarantines, and orders events, then one projector per
 sport rebuilds aggregate state. SOC-2A registers production soccer match-state schemas and
-the projector in `src/lib/soccer/`. `GameState.sportGameState` holds soccer's immutable
+SOC-3A adds shots, own goals, score adjustments, and their semantic projector rules in
+`src/lib/soccer/`. `GameState.sportGameState` holds soccer's immutable
 resolved setup and rebuildable runtime projection. Semantic failures preserve raw events,
 project through the last coherent event, and expose diagnostics.
+
+SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
+totals from active event revisions. Event actors use stable match `participantId` references;
+later anonymous-player resolution maps those totals without rewriting event history. Projected
+on-field and role intervals validate late historical attribution while attacking events leave
+the anchored live clock unchanged. The field and Timeline UI remain SOC-3B and SOC-3C.
 
 SOC-2B and SOC-2C add a development-only Soccer workspace through the normal chooser and
 dashboard. The shared `/setup`, `/players`, and `/game` routes select soccer-specific setup,
@@ -273,7 +280,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md`](PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-2 complete; SOC-3 field and attacking-event planning is next |
+| [`PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md`](PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-3A attacking domain complete; SOC-3B live field and capture is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

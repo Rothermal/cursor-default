@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { GameEvent } from '../gameEvents/types'
+import type { GameEvent, GameEventActor, GameEventTeamSide, JsonObject } from '../gameEvents/types'
 import {
   addGameEvent,
   addGameEvents,
+  deleteGameEvent,
   initializeGameEventStream,
+  restoreGameEvent,
   updateGameEvent,
 } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
@@ -107,6 +109,43 @@ function matchEvent<TType extends keyof SoccerEventPayloadByType>(
   }) as Extract<GameEvent, { eventType: TType }>
 }
 
+function attackingEvent<TType extends 'soccer.shot' | 'soccer.own_goal' | 'soccer.score_adjustment'>(
+  sequence: number,
+  eventType: TType,
+  payload: SoccerEventPayloadByType[TType],
+  teamSide: GameEventTeamSide,
+  actors: GameEventActor[],
+  elapsedMs: number,
+  location: { x: number; y: number; attackingDirection: 'left_to_right' | 'right_to_left' } | null = {
+    x: 0.8,
+    y: 0.5,
+    attackingDirection: 'left_to_right',
+  },
+  periodId = 'regulation-1'
+): GameEvent<JsonObject, string, string> {
+  return createSoccerEvent({
+    id: `20000000-0000-4000-8000-${String(sequence + 1).padStart(12, '0')}`,
+    eventType,
+    payload,
+    recorderUserId: 'user-1',
+    sequence,
+    period: { id: periodId, order: periodId === 'regulation-1' ? 1 : 2 },
+    elapsedMs,
+    occurredAt: new Date(Date.parse('2026-07-18T12:00:00.000Z') + sequence * 1_000).toISOString(),
+    teamSide,
+    location,
+    actors,
+  })
+}
+
+function trackedActor(role: string, participantId: string, playerId: string): GameEventActor {
+  return { role, kind: 'player', participantId, playerId }
+}
+
+function opponentActor(role: string, label: string): GameEventActor {
+  return { role, kind: 'unknown', label }
+}
+
 function initializedState(): GameState {
   const initialized = initializeGameEventStream(state(), gameEventRegistry, gameEventProjectors)
   if (!initialized.ok) throw new Error(initialized.error.message)
@@ -149,8 +188,8 @@ describe('soccer rules and production schemas', () => {
     expect(validateSoccerMatchRules({ ...rules, maxOnFieldPlayers: 0 })).toMatch(/positive/)
   })
 
-  it('registers all SOC-2 match-state schemas and rejects malformed payloads', () => {
-    expect(soccerEventDefinitions).toHaveLength(14)
+  it('registers the SOC-2 and SOC-3A schemas and rejects malformed payloads', () => {
+    expect(soccerEventDefinitions).toHaveLength(17)
     const malformed = matchEvent(
       0,
       'soccer.opening_lineup',
@@ -161,6 +200,261 @@ describe('soccer rules and production schemas', () => {
       ok: false,
       diagnostic: { code: 'validation_failed' },
     })
+    const duplicateActors = attackingEvent(
+      1,
+      'soccer.shot',
+      { outcome: 'goal', situation: 'open_play' },
+      'tracked',
+      [
+        trackedActor('shooter', 'match-p1', 'p1'),
+        trackedActor('shooter', 'match-p2', 'p2'),
+      ],
+      0
+    )
+    expect(gameEventRegistry.inspect(duplicateActors)).toMatchObject({
+      ok: false,
+      diagnostic: { code: 'validation_failed' },
+    })
+  })
+})
+
+describe('soccer attacking event projection', () => {
+  it('projects every shot outcome and situation without inventing restart events', () => {
+    const events: GameEvent[] = [
+      ...kickoffEvents(),
+      attackingEvent(3, 'soccer.shot', { outcome: 'goal', situation: 'penalty' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+      ], 1_000),
+      attackingEvent(4, 'soccer.shot', { outcome: 'off_target', situation: 'direct_free_kick' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+      ], 2_000),
+      attackingEvent(5, 'soccer.shot', { outcome: 'blocked', situation: 'corner_sequence' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+        opponentActor('blocker', 'Opponent block'),
+      ], 3_000),
+      attackingEvent(6, 'soccer.shot', { outcome: 'woodwork', situation: 'other_set_piece' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+      ], 4_000),
+      attackingEvent(7, 'soccer.shot', { outcome: 'saved', situation: 'open_play' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+      ], 5_000),
+    ]
+
+    const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
+    if (!result.ok) throw new Error(result.error.message)
+
+    expect(result.state.sportGameState?.projection.sideTotals.tracked).toMatchObject({
+      score: 1,
+      shots: 5,
+      shotsOnTarget: 2,
+      goals: 1,
+      saved: 1,
+      blocked: 1,
+      offTarget: 1,
+      woodwork: 1,
+      penaltyAttempts: 1,
+      penaltyGoals: 1,
+      directFreeKickAttempts: 1,
+      directFreeKickGoals: 0,
+    })
+    expect(result.state.players.find(player => player.id === 'p2')?.stats).toMatchObject({
+      soc_goal: 1,
+      soc_shot: 5,
+      soc_sot: 2,
+      soc_pen_att: 1,
+      soc_pen_goal: 1,
+      soc_dfk_att: 1,
+      soc_dfk_goal: 0,
+    })
+  })
+
+  it('derives score, attempts, creators, goalkeeper totals, and own goals for both sides', () => {
+    const events: GameEvent[] = [
+      ...kickoffEvents(),
+      attackingEvent(3, 'soccer.shot', { outcome: 'saved', situation: 'open_play' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+        trackedActor('creator_primary', 'match-p1', 'p1'),
+      ], 1_000),
+      attackingEvent(4, 'soccer.shot', { outcome: 'goal', situation: 'open_play' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+        trackedActor('creator_primary', 'match-p1', 'p1'),
+      ], 2_000),
+      attackingEvent(5, 'soccer.shot', { outcome: 'saved', situation: 'penalty' }, 'opponent', [
+        opponentActor('shooter', 'Opponent 9'),
+        trackedActor('goalkeeper', 'match-p1', 'p1'),
+      ], 3_000),
+      attackingEvent(6, 'soccer.shot', { outcome: 'goal', situation: 'open_play' }, 'opponent', [
+        opponentActor('shooter', 'Opponent 10'),
+        trackedActor('goalkeeper', 'match-p1', 'p1'),
+      ], 4_000),
+      attackingEvent(7, 'soccer.own_goal', {}, 'opponent', [
+        trackedActor('own_goal_by', 'match-p2', 'p2'),
+        trackedActor('goalkeeper', 'match-p1', 'p1'),
+      ], 5_000),
+      attackingEvent(8, 'soccer.own_goal', {}, 'tracked', [
+        opponentActor('own_goal_by', 'Opponent 4'),
+      ], 6_000),
+      attackingEvent(9, 'soccer.score_adjustment', {
+        delta: -1,
+        reason: 'Corrected official score',
+      }, 'tracked', [], 7_000, null),
+    ]
+
+    const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
+    if (!result.ok) throw new Error(result.error.message)
+
+    expect(result.state.homeTeamScore).toBe(1)
+    expect(result.state.opponentScore).toBe(2)
+    expect(result.state.sportGameState?.projection.sideTotals).toMatchObject({
+      tracked: { score: 1, shots: 2, shotsOnTarget: 2, goals: 1, saved: 1 },
+      opponent: {
+        score: 2,
+        shots: 2,
+        shotsOnTarget: 2,
+        goals: 1,
+        saved: 1,
+        penaltyAttempts: 1,
+      },
+    })
+    expect(result.state.players.find(player => player.id === 'p2')?.stats).toMatchObject({
+      soc_goal: 1,
+      soc_own_goal: 1,
+      soc_shot: 2,
+      soc_sot: 2,
+    })
+    expect(result.state.players.find(player => player.id === 'p1')?.stats).toMatchObject({
+      soc_ast_primary: 1,
+      soc_ast: 1,
+      soc_key_pass: 1,
+      soc_chance_created: 2,
+      soc_gk_save: 1,
+      soc_gk_ga: 2,
+      soc_gk_sot_faced: 2,
+      soc_gk_pen_faced: 1,
+      soc_gk_pen_save: 1,
+    })
+  })
+
+  it('accepts a historical shot after period end without rewinding the match clock', () => {
+    const events: GameEvent[] = [
+      ...kickoffEvents(),
+      matchEvent(3, 'soccer.clock_paused', { elapsedMs: 1_000 }, 1_000),
+      matchEvent(4, 'soccer.period_ended', { periodId: 'regulation-1' }, 1_000),
+      attackingEvent(5, 'soccer.shot', { outcome: 'off_target', situation: 'open_play' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+      ], 500),
+    ]
+
+    const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
+    if (!result.ok) throw new Error(result.error.message)
+
+    expect(result.state.sportGameState?.projection.status).toBe('period_break')
+    expect(result.state.sportGameState?.projection.clock.elapsedMs).toBe(1_000)
+    expect(result.state.players.find(player => player.id === 'p2')?.stats.soc_shot).toBe(1)
+  })
+
+  it('keeps participant attribution stable when an anonymous player is resolved later', () => {
+    const anonymous = state()
+    const anonymousSetup = setup()
+    anonymousSetup.participants[1] = participant(
+      'match-p2',
+      null,
+      'Guest defender',
+      '2',
+      'starter',
+      'defender'
+    )
+    anonymous.sportGameState = createSoccerSportGameState(anonymousSetup)
+    const initialized = initializeGameEventStream(anonymous, gameEventRegistry, gameEventProjectors)
+    if (!initialized.ok) throw new Error(initialized.error.message)
+    const events: GameEvent[] = [
+      ...kickoffEvents(),
+      attackingEvent(3, 'soccer.shot', { outcome: 'goal', situation: 'open_play' }, 'tracked', [{
+        role: 'shooter',
+        kind: 'unknown',
+        participantId: 'match-p2',
+        label: 'Guest defender',
+      }], 1_000),
+      matchEvent(4, 'soccer.participant_resolved', {
+        participantId: 'match-p2',
+        playerId: 'p2',
+        displayName: 'Defender',
+        number: '2',
+      }, 1_000),
+    ]
+
+    const result = addGameEvents(initialized.state, events, gameEventRegistry, gameEventProjectors)
+    if (!result.ok) throw new Error(result.error.message)
+
+    expect(result.state.players.find(player => player.id === 'p2')?.stats).toMatchObject({
+      soc_goal: 1,
+      soc_shot: 1,
+      soc_sot: 1,
+    })
+  })
+
+  it('reprojects attacking totals when an event is deleted and restored', () => {
+    const shot = attackingEvent(
+      3,
+      'soccer.shot',
+      { outcome: 'goal', situation: 'direct_free_kick' },
+      'tracked',
+      [trackedActor('shooter', 'match-p2', 'p2')],
+      1_000
+    )
+    const added = addGameEvents(
+      initializedState(),
+      [...kickoffEvents(), shot],
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    if (!added.ok) throw new Error(added.error.message)
+
+    const deleted = deleteGameEvent(
+      added.state,
+      shot.id,
+      '2026-07-18T12:10:00.000Z',
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    if (!deleted.ok) throw new Error(deleted.error.message)
+    expect(deleted.state.homeTeamScore).toBe(0)
+    expect(deleted.state.players.find(player => player.id === 'p2')?.stats.soc_shot).toBe(0)
+
+    const restored = restoreGameEvent(
+      deleted.state,
+      shot.id,
+      '2026-07-18T12:11:00.000Z',
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    if (!restored.ok) throw new Error(restored.error.message)
+    expect(restored.state.homeTeamScore).toBe(1)
+    expect(restored.state.players.find(player => player.id === 'p2')?.stats).toMatchObject({
+      soc_shot: 1,
+      soc_sot: 1,
+      soc_dfk_att: 1,
+      soc_dfk_goal: 1,
+    })
+  })
+
+  it('rejects negative score and tracked actors who were not on field', () => {
+    const negative = addGameEvents(initializedState(), [
+      ...kickoffEvents(),
+      attackingEvent(3, 'soccer.score_adjustment', {
+        delta: -1,
+        reason: 'Invalid correction',
+      }, 'tracked', [], 1_000, null),
+    ], gameEventRegistry, gameEventProjectors)
+    expect(negative).toMatchObject({ ok: false, error: { code: 'incomplete_projection' } })
+
+    const benchShot = addGameEvents(initializedState(), [
+      ...kickoffEvents(),
+      attackingEvent(3, 'soccer.shot', { outcome: 'off_target', situation: 'open_play' }, 'tracked', [
+        trackedActor('shooter', 'match-p3', 'p3'),
+      ], 1_000),
+    ], gameEventRegistry, gameEventProjectors)
+    expect(benchShot).toMatchObject({ ok: false, error: { code: 'incomplete_projection' } })
   })
 })
 

@@ -11,6 +11,13 @@ export type SoccerParticipantKind = 'player' | 'anonymous'
 export type SoccerRosterStatus = 'starter' | 'bench'
 export type SoccerRoleGroup = 'goalkeeper' | 'defender' | 'midfielder' | 'forward' | 'custom'
 export type SoccerSegmentKind = 'regulation' | 'extra_time'
+export type SoccerShotOutcome = 'goal' | 'saved' | 'blocked' | 'off_target' | 'woodwork'
+export type SoccerShotSituation =
+  | 'open_play'
+  | 'penalty'
+  | 'direct_free_kick'
+  | 'corner_sequence'
+  | 'other_set_piece'
 
 export interface SoccerRole extends JsonObject {
   group: SoccerRoleGroup
@@ -73,7 +80,53 @@ export interface SoccerProjectedParticipant {
   appearances: number
   totalActiveMs: number
   activeSinceElapsedMs: number | null
+  onFieldIntervals: SoccerOnFieldInterval[]
+  roleIntervals: SoccerRoleInterval[]
   hasExited: boolean
+}
+
+export interface SoccerOnFieldInterval {
+  periodId: string
+  startElapsedMs: number
+  endElapsedMs: number | null
+}
+
+export interface SoccerRoleInterval extends SoccerOnFieldInterval {
+  role: SoccerRole
+}
+
+export interface SoccerParticipantStatTotals {
+  goals: number
+  ownGoals: number
+  primaryAssists: number
+  secondaryAssists: number
+  shots: number
+  shotsOnTarget: number
+  keyPasses: number
+  penaltyAttempts: number
+  penaltyGoals: number
+  directFreeKickAttempts: number
+  directFreeKickGoals: number
+  goalkeeperSaves: number
+  goalkeeperGoalsAllowed: number
+  goalkeeperShotsOnTargetFaced: number
+  goalkeeperPenaltiesFaced: number
+  goalkeeperPenaltySaves: number
+}
+
+export interface SoccerSideAttackingTotals {
+  score: number
+  shots: number
+  shotsOnTarget: number
+  goals: number
+  saved: number
+  blocked: number
+  offTarget: number
+  woodwork: number
+  penaltyAttempts: number
+  penaltyGoals: number
+  directFreeKickAttempts: number
+  directFreeKickGoals: number
 }
 
 export interface SoccerProjectedClock {
@@ -89,6 +142,11 @@ export interface SoccerMatchProjection {
   completedPeriodIds: string[]
   clock: SoccerProjectedClock
   participants: Record<string, SoccerProjectedParticipant>
+  participantStats: Record<string, SoccerParticipantStatTotals>
+  sideTotals: {
+    tracked: SoccerSideAttackingTotals
+    opponent: SoccerSideAttackingTotals
+  }
   currentRules: SoccerMatchRules
   firstPeriodAttackingDirection: SoccerAttackingDirection
   attackingDirection: SoccerAttackingDirection
@@ -180,6 +238,18 @@ export interface SoccerMatchReopenedPayload extends JsonObject {
   reason: string | null
 }
 
+export interface SoccerShotPayload extends JsonObject {
+  outcome: SoccerShotOutcome
+  situation: SoccerShotSituation
+}
+
+export type SoccerOwnGoalPayload = Record<string, never>
+
+export interface SoccerScoreAdjustmentPayload extends JsonObject {
+  delta: 1 | -1
+  reason: string
+}
+
 export type SoccerOpeningLineupEvent = GameEvent<SoccerOpeningLineupPayload, 'soccer.opening_lineup', 'soccer'>
 export type SoccerPeriodStartedEvent = GameEvent<SoccerPeriodPayload, 'soccer.period_started', 'soccer'>
 export type SoccerPeriodEndedEvent = GameEvent<SoccerPeriodPayload, 'soccer.period_ended', 'soccer'>
@@ -194,6 +264,9 @@ export type SoccerMatchRosterAddedEvent = GameEvent<SoccerMatchRosterAddedPayloa
 export type SoccerParticipantResolvedEvent = GameEvent<SoccerParticipantResolvedPayload, 'soccer.participant_resolved', 'soccer'>
 export type SoccerMatchEndedEvent = GameEvent<SoccerMatchEndedPayload, 'soccer.match_ended', 'soccer'>
 export type SoccerMatchReopenedEvent = GameEvent<SoccerMatchReopenedPayload, 'soccer.match_reopened', 'soccer'>
+export type SoccerShotEvent = GameEvent<SoccerShotPayload, 'soccer.shot', 'soccer'>
+export type SoccerOwnGoalEvent = GameEvent<SoccerOwnGoalPayload, 'soccer.own_goal', 'soccer'>
+export type SoccerScoreAdjustmentEvent = GameEvent<SoccerScoreAdjustmentPayload, 'soccer.score_adjustment', 'soccer'>
 
 export type SoccerMatchEvent =
   | SoccerOpeningLineupEvent
@@ -210,3 +283,6 @@ export type SoccerMatchEvent =
   | SoccerParticipantResolvedEvent
   | SoccerMatchEndedEvent
   | SoccerMatchReopenedEvent
+  | SoccerShotEvent
+  | SoccerOwnGoalEvent
+  | SoccerScoreAdjustmentEvent
