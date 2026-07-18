@@ -1,7 +1,10 @@
 import type { GameState } from '../types'
 import type { ParkedGameSummary } from './gameParking'
 
-type ResumableGameState = Pick<GameState, 'sport' | 'gameInfo' | 'players'>
+type ResumableGameState = Pick<
+  GameState,
+  'sport' | 'gameInfo' | 'players' | 'sportGameState' | 'eventStream'
+>
 
 export function sportDashboardPath(sportId: string): string {
   return `/sport/${encodeURIComponent(sportId)}`
@@ -43,6 +46,10 @@ export function isParkedGameForSport(
 export function routeForResumedGame(state: ResumableGameState): string {
   if (!state.sport) return '/'
   if (!state.gameInfo) return '/setup'
+  if (state.sport.id === 'soccer') {
+    if (state.eventStream?.events.length) return '/game'
+    return state.sportGameState?.sportId === 'soccer' ? '/players' : '/setup'
+  }
   if (state.players.length === 0) return '/players'
   return '/game'
 }

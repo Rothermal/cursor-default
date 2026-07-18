@@ -12,6 +12,8 @@ import {
 } from './sportNavigation'
 
 describe('sportNavigation', () => {
+  const emptyEventState = { sportGameState: null, eventStream: null }
+
   it('builds sport-scoped hash route paths', () => {
     expect(sportDashboardPath('basketball')).toBe('/sport/basketball')
     expect(sportTeamsPath('basketball')).toBe('/teams?sport=basketball')
@@ -36,17 +38,50 @@ describe('sportNavigation', () => {
   })
 
   it('routes resumed games to the first incomplete game-flow step', () => {
-    expect(routeForResumedGame({ sport: null, gameInfo: null, players: [] })).toBe('/')
-    expect(routeForResumedGame({ sport: { id: 'basketball' } as never, gameInfo: null, players: [] })).toBe('/setup')
+    expect(routeForResumedGame({ ...emptyEventState, sport: null, gameInfo: null, players: [] })).toBe('/')
+    expect(routeForResumedGame({ ...emptyEventState, sport: { id: 'basketball' } as never, gameInfo: null, players: [] })).toBe('/setup')
     expect(routeForResumedGame({
+      ...emptyEventState,
       sport: { id: 'basketball' } as never,
       gameInfo: { teamName: 'A', opponentName: 'B', tournamentName: '', date: '2026-07-12' },
       players: [],
     })).toBe('/players')
     expect(routeForResumedGame({
+      ...emptyEventState,
       sport: { id: 'basketball' } as never,
       gameInfo: { teamName: 'A', opponentName: 'B', tournamentName: '', date: '2026-07-12' },
       players: [{ id: 'p1', name: 'A', number: '1', stats: {} }],
+    })).toBe('/game')
+  })
+
+  it('routes soccer setup and started matches to their sport-specific stage', () => {
+    const soccer = { id: 'soccer' } as never
+    const gameInfo = {
+      teamName: 'A',
+      opponentName: 'B',
+      tournamentName: '',
+      date: '2026-07-18',
+    }
+    expect(routeForResumedGame({
+      sport: soccer,
+      gameInfo,
+      players: [],
+      sportGameState: null,
+      eventStream: null,
+    })).toBe('/setup')
+    expect(routeForResumedGame({
+      sport: soccer,
+      gameInfo,
+      players: [],
+      sportGameState: { sportId: 'soccer' } as never,
+      eventStream: null,
+    })).toBe('/players')
+    expect(routeForResumedGame({
+      sport: soccer,
+      gameInfo,
+      players: [],
+      sportGameState: { sportId: 'soccer' } as never,
+      eventStream: { version: 1, events: [{}] },
     })).toBe('/game')
   })
 

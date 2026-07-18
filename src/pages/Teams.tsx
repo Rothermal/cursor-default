@@ -18,6 +18,7 @@ import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
+import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 import {
   acceptedTeamRole,
   canClaimPlayerGuardianship,
@@ -106,7 +107,10 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const requestedSportId = searchParams.get('sport')
   const isManagementRoute = mode === 'manage'
   const supabaseClient = supabase
-  const enabledSports = useMemo(() => sports.filter(s => isSportEnabled(s.id)), [isSportEnabled])
+  const enabledSports = useMemo(
+    () => sports.filter(s => isSportWorkspaceAvailable(s.id, isSportEnabled(s.id))),
+    [isSportEnabled]
+  )
   const scopedSport = useMemo(
     () => sports.find(sport => sport.id === requestedSportId) ?? null,
     [requestedSportId]

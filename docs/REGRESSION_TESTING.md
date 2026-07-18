@@ -632,6 +632,28 @@ navigation; these checks primarily protect persistence and event authority befor
 
 ---
 
+## 11c. Soccer setup, roster, lineup, and kickoff (SOC-2B)
+
+**Precondition:** Run the Vite development server. Soccer remains unavailable in production
+builds until SOC-6. Use a soccer cloud team with at least two active players for cloud-source
+checks.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11c.1 | Open the sport chooser with Soccer disabled in persisted settings | A Soccer development-preview card is available; Settings labels it Preview and does not offer a toggle |
+| 11c.2 | Start a new Soccer match and edit regulation preset/count, period labels/durations, clock display, player maximum, substitution limits, extra time, and shootout availability | Valid rules remain stable while segment count changes; Continue blocks invalid or incomplete match rules |
+| 11c.3 | Use a local team source, enter match information, continue, and add local players | The Match Roster step lists players and allows selecting only this match's participants |
+| 11c.4 | Return to setup, choose an accessible cloud soccer team, and continue | Its active roster loads read-only; no cloud game is created and `cloudSync` remains unbound |
+| 11c.5 | Add a game-only participant while using a cloud roster, then return between roster and lineup steps | The anonymous participant keeps one stable match-local identity |
+| 11c.6 | Assign Starter/Bench and roles with no starting goalkeeper or with more starters than the configured maximum | Kickoff is blocked with a focused validation message |
+| 11c.7 | Add or assign exactly one starting goalkeeper, leave the lineup below the maximum, and choose Start Match | A short-handed confirmation appears before kickoff |
+| 11c.8 | Confirm kickoff | Opening lineup, first period, and running clock begin together; `/game` shows `MM:SS`, direction, On Field, and Bench without the legacy stat grid |
+| 11c.9 | Background the tab briefly, return, park the match, then resume it | The displayed clock advances from its persisted anchor and resume returns to `/game` |
+| 11c.10 | Build for production, open an existing soccer Team Info page or `/#/setup?teamId=<soccer-team>`, and attempt to reach a stale/imported active soccer setup through `/setup`, `/players`, `/checkout`, `/game`, or `/summary` | Team Info hides Start Game, the team deep-link does not create or bind a soccer session, Soccer cards are absent, and active soccer route surfaces redirect to the sport chooser |
+| 11c.11 | Start and track a basketball game | Existing setup, roster, checkout, tracker, parking, and cloud behavior are unchanged |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.

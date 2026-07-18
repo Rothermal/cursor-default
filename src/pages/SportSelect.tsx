@@ -7,13 +7,16 @@ import {
   isParkedGameForSport,
   sportDashboardPath,
 } from '../lib/sportNavigation'
+import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 
 export default function SportSelect() {
   const navigate = useNavigate()
   const { state, activeLocalGameId, parkedGames } = useGame()
   const { isSportEnabled } = useSettings()
 
-  const enabledSports = sports.filter(s => isSportEnabled(s.id))
+  const enabledSports = sports.filter(s =>
+    isSportWorkspaceAvailable(s.id, isSportEnabled(s.id))
+  )
   const parkedOnly = parkedGames.filter(game => game.localGameId !== activeLocalGameId)
 
   return (
@@ -46,6 +49,7 @@ export default function SportSelect() {
               const parkedForSport = parkedOnly.filter(game => isParkedGameForSport(game, sport.id))
               const needsSync = parkedForSport.some(game => game.syncDirty || game.syncStatus === 'error')
               const statCount = sport.categories.reduce((n, c) => n + c.actions.length, 0)
+              const isSoccerPreview = sport.id === 'soccer' && import.meta.env.DEV
 
               return (
                 <button
@@ -58,7 +62,7 @@ export default function SportSelect() {
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold text-slate-800">{sport.name}</span>
                     <span className="block text-xs text-slate-500">
-                      {statCount} stats
+                      {isSoccerPreview ? 'Match setup preview' : `${statCount} stats`}
                       {parkedForSport.length > 0 ? ` - ${parkedForSport.length} parked` : ''}
                     </span>
                   </span>

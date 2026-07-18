@@ -4,7 +4,7 @@ Detailed implementation plan for soccer match setup, participation, timing, and 
 history. SOC-2 builds on the shared event foundation from SOC-1 and is intentionally split
 into three sequential pull requests so each change remains reviewable and testable.
 
-Status: Product decisions resolved; SOC-2A implementation complete; SOC-2B is next.
+Status: Product decisions resolved; SOC-2A and SOC-2B implementation complete; SOC-2C is next.
 
 ---
 
@@ -34,7 +34,7 @@ Those remain in later soccer phases.
 - Explicitly exclude soccer setup and event-backed games from aggregate automatic cloud sync until SOC-5.
 - Add focused unit and persistence tests. No user-facing soccer workflow ships in this slice.
 
-### SOC-2B: Setup, roster, lineup, and kickoff
+### SOC-2B: Setup, roster, lineup, and kickoff (complete)
 
 - Add a development-only soccer entry through the normal sport chooser and dashboard.
 - Add soccer-specific match information and per-game rule overrides under `/setup`.
@@ -380,11 +380,19 @@ change this rule. The aggregate sync function also enforces this boundary for di
 - Legacy saves normalize without changing basketball behavior.
 - Setup-only and event-backed soccer games are excluded from aggregate auto-sync and queue dirtying.
 
+### SOC-2B automated coverage
+
+- Development-only workspace availability is independent of the persisted Soccer toggle.
+- Regulation presets, custom segment resizing, and ordered stable segment ids.
+- Kickoff records lineup, period start, and clock start as one projected event batch.
+- Kickoff rejects invalid goalkeeper lineups without mutating the existing state.
+- Soccer resume routing distinguishes match setup, lineup, and started-match stages.
+
 ### Later slice checks
 
-SOC-2B and SOC-2C add component/route tests plus manual regression passes for narrow mobile,
-desktop, background/resume clock behavior, short-handed confirmation, substitutions,
-history correction, extra time, end, and reopen.
+SOC-2C adds focused automated coverage plus manual regression passes for narrow mobile,
+desktop, background/resume clock behavior, substitutions, history correction, extra time,
+end, and reopen.
 
 ---
 

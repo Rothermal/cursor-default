@@ -22,6 +22,7 @@ import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePl
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { isMissingTeamStatsConfigColumnError } from '../lib/cloudSyncHelpers'
+import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 import {
   exportParkedGames,
   getParkedGameStorageInfo,
@@ -114,7 +115,10 @@ export default function Admin() {
   const supabaseClient = supabase
   const userId = user?.id ?? null
 
-  const enabledSports = useMemo(() => sports.filter(s => isSportEnabled(s.id)), [isSportEnabled])
+  const enabledSports = useMemo(
+    () => sports.filter(s => isSportWorkspaceAvailable(s.id, isSportEnabled(s.id))),
+    [isSportEnabled]
+  )
   const enabledCount = enabledSports.length
   const settingsSection = resolveSettingsSection(location.pathname)
   const settingsSportId = settingsSportIdFromPath(location.pathname)
@@ -146,7 +150,7 @@ export default function Admin() {
   const [seasonsError, setSeasonsError] = useState<string | null>(null)
   const [newSeasonName, setNewSeasonName] = useState('')
   const [newSeasonSport, setNewSeasonSport] = useState(
-    () => sports.find(s => isSportEnabled(s.id))?.id ?? sports[0]?.id ?? ''
+    () => sports.find(s => isSportWorkspaceAvailable(s.id, isSportEnabled(s.id)))?.id ?? sports[0]?.id ?? ''
   )
   const [newSeasonStartDate, setNewSeasonStartDate] = useState('')
   const [newSeasonEndDate, setNewSeasonEndDate] = useState('')
@@ -597,7 +601,8 @@ export default function Admin() {
 
             <div className="space-y-2">
               {sports.map(sport => {
-                const enabled = isSportEnabled(sport.id)
+                const isSoccerPreview = sport.id === 'soccer'
+                const enabled = isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
                 return (
                   <div
                     key={sport.id}
@@ -611,21 +616,25 @@ export default function Admin() {
                       <div>
                         <span className="font-medium text-slate-700">{sport.name}</span>
                         <p className="text-xs text-slate-400">
-                          {sport.categories.reduce((n, c) => n + c.actions.length, 0)} stats
-                          across {sport.categories.length} categories
+                          {isSoccerPreview
+                            ? import.meta.env.DEV ? 'Development preview' : 'Coming soon'
+                            : `${sport.categories.reduce((n, c) => n + c.actions.length, 0)} stats across ${sport.categories.length} categories`}
                         </p>
                       </div>
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => toggleSport(sport.id)}
+                      disabled={isSoccerPreview}
                       className={`
                         relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
                         ${enabled ? 'bg-blue-600' : 'bg-slate-300'}
+                        ${isSoccerPreview ? 'cursor-not-allowed opacity-70' : ''}
                       `}
                       role="switch"
                       aria-checked={enabled}
-                      aria-label={`Toggle ${sport.name}`}
+                      aria-label={isSoccerPreview ? `${sport.name} preview availability` : `Toggle ${sport.name}`}
                     >
                       <span
                         className={`
@@ -657,6 +666,7 @@ export default function Admin() {
             <div className="space-y-2">
               {sports.map(sport => {
                 const hasSettings = sport.id === 'basketball'
+                const enabled = isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
                 return (
                   <Link
                     key={sport.id}
@@ -675,7 +685,9 @@ export default function Admin() {
                       </span>
                     </span>
                     <span className="text-xs font-semibold text-slate-400">
-                      {isSportEnabled(sport.id) ? 'Enabled' : 'Disabled'}
+                      {sport.id === 'soccer' && import.meta.env.DEV
+                        ? 'Preview'
+                        : enabled ? 'Enabled' : 'Disabled'}
                     </span>
                   </Link>
                 )
