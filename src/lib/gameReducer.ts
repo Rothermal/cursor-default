@@ -11,6 +11,7 @@ import { mergeCloudSyncState } from './cloudSyncState'
 import { getDisplayedHomeScore } from './gameScore'
 import {
   addGameEvent,
+  addGameEvents,
   deleteGameEvent,
   initializeGameEventStream,
   restoreGameEvent,
@@ -19,6 +20,7 @@ import {
 import { gameEventProjectors, gameEventRegistry } from './gameEvents/runtime'
 import { normalizeGameEventStream } from './gameEvents/stream'
 import { rebuildGameEventProjection } from './gameEvents/projection'
+import { normalizeSportGameState } from './soccer/state'
 import { playerIdMapForRoster, shotChartForRoster } from './rosterAlignment'
 
 export function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyncState {
@@ -52,6 +54,7 @@ export function createInitialState(status: CloudSyncStatus = 'idle'): GameState 
     teamStatsConfig: null,
     shotChart: [],
     eventStream: null,
+    sportGameState: null,
   }
 }
 
@@ -111,6 +114,7 @@ export function applyUndoLastEntry(state: GameState): GameState | null {
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   const resetStatus: CloudSyncStatus = state.cloudSync.status === 'offline' ? 'offline' : 'idle'
+  if (state.eventStream && isLegacyAggregateMutation(action.type)) return state
 
   switch (action.type) {
     case 'SET_SPORT':
@@ -168,6 +172,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const normalizedState: GameState = {
         ...s,
         eventStream: normalizeGameEventStream(s.eventStream),
+        sportGameState: normalizeSportGameState(s.sportGameState),
         shotChart: shotChartForRoster(s.shotChart, s.players),
         cloudSync: {
           ...cs,
@@ -429,6 +434,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SET_TEAM_STATS_CONFIG':
       return { ...state, teamStatsConfig: action.config }
 
+    case 'SET_SPORT_GAME_STATE':
+      if (state.eventStream && state.eventStream.events.length > 0) return state
+      return {
+        ...state,
+        sportGameState: action.sportGameState,
+      }
+
     case 'INITIALIZE_EVENT_STREAM':
       return initializeGameEventStream(state, gameEventRegistry, gameEventProjectors).state
 
@@ -436,6 +448,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return addGameEvent(
         state,
         action.event,
+        gameEventRegistry,
+        gameEventProjectors
+      ).state
+
+    case 'ADD_GAME_EVENTS':
+      return addGameEvents(
+        state,
+        action.events,
         gameEventRegistry,
         gameEventProjectors
       ).state
@@ -471,4 +491,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     default:
       return state
   }
+}
+
+function isLegacyAggregateMutation(type: GameAction['type']): boolean {
+  return [
+    'ADD_SHOT',
+    'REMOVE_LAST_SHOT',
+    'UNDO_LAST_SHOT',
+    'CLEAR_SHOT_CHART',
+    'INCREMENT_STAT',
+    'DECREMENT_STAT',
+    'INCREMENT_OPPONENT_SCORE',
+    'DECREMENT_OPPONENT_SCORE',
+    'INCREMENT_HOME_SCORE',
+    'DECREMENT_HOME_SCORE',
+    'UNDO',
+    'SET_PERIOD',
+  ].includes(type)
 }

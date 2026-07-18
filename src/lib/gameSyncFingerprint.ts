@@ -1,5 +1,6 @@
 import type { GameState } from '../types'
 import { canonicalGameEventStreamForFingerprint } from './gameEvents/stream'
+import { sportGameStateForFingerprint } from './soccer/state'
 
 /**
  * Canonical snapshot of game fields that are uploaded on cloud sync (excludes sync metadata).
@@ -17,6 +18,7 @@ export function buildGameSyncFingerprint(state: GameState): string {
     teamStatsConfig: state.teamStatsConfig,
     shotChart: state.shotChart,
     eventStream: canonicalGameEventStreamForFingerprint(state.eventStream),
+    sportGameState: sportGameStateForFingerprint(state.sportGameState),
     players: state.players.map(player => ({
       id: player.id,
       name: player.name,
@@ -24,6 +26,11 @@ export function buildGameSyncFingerprint(state: GameState): string {
       stats: player.stats,
     })),
   })
+}
+
+/** Sport-owned setup/events use their repository and cannot enter legacy aggregate auto-sync. */
+export function isAggregateCloudSyncEligible(state: GameState): boolean {
+  return state.eventStream === null && state.sportGameState === null
 }
 
 /**

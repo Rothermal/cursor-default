@@ -35,11 +35,22 @@ export function initializeGameEventStream<TEvent extends GameEvent>(
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
   if (state.eventStream) return rebuildAsSuccess(state, registry, projectors)
-  if (!state.sport || !projectors.get(state.sport.id)) {
+  const projector = state.sport ? projectors.get(state.sport.id) : undefined
+  if (!state.sport || !projector) {
     return failed(
       state,
       'unsupported_event_sport',
       'The active sport does not have an installed event projector.'
+    )
+  }
+  if (
+    projector.requiresSportGameState &&
+    state.sportGameState?.sportId !== state.sport.id
+  ) {
+    return failed(
+      state,
+      'sport_setup_required',
+      'Configure the sport-specific game setup before initializing its event stream.'
     )
   }
   if (hasLegacyAggregateActivity(state)) {
@@ -75,12 +86,64 @@ export function addGameEvent<TEvent extends GameEvent>(
   if (state.eventStream.events.some(raw => isGameEventEnvelope(raw) && raw.id === event.id)) {
     return failed(state, 'duplicate_event_id', 'An event with this id already exists.')
   }
-  return rebuildAsSuccess(
+  return appendAndRequireComplete(
+    state,
     {
       ...state,
       eventStream: {
         ...state.eventStream,
         events: [...state.eventStream.events, cloneEvent(event)],
+      },
+    },
+    registry,
+    projectors
+  )
+}
+
+export function addGameEvents<TEvent extends GameEvent>(
+  state: GameState,
+  events: GameEvent[],
+  registry: GameEventRegistry<TEvent>,
+  projectors: GameEventProjectorRegistry<TEvent>
+): GameEventMutationResult {
+  if (!state.eventStream) {
+    return failed(state, 'stream_not_initialized', 'Initialize the event stream before adding events.')
+  }
+  if (events.length === 0) {
+    return failed(state, 'invalid_event', 'At least one event is required.')
+  }
+
+  const existingIds = new Set(
+    state.eventStream.events
+      .filter(isGameEventEnvelope)
+      .map(event => event.id)
+  )
+  const batchIds = new Set<string>()
+  for (const event of events) {
+    if (
+      !isGameEventEnvelope(event) ||
+      event.revision !== 1 ||
+      event.deletedAt !== null ||
+      !registry.inspect(event).ok
+    ) {
+      return failed(state, 'invalid_event', 'Every event in the batch must be valid.')
+    }
+    if (state.sport?.id !== event.sportId) {
+      return failed(state, 'sport_mismatch', 'Every event must match the active game sport.')
+    }
+    if (existingIds.has(event.id) || batchIds.has(event.id)) {
+      return failed(state, 'duplicate_event_id', 'Every event in the batch must have a unique id.')
+    }
+    batchIds.add(event.id)
+  }
+
+  return appendAndRequireComplete(
+    state,
+    {
+      ...state,
+      eventStream: {
+        ...state.eventStream,
+        events: [...state.eventStream.events, ...events.map(cloneEvent)],
       },
     },
     registry,
@@ -199,5 +262,22 @@ function rebuildAsSuccess<TEvent extends GameEvent>(
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
   const rebuilt = rebuildGameEventProjection(state, registry, projectors)
+  return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
+}
+
+function appendAndRequireComplete<TEvent extends GameEvent>(
+  originalState: GameState,
+  appendedState: GameState,
+  registry: GameEventRegistry<TEvent>,
+  projectors: GameEventProjectorRegistry<TEvent>
+): GameEventMutationResult {
+  const rebuilt = rebuildGameEventProjection(appendedState, registry, projectors)
+  if (!rebuilt.inspection.complete) {
+    return failed(
+      originalState,
+      'incomplete_projection',
+      'The event append would create invalid or incomplete match history.'
+    )
+  }
   return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
 }

@@ -128,9 +128,15 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 `GameState.eventStream` is `null` for legacy aggregate-only games and a versioned raw stream
 for event-authoritative games. SOC-1 infrastructure lives in `src/lib/gameEvents/`: the
 generic engine validates, migrates, quarantines, and orders events, then one projector per
-sport rebuilds aggregate state. The production registry is intentionally empty until SOC-2.
-The `game_events` repository is isolated and is **not** part of the automatic cloud queue
-until SOC-5; do not mark event streams cloud-synced through aggregate snapshot sync.
+sport rebuilds aggregate state. SOC-2A registers production soccer match-state schemas and
+the projector in `src/lib/soccer/`. `GameState.sportGameState` holds soccer's immutable
+resolved setup and rebuildable runtime projection. Semantic failures preserve raw events,
+project through the last coherent event, and expose diagnostics.
+
+The `game_events` repository remains isolated and is **not** part of the automatic cloud
+queue until SOC-5. Aggregate cloud sync is disabled as soon as sport-owned setup exists;
+aggregate reducer mutations are disabled once an event stream is initialized. Do not mark
+soccer setup or event streams cloud-synced through snapshot sync.
 
 ### localStorage keys
 
@@ -257,7 +263,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) / [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | SOC-0 product model complete; SOC-1 shared event foundation is the next soccer phase |
+| [`PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md`](PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-2A domain/event foundation complete; SOC-2B setup, roster, lineup, and kickoff UI is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

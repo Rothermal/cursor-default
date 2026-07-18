@@ -134,6 +134,7 @@ function gameState(sport: SportConfig, teamName: string, opponentName: string): 
     teamStatsConfig: null,
     shotChart: [],
     eventStream: null,
+    sportGameState: null,
   }
 }
 
@@ -256,6 +257,35 @@ describe('gameParking', () => {
     saveParkedGameRecordState(summary.localGameId, syncedState, 'user-1')
 
     expect(getParkedGameRecord(summary.localGameId, 'user-1')?.sync.dirty).toBe(false)
+    expect(listDirtyParkedGameRecords('user-1')).toEqual([])
+  })
+
+  it('clears inherited aggregate retry state for event-backed parked games', () => {
+    const eventState: GameState = {
+      ...gameState(soccer, 'Aces', 'Hawks'),
+      eventStream: { version: 1, events: [] },
+    }
+    const incoming = {
+      ...importedRecord('event-backed-game', eventState),
+      sync: {
+        dirty: true,
+        revision: 4,
+        lastEnqueuedRevision: 4,
+        lastSuccessfulSyncRevision: 3,
+        attempts: 2,
+        lastError: 'legacy retry',
+        nextAttemptAt: '2026-07-12T12:10:00.000Z',
+      },
+    }
+
+    importParkedGames(importPayload([incoming]), 'user-1')
+
+    expect(getParkedGameRecord('event-backed-game', 'user-1')?.sync).toMatchObject({
+      dirty: false,
+      attempts: 0,
+      lastError: null,
+      nextAttemptAt: null,
+    })
     expect(listDirtyParkedGameRecords('user-1')).toEqual([])
   })
 

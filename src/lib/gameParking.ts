@@ -1,6 +1,7 @@
 import type { CloudSyncStatus, GameState } from '../types'
 import {
   buildGameSyncFingerprint,
+  isAggregateCloudSyncEligible,
   shouldBlockDiscardUnsyncedGame,
 } from './gameSyncFingerprint'
 import {
@@ -11,6 +12,7 @@ import {
   PENDING_SYNC_KEY,
 } from './gameStorageKeys'
 import { normalizeGameEventStream } from './gameEvents/stream'
+import { normalizeSportGameState } from './soccer/state'
 
 const MANIFEST_VERSION = 1
 const EXPORT_VERSION = 1
@@ -233,11 +235,20 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
 }
 
 function normalizePersistedGameState(state: GameState): GameState {
-  return { ...state, eventStream: normalizeGameEventStream(state.eventStream) }
+  return {
+    ...state,
+    eventStream: normalizeGameEventStream(state.eventStream),
+    sportGameState: normalizeSportGameState(state.sportGameState),
+  }
 }
 
 function hasSyncablePayload(state: GameState): boolean {
-  return Boolean(state.sport && state.gameInfo && state.cloudSync.gameStatus !== 'final')
+  return Boolean(
+    state.sport &&
+      state.gameInfo &&
+      isAggregateCloudSyncEligible(state) &&
+      state.cloudSync.gameStatus !== 'final'
+  )
 }
 
 function normalizeSyncState(
@@ -249,6 +260,17 @@ function normalizeSyncState(
     typeof value?.revision === 'number'
       ? Math.max(0, Math.floor(value.revision))
       : existing?.sync.revision ?? 0
+  if (!hasSyncablePayload(state)) {
+    return {
+      dirty: false,
+      revision,
+      lastEnqueuedRevision: null,
+      lastSuccessfulSyncRevision: revision,
+      attempts: 0,
+      lastError: null,
+      nextAttemptAt: null,
+    }
+  }
   const fingerprint = hasSyncablePayload(state) ? buildGameSyncFingerprint(state) : null
   const dirty = Boolean(
     hasSyncablePayload(state) &&
@@ -319,6 +341,7 @@ function hasPersistableGameState(state: GameState): boolean {
       state.actionLog.length > 0 ||
       state.shotChart.length > 0 ||
       state.eventStream !== null ||
+      state.sportGameState !== null ||
       state.cloudSync.gameId
   )
 }
@@ -785,6 +808,9 @@ function isImportableGameState(value: unknown): value is GameState {
         Number.isInteger(value.eventStream.version) &&
         value.eventStream.version >= 1 &&
         Array.isArray(value.eventStream.events))) &&
+    (value.sportGameState === undefined ||
+      value.sportGameState === null ||
+      normalizeSportGameState(value.sportGameState) !== null) &&
     isPlainObject(cloudSync)
   )
 }

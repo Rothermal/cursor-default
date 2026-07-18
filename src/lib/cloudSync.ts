@@ -5,6 +5,7 @@ import { hasMappableChartShot } from './shotChartSyncMapping'
 import { pickRecorderPerPlayer } from './shotChartReview'
 import { isValidRemotePlayerUuid } from './uuidValidation'
 import { logClientSyncError } from './logClientSyncError'
+import { isAggregateCloudSyncEligible } from './gameSyncFingerprint'
 import {
   getSeasonFromDate,
   invertPlayerIdMap,
@@ -729,6 +730,10 @@ export async function syncGameSnapshotToCloud({
 
   if (!state.sport || !state.gameInfo) {
     throw new Error('Game is not initialized')
+  }
+
+  if (!isAggregateCloudSyncEligible(state)) {
+    throw new Error('Sport-owned event games cannot use aggregate cloud sync')
   }
 
   if (state.cloudSync.gameId) {

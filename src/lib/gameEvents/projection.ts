@@ -4,6 +4,8 @@ import { inspectGameEventStream } from './stream'
 import type {
   GameEvent,
   GameEventInspection,
+  GameEventProjection,
+  SportGameEventProjectionResult,
   SportGameEventProjector,
 } from './types'
 
@@ -65,7 +67,18 @@ export function rebuildGameEventProjection<TEvent extends GameEvent>(
   }
   if (!inspection.complete) return { state, inspection }
 
-  const projection = projector.project(state, inspection.activeEvents)
+  const projected = projector.project(state, inspection.activeEvents)
+  const result = isSportProjectionResult(projected)
+    ? projected
+    : { projection: projected, diagnostics: [] }
+  const projection = result.projection
+  const nextInspection: GameEventInspection<TEvent> = result.diagnostics.length > 0
+    ? {
+        ...inspection,
+        complete: false,
+        diagnostics: [...inspection.diagnostics, ...result.diagnostics],
+      }
+    : inspection
   return {
     state: {
       ...state,
@@ -77,8 +90,18 @@ export function rebuildGameEventProjection<TEvent extends GameEvent>(
       homeTeamScore: projection.homeTeamScore,
       homeScoreAdjustment: 0,
       shotChart: projection.shotChart,
+      sportGameState:
+        projection.sportGameState === undefined
+          ? state.sportGameState
+          : projection.sportGameState,
       actionLog: [],
     },
-    inspection,
+    inspection: nextInspection,
   }
+}
+
+function isSportProjectionResult(
+  value: GameEventProjection | SportGameEventProjectionResult
+): value is SportGameEventProjectionResult {
+  return 'projection' in value && Array.isArray(value.diagnostics)
 }

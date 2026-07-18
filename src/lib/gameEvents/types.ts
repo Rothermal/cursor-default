@@ -84,6 +84,8 @@ export type GameEventDiagnosticCode =
   | 'missing_projector'
   | 'unmapped_player'
   | 'invalid_cloud_row'
+  | 'semantic_validation_failed'
+  | 'unprojected_event'
 
 export interface GameEventDiagnostic {
   code: GameEventDiagnosticCode
@@ -104,11 +106,23 @@ export interface GameEventProjection {
   opponentScore: number
   homeTeamScore: number | null
   shotChart: ShotRecord[]
+  /** Omitted by legacy fixture projectors; sport projectors replace it when supplied. */
+  sportGameState?: GameState['sportGameState']
+}
+
+export interface SportGameEventProjectionResult {
+  projection: GameEventProjection
+  diagnostics: GameEventDiagnostic[]
 }
 
 export interface SportGameEventProjector<TEvent extends GameEvent = GameEvent> {
   sportId: string
-  project: (state: GameState, events: TEvent[]) => GameEventProjection
+  /** Require matching sport-owned setup before an authoritative stream can be initialized. */
+  requiresSportGameState?: boolean
+  project: (
+    state: GameState,
+    events: TEvent[]
+  ) => GameEventProjection | SportGameEventProjectionResult
 }
 
 export type GameEventEditableFields = Pick<
@@ -119,6 +133,7 @@ export type GameEventEditableFields = Pick<
 export type GameEventMutationErrorCode =
   | 'legacy_activity_present'
   | 'unsupported_event_sport'
+  | 'sport_setup_required'
   | 'stream_not_initialized'
   | 'event_not_found'
   | 'duplicate_event_id'
@@ -126,6 +141,7 @@ export type GameEventMutationErrorCode =
   | 'sport_mismatch'
   | 'already_deleted'
   | 'not_deleted'
+  | 'incomplete_projection'
 
 export interface GameEventMutationError {
   code: GameEventMutationErrorCode

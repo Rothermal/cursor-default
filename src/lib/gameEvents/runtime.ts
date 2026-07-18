@@ -1,6 +1,7 @@
 import { GameEventProjectorRegistry } from './projection'
 import { GameEventRegistry } from './registry'
+import { soccerEventDefinitions } from '../soccer/events'
+import { soccerGameEventProjector } from '../soccer/projector'
 
-/** Production definitions are added by sport phases; SOC-1 intentionally leaves these empty. */
-export const gameEventRegistry = new GameEventRegistry()
-export const gameEventProjectors = new GameEventProjectorRegistry()
+export const gameEventRegistry = new GameEventRegistry(soccerEventDefinitions)
+export const gameEventProjectors = new GameEventProjectorRegistry([soccerGameEventProjector])

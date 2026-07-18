@@ -3,6 +3,7 @@ import type {
   GameEventEditableFields,
   GameEventStream,
 } from './lib/gameEvents/types'
+import type { SportGameState } from './lib/soccer/types'
 
 export type ShotZone = 'restricted' | 'paint' | 'mid_range' | 'three'
 
@@ -166,6 +167,8 @@ export interface GameState {
   shotChart: ShotRecord[]
   /** Null for legacy aggregate-only games; present when events are authoritative. */
   eventStream: GameEventStream | null
+  /** Sport-owned immutable setup plus rebuildable runtime projection. */
+  sportGameState: SportGameState | null
 }
 
 export type CloudSyncStatus =
@@ -225,6 +228,8 @@ export type GameAction =
   | { type: 'SET_TEAM_STATS_CONFIG'; config: Record<string, unknown> | null }
   | { type: 'INITIALIZE_EVENT_STREAM' }
   | { type: 'ADD_GAME_EVENT'; event: GameEvent }
+  | { type: 'ADD_GAME_EVENTS'; events: GameEvent[] }
+  | { type: 'SET_SPORT_GAME_STATE'; sportGameState: SportGameState | null }
   | {
       type: 'UPDATE_GAME_EVENT'
       eventId: string
