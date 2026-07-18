@@ -16,6 +16,8 @@ import {
   getParkedGameRecord,
   getParkedGameStorageInfo,
   hasDirtyParkedGames,
+  hasUnsyncedParkedBindingForCloudGame,
+  hasUnsyncedParkedBindingForCloudTeam,
   importParkedGames,
   listDirtyParkedGameRecords,
   listParkedGames,
@@ -258,6 +260,39 @@ describe('gameParking', () => {
 
     expect(getParkedGameRecord(summary.localGameId, 'user-1')?.sync.dirty).toBe(false)
     expect(listDirtyParkedGameRecords('user-1')).toEqual([])
+  })
+
+  it('blocks cloud game/team deletes when a parked (non-active) binding is still unsynced', () => {
+    const dirtyCloud: GameState = {
+      ...gameState(basketball, 'Aces', 'Bears'),
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { '2pt': 2 } }],
+      cloudSync: {
+        ...gameState(basketball, 'Aces', 'Bears').cloudSync,
+        teamId: 'team-parked',
+        gameId: 'game-parked',
+        gameStatus: 'in_progress',
+        lastSyncedGameFingerprint: 'stale',
+      },
+    }
+    saveActiveGameState(dirtyCloud, 'user-1')
+    parkActiveGame('user-1')
+    beginNewActiveParkedGame('user-1')
+    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+
+    expect(hasUnsyncedParkedBindingForCloudGame('user-1', 'game-parked')).toBe(true)
+    expect(hasUnsyncedParkedBindingForCloudTeam('user-1', 'team-parked')).toBe(true)
+    expect(hasUnsyncedParkedBindingForCloudGame('user-1', 'game-other')).toBe(false)
+    expect(hasUnsyncedParkedBindingForCloudTeam('user-1', 'team-other')).toBe(false)
+
+    const parked = listParkedGames('user-1').find(game => game.cloudGameId === 'game-parked')
+    expect(parked).toBeTruthy()
+    const syncedParked = withLastSyncedGameFingerprint(
+      getParkedGameRecord(parked!.localGameId, 'user-1')!.gameState
+    )
+    saveParkedGameRecordState(parked!.localGameId, syncedParked, 'user-1')
+
+    expect(hasUnsyncedParkedBindingForCloudGame('user-1', 'game-parked')).toBe(false)
+    expect(hasUnsyncedParkedBindingForCloudTeam('user-1', 'team-parked')).toBe(false)
   })
 
   it('clears inherited aggregate retry state for event-backed parked games', () => {

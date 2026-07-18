@@ -26,6 +26,8 @@ import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
 import {
   exportParkedGames,
   getParkedGameStorageInfo,
+  hasUnsyncedParkedBindingForCloudGame,
+  hasUnsyncedParkedBindingForCloudTeam,
   importParkedGames,
   parkedGameStorageErrorMessage,
 } from '../lib/gameParking'
@@ -326,11 +328,12 @@ export default function Admin() {
     if (!supabaseClient || !canDeleteTeam(team.accessRole)) return
     setAdminError(null)
     if (
-      gameState.cloudSync.teamId === team.id &&
-      shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())
+      (gameState.cloudSync.teamId === team.id &&
+        shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())) ||
+      hasUnsyncedParkedBindingForCloudTeam(user?.id ?? null, team.id)
     ) {
       setAdminError(
-        'The active local game for this team has unsynced stats. Sync or park them before deleting the team.'
+        'A local game for this team has unsynced stats. Sync or park them before deleting the team.'
       )
       return
     }
@@ -353,8 +356,9 @@ export default function Admin() {
     if (!supabaseClient || !canDeleteGame(team?.accessRole ?? null)) return
     setAdminError(null)
     if (
-      gameState.cloudSync.gameId === game.id &&
-      shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())
+      (gameState.cloudSync.gameId === game.id &&
+        shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())) ||
+      hasUnsyncedParkedBindingForCloudGame(user?.id ?? null, game.id)
     ) {
       setAdminError(
         'This game has unsynced local stats. Sync or park them before deleting the cloud game.'

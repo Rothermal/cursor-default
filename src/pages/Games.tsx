@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
+import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
 import { sports } from '../config/sports'
 import { resolveFinalHomeScoreFromGameRow } from '../lib/gameScore'
 import type { GameState } from '../types'
@@ -413,8 +414,9 @@ export default function Games() {
     setError(null)
 
     if (
-      state.cloudSync.gameId === game.id &&
-      shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())
+      (state.cloudSync.gameId === game.id &&
+        shouldBlockDiscardUnsyncedGame(state, getPendingSyncFlag())) ||
+      hasUnsyncedParkedBindingForCloudGame(userId, game.id)
     ) {
       setError(
         'This game has unsynced local stats. Sync or park them before deleting the cloud game.'
