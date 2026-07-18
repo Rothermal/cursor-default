@@ -619,17 +619,24 @@ export function hasUnsyncedParkedBindingForCloudTeam(
 }
 
 /**
- * True when any parked local game is bound to this cloud season and still has unsynced
- * progress. Season delete CASCADE-wipes teams/games, so Admin must scan the same way.
+ * True when any parked local game is bound to this cloud season (directly or through one
+ * of its teams) and still has unsynced progress. The team fallback protects legacy/imported
+ * states created before `CloudSyncState.seasonId` existed.
  */
 export function hasUnsyncedParkedBindingForCloudSeason(
   ownerId: string | null,
-  cloudSeasonId: string
+  cloudSeasonId: string,
+  cloudTeamIds: ReadonlySet<string> = new Set()
 ): boolean {
   return listParkedGameRecords(ownerId).some(
-    record =>
-      record.gameState.cloudSync.seasonId === cloudSeasonId &&
+    record => {
+      const binding = record.gameState.cloudSync
+      return (
+        binding.seasonId === cloudSeasonId ||
+        (binding.teamId !== null && cloudTeamIds.has(binding.teamId))
+      ) &&
       shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+    }
   )
 }
 

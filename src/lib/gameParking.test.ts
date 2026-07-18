@@ -300,6 +300,36 @@ describe('gameParking', () => {
     expect(hasUnsyncedParkedBindingForCloudSeason('user-1', 'season-parked')).toBe(false)
   })
 
+  it('matches a legacy unsynced season binding through its cloud team id', () => {
+    const legacyCloud: GameState = {
+      ...gameState(basketball, 'Aces', 'Bears'),
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { '2pt': 2 } }],
+      cloudSync: {
+        ...gameState(basketball, 'Aces', 'Bears').cloudSync,
+        seasonId: null,
+        teamId: 'team-legacy',
+        gameId: 'game-legacy',
+        gameStatus: 'in_progress',
+        lastSyncedGameFingerprint: 'stale',
+      },
+    }
+    saveActiveGameState(legacyCloud, 'user-1')
+    parkActiveGame('user-1')
+    beginNewActiveParkedGame('user-1')
+    saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+
+    expect(hasUnsyncedParkedBindingForCloudSeason(
+      'user-1',
+      'season-legacy',
+      new Set(['team-legacy'])
+    )).toBe(true)
+    expect(hasUnsyncedParkedBindingForCloudSeason(
+      'user-1',
+      'season-legacy',
+      new Set(['team-other'])
+    )).toBe(false)
+  })
+
   it('clears inherited aggregate retry state for event-backed parked games', () => {
     const eventState: GameState = {
       ...gameState(soccer, 'Aces', 'Hawks'),

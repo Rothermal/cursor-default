@@ -471,10 +471,29 @@ export default function Admin() {
   const handleDeleteSeason = async (season: AdminSeasonRow) => {
     if (!supabaseClient) return
     setSeasonsError(null)
+    const { data: seasonTeams, error: seasonTeamsError } = await supabaseClient
+      .from('teams')
+      .select('id')
+      .eq('season_id', season.id)
+    if (seasonTeamsError) {
+      setSeasonsError(
+        `Could not verify local games before deleting this season: ${seasonTeamsError.message}`
+      )
+      return
+    }
+    const seasonTeamIds = new Set((seasonTeams ?? []).map(team => team.id))
+    const activeBinding = gameState.cloudSync
+    const activeBoundToSeason =
+      activeBinding.seasonId === season.id ||
+      (activeBinding.teamId !== null && seasonTeamIds.has(activeBinding.teamId))
     if (
-      (gameState.cloudSync.seasonId === season.id &&
+      (activeBoundToSeason &&
         shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())) ||
-      hasUnsyncedParkedBindingForCloudSeason(user?.id ?? null, season.id)
+      hasUnsyncedParkedBindingForCloudSeason(
+        user?.id ?? null,
+        season.id,
+        seasonTeamIds
+      )
     ) {
       setSeasonsError(
         'A local game for this season has unsynced stats. Sync them before deleting the season.'
