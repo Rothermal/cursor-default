@@ -38,7 +38,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 | Hockey | Configured (disabled) | Goals, Assists, Shots, Hits, Blocks, Penalties, Goaltending |
 | Soccer | Configured (disabled) | Goals, Assists, Shots, Tackles, Cards, Goalkeeping |
 
-Sports can be enabled/disabled from **Settings -> App** in the app shell. Sport-specific preferences live under **Settings -> Sports**. Adding a new sport requires only a new entry in `src/config/sports.ts` — the UI discovers it automatically.
+Sports can be enabled/disabled from **Settings -> App** in the app shell. Sport-specific preferences live under **Settings -> Sports**. A new `src/config/sports.ts` entry is automatically discovered by generic UI; full sport support may also require a sport-specific tracker, rules, settings, and summary experience.
 
 ## Tech Stack
 
@@ -373,12 +373,15 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Guardianship hardening (SEC-4)** — contextual self-service claims, creator/manager/self removal, identity-only editing, guardian visibility, and consistent creator-link creation ([plan](docs/PLAN_SEC_4_GUARDIANSHIP_REVIEW.md))
 - [x] **App-level access (SEC-5)** — active/pending/suspended account states, early authenticated-session gate, PostgREST request enforcement, and narrow app-admin management RPCs/UI ([plan](docs/PLAN_SEC_5_APP_LEVEL_ACCESS.md))
 - [x] **Access audit trail (SEC-6)** — immutable member/invite-link/app-access events with team manager and app-admin history views ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
+- [x] **Soccer product model (SOC-0)** — event-first soccer design, complete stat catalog, configurable match/lineup model, soccer field direction, and six-phase implementation roadmap ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 
 ### What's Next
 
+- [ ] **Soccer implementation (SOC-1 through SOC-6)** — shared event foundation; match rules, lineups, and clock; soccer field and attacking events; defense/discipline/team events; cloud sync; summaries and release ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
-- [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
+- [ ] Per-sport stat refinements outside the soccer program (minutes for hockey/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations
 - [ ] Bulk / archive games — beyond per-row delete in Games and Settings -> Advanced data management

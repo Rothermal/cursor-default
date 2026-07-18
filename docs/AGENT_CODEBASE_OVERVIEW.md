@@ -249,7 +249,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | NAV/AUTH foundation shipped; soccer planning still gated on remaining foundation work |
+| [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) / [`PLAN_APP_FOUNDATION_ROADMAP.md`](PLAN_APP_FOUNDATION_ROADMAP.md) | SOC-0 product model complete; SOC-1 shared event foundation is the next soccer phase |
 
 ### Held / waiting for feedback
 
@@ -279,7 +279,7 @@ When shipping a feature, plans typically call for updating this overview (if arc
 
 | If you need to… | Start here |
 |-----------------|------------|
-| Add a stat or sport | [`sports.ts`](../src/config/sports.ts) + [`types.ts`](../src/types.ts) — UI auto-discovers |
+| Add a stat or configured sport | [`sports.ts`](../src/config/sports.ts) + [`types.ts`](../src/types.ts); use the SOC-0 plan as the pattern for full sport-specific support |
 | Change game tracker behavior | [`GameContext.tsx`](../src/context/GameContext.tsx) + [`GameTracker.tsx`](../src/pages/GameTracker.tsx) |
 | Fix cloud sync | [`cloudSync.ts`](../src/lib/cloudSync.ts) + [`gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprint.ts) + `GameContext` hydration guards |
 | Game Summary / finalize | [`GameSummary.tsx`](../src/pages/GameSummary.tsx) + `get_game_stats_resolved` |
