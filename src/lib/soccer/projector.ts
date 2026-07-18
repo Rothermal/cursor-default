@@ -524,6 +524,9 @@ function applyShot(
     if (secondary && (!primary || event.payload.outcome !== 'goal')) {
       return 'A secondary creator requires a primary creator on a goal.'
     }
+    if (primary && secondary && sameActor(primary, secondary)) {
+      return 'Primary and secondary creators must be different actors.'
+    }
     if (event.payload.outcome !== 'goal' && secondary) {
       return 'A non-goal shot can have only one creator.'
     }

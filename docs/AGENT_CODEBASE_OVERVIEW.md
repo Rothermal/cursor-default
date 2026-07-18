@@ -138,7 +138,10 @@ SOC-3A derives soccer score, side attacking totals, player attacking totals, and
 totals from active event revisions. Event actors use stable match `participantId` references;
 later anonymous-player resolution maps those totals without rewriting event history. Projected
 on-field and role intervals validate late historical attribution while attacking events leave
-the anchored live clock unchanged. The field and Timeline UI remain SOC-3B and SOC-3C.
+the anchored live clock unchanged. SOC-3B adds the full-pitch live capture surface, display-only
+field flipping, persisted side/participant defaults, side-aware linked actors, quick goals, and
+projection-driven score. Markers, unified Timeline filters, and attacking-event correction remain
+SOC-3C.
 
 SOC-2B and SOC-2C add a development-only Soccer workspace through the normal chooser and
 dashboard. The shared `/setup`, `/players`, and `/game` routes select soccer-specific setup,
@@ -280,7 +283,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md`](PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-3A attacking domain complete; SOC-3B live field and capture is next |
+| [`PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md`](PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-3A/SOC-3B complete; SOC-3C field review, Timeline, and correction is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

@@ -162,6 +162,13 @@ export interface SoccerSportGameState {
   version: 1
   setup: SoccerMatchSetup
   projection: SoccerMatchProjection
+  capturePreferences: SoccerCapturePreferences
+}
+
+export interface SoccerCapturePreferences {
+  teamSide: 'tracked' | 'opponent'
+  selectedParticipantId: string | null
+  selectionInitialized: boolean
 }
 
 export type SportGameState = SoccerSportGameState

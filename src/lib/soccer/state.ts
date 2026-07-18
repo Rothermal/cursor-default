@@ -47,6 +47,11 @@ export function createSoccerSportGameState(setup: SoccerMatchSetup): SoccerSport
     version: 1,
     setup: clonedSetup,
     projection: createSoccerMatchProjection(clonedSetup),
+    capturePreferences: {
+      teamSide: 'tracked',
+      selectedParticipantId: null,
+      selectionInitialized: false,
+    },
   }
 }
 
@@ -55,7 +60,20 @@ export function normalizeSportGameState(value: unknown): SportGameState | null {
   if (!isPlainObject(value.setup)) return null
   const setup = value.setup as unknown as SoccerMatchSetup
   if (validateSoccerMatchSetup(setup)) return null
-  return createSoccerSportGameState(setup)
+  const normalized = createSoccerSportGameState(setup)
+  if (isPlainObject(value.capturePreferences)) {
+    const preferences = value.capturePreferences
+    if (preferences.teamSide === 'tracked' || preferences.teamSide === 'opponent') {
+      normalized.capturePreferences.teamSide = preferences.teamSide
+    }
+    if (preferences.selectedParticipantId === null || typeof preferences.selectedParticipantId === 'string') {
+      normalized.capturePreferences.selectedParticipantId = preferences.selectedParticipantId
+    }
+    if (typeof preferences.selectionInitialized === 'boolean') {
+      normalized.capturePreferences.selectionInitialized = preferences.selectionInitialized
+    }
+  }
+  return normalized
 }
 
 export function sportGameStateForFingerprint(value: SportGameState | null): unknown {

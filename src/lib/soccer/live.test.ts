@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, SportConfig } from '../../types'
-import { createInitialState } from '../gameReducer'
+import { createInitialState, gameReducer } from '../gameReducer'
 import { prepareSoccerKickoff } from './kickoff'
 import {
   adjustSoccerClock,
@@ -9,6 +9,8 @@ import {
   inspectSoccerHistory,
   isSoccerHalftimeBreak,
   recordSoccerRoleChange,
+  recordSoccerOwnGoal,
+  recordSoccerShot,
   recordSoccerSubstitution,
   reopenSoccerMatch,
   soccerClockDisplayValue,
@@ -17,7 +19,7 @@ import {
   updateSoccerHistoryEvent,
 } from './live'
 import { resolveSoccerMatchRules } from './rules'
-import { createSoccerSportGameState, participantActiveMs } from './state'
+import { createSoccerSportGameState, normalizeSportGameState, participantActiveMs } from './state'
 import type { SoccerMatchSetup } from './types'
 
 const soccer: SportConfig = {
@@ -102,6 +104,100 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it('records a located tracked shot through stable participant actors', () => {
+    const result = recordSoccerShot(kickedOffState(), {
+      teamSide: 'tracked',
+      outcome: 'goal',
+      situation: 'open_play',
+      location: { x: 0.84, y: 0.42, attackingDirection: 'left_to_right' },
+      shooter: { kind: 'participant', participantId: 'match-defender' },
+      primaryCreator: { kind: 'participant', participantId: 'match-keeper' },
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 10_000,
+      eventIds: [uuid(4)],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.state.homeTeamScore).toBe(1)
+    expect(result.state.players.find(player => player.id === 'defender')?.stats).toMatchObject({
+      soc_goal: 1,
+      soc_shot: 1,
+      soc_sot: 1,
+    })
+    const events = result.state.eventStream?.events ?? []
+    expect(events[events.length - 1]).toMatchObject({
+      eventType: 'soccer.shot',
+      teamSide: 'tracked',
+      location: { x: 0.84, y: 0.42, attackingDirection: 'left_to_right' },
+      actors: [
+        { role: 'shooter', kind: 'player', participantId: 'match-defender', playerId: 'defender' },
+        { role: 'creator_primary', kind: 'player', participantId: 'match-keeper', playerId: 'keeper' },
+      ],
+    })
+  })
+
+  it('records opponent saves and tracked own goals against the on-field goalkeeper', () => {
+    const saved = recordSoccerShot(kickedOffState(), {
+      teamSide: 'opponent',
+      outcome: 'saved',
+      situation: 'penalty',
+      location: null,
+      shooter: { kind: 'unknown', label: 'Opponent 9' },
+      goalkeeper: { kind: 'participant', participantId: 'match-keeper' },
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 10_000,
+      eventIds: [uuid(4)],
+    })
+    expect(saved.ok).toBe(true)
+    if (!saved.ok) return
+
+    const ownGoal = recordSoccerOwnGoal(saved.state, {
+      teamSide: 'opponent',
+      location: { x: 0.08, y: 0.5, attackingDirection: 'right_to_left' },
+      ownGoalBy: { kind: 'participant', participantId: 'match-defender' },
+      goalkeeper: { kind: 'participant', participantId: 'match-keeper' },
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 20_000,
+      eventIds: [uuid(5)],
+    })
+    expect(ownGoal.ok).toBe(true)
+    if (!ownGoal.ok) return
+    expect(ownGoal.state.opponentScore).toBe(1)
+    expect(ownGoal.state.players.find(player => player.id === 'keeper')?.stats).toMatchObject({
+      soc_gk_save: 1,
+      soc_gk_ga: 1,
+      soc_gk_sot_faced: 1,
+      soc_gk_pen_faced: 1,
+      soc_gk_pen_save: 1,
+    })
+  })
+
+  it('persists capture preferences through reducer updates and normalization', () => {
+    const state = gameReducer(kickedOffState(), {
+      type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+      preferences: {
+        teamSide: 'opponent',
+        selectedParticipantId: 'match-defender',
+        selectionInitialized: true,
+      },
+    })
+
+    expect(state.sportGameState?.capturePreferences).toEqual({
+      teamSide: 'opponent',
+      selectedParticipantId: 'match-defender',
+      selectionInitialized: true,
+    })
+    expect(normalizeSportGameState(structuredClone(state.sportGameState))?.capturePreferences).toEqual({
+      teamSide: 'opponent',
+      selectedParticipantId: 'match-defender',
+      selectionInitialized: true,
+    })
+  })
+
   it('pauses, ends a period atomically, and starts the next period with its clock', () => {
     const before = kickedOffState()
     const ended = endSoccerPeriod(before, {

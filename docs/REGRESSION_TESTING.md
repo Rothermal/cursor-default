@@ -680,6 +680,26 @@ bench players, at least one backup goalkeeper, and extra time enabled.
 
 ---
 
+## 11e. Soccer live field and attacking capture (SOC-3B)
+
+**Precondition:** Run the Vite development server and start a development soccer match with an
+on-field goalkeeper and at least one outfield participant.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11e.1 | Open the Field tab at narrow mobile and desktop widths | Score, clock controls, capture side, participant chips, full pitch, and quick goals fit without overlap or horizontal page scrolling |
+| 11e.2 | Select Tracked, choose an on-field participant, tap the field, and record each shot outcome | One checked event is appended with normalized location, capture-time attack direction, selected participant, situation, and applicable linked actors; score and totals reproject immediately |
+| 11e.3 | Flip Field View, tap the same visible area, and record another shot | The display rotates 180 degrees while persisted recorder coordinates remain authoritative; flipping never rewrites existing events |
+| 11e.4 | Record tracked and opponent goals with primary/secondary creators, goalkeeper links, blocked-by attribution, and opponent labels | Side-aware defaults are editable, duplicate shooter/creator attribution is rejected, and recent opponent labels can be reused without creating roster records |
+| 11e.5 | Record an own goal benefiting each side | The benefiting side scores without adding a shot; tracked own-goal and goalkeeper attribution follows the event-domain rules |
+| 11e.6 | Use each side's quick Goal action | A normal goal event is created with unknown location and team/unknown attribution; no raw score mutation occurs |
+| 11e.7 | Park and resume after changing capture side and tracked participant | The eligible selection and capture side return; a participant removed from the field clears instead of silently selecting another |
+| 11e.8 | End the period or match, then tap the field | The field remains available for review but live capture is disabled outside an active period |
+| 11e.9 | Open History after recording attacking events | Attacking rows are readable and removable/restorable; editing remains disabled until SOC-3C |
+| 11e.10 | Resume and track a basketball game | Basketball court capture, stat actions, parking, summary, and cloud behavior are unchanged |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.

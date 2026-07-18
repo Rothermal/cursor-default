@@ -593,6 +593,16 @@ describe('soccer attacking event projection', () => {
       ], 1_000),
     ], gameEventRegistry, gameEventProjectors)
     expect(benchShot).toMatchObject({ ok: false, error: { code: 'incomplete_projection' } })
+
+    const duplicateCreators = addGameEvents(initializedState(), [
+      ...kickoffEvents(),
+      attackingEvent(3, 'soccer.shot', { outcome: 'goal', situation: 'open_play' }, 'tracked', [
+        trackedActor('shooter', 'match-p2', 'p2'),
+        trackedActor('creator_primary', 'match-p1', 'p1'),
+        trackedActor('creator_secondary', 'match-p1', 'p1'),
+      ], 1_000),
+    ], gameEventRegistry, gameEventProjectors)
+    expect(duplicateCreators).toMatchObject({ ok: false, error: { code: 'incomplete_projection' } })
   })
 })
 
