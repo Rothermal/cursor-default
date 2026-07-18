@@ -27,6 +27,7 @@ import {
   exportParkedGames,
   getParkedGameStorageInfo,
   hasUnsyncedParkedBindingForCloudGame,
+  hasUnsyncedParkedBindingForCloudSeason,
   hasUnsyncedParkedBindingForCloudTeam,
   importParkedGames,
   parkedGameStorageErrorMessage,
@@ -333,7 +334,7 @@ export default function Admin() {
       hasUnsyncedParkedBindingForCloudTeam(user?.id ?? null, team.id)
     ) {
       setAdminError(
-        'A local game for this team has unsynced stats. Sync or park them before deleting the team.'
+        'A local game for this team has unsynced stats. Sync them before deleting the team.'
       )
       return
     }
@@ -361,7 +362,7 @@ export default function Admin() {
       hasUnsyncedParkedBindingForCloudGame(user?.id ?? null, game.id)
     ) {
       setAdminError(
-        'This game has unsynced local stats. Sync or park them before deleting the cloud game.'
+        'This game has unsynced local stats. Sync them before deleting the cloud game.'
       )
       return
     }
@@ -470,6 +471,16 @@ export default function Admin() {
   const handleDeleteSeason = async (season: AdminSeasonRow) => {
     if (!supabaseClient) return
     setSeasonsError(null)
+    if (
+      (gameState.cloudSync.seasonId === season.id &&
+        shouldBlockDiscardUnsyncedGame(gameState, getPendingSyncFlag())) ||
+      hasUnsyncedParkedBindingForCloudSeason(user?.id ?? null, season.id)
+    ) {
+      setSeasonsError(
+        'A local game for this season has unsynced stats. Sync them before deleting the season.'
+      )
+      return
+    }
     setDeletingId(season.id)
     const { error } = await supabaseClient.from('seasons').delete().eq('id', season.id)
     setDeletingId(null)

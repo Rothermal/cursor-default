@@ -971,7 +971,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       hasUnsyncedParkedBindingForCloudTeam(userId, team.id)
     ) {
       setError(
-        'A local game for this team has unsynced stats. Sync or park them before deleting the team.'
+        'A local game for this team has unsynced stats. Sync them before deleting the team.'
       )
       return
     }

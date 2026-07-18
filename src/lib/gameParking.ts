@@ -618,6 +618,21 @@ export function hasUnsyncedParkedBindingForCloudTeam(
   )
 }
 
+/**
+ * True when any parked local game is bound to this cloud season and still has unsynced
+ * progress. Season delete CASCADE-wipes teams/games, so Admin must scan the same way.
+ */
+export function hasUnsyncedParkedBindingForCloudSeason(
+  ownerId: string | null,
+  cloudSeasonId: string
+): boolean {
+  return listParkedGameRecords(ownerId).some(
+    record =>
+      record.gameState.cloudSync.seasonId === cloudSeasonId &&
+      shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+  )
+}
+
 export function hasDirtyParkedGames(ownerId: string | null): boolean {
   return listParkedGameRecords(ownerId).some(record => record.sync.dirty)
 }

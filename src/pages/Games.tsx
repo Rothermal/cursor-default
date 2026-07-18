@@ -419,7 +419,7 @@ export default function Games() {
       hasUnsyncedParkedBindingForCloudGame(userId, game.id)
     ) {
       setError(
-        'This game has unsynced local stats. Sync or park them before deleting the cloud game.'
+        'This game has unsynced local stats. Sync them before deleting the cloud game.'
       )
       return
     }
