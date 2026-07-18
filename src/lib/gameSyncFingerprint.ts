@@ -1,4 +1,5 @@
 import type { GameState } from '../types'
+import { canonicalGameEventStreamForFingerprint } from './gameEvents/stream'
 
 /**
  * Canonical snapshot of game fields that are uploaded on cloud sync (excludes sync metadata).
@@ -15,6 +16,7 @@ export function buildGameSyncFingerprint(state: GameState): string {
     currentPeriod: state.currentPeriod,
     teamStatsConfig: state.teamStatsConfig,
     shotChart: state.shotChart,
+    eventStream: canonicalGameEventStreamForFingerprint(state.eventStream),
     players: state.players.map(player => ({
       id: player.id,
       name: player.name,

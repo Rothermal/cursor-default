@@ -118,6 +118,7 @@ The dev server starts at `http://localhost:5173`.
    - `supabase/migrations/039_app_level_access.sql` — active/pending/suspended accounts, app-admin RPCs, and PostgREST request enforcement
    - `supabase/migrations/040_access_audit_trail.sql` — immutable member/invite-link/app-access audit events and scoped read RPC
    - `supabase/migrations/041_merge_preserve_shot_chart.sql` — `merge_players_execute` remounts `shot_chart` before deleting the duplicate (avoids ON DELETE CASCADE wipe)
+   - `supabase/migrations/042_game_events.sql` - SOC-1 generic recorder-owned event rows, RLS, and revision-aware event upsert RPC (automatic event sync is deferred to SOC-5)
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -265,7 +266,11 @@ supabase/
     ├── 035_team_access_hardening.sql
     ├── 036_viewer_team_role.sql
     ├── 037_team_invite_links.sql
-    └── 038_guardianship_hardening.sql
+    ├── 038_guardianship_hardening.sql
+    ├── 039_app_level_access.sql
+    ├── 040_access_audit_trail.sql
+    ├── 041_merge_preserve_shot_chart.sql
+    └── 042_game_events.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -280,6 +285,7 @@ docs/
 ├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11 held, F13 moves to BKE
 ├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
 ├── PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md # Soccer product model and SOC-1 through SOC-6 roadmap
+├── PLAN_SOC_1_SHARED_EVENT_FOUNDATION.md # Versioned event foundation, projection, and cloud schema
 ├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
@@ -376,10 +382,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **App-level access (SEC-5)** — active/pending/suspended account states, early authenticated-session gate, PostgREST request enforcement, and narrow app-admin management RPCs/UI ([plan](docs/PLAN_SEC_5_APP_LEVEL_ACCESS.md))
 - [x] **Access audit trail (SEC-6)** — immutable member/invite-link/app-access events with team manager and app-admin history views ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [x] **Soccer product model (SOC-0)** — event-first soccer design, complete stat catalog, configurable match/lineup model, soccer field direction, and six-phase implementation roadmap ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [x] **Shared event foundation (SOC-1)** - versioned raw streams, typed sport registry, deterministic projection and revisioned mutation engine, local parking/fingerprint support, and isolated recorder-owned cloud schema/repository ([plan](docs/PLAN_SOC_1_SHARED_EVENT_FOUNDATION.md))
 
 ### What's Next
 
-- [ ] **Soccer implementation (SOC-1 through SOC-6)** — shared event foundation; match rules, lineups, and clock; soccer field and attacking events; defense/discipline/team events; cloud sync; summaries and release ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer implementation (SOC-2 through SOC-6)** - match rules, lineups, and clock; soccer field and attacking events; defense/discipline/team events; cloud sync; summaries and release ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))

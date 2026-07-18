@@ -61,6 +61,7 @@ function baseState(
     currentPeriod: 1,
     teamStatsConfig: null,
     shotChart,
+    eventStream: null,
   }
 }
 

@@ -1,3 +1,9 @@
+import type {
+  GameEvent,
+  GameEventEditableFields,
+  GameEventStream,
+} from './lib/gameEvents/types'
+
 export type ShotZone = 'restricted' | 'paint' | 'mid_range' | 'three'
 
 /** Location on the half-court diagram in feet; same system as `BasketballCourt` taps. @see `src/lib/shotChartCoordinates.ts` */
@@ -158,6 +164,8 @@ export interface GameState {
   teamStatsConfig: Record<string, unknown> | null
   /** Location-tagged shots from the shot chart (feet from rim; see `shotChartCoordinates.ts`). */
   shotChart: ShotRecord[]
+  /** Null for legacy aggregate-only games; present when events are authoritative. */
+  eventStream: GameEventStream | null
 }
 
 export type CloudSyncStatus =
@@ -215,3 +223,13 @@ export type GameAction =
   | { type: 'SET_CLOUD_SYNC_STATE'; cloudSync: Partial<CloudSyncState> }
   | { type: 'SET_PERIOD'; period: number }
   | { type: 'SET_TEAM_STATS_CONFIG'; config: Record<string, unknown> | null }
+  | { type: 'INITIALIZE_EVENT_STREAM' }
+  | { type: 'ADD_GAME_EVENT'; event: GameEvent }
+  | {
+      type: 'UPDATE_GAME_EVENT'
+      eventId: string
+      changes: Partial<GameEventEditableFields>
+      now?: string
+    }
+  | { type: 'DELETE_GAME_EVENT'; eventId: string; now?: string }
+  | { type: 'RESTORE_GAME_EVENT'; eventId: string; now?: string }

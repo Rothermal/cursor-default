@@ -292,6 +292,7 @@ export default function PlayerProfile() {
       teamStatsConfig: cloudGame.teamStatsConfig ?? null,
       actionLog: [],
       shotChart: cloudGame.shotChart ?? [],
+      eventStream: null,
       cloudSync: {
         seasonId: cloudGame.seasonId ?? null,
         teamId: cloudGame.teamId,

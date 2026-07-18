@@ -49,10 +49,45 @@ function baseState(over: Partial<GameState> = {}): GameState {
     teamStatsConfig: null,
     shotChart: [],
     ...over,
+    eventStream: over.eventStream === undefined ? null : over.eventStream,
   }
 }
 
 describe('gameSyncFingerprint', () => {
+  it('includes the raw event stream and distinguishes legacy from initialized games', () => {
+    const legacy = buildGameSyncFingerprint(baseState())
+    const initialized = buildGameSyncFingerprint(
+      baseState({ eventStream: { version: 1, events: [] } })
+    )
+    const revision = buildGameSyncFingerprint(
+      baseState({ eventStream: { version: 1, events: [{ id: 'e1', revision: 2 }] } })
+    )
+
+    expect(initialized).not.toBe(legacy)
+    expect(revision).not.toBe(initialized)
+  })
+
+  it('canonicalizes raw event order and object keys for dirty detection', () => {
+    const first = buildGameSyncFingerprint(
+      baseState({
+        eventStream: {
+          version: 1,
+          events: [{ id: 'b', payload: { z: 1, a: 2 } }, { id: 'a' }],
+        },
+      })
+    )
+    const reordered = buildGameSyncFingerprint(
+      baseState({
+        eventStream: {
+          version: 1,
+          events: [{ id: 'a' }, { payload: { a: 2, z: 1 }, id: 'b' }],
+        },
+      })
+    )
+
+    expect(first).toBe(reordered)
+  })
+
   it('withLastSyncedGameFingerprint stores canonical fingerprint', () => {
     const s = baseState()
     const next = withLastSyncedGameFingerprint(s)

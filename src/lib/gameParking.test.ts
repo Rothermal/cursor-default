@@ -133,6 +133,7 @@ function gameState(sport: SportConfig, teamName: string, opponentName: string): 
     currentPeriod: 1,
     teamStatsConfig: null,
     shotChart: [],
+    eventStream: null,
   }
 }
 
@@ -343,6 +344,19 @@ describe('gameParking', () => {
       'basketball',
       'soccer',
     ])
+  })
+
+  it('normalizes missing legacy event streams during import', () => {
+    const legacy = gameState(basketball, 'Legacy', 'Bears') as Partial<GameState>
+    delete legacy.eventStream
+
+    const result = importParkedGames(
+      importPayload([importedRecord('legacy-import', legacy as GameState)]),
+      'user-1'
+    )
+
+    expect(result.imported).toBe(1)
+    expect(getParkedGameRecord('legacy-import', 'user-1')?.gameState.eventStream).toBeNull()
   })
 
   it('keeps existing games when imported records use the same local id', () => {
