@@ -4,10 +4,13 @@
 > visible numbering is no longer needed as a standalone feature; the useful version is a
 > tappable shot detail surface with durable shot number and linked F7/F9 metadata.
 >
-> Status: held pending further user feedback.
+> Status: held as a standalone feature. Product intent is assigned to the future basketball
+> event-model program; see
+> [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md).
 >
-> **Hold note:** Do not start implementation until further live-use/user feedback confirms
-> that shot detail/editing is worth prioritizing over smaller court-capture refinements.
+> **Hold note:** Do not start this plan independently. Reconcile its shot detail, linked
+> metadata, and correction requirements during BKE-0, then deliver the event-backed detail
+> surface in BKE-3 if that phase plan confirms the scope.
 
 ## Goal
 
@@ -54,6 +57,10 @@ modal after reload/cloud sync. A modal could guess from action order while the l
 `actionLog` is intact, but the relationship is not durable.
 
 ## Proposed Data Model
+
+> **Historical proposal only:** Do not implement this `ShotRecord` extension as written.
+> BKE-0 must replace it with the approved shared event envelope, basketball projections,
+> and legacy-game compatibility strategy before BKE-3 delivers the detail/edit surface.
 
 Extend `ShotRecord` with optional linked metadata:
 

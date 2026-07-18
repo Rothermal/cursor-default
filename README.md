@@ -38,7 +38,7 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 | Hockey | Configured (disabled) | Goals, Assists, Shots, Hits, Blocks, Penalties, Goaltending |
 | Soccer | Configured (disabled) | Goals, Assists, Shots, Tackles, Cards, Goalkeeping |
 
-Sports can be enabled/disabled from **Settings -> App** in the app shell. Sport-specific preferences live under **Settings -> Sports**. Adding a new sport requires only a new entry in `src/config/sports.ts` — the UI discovers it automatically.
+Sports can be enabled/disabled from **Settings -> App** in the app shell. Sport-specific preferences live under **Settings -> Sports**. A new `src/config/sports.ts` entry is automatically discovered by generic UI; full sport support may also require a sport-specific tracker, rules, settings, and summary experience.
 
 ## Tech Stack
 
@@ -277,8 +277,10 @@ docs/
 ├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game views (living doc; progress table)
 ├── DESIGN_TEAM_INFO_PAGE.md # Team hub / drill-down (shipped V1 design reference)
 ├── DESIGN_SHOT_TRACKER_UI_REVAMP.md # Court-capture program status (F1–F13)
-├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11/F13 held
+├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11 held, F13 moves to BKE
 ├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
+├── PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md # Soccer product model and SOC-1 through SOC-6 roadmap
+├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
 ├── PLAN_ADMIN_SECURITY_ROADMAP.md # Admin/security/access roadmap
@@ -373,19 +375,23 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Guardianship hardening (SEC-4)** — contextual self-service claims, creator/manager/self removal, identity-only editing, guardian visibility, and consistent creator-link creation ([plan](docs/PLAN_SEC_4_GUARDIANSHIP_REVIEW.md))
 - [x] **App-level access (SEC-5)** — active/pending/suspended account states, early authenticated-session gate, PostgREST request enforcement, and narrow app-admin management RPCs/UI ([plan](docs/PLAN_SEC_5_APP_LEVEL_ACCESS.md))
 - [x] **Access audit trail (SEC-6)** — immutable member/invite-link/app-access events with team manager and app-admin history views ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
+- [x] **Soccer product model (SOC-0)** — event-first soccer design, complete stat catalog, configurable match/lineup model, soccer field direction, and six-phase implementation roadmap ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 
 ### What's Next
 
+- [ ] **Soccer implementation (SOC-1 through SOC-6)** — shared event foundation; match rules, lineups, and clock; soccer field and attacking events; defense/discipline/team events; cloud sync; summaries and release ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
+- [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
-- [ ] Per-sport stat refinements and additional stats (minutes for hockey/soccer/football, missed shots for hockey)
+- [ ] Per-sport stat refinements outside the soccer program (minutes for hockey/football, missed shots for hockey)
 - [ ] Player transfer UI: search/autocomplete for adding existing players to new teams (player pool / Add Existing already ships; this is UX polish)
 - [ ] Optional stat descriptions — toggle full stat names vs abbreviations
 - [ ] Bulk / archive games — beyond per-row delete in Games and Settings -> Advanced data management
 
 ### Held / waiting for feedback
 
-- **Court capture F11 / F13** — F10 visible numbering is superseded by F13; F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
+- **Court capture F11 / F13** — F10 visible numbering is superseded by F13; F11 remains held, while F13 product intent is now assigned to the future basketball event migration ([court roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md), [basketball event roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 
 ### Shipped history (formerly Future Enhancements)
 

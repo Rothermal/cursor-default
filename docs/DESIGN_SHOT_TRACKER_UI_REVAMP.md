@@ -5,9 +5,11 @@ context, the data model the work builds on, the recommended build order, and the
 cross-cutting decisions so the individual plans stay consistent.
 
 > **Status:** F1-F9 and F12 are implemented in the app and documented in the linked plans.
-> F10 is no longer needed as a standalone feature and is superseded by F13. F11 and F13
-> are both held pending further user feedback. Manual Supabase-heavy QA is still tracked in
-> [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
+> F10 is no longer needed as a standalone feature and is superseded by F13. F11 remains
+> held pending further user feedback. F13 is held as a standalone feature and assigned to
+> the future basketball event-model program; see
+> [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md). Manual
+> Supabase-heavy QA is still tracked in [REGRESSION_TESTING.md](REGRESSION_TESTING.md).
 >
 > **Major pivot (recorded):** F1 was originally "make the shot chart a tab." After
 > live-use feedback it is now a **single scrollable Game Tracker** where the **court is a
@@ -31,7 +33,7 @@ cross-cutting decisions so the individual plans stay consistent.
 | **F12** | Recent-events undo popup | [completed/PLAN_F12_RECENT_EVENTS_UNDO.md](completed/PLAN_F12_RECENT_EVENTS_UNDO.md) | **Implemented.** The bottom Undo opens a recent-events popup; the newest event can be undone via existing LIFO `UNDO`. |
 | **F7** | Assist-linking on a made shot | [completed/PLAN_F7_ASSIST_LINKING.md](completed/PLAN_F7_ASSIST_LINKING.md) | **Implemented.** After a made court shot, optionally credit a same-side teammate assist as a separate `ast` increment. |
 | **F8** | Live per-player line in popup | [completed/PLAN_F8_LIVE_PER_PLAYER_LINE.md](completed/PLAN_F8_LIVE_PER_PLAYER_LINE.md) | **Implemented.** Shows the selected player's compact live stat line under the popup's Log for label. |
-| **F9-F13** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | F9 rebound-after-miss is implemented; F10 visible numbering is superseded by F13; F11 and F13 are held pending further feedback. |
+| **F9-F13** | Court Event Capture enhancements | [PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | F9 rebound-after-miss is implemented; F10 visible numbering is superseded by F13; F11 is held and F13 moves to the future BKE program. |
 
 F1 is the foundation for F2, F3, and F5-F12. F4 is independent and has landed.
 
@@ -141,8 +143,9 @@ F1  Single-page tracker + Court Event Capture     (implemented)
  └─ F11 Hybrid quick buttons (Option B)            (only if testing shows it's needed)
 F4  In-progress scores on resume UI                (implemented; cloud-list QA pending)
 
-F9 is complete. F10 is superseded by F13 shot detail/edit planning. F11 and F13 are both
-held pending further user feedback before build work resumes.
+F9 is complete. F10 is superseded by F13 shot detail/edit planning. F11 remains held
+pending further user feedback. F13 product intent moves to BKE-0/BKE-3 on the future shared
+basketball event model.
 ```
 
 Rationale and per-feature phases: see
@@ -150,7 +153,7 @@ Rationale and per-feature phases: see
 
 Note: the legacy visible-marker-numbering idea listed as F10 above is no longer planned as
 a standalone build. It is superseded by F13, which moves shot numbering into a shot detail
-and edit workflow.
+and edit workflow delivered through the future basketball event program.
 
 ## Open questions (consolidated)
 

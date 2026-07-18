@@ -1,30 +1,29 @@
 # Plan: App foundation roadmap
 
-Living roadmap for the next foundation work before soccer implementation. This plan covers
-the shared product architecture for sport-aware navigation, focused settings/admin pages,
-Google authentication, account management, and the first soccer planning/build phases.
+Living roadmap for the shipped navigation/auth foundation and the soccer implementation
+program that follows it. This plan covers sport-aware navigation, focused settings/admin
+pages, Google authentication, account management, and SOC-0 through SOC-6.
 
 The intent is to make the app easier to navigate for basketball today while creating a
-clean path for multiple sports in progress at the same time. Each major phase below should
-be expanded into its own execution plan before implementation.
+clean path for multiple sports in progress at the same time. Each remaining SOC phase below
+should be expanded into its own execution plan before implementation.
 
 ---
 
 ## 1. Problem statement
 
 StatKeeper has grown from a basketball-first tracker into a multi-game, multi-sport
-foundation. The current home/admin structure still largely reflects the original app:
+foundation. NAV-1, NAV-2, AUTH-1, and AUTH-2 addressed the original foundation gaps:
 
-- The post-login home is primarily a sport selector plus several direct actions.
-- Settings/admin content is concentrated into long pages, which increases scrolling and
-  mixes normal preferences with advanced/debug-style tools.
-- Authentication is email/password only today, but the desired account model should support
-  Google sign-in/sign-up and account linking.
+- The post-login flow now uses sport choice and sport-scoped dashboards.
+- Settings/admin content is split into focused account, app, sports, data, and advanced
+  destinations.
+- Authentication supports email/password plus Google sign-in and account linking.
 - Soccer is the next sport direction, and the app needs a navigation/settings model that
   does not hard-code basketball assumptions into global workflows.
 
-The next work should establish the app shell and account/settings foundations first, then
-build soccer on top of that structure.
+The foundation work is complete. The next work is the SOC-1 through SOC-6 program built on
+that structure.
 
 ---
 
@@ -230,28 +229,33 @@ sport.
 
 ### SOC-0: Soccer planning
 
-Goal: define the soccer-specific product model before implementation.
+Detailed plan: [PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md).
 
-Questions for SOC-0:
+Status: Product and technical direction resolved; implementation not started.
 
-- What is the first playable soccer stat set?
-- Does soccer need a field-tap event surface in the first build, or can first-pass tracking
-  use a simpler stat grid while the field UI is designed?
-- How should soccer events differ from basketball events in the action log and summary?
-- What soccer settings belong under Settings -> Sports -> Soccer?
-- Which team/season/cloud views can reuse existing generic flows unchanged?
+SOC-0 replaces the dormant soccer stat-grid assumptions with an event-first model:
 
-### SOC-1: First soccer implementation
+- Detailed player events for the tracked team; simplified opponent attribution.
+- A shared, versioned game-event envelope with soccer-specific payloads.
+- Derived stat/score projections instead of independently mutable soccer counters.
+- Configurable match rules, clock, lineup, periods, direction, and substitutions.
+- A full soccer field plus quick-event controls and an editable timeline.
+- A complete stat catalog divided into core, derived, and optional future modules.
+- A required future basketball event-model redesign that does not block soccer
+  ([roadmap](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)).
 
-Goal: ship the smallest useful soccer tracking path on top of the new sport-aware shell.
+### SOC-1 through SOC-6: Soccer implementation program
 
-Expected scope will be defined by SOC-0, but likely starting points include:
+| Phase | Purpose |
+|---|---|
+| SOC-1 | Shared game-event foundation, local persistence, derivation engine, and cloud schema |
+| SOC-2 | Soccer rules, tracked-team side, lineup roles, clock, periods, direction, substitutions, and minutes |
+| SOC-3 | Full field, attacking events, chance creation, goalkeeper links, score events, and timeline editing |
+| SOC-4 | Defense, discipline/staff cards, corners, offsides, shootouts, and structured outcomes |
+| SOC-5 | Cloud sync, independent recorder streams, primary resolution, finalization, and resume hardening |
+| SOC-6 | Soccer summaries, field maps, season aggregates, settings modules, QA, and enablement |
 
-- Add/enable soccer sport configuration.
-- Route soccer setup through the sport dashboard.
-- Use soccer-specific labels, stats, and summaries.
-- Add either a basic soccer tracker surface or a deliberately scoped generic fallback.
-- Ensure parked soccer games and basketball games can coexist and resume independently.
+Each phase receives its own execution plan and one-question-at-a-time Q&A before code work.
 
 ---
 
@@ -263,8 +267,13 @@ Expected scope will be defined by SOC-0, but likely starting points include:
 | **NAV-2** | Settings/Admin split | Reduces scrolling and creates Account/Sports/Data/Advanced destinations. |
 | **AUTH-1** | Google sign-in/sign-up | Must precede AUTH-2; can follow navigation because auth entry does not depend on soccer. |
 | **AUTH-2** | Account management | Implemented; uses the Account destination created by NAV-2 for profile editing, connected methods, and Google linking. |
-| **SOC-0** | Soccer product/technical plan | Define soccer stat model and tracker UI approach. |
-| **SOC-1** | First soccer implementation | Build on the sport dashboard and sport-specific settings structure. |
+| **SOC-0** | Soccer product/technical plan | Complete; defines event-first product model and six-phase implementation roadmap. |
+| **SOC-1** | Shared event foundation | First soccer implementation phase; detailed planning required before code. |
+| **SOC-2** | Match rules, lineups, and clock | Build soccer match state on the shared event foundation. |
+| **SOC-3** | Field and attacking events | Deliver the soccer-native field and linked attacking workflow. |
+| **SOC-4** | Remaining core events | Add defense, discipline, team events, shootouts, and outcomes. |
+| **SOC-5** | Event cloud sync | Harden independent recorder streams, resolution, parking, and finalization. |
+| **SOC-6** | Summary and release | Add soccer reporting, settings, season aggregates, QA, and enablement. |
 
 ---
 
@@ -288,7 +297,12 @@ docs/PLAN_NAV_2_SETTINGS_ADMIN_SPLIT.md
 docs/PLAN_AUTH_1_GOOGLE_SIGN_IN.md
 docs/PLAN_AUTH_2_ACCOUNT_MANAGEMENT.md
 docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md
-docs/PLAN_SOC_1_SOCCER_FIRST_PASS.md
+docs/PLAN_SOC_1_SHARED_EVENT_FOUNDATION.md
+docs/PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md
+docs/PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md
+docs/PLAN_SOC_4_MATCH_EVENT_CATALOG.md
+docs/PLAN_SOC_5_EVENT_CLOUD_SYNC.md
+docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md
 ```
 
 ---
@@ -309,9 +323,8 @@ These do not block this high-level roadmap.
   (localhost, GitHub Pages, custom domain)?
 - AUTH-1: What exact user-facing copy should explain existing account linking?
 - AUTH-2: Avatar display is read-only from Google/profile defaults for now; upload/edit remains a future account phase.
-- SOC-0: What soccer stats and event flow define the first useful soccer tracker?
-- SOC-0: Should the first soccer tracker include a field UI immediately or ship a smaller
-  non-field first pass?
+- SOC-1 through SOC-6: Detailed implementation choices remain phase-local and should be
+  resolved through one-question-at-a-time Q&A before each phase.
 
 ---
 
@@ -323,3 +336,6 @@ These do not block this high-level roadmap.
 - Supabase JavaScript `linkIdentity`: `https://supabase.com/docs/reference/javascript/auth-linkidentity`
 - Google OAuth app verification and consent screen: `https://support.google.com/cloud/answer/13461325`
 - Google sign-in branding guidelines: `https://developers.google.com/identity/branding-guidelines`
+- IFAB permitted youth/grassroots modifications: `https://www.theifab.com/laws/latest/general-modifications/`
+- NCAA soccer shot/assist/save definitions: `https://ncaaorg.s3.amazonaws.com/championships/sports/soccer/rules/PRXSO_RulesBook.pdf`
+- FIFA Football Language: `https://www.fifatrainingcentre.com/en/resources-tools/football-language/`
