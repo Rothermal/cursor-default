@@ -180,6 +180,30 @@ describe('game event cloud transport', () => {
     })
   })
 
+  it('keeps an unmapped recorder row in the durable raw stream but out of projection', async () => {
+    const raw = row([
+      {
+        kind: 'player',
+        role: 'scorer',
+        playerId: '40000000-0000-4000-8000-000000000001',
+      },
+    ])
+    mock.rows = [raw]
+
+    const loaded = await loadGameEventStreamForRecorder(
+      'game-1',
+      'user-1',
+      {},
+      registry
+    )
+
+    expect(loaded.eventStream.events).toEqual([raw])
+    expect(loaded.inspection.activeEvents).toEqual([])
+    expect(loaded.inspection.complete).toBe(false)
+    expect(loaded.inspection.diagnostics[0].code).toBe('unmapped_player')
+    expect(loaded.quarantinedRows).toEqual([raw])
+  })
+
   it('loads, maps, validates, and orders one recorder stream', async () => {
     mock.rows = [
       row([

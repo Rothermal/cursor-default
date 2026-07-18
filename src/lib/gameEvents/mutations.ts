@@ -35,6 +35,13 @@ export function initializeGameEventStream<TEvent extends GameEvent>(
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
   if (state.eventStream) return rebuildAsSuccess(state, registry, projectors)
+  if (!state.sport || !projectors.get(state.sport.id)) {
+    return failed(
+      state,
+      'unsupported_event_sport',
+      'The active sport does not have an installed event projector.'
+    )
+  }
   if (hasLegacyAggregateActivity(state)) {
     return failed(
       state,
@@ -89,7 +96,7 @@ export function updateGameEvent<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
-  return reviseEvent(state, eventId, registry, projectors, event => {
+  return reviseEvent(state, eventId, registry, projectors, 'runtime', event => {
     if (event.deletedAt) return { error: 'already_deleted' as const }
     return {
       event: {
@@ -116,7 +123,7 @@ export function deleteGameEvent<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
-  return reviseEvent(state, eventId, registry, projectors, event => {
+  return reviseEvent(state, eventId, registry, projectors, 'stored', event => {
     if (event.deletedAt) return { error: 'already_deleted' as const }
     return {
       event: { ...event, revision: event.revision + 1, updatedAt: now, deletedAt: now },
@@ -131,7 +138,7 @@ export function restoreGameEvent<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
-  return reviseEvent(state, eventId, registry, projectors, event => {
+  return reviseEvent(state, eventId, registry, projectors, 'stored', event => {
     if (!event.deletedAt) return { error: 'not_deleted' as const }
     return {
       event: { ...event, revision: event.revision + 1, updatedAt: now, deletedAt: null },
@@ -148,6 +155,7 @@ function reviseEvent<TEvent extends GameEvent>(
   eventId: string,
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>,
+  sourceMode: 'runtime' | 'stored',
   revise: (event: GameEvent) => RevisionOutcome
 ): GameEventMutationResult {
   if (!state.eventStream) {
@@ -158,11 +166,13 @@ function reviseEvent<TEvent extends GameEvent>(
   )
   if (index < 0) return failed(state, 'event_not_found', 'The event was not found.')
 
-  const inspected = registry.inspect(state.eventStream.events[index])
+  const stored = state.eventStream.events[index]
+  const inspected = registry.inspect(stored)
   if (!inspected.ok) {
     return failed(state, 'invalid_event', 'A quarantined event cannot be edited by the typed mutation API.')
   }
-  const outcome = revise(inspected.event)
+  const source = sourceMode === 'stored' && isGameEventEnvelope(stored) ? stored : inspected.event
+  const outcome = revise(source)
   if ('error' in outcome) {
     return failed(
       state,

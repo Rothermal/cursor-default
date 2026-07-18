@@ -230,9 +230,57 @@ describe('game event mutations and projections', () => {
     expect((restored.state.eventStream?.events[0] as FixtureEvent).revision).toBe(4)
   })
 
-  it('exposes initialization through the existing game reducer without changing legacy undo', () => {
+  it('keeps raw schema on tombstone/restore but upgrades an explicit content edit', () => {
+    const initialized = initializeGameEventStream(state(), registry, projectors)
+    if (!initialized.ok) throw new Error('fixture initialization failed')
+    const legacy = event('20000000-0000-4000-8000-000000000003', {
+      schemaVersion: 1,
+      payload: { amount: 3 } as unknown as FixturePayload,
+    })
+    const added = addGameEvent(initialized.state, legacy, registry, projectors)
+    if (!added.ok) throw new Error('legacy fixture add failed')
+
+    const deleted = deleteGameEvent(
+      added.state,
+      legacy.id,
+      '2026-07-17T12:05:00.000Z',
+      registry,
+      projectors
+    )
+    if (!deleted.ok) throw new Error('legacy fixture delete failed')
+    const deletedRaw = deleted.state.eventStream?.events[0] as FixtureEvent
+    expect(deletedRaw.schemaVersion).toBe(1)
+    expect(deletedRaw.payload).toEqual({ amount: 3 })
+
+    const restored = restoreGameEvent(
+      deleted.state,
+      legacy.id,
+      '2026-07-17T12:06:00.000Z',
+      registry,
+      projectors
+    )
+    if (!restored.ok) throw new Error('legacy fixture restore failed')
+    const restoredRaw = restored.state.eventStream?.events[0] as FixtureEvent
+    expect(restoredRaw.schemaVersion).toBe(1)
+    expect(restoredRaw.payload).toEqual({ amount: 3 })
+
+    const edited = updateGameEvent(
+      restored.state,
+      legacy.id,
+      { payload: { value: 4 } },
+      '2026-07-17T12:07:00.000Z',
+      registry,
+      projectors
+    )
+    if (!edited.ok) throw new Error('legacy fixture edit failed')
+    const editedRaw = edited.state.eventStream?.events[0] as FixtureEvent
+    expect(editedRaw.schemaVersion).toBe(2)
+    expect(editedRaw.payload).toEqual({ value: 4 })
+  })
+
+  it('keeps reducer initialization disabled until the production sport projector is installed', () => {
     const initialized = gameReducer(state(), { type: 'INITIALIZE_EVENT_STREAM' })
-    expect(initialized.eventStream).toEqual({ version: 1, events: [] })
+    expect(initialized.eventStream).toBeNull()
     expect(gameReducer(state({ opponentScore: 1 }), { type: 'INITIALIZE_EVENT_STREAM' }).eventStream).toBeNull()
   })
 })

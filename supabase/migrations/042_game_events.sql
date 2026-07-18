@@ -96,6 +96,12 @@ create policy "game_events_update_own" on public.game_events
 
 -- There is intentionally no DELETE policy. Client deletion is a revisioned tombstone update.
 
+-- Supabase grants public-schema table DML to API roles by default. Event writes must pass
+-- through the revision-aware RPC, so RLS remains defense in depth rather than a direct path
+-- around stale/conflict detection.
+revoke all on table public.game_events from anon, authenticated;
+grant select on table public.game_events to authenticated;
+
 create or replace function public.upsert_game_event_revisioned(
   p_id uuid,
   p_game_id uuid,
@@ -118,12 +124,42 @@ create or replace function public.upsert_game_event_revisioned(
 )
 returns text
 language plpgsql
+security definer
 set search_path = public
 as $$
 declare
+  v_user_id uuid := (select auth.uid());
+  v_team_id uuid;
+  v_game_status text;
   v_existing public.game_events%rowtype;
   v_written public.game_events%rowtype;
 begin
+  if v_user_id is null then
+    raise exception 'Authentication required';
+  end if;
+
+  select g.team_id, g.status
+  into v_team_id, v_game_status
+  from public.games g
+  where g.id = p_game_id;
+
+  if not found then
+    raise exception 'Game not found';
+  end if;
+  if v_game_status = 'final' then
+    raise exception 'Final games cannot accept event writes';
+  end if;
+  if not public.can_track_team_games(v_team_id) then
+    raise exception 'Not authorized to track this game';
+  end if;
+
+  -- Local creation always begins at revision 1. Existing rows may advance by one or more
+  -- revisions after offline work, but a new id cannot start midway through a history.
+  if p_revision <> 1
+     and not exists (select 1 from public.game_events ge where ge.id = p_id) then
+    return 'conflict';
+  end if;
+
   insert into public.game_events (
     id,
     game_id,
@@ -148,7 +184,7 @@ begin
   ) values (
     p_id,
     p_game_id,
-    (select auth.uid()),
+    v_user_id,
     p_sport_id,
     p_event_type,
     p_schema_version,
@@ -201,7 +237,7 @@ begin
 
   if not found
      or v_existing.game_id <> p_game_id
-     or v_existing.recorded_by <> (select auth.uid()) then
+     or v_existing.recorded_by <> v_user_id then
     return 'conflict';
   end if;
 

@@ -16,6 +16,17 @@ describe('migration 042 game event contracts', () => {
     expect(sql).not.toMatch(/create policy "game_events_delete/i)
   })
 
+  it('makes the security-definer RPC the only authenticated write path', () => {
+    expect(sql).toContain(
+      'revoke all on table public.game_events from anon, authenticated'
+    )
+    expect(sql).toContain('grant select on table public.game_events to authenticated')
+    expect(sql).toContain('security definer')
+    expect(sql).toContain("raise exception 'Authentication required'")
+    expect(sql).toContain('public.can_track_team_games(v_team_id)')
+    expect(sql).not.toMatch(/grant (insert|update|delete|all) on table public\.game_events/i)
+  })
+
   it('implements applied, idempotent, stale, and conflict revision results', () => {
     expect(sql).toContain('upsert_game_event_revisioned')
     expect(sql).toContain('game_events.revision < excluded.revision')
@@ -24,5 +35,6 @@ describe('migration 042 game event contracts', () => {
     expect(sql).toContain("return 'idempotent'")
     expect(sql).toContain("return 'stale'")
     expect(sql).toContain("return 'conflict'")
+    expect(sql).toContain('if p_revision <> 1')
   })
 })

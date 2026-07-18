@@ -118,6 +118,7 @@ export type GameEventEditableFields = Pick<
 
 export type GameEventMutationErrorCode =
   | 'legacy_activity_present'
+  | 'unsupported_event_sport'
   | 'stream_not_initialized'
   | 'event_not_found'
   | 'duplicate_event_id'

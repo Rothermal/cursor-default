@@ -162,13 +162,16 @@ runtime state authority and receives thin actions for:
 - restore event.
 
 Adding to a `null` stream is rejected. Initialization is explicit and allowed only for a
-new game without legacy aggregate activity. New soccer setup will initialize its stream in
-SOC-2. Legacy basketball remains `null` until the basketball migration program.
+new game without legacy aggregate activity whose sport has an installed event projector.
+New soccer setup will register its projector and initialize its stream in SOC-2. Legacy
+basketball remains `null` until the basketball migration program.
 
 Mutation rules:
 
 - ids and creation metadata remain stable,
 - edit/delete/restore increment revision and refresh `updatedAt`,
+- explicit content edits save the current schema, while tombstone/restore preserve the
+  stored raw schema and payload,
 - delete sets `deletedAt`; restore clears it,
 - accepted mutations rebuild the complete projection atomically,
 - invalid mutations return the unchanged state with a structured error from pure helpers,
@@ -246,8 +249,9 @@ SOC-1 adds repository functions but does not call them from automatic sync:
 - return structured transport, mapping, validation, stale, and conflict diagnostics.
 
 An unmapped local actor blocks only that event's upload and leaves it unchanged locally.
-An unmapped cloud actor preserves and quarantines the untouched transport row until roster
-mapping is repaired. Actor references are never silently converted to `unknown`.
+An unmapped cloud actor preserves and quarantines the untouched transport row in the raw
+stream until roster mapping is repaired. It is excluded from projectable events, and actor
+references are never silently converted to `unknown`.
 
 ---
 

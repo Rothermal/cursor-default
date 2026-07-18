@@ -288,7 +288,8 @@ export async function loadGameEventStreamForRecorder<TEvent extends GameEvent>(
     }
   }
 
-  const events: GameEvent[] = []
+  const events: unknown[] = []
+  const mappedEvents: GameEvent[] = []
   const quarantinedRows: unknown[] = []
   const transportDiagnostics: GameEventDiagnostic[] = []
   for (const row of data ?? []) {
@@ -306,8 +307,13 @@ export async function loadGameEventStreamForRecorder<TEvent extends GameEvent>(
       continue
     }
     const mapped = deserializeGameEventFromCloud(row, cloudToLocalPlayerId)
-    if (mapped.ok) events.push(mapped.event)
-    else {
+    if (mapped.ok) {
+      events.push(mapped.event)
+      mappedEvents.push(mapped.event)
+    } else {
+      // Keep the untouched transport row in the durable raw stream. It remains excluded
+      // from projection until a later load can repair its cloud-to-local actor mapping.
+      events.push(mapped.rawRow)
       quarantinedRows.push(mapped.rawRow)
       transportDiagnostics.push(mapped.diagnostic)
     }
@@ -317,7 +323,10 @@ export async function loadGameEventStreamForRecorder<TEvent extends GameEvent>(
     version: GAME_EVENT_STREAM_VERSION,
     events,
   }
-  const inspected = inspectGameEventStream(eventStream, registry)
+  const inspected = inspectGameEventStream(
+    { version: GAME_EVENT_STREAM_VERSION, events: mappedEvents },
+    registry
+  )
   const inspection: GameEventInspection<TEvent> = {
     ...inspected,
     complete: inspected.complete && transportDiagnostics.length === 0,
