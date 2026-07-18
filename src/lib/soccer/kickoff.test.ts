@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, SportConfig } from '../../types'
 import { createInitialState } from '../gameReducer'
+import { nextSoccerEventSequence } from './events'
 import { prepareSoccerKickoff } from './kickoff'
 import { resolveSoccerMatchRules } from './rules'
 import { createSoccerSportGameState } from './state'
@@ -123,5 +124,65 @@ describe('prepareSoccerKickoff', () => {
     })
     expect(before.eventStream).toBeNull()
     expect(before.sportGameState?.projection.status).toBe('not_started')
+  })
+
+  it('rejects incomplete match info and already-started streams without mutating state', () => {
+    const setup = matchSetup()
+    const incomplete = { ...gameState(setup), gameInfo: null }
+    expect(prepareSoccerKickoff(incomplete, setup, { recorderUserId: 'user-1' })).toEqual({
+      ok: false,
+      message: 'Soccer match information is incomplete.',
+    })
+    expect(incomplete.eventStream).toBeNull()
+
+    const started = {
+      ...gameState(setup),
+      eventStream: { version: 1 as const, events: [{ id: 'existing' }] },
+    }
+    expect(prepareSoccerKickoff(started, setup, { recorderUserId: 'user-1' })).toEqual({
+      ok: false,
+      message: 'This soccer match has already started.',
+    })
+    expect(started.eventStream?.events).toHaveLength(1)
+  })
+
+  it('rejects empty and oversized opening lineups before initializing the stream', () => {
+    const noStarters = matchSetup()
+    noStarters.participants = noStarters.participants.map(participant => ({
+      ...participant,
+      initialStatus: 'bench' as const,
+    }))
+    const beforeEmpty = gameState(noStarters)
+    expect(prepareSoccerKickoff(beforeEmpty, noStarters, { recorderUserId: null })).toEqual({
+      ok: false,
+      message: 'Select at least one starter.',
+    })
+    expect(beforeEmpty.eventStream).toBeNull()
+
+    const oversized = matchSetup()
+    oversized.rulesSnapshot = resolveSoccerMatchRules({ gameOverrides: { maxOnFieldPlayers: 1 } })
+    const beforeOver = gameState(oversized)
+    expect(prepareSoccerKickoff(beforeOver, oversized, { recorderUserId: null })).toEqual({
+      ok: false,
+      message: 'The opening lineup exceeds the configured player maximum.',
+    })
+    expect(beforeOver.eventStream).toBeNull()
+  })
+})
+
+describe('nextSoccerEventSequence', () => {
+  it('advances only within the same recorder and ignores invalid sequences', () => {
+    expect(nextSoccerEventSequence([], 'user-1')).toBe(0)
+    expect(nextSoccerEventSequence([
+      { recorderUserId: 'user-1', sequence: 0 },
+      { recorderUserId: 'user-2', sequence: 9 },
+      { recorderUserId: 'user-1', sequence: 2.5 },
+      { recorderUserId: 'user-1', sequence: 3 },
+      { notAnEvent: true },
+    ], 'user-1')).toBe(4)
+    expect(nextSoccerEventSequence([
+      { recorderUserId: null, sequence: 1 },
+      { recorderUserId: null, sequence: 4 },
+    ], null)).toBe(5)
   })
 })
