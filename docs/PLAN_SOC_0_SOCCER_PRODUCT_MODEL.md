@@ -396,6 +396,8 @@ match-duration rates may be added when the base totals are stable.
 
 Team W-D-L, goals for/against, goal difference, clean sheets, configurable standings points,
 and competition tiebreakers are designed follow-ups rather than first-release scope.
+Per-game result capture is core; aggregating those results into a season table is the
+deferred feature.
 
 ---
 
@@ -608,6 +610,11 @@ Every SOC implementation plan must cover:
 - historical events remain visible when an optional module is disabled,
 - HashRouter routes and sport dashboard filters remain compatible,
 - mobile field, popups, timeline, clock, and controls do not overlap.
+
+SOC-0 introduces no executable behavior, so it does not add a placeholder regression script.
+SOC-1 through SOC-4 should add manual coverage as behavior appears, SOC-5 should add cloud,
+offline, and recorder-resolution cases, and SOC-6 should consolidate the complete soccer
+release suite in `REGRESSION_TESTING.md`.
 
 ---
 

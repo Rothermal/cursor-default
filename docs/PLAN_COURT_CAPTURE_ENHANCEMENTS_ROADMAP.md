@@ -3,14 +3,15 @@
 > **For agentic workers:** This is the roadmap for follow-on enhancements to the Court
 > Event Capture model introduced in [completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md](completed/PLAN_F1_GAME_TRACKER_COURT_CAPTURE.md).
 > F5, F6, F7, F8, F9, and F12 are implemented. F10 is no longer needed as a
-> standalone visible-numbering feature and is superseded by F13. F11 and F13 are both
-> held pending further user feedback before any build work. F13 is drafted for review in
-> [PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md).
+> standalone visible-numbering feature and is superseded by F13. F11 remains held pending
+> further user feedback. F13 is held as a standalone feature and assigned to the future
+> basketball event-model program; see
+> [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md).
 
 F5-F12 depend on F1 (the single-page tracker + `CourtEventPopup`) and avoid data-model
-changes by mapping to existing dispatches (`ADD_SHOT`, `INCREMENT_STAT`). F13 is the first
-planned court-capture feature that intentionally considers durable shot metadata and edit
-semantics.
+changes by mapping to existing dispatches (`ADD_SHOT`, `INCREMENT_STAT`). The original F13
+draft first explored durable shot metadata and edit semantics, but its `ShotRecord`-first
+data path is superseded by BKE-0 architecture planning and BKE-3 event-backed delivery.
 
 ## Origin
 
@@ -44,20 +45,19 @@ F1  Single-page tracker + Court Event Capture       (implemented)
  |-- F8  Live per-player line in popup              (implemented)
  |-- F9  Rebound-after-miss prompt                  (implemented; opt-in)
  |-- F10 Shot sequence numbers / recency            (superseded; no standalone work)
- |-- F13 Shot detail + linked metadata/edit modal   (hold pending user feedback)
+ |-- F13 Shot detail + linked metadata/edit modal   (assigned to future BKE-3)
  `-- F11 Hybrid quick buttons (Option B)            (hold pending user feedback)
 F4  In-progress scores on resume UI                 (implemented; cloud-list QA pending)
 ```
 
-**Remaining work:** F11 and F13 are both paused. Revisit only after further user feedback
-clarifies whether quick non-shot buttons or shot detail/editing are worth prioritizing.
+**Remaining work:** F11 is paused pending user feedback. F13 product intent is preserved,
+but implementation moves to the future basketball event program after the shared
+`GameEvent` foundation is proven.
 
 **Why this order:** F12 gives F7's two-step assist undo a visible event list without a
-reducer change. F13 is the natural successor to F7/F9 because it turns their
-adjacent-but-unlinked stat increments into durable shot metadata and an eventual edit
-surface. Both are intentionally held now: build F11 only if live testing shows the extra
-tap for block/steal/assist is real friction, and build F13 only if shot detail/editing
-proves important enough for the larger data-model work.
+reducer change. F13 remains the natural product successor to F7/F9, but the technical path
+now unifies shot, assist, rebound, undo, and editing through basketball events instead of
+adding a second metadata source to `ShotRecord`.
 
 ---
 
@@ -158,7 +158,8 @@ belongs at the metadata/detail level:
 ## F13 - Shot detail + linked metadata + edit modal
 
 > **Expanded to a draft plan:** [PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md).
-> **Status:** Held pending further user feedback.
+> **Status:** Held as a standalone feature. Reconcile in BKE-0 and deliver through BKE-3;
+> see [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md).
 
 **Goal:** Tap an existing shot marker to inspect the shot event: shot number, shooter,
 result/value, zone/location, timestamp/order, and any F7 assist or F9 rebound linked to
@@ -166,7 +167,7 @@ that shot. Later phases make those fields editable and update stat totals safely
 
 **Depends on:** F1, F7, F9, F12. **Effort:** M-L depending on edit/cloud scope.
 
-**Phases:**
+**Historical draft phases, not an executable implementation plan:**
 
 - **P1:** Read-only shot details modal with derived shot number and core shot data.
 - **P2:** Persist linked metadata on new shots (`sequenceNumber`, `assistPlayerId`,
@@ -183,6 +184,9 @@ Supabase migration.
 **Open questions:** sequence assignment vs derived display order; local-first vs
 cloud-in-same-PR; edit scope; undo model for edits; whether legacy local action logs should
 ever infer F7/F9 links (recommended no).
+
+The BKE-0 plan must replace the `ShotRecord`/`shot_chart`-first assumptions above with the
+approved shared event envelope, basketball projections, and historical compatibility path.
 
 ---
 
@@ -229,8 +233,8 @@ or event-sourced recompute). Gather usage data first.
 
 - F5-F12 intentionally avoided data-model changes. They map to `ADD_SHOT`,
   `INCREMENT_STAT`, `UNDO`, and existing stat ids.
-- F13 is the planned exception: durable shot metadata and editing likely require
-  `ShotRecord`, reducer, cloud sync, and Supabase `shot_chart` changes.
+- F13 is no longer a standalone `ShotRecord`/`shot_chart` migration. Its detail and editing
+  goals move through BKE-0 architecture and BKE-3 event-backed UI.
 - F2/F3 interplay: F2's `shotsForSelection` filtering and F3's all-recorder review apply
   to the inline court regardless of these enhancements.
 - When promoting any item to active work, expand it into its own `PLAN_F{n}_*.md` with full

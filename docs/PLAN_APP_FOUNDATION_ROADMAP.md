@@ -1,30 +1,29 @@
 # Plan: App foundation roadmap
 
-Living roadmap for the next foundation work before soccer implementation. This plan covers
-the shared product architecture for sport-aware navigation, focused settings/admin pages,
-Google authentication, account management, and the first soccer planning/build phases.
+Living roadmap for the shipped navigation/auth foundation and the soccer implementation
+program that follows it. This plan covers sport-aware navigation, focused settings/admin
+pages, Google authentication, account management, and SOC-0 through SOC-6.
 
 The intent is to make the app easier to navigate for basketball today while creating a
-clean path for multiple sports in progress at the same time. Each major phase below should
-be expanded into its own execution plan before implementation.
+clean path for multiple sports in progress at the same time. Each remaining SOC phase below
+should be expanded into its own execution plan before implementation.
 
 ---
 
 ## 1. Problem statement
 
 StatKeeper has grown from a basketball-first tracker into a multi-game, multi-sport
-foundation. The current home/admin structure still largely reflects the original app:
+foundation. NAV-1, NAV-2, AUTH-1, and AUTH-2 addressed the original foundation gaps:
 
-- The post-login home is primarily a sport selector plus several direct actions.
-- Settings/admin content is concentrated into long pages, which increases scrolling and
-  mixes normal preferences with advanced/debug-style tools.
-- Authentication is email/password only today, but the desired account model should support
-  Google sign-in/sign-up and account linking.
+- The post-login flow now uses sport choice and sport-scoped dashboards.
+- Settings/admin content is split into focused account, app, sports, data, and advanced
+  destinations.
+- Authentication supports email/password plus Google sign-in and account linking.
 - Soccer is the next sport direction, and the app needs a navigation/settings model that
   does not hard-code basketball assumptions into global workflows.
 
-The next work should establish the app shell and account/settings foundations first, then
-build soccer on top of that structure.
+The foundation work is complete. The next work is the SOC-1 through SOC-6 program built on
+that structure.
 
 ---
 
