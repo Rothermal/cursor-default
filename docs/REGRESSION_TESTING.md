@@ -596,6 +596,25 @@ actions are backfilled.
 
 ---
 
+## 11a. Shared event foundation (SOC-1)
+
+**Precondition:** Existing basketball local/parked games; migration
+`042_game_events.sql` applied only when testing the isolated cloud repository. Soccer remains
+disabled and no production event definitions are registered in SOC-1.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a.1 | Resume a basketball game saved before SOC-1 | Game loads and tracks normally; its missing event field normalizes to `eventStream: null` |
+| 11a.2 | Export and re-import legacy plus current parked games | All valid games import; legacy games remain aggregate-only and event stream data is preserved unchanged |
+| 11a.3 | Track, undo, park, resume, sync, and summarize basketball | Existing stats, action log, shot chart, and cloud behavior are unchanged |
+| 11a.4 | Inspect sport selection and tracker routes | Soccer remains disabled; SOC-1 adds no visible tracker controls |
+| 11a.5 | As owner/admin/scorer, call the isolated event write helper twice with identical id/revision/data | First response is `applied`; second is `idempotent` |
+| 11a.6 | Write a lower revision, then an equal revision with changed payload | RPC reports `stale`, then `conflict`; existing cloud row is unchanged |
+| 11a.7 | As viewer or with another recorder's row id, attempt an event write | RLS/RPC rejects the write; accepted viewers can read team event rows |
+| 11a.8 | Attempt an ordinary SQL/client delete | No client delete policy exists; revisioned tombstone update is the supported path |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.
@@ -627,7 +646,7 @@ actions are backfilled.
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`040_access_audit_trail.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**.
+- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`042_game_events.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025** and **041**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**; shared events **042**.
 
 ---
 

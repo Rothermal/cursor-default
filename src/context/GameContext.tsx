@@ -27,6 +27,9 @@ import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
+import { normalizeGameEventStream } from '../lib/gameEvents/stream'
+import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
+import { gameEventProjectors, gameEventRegistry } from '../lib/gameEvents/runtime'
 import { sports } from '../config/sports'
 import {
   buildGameSyncFingerprint,
@@ -173,6 +176,7 @@ function buildHydratedStateFromCloudGame(
     teamStatsConfig: cloudGame.teamStatsConfig,
     actionLog: [],
     shotChart: cloudGame.shotChart ?? [],
+    eventStream: null,
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
       seasonId: cloudGame.seasonId ?? null,
@@ -209,7 +213,7 @@ function loadState(userId: string | null): GameState {
       const restoredPlayers = Array.isArray(parsed.players) ? parsed.players : []
       const sanitizedMap = sanitizePlayerIdMapForCloud(parsed.cloudSync?.playerIdMap ?? {})
 
-      return {
+      const restoredState: GameState = {
         ...createInitialState(restoredStatus),
         ...parsed,
         homeTeamScore: typeof parsed.homeTeamScore === 'number' ? parsed.homeTeamScore : null,
@@ -220,6 +224,7 @@ function loadState(userId: string | null): GameState {
             ? Math.floor(parsed.currentPeriod)
             : 1,
         teamStatsConfig: parsed.teamStatsConfig ?? null,
+        eventStream: normalizeGameEventStream(parsed.eventStream),
         shotChart: shotChartForRoster(Array.isArray(parsed.shotChart) ? parsed.shotChart : [], restoredPlayers),
         players: restoredPlayers,
         actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
@@ -239,6 +244,11 @@ function loadState(userId: string | null): GameState {
               : null,
         },
       }
+      return rebuildGameEventProjection(
+        restoredState,
+        gameEventRegistry,
+        gameEventProjectors
+      ).state
     }
   } catch {
     // ignore parse errors

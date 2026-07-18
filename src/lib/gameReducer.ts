@@ -9,6 +9,16 @@ import { activePlayerIdAfterRosterChange } from './activePlayerIdForRoster'
 import { clearEntireShotChart, statIdForShotRecord } from './clearShotChart'
 import { mergeCloudSyncState } from './cloudSyncState'
 import { getDisplayedHomeScore } from './gameScore'
+import {
+  addGameEvent,
+  deleteGameEvent,
+  initializeGameEventStream,
+  restoreGameEvent,
+  updateGameEvent,
+} from './gameEvents/mutations'
+import { gameEventProjectors, gameEventRegistry } from './gameEvents/runtime'
+import { normalizeGameEventStream } from './gameEvents/stream'
+import { rebuildGameEventProjection } from './gameEvents/projection'
 import { playerIdMapForRoster, shotChartForRoster } from './rosterAlignment'
 
 export function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyncState {
@@ -41,6 +51,7 @@ export function createInitialState(status: CloudSyncStatus = 'idle'): GameState 
     currentPeriod: 1,
     teamStatsConfig: null,
     shotChart: [],
+    eventStream: null,
   }
 }
 
@@ -154,8 +165,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'HYDRATE_STATE': {
       const s = action.state
       const cs = s.cloudSync
-      return {
+      const normalizedState: GameState = {
         ...s,
+        eventStream: normalizeGameEventStream(s.eventStream),
         shotChart: shotChartForRoster(s.shotChart, s.players),
         cloudSync: {
           ...cs,
@@ -166,6 +178,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               : 0,
         },
       }
+      return rebuildGameEventProjection(
+        normalizedState,
+        gameEventRegistry,
+        gameEventProjectors
+      ).state
     }
 
     case 'REMOVE_PLAYER': {
@@ -411,6 +428,45 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SET_TEAM_STATS_CONFIG':
       return { ...state, teamStatsConfig: action.config }
+
+    case 'INITIALIZE_EVENT_STREAM':
+      return initializeGameEventStream(state, gameEventRegistry, gameEventProjectors).state
+
+    case 'ADD_GAME_EVENT':
+      return addGameEvent(
+        state,
+        action.event,
+        gameEventRegistry,
+        gameEventProjectors
+      ).state
+
+    case 'UPDATE_GAME_EVENT':
+      return updateGameEvent(
+        state,
+        action.eventId,
+        action.changes,
+        action.now ?? new Date().toISOString(),
+        gameEventRegistry,
+        gameEventProjectors
+      ).state
+
+    case 'DELETE_GAME_EVENT':
+      return deleteGameEvent(
+        state,
+        action.eventId,
+        action.now ?? new Date().toISOString(),
+        gameEventRegistry,
+        gameEventProjectors
+      ).state
+
+    case 'RESTORE_GAME_EVENT':
+      return restoreGameEvent(
+        state,
+        action.eventId,
+        action.now ?? new Date().toISOString(),
+        gameEventRegistry,
+        gameEventProjectors
+      ).state
 
     default:
       return state

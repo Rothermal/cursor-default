@@ -62,7 +62,7 @@ flowchart TB
 | [`src/lib/`](../src/lib/) | Pure helpers (scoring, team stats, shot chart, display) | Business logic without UI |
 | [`src/pages/`](../src/pages/) | One screen per route | UI for a feature |
 | [`src/components/`](../src/components/) | Shared UI (Scoreboard, StatButton, shot-chart/, team-stats/) | Reusable widgets |
-| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001–041) | Any DB change |
+| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001–042) | Any DB change |
 | [`docs/`](.) | Design specs and plans | Before building a feature |
 
 **Convention:** Pages orchestrate; heavy logic lives in `lib/` and the `GameContext` reducer.
@@ -125,6 +125,13 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 
 **GameContext** is the runtime heart. Every stat tap updates the reducer, persists to the parked `localStorage` record, and drains through the debounced sync queue into `syncGameSnapshotToCloud`.
 
+`GameState.eventStream` is `null` for legacy aggregate-only games and a versioned raw stream
+for event-authoritative games. SOC-1 infrastructure lives in `src/lib/gameEvents/`: the
+generic engine validates, migrates, quarantines, and orders events, then one projector per
+sport rebuilds aggregate state. The production registry is intentionally empty until SOC-2.
+The `game_events` repository is isolated and is **not** part of the automatic cloud queue
+until SOC-5; do not mark event streams cloud-synced through aggregate snapshot sync.
+
 ### localStorage keys
 
 Defined in [`src/lib/gameStorageKeys.ts`](../src/lib/gameStorageKeys.ts):
@@ -183,6 +190,7 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 | **Resolved stats** | Post-game truth via RPCs after checkout + admin corrections |
 | **Team pseudo-players** | `__team_home__` / `__team_opp__` in [`teamPlayers.ts`](../src/lib/teamPlayers.ts) for fouls, timeouts, etc. |
 | **Shot chart** | `ShotRecord[]` in game state + `shot_chart` table (migration 032) |
+| **Event stream** | Versioned raw `GameEventStream`; authoritative only when non-null, with derived projection health |
 | **Team placeholders** | Cloud `players.is_team_placeholder` rows backing team-level stats |
 
 ---
@@ -191,7 +199,7 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 
 | Item | Detail |
 |------|--------|
-| Migrations | 41 files (`001`–`041`) in [`supabase/migrations/`](../supabase/migrations/) |
+| Migrations | 42 files (`001`–`042`) in [`supabase/migrations/`](../supabase/migrations/) |
 | Tables | 20 core tables (profiles, account_access, access_audit_events, teams, players, games, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
 | Auth | Email/password + Google OAuth (PKCE), account profile/identities, app access status; team RLS scoped via `team_members` roles (owner / admin / scorer / viewer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
@@ -287,6 +295,7 @@ When shipping a feature, plans typically call for updating this overview (if arc
 | Game Summary / finalize | [`GameSummary.tsx`](../src/pages/GameSummary.tsx) + `get_game_stats_resolved` |
 | Team stats (basketball) | [`completed/DESIGN_TEAM_STATS_TRACKING.md`](completed/DESIGN_TEAM_STATS_TRACKING.md) |
 | Shot chart | [`completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md`](completed/DESIGN_SHOT_CHART_IMPLEMENTATION.md) |
+| Shared sport events | [`PLAN_SOC_1_SHARED_EVENT_FOUNDATION.md`](PLAN_SOC_1_SHARED_EVENT_FOUNDATION.md) + `src/lib/gameEvents/` |
 | Team Info hub | [`completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md`](completed/PLAN_TEAM_INFO_DRILLDOWN_IMPLEMENTATION.md) |
 | DB schema change | New numbered migration in `supabase/migrations/`; update README migration list |
 | Assigned a `PLAN_F*` task | Read that plan end-to-end first — it lists exact files and dependencies |

@@ -66,6 +66,7 @@ function state(over: Partial<GameState> = {}): GameState {
     teamStatsConfig: null,
     shotChart: [],
     ...over,
+    eventStream: over.eventStream === undefined ? null : over.eventStream,
   }
 }
 

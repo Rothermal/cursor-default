@@ -22,8 +22,8 @@ foundation. NAV-1, NAV-2, AUTH-1, and AUTH-2 addressed the original foundation g
 - Soccer is the next sport direction, and the app needs a navigation/settings model that
   does not hard-code basketball assumptions into global workflows.
 
-The foundation work is complete. The next work is the SOC-1 through SOC-6 program built on
-that structure.
+The app foundation and SOC-1 shared event foundation are complete. The next work is the
+SOC-2 through SOC-6 soccer program built on that structure.
 
 ---
 
@@ -248,7 +248,7 @@ SOC-0 replaces the dormant soccer stat-grid assumptions with an event-first mode
 
 | Phase | Purpose |
 |---|---|
-| SOC-1 | Shared game-event foundation, local persistence, derivation engine, and cloud schema |
+| SOC-1 | Complete: shared game-event foundation, local persistence, derivation engine, and cloud schema |
 | SOC-2 | Soccer rules, tracked-team side, lineup roles, clock, periods, direction, substitutions, and minutes |
 | SOC-3 | Full field, attacking events, chance creation, goalkeeper links, score events, and timeline editing |
 | SOC-4 | Defense, discipline/staff cards, corners, offsides, shootouts, and structured outcomes |
@@ -268,7 +268,7 @@ Each phase receives its own execution plan and one-question-at-a-time Q&A before
 | **AUTH-1** | Google sign-in/sign-up | Must precede AUTH-2; can follow navigation because auth entry does not depend on soccer. |
 | **AUTH-2** | Account management | Implemented; uses the Account destination created by NAV-2 for profile editing, connected methods, and Google linking. |
 | **SOC-0** | Soccer product/technical plan | Complete; defines event-first product model and six-phase implementation roadmap. |
-| **SOC-1** | Shared event foundation | First soccer implementation phase; detailed planning required before code. |
+| **SOC-1** | Shared event foundation | Complete; versioned streams, deterministic projection, and isolated recorder-owned cloud storage. |
 | **SOC-2** | Match rules, lineups, and clock | Build soccer match state on the shared event foundation. |
 | **SOC-3** | Field and attacking events | Deliver the soccer-native field and linked attacking workflow. |
 | **SOC-4** | Remaining core events | Add defense, discipline, team events, shootouts, and outcomes. |

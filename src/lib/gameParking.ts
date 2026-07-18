@@ -10,6 +10,7 @@ import {
   GAMES_MANIFEST_KEY,
   PENDING_SYNC_KEY,
 } from './gameStorageKeys'
+import { normalizeGameEventStream } from './gameEvents/stream'
 
 const MANIFEST_VERSION = 1
 const EXPORT_VERSION = 1
@@ -213,20 +214,26 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as ParkedGameRecord
     if (!parsed || parsed.localGameId !== localGameId || !parsed.gameState) return null
-    const sync = normalizeSyncState(parsed.sync, null, parsed.gameState)
+    const gameState = normalizePersistedGameState(parsed.gameState)
+    const sync = normalizeSyncState(parsed.sync, null, gameState)
     const updatedAt =
       typeof parsed.updatedAt === 'string'
         ? parsed.updatedAt
         : parsed.summary?.updatedAt ?? nowIso()
     return {
       ...parsed,
+      gameState,
       updatedAt,
-      summary: buildSummary(localGameId, parsed.gameState, updatedAt, sync),
+      summary: buildSummary(localGameId, gameState, updatedAt, sync),
       sync,
     }
   } catch {
     return null
   }
+}
+
+function normalizePersistedGameState(state: GameState): GameState {
+  return { ...state, eventStream: normalizeGameEventStream(state.eventStream) }
 }
 
 function hasSyncablePayload(state: GameState): boolean {
@@ -311,6 +318,7 @@ function hasPersistableGameState(state: GameState): boolean {
       state.players.length > 0 ||
       state.actionLog.length > 0 ||
       state.shotChart.length > 0 ||
+      state.eventStream !== null ||
       state.cloudSync.gameId
   )
 }
@@ -374,7 +382,7 @@ export function migrateLegacyGameStorage(ownerId: string | null): ParkedGamesMan
 
   let localGameId: string | null = null
   try {
-    const gameState = JSON.parse(legacyRaw) as GameState
+    const gameState = normalizePersistedGameState(JSON.parse(legacyRaw) as GameState)
     if (!hasPersistableGameState(gameState)) {
       removeLegacyMirror()
       return emptyManifest(ownerId)
@@ -770,6 +778,13 @@ function isImportableGameState(value: unknown): value is GameState {
     Array.isArray(value.players) &&
     Array.isArray(value.actionLog) &&
     Array.isArray(value.shotChart) &&
+    (value.eventStream === undefined ||
+      value.eventStream === null ||
+      (isPlainObject(value.eventStream) &&
+        typeof value.eventStream.version === 'number' &&
+        Number.isInteger(value.eventStream.version) &&
+        value.eventStream.version >= 1 &&
+        Array.isArray(value.eventStream.events))) &&
     isPlainObject(cloudSync)
   )
 }
@@ -812,15 +827,16 @@ export function importParkedGames(raw: string, ownerId: string | null): ImportPa
       }
 
       const updatedAt = typeof incoming.updatedAt === 'string' ? incoming.updatedAt : nowIso()
-      const sync = normalizeSyncState(incoming.sync, null, incoming.gameState)
+      const gameState = normalizePersistedGameState(incoming.gameState)
+      const sync = normalizeSyncState(incoming.sync, null, gameState)
       const record: ParkedGameRecord = {
         localGameId,
         ownerId,
         createdAt: typeof incoming.createdAt === 'string' ? incoming.createdAt : updatedAt,
         updatedAt,
-        gameState: incoming.gameState,
+        gameState,
         sync,
-        summary: buildSummary(localGameId, incoming.gameState, updatedAt, sync),
+        summary: buildSummary(localGameId, gameState, updatedAt, sync),
       }
       safeSetItem(gameRecordKey(record.localGameId), JSON.stringify(record))
       writtenLocalGameIds.push(record.localGameId)
