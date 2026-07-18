@@ -15,7 +15,9 @@ export function createSoccerMatchProjection(setup: SoccerMatchSetup): SoccerMatc
     status: 'not_started',
     openingLineupRecorded: false,
     currentPeriodId: null,
+    startedPeriodIds: [],
     completedPeriodIds: [],
+    periodEndElapsedMsById: {},
     clock: { running: false, elapsedMs: 0, anchorOccurredAt: null },
     participants: Object.fromEntries(
       setup.participants.map(participant => [participant.id, projectedParticipant(participant)])

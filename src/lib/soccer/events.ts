@@ -117,9 +117,19 @@ export const soccerEventDefinitions: GameEventDefinition<GameEvent>[] = [
   matchStateDefinition('soccer.participant_resolved', validateParticipantResolved),
   matchStateDefinition('soccer.match_ended', validateMatchEnded),
   matchStateDefinition('soccer.match_reopened', validateMatchReopened),
-  attackingDefinition('soccer.shot', validateShot, ['shooter', 'creator_primary', 'creator_secondary', 'goalkeeper', 'blocker']),
-  attackingDefinition('soccer.own_goal', validateOwnGoal, ['own_goal_by', 'goalkeeper']),
-  attackingDefinition('soccer.score_adjustment', validateScoreAdjustment, []),
+  attackingDefinition(
+    'soccer.shot',
+    validateShot,
+    ['shooter', 'creator_primary', 'creator_secondary', 'goalkeeper', 'blocker'],
+    ['shooter']
+  ),
+  attackingDefinition(
+    'soccer.own_goal',
+    validateOwnGoal,
+    ['own_goal_by', 'goalkeeper'],
+    ['own_goal_by']
+  ),
+  attackingDefinition('soccer.score_adjustment', validateScoreAdjustment, [], []),
 ]
 
 function matchStateDefinition(
@@ -150,7 +160,8 @@ function matchStateDefinition(
 function attackingDefinition(
   eventType: 'soccer.shot' | 'soccer.own_goal' | 'soccer.score_adjustment',
   validatePayload: (payload: JsonObject) => boolean,
-  allowedRoles: string[]
+  allowedRoles: string[],
+  requiredRoles: string[]
 ): GameEventDefinition<GameEvent> {
   return {
     sportId: 'soccer',
@@ -159,6 +170,7 @@ function attackingDefinition(
     validate: event => {
       const roles = event.actors.map(actor => actor.role)
       const validActors = roles.every(role => allowedRoles.includes(role)) &&
+        requiredRoles.every(role => roles.includes(role)) &&
         new Set(roles).size === roles.length
       const locationIsAllowed = eventType !== 'soccer.score_adjustment'
         ? true

@@ -139,7 +139,9 @@ export interface SoccerMatchProjection {
   status: SoccerMatchStatus
   openingLineupRecorded: boolean
   currentPeriodId: string | null
+  startedPeriodIds: string[]
   completedPeriodIds: string[]
+  periodEndElapsedMsById: Record<string, number>
   clock: SoccerProjectedClock
   participants: Record<string, SoccerProjectedParticipant>
   participantStats: Record<string, SoccerParticipantStatTotals>

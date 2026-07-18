@@ -188,6 +188,7 @@ function applyPeriodStarted(
   if (!nextSegment || nextSegment.id !== periodId) return 'The requested period is not the next available segment.'
 
   projection.currentPeriodId = periodId
+  if (!projection.startedPeriodIds.includes(periodId)) projection.startedPeriodIds.push(periodId)
   projection.status = 'in_progress'
   projection.attackingDirection = directionForSegment(projection, nextSegment.id)
   projection.endedAt = null
@@ -207,6 +208,7 @@ function applyPeriodEnded(
     return 'Only the active period can be ended.'
   }
   closeOnFieldIntervals(projection, periodId, projection.clock.elapsedMs)
+  projection.periodEndElapsedMsById[periodId] = projection.clock.elapsedMs
   projection.completedPeriodIds.push(periodId)
   projection.currentPeriodId = null
   projection.status = 'period_break'
@@ -704,8 +706,7 @@ function validateAttackingMoment(
   const segment = orderedSoccerSegments(projection.currentRules)
     .find(item => item.id === event.period.id)
   if (!segment || segment.order !== event.period.order) return 'Attacking event period is invalid.'
-  const eligible = projection.currentPeriodId === event.period.id ||
-    projection.completedPeriodIds.includes(event.period.id)
+  const eligible = projection.startedPeriodIds.includes(event.period.id)
   if (!eligible) return 'Attacking event period has not started.'
 
   if (projection.currentPeriodId === event.period.id) {
@@ -717,12 +718,9 @@ function validateAttackingMoment(
       : projection.clock.elapsedMs
     if (event.elapsedMs > maximumElapsed) return 'Attacking event time is ahead of the live clock.'
   } else {
-    const periodEnd = Object.values(projection.participants)
-      .flatMap(participant => participant.onFieldIntervals)
-      .filter(interval => interval.periodId === event.period.id && interval.endElapsedMs !== null)
-      .reduce((latest, interval) => Math.max(latest, interval.endElapsedMs ?? latest), -1)
-    if (periodEnd < 0 || event.elapsedMs > periodEnd) {
-      return 'Attacking event time is outside the completed period.'
+    const periodEnd = projection.periodEndElapsedMsById[event.period.id]
+    if (periodEnd === undefined || event.elapsedMs > periodEnd) {
+      return 'Attacking event time is outside the recorded period bounds.'
     }
   }
   return null
@@ -836,6 +834,7 @@ function applyMatchEnded(
   }
   if (projection.currentPeriodId) {
     closeOnFieldIntervals(projection, projection.currentPeriodId, projection.clock.elapsedMs)
+    projection.periodEndElapsedMsById[projection.currentPeriodId] = projection.clock.elapsedMs
   }
   projection.status = 'ended'
   projection.currentPeriodId = null

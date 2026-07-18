@@ -125,7 +125,8 @@ explicit fallback when no individual should receive credit.
 
 The opponent does not gain a full roster in SOC-3. Opponent actors use event-local unknown or
 labeled identities. Recent labels may improve capture speed but do not become durable roster
-records or receive tracked-player aggregates.
+records or receive tracked-player aggregates. Opponent creator labels are allowed as symmetric
+event context, but they do not project tracked-player assist or chance totals.
 
 Creator rules are:
 
@@ -219,7 +220,9 @@ and ended matches are review-only on the field.
 Timeline Add missed event selects an eligible period and `MM:SS` time and uses the same semantic
 validation as live capture. Historical attacking events do not rewind or advance the live clock.
 Lineup participation is evaluated against reconstructed period/time intervals, so a late-added
-event can be valid even when its capture sequence follows match end.
+event can be valid even when its capture sequence follows match end. The projection records every
+started period and its latest end elapsed time explicitly, including a period closed by suspension
+or abandonment, rather than inferring historical eligibility from participant intervals.
 
 ---
 
