@@ -597,9 +597,12 @@ export default function GameSummary() {
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <button
+              type="button"
               onClick={() => navigate(isFinalCloudGame ? '/games' : '/game')}
+              disabled={finalizing}
+              aria-label={isFinalCloudGame ? 'Back to Cloud Games' : 'Back to Game'}
               className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
-                         active:scale-90 transition-transform"
+                         active:scale-90 transition-transform disabled:opacity-50 disabled:pointer-events-none"
             >
               ←
             </button>

@@ -7,6 +7,7 @@ import {
   shouldBlockDiscardUnsyncedGame,
   shouldBlockManualCloudHydrate,
   shouldDeferCloudResumeHydration,
+  shouldPreserveLocalAfterFinalizeSuccess,
   shouldRejectSkippedFinalSync,
   shouldSkipAutoHydrateForDifferentCloudGame,
   withLastSyncedGameFingerprint,
@@ -197,6 +198,28 @@ describe('gameSyncFingerprint', () => {
     })
     expect(shouldBlockDiscardUnsyncedGame(dirty, false)).toBe(true)
     expect(shouldBlockDiscardUnsyncedGame(clean, true)).toBe(true)
+  })
+
+  it('shouldPreserveLocalAfterFinalizeSuccess keeps fingerprint-ahead locals after cloud final', () => {
+    const syncedFp = buildGameSyncFingerprint(baseState())
+    const clean = baseState({
+      cloudSync: {
+        ...baseState().cloudSync,
+        gameStatus: 'final',
+        lastSyncedGameFingerprint: syncedFp,
+      },
+    })
+    expect(shouldPreserveLocalAfterFinalizeSuccess(clean, false)).toBe(false)
+
+    const midFinalEdit = baseState({
+      players: [{ id: 'p1', name: 'One', number: '1', stats: { pts: 11 } }],
+      cloudSync: {
+        ...baseState().cloudSync,
+        gameStatus: 'final',
+        lastSyncedGameFingerprint: syncedFp,
+      },
+    })
+    expect(shouldPreserveLocalAfterFinalizeSuccess(midFinalEdit, false)).toBe(true)
   })
 
   it('shouldSkipAutoHydrateForDifferentCloudGame when local is bound to another game', () => {
