@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
@@ -18,7 +18,8 @@ import type { GameEvent, GameEventInspection } from '../../lib/gameEvents/types'
 interface SoccerMatchHistoryProps {
   state: GameState
   inspection: GameEventInspection
-  onApply: (result: SoccerLiveResult) => void
+  busy: boolean
+  onApply: (result: SoccerLiveResult) => boolean
 }
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
@@ -29,14 +30,14 @@ const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
   { value: 'custom', label: 'Custom' },
 ]
 
-export default function SoccerMatchHistory({ state, inspection, onApply }: SoccerMatchHistoryProps) {
+export default function SoccerMatchHistory({ state, inspection, busy, onApply }: SoccerMatchHistoryProps) {
   const [editing, setEditing] = useState<SoccerMatchEvent | null>(null)
   const [deleting, setDeleting] = useState<GameEvent | null>(null)
   const active = [...inspection.activeEvents].reverse()
   const deleted = [...inspection.deletedEvents].reverse()
 
   return (
-    <div className="space-y-5">
+    <div className={busy ? 'space-y-5 pointer-events-none opacity-60' : 'space-y-5'} aria-busy={busy}>
       {!inspection.complete && (
         <section className="border border-red-200 bg-red-50 rounded-md px-3 py-3 space-y-2">
           <h2 className="text-sm font-bold text-red-800">Match history needs correction</h2>
@@ -91,8 +92,7 @@ export default function SoccerMatchHistory({ state, inspection, onApply }: Socce
           state={state}
           onClose={() => setEditing(null)}
           onSave={result => {
-            onApply(result)
-            if (result.ok) setEditing(null)
+            if (result.ok && onApply(result)) setEditing(null)
           }}
         />
       )}
@@ -188,7 +188,7 @@ function SoccerEventCorrectionDialog({ event, state, onSave, onClose }: {
 
 function renderEventEditor(
   event: SoccerMatchEvent,
-  setEvent: React.Dispatch<React.SetStateAction<SoccerMatchEvent>>,
+  setEvent: Dispatch<SetStateAction<SoccerMatchEvent>>,
   setPayload: (payload: SoccerMatchEvent['payload']) => void,
   participants: Array<{ participantId: string; displayName: string; number: string | null; role: SoccerRole }>,
   segments: Array<{ id: string; label: string; order: number }>,

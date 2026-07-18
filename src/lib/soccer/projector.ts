@@ -81,6 +81,10 @@ function applySoccerEvent(
   event: SoccerMatchEvent,
   gameState: GameState
 ): string | null {
+  if (projection.clock.running && event.eventType === 'soccer.clock_adjusted') {
+    const error = advanceRunningClock(projection, event.payload.fromElapsedMs, event.occurredAt)
+    if (error) return error
+  }
   if (projection.clock.running && event.elapsedMs !== null && ![
     'soccer.clock_paused',
     'soccer.clock_adjusted',

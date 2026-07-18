@@ -22,6 +22,7 @@ import type {
   SoccerAttackingDirection,
   SoccerMatchEndedPayload,
   SoccerMatchParticipant,
+  SoccerMatchProjection,
   SoccerMatchRules,
   SoccerRole,
   SoccerSubstitutionChange,
@@ -143,30 +144,11 @@ export function adjustSoccerClock(
   if (!Number.isInteger(toElapsedMs) || toElapsedMs < 0) {
     return failure(state, 'Corrected match time must be zero or greater.')
   }
-  if (!context.projection.clock.running) {
-    return appendSpecs(state, options, [{
-      eventType: 'soccer.clock_adjusted',
-      payload: { fromElapsedMs: context.projection.clock.elapsedMs, toElapsedMs },
-      elapsedMs: toElapsedMs,
-    }])
-  }
-  return appendSpecs(state, options, [
-    {
-      eventType: 'soccer.clock_paused',
-      payload: { elapsedMs: context.elapsedMs },
-      elapsedMs: context.elapsedMs,
-    },
-    {
-      eventType: 'soccer.clock_adjusted',
-      payload: { fromElapsedMs: context.elapsedMs, toElapsedMs },
-      elapsedMs: toElapsedMs,
-    },
-    {
-      eventType: 'soccer.clock_started',
-      payload: { anchorElapsedMs: toElapsedMs },
-      elapsedMs: toElapsedMs,
-    },
-  ])
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.clock_adjusted',
+    payload: { fromElapsedMs: context.elapsedMs, toElapsedMs },
+    elapsedMs: toElapsedMs,
+  }])
 }
 
 export function recordSoccerSubstitution(
@@ -356,6 +338,16 @@ export function restoreSoccerHistoryEvent(
 
 export function inspectSoccerHistory(state: GameState): GameEventInspection {
   return rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors).inspection
+}
+
+export function isSoccerHalftimeBreak(projection: SoccerMatchProjection): boolean {
+  const firstRegulationId = projection.currentRules.regulationSegments[0]?.id
+  return Boolean(
+    firstRegulationId &&
+    projection.status === 'period_break' &&
+    projection.completedPeriodIds.length === 1 &&
+    projection.completedPeriodIds[0] === firstRegulationId
+  )
 }
 
 export function soccerClockDisplayValue(

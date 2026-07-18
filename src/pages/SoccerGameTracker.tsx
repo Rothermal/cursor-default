@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   ChevronLeft,
   Compass,
@@ -60,6 +60,8 @@ export default function SoccerGameTracker() {
   const [dialogParticipantId, setDialogParticipantId] = useState<string | null>(null)
   const [confirmEndPeriod, setConfirmEndPeriod] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isApplying, setIsApplying] = useState(false)
+  const applyingRef = useRef(false)
 
   const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
   useEffect(() => {
@@ -71,6 +73,11 @@ export default function SoccerGameTracker() {
     const timer = window.setInterval(() => setNowMs(Date.now()), 250)
     return () => window.clearInterval(timer)
   }, [projection?.clock.running])
+
+  useEffect(() => {
+    applyingRef.current = false
+    setIsApplying(false)
+  }, [state])
 
   const inspection = useMemo(() => inspectSoccerHistory(state), [state])
   const clockValue = soccerClockDisplayValue(state, nowMs)
@@ -90,17 +97,21 @@ export default function SoccerGameTracker() {
   const bench = participants.filter(participant => participant.status !== 'on_field')
   const visibleParticipants = lineupTab === 'on_field' ? onField : bench
 
-  const applyResult = (result: SoccerLiveResult) => {
+  const applyResult = (result: SoccerLiveResult): boolean => {
+    if (applyingRef.current) return false
     if (!result.ok) {
       setError(result.message)
-      return
+      return false
     }
+    applyingRef.current = true
+    setIsApplying(true)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
     setError(null)
     setDialogKind(null)
     setDialogParticipantId(null)
     setActionsOpen(false)
     if (!result.inspection.complete) setMainTab('history')
+    return true
   }
 
   const openDialog = (kind: SoccerLiveDialogKind, participantId: string | null = null) => {
@@ -114,7 +125,8 @@ export default function SoccerGameTracker() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-8">
+    <div className="min-h-screen bg-slate-50 pb-8" aria-busy={isApplying}>
+      {isApplying && <div className="fixed inset-0 z-[70] cursor-wait" aria-hidden="true" />}
       <header className="bg-emerald-800 text-white px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button type="button" onClick={() => navigate(sportDashboardPath('soccer'))} className="h-9 w-9 grid place-items-center rounded-md bg-white/15" aria-label="Back to soccer dashboard" title="Back">
@@ -127,7 +139,7 @@ export default function SoccerGameTracker() {
             </p>
           </div>
           {!ended && (
-            <button type="button" onClick={() => setActionsOpen(true)} disabled={!healthy} className="h-9 w-9 grid place-items-center rounded-md bg-white/15 disabled:opacity-40" aria-label="Match actions" title="Match actions">
+            <button type="button" onClick={() => setActionsOpen(true)} disabled={!healthy || isApplying} className="h-9 w-9 grid place-items-center rounded-md bg-white/15 disabled:opacity-40" aria-label="Match actions" title="Match actions">
               <MoreHorizontal size={21} />
             </button>
           )}
@@ -222,7 +234,7 @@ export default function SoccerGameTracker() {
               {visibleParticipants.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No participants in this view.</p>}
             </>
           ) : (
-            <SoccerMatchHistory state={state} inspection={inspection} onApply={applyResult} />
+            <SoccerMatchHistory state={state} inspection={inspection} busy={isApplying} onApply={applyResult} />
           )}
         </div>
       </main>
@@ -244,6 +256,7 @@ export default function SoccerGameTracker() {
         state={state}
         recorderUserId={user?.id ?? null}
         initialParticipantId={dialogParticipantId}
+        busy={isApplying}
         onApply={applyResult}
         onClose={() => {
           setDialogKind(null)
@@ -292,7 +305,7 @@ function ParticipantRow({ participant, projection, nowMs, disabled, canResolve, 
       {!disabled && (
         <div className="flex gap-1">
           {canResolve && <button type="button" onClick={onResolve} className="h-9 px-2 text-xs font-bold text-blue-600" title="Resolve participant">Resolve</button>}
-          <button type="button" onClick={onRole} className="h-9 px-2 text-xs font-bold text-slate-600">Role</button>
+          {participant.status !== 'left' && <button type="button" onClick={onRole} className="h-9 px-2 text-xs font-bold text-slate-600">Role</button>}
         </div>
       )}
     </div>

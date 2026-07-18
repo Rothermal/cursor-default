@@ -7,6 +7,7 @@ import {
   endSoccerMatch,
   endSoccerPeriod,
   inspectSoccerHistory,
+  isSoccerHalftimeBreak,
   recordSoccerRoleChange,
   recordSoccerSubstitution,
   reopenSoccerMatch,
@@ -16,7 +17,7 @@ import {
   updateSoccerHistoryEvent,
 } from './live'
 import { resolveSoccerMatchRules } from './rules'
-import { createSoccerSportGameState } from './state'
+import { createSoccerSportGameState, participantActiveMs } from './state'
 import type { SoccerMatchSetup } from './types'
 
 const soccer: SportConfig = {
@@ -117,6 +118,9 @@ describe('soccer live match actions', () => {
       completedPeriodIds: ['regulation-1'],
       clock: { running: false, elapsedMs: 60_000 },
     })
+    const halftimeProjection = ended.state.sportGameState?.projection
+    if (!halftimeProjection) throw new Error('soccer projection missing')
+    expect(isSoccerHalftimeBreak(halftimeProjection)).toBe(true)
 
     const started = startNextSoccerPeriod(ended.state, {
       recorderUserId,
@@ -132,6 +136,17 @@ describe('soccer live match actions', () => {
       attackingDirection: 'right_to_left',
       clock: { running: true, elapsedMs: 60_000 },
     })
+
+    const secondBreak = endSoccerPeriod(started.state, {
+      recorderUserId,
+      nowMs: kickoffAt + 125_000,
+      eventIds: [uuid(8), uuid(9)],
+    })
+    expect(secondBreak.ok).toBe(true)
+    if (!secondBreak.ok) return
+    const secondBreakProjection = secondBreak.state.sportGameState?.projection
+    if (!secondBreakProjection) throw new Error('soccer projection missing')
+    expect(isSoccerHalftimeBreak(secondBreakProjection)).toBe(false)
   })
 
   it('records a running-clock substitution at derived canonical time', () => {
@@ -176,7 +191,7 @@ describe('soccer live match actions', () => {
     const adjusted = adjustSoccerClock(
       kickedOffState(),
       45_000,
-      { recorderUserId, nowMs: kickoffAt + 60_000, eventIds: [uuid(4), uuid(5), uuid(6)] }
+      { recorderUserId, nowMs: kickoffAt + 60_000, eventIds: [uuid(4)] }
     )
     expect(adjusted.ok).toBe(true)
     if (!adjusted.ok) return
@@ -186,6 +201,11 @@ describe('soccer live match actions', () => {
       canonicalElapsedMs: 55_000,
       periodElapsedMs: 55_000,
     })
+    expect(adjusted.state.eventStream?.events).toHaveLength(4)
+    const projection = adjusted.state.sportGameState?.projection
+    const keeper = projection?.participants['match-keeper']
+    if (!projection || !keeper) throw new Error('projected goalkeeper missing')
+    expect(participantActiveMs(keeper, projection, kickoffAt + 70_000)).toBe(55_000)
   })
 
   it('ends an in-progress match with an atomic pause and explicitly reopens it', () => {

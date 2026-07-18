@@ -6,6 +6,7 @@ import {
   adjustSoccerClock,
   createSoccerUuid,
   endSoccerMatch,
+  isSoccerHalftimeBreak,
   recordSoccerRoleChanges,
   recordSoccerRulesChange,
   recordSoccerSubstitution,
@@ -32,7 +33,8 @@ interface SoccerLiveActionDialogProps {
   state: GameState
   recorderUserId: string | null
   initialParticipantId?: string | null
-  onApply: (result: SoccerLiveResult) => void
+  busy: boolean
+  onApply: (result: SoccerLiveResult) => boolean
   onClose: () => void
 }
 
@@ -62,6 +64,7 @@ export default function SoccerLiveActionDialog({
   state,
   recorderUserId,
   initialParticipantId = null,
+  busy,
   onApply,
   onClose,
 }: SoccerLiveActionDialogProps) {
@@ -88,6 +91,7 @@ export default function SoccerLiveActionDialog({
 
   return (
     <Dialog title={titles[kind]} onClose={onClose}>
+      <fieldset disabled={busy} className={busy ? 'contents opacity-60' : 'contents'}>
       {kind === 'substitution' && (
         <SubstitutionForm state={state} options={options} onApply={apply} />
       )}
@@ -120,6 +124,7 @@ export default function SoccerLiveActionDialog({
         <EndMatchForm state={state} options={options} onApply={apply} />
       )}
       <FormError message={mutationError} />
+      </fieldset>
     </Dialog>
   )
 }
@@ -130,7 +135,7 @@ function SubstitutionForm({ state, options, onApply }: FormProps) {
   const available = Object.values(projection.participants).filter(item =>
     item.status !== 'on_field' && (!item.hasExited || projection.currentRules.allowReturnSubstitutions)
   )
-  const [halftime, setHalftime] = useState(projection.status === 'period_break')
+  const [halftime, setHalftime] = useState(isSoccerHalftimeBreak(projection))
   const [drafts, setDrafts] = useState<SubstitutionDraft[]>([
     substitutionDraft(onField[0]?.participantId ?? '', available[0]),
   ])
@@ -298,6 +303,11 @@ function ClockCorrectionForm({ state, options, onApply }: FormProps) {
         Corrected match time
         <input value={value} onChange={event => setValue(event.target.value)} inputMode="numeric" placeholder="MM:SS" className="input-field mt-1 text-center text-xl tabular-nums" />
       </label>
+      {projection.currentRules.clockDisplay === 'per_period' && (
+        <p className="text-xs text-slate-500">
+          Enter cumulative match time. The tracker currently displays {displayValue?.primary ?? '00:00'} for this period.
+        </p>
+      )}
       <FormError message={error} />
       <SubmitButton label="Apply Correction" onClick={submit} />
     </div>
