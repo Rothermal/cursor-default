@@ -4,10 +4,13 @@
 > visible numbering is no longer needed as a standalone feature; the useful version is a
 > tappable shot detail surface with durable shot number and linked F7/F9 metadata.
 >
-> Status: held pending further user feedback.
+> Status: held as a standalone feature. Product intent is assigned to the future basketball
+> event-model program; see
+> [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md).
 >
-> **Hold note:** Do not start implementation until further live-use/user feedback confirms
-> that shot detail/editing is worth prioritizing over smaller court-capture refinements.
+> **Hold note:** Do not start this plan independently. Reconcile its shot detail, linked
+> metadata, and correction requirements during BKE-0, then deliver the event-backed detail
+> surface in BKE-3 if that phase plan confirms the scope.
 
 ## Goal
 

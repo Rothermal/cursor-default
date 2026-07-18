@@ -258,11 +258,13 @@ flowchart LR
 | [`DESIGN_SHOT_TRACKER_UI_REVAMP.md`](DESIGN_SHOT_TRACKER_UI_REVAMP.md) | Court-capture program status (F1–F13) |
 | [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Court-capture roadmap; F10 superseded by F13 |
 | [`PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md) | Held draft: shot detail, linked metadata, and editing |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required post-SOC event migration; BKE-0 planning starts after the shared contract stabilizes |
 
 **Court program status:** F1-F9 and F12 are implemented; manual Supabase-heavy QA remains in
 [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). F10 standalone marker numbering is no
-longer needed and is superseded by F13. F11 and F13 are held pending further user feedback —
-do not start them without explicit go-ahead.
+longer needed and is superseded by F13. F11 remains held pending further user feedback.
+F13 product intent is assigned to the future BKE event timeline/detail phase; do not start a
+standalone F13 implementation without reconciling the basketball event roadmap.
 
 ### Verification norms
 

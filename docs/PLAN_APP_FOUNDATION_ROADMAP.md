@@ -242,7 +242,8 @@ SOC-0 replaces the dormant soccer stat-grid assumptions with an event-first mode
 - Configurable match rules, clock, lineup, periods, direction, and substitutions.
 - A full soccer field plus quick-event controls and an editable timeline.
 - A complete stat catalog divided into core, derived, and optional future modules.
-- A required future basketball event-model redesign that does not block soccer.
+- A required future basketball event-model redesign that does not block soccer
+  ([roadmap](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)).
 
 ### SOC-1 through SOC-6: Soccer implementation program
 

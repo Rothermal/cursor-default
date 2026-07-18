@@ -565,6 +565,9 @@ docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md
 
 This follow-up is required but does not block soccer.
 
+Detailed roadmap:
+[PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md).
+
 Basketball currently distributes event meaning across:
 
 - mutable player/team stat counters,
@@ -573,8 +576,8 @@ Basketball currently distributes event meaning across:
 - separate linked assist/rebound increments,
 - planned F13 shot detail/edit behavior.
 
-After the soccer event foundation is proven, create a separate basketball planning program
-to evaluate migration onto `GameEvent`:
+After the soccer event foundation is proven, follow the dedicated basketball program to
+evaluate migration onto `GameEvent`:
 
 - keep all historical aggregate-only games readable,
 - dual-write or project aggregates during a controlled transition,

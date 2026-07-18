@@ -279,6 +279,8 @@ docs/
 ├── DESIGN_SHOT_TRACKER_UI_REVAMP.md # Court-capture program status (F1–F13)
 ├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11/F13 held
 ├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
+├── PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md # Soccer product model and SOC-1 through SOC-6 roadmap
+├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
 ├── PLAN_ADMIN_SECURITY_ROADMAP.md # Admin/security/access roadmap
@@ -378,6 +380,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 ### What's Next
 
 - [ ] **Soccer implementation (SOC-1 through SOC-6)** — shared event foundation; match rules, lineups, and clock; soccer field and attacking events; defense/discipline/team events; cloud sync; summaries and release ([plan](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
 - [ ] **Stat view follow-ups** — the major career/season/team/tournament stat views are shipped; use [DESIGN_STAT_TRACKING_UI.md](docs/DESIGN_STAT_TRACKING_UI.md) and [completed/STAT_TRACKING_UI_PROGRESS.md](docs/completed/STAT_TRACKING_UI_PROGRESS.md) as references for smaller refinements
@@ -388,7 +391,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### Held / waiting for feedback
 
-- **Court capture F11 / F13** — F10 visible numbering is superseded by F13; F11 quick buttons and F13 shot detail/editing are held pending further user feedback ([roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md))
+- **Court capture F11 / F13** — F10 visible numbering is superseded by F13; F11 remains held, while F13 product intent is now assigned to the future basketball event migration ([court roadmap](docs/PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md), [F13 plan](docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md), [basketball event roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 
 ### Shipped history (formerly Future Enhancements)
 
