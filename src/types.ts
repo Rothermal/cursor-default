@@ -3,7 +3,7 @@ import type {
   GameEventEditableFields,
   GameEventStream,
 } from './lib/gameEvents/types'
-import type { SportGameState } from './lib/soccer/types'
+import type { SoccerCapturePreferences, SportGameState } from './lib/soccer/types'
 
 export type ShotZone = 'restricted' | 'paint' | 'mid_range' | 'three'
 
@@ -230,6 +230,7 @@ export type GameAction =
   | { type: 'ADD_GAME_EVENT'; event: GameEvent }
   | { type: 'ADD_GAME_EVENTS'; events: GameEvent[] }
   | { type: 'SET_SPORT_GAME_STATE'; sportGameState: SportGameState | null }
+  | { type: 'SET_SOCCER_CAPTURE_PREFERENCES'; preferences: Partial<SoccerCapturePreferences> }
   | {
       type: 'UPDATE_GAME_EVENT'
       eventId: string

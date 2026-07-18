@@ -59,7 +59,9 @@ export default function SoccerMatchHistory({ state, inspection, busy, onApply }:
             <HistoryRow
               key={event.id}
               event={event}
-              onEdit={() => setEditing(event as SoccerMatchEvent)}
+              onEdit={isAttackingEventType(event.eventType)
+                ? undefined
+                : () => setEditing(event as SoccerMatchEvent)}
               onDelete={() => setDeleting(event)}
             />
           ))}
@@ -134,7 +136,7 @@ function HistoryRow({ event, deleted = false, onEdit, onDelete, onRestore }: {
           <button type="button" onClick={onRestore} className="h-9 w-9 grid place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event.eventType)}`} title="Restore"><RotateCcw size={17} /></button>
         ) : (
           <>
-            <button type="button" onClick={onEdit} className="h-9 w-9 grid place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event.eventType)}`} title="Correct"><Pencil size={17} /></button>
+            {onEdit && <button type="button" onClick={onEdit} className="h-9 w-9 grid place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event.eventType)}`} title="Correct"><Pencil size={17} /></button>}
             <button type="button" onClick={onDelete} className="h-9 w-9 grid place-items-center text-red-600" aria-label={`Remove ${eventTitle(event.eventType)}`} title="Remove"><Trash2 size={17} /></button>
           </>
         )}
@@ -346,6 +348,9 @@ function eventTitle(type: string): string {
     'soccer.participant_resolved': 'Participant resolved',
     'soccer.match_ended': 'Match ended',
     'soccer.match_reopened': 'Match reopened',
+    'soccer.shot': 'Shot',
+    'soccer.own_goal': 'Own goal',
+    'soccer.score_adjustment': 'Score adjustment',
   } as Record<string, string>)[type] ?? type
 }
 
@@ -362,8 +367,20 @@ function eventDetail(event: GameEvent): string {
     case 'soccer.participant_resolved': return String(payload.displayName ?? 'Roster player')
     case 'soccer.match_ended': return String(payload.reason ?? 'Ended')
     case 'soccer.match_reopened': return String(payload.reason ?? 'Reopened')
+    case 'soccer.shot': {
+      const shooter = event.actors.find(actor => actor.role === 'shooter')
+      return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} · ${String(payload.outcome ?? 'shot').replace('_', ' ')} · ${shooter?.label ?? 'Team'}`
+    }
+    case 'soccer.own_goal': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} benefits`
+    case 'soccer.score_adjustment': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} ${Number(payload.delta) > 0 ? '+' : ''}${String(payload.delta ?? '')}`
     default: return event.period.id
   }
+}
+
+function isAttackingEventType(eventType: string): boolean {
+  return eventType === 'soccer.shot' ||
+    eventType === 'soccer.own_goal' ||
+    eventType === 'soccer.score_adjustment'
 }
 
 function defaultRole(): SoccerRole {

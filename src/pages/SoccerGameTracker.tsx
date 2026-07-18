@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   ChevronLeft,
   Compass,
+  Goal,
   Flag,
   History,
+  Map,
   MoreHorizontal,
   Pause,
   Play,
@@ -18,10 +20,14 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
+import SoccerField from '../components/soccer/SoccerField'
 import SoccerLiveActionDialog, {
   type SoccerLiveDialogKind,
 } from '../components/soccer/SoccerLiveActionDialog'
 import SoccerMatchHistory from '../components/soccer/SoccerMatchHistory'
+import SoccerShotCaptureDialog, {
+  type SoccerCaptureDraft,
+} from '../components/soccer/SoccerShotCaptureDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import {
@@ -41,7 +47,7 @@ import {
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
 
-type MainTab = 'lineup' | 'history'
+type MainTab = 'field' | 'lineup' | 'history'
 type LineupTab = 'on_field' | 'bench'
 
 export default function SoccerGameTracker() {
@@ -53,7 +59,7 @@ export default function SoccerGameTracker() {
     : null
   const projection = soccerState?.projection ?? null
   const [nowMs, setNowMs] = useState(Date.now())
-  const [mainTab, setMainTab] = useState<MainTab>('lineup')
+  const [mainTab, setMainTab] = useState<MainTab>('field')
   const [lineupTab, setLineupTab] = useState<LineupTab>('on_field')
   const [actionsOpen, setActionsOpen] = useState(false)
   const [dialogKind, setDialogKind] = useState<SoccerLiveDialogKind | null>(null)
@@ -61,6 +67,8 @@ export default function SoccerGameTracker() {
   const [confirmEndPeriod, setConfirmEndPeriod] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isApplying, setIsApplying] = useState(false)
+  const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
+  const [fieldFlipped, setFieldFlipped] = useState(false)
   const applyingRef = useRef(false)
 
   const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
@@ -79,6 +87,35 @@ export default function SoccerGameTracker() {
     setIsApplying(false)
   }, [state])
 
+  useEffect(() => {
+    if (!soccerState || !projection) return
+    const preferences = soccerState.capturePreferences
+    const onFieldParticipants = Object.values(projection.participants)
+      .filter(participant => participant.status === 'on_field')
+    if (!preferences.selectionInitialized) {
+      const initial = onFieldParticipants.find(participant => participant.role.group !== 'goalkeeper')
+        ?? onFieldParticipants[0]
+        ?? null
+      dispatch({
+        type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+        preferences: {
+          selectedParticipantId: initial?.participantId ?? null,
+          selectionInitialized: true,
+        },
+      })
+      return
+    }
+    if (
+      preferences.selectedParticipantId &&
+      !onFieldParticipants.some(participant => participant.participantId === preferences.selectedParticipantId)
+    ) {
+      dispatch({
+        type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+        preferences: { selectedParticipantId: null },
+      })
+    }
+  }, [dispatch, projection, soccerState])
+
   const inspection = useMemo(() => inspectSoccerHistory(state), [state])
   const clockValue = soccerClockDisplayValue(state, nowMs)
   const segments = projection ? orderedSoccerSegments(projection.currentRules) : []
@@ -96,6 +133,12 @@ export default function SoccerGameTracker() {
   const onField = participants.filter(participant => participant.status === 'on_field')
   const bench = participants.filter(participant => participant.status !== 'on_field')
   const visibleParticipants = lineupTab === 'on_field' ? onField : bench
+  const capturePreferences = soccerState.capturePreferences
+  const fieldCaptureEnabled = healthy && projection.status === 'in_progress' && !isApplying
+
+  const setCaptureSide = (teamSide: 'tracked' | 'opponent') => {
+    dispatch({ type: 'SET_SOCCER_CAPTURE_PREFERENCES', preferences: { teamSide } })
+  }
 
   const applyResult = (result: SoccerLiveResult): boolean => {
     if (applyingRef.current) return false
@@ -125,10 +168,10 @@ export default function SoccerGameTracker() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-8" aria-busy={isApplying}>
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 pb-8" aria-busy={isApplying}>
       {isApplying && <div className="fixed inset-0 z-[70] cursor-wait" aria-hidden="true" />}
       <header className="bg-emerald-800 text-white px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+        <div className="mx-auto flex w-full min-w-0 max-w-2xl items-center gap-3">
           <button type="button" onClick={() => navigate(sportDashboardPath('soccer'))} className="h-9 w-9 grid place-items-center rounded-md bg-white/15" aria-label="Back to soccer dashboard" title="Back">
             <ChevronLeft size={20} />
           </button>
@@ -146,20 +189,29 @@ export default function SoccerGameTracker() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto">
-        <section className="px-4 py-6 text-center border-b border-slate-200 bg-white">
-          <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase text-slate-500 mb-2">
-            <span>{currentSegment?.label ?? (ended ? 'Final' : 'Break')}</span>
-            <span className={`h-2 w-2 rounded-full ${projection.clock.running ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-            <span>{projection.clock.running ? 'Running' : 'Stopped'}</span>
+      <main className="mx-auto w-full min-w-0 max-w-2xl">
+        <section className="px-4 py-4 text-center border-b border-slate-200 bg-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-slate-500">{state.gameInfo.teamName}</p>
+              <p className="text-4xl font-bold tabular-nums text-emerald-800">{state.homeTeamScore ?? 0}</p>
+            </div>
+            <div className="min-w-24">
+              <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase text-slate-500">
+                <span>{currentSegment?.label ?? (ended ? 'Final' : 'Break')}</span>
+                <span className={`h-2 w-2 rounded-full ${projection.clock.running ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+              </div>
+              <div className="mt-1 flex min-h-9 items-baseline justify-center gap-1">
+                <p className="text-3xl font-bold text-slate-900 tabular-nums leading-none">{clockValue.primary}</p>
+                {clockValue.overrun && <span className="text-sm font-bold text-amber-600 tabular-nums">{clockValue.overrun}</span>}
+              </div>
+              <p className="mt-1 text-[11px] font-medium text-slate-500">{projection.clock.running ? 'Running' : 'Stopped'}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-slate-500">{state.gameInfo.opponentName}</p>
+              <p className="text-4xl font-bold tabular-nums text-slate-800">{state.opponentScore}</p>
+            </div>
           </div>
-          <div className="min-h-[4.5rem] flex items-baseline justify-center gap-2">
-            <p className="text-6xl font-bold text-slate-900 tabular-nums tracking-normal leading-none">{clockValue.primary}</p>
-            {clockValue.overrun && <span className="text-xl font-bold text-amber-600 tabular-nums">{clockValue.overrun}</span>}
-          </div>
-          <p className="text-xs text-slate-500 mt-2">
-            {projection.currentRules.clockDirection === 'count_up' ? 'Count up' : 'Count down'} · {projection.currentRules.clockDisplay === 'continuous' ? 'Match time' : 'Period time'}
-          </p>
 
           {!healthy ? (
             <button type="button" onClick={() => setMainTab('history')} className="mt-5 w-full rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
@@ -200,13 +252,85 @@ export default function SoccerGameTracker() {
           </div>
         )}
 
-        <nav className="grid grid-cols-2 border-b border-slate-200 bg-white" aria-label="Soccer tracker views">
+        <nav className="grid grid-cols-3 border-b border-slate-200 bg-white" aria-label="Soccer tracker views">
+          <TabButton active={mainTab === 'field'} label="Field" icon={<Map size={17} />} onClick={() => setMainTab('field')} />
           <TabButton active={mainTab === 'lineup'} label="Lineup" icon={<Users size={17} />} onClick={() => setMainTab('lineup')} />
           <TabButton active={mainTab === 'history'} label="History" icon={<History size={17} />} onClick={() => setMainTab('history')} />
         </nav>
 
         <div className="px-4 py-5">
-          {mainTab === 'lineup' ? (
+          {mainTab === 'field' ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                <ModeButton active={capturePreferences.teamSide === 'tracked'} label="Tracked" onClick={() => setCaptureSide('tracked')} />
+                <ModeButton active={capturePreferences.teamSide === 'opponent'} label="Opponent" onClick={() => setCaptureSide('opponent')} />
+              </div>
+
+              {capturePreferences.teamSide === 'tracked' && (
+                <div className="-mx-4 w-[calc(100%+2rem)] max-w-[calc(100%+2rem)] overflow-x-auto px-4 pb-1">
+                  <div className="flex min-w-max gap-2">
+                    <PlayerChip
+                      active={capturePreferences.selectedParticipantId === null}
+                      label="Team"
+                      onClick={() => dispatch({
+                        type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+                        preferences: { selectedParticipantId: null, selectionInitialized: true },
+                      })}
+                    />
+                    {onField.map(participant => (
+                      <PlayerChip
+                        key={participant.participantId}
+                        active={capturePreferences.selectedParticipantId === participant.participantId}
+                        label={`${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`}
+                        onClick={() => dispatch({
+                          type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+                          preferences: { selectedParticipantId: participant.participantId, selectionInitialized: true },
+                        })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <SoccerField
+                trackedDirection={projection.attackingDirection}
+                captureSide={capturePreferences.teamSide}
+                flipped={fieldFlipped}
+                disabled={!fieldCaptureEnabled}
+                onFlip={() => setFieldFlipped(value => !value)}
+                onLocation={location => setCaptureDraft({
+                  teamSide: capturePreferences.teamSide,
+                  location,
+                })}
+              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <QuickGoalButton
+                  label={state.gameInfo.teamName}
+                  disabled={!fieldCaptureEnabled}
+                  tracked
+                  onClick={() => {
+                    setCaptureSide('tracked')
+                    setCaptureDraft({
+                      teamSide: 'tracked',
+                      location: null,
+                      outcome: 'goal',
+                      preferTeamAttribution: true,
+                    })
+                  }}
+                />
+                <QuickGoalButton
+                  label={state.gameInfo.opponentName}
+                  disabled={!fieldCaptureEnabled}
+                  tracked={false}
+                  onClick={() => {
+                    setCaptureSide('opponent')
+                    setCaptureDraft({ teamSide: 'opponent', location: null, outcome: 'goal' })
+                  }}
+                />
+              </div>
+            </div>
+          ) : mainTab === 'lineup' ? (
             <>
               <div className="grid grid-cols-3 gap-2 text-center mb-4">
                 <Metric label="On field" value={`${onField.length}/${projection.currentRules.maxOnFieldPlayers}`} />
@@ -262,6 +386,20 @@ export default function SoccerGameTracker() {
           setDialogKind(null)
           setDialogParticipantId(null)
         }}
+      />
+
+      <SoccerShotCaptureDialog
+        draft={captureDraft}
+        state={state}
+        recorderUserId={user?.id ?? null}
+        selectedParticipantId={capturePreferences.selectedParticipantId}
+        busy={isApplying}
+        onApply={applyResult}
+        onTrackedParticipantUsed={participantId => dispatch({
+          type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+          preferences: { selectedParticipantId: participantId, selectionInitialized: true },
+        })}
+        onClose={() => setCaptureDraft(null)}
       />
 
       <ConfirmDialog
@@ -344,6 +482,19 @@ function TabButton({ active, label, icon, onClick }: { active: boolean; label: s
 
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
+}
+
+function PlayerChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`h-9 max-w-44 truncate rounded-md border px-3 text-xs font-bold ${active ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>{label}</button>
+}
+
+function QuickGoalButton({ label, disabled, tracked, onClick }: { label: string; disabled: boolean; tracked: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={`min-h-11 min-w-0 rounded-md px-3 text-xs font-bold text-white disabled:opacity-40 flex items-center justify-center gap-2 ${tracked ? 'bg-emerald-700' : 'bg-slate-700'}`}>
+      <Goal size={17} className="shrink-0" />
+      <span className="truncate">Goal - {label}</span>
+    </button>
+  )
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

@@ -1,9 +1,12 @@
 import type { GameState } from '../../types'
 import type {
   GameEvent,
+  GameEventActor,
   GameEventEditableFields,
   GameEventInspection,
+  GameEventLocation,
   GameEventPeriod,
+  GameEventTeamSide,
 } from '../gameEvents/types'
 import {
   addGameEvent,
@@ -25,6 +28,8 @@ import type {
   SoccerMatchProjection,
   SoccerMatchRules,
   SoccerRole,
+  SoccerShotOutcome,
+  SoccerShotSituation,
   SoccerSubstitutionChange,
 } from './types'
 
@@ -32,6 +37,30 @@ export interface SoccerLiveOptions {
   recorderUserId: string | null
   nowMs?: number
   eventIds?: string[]
+}
+
+export type SoccerCaptureActorSelection =
+  | { kind: 'participant'; participantId: string }
+  | { kind: 'unknown'; label: string }
+  | { kind: 'team'; label: string }
+
+export interface SoccerShotCaptureInput {
+  teamSide: GameEventTeamSide
+  outcome: SoccerShotOutcome
+  situation: SoccerShotSituation
+  location: GameEventLocation | null
+  shooter: SoccerCaptureActorSelection
+  primaryCreator?: SoccerCaptureActorSelection | null
+  secondaryCreator?: SoccerCaptureActorSelection | null
+  goalkeeper?: SoccerCaptureActorSelection | null
+  blocker?: SoccerCaptureActorSelection | null
+}
+
+export interface SoccerOwnGoalCaptureInput {
+  teamSide: GameEventTeamSide
+  location: GameEventLocation | null
+  ownGoalBy: SoccerCaptureActorSelection
+  goalkeeper?: SoccerCaptureActorSelection | null
 }
 
 export type SoccerLiveResult =
@@ -50,6 +79,62 @@ interface EventSpec<TType extends keyof SoccerEventPayloadByType = keyof SoccerE
   payload: SoccerEventPayloadByType[TType]
   period?: GameEventPeriod
   elapsedMs?: number | null
+  teamSide?: GameEventTeamSide
+  location?: GameEventLocation | null
+  actors?: GameEventActor[]
+}
+
+export function recordSoccerShot(
+  state: GameState,
+  input: SoccerShotCaptureInput,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  if (context.projection.status !== 'in_progress' || !context.projection.currentPeriodId) {
+    return failure(state, 'Shots can only be recorded during an active period.')
+  }
+  const actors = buildCaptureActors(context.projection, [
+    ['shooter', input.shooter],
+    ['creator_primary', input.primaryCreator],
+    ['creator_secondary', input.secondaryCreator],
+    ['goalkeeper', input.goalkeeper],
+    ['blocker', input.blocker],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.shot',
+    payload: { outcome: input.outcome, situation: input.situation },
+    elapsedMs: context.elapsedMs,
+    teamSide: input.teamSide,
+    location: input.location,
+    actors: actors.value,
+  }])
+}
+
+export function recordSoccerOwnGoal(
+  state: GameState,
+  input: SoccerOwnGoalCaptureInput,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  if (context.projection.status !== 'in_progress' || !context.projection.currentPeriodId) {
+    return failure(state, 'Own goals can only be recorded during an active period.')
+  }
+  const actors = buildCaptureActors(context.projection, [
+    ['own_goal_by', input.ownGoalBy],
+    ['goalkeeper', input.goalkeeper],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.own_goal',
+    payload: {},
+    elapsedMs: context.elapsedMs,
+    teamSide: input.teamSide,
+    location: input.location,
+    actors: actors.value,
+  }])
 }
 
 export function toggleSoccerClock(
@@ -448,11 +533,47 @@ function appendSpecs(
       ? elapsedSoccerClockMs(sportState.projection, nowMs)
       : spec.elapsedMs,
     occurredAt,
+    teamSide: spec.teamSide,
+    location: spec.location,
+    actors: spec.actors,
   }) as GameEvent)
   const result = events.length === 1
     ? addGameEvent(state, events[0], gameEventRegistry, gameEventProjectors)
     : addGameEvents(state, events, gameEventRegistry, gameEventProjectors)
   return mutationResult(result)
+}
+
+function buildCaptureActors(
+  projection: SoccerMatchProjection,
+  selections: Array<[string, SoccerCaptureActorSelection | null | undefined]>
+): { ok: true; value: GameEventActor[] } | { ok: false; message: string } {
+  const actors: GameEventActor[] = []
+  for (const [role, selection] of selections) {
+    if (!selection) continue
+    if (selection.kind === 'participant') {
+      const participant = projection.participants[selection.participantId]
+      if (!participant) return { ok: false, message: 'A selected match participant is unavailable.' }
+      actors.push(participant.playerId
+        ? {
+            role,
+            kind: 'player',
+            participantId: participant.participantId,
+            playerId: participant.playerId,
+            label: participant.displayName,
+          }
+        : {
+            role,
+            kind: 'unknown',
+            participantId: participant.participantId,
+            label: participant.displayName,
+          })
+      continue
+    }
+    const label = selection.label.trim()
+    if (!label) return { ok: false, message: 'Actor labels cannot be empty.' }
+    actors.push({ role, kind: selection.kind, label })
+  }
+  return { ok: true, value: actors }
 }
 
 function eventPeriod(

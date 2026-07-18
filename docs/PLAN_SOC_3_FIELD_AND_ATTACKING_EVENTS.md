@@ -4,7 +4,7 @@ Detailed implementation plan for soccer field capture, attacking events, score p
 and correction history. SOC-3 builds on the event-backed match state from SOC-2 and is split
 into three sequential pull requests so the domain contract lands before the live capture UI.
 
-Status: In progress. Decisions are resolved; SOC-3A is implemented and SOC-3B is next.
+Status: In progress. Decisions are resolved; SOC-3A and SOC-3B are implemented and SOC-3C is next.
 
 ---
 
@@ -35,7 +35,7 @@ belong to SOC-4 through SOC-6.
 - Add focused schema, projection, revision, deletion, and malformed-history tests.
 - Do not expose unfinished field capture controls in this slice.
 
-### SOC-3B: Live field and capture
+### SOC-3B: Live field and capture (complete)
 
 - Add the full-field live surface with a fixed recorder viewpoint and period attack arrows.
 - Add a display-only Flip Field View control that mirrors locations without rewriting them.
@@ -56,7 +56,7 @@ belong to SOC-4 through SOC-6.
 - Add scoring-timeline access from the score and explicit signed score corrections with reasons.
 - Complete mobile, parking/resume, correction, and regression coverage.
 
-SOC-3B starts after SOC-3A is merged. SOC-3C starts after SOC-3B is merged.
+SOC-3A and SOC-3B are merged sequentially. SOC-3C starts after SOC-3B is merged.
 
 ---
 
