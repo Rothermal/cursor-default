@@ -28,6 +28,7 @@ import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/l
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { normalizeGameEventStream } from '../lib/gameEvents/stream'
+import { normalizeSportGameState } from '../lib/soccer/state'
 import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../lib/gameEvents/runtime'
 import { sports } from '../config/sports'
@@ -40,6 +41,7 @@ import {
   shouldRejectSkippedFinalSync,
   shouldSkipAutoHydrateForDifferentCloudGame,
   withLastSyncedGameFingerprint,
+  isAggregateCloudSyncEligible,
 } from '../lib/gameSyncFingerprint'
 import {
   createInitialCloudSyncState,
@@ -100,6 +102,7 @@ function hasSyncPrereqs(state: GameState, isConfigured: boolean, userId: string 
     supabase &&
     state.sport &&
     state.gameInfo &&
+    isAggregateCloudSyncEligible(state) &&
     state.cloudSync.gameStatus !== 'final'
   )
 }
@@ -177,6 +180,7 @@ function buildHydratedStateFromCloudGame(
     actionLog: [],
     shotChart: cloudGame.shotChart ?? [],
     eventStream: null,
+    sportGameState: null,
     cloudSync: {
       ...createInitialCloudSyncState('synced'),
       seasonId: cloudGame.seasonId ?? null,
@@ -225,6 +229,7 @@ function loadState(userId: string | null): GameState {
             : 1,
         teamStatsConfig: parsed.teamStatsConfig ?? null,
         eventStream: normalizeGameEventStream(parsed.eventStream),
+        sportGameState: normalizeSportGameState(parsed.sportGameState),
         shotChart: shotChartForRoster(Array.isArray(parsed.shotChart) ? parsed.shotChart : [], restoredPlayers),
         players: restoredPlayers,
         actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],

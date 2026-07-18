@@ -62,6 +62,7 @@ function baseState(
     teamStatsConfig: null,
     shotChart,
     eventStream: null,
+    sportGameState: null,
   }
 }
 

@@ -600,7 +600,7 @@ actions are backfilled.
 
 **Precondition:** Existing basketball local/parked games; migration
 `042_game_events.sql` applied only when testing the isolated cloud repository. Soccer remains
-disabled and no production event definitions are registered in SOC-1.
+disabled in production; SOC-2A later installs production soccer match-state definitions.
 
 | Step | Action | Expected |
 |------|--------|----------|
@@ -612,6 +612,22 @@ disabled and no production event definitions are registered in SOC-1.
 | 11a.6 | Write a lower revision, then an equal revision with changed payload | RPC reports `stale`, then `conflict`; existing cloud row is unchanged |
 | 11a.7 | As viewer or with another recorder's row id, attempt an event write | RLS/RPC rejects the write; accepted viewers can read team event rows |
 | 11a.8 | Attempt an ordinary SQL/client delete | No client delete policy exists; revisioned tombstone update is the supported path |
+
+---
+
+## 11b. Soccer match-state foundation (SOC-2A)
+
+**Precondition:** Development branch with SOC-2A. Soccer remains hidden from production
+navigation; these checks primarily protect persistence and event authority before SOC-2B UI.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11b.1 | Run `pnpm test` | Soccer rules, all 14 match-state schemas, lifecycle replay, exact participation, batch atomicity, and semantic-stop tests pass |
+| 11b.2 | Initialize a soccer event stream in a test/dev state with a resolved `sportGameState` setup | Opening lineup, period start, and clock start can append as one batch and produce one coherent projection |
+| 11b.3 | Introduce an invalid historical substitution followed by later events | Raw events remain stored; projection stops before the invalid substitution; the offending and later rows have diagnostics |
+| 11b.4 | Park, export, import, and resume an event-backed soccer state | Setup and raw events survive; projection rebuilds; the parked record is not queued for aggregate cloud sync |
+| 11b.5 | Dispatch a legacy stat, score, shot, undo, or period action after event-stream initialization | Reducer returns the unchanged event-backed state |
+| 11b.6 | Resume a legacy basketball game and track/sync normally | `sportGameState` normalizes to `null`; aggregate reducer and cloud behavior remain unchanged |
 
 ---
 

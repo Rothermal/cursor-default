@@ -50,6 +50,7 @@ function baseState(over: Partial<GameState> = {}): GameState {
     shotChart: [],
     ...over,
     eventStream: over.eventStream === undefined ? null : over.eventStream,
+    sportGameState: over.sportGameState === undefined ? null : over.sportGameState,
   }
 }
 

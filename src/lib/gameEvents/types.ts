@@ -84,6 +84,8 @@ export type GameEventDiagnosticCode =
   | 'missing_projector'
   | 'unmapped_player'
   | 'invalid_cloud_row'
+  | 'semantic_validation_failed'
+  | 'unprojected_event'
 
 export interface GameEventDiagnostic {
   code: GameEventDiagnosticCode
@@ -104,11 +106,21 @@ export interface GameEventProjection {
   opponentScore: number
   homeTeamScore: number | null
   shotChart: ShotRecord[]
+  /** Omitted by legacy fixture projectors; sport projectors replace it when supplied. */
+  sportGameState?: GameState['sportGameState']
+}
+
+export interface SportGameEventProjectionResult {
+  projection: GameEventProjection
+  diagnostics: GameEventDiagnostic[]
 }
 
 export interface SportGameEventProjector<TEvent extends GameEvent = GameEvent> {
   sportId: string
-  project: (state: GameState, events: TEvent[]) => GameEventProjection
+  project: (
+    state: GameState,
+    events: TEvent[]
+  ) => GameEventProjection | SportGameEventProjectionResult
 }
 
 export type GameEventEditableFields = Pick<

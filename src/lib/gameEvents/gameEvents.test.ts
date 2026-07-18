@@ -278,9 +278,9 @@ describe('game event mutations and projections', () => {
     expect(editedRaw.payload).toEqual({ value: 4 })
   })
 
-  it('keeps reducer initialization disabled until the production sport projector is installed', () => {
+  it('enables reducer initialization for soccer while preserving the legacy activity guard', () => {
     const initialized = gameReducer(state(), { type: 'INITIALIZE_EVENT_STREAM' })
-    expect(initialized.eventStream).toBeNull()
+    expect(initialized.eventStream).toEqual({ version: 1, events: [] })
     expect(gameReducer(state({ opponentScore: 1 }), { type: 'INITIALIZE_EVENT_STREAM' }).eventStream).toBeNull()
   })
 })

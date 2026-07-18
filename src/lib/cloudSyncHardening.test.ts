@@ -205,6 +205,7 @@ function state(overrides: Partial<GameState> = {}): GameState {
     shotChart: [],
     ...overrides,
     eventStream: overrides.eventStream === undefined ? null : overrides.eventStream,
+    sportGameState: overrides.sportGameState === undefined ? null : overrides.sportGameState,
   }
 }
 

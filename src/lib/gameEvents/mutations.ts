@@ -88,6 +88,56 @@ export function addGameEvent<TEvent extends GameEvent>(
   )
 }
 
+export function addGameEvents<TEvent extends GameEvent>(
+  state: GameState,
+  events: GameEvent[],
+  registry: GameEventRegistry<TEvent>,
+  projectors: GameEventProjectorRegistry<TEvent>
+): GameEventMutationResult {
+  if (!state.eventStream) {
+    return failed(state, 'stream_not_initialized', 'Initialize the event stream before adding events.')
+  }
+  if (events.length === 0) {
+    return failed(state, 'invalid_event', 'At least one event is required.')
+  }
+
+  const existingIds = new Set(
+    state.eventStream.events
+      .filter(isGameEventEnvelope)
+      .map(event => event.id)
+  )
+  const batchIds = new Set<string>()
+  for (const event of events) {
+    if (
+      !isGameEventEnvelope(event) ||
+      event.revision !== 1 ||
+      event.deletedAt !== null ||
+      !registry.inspect(event).ok
+    ) {
+      return failed(state, 'invalid_event', 'Every event in the batch must be valid.')
+    }
+    if (state.sport?.id !== event.sportId) {
+      return failed(state, 'sport_mismatch', 'Every event must match the active game sport.')
+    }
+    if (existingIds.has(event.id) || batchIds.has(event.id)) {
+      return failed(state, 'duplicate_event_id', 'Every event in the batch must have a unique id.')
+    }
+    batchIds.add(event.id)
+  }
+
+  return rebuildAsSuccess(
+    {
+      ...state,
+      eventStream: {
+        ...state.eventStream,
+        events: [...state.eventStream.events, ...events.map(cloneEvent)],
+      },
+    },
+    registry,
+    projectors
+  )
+}
+
 export function updateGameEvent<TEvent extends GameEvent>(
   state: GameState,
   eventId: string,
