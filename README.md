@@ -277,7 +277,7 @@ docs/
 ├── DESIGN_STAT_TRACKING_UI.md    # Design: Career/season/game views (living doc; progress table)
 ├── DESIGN_TEAM_INFO_PAGE.md # Team hub / drill-down (shipped V1 design reference)
 ├── DESIGN_SHOT_TRACKER_UI_REVAMP.md # Court-capture program status (F1–F13)
-├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11/F13 held
+├── PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md # F5–F13 roadmap; F11 held, F13 moves to BKE
 ├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
 ├── PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md # Soccer product model and SOC-1 through SOC-6 roadmap
 ├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration

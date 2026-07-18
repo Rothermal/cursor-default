@@ -3,10 +3,11 @@
 Required follow-up roadmap for moving basketball from its current counter/action-log/shot
 record combination onto the shared `GameEvent` foundation introduced by the soccer program.
 
-Status: Required future work. Architecture planning may begin after SOC-1 stabilizes the
-shared event contract. Implementation should wait until SOC-5 proves offline persistence,
-cloud sync, independent recorder streams, and primary-recorder resolution unless a later
-planning decision explicitly changes that dependency.
+Status: Required future work. BKE-0 architecture planning may begin after SOC-1 stabilizes
+the shared event contract. No BKE-1 through BKE-4 implementation should begin until SOC-5
+proves offline persistence, cloud sync, independent recorder streams, and primary-recorder
+resolution unless a later planning decision explicitly changes that product-sequencing
+gate.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -198,13 +199,14 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 | Phase | Purpose | Dependency | Exit condition |
 |---|---|---|---|
 | BKE-0 | Architecture audit, basketball event catalog, projection contract, compatibility strategy, and F13 reconciliation | Stable SOC-1 shared event contract | Detailed migration design approved; no basketball code migration required |
-| BKE-1 | Court-originated shots and linked assist/rebound events on the shared local event model | Shared local events and deterministic projection proven | New court actions round-trip through events while preserving current totals, shot views, and undo behavior |
-| BKE-2 | Direct stat grid, score adjustments, team/period stats, and remaining basketball actions | BKE-1 | Every new basketball live action has one event-backed source of truth |
-| BKE-3 | Editable basketball timeline/detail experience and F13 delivery | Shared edit/detail pattern plus BKE-2 | Users can review, edit, or delete supported basketball events with projections recalculated |
-| BKE-4 | Cloud event sync, recorder resolution, finalization/correction integration, historical hardening, and cutover | SOC-5 cloud behavior proven and BKE-3 stable | New basketball games sync as event-capable records; legacy games remain readable and unchanged |
+| BKE-1 | Court-originated shots and linked assist/rebound events on the shared local event model | SOC-5 complete and BKE-0 approved | New court actions round-trip through events while preserving current totals, shot views, and undo behavior |
+| BKE-2 | Direct stat grid, score adjustments, team/period stats, and remaining basketball actions | SOC-5 complete and BKE-1 | Every new basketball live action has one event-backed source of truth |
+| BKE-3 | Editable basketball timeline/detail experience and F13 delivery | SOC-5 complete, shared edit/detail pattern proven, and BKE-2 | Users can review, edit, or delete supported basketball events with projections recalculated |
+| BKE-4 | Cloud event sync, recorder resolution, finalization/correction integration, historical hardening, and cutover | SOC-5 complete and BKE-3 stable | New basketball games sync as event-capable records; legacy games remain readable and unchanged |
 
-Implementation does not need to wait for SOC-6 presentation work if SOC-5 has proven the
-shared event lifecycle and BKE-0 confirms the dependency boundary.
+BKE-0 planning does not need to wait for SOC-5. BKE-1 through BKE-4 implementation does not
+need to wait for SOC-6 presentation work once SOC-5 has proven the shared event lifecycle
+and BKE-0 is approved.
 
 Recommended detailed plan names:
 

@@ -58,6 +58,10 @@ modal after reload/cloud sync. A modal could guess from action order while the l
 
 ## Proposed Data Model
 
+> **Historical proposal only:** Do not implement this `ShotRecord` extension as written.
+> BKE-0 must replace it with the approved shared event envelope, basketball projections,
+> and legacy-game compatibility strategy before BKE-3 delivers the detail/edit surface.
+
 Extend `ShotRecord` with optional linked metadata:
 
 ```ts
