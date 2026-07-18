@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { clearActiveParkedGame } from '../lib/gameParking'
 import { supabase } from '../lib/supabase'
-import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
+import { shouldBlockDiscardUnsyncedGame, shouldPreserveLocalAfterFinalizeSuccess } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { useTeamRole } from './useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
@@ -117,6 +117,25 @@ export function useFinalizeGame() {
     setFinalizing(false)
     if (updateError) {
       setFinalizeError(updateError.message ?? 'Failed to finalize game')
+      return
+    }
+
+    // Header/browser back can still leave Summary during the status update await.
+    // If newer local edits arrived after we marked cloud final, keep them — wiping
+    // would permanently lose stats that can no longer sync to a final game.
+    const afterFinal = stateRef.current
+    if (shouldPreserveLocalAfterFinalizeSuccess(afterFinal, getPendingSyncFlag())) {
+      dispatch({
+        type: 'SET_CLOUD_SYNC_STATE',
+        cloudSync: {
+          gameStatus: 'final',
+          lastError:
+            'Cloud game is final, but newer local edits were kept. Export before discarding.',
+        },
+      })
+      setFinalizeError(
+        'Game finalized on the cloud, but newer local edits were kept. Export before discarding.'
+      )
       return
     }
 

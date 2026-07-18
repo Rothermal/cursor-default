@@ -349,7 +349,8 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 5.8 | Game Summary | Tables show per-player and team totals; categories correct |
 | 5.9 | New Game (from sport dashboard with active **local** game) | Confirm -> reset; can start new game (offline-only must not show a permanent "Finish syncing..." block) |
 | 5.9a | Summary → New Game with **unsynced** cloud stats | Blocked with sync message; synced/clean cloud game confirms then resets |
-| 5.9b | Summary → Finalize while in progress | Back to Game / New Game disabled until finalize finishes |
+| 5.9b | Summary → Finalize while in progress | Header ←, Back to Game, and New Game disabled until finalize finishes |
+| 5.9c | During Finalize (slow network), if local edits arrive after cloud `status=final` succeeds | Local game is **not** wiped; error explains cloud is final and local edits were kept for export |
 
 ---
 
