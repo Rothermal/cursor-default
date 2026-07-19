@@ -14,6 +14,7 @@ import {
   recordSoccerOwnGoal,
   recordSoccerShot,
   recordSoccerSubstitution,
+  resolveSoccerCaptureSaveOperation,
   reopenSoccerMatch,
   reviseSoccerScoreAdjustment,
   reviseSoccerShot,
@@ -110,6 +111,19 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it('fails closed when correction type or historical timing is inconsistent', () => {
+    expect(resolveSoccerCaptureSaveOperation('live', 'soccer.shot', null, false))
+      .toEqual({ ok: true, operation: 'record_live' })
+    expect(resolveSoccerCaptureSaveOperation('historical', 'soccer.shot', null, true))
+      .toEqual({ ok: true, operation: 'record_historical' })
+    expect(resolveSoccerCaptureSaveOperation('edit', 'soccer.own_goal', 'soccer.own_goal', true))
+      .toEqual({ ok: true, operation: 'revise' })
+    expect(resolveSoccerCaptureSaveOperation('edit', 'soccer.own_goal', 'soccer.shot', true))
+      .toMatchObject({ ok: false })
+    expect(resolveSoccerCaptureSaveOperation('historical', 'soccer.shot', null, false))
+      .toMatchObject({ ok: false })
+  })
+
   it('records a located tracked shot through stable participant actors', () => {
     const result = recordSoccerShot(kickedOffState(), {
       teamSide: 'tracked',

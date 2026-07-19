@@ -6,6 +6,7 @@ import {
   recordHistoricalSoccerShot,
   recordSoccerOwnGoal,
   recordSoccerShot,
+  resolveSoccerCaptureSaveOperation,
   reviseSoccerOwnGoal,
   reviseSoccerShot,
   soccerAttackingDirectionAt,
@@ -205,6 +206,17 @@ export default function SoccerShotCaptureDialog({
 
   const save = () => {
     if (!outcome) return
+    const intendedEventType = ownGoal ? 'soccer.own_goal' : 'soccer.shot'
+    const operation = resolveSoccerCaptureSaveOperation(
+      mode,
+      intendedEventType,
+      draft.event?.eventType ?? null,
+      moment !== null
+    )
+    if (!operation.ok) {
+      setError(operation.message)
+      return
+    }
     const options = { recorderUserId }
     const eventLocation = location ? { ...location, attackingDirection: captureDirection } : null
     let result: SoccerLiveResult
@@ -220,11 +232,15 @@ export default function SoccerShotCaptureDialog({
           ? { kind: 'participant' as const, participantId: trackedGoalkeeperId }
           : null,
       }
-      result = mode === 'edit' && draft.event?.eventType === 'soccer.own_goal' && moment
-        ? reviseSoccerOwnGoal(state, draft.event.id, input, moment)
-        : mode === 'historical' && moment
-          ? recordHistoricalSoccerOwnGoal(state, input, moment, options)
-          : recordSoccerOwnGoal(state, input, options)
+      if (operation.operation === 'revise') {
+        if (!draft.event || !moment) return setError('The event correction context is unavailable.')
+        result = reviseSoccerOwnGoal(state, draft.event.id, input, moment)
+      } else if (operation.operation === 'record_historical') {
+        if (!moment) return setError('A recorded match time is required.')
+        result = recordHistoricalSoccerOwnGoal(state, input, moment, options)
+      } else {
+        result = recordSoccerOwnGoal(state, input, options)
+      }
     } else {
       const shooter: SoccerCaptureActorSelection = teamSide === 'tracked'
         ? trackedShooterId === '__team__'
@@ -269,11 +285,15 @@ export default function SoccerShotCaptureDialog({
               : null
           : null,
       } satisfies Parameters<typeof recordSoccerShot>[1]
-      result = mode === 'edit' && draft.event?.eventType === 'soccer.shot' && moment
-        ? reviseSoccerShot(state, draft.event.id, input, moment)
-        : mode === 'historical' && moment
-          ? recordHistoricalSoccerShot(state, input, moment, options)
-          : recordSoccerShot(state, input, options)
+      if (operation.operation === 'revise') {
+        if (!draft.event || !moment) return setError('The event correction context is unavailable.')
+        result = reviseSoccerShot(state, draft.event.id, input, moment)
+      } else if (operation.operation === 'record_historical') {
+        if (!moment) return setError('A recorded match time is required.')
+        result = recordHistoricalSoccerShot(state, input, moment, options)
+      } else {
+        result = recordSoccerShot(state, input, options)
+      }
     }
 
     if (!result.ok) {

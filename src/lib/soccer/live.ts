@@ -85,6 +85,26 @@ export type SoccerLiveResult =
   | { ok: true; state: GameState; inspection: GameEventInspection }
   | { ok: false; state: GameState; message: string }
 
+export type SoccerCaptureSaveOperation = 'record_live' | 'record_historical' | 'revise'
+
+export function resolveSoccerCaptureSaveOperation(
+  mode: 'live' | 'historical' | 'edit',
+  intendedEventType: 'soccer.shot' | 'soccer.own_goal',
+  existingEventType: string | null,
+  hasMoment: boolean
+): { ok: true; operation: SoccerCaptureSaveOperation } | { ok: false; message: string } {
+  if (mode === 'live') return { ok: true, operation: 'record_live' }
+  if (!hasMoment) return { ok: false, message: 'A recorded match time is required.' }
+  if (mode === 'historical') return { ok: true, operation: 'record_historical' }
+  if (existingEventType !== intendedEventType) {
+    return {
+      ok: false,
+      message: 'The event type cannot be changed during correction. Remove the event and add a replacement instead.',
+    }
+  }
+  return { ok: true, operation: 'revise' }
+}
+
 export interface SoccerClockDisplayValue {
   primary: string
   overrun: string | null
