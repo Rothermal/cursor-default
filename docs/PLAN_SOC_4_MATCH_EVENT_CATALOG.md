@@ -3,7 +3,7 @@
 Detailed implementation plan for soccer defensive actions, discipline, team events,
 shootouts, and structured match outcomes.
 
-Status: Q&A in progress. Decisions are recorded as they are reviewed.
+Status: Q&A complete. Reviewed decisions are locked; detailed implementation synthesis is next.
 
 ---
 
@@ -196,10 +196,38 @@ The three slices are implemented and reviewed sequentially.
     tracked participant, Team, or Unknown; a tracked foul may identify an opponent label, Team,
     or Unknown. Historical tracked attribution requires on-field eligibility at that time. Only
     participant attribution derives a player foul-drawn total; Team/Unknown remains side-level.
+36. Match setup offers editable IFAB and U.S. High School starting profiles. The recorder reviews
+    and may customize the individual yellow-exit, return-substitution, red-card, tie-resolution,
+    and related competition settings before kickoff. The match snapshots resolved fields rather
+    than a mutable profile name, so profile changes never rewrite parked or historical games.
+37. Foul sanctions and standalone cards store a sanction-appropriate structured reason plus an
+    optional note. Core reasons include dissent, unsporting behavior, persistent offenses,
+    delaying restart, failure to respect distance, unauthorized entry/exit, serious foul play,
+    violent conduct, DOGSO, abusive language, second caution, and `other_not_recorded`. Reason
+    provides Timeline context and filtering metadata but creates no additional SOC-4 statistic.
+38. Below-field unknown-location capture uses a compact icon toolbar for Goal, Foul, Card, and
+    Team Event, all targeting the currently selected tracked/opponent side. It replaces the two
+    separate Quick Goal buttons. Each command opens its family sheet prefilled for speed and does
+    not append blindly; the recorder confirms attribution and event-specific fields before save.
+39. One parked live tracked-participant selection supplies the default shooter, defender, foul
+    committer, player-card recipient, or offside actor where applicable. A family sheet may
+    override it, and the last eligible tracked participant used becomes the next shared default.
+    Team/Unknown remain explicit choices. Historical add/correction never changes the live
+    default, and an ineligible participant is cleared rather than silently replaced.
+40. Shootout setup snapshots an opponent eligible-player count, defaulted to the tracked eligible
+    count and explicitly adjustable by the recorder. The tracked pool must be reduced to equal
+    a smaller opponent count. Opponent actors remain label/Team/Unknown identities learned as
+    events occur; opponent send-offs/unavailability decrement the count and trigger a matching
+    tracked exclusion without inventing an opponent roster.
+41. Shootout projection enforces kicker uniqueness for both sides within each eligible-player
+    round. Known opponent labels cannot repeat early. Team/Unknown kicks consume stable numbered
+    anonymous slots up to the snapshotted opponent count; a retaken attempt does not consume a
+    new slot. This validates order without requiring opponent names or a synthetic roster.
 
 ---
 
-## 4. Open Q&A
+## 4. Planning Follow-up
 
-The remaining event catalog, actor rules, linking behavior, capture ergonomics, derived
-statistics, shootout lifecycle, and outcome rules will be resolved one question at a time.
+No product-level decisions remain open from the SOC-4 Q&A. The next planning pass expands these
+decisions into exact schemas, projector state, UI state diagrams, file-level delivery steps,
+acceptance tests, and SOC-4A/SOC-4B/SOC-4C merge boundaries before implementation begins.
