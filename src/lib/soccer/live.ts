@@ -63,9 +63,47 @@ export interface SoccerOwnGoalCaptureInput {
   goalkeeper?: SoccerCaptureActorSelection | null
 }
 
+export interface SoccerScoreAdjustmentInput {
+  teamSide: GameEventTeamSide
+  delta: 1 | -1
+  reason: string
+}
+
+export interface SoccerEventMoment {
+  period: GameEventPeriod
+  elapsedMs: number
+}
+
+export interface SoccerPeriodTiming {
+  period: GameEventPeriod
+  label: string
+  startElapsedMs: number
+  endElapsedMs: number
+}
+
 export type SoccerLiveResult =
   | { ok: true; state: GameState; inspection: GameEventInspection }
   | { ok: false; state: GameState; message: string }
+
+export type SoccerCaptureSaveOperation = 'record_live' | 'record_historical' | 'revise'
+
+export function resolveSoccerCaptureSaveOperation(
+  mode: 'live' | 'historical' | 'edit',
+  intendedEventType: 'soccer.shot' | 'soccer.own_goal',
+  existingEventType: string | null,
+  hasMoment: boolean
+): { ok: true; operation: SoccerCaptureSaveOperation } | { ok: false; message: string } {
+  if (mode === 'live') return { ok: true, operation: 'record_live' }
+  if (!hasMoment) return { ok: false, message: 'A recorded match time is required.' }
+  if (mode === 'historical') return { ok: true, operation: 'record_historical' }
+  if (existingEventType !== intendedEventType) {
+    return {
+      ok: false,
+      message: 'The event type cannot be changed during correction. Remove the event and add a replacement instead.',
+    }
+  }
+  return { ok: true, operation: 'revise' }
+}
 
 export interface SoccerClockDisplayValue {
   primary: string
@@ -135,6 +173,195 @@ export function recordSoccerOwnGoal(
     location: input.location,
     actors: actors.value,
   }])
+}
+
+export function recordHistoricalSoccerShot(
+  state: GameState,
+  input: SoccerShotCaptureInput,
+  moment: SoccerEventMoment,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = historicalContext(state, moment, options.nowMs)
+  if (!context.ok) return context
+  const actors = buildCaptureActors(context.projection, [
+    ['shooter', input.shooter],
+    ['creator_primary', input.primaryCreator],
+    ['creator_secondary', input.secondaryCreator],
+    ['goalkeeper', input.goalkeeper],
+    ['blocker', input.blocker],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.shot',
+    payload: { outcome: input.outcome, situation: input.situation },
+    period: moment.period,
+    elapsedMs: moment.elapsedMs,
+    teamSide: input.teamSide,
+    location: input.location,
+    actors: actors.value,
+  }])
+}
+
+export function recordHistoricalSoccerOwnGoal(
+  state: GameState,
+  input: SoccerOwnGoalCaptureInput,
+  moment: SoccerEventMoment,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = historicalContext(state, moment, options.nowMs)
+  if (!context.ok) return context
+  const actors = buildCaptureActors(context.projection, [
+    ['own_goal_by', input.ownGoalBy],
+    ['goalkeeper', input.goalkeeper],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.own_goal',
+    payload: {},
+    period: moment.period,
+    elapsedMs: moment.elapsedMs,
+    teamSide: input.teamSide,
+    location: input.location,
+    actors: actors.value,
+  }])
+}
+
+export function reviseSoccerShot(
+  state: GameState,
+  eventId: string,
+  input: SoccerShotCaptureInput,
+  moment: SoccerEventMoment,
+  now = new Date().toISOString()
+): SoccerLiveResult {
+  const sportState = state.sportGameState
+  if (!sportState || sportState.sportId !== 'soccer') return failure(state, 'Soccer match state is unavailable.')
+  const actors = buildCaptureActors(sportState.projection, [
+    ['shooter', input.shooter],
+    ['creator_primary', input.primaryCreator],
+    ['creator_secondary', input.secondaryCreator],
+    ['goalkeeper', input.goalkeeper],
+    ['blocker', input.blocker],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return updateSoccerHistoryEvent(state, eventId, {
+    payload: { outcome: input.outcome, situation: input.situation },
+    period: moment.period,
+    elapsedMs: moment.elapsedMs,
+    teamSide: input.teamSide,
+    location: input.location,
+    actors: actors.value,
+  }, now)
+}
+
+export function reviseSoccerOwnGoal(
+  state: GameState,
+  eventId: string,
+  input: SoccerOwnGoalCaptureInput,
+  moment: SoccerEventMoment,
+  now = new Date().toISOString()
+): SoccerLiveResult {
+  const sportState = state.sportGameState
+  if (!sportState || sportState.sportId !== 'soccer') return failure(state, 'Soccer match state is unavailable.')
+  const actors = buildCaptureActors(sportState.projection, [
+    ['own_goal_by', input.ownGoalBy],
+    ['goalkeeper', input.goalkeeper],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return updateSoccerHistoryEvent(state, eventId, {
+    payload: {},
+    period: moment.period,
+    elapsedMs: moment.elapsedMs,
+    teamSide: input.teamSide,
+    location: input.location,
+    actors: actors.value,
+  }, now)
+}
+
+export function recordSoccerScoreAdjustment(
+  state: GameState,
+  input: SoccerScoreAdjustmentInput,
+  moment: SoccerEventMoment,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = historicalContext(state, moment, options.nowMs)
+  if (!context.ok) return context
+  const reason = input.reason.trim()
+  if (!reason) return failure(state, 'A score adjustment reason is required.')
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.score_adjustment',
+    payload: { delta: input.delta, reason },
+    period: moment.period,
+    elapsedMs: moment.elapsedMs,
+    teamSide: input.teamSide,
+    location: null,
+    actors: [],
+  }])
+}
+
+export function reviseSoccerScoreAdjustment(
+  state: GameState,
+  eventId: string,
+  input: SoccerScoreAdjustmentInput,
+  moment: SoccerEventMoment,
+  now = new Date().toISOString()
+): SoccerLiveResult {
+  const reason = input.reason.trim()
+  if (!reason) return failure(state, 'A score adjustment reason is required.')
+  return updateSoccerHistoryEvent(state, eventId, {
+    payload: { delta: input.delta, reason },
+    period: moment.period,
+    elapsedMs: moment.elapsedMs,
+    teamSide: input.teamSide,
+    location: null,
+    actors: [],
+  }, now)
+}
+
+export function soccerPeriodTimings(state: GameState, nowMs = Date.now()): SoccerPeriodTiming[] {
+  const sportState = state.sportGameState
+  if (!sportState || sportState.sportId !== 'soccer') return []
+  const projection = sportState.projection
+  const liveElapsedMs = elapsedSoccerClockMs(projection, nowMs)
+  return orderedSoccerSegments(projection.currentRules)
+    .filter(segment => projection.startedPeriodIds.includes(segment.id))
+    .map(segment => {
+      const startElapsedMs = currentPeriodStartElapsedMs(state, segment.id)
+      const endElapsedMs = projection.periodEndElapsedMsById[segment.id]
+        ?? (projection.currentPeriodId === segment.id ? liveElapsedMs : startElapsedMs)
+      return {
+        period: { id: segment.id, order: segment.order },
+        label: segment.label,
+        startElapsedMs,
+        endElapsedMs: Math.max(startElapsedMs, endElapsedMs),
+      }
+    })
+}
+
+export function soccerAttackingDirectionAt(
+  state: GameState,
+  moment: SoccerEventMoment
+): SoccerAttackingDirection {
+  const sportState = state.sportGameState
+  if (!sportState || sportState.sportId !== 'soccer') return 'left_to_right'
+  const segments = orderedSoccerSegments(sportState.projection.currentRules)
+  const segmentIndex = segments.findIndex(segment => segment.id === moment.period.id)
+  const base = sportState.projection.firstPeriodAttackingDirection
+  let direction: SoccerAttackingDirection = segmentIndex >= 0 && segmentIndex % 2 === 1
+    ? oppositeDirection(base)
+    : base
+  const changes = inspectSoccerHistory(state).activeEvents
+    .filter(event => event.eventType === 'soccer.attacking_direction_changed' &&
+      event.period.id === moment.period.id &&
+      event.elapsedMs !== null &&
+      event.elapsedMs <= moment.elapsedMs)
+    .sort((left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id))
+  for (const event of changes) {
+    const payload = event.payload as { direction?: unknown }
+    if (payload.direction === 'left_to_right' || payload.direction === 'right_to_left') {
+      direction = payload.direction
+    }
+  }
+  return direction
 }
 
 export function toggleSoccerClock(
@@ -504,6 +731,26 @@ function liveContext(state: GameState, options: SoccerLiveOptions):
   }
 }
 
+function historicalContext(
+  state: GameState,
+  moment: SoccerEventMoment,
+  nowMs = Date.now()
+):
+  | { ok: true; projection: SoccerMatchProjection }
+  | { ok: false; state: GameState; message: string } {
+  const sportState = state.sportGameState
+  if (state.sport?.id !== 'soccer' || !sportState || sportState.sportId !== 'soccer' || !state.eventStream) {
+    return failure(state, 'An initialized soccer match is required.')
+  }
+  const timing = soccerPeriodTimings(state, nowMs)
+    .find(item => item.period.id === moment.period.id && item.period.order === moment.period.order)
+  if (!timing) return failure(state, 'The selected period has not started.')
+  if (!Number.isInteger(moment.elapsedMs) || moment.elapsedMs < timing.startElapsedMs || moment.elapsedMs > timing.endElapsedMs) {
+    return failure(state, 'The selected time is outside the recorded period bounds.')
+  }
+  return { ok: true, projection: sportState.projection }
+}
+
 function appendSpecs(
   state: GameState,
   options: SoccerLiveOptions,
@@ -589,6 +836,10 @@ function eventPeriod(
   return segment
     ? { id: segment.id, order: segment.order }
     : { id: 'match', order: 0 }
+}
+
+function oppositeDirection(direction: SoccerAttackingDirection): SoccerAttackingDirection {
+  return direction === 'left_to_right' ? 'right_to_left' : 'left_to_right'
 }
 
 function currentPeriodStartElapsedMs(state: GameState, periodId: string | null): number {

@@ -20,16 +20,18 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
-import SoccerField from '../components/soccer/SoccerField'
+import SoccerField, { type SoccerFieldMarker } from '../components/soccer/SoccerField'
 import SoccerLiveActionDialog, {
   type SoccerLiveDialogKind,
 } from '../components/soccer/SoccerLiveActionDialog'
 import SoccerMatchHistory from '../components/soccer/SoccerMatchHistory'
+import SoccerScoreTimelineDialog from '../components/soccer/SoccerScoreTimelineDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from '../components/soccer/SoccerShotCaptureDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
+import type { GameEvent } from '../lib/gameEvents/types'
 import {
   endSoccerPeriod,
   formatSoccerDuration,
@@ -38,17 +40,23 @@ import {
   participantActiveMs,
   recordSoccerDirectionChange,
   reopenSoccerMatch,
+  soccerFieldReviewEvents,
   soccerClockDisplayValue,
   startNextSoccerPeriod,
   toggleSoccerClock,
   type SoccerLiveResult,
   type SoccerMatchProjection,
+  type SoccerOwnGoalEvent,
   type SoccerProjectedParticipant,
+  type SoccerScoreAdjustmentEvent,
+  type SoccerShotEvent,
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
 
-type MainTab = 'field' | 'lineup' | 'history'
+type MainTab = 'field' | 'lineup' | 'timeline'
 type LineupTab = 'on_field' | 'bench'
+type MarkerSideFilter = 'all' | 'tracked' | 'opponent'
+type MarkerScope = 'current' | 'match'
 
 export default function SoccerGameTracker() {
   const navigate = useNavigate()
@@ -69,6 +77,10 @@ export default function SoccerGameTracker() {
   const [isApplying, setIsApplying] = useState(false)
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
   const [fieldFlipped, setFieldFlipped] = useState(false)
+  const [markerSideFilter, setMarkerSideFilter] = useState<MarkerSideFilter>('all')
+  const [markerScope, setMarkerScope] = useState<MarkerScope>('current')
+  const [scoreTimelineOpen, setScoreTimelineOpen] = useState(false)
+  const [scoreAdjustmentEdit, setScoreAdjustmentEdit] = useState<SoccerScoreAdjustmentEvent | null>(null)
   const applyingRef = useRef(false)
 
   const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
@@ -135,6 +147,24 @@ export default function SoccerGameTracker() {
   const visibleParticipants = lineupTab === 'on_field' ? onField : bench
   const capturePreferences = soccerState.capturePreferences
   const fieldCaptureEnabled = healthy && projection.status === 'in_progress' && !isApplying
+  const reviewPeriodId = projection.currentPeriodId
+    ?? projection.completedPeriodIds[projection.completedPeriodIds.length - 1]
+    ?? null
+  const fieldMarkers: SoccerFieldMarker[] = soccerFieldReviewEvents(inspection.activeEvents, {
+    side: markerSideFilter,
+    scope: markerScope,
+    periodId: reviewPeriodId,
+  })
+    .map(event => ({
+      id: event.id,
+      x: event.location?.x ?? 0,
+      y: event.location?.y ?? 0,
+      teamSide: event.teamSide,
+      outcome: event.eventType === 'soccer.own_goal'
+        ? 'own_goal'
+        : (event.payload as { outcome: SoccerFieldMarker['outcome'] }).outcome,
+      label: markerLabel(event),
+    }))
 
   const setCaptureSide = (teamSide: 'tracked' | 'opponent') => {
     dispatch({ type: 'SET_SOCCER_CAPTURE_PREFERENCES', preferences: { teamSide } })
@@ -153,7 +183,7 @@ export default function SoccerGameTracker() {
     setDialogKind(null)
     setDialogParticipantId(null)
     setActionsOpen(false)
-    if (!result.inspection.complete) setMainTab('history')
+    if (!result.inspection.complete) setMainTab('timeline')
     return true
   }
 
@@ -192,10 +222,10 @@ export default function SoccerGameTracker() {
       <main className="mx-auto w-full min-w-0 max-w-2xl">
         <section className="px-4 py-4 text-center border-b border-slate-200 bg-white">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-            <div className="min-w-0">
+            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${state.gameInfo.teamName} scoring timeline`}>
               <p className="truncate text-xs font-semibold text-slate-500">{state.gameInfo.teamName}</p>
               <p className="text-4xl font-bold tabular-nums text-emerald-800">{state.homeTeamScore ?? 0}</p>
-            </div>
+            </button>
             <div className="min-w-24">
               <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase text-slate-500">
                 <span>{currentSegment?.label ?? (ended ? 'Final' : 'Break')}</span>
@@ -207,15 +237,15 @@ export default function SoccerGameTracker() {
               </div>
               <p className="mt-1 text-[11px] font-medium text-slate-500">{projection.clock.running ? 'Running' : 'Stopped'}</p>
             </div>
-            <div className="min-w-0">
+            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${state.gameInfo.opponentName} scoring timeline`}>
               <p className="truncate text-xs font-semibold text-slate-500">{state.gameInfo.opponentName}</p>
               <p className="text-4xl font-bold tabular-nums text-slate-800">{state.opponentScore}</p>
-            </div>
+            </button>
           </div>
 
           {!healthy ? (
-            <button type="button" onClick={() => setMainTab('history')} className="mt-5 w-full rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              Review History Issues
+            <button type="button" onClick={() => setMainTab('timeline')} className="mt-5 w-full rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              Review Timeline Issues
             </button>
           ) : ended ? (
             <button type="button" onClick={() => applyResult(reopenSoccerMatch(state, 'Recorder reopened match', options))} className="mt-5 w-full rounded-md bg-slate-800 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
@@ -245,17 +275,17 @@ export default function SoccerGameTracker() {
 
         {error && <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
-        {!healthy && mainTab !== 'history' && (
+        {!healthy && mainTab !== 'timeline' && (
           <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-3">
             <p className="text-sm font-bold text-red-800">Live controls are locked</p>
-            <p className="text-xs text-red-700 mt-1">Correct the diagnosed match history before recording more events.</p>
+            <p className="text-xs text-red-700 mt-1">Correct the diagnosed match timeline before recording more events.</p>
           </div>
         )}
 
         <nav className="grid grid-cols-3 border-b border-slate-200 bg-white" aria-label="Soccer tracker views">
           <TabButton active={mainTab === 'field'} label="Field" icon={<Map size={17} />} onClick={() => setMainTab('field')} />
           <TabButton active={mainTab === 'lineup'} label="Lineup" icon={<Users size={17} />} onClick={() => setMainTab('lineup')} />
-          <TabButton active={mainTab === 'history'} label="History" icon={<History size={17} />} onClick={() => setMainTab('history')} />
+          <TabButton active={mainTab === 'timeline'} label="Timeline" icon={<History size={17} />} onClick={() => setMainTab('timeline')} />
         </nav>
 
         <div className="px-4 py-5">
@@ -267,7 +297,7 @@ export default function SoccerGameTracker() {
               </div>
 
               {capturePreferences.teamSide === 'tracked' && (
-                <div className="-mx-4 w-[calc(100%+2rem)] max-w-[calc(100%+2rem)] overflow-x-auto px-4 pb-1">
+                <div className="-mx-4 w-[calc(100%+2rem)] max-w-[calc(100%+2rem)] overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   <div className="flex min-w-max gap-2">
                     <PlayerChip
                       active={capturePreferences.selectedParticipantId === null}
@@ -292,16 +322,45 @@ export default function SoccerGameTracker() {
                 </div>
               )}
 
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker side</p>
+                  <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
+                    <ModeButton active={markerSideFilter === 'all'} label="All" onClick={() => setMarkerSideFilter('all')} />
+                    <ModeButton active={markerSideFilter === 'tracked'} label="Tracked" onClick={() => setMarkerSideFilter('tracked')} />
+                    <ModeButton active={markerSideFilter === 'opponent'} label="Opp." onClick={() => setMarkerSideFilter('opponent')} />
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker period</p>
+                  <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                    <ModeButton active={markerScope === 'current'} label="Current" onClick={() => setMarkerScope('current')} />
+                    <ModeButton active={markerScope === 'match'} label="Match" onClick={() => setMarkerScope('match')} />
+                  </div>
+                </div>
+              </div>
+
               <SoccerField
                 trackedDirection={projection.attackingDirection}
                 captureSide={capturePreferences.teamSide}
                 flipped={fieldFlipped}
                 disabled={!fieldCaptureEnabled}
+                markers={fieldMarkers}
                 onFlip={() => setFieldFlipped(value => !value)}
                 onLocation={location => setCaptureDraft({
                   teamSide: capturePreferences.teamSide,
                   location,
                 })}
+                onMarker={eventId => {
+                  const event = inspection.activeEvents.find(candidate => candidate.id === eventId)
+                  if (event?.eventType !== 'soccer.shot' && event?.eventType !== 'soccer.own_goal') return
+                  setCaptureDraft({
+                    mode: 'edit',
+                    teamSide: event.teamSide,
+                    location: event.location,
+                    event: event as SoccerShotEvent | SoccerOwnGoalEvent,
+                  })
+                }}
               />
 
               <div className="grid grid-cols-2 gap-2">
@@ -358,7 +417,27 @@ export default function SoccerGameTracker() {
               {visibleParticipants.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No participants in this view.</p>}
             </>
           ) : (
-            <SoccerMatchHistory state={state} inspection={inspection} busy={isApplying} onApply={applyResult} />
+            <SoccerMatchHistory
+              state={state}
+              inspection={inspection}
+              busy={isApplying}
+              onApply={applyResult}
+              onAddMissed={() => setCaptureDraft({
+                mode: 'historical',
+                teamSide: capturePreferences.teamSide,
+                location: null,
+              })}
+              onEditAttacking={event => setCaptureDraft({
+                mode: 'edit',
+                teamSide: event.teamSide,
+                location: event.location,
+                event,
+              })}
+              onEditScoreAdjustment={event => {
+                setScoreAdjustmentEdit(event)
+                setScoreTimelineOpen(true)
+              }}
+            />
           )}
         </div>
       </main>
@@ -400,6 +479,34 @@ export default function SoccerGameTracker() {
           preferences: { selectedParticipantId: participantId, selectionInitialized: true },
         })}
         onClose={() => setCaptureDraft(null)}
+      />
+
+      <SoccerScoreTimelineDialog
+        open={scoreTimelineOpen}
+        state={state}
+        inspection={inspection}
+        recorderUserId={user?.id ?? null}
+        initialEdit={scoreAdjustmentEdit}
+        busy={isApplying}
+        onApply={result => {
+          const applied = applyResult(result)
+          if (applied && result.ok && !result.inspection.complete) setScoreTimelineOpen(false)
+          return applied
+        }}
+        onEditAttacking={event => {
+          setScoreTimelineOpen(false)
+          setScoreAdjustmentEdit(null)
+          setCaptureDraft({
+            mode: 'edit',
+            teamSide: event.teamSide,
+            location: event.location,
+            event,
+          })
+        }}
+        onClose={() => {
+          setScoreTimelineOpen(false)
+          setScoreAdjustmentEdit(null)
+        }}
       />
 
       <ConfirmDialog
@@ -503,4 +610,13 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function limitValue(used: number, limit: number | null): string {
   return limit === null ? `${used}/-` : `${used}/${limit}`
+}
+
+function markerLabel(event: GameEvent): string {
+  const side = event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'
+  if (event.eventType === 'soccer.own_goal') return `Own goal, ${side.toLowerCase()} side benefits`
+  const payload = event.payload as { outcome?: unknown }
+  const outcome = typeof payload.outcome === 'string' ? payload.outcome.replace('_', ' ') : 'shot'
+  const shooter = event.actors.find(actor => actor.role === 'shooter')
+  return `${side} ${outcome}${shooter?.label ? ` by ${shooter.label}` : ''}`
 }

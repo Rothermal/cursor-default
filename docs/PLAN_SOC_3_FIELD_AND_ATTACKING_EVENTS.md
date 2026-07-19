@@ -4,7 +4,7 @@ Detailed implementation plan for soccer field capture, attacking events, score p
 and correction history. SOC-3 builds on the event-backed match state from SOC-2 and is split
 into three sequential pull requests so the domain contract lands before the live capture UI.
 
-Status: In progress. Decisions are resolved; SOC-3A and SOC-3B are implemented and SOC-3C is next.
+Status: Complete. SOC-3A, SOC-3B, and SOC-3C are implemented.
 
 ---
 
@@ -45,7 +45,7 @@ belong to SOC-4 through SOC-6.
 - Add event-driven score controls and quick unknown-location Goal actions for either side.
 - Persist the latest eligible tracked-player and capture-side choices with the parked game.
 
-### SOC-3C: Timeline, correction, and field review
+### SOC-3C: Timeline, correction, and field review (complete)
 
 - Replace soccer History with one newest-first Timeline for match-control and attacking events.
 - Add All, Attacking, and Match Control filters with removed events collapsed by default.
@@ -56,7 +56,7 @@ belong to SOC-4 through SOC-6.
 - Add scoring-timeline access from the score and explicit signed score corrections with reasons.
 - Complete mobile, parking/resume, correction, and regression coverage.
 
-SOC-3A and SOC-3B are merged sequentially. SOC-3C starts after SOC-3B is merged.
+SOC-3A, SOC-3B, and SOC-3C were delivered sequentially. SOC-4 is the next soccer phase.
 
 ---
 
