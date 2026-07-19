@@ -142,7 +142,9 @@ the anchored live clock unchanged. SOC-3B adds the full-pitch live capture surfa
 field flipping, persisted side/participant defaults, side-aware linked actors, quick goals, and
 projection-driven score. SOC-3C adds filtered field markers, the unified Timeline, shared
 attacking-event correction, bounded historical adds, scoring history, and signed score
-adjustments. SOC-4 is the next soccer phase.
+adjustments. SOC-4 planning is complete: SOC-4A adds the remaining event domain,
+SOC-4B adds normal-match capture and review, and SOC-4C adds shootouts and structured
+outcomes. No SOC-4 runtime behavior has shipped yet.
 
 SOC-2B and SOC-2C add a development-only Soccer workspace through the normal chooser and
 dashboard. The shared `/setup`, `/players`, and `/game` routes select soccer-specific setup,
@@ -284,7 +286,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md`](PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-3 complete; SOC-4 defensive, discipline, and team events is next |
+| [`PLAN_SOC_4_MATCH_EVENT_CATALOG.md`](PLAN_SOC_4_MATCH_EVENT_CATALOG.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-3 complete; SOC-4 plan reviewed; SOC-4A match event domain is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback
