@@ -67,10 +67,10 @@ The three slices are implemented and reviewed sequentially.
    independent, the latest mode is persisted with the parked game, and field taps never depend
    on a hidden long-press or gesture convention. Decision 13 finalizes the mode catalog.
 7. Attacking and defensive markers are displayed together by default. Team side remains
-   encoded by the existing tracked/opponent colors, while distinct shapes encode attacking
-   outcomes and defensive action types. An independent `All | Attack | Defense` marker filter
-   may reduce clutter but is not coupled to capture mode. Switching capture mode changes only
-   what the next field tap records and does not reload the field.
+   encoded by the existing tracked/opponent colors, while distinct shapes encode event types
+   and outcomes. The independent marker filter is `All | Shots | Defense | Incidents`, as
+   finalized in Decision 17, and is not coupled to capture mode. Switching capture mode changes
+   only what the next field tap records and does not reload the field.
 8. A `soccer.foul` may include the committing actor's sanction when the foul and card form one
    incident. A standalone `soccer.card` represents a card without a foul or a card issued to a
    different recipient. Standalone recipients may be a player, named or unnamed coach/staff,
@@ -78,9 +78,10 @@ The three slices are implemented and reviewed sequentially.
 9. Sanctions are `none`, `yellow`, `straight_red`, and `second_yellow_red`. A foul may have no
    sanction; a standalone card must have yellow, straight red, or second-yellow red. Warnings,
    temporary dismissals/blue cards, and competition-specific sanctions are deferred modules.
-10. `second_yellow_red` requires an earlier active yellow for the same player in the match. It
-    derives one additional yellow and one red. Removing or revising the prerequisite yellow
-    preserves the raw revision history but exposes a projection diagnostic until repaired.
+10. `second_yellow_red` requires an earlier active yellow for the same player in the same
+    discipline scope. Normal/extra-time and shootout cautions use separate scopes. It derives
+    one additional yellow and one red. Removing or revising the prerequisite yellow preserves
+    the raw revision history but exposes a projection diagnostic until repaired.
 11. The match rules snapshot supports both IFAB-style and NFHS-style yellow-card handling through
     an explicit policy: `stay_on` or `must_leave_may_replace`. Under the latter, an on-field
     tracked player's yellow prompts `Replace now` or `Play short`; immediate replacement records
@@ -446,6 +447,11 @@ Projection derives kick number, initial-series position, sudden-death round, and
 attempt advances. `retake` keeps the same side, kicker identity/anonymous slot, and kick slot.
 `forfeited` advances as not scored. A participant/known label cannot repeat before every eligible
 slot has kicked in that round. Anonymous opponent kicks consume stable numbered slots.
+
+The goalkeeper actor is required for every raw kick event, including `retake` and `forfeited`.
+It identifies the defending goalkeeper designated for that attempt or slot; `unknown` preserves
+the requirement when the recorder cannot identify that goalkeeper. This keeps goalkeeper state
+and correction behavior uniform without treating a forfeited kick as a normal save opportunity.
 
 No new shootout-completed payload stores a winner. Once projection says the sequence is decided,
 the existing `soccer.match_ended` with `completed` becomes the explicit completion event and
