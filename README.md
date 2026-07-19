@@ -286,6 +286,9 @@ docs/
 ├── PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md # Held draft: shot detail / edit
 ├── PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md # Soccer product model and SOC-1 through SOC-6 roadmap
 ├── PLAN_SOC_1_SHARED_EVENT_FOUNDATION.md # Versioned event foundation, projection, and cloud schema
+├── PLAN_SOC_2_MATCH_RULES_LINEUPS_AND_CLOCK.md # Soccer setup, match state, clock, and substitutions
+├── PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md # Soccer field capture, attacking events, and Timeline
+├── PLAN_SOC_4_MATCH_EVENT_CATALOG.md # Defense, discipline, team events, shootouts, and outcomes
 ├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
@@ -392,7 +395,8 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] **Soccer implementation (SOC-4 through SOC-6)** - defense/discipline/team events, cloud sync, summaries, and release ([roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer match event catalog (SOC-4A through SOC-4C)** - implementation-ready plan for defense, discipline, team events, shootouts, and structured outcomes ([plan](docs/PLAN_SOC_4_MATCH_EVENT_CATALOG.md))
+- [ ] **Soccer implementation (SOC-5 through SOC-6)** - cloud sync, summaries, settings, aggregates, QA, and release ([roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))

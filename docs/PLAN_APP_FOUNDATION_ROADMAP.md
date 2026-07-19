@@ -5,8 +5,9 @@ program that follows it. This plan covers sport-aware navigation, focused settin
 pages, Google authentication, account management, and SOC-0 through SOC-6.
 
 The intent is to make the app easier to navigate for basketball today while creating a
-clean path for multiple sports in progress at the same time. Each remaining SOC phase below
-should be expanded into its own execution plan before implementation.
+clean path for multiple sports in progress at the same time. SOC-0 and SOC-1 through SOC-3
+are complete. The reviewed SOC-4 execution plan is split into SOC-4A through SOC-4C, with
+SOC-4A next. SOC-5 and SOC-6 still require phase planning before implementation.
 
 ---
 
@@ -249,9 +250,9 @@ SOC-0 replaces the dormant soccer stat-grid assumptions with an event-first mode
 | Phase | Purpose |
 |---|---|
 | SOC-1 | Complete: shared game-event foundation, local persistence, derivation engine, and cloud schema |
-| SOC-2 | Soccer rules, tracked-team side, lineup roles, clock, periods, direction, substitutions, and minutes |
-| SOC-3 | Full field, attacking events, chance creation, goalkeeper links, score events, and timeline editing |
-| SOC-4 | Defense, discipline/staff cards, corners, offsides, shootouts, and structured outcomes |
+| SOC-2 | Complete: soccer rules, tracked-team side, lineup roles, clock, periods, direction, substitutions, and minutes |
+| SOC-3 | Complete: full field, attacking events, chance creation, goalkeeper links, score events, and Timeline editing |
+| SOC-4 | Planned: defense, discipline/staff cards, team events, shootouts, and structured outcomes; SOC-4A is next |
 | SOC-5 | Cloud sync, independent recorder streams, primary resolution, finalization, and resume hardening |
 | SOC-6 | Soccer summaries, field maps, season aggregates, settings modules, QA, and enablement |
 
@@ -269,9 +270,9 @@ Each phase receives its own execution plan and one-question-at-a-time Q&A before
 | **AUTH-2** | Account management | Implemented; uses the Account destination created by NAV-2 for profile editing, connected methods, and Google linking. |
 | **SOC-0** | Soccer product/technical plan | Complete; defines event-first product model and six-phase implementation roadmap. |
 | **SOC-1** | Shared event foundation | Complete; versioned streams, deterministic projection, and isolated recorder-owned cloud storage. |
-| **SOC-2** | Match rules, lineups, and clock | Build soccer match state on the shared event foundation. |
-| **SOC-3** | Field and attacking events | Deliver the soccer-native field and linked attacking workflow. |
-| **SOC-4** | Remaining core events | Add defense, discipline, team events, shootouts, and outcomes. |
+| **SOC-2** | Match rules, lineups, and clock | Complete; soccer match state is built on the shared event foundation. |
+| **SOC-3** | Field and attacking events | Complete; soccer field capture, attacking workflow, and Timeline are shipped development-only. |
+| **SOC-4A-C** | Remaining core events | Plan complete; implement the event domain, normal-match capture, then shootouts and outcomes. |
 | **SOC-5** | Event cloud sync | Harden independent recorder streams, resolution, parking, and finalization. |
 | **SOC-6** | Summary and release | Add soccer reporting, settings, season aggregates, QA, and enablement. |
 

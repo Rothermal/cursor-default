@@ -545,7 +545,7 @@ migration and conflict strategy belong in SOC-1 and SOC-5 plans.
 | SOC-1 | Shared game-event foundation, local persistence, derivation engine, and cloud schema | Versioned soccer events can round-trip locally and through the schema behind disabled UI; deterministic projections are tested |
 | SOC-2 | Soccer rules, tracked-team side, lineup roles, clock, periods, direction, substitutions, and minutes | A local soccer match can maintain corrected lineup/time state across park/resume |
 | SOC-3 | Full field, shot/goal/chance flows, goalkeeper links, score events, and editable timeline | Core attacking game can be tracked locally end-to-end with consistent derived totals |
-| SOC-4 | Defense, discipline/staff cards, corners, offsides, shootouts, and structured outcomes | Core soccer event catalog is usable and editable locally |
+| SOC-4 | Defense, discipline/staff cards, corners, offsides, shootouts, and structured outcomes ([execution plan](PLAN_SOC_4_MATCH_EVENT_CATALOG.md)) | Core soccer event catalog is usable and editable locally |
 | SOC-5 | Cloud sync, independent recorder streams, primary resolution, finalization, and resume hardening | Soccer games survive offline/cloud transitions and resolve without cross-recorder duplication |
 | SOC-6 | Soccer summaries, field maps, season aggregates, settings modules, regression hardening, and enablement | Soccer can be enabled as a supported sport without regressing basketball or parking |
 
