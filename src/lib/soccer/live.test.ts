@@ -573,7 +573,10 @@ describe('soccer live match actions', () => {
     expect(flipped.ok).toBe(true)
     if (!flipped.ok) return
     expect(flipped.state.sportGameState?.projection.attackingDirection).toBe('right_to_left')
-    expect(soccerAttackingDirectionAt(flipped.state, kickoffAt + 5_000)).toBe('right_to_left')
+    expect(soccerAttackingDirectionAt(flipped.state, {
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 5_000,
+    })).toBe('right_to_left')
 
     const anonymous = {
       id: 'match-late',
@@ -594,8 +597,15 @@ describe('soccer live match actions', () => {
     expect(added.state.sportGameState?.projection.participants['match-late']?.displayName).toBe('Trialist')
     expect(added.state.sportGameState?.projection.participants['match-late']?.playerId).toBeNull()
 
+    const withRosterPlayer: GameState = {
+      ...added.state,
+      players: [
+        ...added.state.players,
+        { id: 'late-player', name: 'Late Player', number: '17', stats: {} },
+      ],
+    }
     const resolved = resolveSoccerParticipant(
-      added.state,
+      withRosterPlayer,
       'match-late',
       'late-player',
       'Late Player',
