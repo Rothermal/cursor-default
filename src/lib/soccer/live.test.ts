@@ -4,18 +4,25 @@ import { createInitialState, gameReducer } from '../gameReducer'
 import { prepareSoccerKickoff } from './kickoff'
 import {
   adjustSoccerClock,
+  addSoccerMatchParticipant,
+  deleteSoccerHistoryEvent,
   endSoccerMatch,
   endSoccerPeriod,
   inspectSoccerHistory,
   isSoccerHalftimeBreak,
+  recordHistoricalSoccerOwnGoal,
   recordHistoricalSoccerShot,
   recordSoccerScoreAdjustment,
   recordSoccerRoleChange,
+  recordSoccerDirectionChange,
   recordSoccerOwnGoal,
   recordSoccerShot,
   recordSoccerSubstitution,
   resolveSoccerCaptureSaveOperation,
+  resolveSoccerParticipant,
   reopenSoccerMatch,
+  restoreSoccerHistoryEvent,
+  reviseSoccerOwnGoal,
   reviseSoccerScoreAdjustment,
   reviseSoccerShot,
   soccerAttackingDirectionAt,
@@ -500,6 +507,160 @@ describe('soccer live match actions', () => {
       primary: '00:00',
       overrun: '+01:00',
       periodElapsedMs: 46 * 60_000,
+    })
+  })
+
+  it('adds, revises, deletes, and restores a historical own goal', () => {
+    const ended = endSoccerPeriod(kickedOffState(), {
+      recorderUserId,
+      nowMs: kickoffAt + 60_000,
+      eventIds: [uuid(4), uuid(5)],
+    })
+    expect(ended.ok).toBe(true)
+    if (!ended.ok) return
+
+    const added = recordHistoricalSoccerOwnGoal(ended.state, {
+      teamSide: 'opponent',
+      location: { x: 0.12, y: 0.48, attackingDirection: 'right_to_left' },
+      ownGoalBy: { kind: 'participant', participantId: 'match-defender' },
+      goalkeeper: { kind: 'participant', participantId: 'match-keeper' },
+    }, {
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 25_000,
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 90_000,
+      eventIds: [uuid(6)],
+    })
+    expect(added.ok).toBe(true)
+    if (!added.ok) return
+    expect(added.state.opponentScore).toBe(1)
+
+    const ownGoal = inspectSoccerHistory(added.state).activeEvents.find(event => event.id === uuid(6))
+    if (!ownGoal) throw new Error('historical own goal missing')
+    const revised = reviseSoccerOwnGoal(added.state, ownGoal.id, {
+      teamSide: 'tracked',
+      location: { x: 0.88, y: 0.5, attackingDirection: 'left_to_right' },
+      ownGoalBy: { kind: 'unknown', label: 'Opponent 4' },
+    }, {
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 35_000,
+    }, '2026-07-18T12:02:00.000Z')
+    expect(revised.ok).toBe(true)
+    if (!revised.ok) return
+    expect(revised.state.homeTeamScore).toBe(1)
+    expect(revised.state.opponentScore).toBe(0)
+
+    const deleted = deleteSoccerHistoryEvent(revised.state, ownGoal.id, '2026-07-18T12:03:00.000Z')
+    expect(deleted.ok).toBe(true)
+    if (!deleted.ok) return
+    expect(deleted.state.homeTeamScore).toBe(0)
+    expect(inspectSoccerHistory(deleted.state).deletedEvents.some(event => event.id === ownGoal.id)).toBe(true)
+
+    const restored = restoreSoccerHistoryEvent(deleted.state, ownGoal.id, '2026-07-18T12:04:00.000Z')
+    expect(restored.ok).toBe(true)
+    if (!restored.ok) return
+    expect(restored.state.homeTeamScore).toBe(1)
+    expect(inspectSoccerHistory(restored.state).activeEvents.some(event => event.id === ownGoal.id)).toBe(true)
+  })
+
+  it('records direction changes and late participant resolve through live actions', () => {
+    const flipped = recordSoccerDirectionChange(kickedOffState(), 'right_to_left', {
+      recorderUserId,
+      nowMs: kickoffAt + 5_000,
+      eventIds: [uuid(4)],
+    })
+    expect(flipped.ok).toBe(true)
+    if (!flipped.ok) return
+    expect(flipped.state.sportGameState?.projection.attackingDirection).toBe('right_to_left')
+    expect(soccerAttackingDirectionAt(flipped.state, kickoffAt + 5_000)).toBe('right_to_left')
+
+    const anonymous = {
+      id: 'match-late',
+      kind: 'anonymous' as const,
+      playerId: null,
+      displayName: 'Trialist',
+      number: '99',
+      initialStatus: 'bench' as const,
+      initialRole: { group: 'forward' as const, label: null },
+    }
+    const added = addSoccerMatchParticipant(flipped.state, anonymous, 'bench', {
+      recorderUserId,
+      nowMs: kickoffAt + 6_000,
+      eventIds: [uuid(5)],
+    })
+    expect(added.ok).toBe(true)
+    if (!added.ok) return
+    expect(added.state.sportGameState?.projection.participants['match-late']?.displayName).toBe('Trialist')
+    expect(added.state.sportGameState?.projection.participants['match-late']?.playerId).toBeNull()
+
+    const resolved = resolveSoccerParticipant(
+      added.state,
+      'match-late',
+      'late-player',
+      'Late Player',
+      '17',
+      {
+        recorderUserId,
+        nowMs: kickoffAt + 7_000,
+        eventIds: [uuid(6)],
+      }
+    )
+    expect(resolved.ok).toBe(true)
+    if (!resolved.ok) return
+    expect(resolved.state.sportGameState?.projection.participants['match-late']).toMatchObject({
+      playerId: 'late-player',
+      displayName: 'Late Player',
+      number: '17',
+    })
+  })
+
+  it('rejects capture actors that are missing or unlabeled', () => {
+    const missing = recordSoccerShot(kickedOffState(), {
+      teamSide: 'tracked',
+      outcome: 'goal',
+      situation: 'open_play',
+      location: null,
+      shooter: { kind: 'participant', participantId: 'missing-player' },
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 10_000,
+      eventIds: [uuid(4)],
+    })
+    expect(missing).toMatchObject({ ok: false, message: 'A selected match participant is unavailable.' })
+
+    const blank = recordSoccerOwnGoal(kickedOffState(), {
+      teamSide: 'opponent',
+      location: null,
+      ownGoalBy: { kind: 'unknown', label: '   ' },
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 10_000,
+      eventIds: [uuid(4)],
+    })
+    expect(blank).toMatchObject({ ok: false, message: 'Actor labels cannot be empty.' })
+
+    const paused = endSoccerPeriod(kickedOffState(), {
+      recorderUserId,
+      nowMs: kickoffAt + 60_000,
+      eventIds: [uuid(4), uuid(5)],
+    })
+    expect(paused.ok).toBe(true)
+    if (!paused.ok) return
+    const outsidePeriod = recordSoccerShot(paused.state, {
+      teamSide: 'tracked',
+      outcome: 'goal',
+      situation: 'open_play',
+      location: null,
+      shooter: { kind: 'participant', participantId: 'match-defender' },
+    }, {
+      recorderUserId,
+      nowMs: kickoffAt + 90_000,
+      eventIds: [uuid(6)],
+    })
+    expect(outsidePeriod).toMatchObject({
+      ok: false,
+      message: 'Shots can only be recorded during an active period.',
     })
   })
 })

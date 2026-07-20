@@ -6,7 +6,9 @@ import {
   adjustSoccerClock,
   createSoccerUuid,
   endSoccerMatch,
+  formatSoccerInputTime,
   isSoccerHalftimeBreak,
+  parseSoccerInputTime,
   recordSoccerRoleChanges,
   recordSoccerRulesChange,
   recordSoccerSubstitution,
@@ -285,12 +287,12 @@ function RoleChangeForm({ state, options, initialParticipantId, onApply }: FormP
 function ClockCorrectionForm({ state, options, onApply }: FormProps) {
   const projection = soccerProjection(state)
   const displayValue = soccerClockDisplayValue(state)
-  const [value, setValue] = useState(formatInputTime(
+  const [value, setValue] = useState(formatSoccerInputTime(
     displayValue?.canonicalElapsedMs ?? projection.clock.elapsedMs
   ))
   const [error, setError] = useState<string | null>(null)
   const submit = () => {
-    const elapsedMs = parseInputTime(value)
+    const elapsedMs = parseSoccerInputTime(value)
     if (elapsedMs === null) {
       setError('Enter time as minutes and seconds, for example 45:30.')
       return
@@ -616,15 +618,4 @@ function updateById<T extends { id: string }>(
 
 function limitValue(used: number, limit: number | null): string {
   return limit === null ? `${used}/-` : `${used}/${limit}`
-}
-
-function formatInputTime(elapsedMs: number): string {
-  const seconds = Math.floor(elapsedMs / 1_000)
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
-}
-
-function parseInputTime(value: string): number | null {
-  const match = value.trim().match(/^(\d+):([0-5]\d)$/)
-  if (!match) return null
-  return (Number(match[1]) * 60 + Number(match[2])) * 1_000
 }
