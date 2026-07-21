@@ -4,19 +4,22 @@ import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
 import {
   deleteSoccerHistoryEvent,
-  formatSoccerDuration,
+  formatSoccerInputTime,
+  parseSoccerInputTime,
   restoreSoccerHistoryEvent,
+  soccerEventMatchesTimelineFilter,
+  soccerEventTimeLabel,
   soccerPeriodTimings,
   updateSoccerHistoryEvent,
   type SoccerLiveResult,
   type SoccerMatchEvent,
   type SoccerOwnGoalEvent,
-  type SoccerPeriodTiming,
   type SoccerMatchRules,
   type SoccerRole,
   type SoccerRoleGroup,
   type SoccerScoreAdjustmentEvent,
   type SoccerShotEvent,
+  type SoccerTimelineFilter,
 } from '../../lib/soccer'
 import type { GameEvent, GameEventInspection } from '../../lib/gameEvents/types'
 
@@ -29,8 +32,6 @@ interface SoccerMatchHistoryProps {
   onEditAttacking: (event: SoccerShotEvent | SoccerOwnGoalEvent) => void
   onEditScoreAdjustment: (event: SoccerScoreAdjustmentEvent) => void
 }
-
-type TimelineFilter = 'all' | 'attacking' | 'match_control'
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
   { value: 'goalkeeper', label: 'Goalkeeper' },
@@ -51,11 +52,11 @@ export default function SoccerMatchHistory({
 }: SoccerMatchHistoryProps) {
   const [editing, setEditing] = useState<SoccerMatchEvent | null>(null)
   const [deleting, setDeleting] = useState<GameEvent | null>(null)
-  const [filter, setFilter] = useState<TimelineFilter>('all')
+  const [filter, setFilter] = useState<SoccerTimelineFilter>('all')
   const [removedOpen, setRemovedOpen] = useState(false)
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
-  const active = [...inspection.activeEvents].reverse().filter(event => eventMatchesFilter(event, filter))
-  const deleted = [...inspection.deletedEvents].reverse().filter(event => eventMatchesFilter(event, filter))
+  const active = [...inspection.activeEvents].reverse().filter(event => soccerEventMatchesTimelineFilter(event, filter))
+  const deleted = [...inspection.deletedEvents].reverse().filter(event => soccerEventMatchesTimelineFilter(event, filter))
 
   const editEvent = (event: GameEvent) => {
     if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
@@ -100,7 +101,7 @@ export default function SoccerMatchHistory({
             <HistoryRow
               key={event.id}
               event={event}
-              timeLabel={timelineTimeLabel(event, timings)}
+              timeLabel={soccerEventTimeLabel(event, timings)}
               onEdit={() => editEvent(event)}
               onDelete={() => setDeleting(event)}
             />
@@ -121,7 +122,7 @@ export default function SoccerMatchHistory({
                 <HistoryRow
                   key={event.id}
                   event={event}
-                  timeLabel={timelineTimeLabel(event, timings)}
+                  timeLabel={soccerEventTimeLabel(event, timings)}
                   deleted
                   onRestore={() => onApply(restoreSoccerHistoryEvent(state, event.id))}
                 />
@@ -358,8 +359,8 @@ function SegmentEditor({ value, segments, onChange }: { value: string; segments:
 }
 
 function TimeEditor({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  const [draft, setDraft] = useState(formatInputTime(value))
-  return <label className="block text-xs font-medium text-slate-600">{label}<input value={draft} onChange={change => setDraft(change.target.value)} onBlur={() => { const parsed = parseInputTime(draft); if (parsed !== null) onChange(parsed); else setDraft(formatInputTime(value)) }} className="input-field mt-1 text-center tabular-nums" inputMode="numeric" /></label>
+  const [draft, setDraft] = useState(formatSoccerInputTime(value))
+  return <label className="block text-xs font-medium text-slate-600">{label}<input value={draft} onChange={change => setDraft(change.target.value)} onBlur={() => { const parsed = parseSoccerInputTime(draft); if (parsed !== null) onChange(parsed); else setDraft(formatSoccerInputTime(value)) }} className="input-field mt-1 text-center tabular-nums" inputMode="numeric" /></label>
 }
 
 function RulesEditor({ rules, onChange }: { rules: SoccerMatchRules; onChange: (rules: SoccerMatchRules) => void }) {
@@ -427,38 +428,6 @@ function FilterButton({ active, label, onClick }: { active: boolean; label: stri
   return <button type="button" onClick={onClick} className={`min-h-9 rounded px-1 text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
 }
 
-function eventMatchesFilter(event: GameEvent, filter: TimelineFilter): boolean {
-  if (filter === 'all') return true
-  return filter === 'attacking'
-    ? isAttackingEventType(event.eventType)
-    : !isAttackingEventType(event.eventType)
-}
-
-function timelineTimeLabel(event: GameEvent, timings: SoccerPeriodTiming[]): string {
-  if (event.elapsedMs === null) return 'No match time'
-  const timing = timings.find(item => item.period.id === event.period.id)
-  return timing
-    ? `${timing.label} · ${formatSoccerDuration(Math.max(0, event.elapsedMs - timing.startElapsedMs))}`
-    : formatSoccerDuration(event.elapsedMs)
-}
-
-function isAttackingEventType(eventType: string): boolean {
-  return eventType === 'soccer.shot' ||
-    eventType === 'soccer.own_goal' ||
-    eventType === 'soccer.score_adjustment'
-}
-
 function defaultRole(): SoccerRole {
   return { group: 'midfielder', label: null }
-}
-
-function formatInputTime(elapsedMs: number): string {
-  const seconds = Math.floor(elapsedMs / 1_000)
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
-}
-
-function parseInputTime(value: string): number | null {
-  const match = value.trim().match(/^(\d+):([0-5]\d)$/)
-  if (!match) return null
-  return (Number(match[1]) * 60 + Number(match[2])) * 1_000
 }

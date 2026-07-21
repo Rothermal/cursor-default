@@ -31,6 +31,7 @@ describe('soccer field coordinates', () => {
       candidate('shot-2', 'soccer.shot', 'opponent', 'first'),
       candidate('own-1', 'soccer.own_goal', 'tracked', 'second'),
       { ...candidate('control', 'soccer.clock_paused', 'tracked', 'first'), location: null },
+      { ...candidate('unlocated', 'soccer.own_goal', 'opponent', 'first'), location: null },
     ]
     expect(soccerFieldReviewEvents(events, {
       side: 'tracked',
@@ -38,10 +39,20 @@ describe('soccer field coordinates', () => {
       periodId: 'first',
     }).map(event => event.id)).toEqual(['shot-1'])
     expect(soccerFieldReviewEvents(events, {
+      side: 'opponent',
+      scope: 'current',
+      periodId: 'first',
+    }).map(event => event.id)).toEqual(['shot-2'])
+    expect(soccerFieldReviewEvents(events, {
       side: 'all',
       scope: 'match',
       periodId: 'first',
     }).map(event => event.id)).toEqual(['shot-1', 'shot-2', 'own-1'])
+    expect(soccerFieldReviewEvents(events, {
+      side: 'all',
+      scope: 'current',
+      periodId: null,
+    })).toEqual([])
   })
 })
 

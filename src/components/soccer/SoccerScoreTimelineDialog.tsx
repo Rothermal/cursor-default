@@ -2,13 +2,13 @@ import { Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { GameEvent, GameEventInspection, GameEventTeamSide } from '../../lib/gameEvents/types'
 import {
-  formatSoccerDuration,
+  isSoccerScoringEvent,
   recordSoccerScoreAdjustment,
   reviseSoccerScoreAdjustment,
+  soccerEventTimeLabel,
   soccerPeriodTimings,
   type SoccerLiveResult,
   type SoccerOwnGoalEvent,
-  type SoccerPeriodTiming,
   type SoccerScoreAdjustmentEvent,
   type SoccerShotEvent,
 } from '../../lib/soccer'
@@ -39,7 +39,7 @@ export default function SoccerScoreTimelineDialog({
 }: SoccerScoreTimelineDialogProps) {
   const [editing, setEditing] = useState<SoccerScoreAdjustmentEvent | 'new' | null>(null)
   const scoringEvents = useMemo(
-    () => [...inspection.activeEvents].reverse().filter(isScoringEvent),
+    () => [...inspection.activeEvents].reverse().filter(isSoccerScoringEvent),
     [inspection.activeEvents]
   )
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
@@ -80,7 +80,7 @@ export default function SoccerScoreTimelineDialog({
                   <ScoringRow
                     key={event.id}
                     event={event}
-                    timeLabel={scoringTimeLabel(event, timings)}
+                    timeLabel={soccerEventTimeLabel(event, timings)}
                     onEdit={() => {
                       if (event.eventType === 'soccer.score_adjustment') {
                         setEditing(event as SoccerScoreAdjustmentEvent)
@@ -202,21 +202,7 @@ function ModeButton({ active, label, onClick }: { active: boolean; label: string
   return <button type="button" onClick={onClick} className={`min-h-9 rounded text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
 }
 
-function isScoringEvent(event: GameEvent): boolean {
-  return event.eventType === 'soccer.own_goal' ||
-    event.eventType === 'soccer.score_adjustment' ||
-    (event.eventType === 'soccer.shot' && (event.payload as { outcome?: unknown }).outcome === 'goal')
-}
-
 function actorLabel(event: GameEvent, role: string): string {
   const actor = event.actors.find(item => item.role === role)
   return actor?.label ?? (actor?.kind === 'team' ? 'Team' : 'Unknown')
-}
-
-function scoringTimeLabel(event: GameEvent, timings: SoccerPeriodTiming[]): string {
-  if (event.elapsedMs === null) return 'No match time'
-  const timing = timings.find(item => item.period.id === event.period.id)
-  return timing
-    ? `${timing.label} · ${formatSoccerDuration(Math.max(0, event.elapsedMs - timing.startElapsedMs))}`
-    : formatSoccerDuration(event.elapsedMs)
 }
