@@ -25,6 +25,11 @@ export const DEFAULT_SOCCER_MATCH_RULES: SoccerMatchRules = {
   substitutionLimit: null,
   substitutionWindowLimit: null,
   maxAssistsPerGoal: 2,
+  yellowCardExitPolicy: 'stay_on',
+  redCardReplacementPolicy: 'play_short',
+  tieResolution: 'draw_allowed',
+  shootoutInitialKicksPerSide: 5,
+  allowUnusedGoalkeeperShootoutReplacement: false,
 }
 
 export type SoccerMatchRulesOverride = {
@@ -39,6 +44,11 @@ export type SoccerMatchRulesOverride = {
   substitutionLimit?: number | null
   substitutionWindowLimit?: number | null
   maxAssistsPerGoal?: number
+  yellowCardExitPolicy?: SoccerMatchRules['yellowCardExitPolicy']
+  redCardReplacementPolicy?: SoccerMatchRules['redCardReplacementPolicy']
+  tieResolution?: SoccerMatchRules['tieResolution']
+  shootoutInitialKicksPerSide?: number
+  allowUnusedGoalkeeperShootoutReplacement?: boolean
 }
 
 export interface SoccerRuleLayers {
@@ -49,20 +59,48 @@ export interface SoccerRuleLayers {
 }
 
 export function resolveSoccerMatchRules(layers: SoccerRuleLayers = {}): SoccerMatchRules {
-  const resolved = [
+  const orderedLayers = [
     layers.appDefaults,
     layers.personalDefaults,
     layers.seasonRules,
     layers.gameOverrides,
-  ].reduce<SoccerMatchRules>((rules, layer) => ({ ...rules, ...(layer ?? {}) } as SoccerMatchRules), {
+  ]
+  const resolved = orderedLayers.reduce<SoccerMatchRules>((rules, layer) => ({
+    ...rules,
+    ...(layer ?? {}),
+  } as SoccerMatchRules), {
     ...DEFAULT_SOCCER_MATCH_RULES,
     regulationSegments: DEFAULT_SOCCER_MATCH_RULES.regulationSegments.map(segment => ({ ...segment })),
     extraTimeSegments: DEFAULT_SOCCER_MATCH_RULES.extraTimeSegments.map(segment => ({ ...segment })),
   })
 
+  const tieResolutionWasSet = orderedLayers.some(layer => layer?.tieResolution !== undefined)
+  const legacyAvailabilityWasSet = orderedLayers.some(layer =>
+    layer?.extraTimeAvailable !== undefined || layer?.shootoutAvailable !== undefined
+  )
+  synchronizeTieResolution(resolved, tieResolutionWasSet || !legacyAvailabilityWasSet)
+
   const error = validateSoccerMatchRules(resolved)
   if (error) throw new Error(error)
   return structuredClone(resolved)
+}
+
+export function normalizeSoccerMatchRules(value: unknown): SoccerMatchRules | null {
+  if (!isPlainObject(value)) return null
+  const normalized = {
+    ...value,
+    yellowCardExitPolicy: value.yellowCardExitPolicy ?? 'stay_on',
+    redCardReplacementPolicy: value.redCardReplacementPolicy ?? 'play_short',
+    tieResolution: value.tieResolution ?? tieResolutionFromLegacy(
+      value.extraTimeAvailable === true,
+      value.shootoutAvailable === true
+    ),
+    shootoutInitialKicksPerSide: value.shootoutInitialKicksPerSide ?? 5,
+    allowUnusedGoalkeeperShootoutReplacement:
+      value.allowUnusedGoalkeeperShootoutReplacement ?? false,
+  } as unknown as SoccerMatchRules
+  synchronizeTieResolution(normalized, true)
+  return validateSoccerMatchRules(normalized) === null ? structuredClone(normalized) : null
 }
 
 export function validateSoccerRole(value: unknown): value is SoccerRole {
@@ -109,6 +147,26 @@ export function validateSoccerMatchRules(value: unknown): string | null {
   if (!isNonNegativeInteger(value.maxAssistsPerGoal) || Number(value.maxAssistsPerGoal) > 2) {
     return 'Maximum assists per goal must be 0, 1, or 2.'
   }
+  if (value.yellowCardExitPolicy !== 'stay_on' && value.yellowCardExitPolicy !== 'must_leave_may_replace') {
+    return 'Yellow-card exit policy is invalid.'
+  }
+  if (value.redCardReplacementPolicy !== 'play_short') return 'Red-card replacement policy is invalid.'
+  if (!['draw_allowed', 'extra_time_then_shootout', 'direct_to_shootout'].includes(String(value.tieResolution))) {
+    return 'Tie resolution is invalid.'
+  }
+  if (!isPositiveInteger(value.shootoutInitialKicksPerSide)) {
+    return 'Initial shootout kick count must be positive.'
+  }
+  if (typeof value.allowUnusedGoalkeeperShootoutReplacement !== 'boolean') {
+    return 'Shootout goalkeeper replacement policy is invalid.'
+  }
+  const expectedLegacy = legacyAvailabilityForTie(value.tieResolution as SoccerMatchRules['tieResolution'])
+  if (
+    value.extraTimeAvailable !== expectedLegacy.extraTimeAvailable ||
+    value.shootoutAvailable !== expectedLegacy.shootoutAvailable
+  ) {
+    return 'Legacy extra-time and shootout availability must match tie resolution.'
+  }
   return null
 }
 
@@ -138,4 +196,48 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isNullableNonNegativeInteger(value: unknown): value is number | null {
   return value === null || isNonNegativeInteger(value)
+}
+
+export function withSoccerTieResolution(
+  rules: SoccerMatchRules,
+  tieResolution: SoccerMatchRules['tieResolution']
+): SoccerMatchRules {
+  const next = structuredClone(rules)
+  next.tieResolution = tieResolution
+  synchronizeTieResolution(next, true)
+  return next
+}
+
+export function soccerTieResolutionFromAvailability(
+  extraTimeAvailable: boolean,
+  shootoutAvailable: boolean
+): SoccerMatchRules['tieResolution'] {
+  return tieResolutionFromLegacy(extraTimeAvailable, shootoutAvailable)
+}
+
+function tieResolutionFromLegacy(
+  extraTimeAvailable: boolean,
+  shootoutAvailable: boolean
+): SoccerMatchRules['tieResolution'] {
+  if (!shootoutAvailable) return 'draw_allowed'
+  return extraTimeAvailable ? 'extra_time_then_shootout' : 'direct_to_shootout'
+}
+
+function legacyAvailabilityForTie(tieResolution: SoccerMatchRules['tieResolution']): {
+  extraTimeAvailable: boolean
+  shootoutAvailable: boolean
+} {
+  return {
+    extraTimeAvailable: tieResolution === 'extra_time_then_shootout',
+    shootoutAvailable: tieResolution !== 'draw_allowed',
+  }
+}
+
+function synchronizeTieResolution(rules: SoccerMatchRules, tieResolutionIsAuthority: boolean): void {
+  if (!tieResolutionIsAuthority) {
+    rules.tieResolution = tieResolutionFromLegacy(rules.extraTimeAvailable, rules.shootoutAvailable)
+  }
+  const legacy = legacyAvailabilityForTie(rules.tieResolution)
+  rules.extraTimeAvailable = legacy.extraTimeAvailable
+  rules.shootoutAvailable = legacy.shootoutAvailable
 }

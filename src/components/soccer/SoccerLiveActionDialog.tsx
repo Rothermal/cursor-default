@@ -14,6 +14,8 @@ import {
   recordSoccerSubstitution,
   resolveSoccerParticipant,
   soccerClockDisplayValue,
+  soccerTieResolutionFromAvailability,
+  withSoccerTieResolution,
   type SoccerLiveOptions,
   type SoccerLiveResult,
   type SoccerMatchParticipant,
@@ -391,7 +393,7 @@ function RulesForm({ state, options, onApply }: FormProps) {
   const [allowReturns, setAllowReturns] = useState(current.allowReturnSubstitutions)
   const [extraTime, setExtraTime] = useState(current.extraTimeAvailable)
   const [shootout, setShootout] = useState(current.shootoutAvailable)
-  const rules = {
+  const rules = withSoccerTieResolution({
     ...current,
     maxOnFieldPlayers: maxPlayers,
     substitutionLimit: subLimit,
@@ -399,7 +401,7 @@ function RulesForm({ state, options, onApply }: FormProps) {
     allowReturnSubstitutions: allowReturns,
     extraTimeAvailable: extraTime,
     shootoutAvailable: shootout,
-  }
+  }, soccerTieResolutionFromAvailability(extraTime, shootout))
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">

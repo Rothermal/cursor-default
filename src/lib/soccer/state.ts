@@ -1,5 +1,5 @@
 import { isPlainObject } from '../gameEvents/envelope'
-import { validateSoccerMatchRules, validateSoccerRole } from './rules'
+import { normalizeSoccerMatchRules, validateSoccerMatchRules, validateSoccerRole } from './rules'
 import type {
   SoccerAttackingDirection,
   SoccerMatchParticipant,
@@ -9,6 +9,7 @@ import type {
   SoccerSportGameState,
   SportGameState,
 } from './types'
+import { SOCCER_GAME_STATE_VERSION } from './types'
 
 export function createSoccerMatchProjection(setup: SoccerMatchSetup): SoccerMatchProjection {
   return {
@@ -25,6 +26,9 @@ export function createSoccerMatchProjection(setup: SoccerMatchSetup): SoccerMatc
     participantStats: Object.fromEntries(
       setup.participants.map(participant => [participant.id, emptyParticipantStats()])
     ),
+    participantDiscipline: Object.fromEntries(
+      setup.participants.map(participant => [participant.id, emptyParticipantDiscipline()])
+    ),
     sideTotals: {
       tracked: emptySideTotals(),
       opponent: emptySideTotals(),
@@ -35,6 +39,11 @@ export function createSoccerMatchProjection(setup: SoccerMatchSetup): SoccerMatc
     substitutionCount: 0,
     substitutionWindowCount: 0,
     endedAt: null,
+    endReason: null,
+    suspendedContext: null,
+    result: 'unresolved',
+    decidedStage: null,
+    shootout: null,
   }
 }
 
@@ -44,21 +53,31 @@ export function createSoccerSportGameState(setup: SoccerMatchSetup): SoccerSport
   const clonedSetup = structuredClone(setup)
   return {
     sportId: 'soccer',
-    version: 1,
+    version: SOCCER_GAME_STATE_VERSION,
     setup: clonedSetup,
     projection: createSoccerMatchProjection(clonedSetup),
     capturePreferences: {
       teamSide: 'tracked',
       selectedParticipantId: null,
       selectionInitialized: false,
+      captureMode: 'shot',
     },
   }
 }
 
 export function normalizeSportGameState(value: unknown): SportGameState | null {
-  if (!isPlainObject(value) || value.sportId !== 'soccer' || value.version !== 1) return null
+  if (
+    !isPlainObject(value) ||
+    value.sportId !== 'soccer' ||
+    (value.version !== 1 && value.version !== SOCCER_GAME_STATE_VERSION)
+  ) return null
   if (!isPlainObject(value.setup)) return null
-  const setup = value.setup as unknown as SoccerMatchSetup
+  const normalizedRules = normalizeSoccerMatchRules(value.setup.rulesSnapshot)
+  if (!normalizedRules) return null
+  const setup = {
+    ...value.setup,
+    rulesSnapshot: normalizedRules,
+  } as unknown as SoccerMatchSetup
   if (validateSoccerMatchSetup(setup)) return null
   const normalized = createSoccerSportGameState(setup)
   if (isPlainObject(value.capturePreferences)) {
@@ -71,6 +90,9 @@ export function normalizeSportGameState(value: unknown): SportGameState | null {
     }
     if (typeof preferences.selectionInitialized === 'boolean') {
       normalized.capturePreferences.selectionInitialized = preferences.selectionInitialized
+    }
+    if (preferences.captureMode === 'shot' || preferences.captureMode === 'defense' || preferences.captureMode === 'foul') {
+      normalized.capturePreferences.captureMode = preferences.captureMode
     }
   }
   return normalized
@@ -177,6 +199,27 @@ export function emptyParticipantStats(): SoccerMatchProjection['participantStats
     goalkeeperShotsOnTargetFaced: 0,
     goalkeeperPenaltiesFaced: 0,
     goalkeeperPenaltySaves: 0,
+    tacklesAttempted: 0,
+    tacklesWon: 0,
+    tacklesLost: 0,
+    interceptions: 0,
+    clearances: 0,
+    recoveries: 0,
+    blockedShots: 0,
+    foulsCommitted: 0,
+    foulsDrawn: 0,
+    yellowCards: 0,
+    redCards: 0,
+  }
+}
+
+export function emptyParticipantDiscipline(): SoccerMatchProjection['participantDiscipline'][string] {
+  return {
+    normalYellowCards: 0,
+    shootoutYellowCards: 0,
+    redCards: 0,
+    shootoutRedCards: 0,
+    ejected: false,
   }
 }
 
@@ -194,6 +237,29 @@ function emptySideTotals(): SoccerMatchProjection['sideTotals']['tracked'] {
     penaltyGoals: 0,
     directFreeKickAttempts: 0,
     directFreeKickGoals: 0,
+    tacklesAttempted: 0,
+    tacklesWon: 0,
+    tacklesLost: 0,
+    interceptions: 0,
+    clearances: 0,
+    recoveries: 0,
+    blockedShots: 0,
+    foulsCommitted: 0,
+    foulsDrawn: 0,
+    yellowCards: 0,
+    redCards: 0,
+    corners: 0,
+    offsides: 0,
+    penaltiesWon: 0,
+    penaltiesConceded: 0,
+    staffYellowCards: 0,
+    staffRedCards: 0,
+    teamAttributedDefensiveActions: 0,
+    unknownAttributedDefensiveActions: 0,
+    teamAttributedFouls: 0,
+    unknownAttributedFouls: 0,
+    teamAttributedCards: 0,
+    unknownAttributedCards: 0,
   }
 }
 

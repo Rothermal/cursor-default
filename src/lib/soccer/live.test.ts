@@ -217,11 +217,13 @@ describe('soccer live match actions', () => {
       teamSide: 'opponent',
       selectedParticipantId: 'match-defender',
       selectionInitialized: true,
+      captureMode: 'shot',
     })
     expect(normalizeSportGameState(structuredClone(state.sportGameState))?.capturePreferences).toEqual({
       teamSide: 'opponent',
       selectedParticipantId: 'match-defender',
       selectionInitialized: true,
+      captureMode: 'shot',
     })
   })
 
@@ -445,7 +447,7 @@ describe('soccer live match actions', () => {
     )
     expect(ended.ok).toBe(true)
     if (!ended.ok) return
-    expect(ended.state.sportGameState?.projection.status).toBe('ended')
+    expect(ended.state.sportGameState?.projection.status).toBe('suspended')
     expect(ended.state.sportGameState?.projection.clock.running).toBe(false)
 
     const reopened = reopenSoccerMatch(
@@ -455,7 +457,7 @@ describe('soccer live match actions', () => {
     )
     expect(reopened.ok).toBe(true)
     if (!reopened.ok) return
-    expect(reopened.state.sportGameState?.projection.status).toBe('period_break')
+    expect(reopened.state.sportGameState?.projection.status).toBe('in_progress')
   })
 
   it('preserves an invalid historical correction and exposes projection diagnostics', () => {

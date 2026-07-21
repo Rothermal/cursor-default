@@ -7,8 +7,19 @@ import type {
   SportGameEventProjectionResult,
   SportGameEventProjector,
 } from '../gameEvents/types'
-import { orderedSoccerSegments, validateSoccerMatchRules } from './rules'
+import { normalizeSoccerMatchRules, orderedSoccerSegments, validateSoccerMatchRules } from './rules'
 import { createSoccerMatchProjection, emptyParticipantStats } from './state'
+import {
+  applySoccerBlockedShotTotals,
+  applySoccerNormalIncident,
+  applySoccerShootoutEvent,
+  compareSoccerIncidentTime,
+  createSoccerSoc4ProjectionContext,
+  isSoccerNormalIncident,
+  isSoccerShootoutEvent,
+  validateSoccerShotSource,
+  type SoccerSoc4ProjectionContext,
+} from './soc4'
 import type {
   SoccerAttackingDirection,
   SoccerMatchEvent,
@@ -44,27 +55,81 @@ export function projectSoccerMatchEvents(
   let projection = createSoccerMatchProjection(sportState.setup)
   const diagnostics: GameEventDiagnostic[] = []
   const seenSequences = new Set<string>()
+  const soc4Context = createSoccerSoc4ProjectionContext(soccerEvents)
+  const pendingIncidents: SoccerMatchEvent[] = []
+  let failedEvent: SoccerMatchEvent | null = null
+  let failureMessage: string | null = null
 
-  for (let index = 0; index < soccerEvents.length; index += 1) {
-    const event = soccerEvents[index]
+  for (const event of soccerEvents) {
     const sequenceKey = `${event.recorderUserId ?? 'local'}\u0000${event.sequence}`
-    const next = structuredClone(projection)
-    const error = seenSequences.has(sequenceKey)
-      ? `Capture sequence ${event.sequence} is duplicated for this recorder.`
-      : applySoccerEvent(next, sportState, event, state)
-    if (error) {
-      diagnostics.push(diagnostic(event.id, error))
-      for (const unprojected of soccerEvents.slice(index + 1)) {
-        diagnostics.push({
-          code: 'unprojected_event',
-          message: 'Event was preserved but not projected because earlier match history is invalid.',
-          eventId: unprojected.id,
-        })
-      }
+    if (seenSequences.has(sequenceKey)) {
+      failedEvent = event
+      failureMessage = `Capture sequence ${event.sequence} is duplicated for this recorder.`
       break
     }
     seenSequences.add(sequenceKey)
+
+    if (isNormalStatEvent(event)) {
+      pendingIncidents.push(event)
+      continue
+    }
+    // Apply timed incidents before later lifecycle or lineup mutations close their intervals.
+    const flushed = flushSoccerIncidents(
+      projection,
+      pendingIncidents,
+      sportState,
+      state,
+      soc4Context
+    )
+    projection = flushed.projection
+    if (flushed.errorEvent) {
+      failedEvent = flushed.errorEvent
+      failureMessage = flushed.message
+      break
+    }
+    const next = structuredClone(projection)
+    const error = applySoccerEvent(next, sportState, event, state, soc4Context)
+    if (error) {
+      failedEvent = event
+      failureMessage = error
+      break
+    }
     projection = next
+  }
+
+  if (!failedEvent) {
+    const flushed = flushSoccerIncidents(
+      projection,
+      pendingIncidents,
+      sportState,
+      state,
+      soc4Context
+    )
+    projection = flushed.projection
+    failedEvent = flushed.errorEvent
+    failureMessage = flushed.message
+  }
+
+  if (!failedEvent && projection.status === 'ended' && projection.endReason === 'completed') {
+    const outcomeError = deriveCompletedMatchOutcome(projection)
+    if (outcomeError) {
+      failedEvent = [...soccerEvents].reverse().find(event =>
+        event.eventType === 'soccer.match_ended' && event.payload.reason === 'completed'
+      ) ?? null
+      failureMessage = outcomeError
+    }
+  }
+
+  if (failedEvent && failureMessage) {
+    diagnostics.push(diagnostic(failedEvent.id, failureMessage))
+    for (const unprojected of soccerEvents.filter(event => event.id !== failedEvent?.id)) {
+      if (unprojected.sequence <= failedEvent.sequence) continue
+      diagnostics.push({
+        code: 'unprojected_event',
+        message: 'Event was preserved but not projected because earlier match history is invalid.',
+        eventId: unprojected.id,
+      })
+    }
   }
 
   const nextSportState: SoccerSportGameState = {
@@ -81,14 +146,15 @@ function applySoccerEvent(
   projection: SoccerMatchProjection,
   sportState: SoccerSportGameState,
   event: SoccerMatchEvent,
-  gameState: GameState
+  gameState: GameState,
+  soc4Context: SoccerSoc4ProjectionContext
 ): string | null {
-  const attackingEvent = isAttackingEvent(event)
-  if (!attackingEvent && projection.clock.running && event.eventType === 'soccer.clock_adjusted') {
+  const statEvent = isAttackingEvent(event) || isSoccerNormalIncident(event) || isSoccerShootoutEvent(event)
+  if (!statEvent && projection.clock.running && event.eventType === 'soccer.clock_adjusted') {
     const error = advanceRunningClock(projection, event.payload.fromElapsedMs, event.occurredAt)
     if (error) return error
   }
-  if (!attackingEvent && projection.clock.running && event.elapsedMs !== null && ![
+  if (!statEvent && projection.clock.running && event.elapsedMs !== null && ![
     'soccer.clock_paused',
     'soccer.clock_adjusted',
   ].includes(event.eventType)) {
@@ -130,12 +196,57 @@ function applySoccerEvent(
     case 'soccer.match_reopened':
       return applyMatchReopened(projection)
     case 'soccer.shot':
-      return applyShot(projection, event)
+      {
+        const sourceError = validateSoccerShotSource(event, soc4Context)
+        if (sourceError) return sourceError
+        const shotError = applyShot(projection, event)
+        if (!shotError) applySoccerBlockedShotTotals(projection, event)
+        return shotError
+      }
     case 'soccer.own_goal':
       return applyOwnGoal(projection, event)
     case 'soccer.score_adjustment':
       return applyScoreAdjustment(projection, event)
+    case 'soccer.defensive_action':
+    case 'soccer.foul':
+    case 'soccer.team_event':
+      return applySoccerNormalIncident(projection, event, soc4Context)
+    case 'soccer.card':
+      return event.period.id === 'shootout'
+        ? applySoccerShootoutEvent(projection, event, soc4Context)
+        : applySoccerNormalIncident(projection, event, soc4Context)
+    case 'soccer.shootout_started':
+    case 'soccer.shootout_eligibility_changed':
+    case 'soccer.shootout_goalkeeper_changed':
+    case 'soccer.shootout_kick':
+      return applySoccerShootoutEvent(projection, event, soc4Context)
   }
+}
+
+function isNormalStatEvent(event: SoccerMatchEvent): boolean {
+  return isAttackingEvent(event) || isSoccerNormalIncident(event)
+}
+
+function flushSoccerIncidents(
+  projection: SoccerMatchProjection,
+  pendingIncidents: SoccerMatchEvent[],
+  sportState: SoccerSportGameState,
+  state: GameState,
+  context: SoccerSoc4ProjectionContext
+): {
+  projection: SoccerMatchProjection
+  errorEvent: SoccerMatchEvent | null
+  message: string | null
+} {
+  const incidents = pendingIncidents.splice(0).sort(compareSoccerIncidentTime)
+  let nextProjection = projection
+  for (const event of incidents) {
+    const candidate = structuredClone(nextProjection)
+    const error = applySoccerEvent(candidate, sportState, event, state, context)
+    if (error) return { projection: nextProjection, errorEvent: event, message: error }
+    nextProjection = candidate
+  }
+  return { projection: nextProjection, errorEvent: null, message: null }
 }
 
 function applyOpeningLineup(
@@ -281,10 +392,12 @@ function applyRulesChanged(
   projection: SoccerMatchProjection,
   rules: SoccerMatchRules
 ): string | null {
-  const rulesError = validateSoccerMatchRules(rules)
+  const normalizedRules = normalizeSoccerMatchRules(rules)
+  const rulesError = normalizedRules ? null : validateSoccerMatchRules(rules)
   if (rulesError) return rulesError
+  if (!normalizedRules) return 'Soccer match rules are invalid.'
   const oldSegments = orderedSoccerSegments(projection.currentRules)
-  const nextSegments = orderedSoccerSegments(rules)
+  const nextSegments = orderedSoccerSegments(normalizedRules)
   for (const periodId of [...projection.completedPeriodIds, projection.currentPeriodId].filter(Boolean)) {
     const oldSegment = oldSegments.find(segment => segment.id === periodId)
     const nextSegment = nextSegments.find(segment => segment.id === periodId)
@@ -292,16 +405,16 @@ function applyRulesChanged(
       return 'Completed and active period definitions cannot be rewritten mid-match.'
     }
   }
-  if (onFieldParticipants(projection).length > rules.maxOnFieldPlayers) {
+  if (onFieldParticipants(projection).length > normalizedRules.maxOnFieldPlayers) {
     return 'The new player maximum is below the current on-field count.'
   }
-  if (rules.substitutionLimit !== null && rules.substitutionLimit < projection.substitutionCount) {
+  if (normalizedRules.substitutionLimit !== null && normalizedRules.substitutionLimit < projection.substitutionCount) {
     return 'The new substitution limit is below substitutions already used.'
   }
-  if (rules.substitutionWindowLimit !== null && rules.substitutionWindowLimit < projection.substitutionWindowCount) {
+  if (normalizedRules.substitutionWindowLimit !== null && normalizedRules.substitutionWindowLimit < projection.substitutionWindowCount) {
     return 'The new window limit is below windows already used.'
   }
-  projection.currentRules = structuredClone(rules)
+  projection.currentRules = structuredClone(normalizedRules)
   return null
 }
 
@@ -720,6 +833,10 @@ function validateAttackingMoment(
       )
       : projection.clock.elapsedMs
     if (event.elapsedMs > maximumElapsed) return 'Attacking event time is ahead of the live clock.'
+  } else if (projection.suspendedContext?.periodId === event.period.id) {
+    if (event.elapsedMs > projection.suspendedContext.elapsedMs) {
+      return 'Attacking event time is after the suspended match time.'
+    }
   } else {
     const periodEnd = projection.periodEndElapsedMsById[event.period.id]
     if (periodEnd === undefined || event.elapsedMs > periodEnd) {
@@ -817,11 +934,34 @@ function applyMatchEnded(
   reason: 'completed' | 'suspended' | 'abandoned',
   occurredAt: string
 ): string | null {
-  if (projection.status !== 'period_break' && projection.status !== 'in_progress') {
+  if (
+    projection.status !== 'period_break' &&
+    projection.status !== 'in_progress' &&
+    projection.status !== 'shootout' &&
+    projection.status !== 'suspended'
+  ) {
     return 'Only an active match can be ended.'
   }
   if (projection.clock.running) return 'Pause the clock before ending the match.'
-  if (reason === 'completed' && projection.status !== 'period_break') {
+  if (reason === 'suspended') {
+    if (projection.status !== 'in_progress' && projection.status !== 'period_break') {
+      return 'Only normal match play can be suspended.'
+    }
+    projection.suspendedContext = projection.currentPeriodId
+      ? { periodId: projection.currentPeriodId, elapsedMs: projection.clock.elapsedMs }
+      : null
+    if (projection.currentPeriodId) {
+      closeOnFieldIntervals(projection, projection.currentPeriodId, projection.clock.elapsedMs)
+    }
+    projection.status = 'suspended'
+    projection.currentPeriodId = null
+    projection.endedAt = occurredAt
+    projection.endReason = null
+    projection.result = 'suspended'
+    projection.decidedStage = null
+    return null
+  }
+  if (reason === 'completed' && projection.status !== 'period_break' && projection.status !== 'shootout') {
     return 'A completed match must end from a period break.'
   }
   if (reason === 'completed') {
@@ -834,6 +974,8 @@ function applyMatchEnded(
     if (extraTimeBegan && !extraTimeIds.every(periodId => projection.completedPeriodIds.includes(periodId))) {
       return 'Began extra time must be completed before ending the match as completed.'
     }
+    const outcomeError = deriveCompletedMatchOutcome(projection)
+    if (outcomeError) return outcomeError
   }
   if (projection.currentPeriodId) {
     closeOnFieldIntervals(projection, projection.currentPeriodId, projection.clock.elapsedMs)
@@ -842,14 +984,64 @@ function applyMatchEnded(
   projection.status = 'ended'
   projection.currentPeriodId = null
   projection.endedAt = occurredAt
+  projection.endReason = reason === 'abandoned' ? 'abandoned' : 'completed'
+  projection.suspendedContext = null
+  if (reason === 'abandoned') {
+    projection.result = 'abandoned'
+    projection.decidedStage = null
+  }
+  return null
+}
+
+function deriveCompletedMatchOutcome(projection: SoccerMatchProjection): string | null {
+  const trackedScore = projection.sideTotals.tracked.score
+  const opponentScore = projection.sideTotals.opponent.score
+  const extraTimeIds = projection.currentRules.extraTimeSegments.map(segment => segment.id)
+  const extraTimeBegan = extraTimeIds.some(periodId => projection.completedPeriodIds.includes(periodId))
+  if (trackedScore === opponentScore) {
+    if (
+      projection.currentRules.tieResolution === 'extra_time_then_shootout' &&
+      !extraTimeIds.every(periodId => projection.completedPeriodIds.includes(periodId))
+    ) return 'A tied winner-required match must complete extra time.'
+    if (projection.currentRules.tieResolution !== 'draw_allowed') {
+      if (!projection.shootout?.decided || !projection.shootout.winner) {
+        return 'A tied winner-required match must complete its shootout.'
+      }
+      projection.result = projection.shootout.winner === 'tracked'
+        ? 'tracked_win'
+        : 'opponent_win'
+      projection.decidedStage = 'shootout'
+    } else {
+      projection.result = 'draw'
+      projection.decidedStage = extraTimeBegan ? 'extra_time' : 'regulation'
+    }
+  } else {
+    projection.result = trackedScore > opponentScore ? 'tracked_win' : 'opponent_win'
+    projection.decidedStage = extraTimeBegan ? 'extra_time' : 'regulation'
+  }
   return null
 }
 
 function applyMatchReopened(projection: SoccerMatchProjection): string | null {
-  if (projection.status !== 'ended') return 'Only an ended match can be reopened.'
-  projection.status = 'period_break'
-  projection.currentPeriodId = null
+  if (projection.status === 'suspended') {
+    const context = projection.suspendedContext
+    projection.status = context ? 'in_progress' : 'period_break'
+    projection.currentPeriodId = context?.periodId ?? null
+    if (context) {
+      projection.clock = { running: false, elapsedMs: context.elapsedMs, anchorOccurredAt: null }
+      openOnFieldIntervals(projection, context.periodId, context.elapsedMs)
+    }
+  } else if (projection.status === 'ended') {
+    projection.status = projection.shootout?.decided ? 'shootout' : 'period_break'
+    projection.currentPeriodId = null
+  } else {
+    return 'Only an ended or suspended match can be reopened.'
+  }
   projection.endedAt = null
+  projection.endReason = null
+  projection.suspendedContext = null
+  projection.result = 'unresolved'
+  projection.decidedStage = null
   return null
 }
 
@@ -1024,6 +1216,17 @@ function buildProjection(
       attacking.goalkeeperShotsOnTargetFaced
     stats.soc_gk_pen_faced = (stats.soc_gk_pen_faced ?? 0) + attacking.goalkeeperPenaltiesFaced
     stats.soc_gk_pen_save = (stats.soc_gk_pen_save ?? 0) + attacking.goalkeeperPenaltySaves
+    stats.soc_tkl_att = (stats.soc_tkl_att ?? 0) + attacking.tacklesAttempted
+    stats.soc_tkl_won = (stats.soc_tkl_won ?? 0) + attacking.tacklesWon
+    stats.soc_tkl_lost = (stats.soc_tkl_lost ?? 0) + attacking.tacklesLost
+    stats.soc_int = (stats.soc_int ?? 0) + attacking.interceptions
+    stats.soc_clear = (stats.soc_clear ?? 0) + attacking.clearances
+    stats.soc_recovery = (stats.soc_recovery ?? 0) + attacking.recoveries
+    stats.soc_block = (stats.soc_block ?? 0) + attacking.blockedShots
+    stats.soc_foul_committed = (stats.soc_foul_committed ?? 0) + attacking.foulsCommitted
+    stats.soc_foul_drawn = (stats.soc_foul_drawn ?? 0) + attacking.foulsDrawn
+    stats.soc_yellow = (stats.soc_yellow ?? 0) + attacking.yellowCards
+    stats.soc_red = (stats.soc_red ?? 0) + attacking.redCards
   }
   return {
     playerStatsById: statsByPlayerId,

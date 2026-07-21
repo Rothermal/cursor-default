@@ -721,6 +721,23 @@ at least one goal, one own goal, and events in more than one period.
 
 ---
 
+## 11g. Soccer match event domain (SOC-4A)
+
+**Precondition:** No new UI is exposed in this phase. Run the automated domain suite against a
+development checkout; soccer remains local-only and production-disabled.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11g.1 | Run `pnpm exec vitest run src/lib/soccer` | Soccer v1-to-v2 normalization, all 25 schemas, defensive/team totals, discipline consequences, restart links, shootout sequencing, and structured outcomes pass |
+| 11g.2 | Normalize a parked SOC-2/SOC-3 state without SOC-4 rule fields or capture mode | State advances to version 2, legacy availability maps to one tie-resolution path, and defaults are added without rewriting events |
+| 11g.3 | Project tackle outcomes, interceptions, clearances, recoveries, fouls, cards, corners, offsides, and linked shot blocks | Participant credit requires valid tracked attribution; Team/Unknown changes side totals only; blocks are counted once from the linked shot |
+| 11g.4 | Revise a card to occur before a later shot/substitution involving the recipient | Raw revision is preserved, the dependency is diagnosed, and an append that would create incomplete history remains atomic |
+| 11g.5 | Exercise stay-on yellow, must-leave yellow replacement, second-yellow red, and goalkeeper-red handoff | Card totals and lineup intervals rebuild together; goalkeeper handoff preserves one goalkeeper and the required one-player reduction |
+| 11g.6 | Project direct-shootout setup, retake, forfeit, repeated-kicker rejection, and a deciding kick | Shootout attempts/score/saves remain separate from normal stats; order and eligibility are deterministic; result derives only after an explicit completed event |
+| 11g.7 | Run `pnpm build`, `pnpm lint`, and `pnpm test` | TypeScript, production build, lint, and the full regression suite pass; no SOC-4B/C controls appear |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.

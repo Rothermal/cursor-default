@@ -54,6 +54,7 @@ export interface SoccerShotCaptureInput {
   secondaryCreator?: SoccerCaptureActorSelection | null
   goalkeeper?: SoccerCaptureActorSelection | null
   blocker?: SoccerCaptureActorSelection | null
+  sourceEventId?: string | null
 }
 
 export interface SoccerOwnGoalCaptureInput {
@@ -122,6 +123,34 @@ interface EventSpec<TType extends keyof SoccerEventPayloadByType = keyof SoccerE
   actors?: GameEventActor[]
 }
 
+export type SoccerSoc4EventType =
+  | 'soccer.defensive_action'
+  | 'soccer.foul'
+  | 'soccer.card'
+  | 'soccer.team_event'
+  | 'soccer.shootout_started'
+  | 'soccer.shootout_eligibility_changed'
+  | 'soccer.shootout_goalkeeper_changed'
+  | 'soccer.shootout_kick'
+
+export interface SoccerCheckedEventInput<TType extends SoccerSoc4EventType> {
+  eventType: TType
+  payload: SoccerEventPayloadByType[TType]
+  period?: GameEventPeriod
+  elapsedMs?: number | null
+  teamSide?: GameEventTeamSide
+  location?: GameEventLocation | null
+  actors?: GameEventActor[]
+}
+
+export function recordCheckedSoccerEvent<TType extends SoccerSoc4EventType>(
+  state: GameState,
+  input: SoccerCheckedEventInput<TType>,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  return appendSpecs(state, options, [input])
+}
+
 export function recordSoccerShot(
   state: GameState,
   input: SoccerShotCaptureInput,
@@ -142,7 +171,11 @@ export function recordSoccerShot(
   if (!actors.ok) return failure(state, actors.message)
   return appendSpecs(state, options, [{
     eventType: 'soccer.shot',
-    payload: { outcome: input.outcome, situation: input.situation },
+    payload: {
+      outcome: input.outcome,
+      situation: input.situation,
+      sourceEventId: input.sourceEventId ?? null,
+    },
     elapsedMs: context.elapsedMs,
     teamSide: input.teamSide,
     location: input.location,
@@ -193,7 +226,11 @@ export function recordHistoricalSoccerShot(
   if (!actors.ok) return failure(state, actors.message)
   return appendSpecs(state, options, [{
     eventType: 'soccer.shot',
-    payload: { outcome: input.outcome, situation: input.situation },
+    payload: {
+      outcome: input.outcome,
+      situation: input.situation,
+      sourceEventId: input.sourceEventId ?? null,
+    },
     period: moment.period,
     elapsedMs: moment.elapsedMs,
     teamSide: input.teamSide,
@@ -244,7 +281,11 @@ export function reviseSoccerShot(
   ])
   if (!actors.ok) return failure(state, actors.message)
   return updateSoccerHistoryEvent(state, eventId, {
-    payload: { outcome: input.outcome, situation: input.situation },
+    payload: {
+      outcome: input.outcome,
+      situation: input.situation,
+      sourceEventId: input.sourceEventId ?? null,
+    },
     period: moment.period,
     elapsedMs: moment.elapsedMs,
     teamSide: input.teamSide,

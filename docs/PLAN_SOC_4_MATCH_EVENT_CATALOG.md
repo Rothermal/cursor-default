@@ -3,7 +3,7 @@
 Detailed implementation plan for soccer defensive actions, discipline, team events,
 shootouts, and structured match outcomes.
 
-Status: Planning complete. Reviewed decisions are locked; SOC-4A is the next implementation PR.
+Status: SOC-4A implementation complete pending review. SOC-4B is next after merge.
 
 ---
 
@@ -22,6 +22,8 @@ aggregation, settings, release hardening, and production enablement remain SOC-6
 ## 2. Delivery Slices
 
 ### SOC-4A: Match event domain
+
+Implementation status: Complete in `feature/soc-4a-match-event-domain`.
 
 - Register the reviewed defensive, discipline, team, shootout, and outcome event schemas.
 - Add semantic validation, deterministic projectors, derived totals, revisions, deletion,
@@ -755,5 +757,5 @@ stats through basketball's legacy mutable counters or cloud game-stat paths.
    cloud, or release behavior are documented and deferred to the owning phase.
 4. After SOC-4C, update this document to Complete and hand implementation to SOC-5 planning.
 
-No further product Q&A is required before SOC-4A. Implementation questions should follow the
+No further product Q&A is required before SOC-4B. Implementation questions should follow the
 locked decisions and conservative codebase patterns above.

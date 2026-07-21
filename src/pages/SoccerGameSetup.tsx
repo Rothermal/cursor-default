@@ -11,6 +11,7 @@ import {
   reorderSoccerSegments,
   resizeSoccerSegments,
   resolveSoccerMatchRules,
+  withSoccerTieResolution,
   validateSoccerMatchRules,
   type SoccerMatchRules,
   type SoccerRegulationPreset,
@@ -374,7 +375,7 @@ export default function SoccerGameSetup() {
 
         <section className="border-t border-slate-200 pt-5 space-y-4">
           <h2 className="text-sm font-bold uppercase text-slate-500">Extra Time</h2>
-          <Toggle label="Extra time available" checked={rules.extraTimeAvailable} onChange={checked => updateRules(current => ({ ...current, extraTimeAvailable: checked }))} />
+          <Toggle label="Extra time available" checked={rules.extraTimeAvailable} onChange={checked => updateRules(current => withSoccerTieResolution(current, checked ? 'extra_time_then_shootout' : current.shootoutAvailable ? 'direct_to_shootout' : 'draw_allowed'))} />
           {rules.extraTimeAvailable && (
             <>
               <NumberField label="Extra-time periods" value={rules.extraTimeSegments.length} min={1} max={4} onChange={count => updateRules(current => ({
@@ -384,7 +385,7 @@ export default function SoccerGameSetup() {
               <SegmentEditor segments={rules.extraTimeSegments} onChange={segments => updateRules(current => ({ ...current, extraTimeSegments: segments }))} />
             </>
           )}
-          <Toggle label="Shootout available" checked={rules.shootoutAvailable} onChange={checked => updateRules(current => ({ ...current, shootoutAvailable: checked }))} />
+          <Toggle label="Shootout available" checked={rules.shootoutAvailable} onChange={checked => updateRules(current => withSoccerTieResolution(current, checked ? current.extraTimeAvailable ? 'extra_time_then_shootout' : 'direct_to_shootout' : 'draw_allowed'))} />
         </section>
 
         <button type="button" onClick={handleContinue} className="btn-primary w-full">
