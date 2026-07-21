@@ -452,6 +452,7 @@ function applyDisciplineLineupResolution(
   )
   if (roleInterval) roleInterval.endElapsedMs = event.elapsedMs
   if (participant.status === 'on_field' && isLatestStartedPeriod(projection, event.period.id)) {
+    closeActiveTime(participant, event.elapsedMs)
     participant.status = 'left'
     participant.hasExited = true
   }
@@ -536,6 +537,7 @@ function applyDisciplineReplacementChange(
     )
     if (roleInterval) roleInterval.endElapsedMs = elapsedMs
     if (outgoing.status === 'on_field' && isLatestStartedPeriod(projection, event.period.id)) {
+      closeActiveTime(outgoing, elapsedMs)
       outgoing.status = 'left'
       outgoing.hasExited = true
     }
@@ -561,9 +563,18 @@ function applyDisciplineReplacementChange(
     incoming.onFieldIntervals.sort((a, b) => a.startElapsedMs - b.startElapsedMs)
     incoming.roleIntervals.sort((a, b) => a.startElapsedMs - b.startElapsedMs)
     incoming.appearances = Math.max(1, incoming.appearances)
-    if (isLatestStartedPeriod(projection, event.period.id)) incoming.status = 'on_field'
+    if (isLatestStartedPeriod(projection, event.period.id)) {
+      incoming.status = 'on_field'
+      incoming.activeSinceElapsedMs = projection.clock.running ? elapsedMs : null
+    }
   }
   return null
+}
+
+function closeActiveTime(participant: SoccerProjectedParticipant, elapsedMs: number): void {
+  if (participant.activeSinceElapsedMs === null) return
+  participant.totalActiveMs += Math.max(0, elapsedMs - participant.activeSinceElapsedMs)
+  participant.activeSinceElapsedMs = null
 }
 
 export function applySoccerShootoutEvent(

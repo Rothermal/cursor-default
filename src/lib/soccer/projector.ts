@@ -73,20 +73,19 @@ export function projectSoccerMatchEvents(
       pendingIncidents.push(event)
       continue
     }
-    if (isIncidentBarrier(event)) {
-      const flushed = flushSoccerIncidents(
-        projection,
-        pendingIncidents,
-        sportState,
-        state,
-        soc4Context
-      )
-      projection = flushed.projection
-      if (flushed.errorEvent) {
-        failedEvent = flushed.errorEvent
-        failureMessage = flushed.message
-        break
-      }
+    // Apply timed incidents before later lifecycle or lineup mutations close their intervals.
+    const flushed = flushSoccerIncidents(
+      projection,
+      pendingIncidents,
+      sportState,
+      state,
+      soc4Context
+    )
+    projection = flushed.projection
+    if (flushed.errorEvent) {
+      failedEvent = flushed.errorEvent
+      failureMessage = flushed.message
+      break
     }
     const next = structuredClone(projection)
     const error = applySoccerEvent(next, sportState, event, state, soc4Context)
@@ -226,11 +225,6 @@ function applySoccerEvent(
 
 function isNormalStatEvent(event: SoccerMatchEvent): boolean {
   return isAttackingEvent(event) || isSoccerNormalIncident(event)
-}
-
-function isIncidentBarrier(event: SoccerMatchEvent): boolean {
-  return isSoccerShootoutEvent(event) ||
-    (event.eventType === 'soccer.match_ended' && event.payload.reason === 'completed')
 }
 
 function flushSoccerIncidents(

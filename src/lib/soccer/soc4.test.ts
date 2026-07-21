@@ -497,6 +497,86 @@ describe('SOC-4A normal-match projection', () => {
     })
   })
 
+  it('preserves a mid-period ejection when the period later ends', () => {
+    const state = append(initializedState(), [
+      ...kickoffEvents(),
+      event(3, 'soccer.card', {
+        sanction: 'straight_red',
+        reason: 'serious_foul_play',
+        note: null,
+        lineupResolution: {
+          cardedParticipantId: 'match-defender',
+          exit: 'ejected',
+          replacementChanges: [],
+          countsAsSubstitutionWindow: false,
+        },
+      }, {
+        elapsedMs: 500,
+        actors: [participantActor('recipient', 'match-defender', 'defender')],
+      }),
+      event(4, 'soccer.clock_paused', { elapsedMs: 1_000 }, { elapsedMs: 1_000 }),
+      event(5, 'soccer.period_ended', { periodId: 'regulation-1' }, { elapsedMs: 1_000 }),
+    ])
+
+    const projection = state.sportGameState!.projection
+    expect(projection.status).toBe('period_break')
+    expect(projection.participants['match-defender'].onFieldIntervals).toEqual([{
+      periodId: 'regulation-1',
+      startElapsedMs: 0,
+      endElapsedMs: 500,
+    }])
+    expect(projection.participants['match-defender'].totalActiveMs).toBe(500)
+    expect(projection.participants['match-defender'].activeSinceElapsedMs).toBeNull()
+    expect(projection.participantDiscipline['match-defender'].ejected).toBe(true)
+  })
+
+  it('preserves incident and discipline history through suspend and resume', () => {
+    const state = append(initializedState(), [
+      ...kickoffEvents(),
+      event(3, 'soccer.defensive_action', { action: 'interception', tackleOutcome: null }, {
+        elapsedMs: 250,
+        actors: [participantActor('defender', 'match-defender', 'defender')],
+      }),
+      event(4, 'soccer.card', {
+        sanction: 'straight_red',
+        reason: 'serious_foul_play',
+        note: null,
+        lineupResolution: {
+          cardedParticipantId: 'match-defender',
+          exit: 'ejected',
+          replacementChanges: [],
+          countsAsSubstitutionWindow: false,
+        },
+      }, {
+        elapsedMs: 500,
+        actors: [participantActor('recipient', 'match-defender', 'defender')],
+      }),
+      event(5, 'soccer.clock_paused', { elapsedMs: 1_000 }, { elapsedMs: 1_000 }),
+      event(6, 'soccer.match_ended', { reason: 'suspended' }, { elapsedMs: 1_000 }),
+      event(7, 'soccer.match_reopened', { reason: 'Match resumed' }, { elapsedMs: 1_000 }),
+    ])
+
+    const projection = state.sportGameState!.projection
+    expect(projection.status).toBe('in_progress')
+    expect(projection.participantStats['match-defender'].interceptions).toBe(1)
+    expect(projection.participantDiscipline['match-defender'].ejected).toBe(true)
+    expect(projection.participants['match-defender'].status).toBe('left')
+    expect(projection.participants['match-defender'].onFieldIntervals).toEqual([{
+      periodId: 'regulation-1',
+      startElapsedMs: 0,
+      endElapsedMs: 500,
+    }])
+  })
+
+  it('rejects an offside actor on a corner during schema inspection', () => {
+    const corner = event(3, 'soccer.team_event', { kind: 'corner' }, {
+      elapsedMs: 500,
+      actors: [unknownActor('offside_player', 'Unknown player')],
+    })
+
+    expect(gameEventRegistry.inspect(corner).ok).toBe(false)
+  })
+
   it('rebuilds the same projection when raw events arrive in a different array order', () => {
     const events = [
       ...kickoffEvents(),

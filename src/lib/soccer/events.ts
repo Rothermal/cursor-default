@@ -247,6 +247,9 @@ function incidentDefinition(
       const validKinds = event.actors.every(actor =>
         eventType === 'soccer.card' || actor.kind !== 'staff'
       )
+      const validTeamEventActors = eventType !== 'soccer.team_event' ||
+        event.payload.kind === 'offside' ||
+        event.actors.length === 0
       if (
         event.sportId !== 'soccer' ||
         event.eventType !== eventType ||
@@ -255,6 +258,7 @@ function incidentDefinition(
         (shootoutMoment && event.location !== null) ||
         !actorsHaveRoles(event.actors, allowedRoles, requiredRoles) ||
         !validKinds ||
+        !validTeamEventActors ||
         !validatePayload(event.payload)
       ) {
         return { ok: false, message: `${eventType} has an invalid soccer payload.` }
