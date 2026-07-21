@@ -189,7 +189,7 @@ describe('soccer rules and production schemas', () => {
   })
 
   it('registers the SOC-2 and SOC-3A schemas and rejects malformed payloads', () => {
-    expect(soccerEventDefinitions).toHaveLength(17)
+    expect(soccerEventDefinitions).toHaveLength(25)
     const malformed = matchEvent(
       0,
       'soccer.opening_lineup',
@@ -445,10 +445,12 @@ describe('soccer attacking event projection', () => {
     const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
     if (!result.ok) throw new Error(result.error.message)
 
-    expect(result.state.sportGameState?.projection.status).toBe('ended')
+    expect(result.state.sportGameState?.projection.status).toBe('suspended')
     expect(result.state.sportGameState?.projection.startedPeriodIds).toEqual(['regulation-1'])
-    expect(result.state.sportGameState?.projection.periodEndElapsedMsById).toEqual({
-      'regulation-1': 1_000,
+    expect(result.state.sportGameState?.projection.periodEndElapsedMsById).toEqual({})
+    expect(result.state.sportGameState?.projection.suspendedContext).toEqual({
+      periodId: 'regulation-1',
+      elapsedMs: 1_000,
     })
     expect(result.state.players.find(player => player.id === 'p2')?.stats.soc_shot).toBe(1)
   })

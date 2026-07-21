@@ -1,6 +1,6 @@
 import type { GameEvent, JsonObject } from '../gameEvents/types'
 
-export const SOCCER_GAME_STATE_VERSION = 1
+export const SOCCER_GAME_STATE_VERSION = 2
 export const SOCCER_EVENT_SCHEMA_VERSION = 1
 
 export type SoccerTrackedTeamDesignation = 'home' | 'away' | 'neutral'
@@ -18,6 +18,36 @@ export type SoccerShotSituation =
   | 'direct_free_kick'
   | 'corner_sequence'
   | 'other_set_piece'
+export type SoccerYellowCardExitPolicy = 'stay_on' | 'must_leave_may_replace'
+export type SoccerRedCardReplacementPolicy = 'play_short'
+export type SoccerTieResolution = 'draw_allowed' | 'extra_time_then_shootout' | 'direct_to_shootout'
+export type SoccerCaptureMode = 'shot' | 'defense' | 'foul'
+export type SoccerDefensiveAction = 'tackle' | 'interception' | 'clearance' | 'recovery'
+export type SoccerTackleOutcome = 'won' | 'lost'
+export type SoccerFoulRestart = 'direct_free_kick' | 'indirect_free_kick' | 'penalty' | 'advantage' | 'none'
+export type SoccerSanction = 'none' | 'yellow' | 'straight_red' | 'second_yellow_red'
+export type SoccerCardSanction = Exclude<SoccerSanction, 'none'>
+export type SoccerDisciplineReason =
+  | 'dissent'
+  | 'unsporting_behavior'
+  | 'persistent_offenses'
+  | 'delaying_restart'
+  | 'failure_to_respect_distance'
+  | 'unauthorized_entry_exit'
+  | 'serious_foul_play'
+  | 'violent_conduct'
+  | 'dogso'
+  | 'abusive_language'
+  | 'second_caution'
+  | 'other_not_recorded'
+export type SoccerTeamEventKind = 'corner' | 'offside'
+export type SoccerShootoutEligibilityChangeReason =
+  | 'equalization'
+  | 'sent_off'
+  | 'unable_to_continue'
+  | 'goalkeeper_replacement'
+export type SoccerShootoutGoalkeeperChangeReason = 'tactical' | 'unable_to_continue' | 'sent_off'
+export type SoccerShootoutKickOutcome = 'scored' | 'saved' | 'missed' | 'woodwork' | 'retake' | 'forfeited'
 
 export interface SoccerRole extends JsonObject {
   group: SoccerRoleGroup
@@ -44,6 +74,11 @@ export interface SoccerMatchRules extends JsonObject {
   substitutionLimit: number | null
   substitutionWindowLimit: number | null
   maxAssistsPerGoal: number
+  yellowCardExitPolicy: SoccerYellowCardExitPolicy
+  redCardReplacementPolicy: SoccerRedCardReplacementPolicy
+  tieResolution: SoccerTieResolution
+  shootoutInitialKicksPerSide: number
+  allowUnusedGoalkeeperShootoutReplacement: boolean
 }
 
 export interface SoccerMatchParticipant extends JsonObject {
@@ -66,8 +101,22 @@ export interface SoccerMatchSetup {
   participants: SoccerMatchParticipant[]
 }
 
-export type SoccerMatchStatus = 'not_started' | 'in_progress' | 'period_break' | 'ended'
+export type SoccerMatchStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'period_break'
+  | 'shootout'
+  | 'suspended'
+  | 'ended'
 export type SoccerParticipantStatus = 'bench' | 'on_field' | 'left'
+export type SoccerMatchResult =
+  | 'tracked_win'
+  | 'opponent_win'
+  | 'draw'
+  | 'suspended'
+  | 'abandoned'
+  | 'unresolved'
+export type SoccerDecidedStage = 'regulation' | 'extra_time' | 'shootout'
 
 export interface SoccerProjectedParticipant {
   participantId: string
@@ -112,6 +161,17 @@ export interface SoccerParticipantStatTotals {
   goalkeeperShotsOnTargetFaced: number
   goalkeeperPenaltiesFaced: number
   goalkeeperPenaltySaves: number
+  tacklesAttempted: number
+  tacklesWon: number
+  tacklesLost: number
+  interceptions: number
+  clearances: number
+  recoveries: number
+  blockedShots: number
+  foulsCommitted: number
+  foulsDrawn: number
+  yellowCards: number
+  redCards: number
 }
 
 export interface SoccerSideAttackingTotals {
@@ -127,6 +187,73 @@ export interface SoccerSideAttackingTotals {
   penaltyGoals: number
   directFreeKickAttempts: number
   directFreeKickGoals: number
+  tacklesAttempted: number
+  tacklesWon: number
+  tacklesLost: number
+  interceptions: number
+  clearances: number
+  recoveries: number
+  blockedShots: number
+  foulsCommitted: number
+  foulsDrawn: number
+  yellowCards: number
+  redCards: number
+  corners: number
+  offsides: number
+  penaltiesWon: number
+  penaltiesConceded: number
+  staffYellowCards: number
+  staffRedCards: number
+  teamAttributedDefensiveActions: number
+  unknownAttributedDefensiveActions: number
+  teamAttributedFouls: number
+  unknownAttributedFouls: number
+  teamAttributedCards: number
+  unknownAttributedCards: number
+}
+
+export interface SoccerParticipantDiscipline {
+  normalYellowCards: number
+  shootoutYellowCards: number
+  redCards: number
+  shootoutRedCards: number
+  ejected: boolean
+}
+
+export interface SoccerShootoutKickProjection {
+  eventId: string
+  teamSide: 'tracked' | 'opponent'
+  outcome: SoccerShootoutKickOutcome
+  kickerKey: string
+  goalkeeperKey: string
+  kickNumber: number
+  round: number
+  suddenDeath: boolean
+  advances: boolean
+  scored: boolean
+}
+
+export interface SoccerShootoutProjection {
+  firstKickingSide: 'tracked' | 'opponent'
+  initialKicksPerSide: number
+  trackedEligibleParticipantIds: string[]
+  trackedExcludedParticipantIds: string[]
+  opponentEligibleCount: number
+  currentGoalkeepers: { tracked: string; opponent: string }
+  kicks: SoccerShootoutKickProjection[]
+  score: { tracked: number; opponent: number }
+  attempts: { tracked: number; opponent: number }
+  saves: { tracked: number; opponent: number }
+  cards: {
+    trackedYellow: number
+    trackedRed: number
+    opponentYellow: number
+    opponentRed: number
+  }
+  nextSide: 'tracked' | 'opponent'
+  decided: boolean
+  winner: 'tracked' | 'opponent' | null
+  suddenDeathRound: number | null
 }
 
 export interface SoccerProjectedClock {
@@ -145,6 +272,7 @@ export interface SoccerMatchProjection {
   clock: SoccerProjectedClock
   participants: Record<string, SoccerProjectedParticipant>
   participantStats: Record<string, SoccerParticipantStatTotals>
+  participantDiscipline: Record<string, SoccerParticipantDiscipline>
   sideTotals: {
     tracked: SoccerSideAttackingTotals
     opponent: SoccerSideAttackingTotals
@@ -155,11 +283,16 @@ export interface SoccerMatchProjection {
   substitutionCount: number
   substitutionWindowCount: number
   endedAt: string | null
+  endReason: 'completed' | 'abandoned' | null
+  suspendedContext: { periodId: string; elapsedMs: number } | null
+  result: SoccerMatchResult
+  decidedStage: SoccerDecidedStage | null
+  shootout: SoccerShootoutProjection | null
 }
 
 export interface SoccerSportGameState {
   sportId: 'soccer'
-  version: 1
+  version: 2
   setup: SoccerMatchSetup
   projection: SoccerMatchProjection
   capturePreferences: SoccerCapturePreferences
@@ -169,6 +302,7 @@ export interface SoccerCapturePreferences {
   teamSide: 'tracked' | 'opponent'
   selectedParticipantId: string | null
   selectionInitialized: boolean
+  captureMode: SoccerCaptureMode
 }
 
 export type SportGameState = SoccerSportGameState
@@ -247,9 +381,10 @@ export interface SoccerMatchReopenedPayload extends JsonObject {
   reason: string | null
 }
 
-export interface SoccerShotPayload extends JsonObject {
+export type SoccerShotPayload = JsonObject & {
   outcome: SoccerShotOutcome
   situation: SoccerShotSituation
+  sourceEventId?: string | null
 }
 
 export type SoccerOwnGoalPayload = Record<string, never>
@@ -257,6 +392,62 @@ export type SoccerOwnGoalPayload = Record<string, never>
 export interface SoccerScoreAdjustmentPayload extends JsonObject {
   delta: 1 | -1
   reason: string
+}
+
+export interface SoccerDisciplineLineupResolution extends JsonObject {
+  cardedParticipantId: string
+  exit: 'none' | 'temporary' | 'ejected'
+  replacementChanges: SoccerSubstitutionChange[]
+  countsAsSubstitutionWindow: boolean
+}
+
+export interface SoccerDefensiveActionPayload extends JsonObject {
+  action: SoccerDefensiveAction
+  tackleOutcome: SoccerTackleOutcome | null
+}
+
+export interface SoccerFoulPayload extends JsonObject {
+  restart: SoccerFoulRestart
+  sanction: SoccerSanction
+  sanctionReason: SoccerDisciplineReason | null
+  note: string | null
+  lineupResolution: SoccerDisciplineLineupResolution | null
+}
+
+export interface SoccerCardPayload extends JsonObject {
+  sanction: SoccerCardSanction
+  reason: SoccerDisciplineReason
+  note: string | null
+  lineupResolution: SoccerDisciplineLineupResolution | null
+}
+
+export interface SoccerTeamEventPayload extends JsonObject {
+  kind: SoccerTeamEventKind
+}
+
+export interface SoccerShootoutStartedPayload extends JsonObject {
+  firstKickingSide: 'tracked' | 'opponent'
+  initialKicksPerSide: number
+  trackedEligibleParticipantIds: string[]
+  trackedExcludedParticipantIds: string[]
+  opponentEligibleCount: number
+  trackedGoalkeeperParticipantId: string
+}
+
+export interface SoccerShootoutEligibilityChangedPayload extends JsonObject {
+  reason: SoccerShootoutEligibilityChangeReason
+  trackedEligibleParticipantIds: string[]
+  trackedExcludedParticipantIds: string[]
+  opponentEligibleCount: number
+}
+
+export interface SoccerShootoutGoalkeeperChangedPayload extends JsonObject {
+  reason: SoccerShootoutGoalkeeperChangeReason
+}
+
+export interface SoccerShootoutKickPayload extends JsonObject {
+  outcome: SoccerShootoutKickOutcome
+  anonymousKickerSlot: number | null
 }
 
 export type SoccerOpeningLineupEvent = GameEvent<SoccerOpeningLineupPayload, 'soccer.opening_lineup', 'soccer'>
@@ -276,6 +467,14 @@ export type SoccerMatchReopenedEvent = GameEvent<SoccerMatchReopenedPayload, 'so
 export type SoccerShotEvent = GameEvent<SoccerShotPayload, 'soccer.shot', 'soccer'>
 export type SoccerOwnGoalEvent = GameEvent<SoccerOwnGoalPayload, 'soccer.own_goal', 'soccer'>
 export type SoccerScoreAdjustmentEvent = GameEvent<SoccerScoreAdjustmentPayload, 'soccer.score_adjustment', 'soccer'>
+export type SoccerDefensiveActionEvent = GameEvent<SoccerDefensiveActionPayload, 'soccer.defensive_action', 'soccer'>
+export type SoccerFoulEvent = GameEvent<SoccerFoulPayload, 'soccer.foul', 'soccer'>
+export type SoccerCardEvent = GameEvent<SoccerCardPayload, 'soccer.card', 'soccer'>
+export type SoccerTeamEventEvent = GameEvent<SoccerTeamEventPayload, 'soccer.team_event', 'soccer'>
+export type SoccerShootoutStartedEvent = GameEvent<SoccerShootoutStartedPayload, 'soccer.shootout_started', 'soccer'>
+export type SoccerShootoutEligibilityChangedEvent = GameEvent<SoccerShootoutEligibilityChangedPayload, 'soccer.shootout_eligibility_changed', 'soccer'>
+export type SoccerShootoutGoalkeeperChangedEvent = GameEvent<SoccerShootoutGoalkeeperChangedPayload, 'soccer.shootout_goalkeeper_changed', 'soccer'>
+export type SoccerShootoutKickEvent = GameEvent<SoccerShootoutKickPayload, 'soccer.shootout_kick', 'soccer'>
 
 export type SoccerMatchEvent =
   | SoccerOpeningLineupEvent
@@ -295,3 +494,11 @@ export type SoccerMatchEvent =
   | SoccerShotEvent
   | SoccerOwnGoalEvent
   | SoccerScoreAdjustmentEvent
+  | SoccerDefensiveActionEvent
+  | SoccerFoulEvent
+  | SoccerCardEvent
+  | SoccerTeamEventEvent
+  | SoccerShootoutStartedEvent
+  | SoccerShootoutEligibilityChangedEvent
+  | SoccerShootoutGoalkeeperChangedEvent
+  | SoccerShootoutKickEvent

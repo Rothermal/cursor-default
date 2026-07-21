@@ -20,6 +20,7 @@ import {
   type SoccerScoreAdjustmentEvent,
   type SoccerShotEvent,
   type SoccerTimelineFilter,
+  withSoccerTieResolution,
 } from '../../lib/soccer'
 import type { GameEvent, GameEventInspection } from '../../lib/gameEvents/types'
 
@@ -364,7 +365,7 @@ function TimeEditor({ label, value, onChange }: { label: string; value: number; 
 }
 
 function RulesEditor({ rules, onChange }: { rules: SoccerMatchRules; onChange: (rules: SoccerMatchRules) => void }) {
-  return <div className="space-y-3"><div className="grid grid-cols-3 gap-2"><NumberEditor label="Players" value={rules.maxOnFieldPlayers} onChange={maxOnFieldPlayers => onChange({ ...rules, maxOnFieldPlayers })} /><NullableEditor label="Subs" value={rules.substitutionLimit} onChange={substitutionLimit => onChange({ ...rules, substitutionLimit })} /><NullableEditor label="Windows" value={rules.substitutionWindowLimit} onChange={substitutionWindowLimit => onChange({ ...rules, substitutionWindowLimit })} /></div><Toggle label="Allow return substitutions" checked={rules.allowReturnSubstitutions} onChange={allowReturnSubstitutions => onChange({ ...rules, allowReturnSubstitutions })} /><Toggle label="Extra time available" checked={rules.extraTimeAvailable} onChange={extraTimeAvailable => onChange({ ...rules, extraTimeAvailable })} /><Toggle label="Shootout available" checked={rules.shootoutAvailable} onChange={shootoutAvailable => onChange({ ...rules, shootoutAvailable })} /></div>
+  return <div className="space-y-3"><div className="grid grid-cols-3 gap-2"><NumberEditor label="Players" value={rules.maxOnFieldPlayers} onChange={maxOnFieldPlayers => onChange({ ...rules, maxOnFieldPlayers })} /><NullableEditor label="Subs" value={rules.substitutionLimit} onChange={substitutionLimit => onChange({ ...rules, substitutionLimit })} /><NullableEditor label="Windows" value={rules.substitutionWindowLimit} onChange={substitutionWindowLimit => onChange({ ...rules, substitutionWindowLimit })} /></div><Toggle label="Allow return substitutions" checked={rules.allowReturnSubstitutions} onChange={allowReturnSubstitutions => onChange({ ...rules, allowReturnSubstitutions })} /><Toggle label="Extra time available" checked={rules.extraTimeAvailable} onChange={extraTimeAvailable => onChange(withSoccerTieResolution(rules, extraTimeAvailable ? 'extra_time_then_shootout' : rules.shootoutAvailable ? 'direct_to_shootout' : 'draw_allowed'))} /><Toggle label="Shootout available" checked={rules.shootoutAvailable} onChange={shootoutAvailable => onChange(withSoccerTieResolution(rules, shootoutAvailable ? rules.extraTimeAvailable ? 'extra_time_then_shootout' : 'direct_to_shootout' : 'draw_allowed'))} /></div>
 }
 
 function NumberEditor({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
