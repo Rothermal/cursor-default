@@ -734,7 +734,24 @@ development checkout; soccer remains local-only and production-disabled.
 | 11g.4 | Revise a card to occur before a later shot/substitution involving the recipient | Raw revision is preserved, the dependency is diagnosed, and an append that would create incomplete history remains atomic |
 | 11g.5 | Exercise stay-on yellow, must-leave yellow replacement, second-yellow red, and goalkeeper-red handoff | Card totals and lineup intervals rebuild together; goalkeeper handoff preserves one goalkeeper and the required one-player reduction |
 | 11g.6 | Project direct-shootout setup, retake, forfeit, repeated-kicker rejection, and a deciding kick | Shootout attempts/score/saves remain separate from normal stats; order and eligibility are deterministic; result derives only after an explicit completed event |
-| 11g.7 | Run `pnpm build`, `pnpm lint`, and `pnpm test` | TypeScript, production build, lint, and the full regression suite pass; no SOC-4B/C controls appear |
+| 11g.7 | Run `pnpm build`, `pnpm lint`, and `pnpm test` | TypeScript, production build, lint, and the full regression suite pass; SOC-4A domain behavior remains deterministic |
+
+---
+
+## 11h. Soccer normal-match capture (SOC-4B)
+
+**Precondition:** Run a development build, create a soccer game, select a starting lineup, and
+start the match. Soccer remains development-only through SOC-6.
+
+| ID | Action | Expected |
+|---|---|---|
+| 11h.1 | At 390x844 and desktop widths, switch among Shot, Defense, and Foul field modes and Tracked/Opponent sides | Controls remain usable without overlap or page-level horizontal scrolling; side/player/mode defaults remain stable |
+| 11h.2 | Log each defensive action, a foul, a card, a corner, and an offside through field taps and quick actions | Events append atomically, use the selected side/actor defaults, and update derived match totals |
+| 11h.3 | Exercise IFAB stay-on yellow, High School replace-now/play-short, a non-goalkeeper red, and goalkeeper-red handoff | The card and required lineup consequence save together and rebuild the same on refresh |
+| 11h.4 | Switch marker family, side, and Current/Match filters; create overlapping markers and select a cluster | Marker shapes/colors distinguish event families and sides; cluster selection opens the intended event without moving the field |
+| 11h.5 | Use Timeline Add Event in a prior started period, edit it, remove it, and restore it | Historical bounds and actor eligibility are enforced; revision history and removed-event state remain visible and deterministic |
+| 11h.6 | Log a direct-free-kick, penalty, or corner-sequence shot after a compatible restart; change and clear its source | Suggested source is optional, side/time compatible, editable, and invalidated visibly if its source is later removed |
+| 11h.7 | Park and resume the soccer game, then run `pnpm build`, `pnpm lint`, and `pnpm test` | Capture preferences and event history survive; no shootout controls appear; basketball and shared parking regressions remain green |
 
 ---
 

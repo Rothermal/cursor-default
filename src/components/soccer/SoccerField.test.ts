@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { soccerFieldLocation, soccerFieldReviewEvents } from '../../lib/soccer/field'
+import {
+  clusterSoccerMarkerPoints,
+  soccerFieldLocation,
+  soccerFieldReviewEvents,
+} from '../../lib/soccer/field'
 
 describe('soccer field coordinates', () => {
   it('stores normalized recorder-view coordinates without a display flip', () => {
@@ -53,6 +57,31 @@ describe('soccer field coordinates', () => {
       scope: 'current',
       periodId: null,
     })).toEqual([])
+  })
+
+  it('filters all SOC-4B field families independently from capture mode', () => {
+    const events = [
+      candidate('shot', 'soccer.shot', 'tracked', 'first'),
+      candidate('defense', 'soccer.defensive_action', 'tracked', 'first'),
+      candidate('foul', 'soccer.foul', 'opponent', 'first'),
+      candidate('corner', 'soccer.team_event', 'tracked', 'first'),
+    ]
+    const base = { side: 'all' as const, scope: 'match' as const, periodId: 'first' }
+    expect(soccerFieldReviewEvents(events, { ...base, family: 'shots' }).map(item => item.id)).toEqual(['shot'])
+    expect(soccerFieldReviewEvents(events, { ...base, family: 'defense' }).map(item => item.id)).toEqual(['defense'])
+    expect(soccerFieldReviewEvents(events, { ...base, family: 'incidents' }).map(item => item.id)).toEqual(['foul', 'corner'])
+  })
+
+  it('clusters overlapping markers without changing stored coordinates', () => {
+    const points = [
+      { id: 'a', x: 0.5, y: 0.5 },
+      { id: 'b', x: 0.52, y: 0.51 },
+      { id: 'c', x: 0.8, y: 0.8 },
+    ]
+    expect(clusterSoccerMarkerPoints(points).map(cluster => cluster.map(item => item.id))).toEqual([
+      ['a', 'b'], ['c'],
+    ])
+    expect(points[0]).toEqual({ id: 'a', x: 0.5, y: 0.5 })
   })
 })
 

@@ -2,12 +2,33 @@ import { describe, expect, it } from 'vitest'
 import { resolveSoccerMatchRules } from './rules'
 import {
   detectRegulationPreset,
+  detectSoccerCompetitionProfile,
   regulationSegmentsForPreset,
   reorderSoccerSegments,
   resizeSoccerSegments,
+  soccerRulesForCompetitionProfile,
 } from './setupRules'
 
 describe('soccer setup rules', () => {
+  it('builds editable IFAB and high-school starting profiles', () => {
+    const ifab = soccerRulesForCompetitionProfile('ifab')
+    const highSchool = soccerRulesForCompetitionProfile('high_school')
+
+    expect(detectSoccerCompetitionProfile(ifab)).toBe('ifab')
+    expect(highSchool).toMatchObject({
+      clockDirection: 'count_down',
+      clockDisplay: 'per_period',
+      allowReturnSubstitutions: true,
+      yellowCardExitPolicy: 'must_leave_may_replace',
+      tieResolution: 'draw_allowed',
+    })
+    expect(highSchool.regulationSegments.map(segment => segment.durationMs)).toEqual([
+      2_400_000, 2_400_000,
+    ])
+    expect(detectSoccerCompetitionProfile(highSchool)).toBe('high_school')
+    expect(detectSoccerCompetitionProfile({ ...highSchool, maxOnFieldPlayers: 9 })).toBe('custom')
+  })
+
   it('builds and detects reviewed regulation presets', () => {
     const rules = reorderSoccerSegments({
       ...resolveSoccerMatchRules(),

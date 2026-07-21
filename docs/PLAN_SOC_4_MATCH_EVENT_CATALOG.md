@@ -3,7 +3,7 @@
 Detailed implementation plan for soccer defensive actions, discipline, team events,
 shootouts, and structured match outcomes.
 
-Status: SOC-4A implementation complete pending review. SOC-4B is next after merge.
+Status: SOC-4A and SOC-4B implementation complete pending review. SOC-4C is next after merge.
 
 ---
 
@@ -31,6 +31,8 @@ Implementation status: Complete in `feature/soc-4a-match-event-domain`.
 - Keep unfinished capture controls hidden until their domain behavior is complete.
 
 ### SOC-4B: Defense, discipline, and team-event capture
+
+Implementation status: Complete in `feature/soc-4b-normal-match-capture`.
 
 - Add live and historical capture plus correction for normal-match defensive actions,
   fouls/cards, corners, offsides, and other reviewed core team events.
@@ -636,6 +638,8 @@ parked state, and deterministically rebuilds complete projections; no unfinished
 
 ### SOC-4B: Normal-match capture and review
 
+Implementation status: Complete in `feature/soc-4b-normal-match-capture`.
+
 Primary files:
 
 - `src/pages/SoccerGameSetup.tsx`, `SoccerGameTracker.tsx`;
@@ -757,5 +761,5 @@ stats through basketball's legacy mutable counters or cloud game-stat paths.
    cloud, or release behavior are documented and deferred to the owning phase.
 4. After SOC-4C, update this document to Complete and hand implementation to SOC-5 planning.
 
-No further product Q&A is required before SOC-4B. Implementation questions should follow the
+No further product Q&A is required before SOC-4C. Implementation questions should follow the
 locked decisions and conservative codebase patterns above.

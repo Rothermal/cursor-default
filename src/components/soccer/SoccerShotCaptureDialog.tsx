@@ -2,6 +2,7 @@ import { MapPin, MapPinOff, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { GameEventActor, GameEventLocation, GameEventTeamSide } from '../../lib/gameEvents/types'
 import {
+  inspectSoccerHistory,
   recordHistoricalSoccerOwnGoal,
   recordHistoricalSoccerShot,
   recordSoccerOwnGoal,
@@ -11,9 +12,11 @@ import {
   reviseSoccerShot,
   soccerAttackingDirectionAt,
   soccerPeriodTimings,
+  soccerShotSourceCandidates,
   type SoccerCaptureActorSelection,
   type SoccerEventMoment,
   type SoccerLiveResult,
+  type SoccerMatchEvent,
   type SoccerOwnGoalEvent,
   type SoccerShotOutcome,
   type SoccerShotEvent,
@@ -87,6 +90,7 @@ export default function SoccerShotCaptureDialog({
   const [teamSide, setTeamSide] = useState<GameEventTeamSide>('tracked')
   const [outcome, setOutcome] = useState<SoccerShotOutcome | null>(null)
   const [situation, setSituation] = useState<SoccerShotSituation>('open_play')
+  const [sourceEventId, setSourceEventId] = useState('')
   const [ownGoal, setOwnGoal] = useState(false)
   const [location, setLocation] = useState<GameEventLocation | null>(null)
   const [trackedShooterId, setTrackedShooterId] = useState('__team__')
@@ -152,6 +156,7 @@ export default function SoccerShotCaptureDialog({
     setTeamSide(event?.teamSide ?? draft.teamSide)
     setOutcome(shot?.payload.outcome ?? (ownGoalEvent ? 'goal' : draft.outcome ?? null))
     setSituation(shot?.payload.situation ?? 'open_play')
+    setSourceEventId(shot?.payload.sourceEventId ?? '')
     setOwnGoal(Boolean(ownGoalEvent))
     setLocation(event?.location ?? draft.location)
     setTrackedShooterId(shooter?.participantId ?? (shooter?.kind === 'team' || draft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
@@ -188,6 +193,18 @@ export default function SoccerShotCaptureDialog({
   if (!draft || !projection) return null
 
   const creatorsAllowed = !ownGoal && situation !== 'penalty' && situation !== 'direct_free_kick'
+  const sourceAllowed = situation === 'penalty' ||
+    situation === 'direct_free_kick' ||
+    situation === 'corner_sequence'
+  const sourceCandidates = moment
+    ? soccerShotSourceCandidates(inspectSoccerHistory(state).activeEvents as SoccerMatchEvent[], {
+        teamSide,
+        situation,
+        period: moment.period,
+        elapsedMs: moment.elapsedMs,
+        excludeEventId: draft.event?.id,
+      })
+    : []
   const ownGoalNeedsGoalkeeper = ownGoal && teamSide === 'opponent'
   const timingInvalid = mode !== 'live' && (
     !selectedTiming ||
@@ -260,6 +277,7 @@ export default function SoccerShotCaptureDialog({
         teamSide,
         outcome,
         situation,
+        sourceEventId: sourceAllowed ? sourceEventId || null : null,
         location: eventLocation,
         shooter,
         primaryCreator: creatorsAllowed
@@ -413,6 +431,20 @@ export default function SoccerShotCaptureDialog({
                 onChange={event => {
                   const next = event.target.value as SoccerShotSituation
                   setSituation(next)
+                  if (next === 'open_play' || next === 'other_set_piece') {
+                    setSourceEventId('')
+                  } else if (moment) {
+                    setSourceEventId(soccerShotSourceCandidates(
+                      inspectSoccerHistory(state).activeEvents as SoccerMatchEvent[],
+                      {
+                        teamSide,
+                        situation: next,
+                        period: moment.period,
+                        elapsedMs: moment.elapsedMs,
+                        excludeEventId: draft.event?.id,
+                      }
+                    )[0]?.eventId ?? '')
+                  }
                   if (next === 'penalty' && location === null) setLocation(penaltyMark(captureDirection))
                   if (next === 'penalty' || next === 'direct_free_kick') {
                     setPrimaryCreatorId('')
@@ -424,6 +456,22 @@ export default function SoccerShotCaptureDialog({
                 className="input-field"
               >
                 {SITUATIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </FieldGroup>
+          )}
+
+          {!ownGoal && sourceAllowed && (
+            <FieldGroup label="Restart source (optional)">
+              <select value={sourceEventId} onChange={event => setSourceEventId(event.target.value)} className="input-field">
+                <option value="">No linked source</option>
+                {sourceEventId && !sourceCandidates.some(candidate => candidate.eventId === sourceEventId) && (
+                  <option value={sourceEventId}>Current source (needs review)</option>
+                )}
+                {sourceCandidates.map(candidate => (
+                  <option key={candidate.eventId} value={candidate.eventId}>
+                    {candidate.label} at {Math.floor(candidate.elapsedMs / 60_000)}:{String(Math.floor(candidate.elapsedMs / 1_000) % 60).padStart(2, '0')}
+                  </option>
+                ))}
               </select>
             </FieldGroup>
           )}

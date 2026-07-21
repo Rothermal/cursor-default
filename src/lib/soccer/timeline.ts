@@ -2,7 +2,13 @@ import type { GameEvent } from '../gameEvents/types'
 import type { SoccerPeriodTiming } from './live'
 import { formatSoccerDuration } from './live'
 
-export type SoccerTimelineFilter = 'all' | 'attacking' | 'match_control'
+export type SoccerTimelineFilter =
+  | 'all'
+  | 'attacking'
+  | 'defensive'
+  | 'discipline'
+  | 'team_events'
+  | 'match_control'
 
 export function isSoccerAttackingEventType(eventType: string): boolean {
   return eventType === 'soccer.shot' ||
@@ -15,9 +21,17 @@ export function soccerEventMatchesTimelineFilter(
   filter: SoccerTimelineFilter
 ): boolean {
   if (filter === 'all') return true
-  return filter === 'attacking'
-    ? isSoccerAttackingEventType(event.eventType)
-    : !isSoccerAttackingEventType(event.eventType)
+  if (filter === 'attacking') return isSoccerAttackingEventType(event.eventType)
+  if (filter === 'defensive') return event.eventType === 'soccer.defensive_action'
+  if (filter === 'discipline') {
+    return event.eventType === 'soccer.foul' || event.eventType === 'soccer.card'
+  }
+  if (filter === 'team_events') return event.eventType === 'soccer.team_event'
+  return !isSoccerAttackingEventType(event.eventType) &&
+    event.eventType !== 'soccer.defensive_action' &&
+    event.eventType !== 'soccer.foul' &&
+    event.eventType !== 'soccer.card' &&
+    event.eventType !== 'soccer.team_event'
 }
 
 export function isSoccerScoringEvent(event: Pick<GameEvent, 'eventType' | 'payload'>): boolean {
