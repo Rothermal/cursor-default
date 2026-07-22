@@ -769,7 +769,7 @@ snapshotted rules require a winner. Soccer remains local-only and production-dis
 | 11i.5 | Record shootout yellow/red cards, equalize eligibility, and send off the current goalkeeper | Shootout discipline stays separate; counts must remain equal; another kick is blocked until the sent-off goalkeeper is replaced |
 | 11i.6 | Change each goalkeeper, including an allowed unused tracked replacement, then park and resume | The designated goalkeeper and paired eligibility change rebuild atomically and survive parking without altering normal lineup history |
 | 11i.7 | Select a kick and correct its outcome; use Timeline to revise, remove, and restore shootout events | The kick sequence, decision, score, diagnostics, and structured result reproject from active revisions; normal Add Event stays hidden once a shootout exists |
-| 11i.8 | Complete a decided shootout, reopen it, suspend/resume normal play, and abandon/reopen with a reason | Completion is unavailable before a decision; suspended play resumes its exact context; abandoned matches require a reopen reason and return to a safe break |
+| 11i.8 | Complete a decided shootout, reopen it, suspend/resume normal play, and abandon/reopen with a reason | Completion is unavailable before a decision; suspended play resumes its exact context; abandoned matches require a reopen reason and return to their existing shootout or normal-match break |
 | 11i.9 | Repeat the workspace at 390x844 and desktop widths, then run `pnpm build`, `pnpm lint`, and `pnpm test` | Score, kick strip, controls, dialogs, Timeline, and review-only field remain readable without page-level horizontal scrolling; basketball regressions remain green |
 
 ---

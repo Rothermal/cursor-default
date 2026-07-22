@@ -43,10 +43,12 @@ export default function SoccerScoreTimelineDialog({
     [inspection.activeEvents]
   )
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
+  const correctionsLocked = state.sportGameState?.sportId === 'soccer' &&
+    Boolean(state.sportGameState.projection.shootout)
 
   useEffect(() => {
-    if (open) setEditing(initialEdit)
-  }, [initialEdit, open])
+    if (open) setEditing(correctionsLocked ? null : initialEdit)
+  }, [correctionsLocked, initialEdit, open])
 
   if (!open) return null
   return (
@@ -74,13 +76,18 @@ export default function SoccerScoreTimelineDialog({
             />
           ) : (
             <>
-              <button type="button" onClick={() => setEditing('new')} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white"><Plus size={17} /> Add Score Adjustment</button>
+              {correctionsLocked ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Remove the shootout events before correcting the normal match score.</p>
+              ) : (
+                <button type="button" onClick={() => setEditing('new')} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white"><Plus size={17} /> Add Score Adjustment</button>
+              )}
               <div className="divide-y divide-slate-200 border-y border-slate-200">
                 {scoringEvents.map(event => (
                   <ScoringRow
                     key={event.id}
                     event={event}
                     timeLabel={soccerEventTimeLabel(event, timings)}
+                    editable={!correctionsLocked}
                     onEdit={() => {
                       if (event.eventType === 'soccer.score_adjustment') {
                         setEditing(event as SoccerScoreAdjustmentEvent)
@@ -176,7 +183,7 @@ function ScoreAdjustmentForm({ state, event, recorderUserId, busy, onApply, onCa
   )
 }
 
-function ScoringRow({ event, timeLabel, onEdit }: { event: GameEvent; timeLabel: string; onEdit: () => void }) {
+function ScoringRow({ event, timeLabel, editable, onEdit }: { event: GameEvent; timeLabel: string; editable: boolean; onEdit: () => void }) {
   const detail = event.eventType === 'soccer.shot'
     ? actorLabel(event, 'shooter')
     : event.eventType === 'soccer.own_goal'
@@ -193,7 +200,7 @@ function ScoringRow({ event, timeLabel, onEdit }: { event: GameEvent; timeLabel:
         <p className="truncate text-xs text-slate-500">{detail}</p>
         <p className="mt-0.5 text-[11px] text-slate-400">{timeLabel} · rev {event.revision}</p>
       </div>
-      <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-slate-600" aria-label="Correct scoring event" title="Correct"><Pencil size={17} /></button>
+      {editable && <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-slate-600" aria-label="Correct scoring event" title="Correct"><Pencil size={17} /></button>}
     </div>
   )
 }

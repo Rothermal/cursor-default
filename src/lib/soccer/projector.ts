@@ -998,6 +998,9 @@ function deriveCompletedMatchOutcome(projection: SoccerMatchProjection): string 
   const opponentScore = projection.sideTotals.opponent.score
   const extraTimeIds = projection.currentRules.extraTimeSegments.map(segment => segment.id)
   const extraTimeBegan = extraTimeIds.some(periodId => projection.completedPeriodIds.includes(periodId))
+  if (projection.shootout && trackedScore !== opponentScore) {
+    return 'A match with a shootout must retain a tied normal match score.'
+  }
   if (trackedScore === opponentScore) {
     if (
       projection.currentRules.tieResolution === 'extra_time_then_shootout' &&
@@ -1032,7 +1035,7 @@ function applyMatchReopened(projection: SoccerMatchProjection): string | null {
       openOnFieldIntervals(projection, context.periodId, context.elapsedMs)
     }
   } else if (projection.status === 'ended') {
-    projection.status = projection.shootout?.decided ? 'shootout' : 'period_break'
+    projection.status = projection.shootout ? 'shootout' : 'period_break'
     projection.currentPeriodId = null
   } else {
     return 'Only an ended or suspended match can be reopened.'

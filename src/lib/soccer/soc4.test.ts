@@ -12,7 +12,10 @@ import { createSoccerEvent, soccerEventDefinitions, type SoccerEventPayloadByTyp
 import {
   endSoccerMatch,
   recordCheckedSoccerEvent,
+  recordSoccerScoreAdjustment,
   recordSoccerShootoutKick,
+  reopenSoccerMatch,
+  reviseSoccerScoreAdjustment,
   startSoccerShootout,
 } from './live'
 import { resolveSoccerMatchRules, type SoccerMatchRulesOverride } from './rules'
@@ -172,6 +175,24 @@ function append(state: GameState, events: GameEvent[]): GameState {
   const result = addGameEvents(state, events, gameEventRegistry, gameEventProjectors)
   if (!result.ok) throw new Error(result.error.message)
   return result.state
+}
+
+function activeShootoutState(): GameState {
+  const regulation = append(initializedState('direct_to_shootout'), completedRegulationEvents())
+  const started = startSoccerShootout(regulation, {
+    firstKickingSide: 'tracked',
+    trackedEligibleParticipantIds: ['match-keeper', 'match-defender'],
+    trackedExcludedParticipantIds: [],
+    opponentEligibleCount: 2,
+    trackedGoalkeeperParticipantId: 'match-keeper',
+    opponentGoalkeeperLabel: 'Unknown',
+  }, {
+    recorderUserId: 'user-1',
+    nowMs: Date.parse('2026-07-21T12:03:00.000Z'),
+    eventIds: ['50000000-0000-4000-8000-000000000020'],
+  })
+  if (!started.ok) throw new Error(started.message)
+  return started.state
 }
 
 describe('SOC-4A rules, state, and schemas', () => {
@@ -855,6 +876,73 @@ describe('SOC-4A shootout projection', () => {
       result: 'tracked_win',
       decidedStage: 'shootout',
     })
+  })
+
+  it('reopens an abandoned undecided shootout into its existing workspace', () => {
+    const abandoned = endSoccerMatch(activeShootoutState(), 'abandoned', {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:10.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000021'],
+    })
+    expect(abandoned.ok).toBe(true)
+    if (!abandoned.ok) return
+
+    const reopened = reopenSoccerMatch(abandoned.state, 'Resume shootout', {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:20.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000022'],
+    })
+    expect(reopened.ok).toBe(true)
+    if (!reopened.ok) return
+    expect(reopened.state.sportGameState?.projection).toMatchObject({
+      status: 'shootout',
+      endReason: null,
+      shootout: { decided: false, nextSide: 'tracked' },
+    })
+  })
+
+  it('blocks normal score adjustments and out-of-range anonymous slots after shootout starts', () => {
+    const state = activeShootoutState()
+    const adjusted = recordSoccerScoreAdjustment(state, {
+      teamSide: 'tracked',
+      delta: 1,
+      reason: 'Late normal-score correction',
+    }, {
+      period: { id: 'regulation-2', order: 2 },
+      elapsedMs: 2_000,
+    }, {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:10.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000023'],
+    })
+    expect(adjusted).toMatchObject({
+      ok: false,
+      message: 'Remove the shootout events before correcting the normal match score.',
+    })
+    expect(reviseSoccerScoreAdjustment(state, '50000000-0000-4000-8000-000000000099', {
+      teamSide: 'tracked',
+      delta: -1,
+      reason: 'Revised correction',
+    }, {
+      period: { id: 'regulation-2', order: 2 },
+      elapsedMs: 2_000,
+    })).toMatchObject({
+      ok: false,
+      message: 'Remove the shootout events before correcting the normal match score.',
+    })
+
+    const invalidSlot = recordSoccerShootoutKick(state, {
+      outcome: 'scored',
+      kicker: { kind: 'unknown', label: 'Unknown' },
+      goalkeeper: { kind: 'unknown', label: 'Unknown' },
+      anonymousKickerSlot: 3,
+    }, {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:10.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000024'],
+    })
+    expect(invalidSlot.ok).toBe(false)
+    expect(invalidSlot.state.eventStream?.events).toHaveLength(state.eventStream!.events.length)
   })
 
   it('completes a tied draw-allowed match without entering a shootout', () => {

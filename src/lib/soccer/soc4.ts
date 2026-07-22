@@ -811,6 +811,12 @@ function validateShootoutKicker(
   anonymousSlot: number | null
 ): string | null {
   const shootout = projection.shootout!
+  const eligibleCount = side === 'tracked'
+    ? shootout.trackedEligibleParticipantIds.length
+    : shootout.opponentEligibleCount
+  if (anonymousSlot !== null && anonymousSlot > eligibleCount) {
+    return 'Anonymous shootout kicker slot exceeds the eligible-player count.'
+  }
   if (side === 'tracked' && actor.participantId) {
     if (!shootout.trackedEligibleParticipantIds.includes(actor.participantId)) {
       return 'Tracked shootout kicker is not eligible.'

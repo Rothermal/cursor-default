@@ -521,6 +521,9 @@ export function recordSoccerScoreAdjustment(
   moment: SoccerEventMoment,
   options: SoccerLiveOptions
 ): SoccerLiveResult {
+  if (hasSoccerShootout(state)) {
+    return failure(state, 'Remove the shootout events before correcting the normal match score.')
+  }
   const context = historicalContext(state, moment, options.nowMs)
   if (!context.ok) return context
   const reason = input.reason.trim()
@@ -543,6 +546,9 @@ export function reviseSoccerScoreAdjustment(
   moment: SoccerEventMoment,
   now = new Date().toISOString()
 ): SoccerLiveResult {
+  if (hasSoccerShootout(state)) {
+    return failure(state, 'Remove the shootout events before correcting the normal match score.')
+  }
   const reason = input.reason.trim()
   if (!reason) return failure(state, 'A score adjustment reason is required.')
   return updateSoccerHistoryEvent(state, eventId, {
@@ -1037,6 +1043,10 @@ function appendSpecs(
     ? addGameEvent(state, events[0], gameEventRegistry, gameEventProjectors)
     : addGameEvents(state, events, gameEventRegistry, gameEventProjectors)
   return mutationResult(result)
+}
+
+function hasSoccerShootout(state: GameState): boolean {
+  return state.sportGameState?.sportId === 'soccer' && Boolean(state.sportGameState.projection.shootout)
 }
 
 function shootoutEligibilitySpec(
