@@ -36,6 +36,9 @@ import SoccerLiveActionDialog, {
 } from '../components/soccer/SoccerLiveActionDialog'
 import SoccerTimeline from '../components/soccer/SoccerTimeline'
 import SoccerScoreTimelineDialog from '../components/soccer/SoccerScoreTimelineDialog'
+import SoccerShootoutManagementDialog, { type SoccerShootoutManagementKind } from '../components/soccer/SoccerShootoutManagementDialog'
+import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupDialog'
+import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from '../components/soccer/SoccerShotCaptureDialog'
@@ -44,12 +47,14 @@ import { useGame } from '../context/GameContext'
 import type { GameEvent } from '../lib/gameEvents/types'
 import {
   endSoccerPeriod,
+  endSoccerMatch,
   formatSoccerDuration,
   inspectSoccerHistory,
   orderedSoccerSegments,
   participantActiveMs,
   recordSoccerDirectionChange,
   reopenSoccerMatch,
+  soccerLifecycleAction,
   soccerFieldReviewEvents,
   soccerClockDisplayValue,
   startNextSoccerPeriod,
@@ -95,6 +100,9 @@ export default function SoccerGameTracker() {
   const [clusterEventIds, setClusterEventIds] = useState<string[] | null>(null)
   const [scoreTimelineOpen, setScoreTimelineOpen] = useState(false)
   const [scoreAdjustmentEdit, setScoreAdjustmentEdit] = useState<SoccerScoreAdjustmentEvent | null>(null)
+  const [shootoutSetupOpen, setShootoutSetupOpen] = useState(false)
+  const [shootoutManagement, setShootoutManagement] = useState<SoccerShootoutManagementKind | null>(null)
+  const [reopenOpen, setReopenOpen] = useState(false)
   const applyingRef = useRef(false)
 
   const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
@@ -146,14 +154,14 @@ export default function SoccerGameTracker() {
   const clockValue = soccerClockDisplayValue(state, nowMs)
   const segments = projection ? orderedSoccerSegments(projection.currentRules) : []
   const currentSegment = segments.find(segment => segment.id === projection?.currentPeriodId) ?? null
-  const nextSegment = projection
-    ? segments.find(segment => !projection.completedPeriodIds.includes(segment.id)) ?? null
-    : null
+  const lifecycleAction = projection ? soccerLifecycleAction(projection) : { kind: 'none' as const }
+  const nextSegment = lifecycleAction.kind === 'start_period' ? lifecycleAction.segment : null
 
   if (invalidRoute || !state.gameInfo || !soccerState || !projection || !clockValue) return null
 
   const healthy = inspection.complete
   const ended = projection.status === 'ended'
+  const shootoutActive = projection.status === 'shootout' && projection.shootout !== null
   const options = { recorderUserId: user?.id ?? null }
   const participants = Object.values(projection.participants)
   const onField = participants.filter(participant => participant.status === 'on_field')
@@ -291,21 +299,39 @@ export default function SoccerGameTracker() {
               Review Timeline Issues
             </button>
           ) : ended ? (
-            <button type="button" onClick={() => applyResult(reopenSoccerMatch(state, 'Recorder reopened match', options))} className="mt-5 w-full rounded-md bg-slate-800 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
-              <RotateCcw size={18} /> Reopen Match
-            </button>
+            <div className="mt-5 space-y-2">
+              <p className="text-sm font-bold text-slate-700">{matchResultLabel(projection, state.gameInfo.teamName, state.gameInfo.opponentName)}</p>
+              <button type="button" onClick={() => setReopenOpen(true)} className="w-full rounded-md bg-slate-800 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                <RotateCcw size={18} /> Reopen Match
+              </button>
+            </div>
+          ) : projection.status === 'suspended' ? (
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => applyResult(reopenSoccerMatch(state, 'Match resumed', options))} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                <Play size={18} /> Resume Match
+              </button>
+              <button type="button" onClick={() => openDialog('end')} className="rounded-md border border-red-300 bg-white px-4 py-3 text-sm font-bold text-red-700">Abandon</button>
+            </div>
           ) : projection.status === 'period_break' ? (
             <div className="mt-5 grid grid-cols-2 gap-2">
-              {nextSegment ? (
+              {lifecycleAction.kind === 'start_period' ? (
                 <button type="button" onClick={() => applyResult(startNextSoccerPeriod(state, options))} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
-                  <Play size={18} /> Start {nextSegment.label}
+                  <Play size={18} /> Start {lifecycleAction.segment.label}
+                </button>
+              ) : lifecycleAction.kind === 'start_shootout' ? (
+                <button type="button" onClick={() => setShootoutSetupOpen(true)} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                  <Goal size={18} /> Start Shootout
+                </button>
+              ) : lifecycleAction.kind === 'complete' ? (
+                <button type="button" onClick={() => applyResult(endSoccerMatch(state, 'completed', options))} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                  <Flag size={18} /> {lifecycleAction.label}
                 </button>
               ) : <span />}
               <button type="button" onClick={() => openDialog('end')} className="rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 flex items-center justify-center gap-2">
-                <Flag size={18} /> End Match
+                <MoreHorizontal size={18} /> Match Status
               </button>
             </div>
-          ) : (
+          ) : shootoutActive ? null : (
             <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
               <button type="button" onClick={primaryClockAction} className={`rounded-md px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2 ${projection.clock.running ? 'bg-amber-600' : 'bg-emerald-700'}`}>
                 {projection.clock.running ? <Pause size={19} /> : <Play size={19} />}
@@ -326,13 +352,43 @@ export default function SoccerGameTracker() {
         )}
 
         <nav className="grid grid-cols-3 border-b border-slate-200 bg-white" aria-label="Soccer tracker views">
-          <TabButton active={mainTab === 'field'} label="Field" icon={<Map size={17} />} onClick={() => setMainTab('field')} />
+          <TabButton active={mainTab === 'field'} label={shootoutActive ? 'Shootout' : 'Field'} icon={shootoutActive ? <Goal size={17} /> : <Map size={17} />} onClick={() => setMainTab('field')} />
           <TabButton active={mainTab === 'lineup'} label="Lineup" icon={<Users size={17} />} onClick={() => setMainTab('lineup')} />
           <TabButton active={mainTab === 'timeline'} label="Timeline" icon={<History size={17} />} onClick={() => setMainTab('timeline')} />
         </nav>
 
         <div className="px-4 py-5">
-          {mainTab === 'field' ? (
+          {mainTab === 'field' && shootoutActive ? (
+            <div className="space-y-6">
+              <SoccerShootoutWorkspace
+                state={state}
+                inspection={inspection}
+                recorderUserId={user?.id ?? null}
+                busy={isApplying}
+                onApply={applyResult}
+                onCard={() => setShootoutManagement('card')}
+                onGoalkeeper={() => setShootoutManagement('goalkeeper')}
+                onEligibility={() => setShootoutManagement('eligibility')}
+              />
+              <section>
+                <h2 className="mb-2 text-xs font-bold uppercase text-slate-500">Normal match field review</h2>
+                <SoccerField
+                  trackedDirection={projection.attackingDirection}
+                  captureSide={capturePreferences.teamSide}
+                  flipped={fieldFlipped}
+                  disabled
+                  markers={fieldMarkers}
+                  onFlip={() => setFieldFlipped(value => !value)}
+                  onLocation={() => {}}
+                  onMarker={eventId => {
+                    const event = inspection.activeEvents.find(candidate => candidate.id === eventId)
+                    if (event) editFieldEvent(event)
+                  }}
+                  onCluster={setClusterEventIds}
+                />
+              </section>
+            </div>
+          ) : mainTab === 'field' ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
                 <ModeButton active={capturePreferences.teamSide === 'tracked'} label="Tracked" onClick={() => setCaptureSide('tracked')} />
@@ -507,6 +563,7 @@ export default function SoccerGameTracker() {
                 setScoreAdjustmentEdit(event)
                 setScoreTimelineOpen(true)
               }}
+              allowAddEvent={!projection.shootout}
             />
           )}
         </div>
@@ -514,6 +571,7 @@ export default function SoccerGameTracker() {
 
       {actionsOpen && (
         <ActionSheet
+          status={projection.status}
           onClose={() => setActionsOpen(false)}
           onAction={openDialog}
           onDirection={() => applyResult(recordSoccerDirectionChange(
@@ -564,6 +622,27 @@ export default function SoccerGameTracker() {
         })}
         onClose={() => setIncidentDraft(null)}
       />
+
+      {shootoutSetupOpen && (
+        <SoccerShootoutSetupDialog
+          state={state}
+          recorderUserId={user?.id ?? null}
+          busy={isApplying}
+          onApply={applyResult}
+          onClose={() => setShootoutSetupOpen(false)}
+        />
+      )}
+
+      {shootoutManagement && (
+        <SoccerShootoutManagementDialog
+          kind={shootoutManagement}
+          state={state}
+          recorderUserId={user?.id ?? null}
+          busy={isApplying}
+          onApply={applyResult}
+          onClose={() => setShootoutManagement(null)}
+        />
+      )}
 
       {clusterEventIds && (
         <ClusterSheet
@@ -617,6 +696,18 @@ export default function SoccerGameTracker() {
         }}
         onCancel={() => setConfirmEndPeriod(false)}
       />
+
+      {reopenOpen && (
+        <ReopenMatchDialog
+          abandoned={projection.endReason === 'abandoned'}
+          busy={isApplying}
+          onClose={() => setReopenOpen(false)}
+          onReopen={reason => {
+            const applied = applyResult(reopenSoccerMatch(state, reason, options))
+            if (applied) setReopenOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -652,12 +743,13 @@ function ParticipantRow({ participant, projection, nowMs, disabled, canResolve, 
   )
 }
 
-function ActionSheet({ onClose, onAction, onDirection }: {
+function ActionSheet({ status, onClose, onAction, onDirection }: {
+  status: SoccerMatchProjection['status']
   onClose: () => void
   onAction: (kind: SoccerLiveDialogKind) => void
   onDirection: () => void
 }) {
-  const actions: Array<{ kind: SoccerLiveDialogKind; label: string; icon: ReactNode }> = [
+  const standardActions: Array<{ kind: SoccerLiveDialogKind; label: string; icon: ReactNode }> = [
     { kind: 'substitution', label: 'Substitutions', icon: <Repeat2 size={20} /> },
     { kind: 'roles', label: 'Roles', icon: <Users size={20} /> },
     { kind: 'clock', label: 'Correct clock', icon: <TimerReset size={20} /> },
@@ -665,13 +757,17 @@ function ActionSheet({ onClose, onAction, onDirection }: {
     { kind: 'rules', label: 'Match rules', icon: <SlidersHorizontal size={20} /> },
     { kind: 'end', label: 'End match', icon: <Flag size={20} /> },
   ]
+  const standardControls = status === 'in_progress' || status === 'period_break'
+  const actions = standardControls
+    ? standardActions
+    : [{ kind: 'end' as const, label: 'Match status', icon: <Flag size={20} /> }]
   return (
     <div className="fixed inset-0 z-40 bg-black/45 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="bg-white w-full sm:max-w-md rounded-t-lg sm:rounded-lg p-4" onClick={event => event.stopPropagation()}>
         <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-slate-800">Match Actions</h2><button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></div>
         <div className="grid grid-cols-2 gap-2">
           {actions.map(action => <button key={action.kind} type="button" onClick={() => onAction(action.kind)} className="min-h-16 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 flex items-center gap-3">{action.icon}{action.label}</button>)}
-          <button type="button" onClick={onDirection} className="min-h-16 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 flex items-center gap-3"><Compass size={20} />Switch direction</button>
+          {standardControls && <button type="button" onClick={onDirection} className="min-h-16 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 flex items-center gap-3"><Compass size={20} />Switch direction</button>}
         </div>
       </div>
     </div>
@@ -705,6 +801,19 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function limitValue(used: number, limit: number | null): string {
   return limit === null ? `${used}/-` : `${used}/${limit}`
+}
+
+function ReopenMatchDialog({ abandoned, busy, onClose, onReopen }: { abandoned: boolean; busy: boolean; onClose: () => void; onReopen: (reason: string | null) => void }) {
+  const [reason, setReason] = useState('')
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center" onClick={onClose}><div role="dialog" aria-modal="true" aria-label="Reopen match" className="w-full rounded-t-lg bg-white p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}><div className="mb-3 flex items-center gap-3"><h2 className="flex-1 font-bold text-slate-900">Reopen Match</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></div><p className="mb-3 text-sm text-slate-600">Reopening returns the match to its last valid correction point.</p><label className="block text-xs font-bold uppercase text-slate-500">Reason {abandoned ? '(required)' : '(optional)'}<textarea value={reason} onChange={event => setReason(event.target.value)} rows={3} className="input-field mt-1 resize-none" /></label><button type="button" disabled={busy || (abandoned && !reason.trim())} onClick={() => onReopen(reason.trim() || null)} className="mt-4 min-h-12 w-full rounded-md bg-slate-800 text-sm font-bold text-white disabled:opacity-40">Reopen Match</button></div></div>
+}
+
+function matchResultLabel(projection: SoccerMatchProjection, trackedName: string, opponentName: string): string {
+  if (projection.result === 'draw') return 'Draw'
+  if (projection.result === 'abandoned') return 'Match abandoned'
+  if (projection.result === 'tracked_win') return `${trackedName} won${projection.decidedStage === 'shootout' ? ' on shootout' : ''}`
+  if (projection.result === 'opponent_win') return `${opponentName} won${projection.decidedStage === 'shootout' ? ' on shootout' : ''}`
+  return 'Result unresolved'
 }
 
 function markerLabel(event: GameEvent): string {

@@ -6,6 +6,7 @@ import {
   adjustSoccerClock,
   createSoccerUuid,
   endSoccerMatch,
+  soccerLifecycleAction,
   formatSoccerInputTime,
   isSoccerHalftimeBreak,
   parseSoccerInputTime,
@@ -463,16 +464,10 @@ function ResolveParticipantForm({ state, options, initialParticipantId, onApply 
 
 function EndMatchForm({ state, options, onApply }: FormProps) {
   const projection = soccerProjection(state)
-  const regulationComplete = projection.currentRules.regulationSegments.every(
-    segment => projection.completedPeriodIds.includes(segment.id)
-  )
-  const extraTimeIds = projection.currentRules.extraTimeSegments.map(segment => segment.id)
-  const extraTimeBegan = extraTimeIds.some(periodId => projection.completedPeriodIds.includes(periodId))
-  const canComplete = projection.status === 'period_break' && regulationComplete && (
-    !extraTimeBegan || extraTimeIds.every(periodId => projection.completedPeriodIds.includes(periodId))
-  )
+  const canComplete = soccerLifecycleAction(projection).kind === 'complete'
+  const canSuspend = projection.status === 'in_progress' || projection.status === 'period_break'
   const [reason, setReason] = useState<'completed' | 'suspended' | 'abandoned'>(
-    canComplete ? 'completed' : 'suspended'
+    projection.status === 'suspended' ? 'abandoned' : canComplete ? 'completed' : canSuspend ? 'suspended' : 'abandoned'
   )
   return (
     <div className="space-y-4">
@@ -484,8 +479,8 @@ function EndMatchForm({ state, options, onApply }: FormProps) {
             ['suspended', 'Suspended'],
             ['abandoned', 'Abandoned'],
           ] as const).map(([value, label]) => (
-            <label key={value} className={`flex items-center gap-3 border border-slate-200 rounded-md px-3 py-3 text-sm font-medium text-slate-700 ${value === 'completed' && !canComplete ? 'opacity-45' : ''}`}>
-              <input type="radio" name="end-reason" checked={reason === value} disabled={value === 'completed' && !canComplete} onChange={() => setReason(value)} className="h-4 w-4 accent-emerald-600" />
+            <label key={value} className={`flex items-center gap-3 border border-slate-200 rounded-md px-3 py-3 text-sm font-medium text-slate-700 ${(value === 'completed' && !canComplete) || (value === 'suspended' && !canSuspend) ? 'opacity-45' : ''}`}>
+              <input type="radio" name="end-reason" checked={reason === value} disabled={(value === 'completed' && !canComplete) || (value === 'suspended' && !canSuspend)} onChange={() => setReason(value)} className="h-4 w-4 accent-emerald-600" />
               {label}
             </label>
           ))}

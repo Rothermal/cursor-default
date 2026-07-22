@@ -9,7 +9,15 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState } from '../gameReducer'
 import type { GameState, SportConfig } from '../../types'
 import { createSoccerEvent, soccerEventDefinitions, type SoccerEventPayloadByType } from './events'
-import { recordCheckedSoccerEvent } from './live'
+import {
+  endSoccerMatch,
+  recordCheckedSoccerEvent,
+  recordSoccerScoreAdjustment,
+  recordSoccerShootoutKick,
+  reopenSoccerMatch,
+  reviseSoccerScoreAdjustment,
+  startSoccerShootout,
+} from './live'
 import { resolveSoccerMatchRules, type SoccerMatchRulesOverride } from './rules'
 import { createSoccerSportGameState, normalizeSportGameState } from './state'
 import type { SoccerMatchParticipant, SoccerMatchSetup } from './types'
@@ -167,6 +175,24 @@ function append(state: GameState, events: GameEvent[]): GameState {
   const result = addGameEvents(state, events, gameEventRegistry, gameEventProjectors)
   if (!result.ok) throw new Error(result.error.message)
   return result.state
+}
+
+function activeShootoutState(): GameState {
+  const regulation = append(initializedState('direct_to_shootout'), completedRegulationEvents())
+  const started = startSoccerShootout(regulation, {
+    firstKickingSide: 'tracked',
+    trackedEligibleParticipantIds: ['match-keeper', 'match-defender'],
+    trackedExcludedParticipantIds: [],
+    opponentEligibleCount: 2,
+    trackedGoalkeeperParticipantId: 'match-keeper',
+    opponentGoalkeeperLabel: 'Unknown',
+  }, {
+    recorderUserId: 'user-1',
+    nowMs: Date.parse('2026-07-21T12:03:00.000Z'),
+    eventIds: ['50000000-0000-4000-8000-000000000020'],
+  })
+  if (!started.ok) throw new Error(started.message)
+  return started.state
 }
 
 describe('SOC-4A rules, state, and schemas', () => {
@@ -746,6 +772,177 @@ describe('SOC-4A shootout projection', () => {
     ], gameEventRegistry, gameEventProjectors)
 
     expect(result.ok).toBe(false)
+  })
+
+  it('requires a sent-off shootout goalkeeper to be replaced before the next kick', () => {
+    const shootout = { id: 'shootout', order: 3 }
+    const result = addGameEvents(initializedState('direct_to_shootout'), [
+      ...completedRegulationEvents(),
+      event(9, 'soccer.shootout_started', {
+        firstKickingSide: 'opponent',
+        initialKicksPerSide: 1,
+        trackedEligibleParticipantIds: ['match-keeper', 'match-defender'],
+        trackedExcludedParticipantIds: [],
+        opponentEligibleCount: 2,
+        trackedGoalkeeperParticipantId: 'match-keeper',
+      }, { elapsedMs: null, period: shootout }),
+      event(10, 'soccer.card', {
+        sanction: 'straight_red',
+        reason: 'other_not_recorded',
+        note: null,
+        lineupResolution: null,
+      }, {
+        elapsedMs: null,
+        period: shootout,
+        actors: [participantActor('recipient', 'match-keeper', 'keeper')],
+      }),
+      event(11, 'soccer.shootout_eligibility_changed', {
+        reason: 'sent_off',
+        trackedEligibleParticipantIds: ['match-defender'],
+        trackedExcludedParticipantIds: ['match-keeper'],
+        opponentEligibleCount: 1,
+      }, { elapsedMs: null, period: shootout }),
+      event(12, 'soccer.shootout_kick', { outcome: 'missed', anonymousKickerSlot: 1 }, {
+        elapsedMs: null,
+        period: shootout,
+        teamSide: 'opponent',
+        actors: [
+          unknownActor('kicker', 'Unknown'),
+          participantActor('goalkeeper', 'match-keeper', 'keeper'),
+        ],
+      }),
+    ], gameEventRegistry, gameEventProjectors)
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'incomplete_projection' } })
+  })
+
+  it('runs the checked shootout lifecycle through a completed result', () => {
+    const regulation = append(initializedState('direct_to_shootout'), completedRegulationEvents())
+    const started = startSoccerShootout(regulation, {
+      firstKickingSide: 'tracked',
+      trackedEligibleParticipantIds: ['match-keeper', 'match-defender'],
+      trackedExcludedParticipantIds: [],
+      opponentEligibleCount: 2,
+      trackedGoalkeeperParticipantId: 'match-keeper',
+      opponentGoalkeeperLabel: 'Unknown',
+    }, {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:00.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000010'],
+    })
+    expect(started.ok).toBe(true)
+    if (!started.ok) return
+
+    const trackedKick = recordSoccerShootoutKick(started.state, {
+      outcome: 'scored',
+      kicker: { kind: 'participant', participantId: 'match-defender' },
+      goalkeeper: { kind: 'unknown', label: 'Unknown' },
+      anonymousKickerSlot: null,
+    }, {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:10.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000011'],
+    })
+    expect(trackedKick.ok).toBe(true)
+    if (!trackedKick.ok) return
+
+    const opponentKick = recordSoccerShootoutKick(trackedKick.state, {
+      outcome: 'missed',
+      kicker: { kind: 'unknown', label: 'Unknown' },
+      goalkeeper: { kind: 'participant', participantId: 'match-keeper' },
+      anonymousKickerSlot: 1,
+    }, {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:20.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000012'],
+    })
+    expect(opponentKick.ok).toBe(true)
+    if (!opponentKick.ok) return
+    expect(opponentKick.state.sportGameState?.projection.shootout).toMatchObject({
+      score: { tracked: 1, opponent: 0 },
+      decided: true,
+      winner: 'tracked',
+    })
+
+    const completed = endSoccerMatch(opponentKick.state, 'completed', {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:30.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000013'],
+    })
+    expect(completed.ok).toBe(true)
+    if (!completed.ok) return
+    expect(completed.state.sportGameState?.projection).toMatchObject({
+      status: 'ended',
+      result: 'tracked_win',
+      decidedStage: 'shootout',
+    })
+  })
+
+  it('reopens an abandoned undecided shootout into its existing workspace', () => {
+    const abandoned = endSoccerMatch(activeShootoutState(), 'abandoned', {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:10.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000021'],
+    })
+    expect(abandoned.ok).toBe(true)
+    if (!abandoned.ok) return
+
+    const reopened = reopenSoccerMatch(abandoned.state, 'Resume shootout', {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:20.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000022'],
+    })
+    expect(reopened.ok).toBe(true)
+    if (!reopened.ok) return
+    expect(reopened.state.sportGameState?.projection).toMatchObject({
+      status: 'shootout',
+      endReason: null,
+      shootout: { decided: false, nextSide: 'tracked' },
+    })
+  })
+
+  it('blocks normal score adjustments and out-of-range anonymous slots after shootout starts', () => {
+    const state = activeShootoutState()
+    const adjusted = recordSoccerScoreAdjustment(state, {
+      teamSide: 'tracked',
+      delta: 1,
+      reason: 'Late normal-score correction',
+    }, {
+      period: { id: 'regulation-2', order: 2 },
+      elapsedMs: 2_000,
+    }, {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:10.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000023'],
+    })
+    expect(adjusted).toMatchObject({
+      ok: false,
+      message: 'Remove the shootout events before correcting the normal match score.',
+    })
+    expect(reviseSoccerScoreAdjustment(state, '50000000-0000-4000-8000-000000000099', {
+      teamSide: 'tracked',
+      delta: -1,
+      reason: 'Revised correction',
+    }, {
+      period: { id: 'regulation-2', order: 2 },
+      elapsedMs: 2_000,
+    })).toMatchObject({
+      ok: false,
+      message: 'Remove the shootout events before correcting the normal match score.',
+    })
+
+    const invalidSlot = recordSoccerShootoutKick(state, {
+      outcome: 'scored',
+      kicker: { kind: 'unknown', label: 'Unknown' },
+      goalkeeper: { kind: 'unknown', label: 'Unknown' },
+      anonymousKickerSlot: 3,
+    }, {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-21T12:03:10.000Z'),
+      eventIds: ['50000000-0000-4000-8000-000000000024'],
+    })
+    expect(invalidSlot.ok).toBe(false)
+    expect(invalidSlot.state.eventStream?.events).toHaveLength(state.eventStream!.events.length)
   })
 
   it('completes a tied draw-allowed match without entering a shootout', () => {

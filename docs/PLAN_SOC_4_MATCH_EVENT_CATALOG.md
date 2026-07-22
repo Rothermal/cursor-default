@@ -3,7 +3,7 @@
 Detailed implementation plan for soccer defensive actions, discipline, team events,
 shootouts, and structured match outcomes.
 
-Status: SOC-4A and SOC-4B implementation complete pending review. SOC-4C is next after merge.
+Status: Complete. SOC-4A through SOC-4C are implemented; SOC-5 planning is next.
 
 ---
 
@@ -40,6 +40,8 @@ Implementation status: Complete in `feature/soc-4b-normal-match-capture`.
 - Preserve compact mobile capture and existing SOC-2/SOC-3 workflows.
 
 ### SOC-4C: Shootouts and structured outcomes
+
+Implementation status: Complete in `feature/soc-4c-shootout-outcomes`.
 
 - Add the dedicated shootout lifecycle, kick capture, correction, and shootout score.
 - Keep shootout scoring separate from regulation/extra-time score and normal player totals.
@@ -759,7 +761,7 @@ stats through basketball's legacy mutable counters or cloud game-stat paths.
 2. Merge SOC-4B and pull before branching SOC-4C.
 3. Keep each PR limited to its listed exit condition; review comments that require later UI,
    cloud, or release behavior are documented and deferred to the owning phase.
-4. After SOC-4C, update this document to Complete and hand implementation to SOC-5 planning.
+4. SOC-4C completes this plan and hands implementation to SOC-5 planning.
 
-No further product Q&A is required before SOC-4C. Implementation questions should follow the
-locked decisions and conservative codebase patterns above.
+No further SOC-4 implementation is planned. SOC-5 receives its own Q&A and execution plan before
+event cloud synchronization or finalization work begins.

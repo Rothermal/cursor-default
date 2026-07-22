@@ -20,6 +20,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createSoccerEvent, nextSoccerEventSequence, type SoccerEventPayloadByType } from './events'
 import { createSoccerUuid } from './id'
 import { orderedSoccerSegments } from './rules'
+import { soccerLifecycleAction, soccerShootoutPeriod } from './shootout'
 import { elapsedSoccerClockMs } from './state'
 import type {
   SoccerAttackingDirection,
@@ -28,6 +29,11 @@ import type {
   SoccerMatchProjection,
   SoccerMatchRules,
   SoccerRole,
+  SoccerCardSanction,
+  SoccerDisciplineReason,
+  SoccerShootoutEligibilityChangeReason,
+  SoccerShootoutGoalkeeperChangeReason,
+  SoccerShootoutKickOutcome,
   SoccerShotOutcome,
   SoccerShotSituation,
   SoccerSubstitutionChange,
@@ -68,6 +74,47 @@ export interface SoccerScoreAdjustmentInput {
   teamSide: GameEventTeamSide
   delta: 1 | -1
   reason: string
+}
+
+export interface SoccerShootoutStartInput {
+  firstKickingSide: GameEventTeamSide
+  trackedEligibleParticipantIds: string[]
+  trackedExcludedParticipantIds: string[]
+  opponentEligibleCount: number
+  trackedGoalkeeperParticipantId: string
+  opponentGoalkeeperLabel: string
+}
+
+export interface SoccerShootoutKickInput {
+  outcome: SoccerShootoutKickOutcome
+  kicker: SoccerCaptureActorSelection
+  goalkeeper: SoccerCaptureActorSelection
+  anonymousKickerSlot: number | null
+}
+
+export interface SoccerShootoutEligibilityInput {
+  reason: SoccerShootoutEligibilityChangeReason
+  trackedEligibleParticipantIds: string[]
+  trackedExcludedParticipantIds: string[]
+  opponentEligibleCount: number
+  actors?: GameEventActor[]
+}
+
+export interface SoccerShootoutGoalkeeperInput {
+  teamSide: GameEventTeamSide
+  reason: SoccerShootoutGoalkeeperChangeReason
+  goalkeeperOut: SoccerCaptureActorSelection
+  goalkeeperIn: SoccerCaptureActorSelection
+  eligibility?: SoccerShootoutEligibilityInput | null
+}
+
+export interface SoccerShootoutCardInput {
+  teamSide: GameEventTeamSide
+  sanction: SoccerCardSanction
+  reason: SoccerDisciplineReason
+  note: string | null
+  recipient: GameEventActor
+  eligibility?: SoccerShootoutEligibilityInput | null
 }
 
 export interface SoccerEventMoment {
@@ -149,6 +196,156 @@ export function recordCheckedSoccerEvent<TType extends SoccerSoc4EventType>(
   options: SoccerLiveOptions
 ): SoccerLiveResult {
   return appendSpecs(state, options, [input])
+}
+
+export function startSoccerShootout(
+  state: GameState,
+  input: SoccerShootoutStartInput,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  if (soccerLifecycleAction(context.projection).kind !== 'start_shootout') {
+    return failure(state, 'The match is not ready to start a shootout.')
+  }
+  const period = soccerShootoutPeriod(context.projection)
+  const specs: EventSpec[] = [{
+    eventType: 'soccer.shootout_started',
+    payload: {
+      firstKickingSide: input.firstKickingSide,
+      initialKicksPerSide: context.projection.currentRules.shootoutInitialKicksPerSide,
+      trackedEligibleParticipantIds: input.trackedEligibleParticipantIds,
+      trackedExcludedParticipantIds: input.trackedExcludedParticipantIds,
+      opponentEligibleCount: input.opponentEligibleCount,
+      trackedGoalkeeperParticipantId: input.trackedGoalkeeperParticipantId,
+    },
+    period,
+    elapsedMs: null,
+  }]
+  const opponentGoalkeeperLabel = input.opponentGoalkeeperLabel.trim()
+  if (opponentGoalkeeperLabel && opponentGoalkeeperLabel.toLowerCase() !== 'unknown') {
+    specs.push({
+      eventType: 'soccer.shootout_goalkeeper_changed',
+      payload: { reason: 'tactical' },
+      period,
+      elapsedMs: null,
+      teamSide: 'opponent',
+      actors: [
+        { role: 'goalkeeper_out', kind: 'unknown', label: 'Unknown' },
+        { role: 'goalkeeper_in', kind: 'unknown', label: opponentGoalkeeperLabel },
+      ],
+    })
+  }
+  return appendSpecs(state, options, specs)
+}
+
+export function recordSoccerShootoutKick(
+  state: GameState,
+  input: SoccerShootoutKickInput,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  const shootout = context.projection.shootout
+  if (context.projection.status !== 'shootout' || !shootout || shootout.decided) {
+    return failure(state, 'A kick requires an active undecided shootout.')
+  }
+  const actors = buildCaptureActors(context.projection, [
+    ['kicker', input.kicker],
+    ['goalkeeper', input.goalkeeper],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.shootout_kick',
+    payload: { outcome: input.outcome, anonymousKickerSlot: input.anonymousKickerSlot },
+    period: soccerShootoutPeriod(context.projection),
+    elapsedMs: null,
+    teamSide: shootout.nextSide,
+    actors: actors.value,
+  }])
+}
+
+export function reviseSoccerShootoutKick(
+  state: GameState,
+  eventId: string,
+  teamSide: GameEventTeamSide,
+  input: SoccerShootoutKickInput,
+  now = new Date().toISOString()
+): SoccerLiveResult {
+  const sportState = state.sportGameState
+  if (!sportState || sportState.sportId !== 'soccer') return failure(state, 'Soccer match state is unavailable.')
+  const actors = buildCaptureActors(sportState.projection, [
+    ['kicker', input.kicker],
+    ['goalkeeper', input.goalkeeper],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  return updateSoccerHistoryEvent(state, eventId, {
+    payload: { outcome: input.outcome, anonymousKickerSlot: input.anonymousKickerSlot },
+    period: soccerShootoutPeriod(sportState.projection),
+    elapsedMs: null,
+    teamSide,
+    location: null,
+    actors: actors.value,
+  }, now)
+}
+
+export function recordSoccerShootoutEligibility(
+  state: GameState,
+  input: SoccerShootoutEligibilityInput,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  return appendSpecs(state, options, [shootoutEligibilitySpec(context.projection, input)])
+}
+
+export function recordSoccerShootoutGoalkeeperChange(
+  state: GameState,
+  input: SoccerShootoutGoalkeeperInput,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  const actors = buildCaptureActors(context.projection, [
+    ['goalkeeper_out', input.goalkeeperOut],
+    ['goalkeeper_in', input.goalkeeperIn],
+  ])
+  if (!actors.ok) return failure(state, actors.message)
+  const specs: EventSpec[] = []
+  if (input.eligibility) specs.push(shootoutEligibilitySpec(context.projection, input.eligibility))
+  specs.push({
+    eventType: 'soccer.shootout_goalkeeper_changed',
+    payload: { reason: input.reason },
+    period: soccerShootoutPeriod(context.projection),
+    elapsedMs: null,
+    teamSide: input.teamSide,
+    actors: actors.value,
+  })
+  return appendSpecs(state, options, specs)
+}
+
+export function recordSoccerShootoutCard(
+  state: GameState,
+  input: SoccerShootoutCardInput,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  const context = liveContext(state, options)
+  if (!context.ok) return context
+  const specs: EventSpec[] = [{
+    eventType: 'soccer.card',
+    payload: {
+      sanction: input.sanction,
+      reason: input.reason,
+      note: input.note?.trim() || null,
+      lineupResolution: null,
+    },
+    period: soccerShootoutPeriod(context.projection),
+    elapsedMs: null,
+    teamSide: input.teamSide,
+    actors: [{ ...input.recipient, role: 'recipient' }],
+  }]
+  if (input.eligibility) specs.push(shootoutEligibilitySpec(context.projection, input.eligibility))
+  return appendSpecs(state, options, specs)
 }
 
 export function recordSoccerShot(
@@ -324,6 +521,9 @@ export function recordSoccerScoreAdjustment(
   moment: SoccerEventMoment,
   options: SoccerLiveOptions
 ): SoccerLiveResult {
+  if (hasSoccerShootout(state)) {
+    return failure(state, 'Remove the shootout events before correcting the normal match score.')
+  }
   const context = historicalContext(state, moment, options.nowMs)
   if (!context.ok) return context
   const reason = input.reason.trim()
@@ -346,6 +546,9 @@ export function reviseSoccerScoreAdjustment(
   moment: SoccerEventMoment,
   now = new Date().toISOString()
 ): SoccerLiveResult {
+  if (hasSoccerShootout(state)) {
+    return failure(state, 'Remove the shootout events before correcting the normal match score.')
+  }
   const reason = input.reason.trim()
   if (!reason) return failure(state, 'A score adjustment reason is required.')
   return updateSoccerHistoryEvent(state, eventId, {
@@ -466,9 +669,9 @@ export function startNextSoccerPeriod(
   if (projection.status !== 'period_break' || projection.currentPeriodId) {
     return failure(state, 'The next period can only start from a period break.')
   }
-  const next = orderedSoccerSegments(projection.currentRules)
-    .find(segment => !projection.completedPeriodIds.includes(segment.id))
-  if (!next) return failure(state, 'No configured period remains.')
+  const action = soccerLifecycleAction(projection)
+  if (action.kind !== 'start_period') return failure(state, 'No playable period remains.')
+  const next = action.segment
   const period = { id: next.id, order: next.order }
   const elapsedMs = projection.clock.elapsedMs
   return appendSpecs(state, options, [
@@ -610,8 +813,16 @@ export function endSoccerMatch(
   const context = liveContext(state, options)
   if (!context.ok) return context
   const { projection, elapsedMs, period } = context
-  if (projection.status !== 'in_progress' && projection.status !== 'period_break') {
+  if (
+    projection.status !== 'in_progress' &&
+    projection.status !== 'period_break' &&
+    projection.status !== 'shootout' &&
+    projection.status !== 'suspended'
+  ) {
     return failure(state, 'Only an active match can be ended.')
+  }
+  if (projection.status === 'shootout' && reason !== 'completed' && reason !== 'abandoned') {
+    return failure(state, 'An active shootout can only be completed or abandoned.')
   }
   const specs: EventSpec[] = []
   if (projection.clock.running) {
@@ -638,9 +849,12 @@ export function reopenSoccerMatch(
 ): SoccerLiveResult {
   const context = liveContext(state, options)
   if (!context.ok) return context
+  if (context.projection.status === 'ended' && context.projection.endReason === 'abandoned' && !reason?.trim()) {
+    return failure(state, 'A reason is required to reopen an abandoned match.')
+  }
   return appendSpecs(state, options, [{
     eventType: 'soccer.match_reopened',
-    payload: { reason },
+    payload: { reason: reason?.trim() || null },
     elapsedMs: context.elapsedMs,
   }])
 }
@@ -829,6 +1043,28 @@ function appendSpecs(
     ? addGameEvent(state, events[0], gameEventRegistry, gameEventProjectors)
     : addGameEvents(state, events, gameEventRegistry, gameEventProjectors)
   return mutationResult(result)
+}
+
+function hasSoccerShootout(state: GameState): boolean {
+  return state.sportGameState?.sportId === 'soccer' && Boolean(state.sportGameState.projection.shootout)
+}
+
+function shootoutEligibilitySpec(
+  projection: SoccerMatchProjection,
+  input: SoccerShootoutEligibilityInput
+): EventSpec<'soccer.shootout_eligibility_changed'> {
+  return {
+    eventType: 'soccer.shootout_eligibility_changed',
+    payload: {
+      reason: input.reason,
+      trackedEligibleParticipantIds: input.trackedEligibleParticipantIds,
+      trackedExcludedParticipantIds: input.trackedExcludedParticipantIds,
+      opponentEligibleCount: input.opponentEligibleCount,
+    },
+    period: soccerShootoutPeriod(projection),
+    elapsedMs: null,
+    actors: input.actors ?? [],
+  }
 }
 
 function buildCaptureActors(

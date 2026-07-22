@@ -754,6 +754,9 @@ function applyShootoutKick(
   if (goalkeeperKey !== shootout.currentGoalkeepers[goalkeeperSide] && goalkeeper.kind !== 'unknown') {
     return 'Kick goalkeeper does not match the designated defending goalkeeper.'
   }
+  if (context.shootoutRedActors.has(`${goalkeeperSide}:${goalkeeperKey}`)) {
+    return 'A sent-off goalkeeper must be replaced before the next kick.'
+  }
 
   const kickerKey = shootoutKickerKey(kicker, event.payload.anonymousKickerSlot)
   const latestKick = shootout.kicks[shootout.kicks.length - 1]
@@ -808,6 +811,12 @@ function validateShootoutKicker(
   anonymousSlot: number | null
 ): string | null {
   const shootout = projection.shootout!
+  const eligibleCount = side === 'tracked'
+    ? shootout.trackedEligibleParticipantIds.length
+    : shootout.opponentEligibleCount
+  if (anonymousSlot !== null && anonymousSlot > eligibleCount) {
+    return 'Anonymous shootout kicker slot exceeds the eligible-player count.'
+  }
   if (side === 'tracked' && actor.participantId) {
     if (!shootout.trackedEligibleParticipantIds.includes(actor.participantId)) {
       return 'Tracked shootout kicker is not eligible.'

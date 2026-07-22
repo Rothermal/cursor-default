@@ -755,6 +755,25 @@ start the match. Soccer remains development-only through SOC-6.
 
 ---
 
+## 11i. Soccer shootout and structured outcomes (SOC-4C)
+
+**Precondition:** Run a development build and complete regulation in a tied soccer match whose
+snapshotted rules require a winner. Soccer remains local-only and production-disabled.
+
+| ID | Action | Expected |
+|---|---|---|
+| 11i.1 | Complete regulation under draw-allowed, direct-shootout, and extra-time-then-shootout rules | Only the valid next lifecycle action appears; a draw can complete, direct rules offer Shootout, and begun extra time must finish before a shootout |
+| 11i.2 | Start a shootout and review first side, kick count, tracked eligibility/exclusions, opponent count, and both goalkeepers | The workspace opens only when counts and goalkeepers are valid; normal score remains unchanged and shootout score starts at zero |
+| 11i.3 | Record scored, saved, missed, woodwork, retake, and forfeited outcomes for both sides | Order alternates correctly, retakes preserve the kicker, attempts/saves/scores derive correctly, and no kick changes normal player or match totals |
+| 11i.4 | Attempt to reuse a kicker before every eligible slot has kicked, then continue into sudden death | Early reuse is blocked; a completed cycle permits reuse; early clinch and sudden-death decisions follow the snapshotted kick count |
+| 11i.5 | Record shootout yellow/red cards, equalize eligibility, and send off the current goalkeeper | Shootout discipline stays separate; counts must remain equal; another kick is blocked until the sent-off goalkeeper is replaced |
+| 11i.6 | Change each goalkeeper, including an allowed unused tracked replacement, then park and resume | The designated goalkeeper and paired eligibility change rebuild atomically and survive parking without altering normal lineup history |
+| 11i.7 | Select a kick and correct its outcome; use Timeline to revise, remove, and restore shootout events | The kick sequence, decision, score, diagnostics, and structured result reproject from active revisions; normal Add Event stays hidden once a shootout exists |
+| 11i.8 | Complete a decided shootout, reopen it, suspend/resume normal play, and abandon/reopen with a reason | Completion is unavailable before a decision; suspended play resumes its exact context; abandoned matches require a reopen reason and return to their existing shootout or normal-match break |
+| 11i.9 | Repeat the workspace at 390x844 and desktop widths, then run `pnpm build`, `pnpm lint`, and `pnpm test` | Score, kick strip, controls, dialogs, Timeline, and review-only field remain readable without page-level horizontal scrolling; basketball regressions remain green |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.

@@ -460,6 +460,31 @@ describe('soccer live match actions', () => {
     expect(reopened.state.sportGameState?.projection.status).toBe('in_progress')
   })
 
+  it('requires a reason to reopen an abandoned match', () => {
+    const abandoned = endSoccerMatch(
+      kickedOffState(),
+      'abandoned',
+      { recorderUserId, nowMs: kickoffAt + 90_000, eventIds: [uuid(4), uuid(5)] }
+    )
+    expect(abandoned.ok).toBe(true)
+    if (!abandoned.ok) return
+
+    expect(reopenSoccerMatch(abandoned.state, '', {
+      recorderUserId,
+      nowMs: kickoffAt + 100_000,
+      eventIds: [uuid(6)],
+    })).toMatchObject({ ok: false, message: 'A reason is required to reopen an abandoned match.' })
+
+    const reopened = reopenSoccerMatch(abandoned.state, 'Official correction', {
+      recorderUserId,
+      nowMs: kickoffAt + 100_000,
+      eventIds: [uuid(6)],
+    })
+    expect(reopened.ok).toBe(true)
+    if (!reopened.ok) return
+    expect(reopened.state.sportGameState?.projection.status).toBe('period_break')
+  })
+
   it('preserves an invalid historical correction and exposes projection diagnostics', () => {
     const state = kickedOffState()
     const event = inspectSoccerHistory(state).activeEvents.find(

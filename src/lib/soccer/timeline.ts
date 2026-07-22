@@ -44,7 +44,7 @@ export function soccerEventTimeLabel(
   event: Pick<GameEvent, 'elapsedMs' | 'period'>,
   timings: SoccerPeriodTiming[]
 ): string {
-  if (event.elapsedMs === null) return 'No match time'
+  if (event.elapsedMs === null) return event.period.id === 'shootout' ? 'Shootout' : 'No match time'
   const timing = timings.find(item => item.period.id === event.period.id)
   return timing
     ? `${timing.label} · ${formatSoccerDuration(Math.max(0, event.elapsedMs - timing.startElapsedMs))}`
