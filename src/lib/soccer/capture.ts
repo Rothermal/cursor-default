@@ -1,10 +1,57 @@
 import type { GameEventPeriod, GameEventTeamSide } from '../gameEvents/types'
-import type { SoccerMatchEvent, SoccerShotSituation } from './types'
+import type {
+  SoccerMatchEvent,
+  SoccerCardSanction,
+  SoccerProjectedParticipant,
+  SoccerRole,
+  SoccerShotSituation,
+  SoccerYellowCardExitPolicy,
+} from './types'
 
 export interface SoccerShotSourceCandidate {
   eventId: string
   elapsedMs: number
   label: string
+}
+
+export type SoccerDisciplineCaptureChoice = 'stay' | 'short' | 'replace' | 'keeper_handoff'
+
+export function soccerDisciplineCaptureChoice(
+  sanction: SoccerCardSanction,
+  yellowPolicy: SoccerYellowCardExitPolicy,
+  goalkeeper: boolean,
+  current: SoccerDisciplineCaptureChoice
+): SoccerDisciplineCaptureChoice {
+  if (sanction === 'yellow') {
+    if (yellowPolicy === 'stay_on') return 'stay'
+    if (goalkeeper) return 'replace'
+    return current === 'replace' ? 'replace' : 'short'
+  }
+  return goalkeeper ? 'keeper_handoff' : 'short'
+}
+
+export function soccerParticipantWasOnFieldAt(
+  participant: SoccerProjectedParticipant,
+  periodId: string,
+  elapsedMs: number
+): boolean {
+  return participant.onFieldIntervals.some(interval =>
+    interval.periodId === periodId &&
+    elapsedMs >= interval.startElapsedMs &&
+    (interval.endElapsedMs === null || elapsedMs <= interval.endElapsedMs)
+  )
+}
+
+export function soccerParticipantRoleAt(
+  participant: SoccerProjectedParticipant,
+  periodId: string,
+  elapsedMs: number,
+  initialRole: SoccerRole = participant.role
+): SoccerRole {
+  const intervals = participant.roleIntervals
+    .filter(interval => interval.periodId === periodId && interval.startElapsedMs <= elapsedMs)
+    .sort((left, right) => right.startElapsedMs - left.startElapsedMs)
+  return intervals[0]?.role ?? initialRole
 }
 
 export function soccerShotSourceCandidates(

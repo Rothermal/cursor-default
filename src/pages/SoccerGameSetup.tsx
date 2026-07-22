@@ -74,6 +74,7 @@ export default function SoccerGameSetup() {
   const [rules, setRules] = useState<SoccerMatchRules>(() =>
     structuredClone(existingSetup?.rulesSnapshot ?? resolveSoccerMatchRules())
   )
+  const [competitionProfileOverride, setCompetitionProfileOverride] = useState<SoccerCompetitionProfile | null>(null)
 
   useEffect(() => {
     if (state.eventStream?.events.length) navigate('/game', { replace: true })
@@ -150,11 +151,12 @@ export default function SoccerGameSetup() {
     [selectedTeamId, teams]
   )
   const regulationPreset = detectRegulationPreset(rules)
-  const competitionProfile = detectSoccerCompetitionProfile(rules)
+  const competitionProfile = competitionProfileOverride ?? detectSoccerCompetitionProfile(rules)
 
   if (invalidRoute) return null
 
   const updateRules = (update: (current: SoccerMatchRules) => SoccerMatchRules) => {
+    setCompetitionProfileOverride(null)
     setRules(current => reorderSoccerSegments(update(current)))
   }
 
@@ -167,6 +169,7 @@ export default function SoccerGameSetup() {
   }
 
   const applyCompetitionProfile = (profile: SoccerCompetitionProfile) => {
+    setCompetitionProfileOverride(profile === 'custom' ? 'custom' : null)
     if (profile === 'custom') return
     setRules(soccerRulesForCompetitionProfile(profile))
   }

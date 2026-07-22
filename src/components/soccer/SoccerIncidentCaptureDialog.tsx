@@ -10,18 +10,23 @@ import type {
 import {
   recordCheckedSoccerEvent,
   soccerAttackingDirectionAt,
+  soccerDisciplineCaptureChoice,
+  soccerParticipantRoleAt,
+  soccerParticipantWasOnFieldAt,
   soccerPeriodTimings,
   updateSoccerHistoryEvent,
   type SoccerCardEvent,
   type SoccerCardSanction,
   type SoccerDefensiveAction,
   type SoccerDefensiveActionEvent,
+  type SoccerDisciplineCaptureChoice,
   type SoccerDisciplineLineupResolution,
   type SoccerDisciplineReason,
   type SoccerFoulEvent,
   type SoccerFoulRestart,
   type SoccerLiveResult,
   type SoccerProjectedParticipant,
+  type SoccerRole,
   type SoccerSanction,
   type SoccerTeamEventEvent,
   type SoccerTeamEventKind,
@@ -57,8 +62,6 @@ interface SoccerIncidentCaptureDialogProps {
 }
 
 type Attribution = 'participant' | 'team' | 'unknown' | 'staff'
-type DisciplineChoice = 'stay' | 'short' | 'replace' | 'keeper_handoff'
-
 const DEFENSIVE_ACTIONS: Array<{ value: SoccerDefensiveAction; label: string }> = [
   { value: 'tackle', label: 'Tackle' },
   { value: 'interception', label: 'Interception' },
@@ -106,6 +109,10 @@ export default function SoccerIncidentCaptureDialog({
     () => projection ? Object.values(projection.participants) : [],
     [projection]
   )
+  const initialRoles = useMemo(
+    () => new Map(sportState?.setup?.participants.map(participant => [participant.id, participant.initialRole]) ?? []),
+    [sportState?.setup?.participants]
+  )
   const recentLabels = useMemo(() => recentOpponentLabels(state), [state])
   const mode = draft?.mode ?? (draft?.event ? 'edit' : 'live')
   const [teamSide, setTeamSide] = useState<GameEventTeamSide>('tracked')
@@ -124,7 +131,7 @@ export default function SoccerIncidentCaptureDialog({
   const [fouledLabel, setFouledLabel] = useState('Unknown opponent')
   const [teamEventKind, setTeamEventKind] = useState<SoccerTeamEventKind>('corner')
   const [offsideActorRecorded, setOffsideActorRecorded] = useState(false)
-  const [disciplineChoice, setDisciplineChoice] = useState<DisciplineChoice>('stay')
+  const [disciplineChoice, setDisciplineChoice] = useState<SoccerDisciplineCaptureChoice>('stay')
   const [replacementInId, setReplacementInId] = useState('')
   const [replacementOutId, setReplacementOutId] = useState('')
   const [selectedPeriodId, setSelectedPeriodId] = useState('')
@@ -145,24 +152,50 @@ export default function SoccerIncidentCaptureDialog({
   const eligibleParticipants = participants.filter(participant =>
     mode === 'live'
       ? participant.status === 'on_field'
-      : moment !== null && participantWasOnField(participant, moment.period.id, moment.elapsedMs)
+      : moment !== null && soccerParticipantWasOnFieldAt(participant, moment.period.id, moment.elapsedMs)
   )
   const selectedParticipant = participants.find(item => item.participantId === participantId) ?? null
   const selectedRole = selectedParticipant && moment
-    ? roleAtMoment(selectedParticipant, moment.period.id, moment.elapsedMs)
+    ? soccerParticipantRoleAt(
+        selectedParticipant,
+        moment.period.id,
+        moment.elapsedMs,
+        initialRoles.get(selectedParticipant.participantId)
+      )
     : selectedParticipant?.role ?? null
+  const existingResolution = draft?.event?.eventType === 'soccer.card' || draft?.event?.eventType === 'soccer.foul'
+    ? draft.event.payload.lineupResolution
+    : null
+  const existingReplacementInId = existingResolution?.replacementChanges[0]?.playerInParticipantId ?? null
   const currentOrHistoricalBench = participants.filter(participant => {
-    if (participant.participantId === replacementInId) return true
+    if (mode === 'edit' && participant.participantId === existingReplacementInId) return true
     return mode === 'live'
       ? participant.status !== 'on_field' && participant.status !== 'left'
-      : moment !== null && !participantWasOnField(participant, moment.period.id, moment.elapsedMs)
+      : moment !== null && !soccerParticipantWasOnFieldAt(participant, moment.period.id, moment.elapsedMs)
   })
   const goalkeeperBench = currentOrHistoricalBench.filter(participant =>
-    participant.role.group === 'goalkeeper'
+    moment !== null && soccerParticipantRoleAt(
+      participant,
+      moment.period.id,
+      moment.elapsedMs,
+      initialRoles.get(participant.participantId)
+    ).group === 'goalkeeper'
   )
   const fieldPlayers = eligibleParticipants.filter(participant =>
-    participant.participantId === replacementOutId ||
-    roleAtMoment(participant, moment?.period.id, moment?.elapsedMs)?.group !== 'goalkeeper'
+    !moment || soccerParticipantRoleAt(
+      participant,
+      moment.period.id,
+      moment.elapsedMs,
+      initialRoles.get(participant.participantId)
+    ).group !== 'goalkeeper'
+  )
+  const nonGoalkeeperBench = currentOrHistoricalBench.filter(participant =>
+    !moment || soccerParticipantRoleAt(
+      participant,
+      moment.period.id,
+      moment.elapsedMs,
+      initialRoles.get(participant.participantId)
+    ).group !== 'goalkeeper'
   )
   const trackedDirection = moment
     ? soccerAttackingDirectionAt(state, moment)
@@ -175,6 +208,19 @@ export default function SoccerIncidentCaptureDialog({
   )
   const disciplineApplies = (draft?.kind === 'card' || draft?.kind === 'foul') &&
     sanction !== 'none' && teamSide === 'tracked' && attribution === 'participant'
+  const effectiveDisciplineChoice = disciplineApplies && selectedRole && projection
+    ? soccerDisciplineCaptureChoice(
+        sanction as SoccerCardSanction,
+        projection.currentRules.yellowCardExitPolicy,
+        selectedRole.group === 'goalkeeper',
+        disciplineChoice
+      )
+    : disciplineChoice
+  const replacementBench = selectedRole?.group === 'goalkeeper' ? goalkeeperBench : nonGoalkeeperBench
+  const replacementInInvalid = (effectiveDisciplineChoice === 'replace' || effectiveDisciplineChoice === 'keeper_handoff') &&
+    !replacementBench.some(participant => participant.participantId === replacementInId)
+  const replacementOutInvalid = effectiveDisciplineChoice === 'keeper_handoff' &&
+    !fieldPlayers.some(participant => participant.participantId === replacementOutId && participant.participantId !== participantId)
 
   useEffect(() => {
     if (!draft || !projection) return
@@ -243,24 +289,28 @@ export default function SoccerIncidentCaptureDialog({
 
   useEffect(() => {
     if (!disciplineApplies || !selectedRole) return
-    if (sanction === 'yellow') {
-      setDisciplineChoice(current => sportState?.projection.currentRules.yellowCardExitPolicy === 'stay_on'
-        ? 'stay'
-        : current === 'replace' ? current : 'short')
-    } else {
-      setDisciplineChoice(selectedRole.group === 'goalkeeper' ? 'keeper_handoff' : 'short')
-    }
+    setDisciplineChoice(current => soccerDisciplineCaptureChoice(
+      sanction as SoccerCardSanction,
+      sportState?.projection.currentRules.yellowCardExitPolicy ?? 'stay_on',
+      selectedRole.group === 'goalkeeper',
+      current
+    ))
   }, [disciplineApplies, sanction, selectedRole, sportState?.projection.currentRules.yellowCardExitPolicy])
 
   if (!draft || !projection || !sportState) return null
 
   const actorRequired = draft.kind !== 'team_event' ||
     (teamEventKind === 'offside' && offsideActorRecorded)
+  const participantActorInvalid = actorRequired && attribution === 'participant' &&
+    !eligibleParticipants.some(participant => participant.participantId === participantId)
+  const fouledParticipantInvalid = draft.kind === 'foul' && fouledAttribution === 'participant' &&
+    !eligibleParticipants.some(participant => participant.participantId === fouledParticipantId)
   const saveDisabled = busy || timingInvalid ||
     (actorRequired && attribution === 'participant' && !participantId) ||
     (actorRequired && (attribution === 'unknown' || attribution === 'staff') && !actorLabel.trim()) ||
-    (disciplineChoice === 'replace' && disciplineApplies && !replacementInId) ||
-    (disciplineChoice === 'keeper_handoff' && disciplineApplies && (!replacementInId || !replacementOutId))
+    participantActorInvalid || fouledParticipantInvalid ||
+    (disciplineApplies && replacementInInvalid) ||
+    (disciplineApplies && replacementOutInvalid)
 
   const save = () => {
     const eventType = kindEventType(draft.kind)
@@ -296,14 +346,23 @@ export default function SoccerIncidentCaptureDialog({
       }
       actors.push(fouled)
     }
+    const replacementParticipant = participants.find(item => item.participantId === replacementInId) ?? null
+    const replacementRole = replacementParticipant && moment
+      ? soccerParticipantRoleAt(
+          replacementParticipant,
+          moment.period.id,
+          moment.elapsedMs,
+          initialRoles.get(replacementParticipant.participantId)
+        )
+      : replacementParticipant?.role ?? null
     const lineupResolution = buildLineupResolution(
       disciplineApplies,
       participantId,
       sanction,
-      disciplineChoice,
+      effectiveDisciplineChoice,
       replacementInId,
       replacementOutId,
-      projection.participants
+      replacementRole
     )
     const payload = draft.kind === 'defense'
       ? { action, tackleOutcome: action === 'tackle' ? tackleOutcome : null }
@@ -453,7 +512,7 @@ export default function SoccerIncidentCaptureDialog({
               onReplacementOutId={setReplacementOutId}
               bench={selectedRole.group === 'goalkeeper'
                 ? goalkeeperBench
-                : currentOrHistoricalBench.filter(participant => participant.role.group !== 'goalkeeper')}
+                : nonGoalkeeperBench}
               fieldPlayers={fieldPlayers.filter(item => item.participantId !== participantId)}
             />
           )}
@@ -552,8 +611,8 @@ function LineupResolutionEditor({ sanction, yellowPolicy, goalkeeper, choice, on
   sanction: SoccerCardSanction
   yellowPolicy: 'stay_on' | 'must_leave_may_replace'
   goalkeeper: boolean
-  choice: DisciplineChoice
-  onChoice: (value: DisciplineChoice) => void
+  choice: SoccerDisciplineCaptureChoice
+  onChoice: (value: SoccerDisciplineCaptureChoice) => void
   replacementInId: string
   onReplacementInId: (value: string) => void
   replacementOutId: string
@@ -562,6 +621,7 @@ function LineupResolutionEditor({ sanction, yellowPolicy, goalkeeper, choice, on
   fieldPlayers: SoccerProjectedParticipant[]
 }) {
   if (sanction === 'yellow' && yellowPolicy === 'stay_on') return <p className="rounded-md bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Player remains on the field under this match's yellow-card rule.</p>
+  if (sanction === 'yellow' && goalkeeper) return <FieldGroup label="Goalkeeper yellow card"><p className="mb-2 text-xs text-slate-600">Choose the goalkeeper entering immediately while the cautioned goalkeeper leaves.</p><select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field"><option value="">Goalkeeper in</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select></FieldGroup>
   if (sanction !== 'yellow' && !goalkeeper) return <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">Player is ejected and the team plays short.</p>
   if (sanction !== 'yellow' && goalkeeper) return <FieldGroup label="Goalkeeper ejection"><p className="mb-2 text-xs text-slate-600">Choose the field player leaving and the goalkeeper entering. The team remains one player short.</p><select value={replacementOutId} onChange={event => onReplacementOutId(event.target.value)} className="input-field"><option value="">Field player out</option>{fieldPlayers.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select><select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field mt-2"><option value="">Goalkeeper in</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select></FieldGroup>
   return <FieldGroup label="Yellow-card lineup"><div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><ChoiceButton active={choice === 'short'} label="Play short" onClick={() => onChoice('short')} compact /><ChoiceButton active={choice === 'replace'} label="Replace now" onClick={() => onChoice('replace')} compact /></div>{choice === 'replace' && <select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field mt-2"><option value="">Player entering</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select>}</FieldGroup>
@@ -581,11 +641,11 @@ function createActor(participants: Record<string, SoccerProjectedParticipant>, r
   return { role, kind: attribution, label: resolvedLabel }
 }
 
-function buildLineupResolution(applies: boolean, participantId: string, sanction: SoccerSanction, choice: DisciplineChoice, replacementInId: string, replacementOutId: string, participants: Record<string, SoccerProjectedParticipant>): SoccerDisciplineLineupResolution | null {
+function buildLineupResolution(applies: boolean, participantId: string, sanction: SoccerSanction, choice: SoccerDisciplineCaptureChoice, replacementInId: string, replacementOutId: string, replacementInRole: SoccerRole | null): SoccerDisciplineLineupResolution | null {
   if (!applies || sanction === 'none') return null
   const exit = sanction === 'yellow' ? choice === 'stay' ? 'none' : 'temporary' : 'ejected'
   const replacementChanges = choice === 'replace'
-    ? [{ playerOutParticipantId: null, playerInParticipantId: replacementInId, playerInRole: participants[replacementInId]?.role ?? null }]
+    ? [{ playerOutParticipantId: null, playerInParticipantId: replacementInId, playerInRole: replacementInRole }]
     : choice === 'keeper_handoff'
       ? [{ playerOutParticipantId: replacementOutId, playerInParticipantId: replacementInId, playerInRole: { group: 'goalkeeper' as const, label: null } }]
       : []
@@ -615,15 +675,6 @@ function eligibleLiveParticipant(participants: SoccerProjectedParticipant[], sel
     ?? participants.find(item => item.status === 'on_field' && item.role.group !== 'goalkeeper')
     ?? participants.find(item => item.status === 'on_field')
     ?? null
-}
-
-function participantWasOnField(participant: SoccerProjectedParticipant, periodId: string, elapsedMs: number): boolean {
-  return participant.onFieldIntervals.some(interval => interval.periodId === periodId && elapsedMs >= interval.startElapsedMs && (interval.endElapsedMs === null || elapsedMs <= interval.endElapsedMs))
-}
-
-function roleAtMoment(participant: SoccerProjectedParticipant, periodId?: string, elapsedMs?: number) {
-  if (periodId === undefined || elapsedMs === undefined) return participant.role
-  return participant.roleIntervals.find(interval => interval.periodId === periodId && elapsedMs >= interval.startElapsedMs && (interval.endElapsedMs === null || elapsedMs <= interval.endElapsedMs))?.role ?? participant.role
 }
 
 function recentOpponentLabels(state: GameState): string[] {
