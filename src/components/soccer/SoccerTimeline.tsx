@@ -34,6 +34,7 @@ interface SoccerTimelineProps {
   onEditAttacking: (event: SoccerShotEvent | SoccerOwnGoalEvent) => void
   onEditIncident: (event: SoccerIncidentEvent) => void
   onEditScoreAdjustment: (event: SoccerScoreAdjustmentEvent) => void
+  allowAddEvent?: boolean
 }
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
@@ -53,6 +54,7 @@ export default function SoccerTimeline({
   onEditAttacking,
   onEditIncident,
   onEditScoreAdjustment,
+  allowAddEvent = true,
 }: SoccerTimelineProps) {
   const [editing, setEditing] = useState<SoccerMatchEvent | null>(null)
   const [deleting, setDeleting] = useState<GameEvent | null>(null)
@@ -75,7 +77,7 @@ export default function SoccerTimeline({
     if (
       event.eventType === 'soccer.defensive_action' ||
       event.eventType === 'soccer.foul' ||
-      event.eventType === 'soccer.card' ||
+      (event.eventType === 'soccer.card' && event.period.id !== 'shootout') ||
       event.eventType === 'soccer.team_event'
     ) {
       onEditIncident(event as SoccerIncidentEvent)
@@ -103,7 +105,7 @@ export default function SoccerTimeline({
             <h2 className="text-sm font-bold uppercase text-slate-500">Timeline</h2>
             <p className="text-xs text-slate-400">Newest first</p>
           </div>
-          <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add Event</button>
+          {allowAddEvent && <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add Event</button>}
         </div>
         <label className="block text-xs font-bold uppercase text-slate-500">Event family<select value={filter} onChange={event => setFilter(event.target.value as SoccerTimelineFilter)} className="input-field mt-1"><option value="all">All</option><option value="attacking">Attacking</option><option value="defensive">Defensive</option><option value="discipline">Discipline</option><option value="team_events">Team Events</option><option value="match_control">Match Control</option></select></label>
         <div className="divide-y divide-slate-200 border-y border-slate-200">
@@ -261,6 +263,9 @@ function SoccerEventCorrectionDialog({ event, state, onSave, onClose }: {
       payload: draft.payload,
       period: draft.period,
       elapsedMs: draft.elapsedMs,
+      teamSide: draft.teamSide,
+      location: draft.location,
+      actors: draft.actors,
     })
     if (!result.ok) {
       setError(result.message)
@@ -384,6 +389,29 @@ function renderEventEditor(
       const payload = event.payload
       return <label className="block text-sm font-medium text-slate-700">Reason<input value={payload.reason ?? ''} onChange={change => setPayload({ reason: change.target.value || null })} className="input-field mt-1" /></label>
     }
+    case 'soccer.shootout_started': {
+      const payload = event.payload
+      const accounted = [...new Set([...payload.trackedEligibleParticipantIds, ...payload.trackedExcludedParticipantIds])]
+      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">First side<select value={payload.firstKickingSide} onChange={change => setPayload({ ...payload, firstKickingSide: change.target.value as 'tracked' | 'opponent' })} className="input-field mt-1"><option value="tracked">Tracked</option><option value="opponent">Opponent</option></select></label><NumberEditor label="Opponent eligible" value={payload.opponentEligibleCount} onChange={opponentEligibleCount => setPayload({ ...payload, opponentEligibleCount })} /><div className="divide-y divide-slate-200 border-y border-slate-200">{accounted.map(id => { const participant = participants.find(item => item.participantId === id); const checked = payload.trackedEligibleParticipantIds.includes(id); return <label key={id} className="flex min-h-10 items-center gap-3 text-sm text-slate-700"><input type="checkbox" checked={checked} onChange={() => setPayload({ ...payload, trackedEligibleParticipantIds: checked ? payload.trackedEligibleParticipantIds.filter(item => item !== id) : [...payload.trackedEligibleParticipantIds, id], trackedExcludedParticipantIds: checked ? [...payload.trackedExcludedParticipantIds, id] : payload.trackedExcludedParticipantIds.filter(item => item !== id) })} className="h-5 w-5 accent-emerald-700" />{participant?.displayName ?? id}</label> })}</div><ParticipantEditor label="Tracked goalkeeper" value={payload.trackedGoalkeeperParticipantId} participants={participants} onChange={trackedGoalkeeperParticipantId => setPayload({ ...payload, trackedGoalkeeperParticipantId })} /></div>
+    }
+    case 'soccer.shootout_eligibility_changed': {
+      const payload = event.payload
+      const accounted = [...new Set([...payload.trackedEligibleParticipantIds, ...payload.trackedExcludedParticipantIds])]
+      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">Reason<select value={payload.reason} onChange={change => setPayload({ ...payload, reason: change.target.value as typeof payload.reason })} className="input-field mt-1"><option value="equalization">Equalization</option><option value="sent_off">Sent off</option><option value="unable_to_continue">Unable to continue</option><option value="goalkeeper_replacement">Goalkeeper replacement</option></select></label><NumberEditor label="Opponent eligible" value={payload.opponentEligibleCount} onChange={opponentEligibleCount => setPayload({ ...payload, opponentEligibleCount })} /><div className="divide-y divide-slate-200 border-y border-slate-200">{accounted.map(id => { const participant = participants.find(item => item.participantId === id); const checked = payload.trackedEligibleParticipantIds.includes(id); return <label key={id} className="flex min-h-10 items-center gap-3 text-sm text-slate-700"><input type="checkbox" checked={checked} onChange={() => setPayload({ ...payload, trackedEligibleParticipantIds: checked ? payload.trackedEligibleParticipantIds.filter(item => item !== id) : [...payload.trackedEligibleParticipantIds, id], trackedExcludedParticipantIds: checked ? [...payload.trackedExcludedParticipantIds, id] : payload.trackedExcludedParticipantIds.filter(item => item !== id) })} className="h-5 w-5 accent-emerald-700" />{participant?.displayName ?? id}</label> })}</div></div>
+    }
+    case 'soccer.shootout_goalkeeper_changed': {
+      const payload = event.payload
+      const incoming = event.actors.find(actor => actor.role === 'goalkeeper_in')
+      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">Reason<select value={payload.reason} onChange={change => setPayload({ reason: change.target.value as typeof payload.reason })} className="input-field mt-1"><option value="tactical">Tactical</option><option value="unable_to_continue">Unable to continue</option><option value="sent_off">Sent off</option></select></label><label className="block text-sm font-medium text-slate-700">Incoming goalkeeper<input value={incoming?.label ?? ''} onChange={change => setEvent(current => ({ ...current, actors: current.actors.map(actor => actor.role === 'goalkeeper_in' ? { ...actor, label: change.target.value } : actor) } as SoccerMatchEvent))} className="input-field mt-1" /></label></div>
+    }
+    case 'soccer.shootout_kick': {
+      const payload = event.payload
+      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">Outcome<select value={payload.outcome} onChange={change => setPayload({ ...payload, outcome: change.target.value as typeof payload.outcome })} className="input-field mt-1"><option value="scored">Scored</option><option value="saved">Saved</option><option value="missed">Missed</option><option value="woodwork">Woodwork</option><option value="retake">Retake</option><option value="forfeited">Forfeited</option></select></label>{payload.anonymousKickerSlot !== null && <NumberEditor label="Anonymous slot" value={payload.anonymousKickerSlot} onChange={anonymousKickerSlot => setPayload({ ...payload, anonymousKickerSlot })} />}</div>
+    }
+    case 'soccer.card': {
+      const payload = event.payload
+      return <div className="space-y-3"><div><p className="text-sm font-medium text-slate-700">Sanction</p><p className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm capitalize text-slate-700">{payload.sanction.replace(/_/g, ' ')}</p><p className="mt-1 text-xs text-slate-500">Remove and record a replacement card to change its sanction.</p></div><label className="block text-sm font-medium text-slate-700">Note<input value={payload.note ?? ''} onChange={change => setPayload({ ...payload, note: change.target.value || null })} className="input-field mt-1" /></label></div>
+    }
   }
 }
 
@@ -447,6 +475,10 @@ function eventTitle(type: string): string {
     'soccer.foul': 'Foul',
     'soccer.card': 'Card',
     'soccer.team_event': 'Team event',
+    'soccer.shootout_started': 'Shootout started',
+    'soccer.shootout_eligibility_changed': 'Shootout eligibility',
+    'soccer.shootout_goalkeeper_changed': 'Shootout goalkeeper',
+    'soccer.shootout_kick': 'Shootout kick',
   } as Record<string, string>)[type] ?? type
 }
 
@@ -487,6 +519,10 @@ function eventDetail(event: GameEvent): string {
       const actor = event.actors.find(item => item.role === 'offside_player')
       return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} / ${String(payload.kind ?? 'team event')}${actor?.label ? ` / ${actor.label}` : ''}`
     }
+    case 'soccer.shootout_started': return `${String(payload.firstKickingSide)} first / ${String(payload.initialKicksPerSide)} kicks / ${String(payload.opponentEligibleCount)} eligible`
+    case 'soccer.shootout_eligibility_changed': return `${String(payload.reason).replace(/_/g, ' ')} / ${Array.isArray(payload.trackedEligibleParticipantIds) ? payload.trackedEligibleParticipantIds.length : 0} each`
+    case 'soccer.shootout_goalkeeper_changed': return `${event.teamSide} / ${event.actors.find(actor => actor.role === 'goalkeeper_in')?.label ?? 'Unknown'} / ${String(payload.reason).replace(/_/g, ' ')}`
+    case 'soccer.shootout_kick': return `${event.teamSide} / ${event.actors.find(actor => actor.role === 'kicker')?.label ?? 'Unknown'} / ${String(payload.outcome)}`
     default: return event.period.id
   }
 }

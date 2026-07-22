@@ -394,10 +394,10 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Soccer Timeline and field review (SOC-3C)** - filtered unified Timeline, outcome markers, shared attacking-event correction, historical adds, scoring history, and signed score adjustments ([plan](docs/PLAN_SOC_3_FIELD_AND_ATTACKING_EVENTS.md))
 - [x] **Soccer match event domain (SOC-4A)** - version-2 rule/state normalization, defense/discipline/team/shootout schemas, phased projection, derived totals, temporal dependency diagnostics, and structured outcomes behind hidden UI ([plan](docs/PLAN_SOC_4_MATCH_EVENT_CATALOG.md))
 - [x] **Soccer normal-match event capture (SOC-4B)** - setup profiles, Defense/Foul field modes, compact quick actions, incident sheets, all-family markers, restart links, and expanded Timeline review ([plan](docs/PLAN_SOC_4_MATCH_EVENT_CATALOG.md))
+- [x] **Soccer shootout and outcome workspace (SOC-4C)** - gated shootout setup, separate score and kick sequence, kicker/goalkeeper/eligibility management, corrections, and structured completion/reopen flows ([plan](docs/PLAN_SOC_4_MATCH_EVENT_CATALOG.md))
 
 ### What's Next
 
-- [ ] **Soccer shootout and outcome workspace (SOC-4C)** - shootout setup, kick capture and correction, eligibility, and structured match outcomes ([plan](docs/PLAN_SOC_4_MATCH_EVENT_CATALOG.md))
 - [ ] **Soccer implementation (SOC-5 through SOC-6)** - cloud sync, summaries, settings, aggregates, QA, and release ([roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))

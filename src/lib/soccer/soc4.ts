@@ -754,6 +754,9 @@ function applyShootoutKick(
   if (goalkeeperKey !== shootout.currentGoalkeepers[goalkeeperSide] && goalkeeper.kind !== 'unknown') {
     return 'Kick goalkeeper does not match the designated defending goalkeeper.'
   }
+  if (context.shootoutRedActors.has(`${goalkeeperSide}:${goalkeeperKey}`)) {
+    return 'A sent-off goalkeeper must be replaced before the next kick.'
+  }
 
   const kickerKey = shootoutKickerKey(kicker, event.payload.anonymousKickerSlot)
   const latestKick = shootout.kicks[shootout.kicks.length - 1]
