@@ -774,6 +774,26 @@ snapshotted rules require a winner. Soccer remains local-only and production-dis
 
 ---
 
+## 11j. Soccer cloud event transport (SOC-5A)
+
+**Precondition:** Signed in, migration `043_soccer_event_cloud_transport.sql` applied, and
+the development Soccer workspace available. Soccer remains production-disabled. Use one
+local-roster match and one existing cloud-team match.
+
+| ID | Action | Expected |
+|---|---|---|
+| 11j.1 | Start a local-roster match while online and wait for sync | One personal cloud game binds to the local game id; no season, team, roster, or permanent player rows are created; participant snapshots and all kickoff events exist |
+| 11j.2 | Start from a cloud soccer team while online | The game binds to the selected team/season, snapshots selected and game-only participants, and source-player links exist only for team roster players |
+| 11j.3 | Record events, revise one, and remove one | The recorder's cloud rows contain the latest revisions/tombstone; the checkpoint count, max sequence, revision set, and fingerprint update before the local status becomes synced |
+| 11j.4 | Go offline, record several event families, park the game, and reconnect | Tracking remains usable; the active game syncs first, parked dirty games follow oldest-first, and local data remains present through retries |
+| 11j.5 | Open a healthy soccer game parked before SOC-5A and reconnect | It binds with the existing local id and uploads unchanged event ids, revisions, sequences, and timestamps without history migration |
+| 11j.6 | Import or create a soccer stream with an invalid envelope or projection diagnostic | Upload is rejected as a whole, the game remains local/dirty with a visible error, and no partial checkpoint is confirmed |
+| 11j.7 | Edit the game while an upload is in flight | Completion of the older upload does not clear the newer dirty state; a following queue pass uploads and confirms the latest fingerprint |
+| 11j.8 | Reload with a synced personal soccer game plus an older aggregate cloud game | The personal soccer row does not enter the legacy aggregate hydrator or overwrite the local soccer event workspace |
+| 11j.9 | Record and sync a basketball game after SOC-5A | Aggregate stats and shot-chart sync behave unchanged and never write soccer participant/checkpoint rows |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.
@@ -805,7 +825,7 @@ snapshotted rules require a winner. Soccer remains local-only and production-dis
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`042_game_events.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025** and **041**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**; shared events **042**.
+- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`043_soccer_event_cloud_transport.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025** and **041**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**; shared events **042**; soccer event transport **043**.
 
 ---
 

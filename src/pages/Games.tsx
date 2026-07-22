@@ -120,6 +120,7 @@ export default function Games() {
         .select(
           'id,team_id,opponent_name,opponent_score,tournament_name,tournament_id,home_team_score,home_score_adjustment,game_date,status,created_at'
         )
+        .not('team_id', 'is', null)
         .order('created_at', { ascending: false })
 
       if (cancelled) return

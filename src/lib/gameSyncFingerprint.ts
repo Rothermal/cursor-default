@@ -33,6 +33,19 @@ export function isAggregateCloudSyncEligible(state: GameState): boolean {
   return state.eventStream === null && state.sportGameState === null
 }
 
+/** Soccer owns its event stream and setup snapshot; it syncs through the event repository. */
+export function isSoccerEventCloudSyncEligible(state: GameState): boolean {
+  return Boolean(
+    state.sport?.id === 'soccer' &&
+      state.eventStream !== null &&
+      state.sportGameState?.sportId === 'soccer'
+  )
+}
+
+export function isCloudSyncEligible(state: GameState): boolean {
+  return isAggregateCloudSyncEligible(state) || isSoccerEventCloudSyncEligible(state)
+}
+
 /**
  * Record that the current game payload matches what was last loaded from or pushed to the cloud.
  * Call after building state from a cloud row or after a successful sync upload.

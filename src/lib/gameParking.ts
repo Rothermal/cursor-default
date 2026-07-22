@@ -1,7 +1,7 @@
 import type { CloudSyncStatus, GameState } from '../types'
 import {
   buildGameSyncFingerprint,
-  isAggregateCloudSyncEligible,
+  isCloudSyncEligible,
   shouldBlockDiscardUnsyncedGame,
 } from './gameSyncFingerprint'
 import {
@@ -246,7 +246,7 @@ function hasSyncablePayload(state: GameState): boolean {
   return Boolean(
     state.sport &&
       state.gameInfo &&
-      isAggregateCloudSyncEligible(state) &&
+      isCloudSyncEligible(state) &&
       state.cloudSync.gameStatus !== 'final'
   )
 }

@@ -23,6 +23,7 @@ import {
   loadCloudGameById,
   getLastOpenedPreferenceSupport,
 } from '../lib/cloudSync'
+import { syncSoccerEventGameToCloud } from '../lib/soccer/cloudSync'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
@@ -41,7 +42,8 @@ import {
   shouldRejectSkippedFinalSync,
   shouldSkipAutoHydrateForDifferentCloudGame,
   withLastSyncedGameFingerprint,
-  isAggregateCloudSyncEligible,
+  isCloudSyncEligible,
+  isSoccerEventCloudSyncEligible,
 } from '../lib/gameSyncFingerprint'
 import {
   createInitialCloudSyncState,
@@ -102,7 +104,7 @@ function hasSyncPrereqs(state: GameState, isConfigured: boolean, userId: string 
     supabase &&
     state.sport &&
     state.gameInfo &&
-    isAggregateCloudSyncEligible(state) &&
+    isCloudSyncEligible(state) &&
     state.cloudSync.gameStatus !== 'final'
   )
 }
@@ -305,6 +307,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
+  const soccerEventCloudEligible = isSoccerEventCloudSyncEligible(state)
 
   useLayoutEffect(() => {
     stateRef.current = state
@@ -594,10 +597,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!userId) return
-    if (!state.cloudSync.gameId) return
+    if (!state.cloudSync.gameId || soccerEventCloudEligible) return
     if (!canHydrateAsActiveGame(state.cloudSync.gameStatus ?? '')) return
     setResumeTarget(userId, state.cloudSync.gameId)
-  }, [state.cloudSync.gameId, state.cloudSync.gameStatus, userId])
+  }, [soccerEventCloudEligible, state.cloudSync.gameId, state.cloudSync.gameStatus, userId])
 
   useEffect(() => {
     if ((!isConfigured || !isOnline) && state.cloudSync.status !== 'offline') {
@@ -691,10 +694,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const synced = await syncGameSnapshotToCloud({
-          state: snapshot,
-          userId: snapshotUserId!,
-        })
+        const synced = isSoccerEventCloudSyncEligible(snapshot)
+          ? await syncSoccerEventGameToCloud({
+              state: snapshot,
+              userId: snapshotUserId!,
+              localGameId: record.localGameId,
+            })
+          : await syncGameSnapshotToCloud({
+              state: snapshot,
+              userId: snapshotUserId!,
+            })
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
         if (!latestRecord) return
 
@@ -705,6 +714,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         // unsynced edits. Checking only `snapshot` let mid-sync edits report success while
         // cloud stayed final and `gameStatus: 'final'` cleared the dirty queue forever.
         if (
+          'skippedFinalGame' in synced &&
           synced.skippedFinalGame &&
           (shouldRejectSkippedFinalSync(snapshot) ||
             shouldRejectSkippedFinalSync(latestState))
@@ -743,13 +753,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
           seasonId: synced.seasonId,
           teamId: synced.teamId,
           gameId: synced.gameId,
-          gameStatus: synced.skippedFinalGame ? 'final' : 'in_progress',
+          gameStatus:
+            'skippedFinalGame' in synced && synced.skippedFinalGame
+              ? 'final'
+              : 'in_progress',
           playerIdMap: synced.playerIdMap,
           status: 'synced',
           lastSyncedAt: synced.syncedAt,
           lastError: null,
           shotChartHydrationDroppedRows:
-            synced.shotChartCloudSync === 'synced'
+            'shotChartCloudSync' in synced && synced.shotChartCloudSync === 'synced'
               ? 0
               : snapshot.cloudSync.shotChartHydrationDroppedRows,
           lastSyncedGameFingerprint: snapshotFingerprint,
@@ -766,7 +779,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           lastError: null,
           nextAttemptAt: null,
         })
-        if (snapshotUserId && isStillActiveRecord) {
+        if (
+          snapshotUserId &&
+          isStillActiveRecord &&
+          !isSoccerEventCloudSyncEligible(snapshot)
+        ) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
         if (isStillActiveRecord) {
