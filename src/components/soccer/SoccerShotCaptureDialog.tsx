@@ -2,6 +2,7 @@ import { MapPin, MapPinOff, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { GameEventActor, GameEventLocation, GameEventTeamSide } from '../../lib/gameEvents/types'
 import {
+  inspectSoccerHistory,
   recordHistoricalSoccerOwnGoal,
   recordHistoricalSoccerShot,
   recordSoccerOwnGoal,
@@ -10,10 +11,14 @@ import {
   reviseSoccerOwnGoal,
   reviseSoccerShot,
   soccerAttackingDirectionAt,
+  soccerParticipantRoleAt,
+  soccerParticipantWasOnFieldAt,
   soccerPeriodTimings,
+  soccerShotSourceCandidates,
   type SoccerCaptureActorSelection,
   type SoccerEventMoment,
   type SoccerLiveResult,
+  type SoccerMatchEvent,
   type SoccerOwnGoalEvent,
   type SoccerShotOutcome,
   type SoccerShotEvent,
@@ -68,9 +73,8 @@ export default function SoccerShotCaptureDialog({
   onTrackedParticipantUsed,
   onClose,
 }: SoccerShotCaptureDialogProps) {
-  const projection = state.sportGameState?.sportId === 'soccer'
-    ? state.sportGameState.projection
-    : null
+  const sportState = state.sportGameState?.sportId === 'soccer' ? state.sportGameState : null
+  const projection = sportState?.projection ?? null
   const onField = useMemo(
     () => projection
       ? Object.values(projection.participants).filter(participant => participant.status === 'on_field')
@@ -81,12 +85,17 @@ export default function SoccerShotCaptureDialog({
     () => projection ? Object.values(projection.participants) : [],
     [projection]
   )
+  const initialRoles = useMemo(
+    () => new Map(sportState?.setup?.participants.map(participant => [participant.id, participant.initialRole]) ?? []),
+    [sportState?.setup?.participants]
+  )
   const periodTimings = useMemo(() => soccerPeriodTimings(state), [state])
   const recentOpponentLabels = useMemo(() => opponentLabels(state), [state])
   const mode = draft?.mode ?? (draft?.event ? 'edit' : 'live')
   const [teamSide, setTeamSide] = useState<GameEventTeamSide>('tracked')
   const [outcome, setOutcome] = useState<SoccerShotOutcome | null>(null)
   const [situation, setSituation] = useState<SoccerShotSituation>('open_play')
+  const [sourceEventId, setSourceEventId] = useState('')
   const [ownGoal, setOwnGoal] = useState(false)
   const [location, setLocation] = useState<GameEventLocation | null>(null)
   const [trackedShooterId, setTrackedShooterId] = useState('__team__')
@@ -112,24 +121,38 @@ export default function SoccerShotCaptureDialog({
   const selectedTiming = periodTimings.find(item => item.period.id === selectedPeriodId)
     ?? periodTimings[periodTimings.length - 1]
     ?? null
-  const moment: SoccerEventMoment | null = selectedTiming
-    ? {
-        period: selectedTiming.period,
-        elapsedMs: selectedTiming.startElapsedMs + periodElapsedMs,
-      }
-    : null
-  const historicalGoalkeeper = projection && moment
-    ? allParticipants.find(participant => participant.roleIntervals.some(interval =>
-      interval.periodId === moment.period.id &&
-      interval.role.group === 'goalkeeper' &&
-      moment.elapsedMs >= interval.startElapsedMs &&
-      (interval.endElapsedMs === null || moment.elapsedMs <= interval.endElapsedMs)
-    )) ?? null
+  const moment: SoccerEventMoment | null = useMemo(
+    () => selectedTiming
+      ? {
+          period: selectedTiming.period,
+          elapsedMs: selectedTiming.startElapsedMs + periodElapsedMs,
+        }
+      : null,
+    [periodElapsedMs, selectedTiming]
+  )
+  const historicalParticipants = useMemo(
+    () => moment
+      ? allParticipants.filter(participant =>
+          soccerParticipantWasOnFieldAt(participant, moment.period.id, moment.elapsedMs)
+        )
+      : [],
+    [allParticipants, moment]
+  )
+  const historicalGoalkeeper = moment
+    ? historicalParticipants.find(participant => soccerParticipantRoleAt(
+        participant,
+        moment.period.id,
+        moment.elapsedMs,
+        initialRoles.get(participant.participantId)
+      ).group === 'goalkeeper') ?? null
     : null
   const goalkeeper = mode === 'live'
     ? onField.find(participant => participant.role.group === 'goalkeeper') ?? null
     : historicalGoalkeeper
-  const selectableParticipants = mode === 'live' ? onField : allParticipants
+  const selectableParticipants = mode === 'live' ? onField : historicalParticipants
+  const selectableGoalkeepers = mode === 'live'
+    ? onField.filter(participant => participant.role.group === 'goalkeeper')
+    : historicalGoalkeeper ? [historicalGoalkeeper] : []
 
   useEffect(() => {
     if (!draft) return
@@ -152,6 +175,7 @@ export default function SoccerShotCaptureDialog({
     setTeamSide(event?.teamSide ?? draft.teamSide)
     setOutcome(shot?.payload.outcome ?? (ownGoalEvent ? 'goal' : draft.outcome ?? null))
     setSituation(shot?.payload.situation ?? 'open_play')
+    setSourceEventId(shot?.payload.sourceEventId ?? '')
     setOwnGoal(Boolean(ownGoalEvent))
     setLocation(event?.location ?? draft.location)
     setTrackedShooterId(shooter?.participantId ?? (shooter?.kind === 'team' || draft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
@@ -185,18 +209,58 @@ export default function SoccerShotCaptureDialog({
     }
   }, [draft, goalkeeper, trackedGoalkeeperId])
 
+  useEffect(() => {
+    if (!draft || mode === 'live' || !moment) return
+    const validIds = new Set(historicalParticipants.map(participant => participant.participantId))
+    const fallbackId = historicalParticipants.find(participant => soccerParticipantRoleAt(
+      participant,
+      moment.period.id,
+      moment.elapsedMs,
+      initialRoles.get(participant.participantId)
+    ).group !== 'goalkeeper')?.participantId ?? historicalParticipants[0]?.participantId ?? ''
+    setTrackedShooterId(current => current === '__team__' || validIds.has(current) ? current : fallbackId || '__team__')
+    setOwnGoalParticipantId(current => validIds.has(current) ? current : fallbackId)
+    setPrimaryCreatorId(current => validIds.has(current) ? current : '')
+    setSecondaryCreatorId(current => validIds.has(current) ? current : '')
+    setTrackedBlockerId(current => current === '__team__' || current === '__unknown__' || validIds.has(current) ? current : '__team__')
+    setTrackedGoalkeeperId(current => current && validIds.has(current) && current === historicalGoalkeeper?.participantId
+      ? current
+      : historicalGoalkeeper?.participantId ?? '')
+  }, [draft, historicalGoalkeeper, historicalParticipants, initialRoles, mode, moment])
+
   if (!draft || !projection) return null
 
   const creatorsAllowed = !ownGoal && situation !== 'penalty' && situation !== 'direct_free_kick'
+  const sourceAllowed = situation === 'penalty' ||
+    situation === 'direct_free_kick' ||
+    situation === 'corner_sequence'
+  const sourceCandidates = moment
+    ? soccerShotSourceCandidates(inspectSoccerHistory(state).activeEvents as SoccerMatchEvent[], {
+        teamSide,
+        situation,
+        period: moment.period,
+        elapsedMs: moment.elapsedMs,
+        excludeEventId: draft.event?.id,
+      })
+    : []
   const ownGoalNeedsGoalkeeper = ownGoal && teamSide === 'opponent'
   const timingInvalid = mode !== 'live' && (
     !selectedTiming ||
     periodElapsedMs < 0 ||
     selectedTiming.startElapsedMs + periodElapsedMs > selectedTiming.endElapsedMs
   )
+  const selectableParticipantIds = new Set(selectableParticipants.map(participant => participant.participantId))
+  const historicalActorInvalid = mode !== 'live' && (
+    (!ownGoal && teamSide === 'tracked' && trackedShooterId !== '__team__' && !selectableParticipantIds.has(trackedShooterId)) ||
+    (ownGoal && teamSide === 'opponent' && !selectableParticipantIds.has(ownGoalParticipantId)) ||
+    (primaryCreatorId !== '' && !selectableParticipantIds.has(primaryCreatorId)) ||
+    (secondaryCreatorId !== '' && !selectableParticipantIds.has(secondaryCreatorId)) ||
+    (trackedBlockerId !== '__team__' && trackedBlockerId !== '__unknown__' && !selectableParticipantIds.has(trackedBlockerId)) ||
+    (trackedGoalkeeperId !== '' && !selectableParticipantIds.has(trackedGoalkeeperId))
+  )
   const saveDisabled = busy || outcome === null || (
     ownGoal && teamSide === 'opponent' && !ownGoalParticipantId
-  ) || (ownGoalNeedsGoalkeeper && !trackedGoalkeeperId) || timingInvalid
+  ) || (ownGoalNeedsGoalkeeper && !trackedGoalkeeperId) || timingInvalid || historicalActorInvalid
   const trackedDirection = moment
     ? soccerAttackingDirectionAt(state, moment)
     : projection.attackingDirection
@@ -260,6 +324,7 @@ export default function SoccerShotCaptureDialog({
         teamSide,
         outcome,
         situation,
+        sourceEventId: sourceAllowed ? sourceEventId || null : null,
         location: eventLocation,
         shooter,
         primaryCreator: creatorsAllowed
@@ -330,8 +395,8 @@ export default function SoccerShotCaptureDialog({
             <>
               <FieldGroup label="Side">
                 <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
-                  <ChoiceButton active={teamSide === 'tracked'} label="Tracked" onClick={() => setTeamSide('tracked')} compact />
-                  <ChoiceButton active={teamSide === 'opponent'} label="Opponent" onClick={() => setTeamSide('opponent')} compact />
+                  <ChoiceButton active={teamSide === 'tracked'} label="Tracked" onClick={() => { setTeamSide('tracked'); if (teamSide !== 'tracked') setSourceEventId('') }} compact />
+                  <ChoiceButton active={teamSide === 'opponent'} label="Opponent" onClick={() => { setTeamSide('opponent'); if (teamSide !== 'opponent') setSourceEventId('') }} compact />
                 </div>
               </FieldGroup>
               <FieldGroup label="Match time">
@@ -342,13 +407,14 @@ export default function SoccerShotCaptureDialog({
                       const next = periodTimings.find(item => item.period.id === event.target.value)
                       setSelectedPeriodId(event.target.value)
                       setPeriodElapsedMs(next ? next.endElapsedMs - next.startElapsedMs : 0)
+                      setSourceEventId('')
                     }}
                     className="input-field"
                   >
                     {periodTimings.map(item => <option key={item.period.id} value={item.period.id}>{item.label}</option>)}
                   </select>
-                  <label className="text-[11px] font-bold uppercase text-slate-500">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => setPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000)} className="input-field mt-1" /></label>
-                  <label className="text-[11px] font-bold uppercase text-slate-500">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => setPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000)} className="input-field mt-1" /></label>
+                  <label className="text-[11px] font-bold uppercase text-slate-500">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => { setPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000); setSourceEventId('') }} className="input-field mt-1" /></label>
+                  <label className="text-[11px] font-bold uppercase text-slate-500">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => { setPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000); setSourceEventId('') }} className="input-field mt-1" /></label>
                 </div>
                 {timingInvalid && <p className="mt-2 text-xs font-medium text-amber-700">Choose a time inside the recorded period.</p>}
               </FieldGroup>
@@ -413,6 +479,20 @@ export default function SoccerShotCaptureDialog({
                 onChange={event => {
                   const next = event.target.value as SoccerShotSituation
                   setSituation(next)
+                  if (next === 'open_play' || next === 'other_set_piece') {
+                    setSourceEventId('')
+                  } else if (moment) {
+                    setSourceEventId(soccerShotSourceCandidates(
+                      inspectSoccerHistory(state).activeEvents as SoccerMatchEvent[],
+                      {
+                        teamSide,
+                        situation: next,
+                        period: moment.period,
+                        elapsedMs: moment.elapsedMs,
+                        excludeEventId: draft.event?.id,
+                      }
+                    )[0]?.eventId ?? '')
+                  }
                   if (next === 'penalty' && location === null) setLocation(penaltyMark(captureDirection))
                   if (next === 'penalty' || next === 'direct_free_kick') {
                     setPrimaryCreatorId('')
@@ -428,11 +508,27 @@ export default function SoccerShotCaptureDialog({
             </FieldGroup>
           )}
 
+          {!ownGoal && sourceAllowed && (
+            <FieldGroup label="Restart source (optional)">
+              <select value={sourceEventId} onChange={event => setSourceEventId(event.target.value)} className="input-field">
+                <option value="">No linked source</option>
+                {sourceEventId && !sourceCandidates.some(candidate => candidate.eventId === sourceEventId) && (
+                  <option value={sourceEventId}>Current source (needs review)</option>
+                )}
+                {sourceCandidates.map(candidate => (
+                  <option key={candidate.eventId} value={candidate.eventId}>
+                    {candidate.label} at {Math.floor(candidate.elapsedMs / 60_000)}:{String(Math.floor(candidate.elapsedMs / 1_000) % 60).padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+            </FieldGroup>
+          )}
+
           {ownGoalNeedsGoalkeeper && (
             <FieldGroup label="Tracked goalkeeper">
               <select value={trackedGoalkeeperId} onChange={event => setTrackedGoalkeeperId(event.target.value)} className="input-field">
                 <option value="">Select goalkeeper</option>
-                {selectableParticipants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}
+                {selectableGoalkeepers.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}
               </select>
               {!trackedGoalkeeperId && <p role="alert" className="mt-2 text-xs font-medium text-amber-700">A tracked goalkeeper is required for this own goal.</p>}
             </FieldGroup>
@@ -490,7 +586,7 @@ export default function SoccerShotCaptureDialog({
             <FieldGroup label="Tracked goalkeeper">
               <select value={trackedGoalkeeperId} onChange={event => setTrackedGoalkeeperId(event.target.value)} className="input-field">
                 <option value="">Select goalkeeper</option>
-                {selectableParticipants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}
+                {selectableGoalkeepers.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}
               </select>
             </FieldGroup>
           )}

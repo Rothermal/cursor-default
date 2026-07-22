@@ -6,14 +6,17 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import {
   createSoccerSportGameState,
+  detectSoccerCompetitionProfile,
   detectRegulationPreset,
   regulationSegmentsForPreset,
   reorderSoccerSegments,
   resizeSoccerSegments,
   resolveSoccerMatchRules,
+  soccerRulesForCompetitionProfile,
   withSoccerTieResolution,
   validateSoccerMatchRules,
   type SoccerMatchRules,
+  type SoccerCompetitionProfile,
   type SoccerRegulationPreset,
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
@@ -71,6 +74,7 @@ export default function SoccerGameSetup() {
   const [rules, setRules] = useState<SoccerMatchRules>(() =>
     structuredClone(existingSetup?.rulesSnapshot ?? resolveSoccerMatchRules())
   )
+  const [competitionProfileOverride, setCompetitionProfileOverride] = useState<SoccerCompetitionProfile | null>(null)
 
   useEffect(() => {
     if (state.eventStream?.events.length) navigate('/game', { replace: true })
@@ -147,10 +151,12 @@ export default function SoccerGameSetup() {
     [selectedTeamId, teams]
   )
   const regulationPreset = detectRegulationPreset(rules)
+  const competitionProfile = competitionProfileOverride ?? detectSoccerCompetitionProfile(rules)
 
   if (invalidRoute) return null
 
   const updateRules = (update: (current: SoccerMatchRules) => SoccerMatchRules) => {
+    setCompetitionProfileOverride(null)
     setRules(current => reorderSoccerSegments(update(current)))
   }
 
@@ -160,6 +166,12 @@ export default function SoccerGameSetup() {
       ...current,
       regulationSegments: regulationSegmentsForPreset(preset),
     }))
+  }
+
+  const applyCompetitionProfile = (profile: SoccerCompetitionProfile) => {
+    setCompetitionProfileOverride(profile === 'custom' ? 'custom' : null)
+    if (profile === 'custom') return
+    setRules(soccerRulesForCompetitionProfile(profile))
   }
 
   const handleContinue = () => {
@@ -319,6 +331,47 @@ export default function SoccerGameSetup() {
             ]}
             onChange={setDirection}
           />
+        </section>
+
+        <section className="border-t border-slate-200 pt-5 space-y-4">
+          <h2 className="text-sm font-bold uppercase text-slate-500">Competition Rules</h2>
+          <label className="block text-sm font-medium text-slate-700">
+            Starting profile
+            <select
+              value={competitionProfile}
+              onChange={event => applyCompetitionProfile(event.target.value as SoccerCompetitionProfile)}
+              className="input-field mt-1"
+            >
+              <option value="ifab">IFAB</option>
+              <option value="high_school">U.S. High School</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <Segmented
+            label="Yellow-card exit"
+            value={rules.yellowCardExitPolicy}
+            options={[
+              { value: 'stay_on', label: 'Player stays on' },
+              { value: 'must_leave_may_replace', label: 'Must leave' },
+            ]}
+            onChange={value => updateRules(current => ({ ...current, yellowCardExitPolicy: value }))}
+          />
+          <label className="block text-sm font-medium text-slate-700">
+            Tie resolution
+            <select
+              value={rules.tieResolution}
+              onChange={event => updateRules(current => withSoccerTieResolution(
+                current,
+                event.target.value as SoccerMatchRules['tieResolution']
+              ))}
+              className="input-field mt-1"
+            >
+              <option value="draw_allowed">Draw allowed</option>
+              <option value="extra_time_then_shootout">Extra time, then shootout</option>
+              <option value="direct_to_shootout">Direct to shootout</option>
+            </select>
+          </label>
+          <p className="text-xs text-slate-500">Red cards play short. Competition-specific replacement remains unavailable.</p>
         </section>
 
         <section className="border-t border-slate-200 pt-5 space-y-4">

@@ -1,16 +1,19 @@
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react'
 import type { GameEventLocation, GameEventTeamSide } from '../../lib/gameEvents/types'
 import type { SoccerAttackingDirection } from '../../lib/soccer'
-import { soccerFieldLocation } from '../../lib/soccer/field'
+import { clusterSoccerMarkerPoints, soccerFieldLocation } from '../../lib/soccer/field'
 
-export type SoccerFieldMarkerOutcome = 'goal' | 'saved' | 'blocked' | 'off_target' | 'woodwork' | 'own_goal'
+export type SoccerFieldMarkerKind =
+  | 'goal' | 'saved' | 'blocked' | 'off_target' | 'woodwork' | 'own_goal'
+  | 'tackle_won' | 'tackle_lost' | 'interception' | 'clearance' | 'recovery'
+  | 'foul' | 'yellow_card' | 'red_card' | 'corner' | 'offside'
 
 export interface SoccerFieldMarker {
   id: string
   x: number
   y: number
   teamSide: GameEventTeamSide
-  outcome: SoccerFieldMarkerOutcome
+  kind: SoccerFieldMarkerKind
   label: string
 }
 
@@ -23,6 +26,7 @@ interface SoccerFieldProps {
   onFlip: () => void
   onLocation: (location: GameEventLocation) => void
   onMarker?: (markerId: string) => void
+  onCluster?: (markerIds: string[]) => void
 }
 
 export default function SoccerField({
@@ -34,6 +38,7 @@ export default function SoccerField({
   onFlip,
   onLocation,
   onMarker,
+  onCluster,
 }: SoccerFieldProps) {
   const captureDirection = captureSide === 'tracked'
     ? trackedDirection
@@ -94,11 +99,17 @@ export default function SoccerField({
           <path d="M98 60.8 A1.2 1.2 0 0 1 96.8 62" fill="none" stroke="#f8fafc" strokeWidth="0.45" />
           <rect x="98" y="27.8" width="1.7" height="8.4" fill="none" stroke="#f8fafc" strokeWidth="0.5" />
 
-          {markers.map(marker => (
+          {clusterSoccerMarkerPoints(markers).map(cluster => cluster.length === 1 ? (
             <SoccerMarker
-              key={marker.id}
-              marker={marker}
-              onSelect={onMarker ? () => onMarker(marker.id) : undefined}
+              key={cluster[0].id}
+              marker={cluster[0]}
+              onSelect={onMarker ? () => onMarker(cluster[0].id) : undefined}
+            />
+          ) : (
+            <SoccerMarkerCluster
+              key={cluster.map(marker => marker.id).join(':')}
+              markers={cluster}
+              onSelect={onCluster ? () => onCluster(cluster.map(marker => marker.id)) : undefined}
             />
           ))}
         </svg>
@@ -118,23 +129,24 @@ function MarkerLegend() {
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-600" aria-label="Field marker legend">
       <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-yellow-400" />Tracked</span>
       <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" />Opponent</span>
-      <span className="flex items-center gap-1"><LegendGlyph outcome="goal" />Goal</span>
-      <span className="flex items-center gap-1"><LegendGlyph outcome="saved" />Saved</span>
-      <span className="flex items-center gap-1"><LegendGlyph outcome="blocked" />Blocked</span>
-      <span className="flex items-center gap-1"><LegendGlyph outcome="off_target" />Off</span>
-      <span className="flex items-center gap-1"><LegendGlyph outcome="woodwork" />Woodwork</span>
-      <span className="flex items-center gap-1"><LegendGlyph outcome="own_goal" />Own goal</span>
+      <span className="flex items-center gap-1"><LegendGlyph kind="goal" />Goal</span>
+      <span className="flex items-center gap-1"><LegendGlyph kind="saved" />Shot</span>
+      <span className="flex items-center gap-1"><LegendGlyph kind="interception" />Defense</span>
+      <span className="flex items-center gap-1"><LegendGlyph kind="foul" />Foul</span>
+      <span className="flex items-center gap-1"><LegendGlyph kind="yellow_card" />Card</span>
+      <span className="flex items-center gap-1"><LegendGlyph kind="corner" />Team event</span>
     </div>
   )
 }
 
-function LegendGlyph({ outcome }: { outcome: SoccerFieldMarkerOutcome }) {
+function LegendGlyph({ kind }: { kind: SoccerFieldMarkerKind }) {
   const base = 'inline-grid h-2.5 w-2.5 place-items-center border border-slate-500 text-[9px] leading-none'
-  if (outcome === 'goal') return <span className={`${base} rounded-full bg-slate-500`} />
-  if (outcome === 'saved') return <span className={`${base} rounded-full`} />
-  if (outcome === 'blocked') return <span className={base} />
-  if (outcome === 'off_target') return <span className="inline-grid h-2.5 w-2.5 place-items-center text-[10px] leading-none">x</span>
-  if (outcome === 'woodwork') return <span className={`${base} rotate-45 scale-75`} />
+  if (kind === 'goal') return <span className={`${base} rounded-full bg-slate-500`} />
+  if (kind === 'saved') return <span className={`${base} rounded-full`} />
+  if (kind === 'interception') return <span className={`${base} rotate-45 scale-75`} />
+  if (kind === 'foul') return <span className={`${base} rounded-sm`}>!</span>
+  if (kind === 'yellow_card') return <span className={`${base} bg-yellow-300`} />
+  if (kind === 'corner') return <span className="h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-slate-500" />
   return <span className="h-0 w-0 border-x-[5px] border-b-[9px] border-x-transparent border-b-slate-500" />
 }
 
@@ -143,7 +155,9 @@ function SoccerMarker({ marker, onSelect }: { marker: SoccerFieldMarker; onSelec
   const y = marker.y * 64
   const color = marker.teamSide === 'tracked' ? '#facc15' : '#38bdf8'
   const common = {
-    fill: marker.outcome === 'goal' ? color : '#0f172a',
+    fill: marker.kind === 'goal' || marker.kind === 'tackle_won'
+      ? color
+      : marker.kind === 'tackle_lost' ? 'none' : '#0f172a',
     stroke: color,
     strokeWidth: 0.85,
   }
@@ -165,20 +179,41 @@ function SoccerMarker({ marker, onSelect }: { marker: SoccerFieldMarker; onSelec
       }}
     >
       <circle cx={x} cy={y} r="2.6" fill="#0f172a" fillOpacity="0.72" stroke="#f8fafc" strokeWidth="0.45" />
-      {marker.outcome === 'blocked' ? (
+      {marker.kind === 'blocked' || marker.kind === 'tackle_won' || marker.kind === 'tackle_lost' ? (
         <rect x={x - 1.35} y={y - 1.35} width="2.7" height="2.7" {...common} />
-      ) : marker.outcome === 'off_target' ? (
+      ) : marker.kind === 'off_target' ? (
         <g stroke={color} strokeWidth="0.9" strokeLinecap="round">
           <line x1={x - 1.35} y1={y - 1.35} x2={x + 1.35} y2={y + 1.35} />
           <line x1={x + 1.35} y1={y - 1.35} x2={x - 1.35} y2={y + 1.35} />
         </g>
-      ) : marker.outcome === 'woodwork' ? (
+      ) : marker.kind === 'woodwork' || marker.kind === 'interception' ? (
         <path d={`M ${x} ${y - 1.7} L ${x + 1.7} ${y} L ${x} ${y + 1.7} L ${x - 1.7} ${y} Z`} {...common} />
-      ) : marker.outcome === 'own_goal' ? (
+      ) : marker.kind === 'own_goal' || marker.kind === 'corner' ? (
         <path d={`M ${x} ${y - 1.8} L ${x + 1.8} ${y + 1.5} L ${x - 1.8} ${y + 1.5} Z`} {...common} />
+      ) : marker.kind === 'clearance' ? (
+        <path d={`M ${x - 1.8} ${y + 1.4} L ${x + 1.8} ${y} L ${x - 1.8} ${y - 1.4} Z`} {...common} />
+      ) : marker.kind === 'recovery' ? (
+        <g stroke={color} strokeWidth="0.9" strokeLinecap="round"><line x1={x - 1.5} y1={y} x2={x + 1.5} y2={y} /><line x1={x} y1={y - 1.5} x2={x} y2={y + 1.5} /></g>
+      ) : marker.kind === 'foul' ? (
+        <text x={x} y={y + 1.25} textAnchor="middle" fill={color} fontSize="3.7" fontWeight="700">!</text>
+      ) : marker.kind === 'yellow_card' || marker.kind === 'red_card' ? (
+        <rect x={x - 1.05} y={y - 1.55} width="2.1" height="3.1" rx="0.25" fill={marker.kind === 'yellow_card' ? '#fde047' : '#ef4444'} stroke={color} strokeWidth="0.55" />
+      ) : marker.kind === 'offside' ? (
+        <g stroke={color} strokeWidth="0.8"><line x1={x - 1.4} y1={y - 1.4} x2={x + 1.4} y2={y + 1.4} /><line x1={x + 1.4} y1={y - 1.4} x2={x - 1.4} y2={y + 1.4} /><line x1={x - 1.8} y1={y + 1.8} x2={x + 1.8} y2={y + 1.8} /></g>
       ) : (
-        <circle cx={x} cy={y} r={marker.outcome === 'saved' ? 1.45 : 1.6} {...common} />
+        <circle cx={x} cy={y} r={marker.kind === 'saved' ? 1.45 : 1.6} {...common} />
       )}
+    </g>
+  )
+}
+
+function SoccerMarkerCluster({ markers, onSelect }: { markers: SoccerFieldMarker[]; onSelect?: () => void }) {
+  const x = markers.reduce((total, marker) => total + marker.x, 0) / markers.length * 100
+  const y = markers.reduce((total, marker) => total + marker.y, 0) / markers.length * 64
+  return (
+    <g role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} aria-label={`${markers.length} events at this location`} className={onSelect ? 'cursor-pointer outline-none' : undefined} onClick={event => { event.stopPropagation(); onSelect?.() }} onKeyDown={event => { if (!onSelect || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); event.stopPropagation(); onSelect() }}>
+      <circle cx={x} cy={y} r="4.2" fill="#0f172a" stroke="#f8fafc" strokeWidth="0.65" />
+      <text x={x} y={y + 1.35} textAnchor="middle" fill="#f8fafc" fontSize="4" fontWeight="700">{markers.length}</text>
     </g>
   )
 }

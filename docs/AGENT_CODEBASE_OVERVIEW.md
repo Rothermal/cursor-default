@@ -145,8 +145,8 @@ attacking-event correction, bounded historical adds, scoring history, and signed
 adjustments. SOC-4A adds version-2 rule/state normalization, the remaining event schemas,
 phased incident projection, temporal discipline dependencies, normal-match derived totals,
 shootout sequencing, and structured outcomes through pure APIs. Its UI remains hidden.
-SOC-4B adds normal-match capture and review, and SOC-4C exposes shootouts and structured
-outcomes.
+SOC-4B exposes normal-match defense, foul, discipline, corner, and offside capture and review.
+SOC-4C exposes shootouts and structured outcomes.
 
 SOC-2B and SOC-2C add a development-only Soccer workspace through the normal chooser and
 dashboard. The shared `/setup`, `/players`, and `/game` routes select soccer-specific setup,
@@ -288,7 +288,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_4_MATCH_EVENT_CATALOG.md`](PLAN_SOC_4_MATCH_EVENT_CATALOG.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-4A domain complete pending review; SOC-4B normal-match capture is next after merge |
+| [`PLAN_SOC_4_MATCH_EVENT_CATALOG.md`](PLAN_SOC_4_MATCH_EVENT_CATALOG.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-4A domain and SOC-4B normal-match capture complete pending review; SOC-4C is next after merge |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

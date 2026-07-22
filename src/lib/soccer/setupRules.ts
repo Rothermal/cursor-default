@@ -1,6 +1,34 @@
+import { resolveSoccerMatchRules, withSoccerTieResolution } from './rules'
 import type { SoccerMatchRules, SoccerMatchSegment } from './types'
 
 export type SoccerRegulationPreset = 'standard' | 'youth' | 'quarters' | 'custom'
+export type SoccerCompetitionProfile = 'ifab' | 'high_school' | 'custom'
+
+export function soccerRulesForCompetitionProfile(
+  profile: Exclude<SoccerCompetitionProfile, 'custom'>
+): SoccerMatchRules {
+  if (profile === 'ifab') return resolveSoccerMatchRules()
+  return withSoccerTieResolution(resolveSoccerMatchRules({
+    gameOverrides: {
+      regulationSegments: createSegments('regulation', 2, 40, ['First Half', 'Second Half']),
+      clockDirection: 'count_down',
+      clockDisplay: 'per_period',
+      allowReturnSubstitutions: true,
+      substitutionLimit: null,
+      substitutionWindowLimit: null,
+      yellowCardExitPolicy: 'must_leave_may_replace',
+    },
+  }), 'draw_allowed')
+}
+
+export function detectSoccerCompetitionProfile(rules: SoccerMatchRules): SoccerCompetitionProfile {
+  for (const profile of ['ifab', 'high_school'] as const) {
+    if (JSON.stringify(rules) === JSON.stringify(soccerRulesForCompetitionProfile(profile))) {
+      return profile
+    }
+  }
+  return 'custom'
+}
 
 export function regulationSegmentsForPreset(
   preset: Exclude<SoccerRegulationPreset, 'custom'>

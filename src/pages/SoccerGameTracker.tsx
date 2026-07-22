@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
+  BadgeAlert,
   ChevronLeft,
   Compass,
   Goal,
   Flag,
+  FlagTriangleRight,
   History,
   Map,
   MoreHorizontal,
@@ -20,11 +22,19 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
-import SoccerField, { type SoccerFieldMarker } from '../components/soccer/SoccerField'
+import SoccerField, {
+  type SoccerFieldMarker,
+  type SoccerFieldMarkerKind,
+} from '../components/soccer/SoccerField'
+import SoccerIncidentCaptureDialog, {
+  type SoccerIncidentDraft,
+  type SoccerIncidentEvent,
+  type SoccerIncidentKind,
+} from '../components/soccer/SoccerIncidentCaptureDialog'
 import SoccerLiveActionDialog, {
   type SoccerLiveDialogKind,
 } from '../components/soccer/SoccerLiveActionDialog'
-import SoccerMatchHistory from '../components/soccer/SoccerMatchHistory'
+import SoccerTimeline from '../components/soccer/SoccerTimeline'
 import SoccerScoreTimelineDialog from '../components/soccer/SoccerScoreTimelineDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
@@ -57,6 +67,7 @@ type MainTab = 'field' | 'lineup' | 'timeline'
 type LineupTab = 'on_field' | 'bench'
 type MarkerSideFilter = 'all' | 'tracked' | 'opponent'
 type MarkerScope = 'current' | 'match'
+type MarkerFamilyFilter = 'all' | 'shots' | 'defense' | 'incidents'
 
 export default function SoccerGameTracker() {
   const navigate = useNavigate()
@@ -76,9 +87,12 @@ export default function SoccerGameTracker() {
   const [error, setError] = useState<string | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
+  const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
   const [fieldFlipped, setFieldFlipped] = useState(false)
   const [markerSideFilter, setMarkerSideFilter] = useState<MarkerSideFilter>('all')
   const [markerScope, setMarkerScope] = useState<MarkerScope>('current')
+  const [markerFamilyFilter, setMarkerFamilyFilter] = useState<MarkerFamilyFilter>('all')
+  const [clusterEventIds, setClusterEventIds] = useState<string[] | null>(null)
   const [scoreTimelineOpen, setScoreTimelineOpen] = useState(false)
   const [scoreAdjustmentEdit, setScoreAdjustmentEdit] = useState<SoccerScoreAdjustmentEvent | null>(null)
   const applyingRef = useRef(false)
@@ -154,20 +168,49 @@ export default function SoccerGameTracker() {
     side: markerSideFilter,
     scope: markerScope,
     periodId: reviewPeriodId,
+    family: markerFamilyFilter,
   })
     .map(event => ({
       id: event.id,
       x: event.location?.x ?? 0,
       y: event.location?.y ?? 0,
       teamSide: event.teamSide,
-      outcome: event.eventType === 'soccer.own_goal'
-        ? 'own_goal'
-        : (event.payload as { outcome: SoccerFieldMarker['outcome'] }).outcome,
+      kind: markerKind(event),
       label: markerLabel(event),
     }))
 
   const setCaptureSide = (teamSide: 'tracked' | 'opponent') => {
     dispatch({ type: 'SET_SOCCER_CAPTURE_PREFERENCES', preferences: { teamSide } })
+  }
+
+  const setCaptureMode = (captureMode: 'shot' | 'defense' | 'foul') => {
+    dispatch({ type: 'SET_SOCCER_CAPTURE_PREFERENCES', preferences: { captureMode } })
+  }
+
+  const openIncident = (
+    kind: SoccerIncidentKind,
+    location: SoccerIncidentDraft['location'],
+    mode: SoccerIncidentDraft['mode'] = 'live',
+    event?: SoccerIncidentEvent
+  ) => setIncidentDraft({
+    kind,
+    teamSide: event?.teamSide ?? capturePreferences.teamSide,
+    location: event?.location ?? location,
+    mode,
+    event,
+  })
+
+  const editFieldEvent = (event: GameEvent) => {
+    if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
+      setCaptureDraft({
+        mode: 'edit',
+        teamSide: event.teamSide,
+        location: event.location,
+        event: event as SoccerShotEvent | SoccerOwnGoalEvent,
+      })
+      return
+    }
+    if (isIncidentEvent(event)) openIncident(incidentKind(event), event.location, 'edit', event)
   }
 
   const applyResult = (result: SoccerLiveResult): boolean => {
@@ -322,6 +365,25 @@ export default function SoccerGameTracker() {
                 </div>
               )}
 
+              <div>
+                <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Field capture</p>
+                <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
+                  <ModeButton active={capturePreferences.captureMode === 'shot'} label="Shot" onClick={() => setCaptureMode('shot')} />
+                  <ModeButton active={capturePreferences.captureMode === 'defense'} label="Defense" onClick={() => setCaptureMode('defense')} />
+                  <ModeButton active={capturePreferences.captureMode === 'foul'} label="Foul" onClick={() => setCaptureMode('foul')} />
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker family</p>
+                <div className="grid grid-cols-4 rounded-md bg-slate-200 p-1">
+                  <ModeButton active={markerFamilyFilter === 'all'} label="All" onClick={() => setMarkerFamilyFilter('all')} />
+                  <ModeButton active={markerFamilyFilter === 'shots'} label="Shots" onClick={() => setMarkerFamilyFilter('shots')} />
+                  <ModeButton active={markerFamilyFilter === 'defense'} label="Defense" onClick={() => setMarkerFamilyFilter('defense')} />
+                  <ModeButton active={markerFamilyFilter === 'incidents'} label="Incidents" onClick={() => setMarkerFamilyFilter('incidents')} />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker side</p>
@@ -347,45 +409,50 @@ export default function SoccerGameTracker() {
                 disabled={!fieldCaptureEnabled}
                 markers={fieldMarkers}
                 onFlip={() => setFieldFlipped(value => !value)}
-                onLocation={location => setCaptureDraft({
-                  teamSide: capturePreferences.teamSide,
-                  location,
-                })}
+                onLocation={location => {
+                  if (capturePreferences.captureMode === 'shot') {
+                    setCaptureDraft({ teamSide: capturePreferences.teamSide, location })
+                  } else {
+                    openIncident(capturePreferences.captureMode, location)
+                  }
+                }}
                 onMarker={eventId => {
                   const event = inspection.activeEvents.find(candidate => candidate.id === eventId)
-                  if (event?.eventType !== 'soccer.shot' && event?.eventType !== 'soccer.own_goal') return
-                  setCaptureDraft({
-                    mode: 'edit',
-                    teamSide: event.teamSide,
-                    location: event.location,
-                    event: event as SoccerShotEvent | SoccerOwnGoalEvent,
-                  })
+                  if (event) editFieldEvent(event)
                 }}
+                onCluster={setClusterEventIds}
               />
 
-              <div className="grid grid-cols-2 gap-2">
-                <QuickGoalButton
-                  label={state.gameInfo.teamName}
+              <div className="grid grid-cols-4 gap-2" aria-label="Quick capture">
+                <QuickCaptureButton
+                  label="Goal"
+                  icon={<Goal size={18} />}
                   disabled={!fieldCaptureEnabled}
-                  tracked
                   onClick={() => {
-                    setCaptureSide('tracked')
                     setCaptureDraft({
-                      teamSide: 'tracked',
+                      teamSide: capturePreferences.teamSide,
                       location: null,
                       outcome: 'goal',
-                      preferTeamAttribution: true,
                     })
                   }}
                 />
-                <QuickGoalButton
-                  label={state.gameInfo.opponentName}
+                <QuickCaptureButton
+                  label="Foul"
+                  icon={<FlagTriangleRight size={18} />}
                   disabled={!fieldCaptureEnabled}
-                  tracked={false}
-                  onClick={() => {
-                    setCaptureSide('opponent')
-                    setCaptureDraft({ teamSide: 'opponent', location: null, outcome: 'goal' })
-                  }}
+                  onClick={() => openIncident('foul', null)}
+                />
+                <QuickCaptureButton
+                  label="Card"
+                  icon={<BadgeAlert size={18} />}
+                  disabled={!fieldCaptureEnabled}
+                  onClick={() => openIncident('card', null)}
+                />
+                <QuickCaptureButton
+                  label="Team"
+                  icon={<Flag size={18} />}
+                  disabled={!fieldCaptureEnabled}
+                  onClick={() => openIncident('team_event', null)}
                 />
               </div>
             </div>
@@ -417,22 +484,25 @@ export default function SoccerGameTracker() {
               {visibleParticipants.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No participants in this view.</p>}
             </>
           ) : (
-            <SoccerMatchHistory
+            <SoccerTimeline
               state={state}
               inspection={inspection}
               busy={isApplying}
               onApply={applyResult}
-              onAddMissed={() => setCaptureDraft({
-                mode: 'historical',
-                teamSide: capturePreferences.teamSide,
-                location: null,
-              })}
+              onAddEvent={kind => {
+                if (kind === 'shot') {
+                  setCaptureDraft({ mode: 'historical', teamSide: capturePreferences.teamSide, location: null })
+                } else {
+                  openIncident(kind, null, 'historical')
+                }
+              }}
               onEditAttacking={event => setCaptureDraft({
                 mode: 'edit',
                 teamSide: event.teamSide,
                 location: event.location,
                 event,
               })}
+              onEditIncident={event => openIncident(incidentKind(event), event.location, 'edit', event)}
               onEditScoreAdjustment={event => {
                 setScoreAdjustmentEdit(event)
                 setScoreTimelineOpen(true)
@@ -480,6 +550,31 @@ export default function SoccerGameTracker() {
         })}
         onClose={() => setCaptureDraft(null)}
       />
+
+      <SoccerIncidentCaptureDialog
+        draft={incidentDraft}
+        state={state}
+        recorderUserId={user?.id ?? null}
+        selectedParticipantId={capturePreferences.selectedParticipantId}
+        busy={isApplying}
+        onApply={applyResult}
+        onTrackedParticipantUsed={participantId => dispatch({
+          type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+          preferences: { selectedParticipantId: participantId, selectionInitialized: true },
+        })}
+        onClose={() => setIncidentDraft(null)}
+      />
+
+      {clusterEventIds && (
+        <ClusterSheet
+          events={inspection.activeEvents.filter(event => clusterEventIds.includes(event.id))}
+          onSelect={event => {
+            setClusterEventIds(null)
+            editFieldEvent(event)
+          }}
+          onClose={() => setClusterEventIds(null)}
+        />
+      )}
 
       <SoccerScoreTimelineDialog
         open={scoreTimelineOpen}
@@ -595,11 +690,11 @@ function PlayerChip({ active, label, onClick }: { active: boolean; label: string
   return <button type="button" onClick={onClick} className={`h-9 max-w-44 truncate rounded-md border px-3 text-xs font-bold ${active ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>{label}</button>
 }
 
-function QuickGoalButton({ label, disabled, tracked, onClick }: { label: string; disabled: boolean; tracked: boolean; onClick: () => void }) {
+function QuickCaptureButton({ label, icon, disabled, onClick }: { label: string; icon: ReactNode; disabled: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`min-h-11 min-w-0 rounded-md px-3 text-xs font-bold text-white disabled:opacity-40 flex items-center justify-center gap-2 ${tracked ? 'bg-emerald-700' : 'bg-slate-700'}`}>
-      <Goal size={17} className="shrink-0" />
-      <span className="truncate">Goal - {label}</span>
+    <button type="button" onClick={onClick} disabled={disabled} className="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-bold text-slate-700 disabled:opacity-40">
+      {icon}
+      <span className="truncate">{label}</span>
     </button>
   )
 }
@@ -615,8 +710,67 @@ function limitValue(used: number, limit: number | null): string {
 function markerLabel(event: GameEvent): string {
   const side = event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'
   if (event.eventType === 'soccer.own_goal') return `Own goal, ${side.toLowerCase()} side benefits`
+  if (event.eventType === 'soccer.defensive_action') {
+    const payload = event.payload as { action: string; tackleOutcome: string | null }
+    const detail = payload.action === 'tackle' ? ` ${payload.tackleOutcome}` : ''
+    return `${side} ${payload.action.replace('_', ' ')}${detail}`
+  }
+  if (event.eventType === 'soccer.foul') return `${side} foul`
+  if (event.eventType === 'soccer.card') {
+    return `${side} ${(event.payload as { sanction: string }).sanction.replace(/_/g, ' ')}`
+  }
+  if (event.eventType === 'soccer.team_event') {
+    return `${side} ${(event.payload as { kind: string }).kind}`
+  }
   const payload = event.payload as { outcome?: unknown }
   const outcome = typeof payload.outcome === 'string' ? payload.outcome.replace('_', ' ') : 'shot'
   const shooter = event.actors.find(actor => actor.role === 'shooter')
   return `${side} ${outcome}${shooter?.label ? ` by ${shooter.label}` : ''}`
+}
+
+function markerKind(event: GameEvent): SoccerFieldMarkerKind {
+  if (event.eventType === 'soccer.own_goal') return 'own_goal'
+  if (event.eventType === 'soccer.shot') {
+    return (event.payload as { outcome: SoccerFieldMarkerKind }).outcome
+  }
+  if (event.eventType === 'soccer.defensive_action') {
+    const payload = event.payload as { action: string; tackleOutcome: string | null }
+    return payload.action === 'tackle'
+      ? payload.tackleOutcome === 'won' ? 'tackle_won' : 'tackle_lost'
+      : payload.action as SoccerFieldMarkerKind
+  }
+  if (event.eventType === 'soccer.foul') return 'foul'
+  if (event.eventType === 'soccer.card') {
+    return (event.payload as { sanction: string }).sanction === 'yellow' ? 'yellow_card' : 'red_card'
+  }
+  if (event.eventType === 'soccer.team_event') {
+    return (event.payload as { kind: 'corner' | 'offside' }).kind
+  }
+  return 'saved'
+}
+
+function isIncidentEvent(event: GameEvent): event is SoccerIncidentEvent {
+  return event.eventType === 'soccer.defensive_action' ||
+    event.eventType === 'soccer.foul' ||
+    event.eventType === 'soccer.card' ||
+    event.eventType === 'soccer.team_event'
+}
+
+function incidentKind(event: SoccerIncidentEvent): SoccerIncidentKind {
+  if (event.eventType === 'soccer.defensive_action') return 'defense'
+  if (event.eventType === 'soccer.team_event') return 'team_event'
+  return event.eventType === 'soccer.foul' ? 'foul' : 'card'
+}
+
+function ClusterSheet({ events, onSelect, onClose }: { events: GameEvent[]; onSelect: (event: GameEvent) => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 sm:items-center" onClick={onClose}>
+      <div className="w-full rounded-t-lg bg-white p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-slate-800">Events at this location</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></div>
+        <div className="divide-y divide-slate-200 border-y border-slate-200">
+          {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="truncate text-sm font-semibold text-slate-800">{markerLabel(event)}</span><span className="text-xs font-bold text-emerald-700">Edit</span></button>)}
+        </div>
+      </div>
+    </div>
+  )
 }
