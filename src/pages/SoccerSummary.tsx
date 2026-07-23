@@ -6,12 +6,13 @@ import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import SoccerOverview from '../components/soccer-summary/SoccerOverview'
 import SoccerPlayers from '../components/soccer-summary/SoccerPlayers'
 import SoccerRecordingSelector from '../components/soccer-summary/SoccerRecordingSelector'
+import SoccerReviewTimeline from '../components/soccer-summary/SoccerReviewTimeline'
 import SoccerSummaryHeader from '../components/soccer-summary/SoccerSummaryHeader'
 import SoccerSummaryTabs from '../components/soccer-summary/SoccerSummaryTabs'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
-import { reopenSoccerMatch } from '../lib/soccer/live'
+import { reopenSoccerMatch, type SoccerLiveResult } from '../lib/soccer/live'
 import type {
   SoccerPlayerCategory,
   SoccerPlayerReviewSide,
@@ -65,6 +66,7 @@ export default function SoccerSummary() {
     useState<SoccerPlayerReviewSide>('tracked')
   const [playerCategory, setPlayerCategory] =
     useState<SoccerPlayerCategory>('attack')
+  const [timelineBusy, setTimelineBusy] = useState(false)
   const requestIdRef = useRef(0)
   const routeKeyRef = useRef<string | null>(null)
   const sourceRef = useRef<SoccerSummarySource | null>(null)
@@ -279,6 +281,28 @@ export default function SoccerSummary() {
     source.kind === 'cloud_recording' &&
     source.recorder.recorderId === user?.id
 
+  const applyTimelineResult = (result: SoccerLiveResult): boolean => {
+    if (source.kind !== 'local' || !source.editable) {
+      setRefreshError('Open your local recorder stream before changing event history.')
+      return false
+    }
+    if (!result.ok) {
+      setRefreshError(result.message)
+      return false
+    }
+    const nextSource: SoccerSummarySource = {
+      ...source,
+      state: result.state,
+      inspection: result.inspection,
+    }
+    setTimelineBusy(true)
+    sourceRef.current = nextSource
+    setSource(nextSource)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+    window.setTimeout(() => setTimelineBusy(false), 0)
+    return true
+  }
+
   const reopenLocal = () => {
     const reason = soccerState.projection.endReason === 'abandoned'
       ? window.prompt('Why is this abandoned match being reopened?')?.trim() ?? ''
@@ -371,6 +395,7 @@ export default function SoccerSummary() {
       <SoccerSummaryTabs
         activeTab={query.tab}
         showPlayers={healthy}
+        showTimeline={healthy}
         onChange={changeTab}
       />
       <SoccerRecordingSelector
@@ -428,6 +453,13 @@ export default function SoccerSummary() {
           category={playerCategory}
           onSideChange={setPlayerSide}
           onCategoryChange={setPlayerCategory}
+        />
+      ) : query.tab === 'timeline' && healthy ? (
+        <SoccerReviewTimeline
+          source={source}
+          recorderUserId={user?.id ?? null}
+          busy={timelineBusy}
+          onApply={applyTimelineResult}
         />
       ) : (
         <SoccerOverview

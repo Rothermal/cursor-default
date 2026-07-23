@@ -90,7 +90,7 @@ describe('soccer summary navigation', () => {
       legacySoccerReviewSummaryPath(
         '?gameId=game-1&tab=timeline&from=games&junk=ignored'
       )
-    ).toBe('/summary?gameId=game-1&tab=overview&from=games')
+    ).toBe('/summary?gameId=game-1&tab=timeline&from=games')
   })
 
   it('keeps direct cloud soccer summary routing after local state is discarded', () => {

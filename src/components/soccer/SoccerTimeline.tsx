@@ -2,14 +2,25 @@ import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction }
 import { ChevronDown, ChevronUp, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
+import SoccerIncidentCaptureDialog, {
+  type SoccerIncidentDraft,
+  type SoccerIncidentEvent,
+  type SoccerIncidentKind,
+} from './SoccerIncidentCaptureDialog'
+import SoccerScoreTimelineDialog from './SoccerScoreTimelineDialog'
+import SoccerShotCaptureDialog, {
+  type SoccerCaptureDraft,
+} from './SoccerShotCaptureDialog'
 import {
   deleteSoccerHistoryEvent,
   formatSoccerInputTime,
   parseSoccerInputTime,
   restoreSoccerHistoryEvent,
-  soccerEventMatchesTimelineFilter,
+  SOCCER_SUMMARY_TIMELINE_FILTERS,
   soccerEventTimeLabel,
   soccerPeriodTimings,
+  soccerSummaryEventMatchesFilter,
+  soccerSummaryTimelineReview,
   updateSoccerHistoryEvent,
   type SoccerLiveResult,
   type SoccerMatchEvent,
@@ -18,24 +29,29 @@ import {
   type SoccerRole,
   type SoccerRoleGroup,
   type SoccerScoreAdjustmentEvent,
+  type SoccerSummaryTimelineFilter,
+  type SoccerSummaryTimelineSection,
   type SoccerShotEvent,
-  type SoccerTimelineFilter,
   withSoccerTieResolution,
 } from '../../lib/soccer'
-import type { GameEvent, GameEventInspection } from '../../lib/gameEvents/types'
-import type { SoccerIncidentEvent, SoccerIncidentKind } from './SoccerIncidentCaptureDialog'
+import type {
+  GameEvent,
+  GameEventInspection,
+  GameEventTeamSide,
+} from '../../lib/gameEvents/types'
 
 interface SoccerTimelineProps {
   state: GameState
   inspection: GameEventInspection
   busy: boolean
   onApply: (result: SoccerLiveResult) => boolean
-  onAddEvent: (kind: 'shot' | SoccerIncidentKind) => void
-  onEditAttacking: (event: SoccerShotEvent | SoccerOwnGoalEvent) => void
-  onEditIncident: (event: SoccerIncidentEvent) => void
-  onEditScoreAdjustment: (event: SoccerScoreAdjustmentEvent) => void
+  recorderUserId: string | null
+  selectedParticipantId?: string | null
+  defaultTeamSide?: GameEventTeamSide
+  onTrackedParticipantUsed?: (participantId: string) => void
   allowAddEvent?: boolean
   readOnly?: boolean
+  presentation?: 'live' | 'review'
 }
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
@@ -51,29 +67,53 @@ export default function SoccerTimeline({
   inspection,
   busy,
   onApply,
-  onAddEvent,
-  onEditAttacking,
-  onEditIncident,
-  onEditScoreAdjustment,
+  recorderUserId,
+  selectedParticipantId = null,
+  defaultTeamSide = 'tracked',
+  onTrackedParticipantUsed = () => {},
   allowAddEvent = true,
   readOnly = false,
+  presentation = 'live',
 }: SoccerTimelineProps) {
   const [editing, setEditing] = useState<SoccerMatchEvent | null>(null)
   const [deleting, setDeleting] = useState<GameEvent | null>(null)
-  const [filter, setFilter] = useState<SoccerTimelineFilter>('all')
+  const [filter, setFilter] = useState<SoccerSummaryTimelineFilter>('all')
   const [removedOpen, setRemovedOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
+  const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
+  const [scoreTimelineOpen, setScoreTimelineOpen] = useState(false)
+  const [scoreAdjustmentEdit, setScoreAdjustmentEdit] =
+    useState<SoccerScoreAdjustmentEvent | null>(null)
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
-  const active = [...inspection.activeEvents].reverse().filter(event => soccerEventMatchesTimelineFilter(event, filter))
-  const deleted = [...inspection.deletedEvents].reverse().filter(event => soccerEventMatchesTimelineFilter(event, filter))
+  const review = useMemo(
+    () => soccerSummaryTimelineReview(state, inspection, filter),
+    [filter, inspection, state]
+  )
+  const allEventsReview = useMemo(
+    () => soccerSummaryTimelineReview(state, inspection, 'all'),
+    [inspection, state]
+  )
+  const active = [...inspection.activeEvents]
+    .reverse()
+    .filter(event => soccerSummaryEventMatchesFilter(event, filter))
+  const deleted = [...inspection.deletedEvents]
+    .reverse()
+    .filter(event => soccerSummaryEventMatchesFilter(event, filter))
 
   const editEvent = (event: GameEvent) => {
     if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
-      onEditAttacking(event as SoccerShotEvent | SoccerOwnGoalEvent)
+      setCaptureDraft({
+        mode: 'edit',
+        teamSide: event.teamSide,
+        location: event.location,
+        event: event as SoccerShotEvent | SoccerOwnGoalEvent,
+      })
       return
     }
     if (event.eventType === 'soccer.score_adjustment') {
-      onEditScoreAdjustment(event as SoccerScoreAdjustmentEvent)
+      setScoreAdjustmentEdit(event as SoccerScoreAdjustmentEvent)
+      setScoreTimelineOpen(true)
       return
     }
     if (
@@ -82,10 +122,35 @@ export default function SoccerTimeline({
       (event.eventType === 'soccer.card' && event.period.id !== 'shootout') ||
       event.eventType === 'soccer.team_event'
     ) {
-      onEditIncident(event as SoccerIncidentEvent)
+      const incident = event as SoccerIncidentEvent
+      setIncidentDraft({
+        kind: incidentKind(incident),
+        teamSide: incident.teamSide,
+        location: incident.location,
+        mode: 'edit',
+        event: incident,
+      })
       return
     }
     setEditing(event as SoccerMatchEvent)
+  }
+
+  const addEvent = (kind: 'shot' | SoccerIncidentKind) => {
+    setAddOpen(false)
+    if (kind === 'shot') {
+      setCaptureDraft({
+        mode: 'historical',
+        teamSide: defaultTeamSide,
+        location: null,
+      })
+      return
+    }
+    setIncidentDraft({
+      kind,
+      teamSide: defaultTeamSide,
+      location: null,
+      mode: 'historical',
+    })
   }
 
   return (
@@ -105,48 +170,86 @@ export default function SoccerTimeline({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold uppercase text-slate-500">Timeline</h2>
-            <p className="text-xs text-slate-400">Newest first</p>
+            <p className="text-xs text-slate-400">
+              {presentation === 'review' ? 'Oldest first by period' : 'Newest first'}
+            </p>
           </div>
           {allowAddEvent && !readOnly && <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add Event</button>}
         </div>
-        <label className="block text-xs font-bold uppercase text-slate-500">Event family<select value={filter} onChange={event => setFilter(event.target.value as SoccerTimelineFilter)} className="input-field mt-1"><option value="all">All</option><option value="attacking">Attacking</option><option value="defensive">Defensive</option><option value="discipline">Discipline</option><option value="team_events">Team Events</option><option value="match_control">Match Control</option></select></label>
-        <div className="divide-y divide-slate-200 border-y border-slate-200">
-          {active.map(event => (
-            <HistoryRow
-              key={event.id}
-              event={event}
-              timeLabel={soccerEventTimeLabel(event, timings)}
-              onEdit={readOnly ? undefined : () => editEvent(event)}
-              onDelete={readOnly ? undefined : () => setDeleting(event)}
+        {presentation === 'review' ? (
+          <>
+            <TimelineFilterChips filter={filter} onChange={setFilter} />
+            <ReviewSections
+              sections={review.activeSections}
+              readOnly={readOnly}
+              onEdit={editEvent}
+              onDelete={setDeleting}
             />
-          ))}
-          {active.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No events in this view.</p>}
-        </div>
-      </section>
-
-      {inspection.deletedEvents.length > 0 && (
-        <section>
-          <button type="button" onClick={() => setRemovedOpen(value => !value)} className="flex min-h-10 w-full items-center justify-between border-y border-slate-200 text-sm font-bold text-slate-600">
-            <span>Removed Events ({inspection.deletedEvents.length})</span>
-            {removedOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-          </button>
-          {removedOpen && (
-            <div className="divide-y divide-slate-200 border-b border-slate-200 opacity-70">
-              {deleted.map(event => (
+          </>
+        ) : (
+          <>
+            <label className="block text-xs font-bold uppercase text-slate-500">
+              Event family
+              <select
+                value={filter}
+                onChange={event =>
+                  setFilter(event.target.value as SoccerSummaryTimelineFilter)
+                }
+                className="input-field mt-1"
+              >
+                {SOCCER_SUMMARY_TIMELINE_FILTERS.map(item => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="divide-y divide-slate-200 border-y border-slate-200">
+              {active.map(event => (
                 <HistoryRow
                   key={event.id}
                   event={event}
                   timeLabel={soccerEventTimeLabel(event, timings)}
-                  deleted
-                  onRestore={
-                    readOnly
-                      ? undefined
-                      : () => onApply(restoreSoccerHistoryEvent(state, event.id))
-                  }
+                  onEdit={readOnly ? undefined : () => editEvent(event)}
+                  onDelete={readOnly ? undefined : () => setDeleting(event)}
                 />
               ))}
-              {deleted.length === 0 && <p className="py-5 text-center text-xs text-slate-500">No removed events in this filter.</p>}
+              {active.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No events in this view.</p>}
             </div>
+          </>
+        )}
+      </section>
+
+      {allEventsReview.removedCount > 0 && (
+        <section>
+          <button type="button" onClick={() => setRemovedOpen(value => !value)} className="flex min-h-10 w-full items-center justify-between border-y border-slate-200 text-sm font-bold text-slate-600">
+            <span>Removed Events ({allEventsReview.removedCount})</span>
+            {removedOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+          </button>
+          {removedOpen && (
+            presentation === 'review' ? (
+              <ReviewSections
+                sections={review.removedSections}
+                readOnly={readOnly}
+                removed
+                onRestore={event => onApply(restoreSoccerHistoryEvent(state, event.id))}
+              />
+            ) : (
+              <div className="divide-y divide-slate-200 border-b border-slate-200 opacity-70">
+                {deleted.map(event => (
+                  <HistoryRow
+                    key={event.id}
+                    event={event}
+                    timeLabel={soccerEventTimeLabel(event, timings)}
+                    deleted
+                    onRestore={
+                      readOnly
+                        ? undefined
+                        : () => onApply(restoreSoccerHistoryEvent(state, event.id))
+                    }
+                  />
+                ))}
+                {deleted.length === 0 && <p className="py-5 text-center text-xs text-slate-500">No removed events in this filter.</p>}
+              </div>
+            )
           )}
         </section>
       )}
@@ -174,11 +277,58 @@ export default function SoccerTimeline({
                 ['foul', 'Foul'],
                 ['card', 'Card'],
                 ['team_event', 'Team Event'],
-              ] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => { setAddOpen(false); onAddEvent(kind) }} className="min-h-12 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700">{label}</button>)}
+              ] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => addEvent(kind)} className="min-h-12 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700">{label}</button>)}
             </div>
           </div>
         </div>
       )}
+
+      <SoccerShotCaptureDialog
+        draft={captureDraft}
+        state={state}
+        recorderUserId={recorderUserId}
+        selectedParticipantId={selectedParticipantId}
+        busy={busy}
+        onApply={onApply}
+        onTrackedParticipantUsed={onTrackedParticipantUsed}
+        onClose={() => setCaptureDraft(null)}
+      />
+
+      <SoccerIncidentCaptureDialog
+        draft={incidentDraft}
+        state={state}
+        recorderUserId={recorderUserId}
+        selectedParticipantId={selectedParticipantId}
+        busy={busy}
+        onApply={onApply}
+        onTrackedParticipantUsed={onTrackedParticipantUsed}
+        onClose={() => setIncidentDraft(null)}
+      />
+
+      <SoccerScoreTimelineDialog
+        open={scoreTimelineOpen}
+        state={state}
+        inspection={inspection}
+        recorderUserId={recorderUserId}
+        initialEdit={scoreAdjustmentEdit}
+        busy={busy}
+        readOnly={readOnly}
+        onApply={onApply}
+        onEditAttacking={event => {
+          setScoreTimelineOpen(false)
+          setScoreAdjustmentEdit(null)
+          setCaptureDraft({
+            mode: 'edit',
+            teamSide: event.teamSide,
+            location: event.location,
+            event,
+          })
+        }}
+        onClose={() => {
+          setScoreTimelineOpen(false)
+          setScoreAdjustmentEdit(null)
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(deleting)}
@@ -187,8 +337,12 @@ export default function SoccerTimeline({
         confirmLabel="Remove Event"
         cancelLabel="Cancel"
         onConfirm={() => {
-          if (deleting) onApply(deleteSoccerHistoryEvent(state, deleting.id))
-          setDeleting(null)
+          if (
+            deleting &&
+            onApply(deleteSoccerHistoryEvent(state, deleting.id))
+          ) {
+            setDeleting(null)
+          }
         }}
         onCancel={() => setDeleting(null)}
       />
@@ -196,37 +350,161 @@ export default function SoccerTimeline({
   )
 }
 
-function HistoryRow({ event, timeLabel, deleted = false, onEdit, onDelete, onRestore }: {
+function TimelineFilterChips({
+  filter,
+  onChange,
+}: {
+  filter: SoccerSummaryTimelineFilter
+  onChange: (filter: SoccerSummaryTimelineFilter) => void
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Timeline event family">
+      {SOCCER_SUMMARY_TIMELINE_FILTERS.map(item => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onChange(item.id)}
+          className={`min-h-9 shrink-0 border px-3 text-xs font-bold ${
+            filter === item.id
+              ? 'border-emerald-700 bg-emerald-700 text-white'
+              : 'border-slate-300 bg-white text-slate-600'
+          }`}
+          aria-pressed={filter === item.id}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ReviewSections({
+  sections,
+  readOnly,
+  removed = false,
+  onEdit,
+  onDelete,
+  onRestore,
+}: {
+  sections: SoccerSummaryTimelineSection[]
+  readOnly: boolean
+  removed?: boolean
+  onEdit?: (event: GameEvent) => void
+  onDelete?: (event: GameEvent) => void
+  onRestore?: (event: GameEvent) => void
+}) {
+  if (sections.length === 0) {
+    return (
+      <p className="border-y border-slate-200 bg-white py-8 text-center text-sm text-slate-500">
+        No {removed ? 'removed ' : ''}events in this view.
+      </p>
+    )
+  }
+  return (
+    <div className={removed ? 'opacity-70' : ''}>
+      {sections.map(section => (
+        <section key={section.periodId}>
+          <h3 className="border-y border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-600">
+            {section.label}
+          </h3>
+          <div className="divide-y divide-slate-200 bg-white">
+            {section.rows.map(row => (
+              <HistoryRow
+                key={row.event.id}
+                event={row.event}
+                timeLabel={row.timeLabel}
+                deleted={removed}
+                review
+                onEdit={!readOnly && onEdit ? () => onEdit(row.event) : undefined}
+                onDelete={!readOnly && onDelete ? () => onDelete(row.event) : undefined}
+                onRestore={!readOnly && onRestore ? () => onRestore(row.event) : undefined}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function HistoryRow({
+  event,
+  timeLabel,
+  deleted = false,
+  review = false,
+  onEdit,
+  onDelete,
+  onRestore,
+}: {
   event: GameEvent
   timeLabel: string
   deleted?: boolean
+  review?: boolean
   onEdit?: () => void
   onDelete?: () => void
   onRestore?: () => void
 }) {
+  const [metadataOpen, setMetadataOpen] = useState(false)
   const contextDetail = eventContextDetail(event)
   return (
-    <div className="min-h-16 py-3 flex items-center gap-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-slate-800 truncate">{eventTitle(event.eventType)}</p>
-        <p className="text-xs text-slate-500 truncate">{eventDetail(event)}</p>
-        {contextDetail && <p className="text-[11px] text-slate-500 truncate">{contextDetail}</p>}
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          {timeLabel} · rev {event.revision}
-        </p>
+    <div className="min-h-16 px-3 py-3">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-slate-800">{eventTitle(event.eventType)}</p>
+          <p className="truncate text-xs text-slate-500">{eventDetail(event)}</p>
+          {contextDetail && <p className="truncate text-[11px] text-slate-500">{contextDetail}</p>}
+          {!review && (
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              {timeLabel} · rev {event.revision}
+            </p>
+          )}
+          {review && (
+            <p className="mt-0.5 text-[11px] text-slate-400">{timeLabel}</p>
+          )}
+          {review && event.revision > 1 && (
+            <button
+              type="button"
+              onClick={() => setMetadataOpen(value => !value)}
+              className="mt-1 text-[11px] font-bold text-emerald-700"
+              aria-expanded={metadataOpen}
+            >
+              {metadataOpen ? 'Hide correction details' : 'Corrected'}
+            </button>
+          )}
+        </div>
+        <div className="flex shrink-0 gap-1">
+          {deleted ? (
+            onRestore && <button type="button" onClick={onRestore} className="grid h-9 w-9 place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event.eventType)}`} title="Restore"><RotateCcw size={17} /></button>
+          ) : (
+            <>
+              {onEdit && <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event.eventType)}`} title="Correct"><Pencil size={17} /></button>}
+              {onDelete && <button type="button" onClick={onDelete} className="grid h-9 w-9 place-items-center text-red-600" aria-label={`Remove ${eventTitle(event.eventType)}`} title="Remove"><Trash2 size={17} /></button>}
+            </>
+          )}
+        </div>
       </div>
-      <div className="flex gap-1 shrink-0">
-        {deleted ? (
-          <button type="button" onClick={onRestore} className="h-9 w-9 grid place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event.eventType)}`} title="Restore"><RotateCcw size={17} /></button>
-        ) : (
-          <>
-            {onEdit && <button type="button" onClick={onEdit} className="h-9 w-9 grid place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event.eventType)}`} title="Correct"><Pencil size={17} /></button>}
-            <button type="button" onClick={onDelete} className="h-9 w-9 grid place-items-center text-red-600" aria-label={`Remove ${eventTitle(event.eventType)}`} title="Remove"><Trash2 size={17} /></button>
-          </>
-        )}
-      </div>
+      {review && event.revision > 1 && metadataOpen && (
+        <div className="mt-2 border-l-2 border-emerald-200 pl-3 text-[11px] text-slate-500">
+          <p>Current revision {event.revision}</p>
+          <p>Updated {formatEventTimestamp(event.updatedAt)}</p>
+          {deleted && event.deletedAt && (
+            <p>Removed {formatEventTimestamp(event.deletedAt)}</p>
+          )}
+        </div>
+      )}
     </div>
   )
+}
+
+function formatEventTimestamp(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function incidentKind(event: SoccerIncidentEvent): SoccerIncidentKind {
+  if (event.eventType === 'soccer.defensive_action') return 'defense'
+  if (event.eventType === 'soccer.team_event') return 'team_event'
+  return event.eventType === 'soccer.foul' ? 'foul' : 'card'
 }
 
 function eventContextDetail(event: GameEvent): string | null {
