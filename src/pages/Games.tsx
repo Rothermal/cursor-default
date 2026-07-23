@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
+import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
 import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
@@ -23,7 +24,10 @@ import {
 
 interface GameRow {
   id: string
-  team_id: string
+  team_id: string | null
+  created_by: string
+  sport_id: string | null
+  tracked_team_name: string | null
   opponent_name: string
   opponent_score: number
   tournament_name: string | null
@@ -102,7 +106,10 @@ export default function Games() {
   const visibleGames = useMemo(
     () =>
       scopedSport
-        ? games.filter(game => teamMap[game.team_id]?.seasons?.sport === scopedSport.id)
+        ? games.filter(game =>
+            (game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)) ===
+            scopedSport.id
+          )
         : games,
     [games, scopedSport, teamMap]
   )
@@ -115,13 +122,32 @@ export default function Games() {
       setLoading(true)
       setError(null)
 
-      const { data: gameRows, error: gamesError } = await supabaseClient
+      const advancedGames = await supabaseClient
         .from('games')
         .select(
-          'id,team_id,opponent_name,opponent_score,tournament_name,tournament_id,home_team_score,home_score_adjustment,game_date,status,created_at'
+          'id,team_id,created_by,sport_id,tracked_team_name,opponent_name,opponent_score,tournament_name,tournament_id,home_team_score,home_score_adjustment,game_date,status,created_at'
         )
-        .not('team_id', 'is', null)
         .order('created_at', { ascending: false })
+      let gameRows = advancedGames.data
+      let gamesError = advancedGames.error
+      if (
+        gamesError?.message.includes('column') &&
+        (gamesError.message.includes('sport_id') || gamesError.message.includes('tracked_team_name'))
+      ) {
+        const legacyGames = await supabaseClient
+          .from('games')
+          .select(
+            'id,team_id,created_by,opponent_name,opponent_score,tournament_name,tournament_id,home_team_score,home_score_adjustment,game_date,status,created_at'
+          )
+          .not('team_id', 'is', null)
+          .order('created_at', { ascending: false })
+        gameRows = (legacyGames.data ?? []).map(row => ({
+          ...row,
+          sport_id: null,
+          tracked_team_name: null,
+        }))
+        gamesError = legacyGames.error
+      }
 
       if (cancelled) return
       if (gamesError) {
@@ -133,9 +159,14 @@ export default function Games() {
       const loadedGames = (gameRows ?? []) as GameRow[]
       setGames(loadedGames)
 
-      const teamIds = [...new Set(loadedGames.map(game => game.team_id))]
+      const teamIds = [
+        ...new Set(
+          loadedGames.map(game => game.team_id).filter((id): id is string => Boolean(id))
+        ),
+      ]
       if (teamIds.length === 0) {
         setTeamMap({})
+        setTeamRolesById({})
         setLoading(false)
         return
       }
@@ -217,9 +248,10 @@ export default function Games() {
           continue
         }
 
-        const team = teamMap[g.team_id]
-        const sport = sports.find(s => s.id === team?.seasons?.sport)
+        const team = g.team_id ? teamMap[g.team_id] : null
+        const sport = sports.find(s => s.id === (g.sport_id ?? team?.seasons?.sport))
         if (!sport) continue
+        if (sport.id === 'soccer') continue
 
         const byStat: Record<string, number> = {}
         if (g.status === 'final') {
@@ -258,7 +290,10 @@ export default function Games() {
   useEffect(() => {
     if (!supabaseClient) return
     const basketballIds = visibleGames
-      .filter(g => teamMap[g.team_id]?.seasons?.sport === 'basketball')
+      .filter(g =>
+        (g.sport_id ?? (g.team_id ? teamMap[g.team_id]?.seasons?.sport : null)) ===
+        'basketball'
+      )
       .map(g => g.id)
     if (basketballIds.length === 0) {
       setChartGameIds(new Set())
@@ -306,13 +341,35 @@ export default function Games() {
 
   const handleOpenGame = async (game: GameRow) => {
     if (!userId) return
-    if (teamMap[game.team_id]?.seasons?.sport === 'soccer') {
-      setError('Resume this soccer match from its parked game on the Soccer dashboard.')
+    const gameSportId =
+      game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
+    const teamRole = game.team_id ? teamRolesById[game.team_id] ?? null : null
+    if (gameSportId === 'soccer') {
+      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+        return
+      }
+      setError(null)
+      setLoadingGameId(game.id)
+      const soccerGame = await loadSoccerCloudGameById(userId, game.id).catch(err => {
+        setError(err instanceof Error ? err.message : 'Could not load soccer game')
+        return null
+      })
+      if (!soccerGame) {
+        setError(current => current ?? 'No recorder stream is available for this soccer game.')
+        setLoadingGameId(null)
+        return
+      }
+      if (!openGameSnapshot(soccerGame)) {
+        setLoadingGameId(null)
+        return
+      }
+      setLoadingGameId(null)
+      navigate('/game')
       return
     }
-    const teamRole = teamRolesById[game.team_id] ?? null
     if (game.status !== 'final' && !canTrackGames(teamRole)) {
-      navigate(gameInfoPath(game.id, game.team_id))
+      if (game.team_id) navigate(gameInfoPath(game.id, game.team_id))
       return
     }
     const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
@@ -393,7 +450,7 @@ export default function Games() {
       !supabaseClient ||
       !game ||
       game.status === 'final' ||
-      !canTrackGames(teamRolesById[game.team_id] ?? null) ||
+      !canTrackGames(game.team_id ? teamRolesById[game.team_id] ?? null : null) ||
       !editingOpponentName.trim()
     ) return
     setError(null)
@@ -415,7 +472,10 @@ export default function Games() {
   }
 
   const handleDeleteGame = async (game: GameRow) => {
-    if (!supabaseClient || !canDeleteGame(teamRolesById[game.team_id] ?? null)) return
+    if (
+      !supabaseClient ||
+      !canDeleteGame(game.team_id ? teamRolesById[game.team_id] ?? null : null)
+    ) return
     setError(null)
 
     if (
@@ -450,9 +510,9 @@ export default function Games() {
   }
 
   const renderGameCard = (game: GameRow) => {
-    const team = teamMap[game.team_id]
-    const teamRole = teamRolesById[game.team_id] ?? null
-    const sport = sports.find(item => item.id === team?.seasons?.sport)
+    const team = game.team_id ? teamMap[game.team_id] : null
+    const teamRole = game.team_id ? teamRolesById[game.team_id] ?? null : null
+    const sport = sports.find(item => item.id === (game.sport_id ?? team?.seasons?.sport))
     // All statuses show a score (F4 D7), except a scheduled game still at 0–0.
     const scoreLine = scoreLines[game.id] ?? null
     const scoreHint =
@@ -462,7 +522,8 @@ export default function Games() {
       <div key={game.id} className="card">
         <div className="flex items-center justify-between mb-2">
           <p className="font-semibold text-slate-700">
-            {sport?.icon ?? '🏟️'} {team ? teamDisplayName(team) : 'Unknown Team'}
+            {sport?.icon ?? '🏟️'}{' '}
+            {team ? teamDisplayName(team) : game.tracked_team_name ?? 'Personal Game'}
           </p>
           <span className={`text-[11px] px-2 py-1 rounded-full font-semibold ${statusBadge(game.status)}`}>
             {statusLabel(game.status)}
@@ -517,7 +578,7 @@ export default function Games() {
         {game.tournament_name && (
           <div className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
             <span>🏆 {game.tournament_name}</span>
-            {game.tournament_id && team && (
+            {game.tournament_id && team && game.team_id && (
               <Link
                 to={`/tournament-stats?tournamentId=${encodeURIComponent(game.tournament_id)}&teamId=${encodeURIComponent(game.team_id)}`}
                 className="text-blue-600 font-semibold underline"
@@ -541,10 +602,15 @@ export default function Games() {
         <div className="flex gap-2 mt-3">
           {sport?.id === 'soccer' ? (
             <button
-              onClick={() => navigate(sportDashboardPath('soccer'))}
-              className="btn-secondary flex-1 py-2"
+              onClick={() => { void handleOpenGame(game) }}
+              disabled={loadingGameId === game.id || game.status === 'final'}
+              className="btn-primary flex-1 py-2 disabled:opacity-50"
             >
-              Soccer Dashboard
+              {loadingGameId === game.id
+                ? 'Loading...'
+                : game.status === 'final'
+                  ? 'Finalized'
+                  : 'Resume Game'}
             </button>
           ) : (
             <button

@@ -23,7 +23,11 @@ import {
   loadCloudGameById,
   getLastOpenedPreferenceSupport,
 } from '../lib/cloudSync'
-import { syncSoccerEventGameToCloud } from '../lib/soccer/cloudSync'
+import {
+  SoccerCloudRecoveryError,
+  syncSoccerEventGameToCloud,
+} from '../lib/soccer/cloudSync'
+import { applyGameEventConflictResolution } from '../lib/soccer/cloudConflicts'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
@@ -50,6 +54,7 @@ import {
   createInitialState,
   gameReducer,
 } from '../lib/gameReducer'
+import { activeCloudSyncStateAction } from '../lib/cloudSyncState'
 import {
   activateParkedGame,
   beginNewActiveParkedGame,
@@ -249,6 +254,18 @@ function loadState(userId: string | null): GameState {
             typeof parsed.cloudSync?.lastSyncedGameFingerprint === 'string'
               ? parsed.cloudSync.lastSyncedGameFingerprint
               : null,
+          eventSyncBase:
+            parsed.cloudSync?.eventSyncBase && typeof parsed.cloudSync.eventSyncBase === 'object'
+              ? parsed.cloudSync.eventSyncBase
+              : {},
+          eventConflicts: Array.isArray(parsed.cloudSync?.eventConflicts)
+            ? parsed.cloudSync.eventConflicts
+            : [],
+          pendingEventConflictResolutions: Array.isArray(
+            parsed.cloudSync?.pendingEventConflictResolutions
+          )
+            ? parsed.cloudSync.pendingEventConflictResolutions
+            : [],
         },
       }
       return rebuildGameEventProjection(
@@ -278,6 +295,10 @@ interface GameContextType {
   discardParkedGame: (localGameId: string) => boolean
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
+  resolveSoccerEventConflict: (
+    eventId: string,
+    resolution: 'local' | 'remote'
+  ) => { ok: true } | { ok: false; reason: string }
 }
 
 export type FlushCloudSyncResult =
@@ -749,6 +770,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           return
         }
 
+        const syncedPayloadState = 'syncedState' in synced ? synced.syncedState : snapshot
+        const localUnchanged = buildGameSyncFingerprint(latestState) === snapshotFingerprint
+        const payloadState =
+          'syncedState' in synced && localUnchanged ? synced.syncedState : latestState
         const cloudSyncPatch: Partial<CloudSyncState> = {
           seasonId: synced.seasonId,
           teamId: synced.teamId,
@@ -765,12 +790,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
             'shotChartCloudSync' in synced && synced.shotChartCloudSync === 'synced'
               ? 0
               : snapshot.cloudSync.shotChartHydrationDroppedRows,
-          lastSyncedGameFingerprint: snapshotFingerprint,
+          lastSyncedGameFingerprint: buildGameSyncFingerprint(syncedPayloadState),
+          eventSyncBase: localUnchanged
+            ? syncedPayloadState.cloudSync.eventSyncBase ?? {}
+            : latestState.cloudSync.eventSyncBase ?? {},
+          eventConflicts: localUnchanged
+            ? syncedPayloadState.cloudSync.eventConflicts ?? []
+            : latestState.cloudSync.eventConflicts ?? [],
+          pendingEventConflictResolutions: localUnchanged
+            ? syncedPayloadState.cloudSync.pendingEventConflictResolutions ?? []
+            : (latestState.cloudSync.pendingEventConflictResolutions ?? []).filter(
+                pending => !(snapshot.cloudSync.pendingEventConflictResolutions ?? []).some(
+                  uploaded => uploaded.conflictId === pending.conflictId
+                )
+              ),
         }
         const nextState: GameState = {
-          ...latestState,
+          ...payloadState,
           cloudSync: {
-            ...latestState.cloudSync,
+            ...payloadState.cloudSync,
             ...cloudSyncPatch,
           },
         }
@@ -787,10 +825,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
         if (isStillActiveRecord) {
-          dispatch({
-            type: 'SET_CLOUD_SYNC_STATE',
-            cloudSync: cloudSyncPatch,
-          })
+          dispatch(activeCloudSyncStateAction(
+            nextState,
+            cloudSyncPatch,
+            'syncedState' in synced && localUnchanged
+          ))
         }
       } catch (error) {
         const networkish = isLikelyNetworkError(error)
@@ -799,12 +838,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (!latestRecord) return
 
         const latestState = latestRecord.gameState
+        const canApplyRecovery =
+          error instanceof SoccerCloudRecoveryError &&
+          buildGameSyncFingerprint(latestState) === snapshotFingerprint
+        const recoveredState = canApplyRecovery ? error.recoveredState : latestState
         const attempts = latestRecord.sync.attempts + 1
         const retryMs = Math.min(30_000, 1000 * 2 ** Math.min(attempts, 5))
         const errorState: GameState = {
-          ...latestState,
+          ...recoveredState,
           cloudSync: {
-            ...latestState.cloudSync,
+            ...recoveredState.cloudSync,
             status: networkish ? 'offline' : 'error',
             lastError: networkish ? null : errMsg,
           },
@@ -816,13 +859,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           nextAttemptAt: retryMs > 0 ? new Date(Date.now() + retryMs).toISOString() : null,
         })
         if (getActiveLocalGameId(snapshotUserId) === record.localGameId) {
-          dispatch({
-            type: 'SET_CLOUD_SYNC_STATE',
-            cloudSync: {
-              status: networkish ? 'offline' : 'error',
-              lastError: networkish ? null : errMsg,
-            },
-          })
+          const errorPatch: Partial<CloudSyncState> = {
+            status: networkish ? 'offline' : 'error',
+            lastError: networkish ? null : errMsg,
+          }
+          dispatch(activeCloudSyncStateAction(errorState, errorPatch, canApplyRecovery))
         }
         if (!networkish && snapshotUserId) {
           void logClientSyncError(snapshotUserId, errMsg, latestState)
@@ -885,6 +926,57 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
     return { ok: true }
   }, [isOnline, runCloudSync, userId])
+
+  const resolveSoccerEventConflict = useCallback(
+    (eventId: string, resolution: 'local' | 'remote') => {
+      const current = stateRef.current
+      const conflict = current.cloudSync.eventConflicts?.find(item => item.eventId === eventId)
+      if (!conflict || !current.eventStream) {
+        return { ok: false as const, reason: 'That event conflict is no longer available.' }
+      }
+      const applied = applyGameEventConflictResolution(
+        current.eventStream,
+        conflict,
+        resolution,
+        new Date().toISOString()
+      )
+      const remainingConflicts = (current.cloudSync.eventConflicts ?? []).filter(
+        item => item.eventId !== eventId
+      )
+      const candidate: GameState = {
+        ...current,
+        eventStream: applied.eventStream,
+        cloudSync: {
+          ...current.cloudSync,
+          eventSyncBase: {
+            ...(current.cloudSync.eventSyncBase ?? {}),
+            [eventId]: applied.syncBase,
+          },
+          eventConflicts: remainingConflicts,
+          pendingEventConflictResolutions: [
+            ...(current.cloudSync.pendingEventConflictResolutions ?? []),
+            applied.pending,
+          ],
+          status: remainingConflicts.length > 0 ? 'error' : 'idle',
+          lastError:
+            remainingConflicts.length > 0
+              ? 'Review competing event revisions before syncing.'
+              : null,
+        },
+      }
+      const rebuilt = rebuildGameEventProjection(candidate, gameEventRegistry, gameEventProjectors)
+      if (!rebuilt.inspection.complete) {
+        return {
+          ok: false as const,
+          reason: rebuilt.inspection.diagnostics[0]?.message ?? 'That resolution is not valid.',
+        }
+      }
+      stateRef.current = rebuilt.state
+      dispatch({ type: 'HYDRATE_STATE', state: rebuilt.state })
+      return { ok: true as const }
+    },
+    []
+  )
 
   const syncFingerprint = buildGameSyncFingerprint(state)
   const queueFingerprint = parkedGames
@@ -966,6 +1058,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         resumeParkedGame,
         discardParkedGame,
         flushCloudSync,
+        resolveSoccerEventConflict,
       }}
     >
       {children}

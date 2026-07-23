@@ -178,6 +178,25 @@ export type CloudSyncStatus =
   | 'synced'
   | 'error'
 
+export interface GameEventSyncBaseEntry {
+  revision: number
+  fingerprint: string
+}
+
+export interface GameEventSyncConflict {
+  conflictId: string
+  eventId: string
+  localEvent: GameEvent
+  remoteEvent: GameEvent
+  detectedAt: string
+}
+
+export interface PendingGameEventConflictResolution {
+  conflictId: string
+  eventId: string
+  resolution: 'local' | 'remote'
+}
+
 export interface CloudSyncState {
   seasonId: string | null
   teamId: string | null
@@ -198,6 +217,12 @@ export interface CloudSyncState {
    * cloud rows while this is positive and local `shotChart` is empty.
    */
   shotChartHydrationDroppedRows: number
+  /** Last cloud-confirmed same-recorder event payloads, keyed by event id. */
+  eventSyncBase?: Record<string, GameEventSyncBaseEntry>
+  /** Competing same-event revisions that require an explicit recorder choice. */
+  eventConflicts?: GameEventSyncConflict[]
+  /** Offline-capable choices waiting for their cloud conflict audit row to close. */
+  pendingEventConflictResolutions?: PendingGameEventConflictResolution[]
 }
 
 export type GameAction =

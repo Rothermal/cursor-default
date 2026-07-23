@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../../types'
+import type { GameEvent } from '../gameEvents/types'
+import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { createInitialState } from '../gameReducer'
 import { prepareSoccerKickoff } from './kickoff'
 import {
@@ -9,11 +11,13 @@ import {
 } from './live'
 import { resolveSoccerMatchRules } from './rules'
 import { createSoccerSportGameState } from './state'
+import { gameEventSyncBase } from './cloudConflicts'
 import type { SoccerMatchSetup } from './types'
 
 const cloudMock = vi.hoisted(() => ({
   rpc: vi.fn(),
   upsert: vi.fn(),
+  load: vi.fn(),
 }))
 
 vi.mock('../supabase', () => ({
@@ -24,12 +28,14 @@ vi.mock('../supabase', () => ({
 
 vi.mock('../gameEvents/cloud', () => ({
   upsertGameEventForRecorder: (...args: unknown[]) => cloudMock.upsert(...args),
+  loadGameEventStreamForRecorder: (...args: unknown[]) => cloudMock.load(...args),
 }))
 import {
   assertHealthySoccerEventGame,
   soccerCloudParticipants,
   soccerEventRevisionCheckpoint,
   soccerEventStreamFingerprint,
+  SoccerCloudRecoveryError,
   syncSoccerEventGameToCloud,
 } from './cloudSync'
 
@@ -155,8 +161,9 @@ describe('soccer event cloud sync helpers', () => {
   beforeEach(() => {
     cloudMock.rpc.mockReset()
     cloudMock.upsert.mockReset()
+    cloudMock.load.mockReset()
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'bind_soccer_event_game'
+      name === 'bind_soccer_event_game_v2'
         ? {
             data: {
               game_id: 'cloud-game-1',
@@ -167,6 +174,13 @@ describe('soccer event cloud sync helpers', () => {
         : { data: '2026-07-22T12:01:00.000Z', error: null }
     ))
     cloudMock.upsert.mockResolvedValue({ ok: true, status: 'applied' })
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: { version: 1, events: [] },
+      inspection: { complete: true, activeEvents: [], deletedEvents: [], diagnostics: [] },
+      quarantinedRows: [],
+      error: null,
+    })
   })
 
   it('creates personal snapshots without claiming permanent cloud players', () => {
@@ -232,7 +246,7 @@ describe('soccer event cloud sync helpers', () => {
     })
     expect(cloudMock.upsert).toHaveBeenCalledTimes(3)
     expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
-      'bind_soccer_event_game',
+      'bind_soccer_event_game_v2',
       'confirm_game_event_stream_checkpoint',
     ])
     expect(cloudMock.rpc.mock.calls[1]?.[1]).toMatchObject({
@@ -252,12 +266,12 @@ describe('soccer event cloud sync helpers', () => {
       localGameId: '20000000-0000-4000-8000-000000000001',
     })).rejects.toThrow('could not sync')
 
-    expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual(['bind_soccer_event_game'])
+    expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual(['bind_soccer_event_game_v2'])
   })
 
   it('uploads a late resolved player actor with the refreshed participant map', async () => {
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'bind_soccer_event_game'
+      name === 'bind_soccer_event_game_v2'
         ? {
             data: {
               game_id: 'cloud-game-1',
@@ -291,5 +305,133 @@ describe('soccer event cloud sync helpers', () => {
       expect.objectContaining({ eventType: 'soccer.shot' }),
       expect.objectContaining({ 'player-late': 'cloud-participant-2' })
     )
+  })
+
+  it('pulls and adopts an unrelated remote event before uploading the checkpoint', async () => {
+    const withRemoteShot = lateResolvedShotState()
+    const remoteEvents = withRemoteShot.eventStream!.events
+    const remoteChain = remoteEvents.slice(3)
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: { version: 1, events: remoteChain },
+      inspection: { complete: true, activeEvents: remoteChain, deletedEvents: [], diagnostics: [] },
+      quarantinedRows: [],
+      error: null,
+    })
+    cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === 'bind_soccer_event_game_v2'
+        ? {
+            data: {
+              game_id: 'cloud-game-1',
+              participant_id_map: {
+                'player-keeper': 'cloud-participant-1',
+                'player-late': 'cloud-participant-2',
+              },
+              participants: [
+                {
+                  id: 'cloud-participant-1',
+                  client_participant_id: 'participant-keeper',
+                  client_player_id: 'player-keeper',
+                  display_name: 'Keeper',
+                  jersey_number: '1',
+                },
+                {
+                  id: 'cloud-participant-2',
+                  client_participant_id: 'participant-late',
+                  client_player_id: 'player-late',
+                  display_name: 'Late Player',
+                  jersey_number: '17',
+                },
+              ],
+            },
+            error: null,
+          }
+        : { data: '2026-07-22T12:01:00.000Z', error: null }
+    ))
+
+    const result = await syncSoccerEventGameToCloud({
+      state: startedState(),
+      userId: 'user-1',
+      localGameId: '20000000-0000-4000-8000-000000000001',
+    })
+
+    expect(result.syncedState.eventStream?.events).toHaveLength(6)
+    expect(result.syncedState.cloudSync.eventSyncBase).toHaveProperty(
+      '10000000-0000-4000-8000-000000000006'
+    )
+    expect(cloudMock.upsert).toHaveBeenCalledTimes(6)
+  })
+
+  it('uses the SOC-5A whole-game checkpoint as the first per-event merge base', async () => {
+    const state = startedState()
+    state.cloudSync.lastSyncedGameFingerprint = buildGameSyncFingerprint(state)
+    state.cloudSync.eventSyncBase = {}
+    const original = state.eventStream!.events[0] as GameEvent | undefined
+    if (!original || typeof original !== 'object') throw new Error('missing event')
+    const remote = { ...original, revision: 2, updatedAt: '2026-07-22T12:00:10.000Z' }
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: { version: 1, events: [remote] },
+      inspection: { complete: true, activeEvents: [remote], deletedEvents: [], diagnostics: [] },
+      quarantinedRows: [],
+      error: null,
+    })
+
+    const result = await syncSoccerEventGameToCloud({
+      state,
+      userId: 'user-1',
+      localGameId: '20000000-0000-4000-8000-000000000001',
+    })
+
+    expect(result.syncedState.eventStream?.events[0]).toMatchObject({
+      id: original.id,
+      revision: 2,
+      updatedAt: '2026-07-22T12:00:10.000Z',
+    })
+    expect(result.syncedState.cloudSync.eventConflicts).toEqual([])
+  })
+
+  it('preserves competing revisions and stops before event upload', async () => {
+    const state = startedState()
+    const original = state.eventStream!.events[0]
+    if (!original || typeof original !== 'object') throw new Error('missing event')
+    state.cloudSync.eventSyncBase = gameEventSyncBase(state.eventStream)
+    const local = { ...original, revision: 2, updatedAt: '2026-07-22T12:00:10.000Z' }
+    const remote = { ...original, revision: 2, updatedAt: '2026-07-22T12:00:11.000Z' }
+    state.eventStream!.events[0] = local
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: { version: 1, events: [remote] },
+      inspection: { complete: true, activeEvents: [remote], deletedEvents: [], diagnostics: [] },
+      quarantinedRows: [],
+      error: null,
+    })
+    cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === 'bind_soccer_event_game_v2'
+        ? {
+            data: {
+              game_id: 'cloud-game-1',
+              participant_id_map: { 'player-keeper': 'cloud-participant-1' },
+            },
+            error: null,
+          }
+        : name === 'record_game_event_conflict'
+          ? { data: '30000000-0000-4000-8000-000000000001', error: null }
+          : { data: '2026-07-22T12:01:00.000Z', error: null }
+    ))
+
+    let caught: unknown
+    try {
+      await syncSoccerEventGameToCloud({
+        state,
+        userId: 'user-1',
+        localGameId: '20000000-0000-4000-8000-000000000001',
+      })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(SoccerCloudRecoveryError)
+    expect((caught as SoccerCloudRecoveryError).recoveredState.cloudSync.eventConflicts).toHaveLength(1)
+    expect(cloudMock.upsert).not.toHaveBeenCalled()
   })
 })
