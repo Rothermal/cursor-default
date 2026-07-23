@@ -115,8 +115,11 @@ re-resolve authority, or combine recorder streams.
 - If it belongs to the current user, `Open Tracker` creates/resumes a local binding before edits
   are enabled.
 - Refresh, focus polling, tab changes, and player/field filters retain the selected recorder.
+- While another recording is selected, Overview and every detail tab show that recording and the
+  Finalize panel is hidden. The user must return to Primary, which reloads normal
+  `cloud_primary` authority, before Finalize is available.
 - Finalization always uses the effective primary contract; browsing another recording never
-  changes or finalizes it.
+  changes, finalizes, or appears to finalize it.
 - Returning to `Primary` reloads normal `cloud_primary` authority.
 - Canonical finals do not offer alternate live recorder totals as equivalent final results.
   Recorder presence/recovery remains available through the existing management control.
@@ -178,7 +181,7 @@ Use readable labels in detail and compact abbreviations only where table width r
 |---|---|---|
 | Attack | Goals, assists, shots, shots on target | Own goals, primary/secondary assists, key passes, penalty and direct-free-kick attempts/goals |
 | Defense | Tackles won/attempted, interceptions, clearances | Tackles lost, recoveries, blocked shots, tackle win rate |
-| Discipline | Fouls committed, yellow, red | Fouls drawn and normal-match discipline detail |
+| Discipline | Fouls committed, yellow, red | Fouls drawn and normal-match player discipline detail; never staff/team cards |
 | Goalkeeping | Saves, goals allowed, save percentage | SOT faced, penalties faced/saved, clean-sheet context |
 
 Shootout cards, kicks, goals, saves, and misses never enter these category totals.
@@ -228,6 +231,10 @@ Goalkeeper credit:
 - count normal and extra-time goals, including own goals, against the defending team;
 - count an own goal against the goalkeeper active by canonical event order when that goalkeeper
   can be identified;
+- when a conceded goal cannot be assigned to one goalkeeper but falls within one or more
+  goalkeeper-role intervals, deny credit to every overlapping goalkeeper;
+- when no goalkeeper interval can be identified for a conceded goal, mark individual clean-sheet
+  status unavailable for that side rather than awarding every goalkeeper;
 - award a keeper when no goal was conceded during any of that keeper's goalkeeper intervals;
 - label every qualifying goalkeeper `Shared clean sheet` when more than one goalkeeper qualifies;
 - do not require a minimum number of minutes;

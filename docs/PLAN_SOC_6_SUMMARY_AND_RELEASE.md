@@ -77,6 +77,8 @@ Detailed plan:
 
 Complete player, Timeline, field-map, and shootout review.
 
+- Deliver SOC-6B through the detailed plan's 6B1-6B4 slices.
+- Expose each new tab only when that tab's complete implementation and regression boundary ship.
 - Player table keeps identity, lineup status, role, and minutes fixed while category tabs switch
   Attack, Defense, Discipline, and Goalkeeping columns.
 - Include every match participant; unused substitutes display `DNP`.
