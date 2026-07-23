@@ -119,6 +119,13 @@ export function soccerSummaryBackPath(query: SoccerSummaryQuery): string {
   }
 }
 
+export function isSoccerSummaryRoute(
+  activeSportId: string | null | undefined,
+  params: URLSearchParams
+): boolean {
+  return activeSportId === 'soccer' || Boolean(cleanParam(params.get('gameId')))
+}
+
 export function soccerSummaryResult(
   projection: SoccerMatchProjection
 ): SoccerSummaryResult {

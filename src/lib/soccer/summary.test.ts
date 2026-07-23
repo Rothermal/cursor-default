@@ -3,6 +3,7 @@ import { DEFAULT_SOCCER_MATCH_RULES } from './rules'
 import { createSoccerMatchProjection } from './state'
 import {
   formatSoccerMatchFormat,
+  isSoccerSummaryRoute,
   legacySoccerReviewSummaryPath,
   parseSoccerSummaryQuery,
   soccerMatchLeaders,
@@ -86,6 +87,14 @@ describe('soccer summary navigation', () => {
         '?gameId=game-1&tab=timeline&from=games&junk=ignored'
       )
     ).toBe('/summary?gameId=game-1&tab=overview&from=games')
+  })
+
+  it('keeps direct cloud soccer summary routing after local state is discarded', () => {
+    expect(
+      isSoccerSummaryRoute(null, new URLSearchParams('gameId=game-1'))
+    ).toBe(true)
+    expect(isSoccerSummaryRoute('soccer', new URLSearchParams())).toBe(true)
+    expect(isSoccerSummaryRoute('basketball', new URLSearchParams())).toBe(false)
   })
 })
 

@@ -3,7 +3,7 @@ import type { GameEvent, GameEventInspection } from '../gameEvents/types'
 import { inspectSoccerHistory } from './live'
 import {
   loadSoccerCanonicalPublication,
-  soccerProjectionFromCanonicalSnapshot,
+  inspectSoccerCanonicalSnapshot,
   type SoccerCanonicalPublication,
 } from './finalization'
 import {
@@ -78,7 +78,7 @@ const defaultDependencies: SoccerSummarySourceDependencies = {
   loadCanonical: loadSoccerCanonicalPublication,
   loadRecorders: loadSoccerGameRecorders,
   projectCanonical: (state, recorder, publication) =>
-    soccerProjectionFromCanonicalSnapshot(
+    inspectSoccerCanonicalSnapshot(
       state,
       recorder,
       publication.snapshot

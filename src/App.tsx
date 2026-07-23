@@ -36,6 +36,7 @@ import SoccerPlayerSetup from './pages/SoccerPlayerSetup'
 import SoccerGameTracker from './pages/SoccerGameTracker'
 import SoccerCloudReview from './pages/SoccerCloudReview'
 import SoccerSummary from './pages/SoccerSummary'
+import { isSoccerSummaryRoute } from './lib/soccer/summary'
 
 function GameSetupRoute() {
   const { state } = useGame()
@@ -67,9 +68,7 @@ function GameCheckoutRoute() {
 function GameSummaryRoute() {
   const { state } = useGame()
   const [searchParams] = useSearchParams()
-  const isSoccerSummary =
-    state.sport?.id === 'soccer' || Boolean(searchParams.get('gameId'))
-  if (!isSoccerSummary) return <GameSummary />
+  if (!isSoccerSummaryRoute(state.sport?.id, searchParams)) return <GameSummary />
   return import.meta.env.DEV ? <SoccerSummary /> : <Navigate to="/" replace />
 }
 

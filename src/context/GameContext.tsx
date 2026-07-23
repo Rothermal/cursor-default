@@ -302,6 +302,7 @@ interface GameContextType {
   discardParkedGame: (localGameId: string) => boolean
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
+  flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
   markSoccerCloudGameReopened: (gameId: string) => void
   resolveSoccerEventConflict: (
     eventId: string,
@@ -935,6 +936,49 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }, [isOnline, runCloudSync, userId])
 
+  const flushCloudGameSync = useCallback(async (
+    gameId: string
+  ): Promise<FlushCloudSyncResult> => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+    await runCloudSync()
+    if (!isOnline) {
+      return { ok: false, reason: 'Offline - connect to sync before continuing' }
+    }
+    const matching = listParkedGameRecords(userId).filter(
+      record => record.gameState.cloudSync.gameId === gameId
+    )
+    const failed = matching.find(
+      record => record.gameState.cloudSync.status === 'error'
+    )
+    if (failed) {
+      return {
+        ok: false,
+        reason: failed.gameState.cloudSync.lastError ?? 'Cloud sync failed',
+      }
+    }
+    const offline = matching.some(
+      record => record.gameState.cloudSync.status === 'offline'
+    )
+    if (offline) {
+      return { ok: false, reason: 'Offline - connect to sync before continuing' }
+    }
+    if (
+      matching.some(record =>
+        record.sync.dirty ||
+        shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
+      )
+    ) {
+      return {
+        ok: false,
+        reason: 'This game still has local changes that could not be synced.',
+      }
+    }
+    return { ok: true }
+  }, [isOnline, runCloudSync, userId])
+
   const markSoccerCloudGameReopened = useCallback((gameId: string) => {
     try {
       setParkedGames(markParkedCloudGameReopened(userId, gameId))
@@ -1085,6 +1129,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         resumeParkedGame,
         discardParkedGame,
         flushCloudSync,
+        flushCloudGameSync,
         markSoccerCloudGameReopened,
         resolveSoccerEventConflict,
       }}

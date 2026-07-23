@@ -8,13 +8,14 @@ import SoccerSummaryHeader from '../components/soccer-summary/SoccerSummaryHeade
 import SoccerSummaryTabs from '../components/soccer-summary/SoccerSummaryTabs'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
-import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
+import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
 import { reopenSoccerMatch } from '../lib/soccer/live'
 import { loadSoccerGameRecorders, type SoccerRecorderSummary } from '../lib/soccer/recorders'
 import {
   parseSoccerSummaryQuery,
   soccerMatchLeaders,
   soccerSummaryBackPath,
+  soccerSummaryPath,
   soccerSummaryResult,
   soccerTeamComparison,
 } from '../lib/soccer/summary'
@@ -38,8 +39,9 @@ export default function SoccerSummary() {
     dispatch,
     activeLocalGameId,
     parkedGames,
+    openGameSnapshot,
     resumeParkedGame,
-    flushCloudSync,
+    flushCloudGameSync,
     markSoccerCloudGameReopened,
   } = useGame()
   const [source, setSource] = useState<SoccerSummarySource | null>(null)
@@ -48,60 +50,74 @@ export default function SoccerSummary() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [errorAuthority, setErrorAuthority] =
     useState<SoccerSummaryAuthority>('local')
-  const [authorityGameId, setAuthorityGameId] = useState<string | null>(null)
   const [reopenedGameId, setReopenedGameId] = useState<string | null>(null)
   const requestIdRef = useRef(0)
   const routeKeyRef = useRef<string | null>(null)
-  const effectiveGameId = query.gameId ?? authorityGameId
+  const sourceRef = useRef<SoccerSummarySource | null>(null)
 
   const refresh = useCallback(async (
-    options: { showLoading?: boolean; gameId?: string | null } = {}
+    options: {
+      showLoading?: boolean
+      gameId?: string | null
+      replaceSource?: boolean
+    } = {}
   ) => {
     const requestId = ++requestIdRef.current
-    if (options.showLoading) setLoading(true)
+    if (options.replaceSource) {
+      sourceRef.current = null
+      setSource(null)
+    }
+    if (options.showLoading || options.replaceSource) setLoading(true)
     else setRefreshing(true)
     setError(null)
+    setRefreshError(null)
     try {
       const next = await loadSoccerSummarySource(
         state,
-        options.gameId === undefined ? effectiveGameId : options.gameId
+        options.gameId === undefined ? query.gameId : options.gameId
       )
       if (requestId !== requestIdRef.current) return
+      sourceRef.current = next
       setSource(next)
       setRecorders(next.recorders)
       setErrorAuthority(next.kind)
     } catch (caught) {
       if (requestId !== requestIdRef.current) return
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'The soccer summary could not load.'
-      )
-      setErrorAuthority(
-        caught instanceof SoccerSummarySourceError
-          ? caught.authority
-          : effectiveGameId
-            ? 'cloud_primary'
-            : 'local'
-      )
-      setSource(null)
+      const message = caught instanceof Error
+        ? caught.message
+        : 'The soccer summary could not load.'
+      if (sourceRef.current && !options.replaceSource) {
+        setRefreshError(message)
+      } else {
+        setError(message)
+        setErrorAuthority(
+          caught instanceof SoccerSummarySourceError
+            ? caught.authority
+            : query.gameId
+              ? 'cloud_primary'
+              : 'local'
+        )
+        sourceRef.current = null
+        setSource(null)
+      }
     } finally {
       if (requestId === requestIdRef.current) {
         setLoading(false)
         setRefreshing(false)
       }
     }
-  }, [effectiveGameId, state])
+  }, [query.gameId, state])
 
   useEffect(() => {
-    const routeKey = effectiveGameId ?? 'local'
+    const routeKey = query.gameId ?? 'local'
     const showLoading = routeKeyRef.current !== routeKey
     routeKeyRef.current = routeKey
-    void refresh({ showLoading })
+    void refresh({ showLoading, replaceSource: showLoading })
     // refresh intentionally changes when local GameState changes.
-  }, [effectiveGameId, state, refresh])
+  }, [query.gameId, state, refresh])
 
   useEffect(() => {
     if (source?.kind !== 'cloud_primary') return
@@ -115,6 +131,17 @@ export default function SoccerSummary() {
       window.removeEventListener('focus', onFocus)
     }
   }, [refresh, source?.kind])
+
+  useEffect(() => {
+    const gameId = source?.state.cloudSync.gameId
+    if (source?.kind !== 'canonical' || query.gameId || !gameId) return
+    navigate(soccerSummaryPath({
+      gameId,
+      tab: query.tab,
+      from: query.from,
+      teamId: query.teamId,
+    }), { replace: true })
+  }, [navigate, query.from, query.gameId, query.tab, query.teamId, source])
 
   const openRecorders = async () => {
     const gameId = source?.state.cloudSync.gameId
@@ -165,6 +192,13 @@ export default function SoccerSummary() {
   const resumable = reopenedGameId
     ? parkedGames.find(game => game.cloudGameId === reopenedGameId) ?? null
     : null
+  const ownedRecorder = user
+    ? source.recorders.find(recorder => recorder.recorderId === user.id) ?? null
+    : null
+  const canOpenReopenedStream =
+    source.kind === 'cloud_primary' &&
+    reopenedGameId === cloudGameId &&
+    Boolean(resumable || ownedRecorder)
 
   const reopenLocal = () => {
     const reason = soccerState.projection.endReason === 'abandoned'
@@ -180,20 +214,49 @@ export default function SoccerSummary() {
       return
     }
     dispatch({ type: 'HYDRATE_STATE', state: reopened.state })
-    setSource({
+    const nextSource: SoccerSummarySource = {
       ...source,
       state: reopened.state,
       inspection: reopened.inspection,
-    })
+    }
+    sourceRef.current = nextSource
+    setSource(nextSource)
   }
 
-  const resumeReopened = () => {
-    if (!resumable) return
+  const resumeReopened = async () => {
+    if (!cloudGameId || !user) return
+    if (resumable) {
+      if (
+        activeLocalGameId !== resumable.localGameId &&
+        !window.confirm('Park the current game and resume this soccer recorder stream?')
+      ) return
+      if (!resumeParkedGame(resumable.localGameId)) return
+      navigate('/game')
+      return
+    }
+    if (!ownedRecorder) return
+    const recorderState = await loadSoccerCloudGameById(user.id, cloudGameId)
+      .catch(caught => {
+        setRefreshError(
+          caught instanceof Error
+            ? caught.message
+            : 'Your recorder stream could not load.'
+        )
+        return null
+      })
+    if (!recorderState) {
+      setRefreshError('Your recorder stream is not available to resume.')
+      return
+    }
+    const hasActiveGame = Boolean(
+      state.sport && (state.gameInfo || state.players.length > 0)
+    )
     if (
-      activeLocalGameId !== resumable.localGameId &&
-      !window.confirm('Park the current game and resume this soccer recorder stream?')
+      hasActiveGame &&
+      state.cloudSync.gameId !== cloudGameId &&
+      !window.confirm('Park the current game and open your soccer recorder stream?')
     ) return
-    if (!resumeParkedGame(resumable.localGameId)) return
+    if (!openGameSnapshot(recorderState)) return
     navigate('/game')
   }
 
@@ -208,6 +271,27 @@ export default function SoccerSummary() {
         onOpenRecorders={cloudGameId ? () => { void openRecorders() } : undefined}
       />
       <SoccerSummaryTabs />
+
+      {refreshError && (
+        <section className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+          <div className="mx-auto flex max-w-2xl items-start gap-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">Summary refresh failed</p>
+              <p className="mt-0.5 text-xs">
+                Showing the last loaded result. {refreshError}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { void refresh() }}
+              className="min-h-9 shrink-0 border border-amber-400 bg-white px-3 text-xs font-bold"
+            >
+              Retry
+            </button>
+          </div>
+        </section>
+      )}
 
       {!healthy && (
         <section className="border-b border-amber-300 bg-amber-50 px-4 py-4 text-amber-900">
@@ -234,7 +318,7 @@ export default function SoccerSummary() {
         comparisons={comparisons}
         leaders={leaders}
         healthy={healthy}
-        actions={healthy ? (
+        actions={(
           <>
             {source.kind === 'local' &&
               source.editable &&
@@ -252,7 +336,7 @@ export default function SoccerSummary() {
                 </section>
               )}
 
-            {cloudGameId && (
+            {healthy && cloudGameId && (
               <div className="mx-auto max-w-2xl">
                 <SoccerFinalizationPanel
                   baseState={source.state}
@@ -261,55 +345,53 @@ export default function SoccerSummary() {
                     source.publication?.finalizedAt ??
                     source.state.cloudSync.lastSyncedAt
                   }
-                  flushCloudSync={async () => {
-                    const synced = await flushCloudSync()
-                    if (!synced.ok) return synced
-                    if (
-                      user?.id &&
-                      hasUnsyncedParkedBindingForCloudGame(user.id, cloudGameId)
-                    ) {
-                      return {
-                        ok: false,
-                        reason: 'A local primary stream for this game still has unsynced changes.',
-                      }
-                    }
-                    return { ok: true }
-                  }}
+                  flushCloudSync={() => flushCloudGameSync(cloudGameId)}
                   onFinalized={() => {
-                    setAuthorityGameId(cloudGameId)
+                    navigate(soccerSummaryPath({
+                      gameId: cloudGameId,
+                      tab: query.tab,
+                      from: query.from,
+                      teamId: query.teamId,
+                    }), { replace: true })
                     if (source.kind === 'local') {
                       dispatch({
                         type: 'SET_CLOUD_SYNC_STATE',
                         cloudSync: { gameStatus: 'final' },
                       })
                     }
-                    void refresh({ gameId: cloudGameId })
+                    void refresh({
+                      gameId: cloudGameId,
+                      replaceSource: true,
+                    })
                   }}
                   onReopened={() => {
-                    setAuthorityGameId(cloudGameId)
                     markSoccerCloudGameReopened(cloudGameId)
                     setReopenedGameId(cloudGameId)
-                    void refresh({ gameId: cloudGameId })
+                    void refresh({
+                      gameId: cloudGameId,
+                      replaceSource: true,
+                    })
                   }}
                 />
               </div>
             )}
 
-            {resumable && source.kind === 'cloud_primary' && (
+            {canOpenReopenedStream && (
               <section className="border-b border-slate-200 bg-emerald-50 px-4 py-4">
                 <div className="mx-auto max-w-2xl">
                   <button
                     type="button"
-                    onClick={resumeReopened}
+                      onClick={() => { void resumeReopened() }}
                     className="flex min-h-11 w-full items-center justify-center gap-2 bg-emerald-700 px-3 text-sm font-bold text-white"
                   >
-                    <Play size={17} /> Resume Tracker
+                    <Play size={17} />
+                    {resumable ? 'Resume Tracker' : 'Open Tracker'}
                   </button>
                 </div>
               </section>
             )}
           </>
-        ) : null}
+        )}
       />
 
       <SoccerRecorderDialog

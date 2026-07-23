@@ -25,6 +25,7 @@ import {
   createSoccerCanonicalSnapshot,
   loadSoccerCanonicalPublication,
   loadSoccerFinalizationReadiness,
+  inspectSoccerCanonicalSnapshot,
   soccerProjectionFromCanonicalSnapshot,
 } from './finalization'
 
@@ -174,6 +175,19 @@ describe('soccer finalization repository', () => {
       projection.recorder,
       snapshot
     )).toThrow('do not reproduce a final match')
+
+    const inspected = inspectSoccerCanonicalSnapshot(
+      baseState(),
+      projection.recorder,
+      snapshot
+    )
+    expect(inspected.inspection.complete).toBe(false)
+    expect(
+      inspected.inspection.diagnostics[
+        inspected.inspection.diagnostics.length - 1
+      ]?.message
+    )
+      .toContain('do not reproduce a final match')
   })
 
   it('parses authoritative finalization readiness', async () => {
