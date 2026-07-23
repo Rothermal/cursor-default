@@ -116,12 +116,10 @@ export default function SoccerSummary() {
         ? caught.message
         : 'The soccer summary could not load.'
       if (sourceRef.current && !options.replaceSource) {
-        if (
-          selectedRecordingIdRef.current &&
-          sourceRef.current.kind !== 'cloud_recording'
-        ) {
-          selectedRecordingIdRef.current = null
-        }
+        selectedRecordingIdRef.current =
+          sourceRef.current.kind === 'cloud_recording'
+            ? sourceRef.current.recorder.recorderId
+            : null
         setRefreshError(message)
       } else {
         setError(message)
@@ -348,7 +346,7 @@ export default function SoccerSummary() {
 
   const returnToPrimary = () => {
     selectedRecordingIdRef.current = null
-    void refresh({ replaceSource: true })
+    void refresh()
   }
 
   const changeTab = (tab: typeof query.tab) => {

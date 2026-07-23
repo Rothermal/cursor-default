@@ -72,7 +72,10 @@ export default function SoccerPlayers({
             <button
               key={id}
               type="button"
-              onClick={() => onSideChange(id)}
+              onClick={() => {
+                setSelected(null)
+                onSideChange(id)
+              }}
               className={`min-h-10 px-2 text-sm font-bold ${
                 side === id
                   ? 'bg-emerald-700 text-white'
@@ -249,12 +252,6 @@ function categoryColumns(category: SoccerPlayerCategory): CategoryColumn[] {
         label: 'Fouls committed',
         shortLabel: 'FC',
         value: player => player.stats.foulsCommitted,
-      },
-      {
-        id: 'fouls-drawn',
-        label: 'Fouls drawn',
-        shortLabel: 'FD',
-        value: player => player.stats.foulsDrawn,
       },
       {
         id: 'yellow',

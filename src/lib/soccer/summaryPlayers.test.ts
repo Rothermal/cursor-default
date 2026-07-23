@@ -267,9 +267,18 @@ describe('soccer player review', () => {
       .toBe('credited')
   })
 
-  it('shares clean sheets and excludes abandoned matches from final credit', () => {
+  it('shares clean sheets, ignores shootout kicks, and excludes abandoned matches', () => {
     const state = fixtureState()
-    let review = soccerPlayerReview(state, inspection())
+    const shootoutKick = matchEvent(5, 'soccer.shootout_kick', {
+      teamSide: 'opponent',
+      periodId: 'shootout',
+      payload: {
+        kickNumber: 1,
+        outcome: 'scored',
+      },
+    })
+    shootoutKick.elapsedMs = null
+    let review = soccerPlayerReview(state, inspection(shootoutKick))
     expect(review.tracked.rows.find(row => row.participantId === 'keeper-a')?.cleanSheet.status)
       .toBe('shared')
     expect(review.tracked.rows.find(row => row.participantId === 'keeper-b')?.cleanSheet.status)
@@ -290,8 +299,11 @@ describe('soccer player review', () => {
       payload: { delta: 1, reason: 'Correction' },
     })
     let review = soccerPlayerReview(state, inspection(adjustment))
-    expect(review.tracked.rows.find(row => row.participantId === 'keeper-a')?.cleanSheet.status)
-      .toBe('unavailable')
+    expect(review.tracked.rows.find(row => row.participantId === 'keeper-a')?.cleanSheet)
+      .toEqual({
+        status: 'unavailable',
+        label: 'Unavailable - score adjusted',
+      })
     expect(review.tracked.rows.find(row => row.participantId === 'keeper-b')?.cleanSheet.status)
       .toBe('unavailable')
 
@@ -312,7 +324,10 @@ describe('soccer player review', () => {
 
     unattributed.elapsedMs = 100 * 60_000
     review = soccerPlayerReview(state, inspection(unattributed))
-    expect(review.tracked.rows.find(row => row.participantId === 'keeper-a')?.cleanSheet.status)
-      .toBe('unavailable')
+    expect(review.tracked.rows.find(row => row.participantId === 'keeper-a')?.cleanSheet)
+      .toEqual({
+        status: 'unavailable',
+        label: 'Unavailable - goalkeeper attribution needs review',
+      })
   })
 })

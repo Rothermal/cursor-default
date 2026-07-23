@@ -92,7 +92,7 @@ export interface SoccerPlayerReview {
 interface GoalkeeperCleanSheetContext {
   candidates: Set<string>
   conceded: Set<string>
-  unavailable: boolean
+  unavailableReason: 'score_adjusted' | 'goalkeeper_attribution' | null
 }
 
 export function soccerPlayerReview(
@@ -115,7 +115,7 @@ export function soccerPlayerReview(
   const noFinalCredit =
     projection.status === 'suspended' ||
     projection.endReason === 'abandoned'
-  const cleanQualifiers = completed && !cleanSheets.unavailable
+  const cleanQualifiers = completed && !cleanSheets.unavailableReason
     ? [...cleanSheets.candidates].filter(id => !cleanSheets.conceded.has(id))
     : []
   const rows = participants
@@ -361,10 +361,14 @@ function goalkeeperCleanSheetContext(
       .map(participant => participant.participantId)
   )
   const conceded = new Set<string>()
-  let unavailable = inspection.activeEvents.some(event =>
-    event.eventType === 'soccer.score_adjustment' &&
-    event.teamSide === 'opponent'
-  )
+  let unavailableReason: GoalkeeperCleanSheetContext['unavailableReason'] =
+    inspection.activeEvents.some(
+      event =>
+        event.eventType === 'soccer.score_adjustment' &&
+        event.teamSide === 'opponent'
+    )
+      ? 'score_adjusted'
+      : null
 
   for (const event of inspection.activeEvents) {
     if (!isTrackedConcession(event)) continue
@@ -381,6 +385,8 @@ function goalkeeperCleanSheetContext(
     const overlapping = participants
       .filter(participant => candidates.has(participant.participantId))
       .filter(participant => participant.roleIntervals.some(interval =>
+        // Without a canonical actor link, exact-boundary overlap is intentionally
+        // fail-closed: every plausible goalkeeper is denied credit.
         interval.role.group === 'goalkeeper' &&
         interval.periodId === event.period.id &&
         event.elapsedMs !== null &&
@@ -389,13 +395,13 @@ function goalkeeperCleanSheetContext(
       ))
       .map(participant => participant.participantId)
     if (overlapping.length === 0) {
-      unavailable = true
+      unavailableReason ??= 'goalkeeper_attribution'
     } else {
       overlapping.forEach(id => conceded.add(id))
     }
   }
 
-  return { candidates, conceded, unavailable }
+  return { candidates, conceded, unavailableReason }
 }
 
 function isTrackedConcession(event: GameEvent): boolean {
@@ -415,10 +421,16 @@ function playerCleanSheet(
   if (!context.candidates.has(participantId)) {
     return { status: 'not_applicable', label: 'Not applicable' }
   }
-  if (context.unavailable) {
+  if (context.unavailableReason === 'score_adjusted') {
     return {
       status: 'unavailable',
-      label: 'Unavailable - score or goalkeeper attribution needs review',
+      label: 'Unavailable - score adjusted',
+    }
+  }
+  if (context.unavailableReason === 'goalkeeper_attribution') {
+    return {
+      status: 'unavailable',
+      label: 'Unavailable - goalkeeper attribution needs review',
     }
   }
   if (context.conceded.has(participantId)) {
