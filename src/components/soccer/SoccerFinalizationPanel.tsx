@@ -69,6 +69,11 @@ export default function SoccerFinalizationPanel({
     !readiness.canFinalize &&
     !readiness.canReopen
   ) return null
+  if (
+    readiness?.canFinalize &&
+    !readiness.primaryEnded &&
+    readiness.primaryConflictCount === 0
+  ) return null
 
   const handleFinalize = async () => {
     if (!readiness?.canFinalize || busy) return
@@ -198,6 +203,7 @@ export default function SoccerFinalizationPanel({
               disabled={
                 busy ||
                 !readiness.primaryRecorderId ||
+                !readiness.primaryEnded ||
                 readiness.primaryConflictCount > 0
               }
               className="min-h-11 bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-40"

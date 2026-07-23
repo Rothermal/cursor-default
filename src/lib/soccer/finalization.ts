@@ -17,7 +17,7 @@ import {
   soccerEventStreamFingerprint,
 } from './cloudSync'
 import { createSoccerSportGameState, normalizeSportGameState } from './state'
-import type { SoccerMatchProjection, SoccerMatchSetup } from './types'
+import type { SoccerMatchSetup } from './types'
 
 export interface SoccerFinalizationReadiness {
   gameStatus: string
@@ -25,6 +25,7 @@ export interface SoccerFinalizationReadiness {
   canReopen: boolean
   primaryRecorderId: string | null
   primaryDisplayName: string | null
+  primaryEnded: boolean
   primaryCheckpointCurrent: boolean
   primaryConflictCount: number
   primaryLocked: boolean
@@ -34,7 +35,7 @@ export interface SoccerFinalizationReadiness {
 }
 
 export interface SoccerCanonicalSnapshot {
-  version: 1
+  version: 2
   sportId: 'soccer'
   gameId: string
   primaryRecorderId: string
@@ -46,7 +47,6 @@ export interface SoccerCanonicalSnapshot {
     sportId: 'soccer'
     version: number
     setup: SoccerMatchSetup
-    projection: SoccerMatchProjection
   }
 }
 
@@ -101,6 +101,7 @@ export async function loadSoccerFinalizationReadiness(
     canReopen: row.can_reopen === true,
     primaryRecorderId: nullableString(row.primary_recorded_by),
     primaryDisplayName: nullableString(row.primary_display_name),
+    primaryEnded: row.primary_ended === true,
     primaryCheckpointCurrent: row.primary_checkpoint_current === true,
     primaryConflictCount: requiredInteger(row.primary_conflict_count, 'primary conflict count'),
     primaryLocked: row.primary_locked === true,
@@ -309,7 +310,7 @@ export function createSoccerCanonicalSnapshot(
     throw new Error('Primary soccer projection is unavailable.')
   }
   return {
-    version: 1,
+    version: 2,
     sportId: 'soccer',
     gameId,
     primaryRecorderId: recorderId,
@@ -318,7 +319,6 @@ export function createSoccerCanonicalSnapshot(
       sportId: 'soccer',
       version: soccerState.version,
       setup: structuredClone(soccerState.setup),
-      projection: structuredClone(soccerState.projection),
     },
   }
 }
@@ -380,9 +380,13 @@ export function soccerProjectionFromCanonicalSnapshot(
   if (
     !rebuilt.inspection.complete ||
     soccerState?.sportId !== 'soccer' ||
-    stableJson(soccerState.projection) !== stableJson(snapshot.sportGameState.projection)
+    soccerState.projection.status !== 'ended' ||
+    (
+      soccerState.projection.endReason !== 'completed' &&
+      soccerState.projection.endReason !== 'abandoned'
+    )
   ) {
-    throw new Error('Canonical soccer snapshot does not reproduce its locked projection.')
+    throw new Error('Canonical soccer events do not reproduce a final match.')
   }
   return {
     recorder,
@@ -395,7 +399,7 @@ export function soccerProjectionFromCanonicalSnapshot(
 function parseCanonicalSnapshot(value: unknown): SoccerCanonicalSnapshot {
   if (
     !isPlainObject(value) ||
-    value.version !== 1 ||
+    value.version !== 2 ||
     value.sportId !== 'soccer' ||
     typeof value.gameId !== 'string' ||
     typeof value.primaryRecorderId !== 'string' ||
@@ -403,22 +407,11 @@ function parseCanonicalSnapshot(value: unknown): SoccerCanonicalSnapshot {
     !isPlainObject(value.sportGameState) ||
     value.sportGameState.sportId !== 'soccer' ||
     !isPlainObject(value.sportGameState.setup) ||
-    !isPlainObject(value.sportGameState.projection)
+    'projection' in value.sportGameState
   ) {
     throw new Error('Canonical soccer snapshot is invalid.')
   }
   return value as unknown as SoccerCanonicalSnapshot
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
-  if (isPlainObject(value)) {
-    return `{${Object.keys(value)
-      .sort()
-      .map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value) ?? 'null'
 }
 
 function firstRow(value: unknown): Record<string, unknown> {

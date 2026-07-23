@@ -848,7 +848,7 @@ migrations 043 through 046 applied, and Soccer running in development.
 | 11m.2 | Finalize the same snapshot again | The RPC returns the existing publication id/number without creating a duplicate |
 | 11m.3 | Retry finalization with a changed primary, revision set, fingerprint, or snapshot after the game is final | Server rejects the non-idempotent request |
 | 11m.4 | Attempt finalization as scorer/viewer or by directly updating a soccer game to `final` | UI omits the action and server rejects both RPC and direct status bypass |
-| 11m.5 | Leave the primary match running, suspended, or in period break and attempt finalization | Finalization stops; only completed or abandoned `ended` projection is accepted |
+| 11m.5 | Leave the primary match running, suspended, reopened, or in period break and attempt finalization | Finalization stops; the verified primary cloud stream must end with a completed or abandoned match event |
 | 11m.6 | Make the active user's primary stream dirty, then finalize | Tracker flushes and confirms that exact primary stream before publishing |
 | 11m.7 | Leave unresolved conflicts on the primary | Finalize remains disabled and manager conflict review shows the durable device/cloud versions |
 | 11m.8 | As owner/admin, choose a primary conflict version | Selected version receives a new revision, resolution is audited, projection/checkpoint refresh, and finalization can proceed when healthy |
@@ -856,9 +856,9 @@ migrations 043 through 046 applied, and Soccer running in development.
 | 11m.10 | Keep pre-finalization non-primary events queued, finalize, then reconnect that recorder | Their own pre-finalization events/participants/checkpoint finish as audit-only history; canonical publication and scores do not change |
 | 11m.11 | Create a new event or revision after finalized time, or attempt a primary write | Server rejects it; finalized capture remains locked |
 | 11m.12 | Open a finalized game as viewer, scorer, and manager | All see the same canonical primary score/timeline; other recorder streams remain optional read-only details |
-| 11m.13 | Tamper with stored canonical projection in a test/staging database | Client rejects the publication when its event stream cannot reproduce the stored projection |
+| 11m.13 | Add a client projection to the canonical payload, forge its score, or replace the terminal match event in test/staging | Server rejects projection-bearing source payloads and non-final streams; published scores are derived from stored primary events |
 | 11m.14 | Reopen without a reason, as scorer/viewer, or through direct status update | Server rejects the request |
-| 11m.15 | Reopen as owner/admin with a reason | Active publication is invalidated but retained, primary unlocks, game returns to in progress, and audit history records actor/reason |
+| 11m.15 | Reopen as owner/admin with a reason, then resume a matching local binding | Active publication is invalidated but retained, primary unlocks, published score columns clear, cloud and local status return to in progress, and audit history records actor/reason |
 | 11m.16 | Change primary after reopen, correct the match, and finalize again | Publication number increments; the old invalidated publication remains queryable in database history |
 | 11m.17 | Finalize and reopen a personal soccer game | Only the personal game creator may perform either action |
 | 11m.18 | Finalize a basketball game after migration 046 | Existing aggregate finalization, checkout, summary, and correction behavior are unchanged |

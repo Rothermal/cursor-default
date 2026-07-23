@@ -25,6 +25,7 @@ describe('migration 046 soccer finalization contracts', () => {
     expect(sql).toContain('create or replace function public.finalize_soccer_event_game')
     expect(sql).toContain('public.can_manage_soccer_game(p_game_id)')
     expect(sql).toContain('public.is_game_event_checkpoint_current')
+    expect(sql).toContain('primary_ended boolean')
     expect(sql).toContain(
       'v_checkpoint.event_revisions is distinct from p_event_revisions'
     )
@@ -35,7 +36,16 @@ describe('migration 046 soccer finalization contracts', () => {
       'setup.setup_snapshot is not distinct from'
     )
     expect(sql).toContain('for share')
-    expect(sql).toContain("projection,status}' <> 'ended'")
+    expect(sql).toContain(
+      "event.event_type in ('soccer.match_ended', 'soccer.match_reopened')"
+    )
+    expect(sql).toContain("event.payload->>'outcome' = 'goal'")
+    expect(sql).toContain(
+      "then (event.payload->>'delta')::integer"
+    )
+    expect(sql).not.toContain(
+      "p_canonical_snapshot#>>'{sportgamestate,projection,sidetotals"
+    )
     expect(sql).toContain('snapshot_fingerprint')
     expect(sql).toContain("status = 'final'")
     expect(sql).toContain("'soccer_game_finalized'")
@@ -46,7 +56,8 @@ describe('migration 046 soccer finalization contracts', () => {
     expect(sql).toContain("if length(v_reason) < 3")
     expect(sql).toContain('invalidation_reason = v_reason')
     expect(sql).toContain('locked_at = null')
-    expect(sql).toContain("update public.games set status = 'in_progress'")
+    expect(sql).toContain("status = 'in_progress'")
+    expect(sql).toContain('home_team_score = null')
     expect(sql).toContain("'soccer_game_reopened'")
     expect(sql).not.toContain('delete from public.game_event_canonical_publications')
   })

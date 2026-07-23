@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CloudSyncState } from '../types'
 import { createInitialState, gameReducer } from './gameReducer'
-import { activeCloudSyncStateAction, mergeCloudSyncState } from './cloudSyncState'
+import {
+  activeCloudSyncStateAction,
+  mergeCloudSyncState,
+  resolvedCloudGameStatus,
+} from './cloudSyncState'
 
 function base(overrides: Partial<CloudSyncState> = {}): CloudSyncState {
   return {
@@ -20,6 +24,22 @@ function base(overrides: Partial<CloudSyncState> = {}): CloudSyncState {
 }
 
 describe('mergeCloudSyncState', () => {
+  it('lets authoritative soccer cloud status clear a sticky local final', () => {
+    expect(resolvedCloudGameStatus('final', {
+      gameStatus: 'in_progress',
+    })).toBe('in_progress')
+    expect(resolvedCloudGameStatus('in_progress', {
+      gameStatus: 'final',
+    })).toBe('final')
+  })
+
+  it('preserves legacy final status when aggregate sync has no cloud status', () => {
+    expect(resolvedCloudGameStatus('final', {})).toBe('final')
+    expect(resolvedCloudGameStatus('in_progress', {
+      skippedFinalGame: true,
+    })).toBe('final')
+  })
+
   it('hydrates a recovered active payload instead of applying metadata only', () => {
     const current = createInitialState()
     const recovered = {

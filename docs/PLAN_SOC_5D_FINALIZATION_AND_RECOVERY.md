@@ -32,9 +32,9 @@ season aggregate, and settings experience. Those remain SOC-6.
   index permits one active publication per game while retaining invalidated history.
 - `finalize_soccer_event_game` locks the game row, rechecks manager access, primary identity,
   checkpoint revisions/fingerprint, conflicts, setup, every canonical event field against the
-  stored primary rows, final projection, and scores in one transaction.
-- The same transaction persists the canonical event stream plus projection, locks the primary,
-  stores final scores, marks the game final, and emits `soccer_game_finalized`.
+  stored primary rows, terminal match event, and event-derived scores in one transaction.
+- The same transaction persists the canonical setup plus event stream, locks the primary,
+  stores server-derived final scores, marks the game final, and emits `soccer_game_finalized`.
 - A byte-equivalent retry returns the existing publication; a different request against an
   already final game fails.
 - Direct soccer status changes cannot bypass publication-backed finalization.
@@ -42,11 +42,12 @@ season aggregate, and settings experience. Those remain SOC-6.
 ### Final review and reopen
 
 - Finalized soccer review uses the canonical snapshot, not a live union or another recorder.
-- The client rebuilds the stored event stream and rejects a publication whose deterministic
-  projection does not match the stored projection.
+- The client rebuilds the deterministic projection from the immutable canonical setup and event
+  stream. A client-supplied projection is never accepted as canonical source data.
 - `reopen_soccer_event_game` requires owner/admin or personal-owner access plus a reason.
 - Reopen invalidates the active publication, unlocks the selected primary, restores cloud status
-  to in progress, and emits `soccer_game_reopened`. Publication history is never deleted.
+  to in progress, clears published score columns, updates matching local bindings, and emits
+  `soccer_game_reopened`. Publication history is never deleted.
 - A later primary change or corrected result requires reopen and a new publication number.
 
 ### Late non-primary audit uploads
@@ -59,13 +60,18 @@ season aggregate, and settings experience. Those remain SOC-6.
   stops presenting the match as editable.
 - These rows remain recorder-owned audit history and never change canonical scores, projection,
   primary selection, or publication.
+- Client occurrence timestamps cannot prove that an offline event was authored before
+  finalization. `stored_at` remains the authoritative server receipt time, so late rows are
+  identifiable as post-finalization arrivals and must not be treated as canonical evidence.
 - Final soccer parked records remain queued until that audit upload is checkpointed; clean final
   records can then leave local parking normally.
 
 ## 3. Safety Boundaries
 
 - Game id plus recorder id remains the stream identity.
-- A canonical snapshot contains exactly one recorder's event stream and projection.
+- A canonical snapshot contains exactly one recorder's event stream plus the locked match setup.
+- PostgreSQL derives publication scores from the verified stored event rows. The client derives
+  the richer display projection from the immutable canonical source when loading review.
 - The primary checkpoint revision set is compared again under the finalization transaction's
   game-row lock, closing the load-to-publish race.
 - Event writers, conflict recording, and checkpoint confirmation take a shared game-row lock, so
@@ -79,7 +85,7 @@ season aggregate, and settings experience. Those remain SOC-6.
 
 Automated coverage includes:
 
-- canonical snapshot round-trip and tamper rejection;
+- canonical source round-trip, projection rebuild, and non-final-event rejection;
 - readiness and active-publication parsing;
 - migration 046 RLS, role, checkpoint, publication, reopen, direct-status, conflict-preparation,
   and late-audit contracts;

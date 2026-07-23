@@ -35,6 +35,7 @@ interface SoccerTimelineProps {
   onEditIncident: (event: SoccerIncidentEvent) => void
   onEditScoreAdjustment: (event: SoccerScoreAdjustmentEvent) => void
   allowAddEvent?: boolean
+  readOnly?: boolean
 }
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
@@ -55,6 +56,7 @@ export default function SoccerTimeline({
   onEditIncident,
   onEditScoreAdjustment,
   allowAddEvent = true,
+  readOnly = false,
 }: SoccerTimelineProps) {
   const [editing, setEditing] = useState<SoccerMatchEvent | null>(null)
   const [deleting, setDeleting] = useState<GameEvent | null>(null)
@@ -105,7 +107,7 @@ export default function SoccerTimeline({
             <h2 className="text-sm font-bold uppercase text-slate-500">Timeline</h2>
             <p className="text-xs text-slate-400">Newest first</p>
           </div>
-          {allowAddEvent && <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add Event</button>}
+          {allowAddEvent && !readOnly && <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add Event</button>}
         </div>
         <label className="block text-xs font-bold uppercase text-slate-500">Event family<select value={filter} onChange={event => setFilter(event.target.value as SoccerTimelineFilter)} className="input-field mt-1"><option value="all">All</option><option value="attacking">Attacking</option><option value="defensive">Defensive</option><option value="discipline">Discipline</option><option value="team_events">Team Events</option><option value="match_control">Match Control</option></select></label>
         <div className="divide-y divide-slate-200 border-y border-slate-200">
@@ -114,8 +116,8 @@ export default function SoccerTimeline({
               key={event.id}
               event={event}
               timeLabel={soccerEventTimeLabel(event, timings)}
-              onEdit={() => editEvent(event)}
-              onDelete={() => setDeleting(event)}
+              onEdit={readOnly ? undefined : () => editEvent(event)}
+              onDelete={readOnly ? undefined : () => setDeleting(event)}
             />
           ))}
           {active.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No events in this view.</p>}
@@ -136,7 +138,11 @@ export default function SoccerTimeline({
                   event={event}
                   timeLabel={soccerEventTimeLabel(event, timings)}
                   deleted
-                  onRestore={() => onApply(restoreSoccerHistoryEvent(state, event.id))}
+                  onRestore={
+                    readOnly
+                      ? undefined
+                      : () => onApply(restoreSoccerHistoryEvent(state, event.id))
+                  }
                 />
               ))}
               {deleted.length === 0 && <p className="py-5 text-center text-xs text-slate-500">No removed events in this filter.</p>}

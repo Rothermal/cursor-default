@@ -98,6 +98,7 @@ returns table (
   can_reopen boolean,
   primary_recorded_by uuid,
   primary_display_name text,
+  primary_ended boolean,
   primary_checkpoint_current boolean,
   primary_conflict_count integer,
   primary_locked boolean,
@@ -140,6 +141,18 @@ begin
     case when v_primary is null then null
       else coalesce(nullif(trim(profile.display_name), ''), 'StatKeeper user')
     end::text,
+    coalesce((
+      select
+        event.event_type = 'soccer.match_ended'
+        and event.payload->>'reason' in ('completed', 'abandoned')
+      from public.game_events event
+      where event.game_id = p_game_id
+        and event.recorded_by = v_primary
+        and event.deleted_at is null
+        and event.event_type in ('soccer.match_ended', 'soccer.match_reopened')
+      order by event.stream_sequence desc, event.id desc
+      limit 1
+    ), false),
     case when v_primary is null then false
       else public.is_game_event_checkpoint_current(p_game_id, v_primary)
     end,
@@ -255,6 +268,8 @@ declare
   v_finalized_at timestamptz := now();
   v_tracked_score integer;
   v_opponent_score integer;
+  v_terminal_event_type text;
+  v_end_reason text;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
   if not public.can_manage_soccer_game(p_game_id) then
@@ -312,7 +327,7 @@ begin
     raise exception 'Primary recorder changed; reload before finalizing';
   end if;
 
-  if p_canonical_snapshot->>'version' <> '1'
+  if p_canonical_snapshot->>'version' <> '2'
      or p_canonical_snapshot->>'sportId' <> 'soccer'
      or p_canonical_snapshot->>'gameId' <> p_game_id::text
      or p_canonical_snapshot->>'primaryRecorderId' <> p_primary_recorded_by::text
@@ -324,12 +339,8 @@ begin
           <> v_checkpoint.event_count
      or jsonb_typeof(p_canonical_snapshot->'sportGameState') <> 'object'
      or p_canonical_snapshot#>>'{sportGameState,sportId}' <> 'soccer'
-     or p_canonical_snapshot#>>'{sportGameState,projection,status}' <> 'ended'
-     or coalesce(
-          p_canonical_snapshot#>>'{sportGameState,projection,endReason}',
-          ''
-        ) not in ('completed', 'abandoned') then
-    raise exception 'Canonical soccer projection is not final';
+     or p_canonical_snapshot#>'{sportGameState,projection}' is not null then
+    raise exception 'Canonical soccer source payload is invalid';
   end if;
 
   if exists (
@@ -424,13 +435,52 @@ begin
     raise exception 'Canonical event content does not match the primary cloud stream';
   end if;
 
+  select event.event_type, event.payload->>'reason'
+  into v_terminal_event_type, v_end_reason
+  from public.game_events event
+  where event.game_id = p_game_id
+    and event.recorded_by = p_primary_recorded_by
+    and event.deleted_at is null
+    and event.event_type in ('soccer.match_ended', 'soccer.match_reopened')
+  order by event.stream_sequence desc, event.id desc
+  limit 1;
+  if not found
+     or v_terminal_event_type <> 'soccer.match_ended'
+     or v_end_reason not in ('completed', 'abandoned') then
+    raise exception 'Primary cloud events do not end in a final soccer outcome';
+  end if;
+
   begin
-    v_tracked_score :=
-      (p_canonical_snapshot#>>'{sportGameState,projection,sideTotals,tracked,score}')::integer;
-    v_opponent_score :=
-      (p_canonical_snapshot#>>'{sportGameState,projection,sideTotals,opponent,score}')::integer;
+    select
+      coalesce(sum(case
+        when event.team_side = 'tracked'
+          and event.event_type = 'soccer.shot'
+          and event.payload->>'outcome' = 'goal' then 1
+        when event.team_side = 'tracked'
+          and event.event_type = 'soccer.own_goal' then 1
+        when event.team_side = 'tracked'
+          and event.event_type = 'soccer.score_adjustment'
+          then (event.payload->>'delta')::integer
+        else 0
+      end), 0)::integer,
+      coalesce(sum(case
+        when event.team_side = 'opponent'
+          and event.event_type = 'soccer.shot'
+          and event.payload->>'outcome' = 'goal' then 1
+        when event.team_side = 'opponent'
+          and event.event_type = 'soccer.own_goal' then 1
+        when event.team_side = 'opponent'
+          and event.event_type = 'soccer.score_adjustment'
+          then (event.payload->>'delta')::integer
+        else 0
+      end), 0)::integer
+    into v_tracked_score, v_opponent_score
+    from public.game_events event
+    where event.game_id = p_game_id
+      and event.recorded_by = p_primary_recorded_by
+      and event.deleted_at is null;
   exception when others then
-    raise exception 'Canonical soccer scores are invalid';
+    raise exception 'Primary cloud events contain invalid soccer scoring data';
   end;
   if v_tracked_score is null
      or v_opponent_score is null
@@ -549,7 +599,12 @@ begin
   where game_id = p_game_id
     and recorded_by = v_publication.primary_recorded_by;
 
-  update public.games set status = 'in_progress' where id = p_game_id;
+  update public.games set
+    status = 'in_progress',
+    home_team_score = null,
+    opponent_score = 0,
+    home_score_adjustment = 0
+  where id = p_game_id;
 
   perform public.record_access_audit_event(
     'soccer_game_reopened',
@@ -815,6 +870,9 @@ begin
     select publication.finalized_at into v_finalized_at
     from public.game_event_canonical_publications publication
     where publication.game_id = p_game_id and publication.invalidated_at is null;
+    -- Offline events have client-authored occurrence timestamps, so these checks preserve
+    -- queue intent rather than prove pre-final authorship. stored_at records actual receipt;
+    -- late non-primary rows remain audit-only and never enter the canonical publication.
     if p_sport_id <> 'soccer'
        or p_event_created_at > v_finalized_at
        or p_event_updated_at > v_finalized_at

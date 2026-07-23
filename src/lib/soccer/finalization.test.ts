@@ -148,22 +148,32 @@ describe('soccer finalization repository', () => {
       projection.state.sportGameState?.projection
     )
     expect(rebuilt.eventStream.events).toEqual(projection.eventStream.events)
+    expect(snapshot.sportGameState).not.toHaveProperty('projection')
   })
 
-  it('rejects a canonical snapshot whose stored projection does not match its events', () => {
+  it('rejects canonical events that do not rebuild to a final match', () => {
     const projection = endedProjection()
     const snapshot = createSoccerCanonicalSnapshot(
       'game-1',
       'recorder-a',
       projection
     )
-    snapshot.sportGameState.projection.sideTotals.tracked.score += 1
+    const matchEnded = snapshot.eventStream.events.find(event =>
+      typeof event === 'object' &&
+      event !== null &&
+      'eventType' in event &&
+      event.eventType === 'soccer.match_ended'
+    )
+    if (!matchEnded || typeof matchEnded !== 'object' || !('payload' in matchEnded)) {
+      throw new Error('Missing match-ended event')
+    }
+    matchEnded.payload = { reason: 'suspended' }
 
     expect(() => soccerProjectionFromCanonicalSnapshot(
       baseState(),
       projection.recorder,
       snapshot
-    )).toThrow('does not reproduce')
+    )).toThrow('do not reproduce a final match')
   })
 
   it('parses authoritative finalization readiness', async () => {
@@ -174,6 +184,7 @@ describe('soccer finalization repository', () => {
         can_reopen: false,
         primary_recorded_by: 'recorder-a',
         primary_display_name: 'Recorder A',
+        primary_ended: true,
         primary_checkpoint_current: true,
         primary_conflict_count: 0,
         primary_locked: false,
@@ -190,6 +201,7 @@ describe('soccer finalization repository', () => {
       canReopen: false,
       primaryRecorderId: 'recorder-a',
       primaryDisplayName: 'Recorder A',
+      primaryEnded: true,
       primaryCheckpointCurrent: true,
       primaryConflictCount: 0,
       primaryLocked: false,

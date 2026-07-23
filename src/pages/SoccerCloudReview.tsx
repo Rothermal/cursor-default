@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import SoccerFinalizationPanel from '../components/soccer/SoccerFinalizationPanel'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import { useAuth } from '../context/AuthContext'
+import { useGame } from '../context/GameContext'
+import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
 import { formatSoccerDuration } from '../lib/soccer'
 import type {
   SoccerRecorderProjection,
@@ -18,6 +20,7 @@ export default function SoccerCloudReview() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
+  const { flushCloudSync, markSoccerCloudGameReopened } = useGame()
   const gameId = searchParams.get('gameId')
   const [primary, setPrimary] = useState<SoccerRecorderProjection | null>(null)
   const [publication, setPublication] = useState<SoccerCanonicalPublication | null>(null)
@@ -155,8 +158,23 @@ export default function SoccerCloudReview() {
             baseState={primary.state}
             currentUserId={user?.id ?? null}
             refreshKey={publication?.finalizedAt ?? primary.state.cloudSync.lastSyncedAt}
+            flushCloudSync={async () => {
+              const result = await flushCloudSync()
+              if (!result.ok) return result
+              if (
+                user?.id &&
+                hasUnsyncedParkedBindingForCloudGame(user.id, gameId!)
+              ) {
+                return {
+                  ok: false,
+                  reason: 'A local primary stream for this game still has unsynced changes.',
+                }
+              }
+              return { ok: true }
+            }}
             onFinalized={() => { void refresh() }}
             onReopened={() => {
+              markSoccerCloudGameReopened(gameId!)
               navigate('/games?sport=soccer', { replace: true })
             }}
           />
