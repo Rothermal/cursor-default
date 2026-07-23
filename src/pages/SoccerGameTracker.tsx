@@ -40,6 +40,7 @@ import SoccerShootoutManagementDialog, { type SoccerShootoutManagementKind } fro
 import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupDialog'
 import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
 import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
+import SoccerFinalizationPanel from '../components/soccer/SoccerFinalizationPanel'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
@@ -431,6 +432,30 @@ export default function SoccerGameTracker() {
             </div>
           )}
         </section>
+
+        {ended && state.cloudSync.gameId && (
+          <SoccerFinalizationPanel
+            baseState={state}
+            currentUserId={user?.id ?? null}
+            refreshKey={state.cloudSync.lastSyncedAt}
+            flushCloudSync={flushCloudSync}
+            onFinalized={() => {
+              dispatch({
+                type: 'SET_CLOUD_SYNC_STATE',
+                cloudSync: { gameStatus: 'final' },
+              })
+              navigate(
+                `/soccer/review?gameId=${encodeURIComponent(state.cloudSync.gameId!)}`
+              )
+            }}
+            onReopened={() => {
+              dispatch({
+                type: 'SET_CLOUD_SYNC_STATE',
+                cloudSync: { gameStatus: 'in_progress' },
+              })
+            }}
+          />
+        )}
 
         {error && <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 

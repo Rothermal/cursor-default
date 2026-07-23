@@ -62,7 +62,7 @@ flowchart TB
 | [`src/lib/`](../src/lib/) | Pure helpers (scoring, team stats, shot chart, display) | Business logic without UI |
 | [`src/pages/`](../src/pages/) | One screen per route | UI for a feature |
 | [`src/components/`](../src/components/) | Shared UI (Scoreboard, StatButton, shot-chart/, team-stats/) | Reusable widgets |
-| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001–045) | Any DB change |
+| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001-046) | Any DB change |
 | [`docs/`](.) | Design specs and plans | Before building a feature |
 
 **Convention:** Pages orchestrate; heavy logic lives in `lib/` and the `GameContext` reducer.
@@ -153,8 +153,9 @@ binding, game-scoped participant snapshots, revision uploads, and verified recor
 SOC-5B adds immutable setup recovery, pull-before-push same-recorder merge, event-aware Cloud Games
 resume, and durable side-by-side conflict resolution. SOC-5C adds independent team recorder
 binding, compact recorder presence, isolated read-only stream projection, provisional primary
-selection, and immutable selection history. Soccer remains development-only; primary locking,
-canonical publication, and finalization remain SOC-5D.
+selection, and immutable selection history. SOC-5D adds append-only canonical publications,
+owner/admin primary locking, manager conflict preparation, final review, late non-primary audit
+uploads, and reason-required audited reopen. Soccer remains development-only until SOC-6.
 
 SOC-2B and SOC-2C add a development-only Soccer workspace through the normal chooser and
 dashboard. The shared `/setup`, `/players`, and `/game` routes select soccer-specific setup,
@@ -165,7 +166,8 @@ changes, history corrections, diagnostics, and match end/reopen. Production buil
 those soccer route surfaces to the sport chooser until SOC-6. Cloud teams are read-only roster
 sources; SOC-5A mirrors healthy local event streams, SOC-5B resumes the same recorder from cloud,
 and SOC-5C lets additional authorized team recorders start independent streams against the same
-game while viewers inspect only the primary stream.
+game while viewers inspect only the primary stream. SOC-5D review resolves the active canonical
+publication when final and uses the live primary only before finalization or after reopen.
 Legacy `/checkout` and
 `/summary` surfaces redirect active soccer games back into the soccer flow.
 
@@ -243,7 +245,7 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 
 | Item | Detail |
 |------|--------|
-| Migrations | 45 files (`001`–`045`) in [`supabase/migrations/`](../supabase/migrations/) |
+| Migrations | 46 files (`001`-`046`) in [`supabase/migrations/`](../supabase/migrations/) |
 | Tables | 22 core tables (profiles, account_access, access_audit_events, teams, players, games, game_participants, game_events, game_event_stream_checkpoints, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
 | Auth | Email/password + Google OAuth (PKCE), account profile/identities, app access status; team RLS scoped via `team_members` roles (owner / admin / scorer / viewer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
@@ -268,10 +270,13 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 | `get_access_audit_events` | Team-scoped or app-admin-global access history |
 | `update_player_identity` | Creator/guardian identity-only player editing |
 | `merge_players_preview` / `merge_players_execute` | Player merge wizard |
-| `bind_soccer_event_game_v3` / `confirm_game_event_stream_checkpoint` | SOC-5A-C game binding, setup/participant snapshots, independent recorder joining, and verified recorder sync |
+| `bind_soccer_event_game_v4` / `confirm_game_event_stream_checkpoint` | SOC-5A-D game binding, setup/participant snapshots, independent recorder joining, verified sync, and final audit completion |
 | `record_game_event_conflict` / `resolve_game_event_conflict` | SOC-5B durable same-recorder conflict recovery |
 | `get_soccer_game_recorders` / `set_soccer_primary_recorder` | SOC-5C recorder presence and provisional owner/admin primary resolution |
 | `get_soccer_primary_recorder_history` | SOC-5C immutable primary-selection history |
+| `get_soccer_finalization_readiness` / `finalize_soccer_event_game` | SOC-5D manager readiness, primary lock, and canonical publication |
+| `get_soccer_canonical_publication` / `reopen_soccer_event_game` | SOC-5D canonical review and reason-required audited reopen |
+| `get_soccer_primary_conflicts_for_finalization` / `resolve_soccer_primary_conflict_for_finalization` | SOC-5D manager preparation of unresolved primary conflicts |
 
 Without Supabase env vars, `supabase.ts` returns `null` and the app skips auth (`isConfigured === false`).
 
@@ -305,7 +310,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5C_INDEPENDENT_RECORDERS_AND_PRIMARY.md`](PLAN_SOC_5C_INDEPENDENT_RECORDERS_AND_PRIMARY.md) | SOC-5 decisions and phases; SOC-5A-C transport, recovery, and recorder resolution implemented |
+| [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

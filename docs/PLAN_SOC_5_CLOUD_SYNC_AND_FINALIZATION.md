@@ -1,6 +1,6 @@
 # Plan: SOC-5 Cloud Sync and Finalization
 
-Status: In progress. Product decisions are complete; SOC-5A through SOC-5C are implemented.
+Status: Implemented. Product decisions are complete; SOC-5A through SOC-5D are implemented.
 
 ## 1. Goal
 
@@ -45,6 +45,10 @@ release QA, and production enablement remain SOC-6.
 - Publish the canonical projection and lock the selected primary in one idempotent transaction.
 - Permit audit-only completion of already queued non-primary uploads.
 - Add reason-required audited reopen; late primary changes require reopen.
+
+Implemented by migration 046, `src/lib/soccer/finalization.ts`, and
+`SoccerFinalizationPanel`. See
+[`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md).
 
 ## 3. Reviewed Decisions
 

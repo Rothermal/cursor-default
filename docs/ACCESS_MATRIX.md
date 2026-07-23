@@ -52,7 +52,8 @@ describes the approved future behavior.
 | View member email addresses | Allow for management | Allow for management | Deny | Deny | Deny |
 | Start a team game | Allow | Allow | Allow | Deny | Deny |
 | Resume and track an in-progress game | Allow | Allow | Allow | Deny | Deny |
-| Finalize an in-progress game | Allow | Allow | Allow | Deny | Deny |
+| Finalize an in-progress basketball game | Allow | Allow | Allow | Deny | Deny |
+| Finalize or reopen a soccer game | Allow | Allow | Deny | Deny | Deny |
 | Edit team name or nickname | Allow | Allow | Deny | Deny | Deny |
 | Delete team | Allow | Deny | Deny | Deny | Deny |
 | Add, reactivate, or remove a roster entry | Allow | Allow | Deny | Deny | Deny |
@@ -80,6 +81,9 @@ Rules that cut across the table:
 - Accepted membership is required for every team-derived read or write.
 - Finalization ends normal raw game/stat writes. Later changes use explicit correction or
   admin actions rather than editing recorder submissions in place.
+- Soccer finalization is publication-backed: owner/admin only, one locked healthy primary,
+  canonical snapshot, and reason-required audited reopen. Scorers may finish only queued
+  pre-finalization non-primary audit uploads.
 - Team role alone never grants permission to edit a player's global identity or delete
   the global player record.
 - Owner transfer is not implied by role editing and needs a dedicated future design.
@@ -163,9 +167,11 @@ closed SEC0-15 in migration 039 with a PostgREST request gate and app-admin-only
 | Player merge RPCs | Owner/admin on every involved team can preview/execute | `024_player_merge_rpcs.sql` |
 | `player_merge_audit` | User reads only merges they performed | `025_player_merge_audit_select_policy.sql` |
 | `shot_chart` | Team members read; recorder writes/deletes own rows | `032_shot_chart.sql` |
-| Soccer `game_events` / checkpoints | Team members read; owner/admin/scorer writes only their own non-final recorder stream; viewers read only | Migrations 042–045 |
+| Soccer `game_events` / checkpoints | Team members read; owner/admin/scorer writes only their own non-final recorder stream; after final, a non-primary recorder may finish only pre-finalization audit uploads; viewers read only | Migrations 042-046 |
 | Soccer primary recorder RPC | Team owner/admin or personal-game owner selects a current conflict-free stream; scorer/viewer denied | `set_soccer_primary_recorder` in migration 045 |
 | Soccer primary history | Game readers can inspect immutable selection history; direct writes denied | Migration 045 |
+| Soccer canonical publications | Game readers inspect the active canonical snapshot; history is append-only and client writes are denied | Migration 046 |
+| Soccer finalize/reopen RPCs | Team owner/admin or personal-game owner only; exact primary checkpoint and final projection required; reopen requires reason | Migration 046 |
 | `client_sync_errors` | User inserts/reads own rows | `033_client_sync_errors.sql` |
 | Authenticated app shell | Any authenticated Supabase user enters; no app status exists | `src/App.tsx`, `src/context/AuthContext.tsx` |
 | Local parked games | Device-local records scoped by stored owner id | `src/lib/gameParking.ts` |

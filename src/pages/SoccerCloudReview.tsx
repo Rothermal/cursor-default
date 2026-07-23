@@ -1,14 +1,18 @@
 import { ChevronLeft, History, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import SoccerFinalizationPanel from '../components/soccer/SoccerFinalizationPanel'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import { useAuth } from '../context/AuthContext'
 import { formatSoccerDuration } from '../lib/soccer'
-import {
-  loadSoccerPrimaryCloudReview,
-  type SoccerRecorderProjection,
-  type SoccerRecorderSummary,
+import type {
+  SoccerRecorderProjection,
+  SoccerRecorderSummary,
 } from '../lib/soccer/recorders'
+import {
+  loadSoccerCanonicalOrPrimaryReview,
+  type SoccerCanonicalPublication,
+} from '../lib/soccer/finalization'
 
 export default function SoccerCloudReview() {
   const navigate = useNavigate()
@@ -16,6 +20,7 @@ export default function SoccerCloudReview() {
   const { user } = useAuth()
   const gameId = searchParams.get('gameId')
   const [primary, setPrimary] = useState<SoccerRecorderProjection | null>(null)
+  const [publication, setPublication] = useState<SoccerCanonicalPublication | null>(null)
   const [recorders, setRecorders] = useState<SoccerRecorderSummary[]>([])
   const [recordersOpen, setRecordersOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -30,9 +35,10 @@ export default function SoccerCloudReview() {
     if (!primary) setLoading(true)
     setError(null)
     try {
-      const result = await loadSoccerPrimaryCloudReview(gameId)
+      const result = await loadSoccerCanonicalOrPrimaryReview(gameId)
       setPrimary(result.primary)
       setRecorders(result.recorders)
+      setPublication(result.publication)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Soccer game could not load.')
     } finally {
@@ -100,7 +106,8 @@ export default function SoccerCloudReview() {
               {primary.state.gameInfo?.teamName} vs {primary.state.gameInfo?.opponentName}
             </h1>
             <p className="truncate text-xs text-emerald-100">
-              Read-only primary stream | {primary.recorder.displayName}
+              {publication ? 'Canonical final' : 'Read-only primary stream'} |{' '}
+              {primary.recorder.displayName}
             </p>
           </div>
           <button
@@ -142,6 +149,18 @@ export default function SoccerCloudReview() {
             </p>
           </div>
         </section>
+
+        {(publication || soccerState?.projection.status === 'ended') && (
+          <SoccerFinalizationPanel
+            baseState={primary.state}
+            currentUserId={user?.id ?? null}
+            refreshKey={publication?.finalizedAt ?? primary.state.cloudSync.lastSyncedAt}
+            onFinalized={() => { void refresh() }}
+            onReopened={() => {
+              navigate('/games?sport=soccer', { replace: true })
+            }}
+          />
+        )}
 
         {!primary.inspection.complete && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

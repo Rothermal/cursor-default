@@ -110,7 +110,10 @@ function hasSyncPrereqs(state: GameState, isConfigured: boolean, userId: string 
     state.sport &&
     state.gameInfo &&
     isCloudSyncEligible(state) &&
-    state.cloudSync.gameStatus !== 'final'
+    (
+      state.cloudSync.gameStatus !== 'final' ||
+      isSoccerEventCloudSyncEligible(state)
+    )
   )
 }
 
@@ -779,7 +782,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
           teamId: synced.teamId,
           gameId: synced.gameId,
           gameStatus:
-            'skippedFinalGame' in synced && synced.skippedFinalGame
+            snapshot.cloudSync.gameStatus === 'final' ||
+            ('gameStatus' in synced && synced.gameStatus === 'final') ||
+            ('skippedFinalGame' in synced && synced.skippedFinalGame)
               ? 'final'
               : 'in_progress',
           playerIdMap: synced.playerIdMap,
