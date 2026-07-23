@@ -40,6 +40,7 @@ import SoccerShootoutManagementDialog, { type SoccerShootoutManagementKind } fro
 import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupDialog'
 import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
 import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
+import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from '../components/soccer/SoccerShotCaptureDialog'
@@ -69,6 +70,11 @@ import {
   type SoccerShotEvent,
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import {
+  loadSoccerGameRecorders,
+  primarySoccerRecorder,
+  type SoccerRecorderSummary,
+} from '../lib/soccer/recorders'
 
 type MainTab = 'field' | 'lineup' | 'timeline'
 type LineupTab = 'on_field' | 'bench'
@@ -107,6 +113,9 @@ export default function SoccerGameTracker() {
   const [reopenOpen, setReopenOpen] = useState(false)
   const [conflictOpen, setConflictOpen] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
+  const [recordersOpen, setRecordersOpen] = useState(false)
+  const [recorders, setRecorders] = useState<SoccerRecorderSummary[]>([])
+  const [recordersLoading, setRecordersLoading] = useState(false)
   const applyingRef = useRef(false)
 
   const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
@@ -126,6 +135,42 @@ export default function SoccerGameTracker() {
   }, [state])
 
   const cloudConflicts = state.cloudSync.eventConflicts ?? []
+  const primaryRecorder = primarySoccerRecorder(recorders)
+
+  const refreshRecorders = async () => {
+    const gameId = state.cloudSync.gameId
+    if (!gameId) {
+      setRecorders([])
+      return
+    }
+    setRecordersLoading(true)
+    try {
+      setRecorders(await loadSoccerGameRecorders(gameId))
+    } catch {
+      setRecorders([])
+    } finally {
+      setRecordersLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void refreshRecorders()
+    // A confirmed checkpoint changes lastSyncedAt and can add the current recorder.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.cloudSync.gameId, state.cloudSync.lastSyncedAt])
+
+  useEffect(() => {
+    if (!state.cloudSync.gameId) return
+    const timer = window.setInterval(() => { void refreshRecorders() }, 30_000)
+    const onFocus = () => { void refreshRecorders() }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.cloudSync.gameId])
+
   useEffect(() => {
     if (cloudConflicts.length > 0) setConflictOpen(true)
   }, [cloudConflicts.length])
@@ -406,6 +451,34 @@ export default function SoccerGameTracker() {
             <button type="button" onClick={exportRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
           </div>
         ) : null}
+
+        {state.cloudSync.gameId && (
+          <button
+            type="button"
+            onClick={() => {
+              setRecordersOpen(true)
+              void refreshRecorders()
+            }}
+            className="mx-4 mt-4 flex min-h-12 items-center gap-3 border-y border-slate-200 bg-white px-1 text-left"
+          >
+            <Users size={19} className="shrink-0 text-emerald-700" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-slate-800">
+                {recordersLoading
+                  ? 'Loading recorder streams...'
+                  : `${recorders.length} ${recorders.length === 1 ? 'recorder' : 'recorders'}`}
+              </span>
+              <span className="block truncate text-xs text-slate-500">
+                {primaryRecorder
+                  ? `Primary: ${primaryRecorder.displayName}`
+                  : 'Primary recorder pending'}
+              </span>
+            </span>
+            {recorders.some(recorder => !recorder.checkpointCurrent) && (
+              <BadgeAlert size={17} className="shrink-0 text-amber-600" />
+            )}
+          </button>
+        )}
 
         {!healthy && mainTab !== 'timeline' && (
           <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-3">
@@ -727,6 +800,15 @@ export default function SoccerGameTracker() {
           onClose={() => setConflictOpen(false)}
         />
       )}
+
+      <SoccerRecorderDialog
+        open={recordersOpen}
+        baseState={state}
+        currentUserId={user?.id ?? null}
+        recorders={recorders}
+        onRecordersChanged={refreshRecorders}
+        onClose={() => setRecordersOpen(false)}
+      />
 
       <SoccerScoreTimelineDialog
         open={scoreTimelineOpen}

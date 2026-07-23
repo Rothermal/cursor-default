@@ -34,6 +34,7 @@ import { consumeOAuthReturnPath } from './lib/oauthReturnPath'
 import SoccerGameSetup from './pages/SoccerGameSetup'
 import SoccerPlayerSetup from './pages/SoccerPlayerSetup'
 import SoccerGameTracker from './pages/SoccerGameTracker'
+import SoccerCloudReview from './pages/SoccerCloudReview'
 
 function GameSetupRoute() {
   const { state } = useGame()
@@ -170,6 +171,9 @@ function AppRoutes() {
             <Route path="/team/season" element={<SeasonInfo />} />
             <Route path="/game-info" element={<GameInfo />} />
             <Route path="/games" element={<Games />} />
+            {import.meta.env.DEV && (
+              <Route path="/soccer/review" element={<SoccerCloudReview />} />
+            )}
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/player" element={<PlayerProfile />} />
             <Route path="/player-info" element={<PlayerProfile />} />

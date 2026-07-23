@@ -162,7 +162,7 @@ export async function syncSoccerEventGameToCloud({
   const participants = soccerCloudParticipants(sportState)
 
   const { data: bindingData, error: bindingError } = await supabase.rpc(
-    'bind_soccer_event_game_v2',
+    'bind_soccer_event_game_v3',
     {
       p_existing_game_id: state.cloudSync.gameId,
       p_client_local_game_id: localGameId,

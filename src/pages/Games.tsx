@@ -5,6 +5,7 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
+import { createSoccerIndependentRecorderState } from '../lib/soccer/recorders'
 import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { hasUnsyncedParkedBindingForCloudGame } from '../lib/gameParking'
@@ -345,18 +346,45 @@ export default function Games() {
       game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
     const teamRole = game.team_id ? teamRolesById[game.team_id] ?? null : null
     if (gameSportId === 'soccer') {
-      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
-      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+      if (!import.meta.env.DEV) {
+        setError('Soccer cloud review remains unavailable until the soccer release phase.')
+        return
+      }
+      if (game.status === 'final') {
+        navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
         return
       }
       setError(null)
       setLoadingGameId(game.id)
-      const soccerGame = await loadSoccerCloudGameById(userId, game.id).catch(err => {
+      let soccerGame = await loadSoccerCloudGameById(userId, game.id).catch(err => {
         setError(err instanceof Error ? err.message : 'Could not load soccer game')
         return null
       })
       if (!soccerGame) {
-        setError(current => current ?? 'No recorder stream is available for this soccer game.')
+        if (!canTrackGames(teamRole)) {
+          setLoadingGameId(null)
+          navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
+          return
+        }
+        const startIndependent = window.confirm(
+          'Start your own independent recorder stream for this game? Select Cancel to open read-only review.'
+        )
+        if (!startIndependent) {
+          setLoadingGameId(null)
+          navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
+          return
+        }
+        soccerGame = await createSoccerIndependentRecorderState(userId, game.id).catch(err => {
+          setError(err instanceof Error ? err.message : 'Could not start recorder stream')
+          return null
+        })
+      }
+      if (!soccerGame) {
+        setLoadingGameId(null)
+        return
+      }
+      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
         setLoadingGameId(null)
         return
       }
@@ -603,14 +631,16 @@ export default function Games() {
           {sport?.id === 'soccer' ? (
             <button
               onClick={() => { void handleOpenGame(game) }}
-              disabled={loadingGameId === game.id || game.status === 'final'}
+              disabled={loadingGameId === game.id}
               className="btn-primary flex-1 py-2 disabled:opacity-50"
             >
               {loadingGameId === game.id
                 ? 'Loading...'
                 : game.status === 'final'
-                  ? 'Finalized'
-                  : 'Resume Game'}
+                  ? 'Review Game'
+                  : canTrackGames(teamRole)
+                    ? 'Open Game'
+                    : 'Review Game'}
             </button>
           ) : (
             <button
