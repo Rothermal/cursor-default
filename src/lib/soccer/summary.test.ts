@@ -46,7 +46,10 @@ function setup(): SoccerMatchSetup {
 }
 
 describe('soccer summary navigation', () => {
-  it('parses constrained context and falls back future tabs to overview', () => {
+  it('parses shipped tabs and falls back future tabs to overview', () => {
+    expect(
+      parseSoccerSummaryQuery(new URLSearchParams('tab=players')).tab
+    ).toBe('players')
     const parsed = parseSoccerSummaryQuery(
       new URLSearchParams(
         'gameId=game-1&tab=field&from=game-info&teamId=team-1'
@@ -76,11 +79,12 @@ describe('soccer summary navigation', () => {
     expect(
       soccerSummaryPath({
         gameId: 'game 1',
+        tab: 'players',
         from: 'team',
         teamId: 'team/1',
       })
     ).toBe(
-      '/summary?gameId=game+1&tab=overview&from=team&teamId=team%2F1'
+      '/summary?gameId=game+1&tab=players&from=team&teamId=team%2F1'
     )
     expect(
       legacySoccerReviewSummaryPath(

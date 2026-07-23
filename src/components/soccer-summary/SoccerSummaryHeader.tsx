@@ -25,7 +25,9 @@ export default function SoccerSummaryHeader({
     ? 'Local'
     : source.kind === 'cloud_primary'
       ? 'Synced Primary'
-      : 'Canonical Final'
+      : source.kind === 'cloud_recording'
+        ? 'Other Recording'
+        : 'Canonical Final'
 
   return (
     <header className="bg-emerald-900 text-white">

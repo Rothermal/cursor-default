@@ -881,9 +881,32 @@ development, and at least one local match plus one team cloud match available.
 | 11n.9 | Introduce a projection diagnostic in a local, primary, or canonical stream | Last coherent score/context and recovery/Resume actions remain visible, while team comparison, leaders, and finalization are suppressed and diagnostics are shown |
 | 11n.10 | Leave the non-final cloud summary open, focus another window and return, then wait 30 seconds; force one refresh request to fail | Focus, manual Refresh, and the active-page interval reload only the effective primary; a transient failure keeps the last good Overview with a retry warning, and canonical finals do not poll |
 | 11n.11 | Use long team/player names, tied leaders, all-zero optional rows, extra time, penalties, suspended, and abandoned results at narrow mobile and desktop widths | Header columns remain stable, text wraps/truncates safely, ties remain visible, optional both-zero rows hide, and result context is explicit |
-| 11n.12 | Open a future or invalid `tab` query value | SOC-6A safely renders Overview and shows no incomplete Players, Timeline, Field, or Shootout tabs |
+| 11n.12 | Open `tab=players`, then a future or invalid `tab` query value | Players opens the shipped SOC-6B1 view; unsupported Timeline, Field, Shootout, or unknown values normalize to Overview |
 | 11n.13 | Open legacy `/#/soccer/review` with `gameId`, `from`, `teamId`, and an unrelated parameter | It redirects to `/summary`, preserving only supported context and normalizing the tab to Overview |
 | 11n.14 | Re-run basketball local and cloud summary entry paths | Basketball still renders `GameSummary`; soccer source loading and direct cloud review are not invoked |
+
+## 11o. Soccer summary Players (SOC-6B1)
+
+> **Scope:** URL-backed Players review for local/current-recorder, remote primary, isolated other
+> recorder, and canonical authority. Soccer remains development-only until SOC-6E.
+
+| # | Action | Expected |
+|---|--------|----------|
+| 11o.1 | Open `/#/summary?tab=players` for a healthy local, effective-primary, and canonical match | The same Players surface loads from the selected authority without activating or replacing another parked game |
+| 11o.2 | Review starters, return substitutes, a player with a zero-second appearance, a late participant, and an unused substitute | Rows use stable match identity; starters come first in opening order, used substitutes follow first appearance, `0:00` is an appearance, and unused players show `DNP` |
+| 11o.3 | Switch Attack, Defense, Discipline, and Goalkeeping categories, move to Overview, then return | Identity, lineup status, role, and minutes remain fixed; the selected category and side survive tab changes but reset for a different game |
+| 11o.4 | Open Player Detail for a participant who changed roles and re-entered | Complete normal-match totals, real appearance count, rates, on-field intervals, and role intervals retain second precision and correct period-local times |
+| 11o.5 | Verify shots, goals, tackles, saves, normal penalties, and zero denominators | Rates show rounded percentage plus raw numerator/denominator; regulation/extra-time penalties count, shootout activity does not, and zero-denominator rates show no percentage |
+| 11o.6 | Complete a clean sheet with one and then two goalkeepers who played | One qualifying goalkeeper receives `Clean sheet`; multiple qualifying goalkeepers each receive `Shared clean sheet`; DNP keepers receive none |
+| 11o.7 | Concede before or after a goalkeeper substitution, record an own goal at the same timestamp as a substitution, and leave one concession unattributed | Canonical event order/link attribution denies the responsible keeper; overlapping fallback denies every overlapping keeper; no identifiable interval marks individual credit unavailable |
+| 11o.8 | Add an opponent score adjustment, then remove/correct it | Team context follows corrected normal score; individual goalkeeper credit is unavailable while attribution is unreliable and recomputes after correction |
+| 11o.9 | Open Players during a live, suspended, abandoned, and completed match | Live zero-concession context is provisional; suspended/abandoned matches award no final credit; completed matches derive final credit |
+| 11o.10 | Select Opponent in a current match | Team clean-sheet context remains truthful and the UI shows a team-only state rather than inventing player lineup, role, or minutes from actor labels |
+| 11o.11 | On a non-final cloud game with multiple recorders, choose **Other recordings** and select a non-primary stream | Header and every summary tab show one clearly labeled `Other Recording`; totals never blend, tab/refresh retain selection, and changing games resets to Primary |
+| 11o.12 | While viewing Other Recording, inspect Overview as owner/admin | Finalize is absent; returning to Primary reloads effective-primary authority before Finalize can appear |
+| 11o.13 | Select the current user's non-primary recording with and without a parked copy | Summary remains read-only; **Resume Tracker** uses the matching binding, while **Open Tracker** creates a local binding before edits |
+| 11o.14 | Introduce projection diagnostics while Players is selected | Players disappears and the route normalizes to Overview; diagnostics and recovery/source controls remain available |
+| 11o.15 | Test long names, missing numbers, all four categories, rate fractions, and detail sheets at narrow mobile and desktop widths | Names truncate without covering stats, table dimensions remain stable, controls remain tappable, and the detail sheet fits without page-level horizontal overflow |
 
 ---
 

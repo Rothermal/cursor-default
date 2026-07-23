@@ -4,12 +4,18 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import SoccerFinalizationPanel from '../components/soccer/SoccerFinalizationPanel'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import SoccerOverview from '../components/soccer-summary/SoccerOverview'
+import SoccerPlayers from '../components/soccer-summary/SoccerPlayers'
+import SoccerRecordingSelector from '../components/soccer-summary/SoccerRecordingSelector'
 import SoccerSummaryHeader from '../components/soccer-summary/SoccerSummaryHeader'
 import SoccerSummaryTabs from '../components/soccer-summary/SoccerSummaryTabs'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
 import { reopenSoccerMatch } from '../lib/soccer/live'
+import type {
+  SoccerPlayerCategory,
+  SoccerPlayerReviewSide,
+} from '../lib/soccer/summaryPlayers'
 import { loadSoccerGameRecorders, type SoccerRecorderSummary } from '../lib/soccer/recorders'
 import {
   parseSoccerSummaryQuery,
@@ -21,6 +27,7 @@ import {
 } from '../lib/soccer/summary'
 import {
   loadSoccerSummarySource,
+  loadSoccerSummaryRecordingSource,
   SoccerSummarySourceError,
   type SoccerSummaryAuthority,
   type SoccerSummarySource,
@@ -54,9 +61,15 @@ export default function SoccerSummary() {
   const [errorAuthority, setErrorAuthority] =
     useState<SoccerSummaryAuthority>('local')
   const [reopenedGameId, setReopenedGameId] = useState<string | null>(null)
+  const [playerSide, setPlayerSide] =
+    useState<SoccerPlayerReviewSide>('tracked')
+  const [playerCategory, setPlayerCategory] =
+    useState<SoccerPlayerCategory>('attack')
   const requestIdRef = useRef(0)
   const routeKeyRef = useRef<string | null>(null)
   const sourceRef = useRef<SoccerSummarySource | null>(null)
+  const selectedRecordingIdRef = useRef<string | null>(null)
+  const playerViewGameKeyRef = useRef<string | null>(null)
 
   const refresh = useCallback(async (
     options: {
@@ -75,10 +88,23 @@ export default function SoccerSummary() {
     setError(null)
     setRefreshError(null)
     try {
-      const next = await loadSoccerSummarySource(
+      let next = await loadSoccerSummarySource(
         state,
         options.gameId === undefined ? query.gameId : options.gameId
       )
+      const selectedRecordingId = selectedRecordingIdRef.current
+      if (selectedRecordingId && next.kind === 'cloud_primary') {
+        const selectedRecorder = next.recorders.find(
+          recorder => recorder.recorderId === selectedRecordingId
+        )
+        if (!selectedRecorder || selectedRecorder.isPrimary) {
+          selectedRecordingIdRef.current = null
+        } else {
+          next = await loadSoccerSummaryRecordingSource(next, selectedRecorder)
+        }
+      } else if (selectedRecordingId && next.kind !== 'cloud_recording') {
+        selectedRecordingIdRef.current = null
+      }
       if (requestId !== requestIdRef.current) return
       sourceRef.current = next
       setSource(next)
@@ -90,6 +116,10 @@ export default function SoccerSummary() {
         ? caught.message
         : 'The soccer summary could not load.'
       if (sourceRef.current && !options.replaceSource) {
+        selectedRecordingIdRef.current =
+          sourceRef.current.kind === 'cloud_recording'
+            ? sourceRef.current.recorder.recorderId
+            : null
         setRefreshError(message)
       } else {
         setError(message)
@@ -115,12 +145,21 @@ export default function SoccerSummary() {
     const routeKey = query.gameId ?? 'local'
     const showLoading = routeKeyRef.current !== routeKey
     routeKeyRef.current = routeKey
+    if (showLoading) selectedRecordingIdRef.current = null
     void refresh({ showLoading, replaceSource: showLoading })
     // refresh intentionally changes when local GameState changes.
   }, [query.gameId, state, refresh])
 
   useEffect(() => {
-    if (source?.kind !== 'cloud_primary') return
+    const gameKey = query.gameId ?? activeLocalGameId ?? 'local'
+    if (playerViewGameKeyRef.current === gameKey) return
+    playerViewGameKeyRef.current = gameKey
+    setPlayerSide('tracked')
+    setPlayerCategory('attack')
+  }, [activeLocalGameId, query.gameId])
+
+  useEffect(() => {
+    if (source?.kind !== 'cloud_primary' && source?.kind !== 'cloud_recording') return
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
     }, 30_000)
@@ -142,6 +181,40 @@ export default function SoccerSummary() {
       teamId: query.teamId,
     }), { replace: true })
   }, [navigate, query.from, query.gameId, query.tab, query.teamId, source])
+
+  useEffect(() => {
+    if (!query.requestedTab || query.requestedTab === query.tab) return
+    navigate(soccerSummaryPath({
+      gameId: query.gameId,
+      tab: query.tab,
+      from: query.from,
+      teamId: query.teamId,
+    }), { replace: true })
+  }, [
+    navigate,
+    query.from,
+    query.gameId,
+    query.requestedTab,
+    query.tab,
+    query.teamId,
+  ])
+
+  useEffect(() => {
+    if (!source || source.inspection.complete || query.tab === 'overview') return
+    navigate(soccerSummaryPath({
+      gameId: query.gameId,
+      tab: 'overview',
+      from: query.from,
+      teamId: query.teamId,
+    }), { replace: true })
+  }, [
+    navigate,
+    query.from,
+    query.gameId,
+    query.tab,
+    query.teamId,
+    source,
+  ])
 
   const openRecorders = async () => {
     const gameId = source?.state.cloudSync.gameId
@@ -189,8 +262,11 @@ export default function SoccerSummary() {
   const comparisons = healthy ? soccerTeamComparison(soccerState.projection) : []
   const leaders = healthy ? soccerMatchLeaders(soccerState.projection) : []
   const cloudGameId = source.state.cloudSync.gameId
+  const matchingParked = cloudGameId
+    ? parkedGames.find(game => game.cloudGameId === cloudGameId) ?? null
+    : null
   const resumable = reopenedGameId
-    ? parkedGames.find(game => game.cloudGameId === reopenedGameId) ?? null
+    ? matchingParked
     : null
   const ownedRecorder = user
     ? source.recorders.find(recorder => recorder.recorderId === user.id) ?? null
@@ -199,6 +275,9 @@ export default function SoccerSummary() {
     source.kind === 'cloud_primary' &&
     reopenedGameId === cloudGameId &&
     Boolean(resumable || ownedRecorder)
+  const canOpenSelectedRecording =
+    source.kind === 'cloud_recording' &&
+    source.recorder.recorderId === user?.id
 
   const reopenLocal = () => {
     const reason = soccerState.projection.endReason === 'abandoned'
@@ -223,14 +302,14 @@ export default function SoccerSummary() {
     setSource(nextSource)
   }
 
-  const resumeReopened = async () => {
+  const openOwnedStream = async () => {
     if (!cloudGameId || !user) return
-    if (resumable) {
+    if (matchingParked) {
       if (
-        activeLocalGameId !== resumable.localGameId &&
+        activeLocalGameId !== matchingParked.localGameId &&
         !window.confirm('Park the current game and resume this soccer recorder stream?')
       ) return
-      if (!resumeParkedGame(resumable.localGameId)) return
+      if (!resumeParkedGame(matchingParked.localGameId)) return
       navigate('/game')
       return
     }
@@ -260,6 +339,25 @@ export default function SoccerSummary() {
     navigate('/game')
   }
 
+  const selectRecording = (recorder: SoccerRecorderSummary) => {
+    selectedRecordingIdRef.current = recorder.recorderId
+    void refresh()
+  }
+
+  const returnToPrimary = () => {
+    selectedRecordingIdRef.current = null
+    void refresh()
+  }
+
+  const changeTab = (tab: typeof query.tab) => {
+    navigate(soccerSummaryPath({
+      gameId: query.gameId,
+      tab,
+      from: query.from,
+      teamId: query.teamId,
+    }))
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <SoccerSummaryHeader
@@ -270,7 +368,17 @@ export default function SoccerSummary() {
         onRefresh={() => { void refresh() }}
         onOpenRecorders={cloudGameId ? () => { void openRecorders() } : undefined}
       />
-      <SoccerSummaryTabs />
+      <SoccerSummaryTabs
+        activeTab={query.tab}
+        showPlayers={healthy}
+        onChange={changeTab}
+      />
+      <SoccerRecordingSelector
+        source={source}
+        busy={loading || refreshing}
+        onSelect={selectRecording}
+        onPrimary={returnToPrimary}
+      />
 
       {refreshError && (
         <section className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
@@ -313,13 +421,22 @@ export default function SoccerSummary() {
         </section>
       )}
 
-      <SoccerOverview
-        source={source}
-        comparisons={comparisons}
-        leaders={leaders}
-        healthy={healthy}
-        actions={(
-          <>
+      {query.tab === 'players' && healthy ? (
+        <SoccerPlayers
+          source={source}
+          side={playerSide}
+          category={playerCategory}
+          onSideChange={setPlayerSide}
+          onCategoryChange={setPlayerCategory}
+        />
+      ) : (
+        <SoccerOverview
+          source={source}
+          comparisons={comparisons}
+          leaders={leaders}
+          healthy={healthy}
+          actions={(
+            <>
             {source.kind === 'local' &&
               source.editable &&
               soccerState.projection.status === 'ended' && (
@@ -336,7 +453,7 @@ export default function SoccerSummary() {
                 </section>
               )}
 
-            {healthy && cloudGameId && (
+            {healthy && cloudGameId && source.kind !== 'cloud_recording' && (
               <div className="mx-auto max-w-2xl">
                 <SoccerFinalizationPanel
                   baseState={source.state}
@@ -376,23 +493,24 @@ export default function SoccerSummary() {
               </div>
             )}
 
-            {canOpenReopenedStream && (
+            {(canOpenReopenedStream || canOpenSelectedRecording) && (
               <section className="border-b border-slate-200 bg-emerald-50 px-4 py-4">
                 <div className="mx-auto max-w-2xl">
                   <button
                     type="button"
-                      onClick={() => { void resumeReopened() }}
+                    onClick={() => { void openOwnedStream() }}
                     className="flex min-h-11 w-full items-center justify-center gap-2 bg-emerald-700 px-3 text-sm font-bold text-white"
                   >
                     <Play size={17} />
-                    {resumable ? 'Resume Tracker' : 'Open Tracker'}
+                    {matchingParked ? 'Resume Tracker' : 'Open Tracker'}
                   </button>
                 </div>
               </section>
             )}
-          </>
-        )}
-      />
+            </>
+          )}
+        />
+      )}
 
       <SoccerRecorderDialog
         open={recordersOpen}
@@ -432,6 +550,8 @@ function SoccerSummaryError({
 }) {
   const sourceLabel = authority === 'canonical'
     ? 'Canonical final'
+    : authority === 'cloud_recording'
+      ? 'Other recording'
     : authority === 'cloud_primary'
       ? 'Synced primary'
       : 'Local match'

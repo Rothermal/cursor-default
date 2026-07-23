@@ -10,6 +10,7 @@ import {
   loadSoccerCloudSummaryState,
   loadSoccerGameRecorders,
   loadSoccerPrimaryCloudReview,
+  loadSoccerRecorderProjection,
   type SoccerRecorderProjection,
   type SoccerRecorderSummary,
 } from './recorders'
@@ -36,6 +37,12 @@ export type SoccerSummarySource =
       editable: false
     })
   | (SoccerSummarySourceBase & {
+      kind: 'cloud_recording'
+      recorder: SoccerRecorderSummary
+      publication: null
+      editable: false
+    })
+  | (SoccerSummarySourceBase & {
       kind: 'canonical'
       recorder: SoccerRecorderSummary
       publication: SoccerCanonicalPublication
@@ -45,6 +52,7 @@ export type SoccerSummarySource =
 export type SoccerSummaryAuthority =
   | 'local'
   | 'cloud_primary'
+  | 'cloud_recording'
   | 'canonical'
 
 export class SoccerSummarySourceError extends Error {
@@ -118,6 +126,55 @@ export async function loadSoccerSummarySource(
     publication: null,
     inspection: inspectSoccerHistory(localState),
     editable: true,
+  }
+}
+
+export async function loadSoccerSummaryRecordingSource(
+  baseSource: SoccerSummarySource,
+  recorder: SoccerRecorderSummary,
+  loadRecorder: (
+    baseState: GameState,
+    selectedRecorder: SoccerRecorderSummary
+  ) => Promise<SoccerRecorderProjection> = loadSoccerRecorderProjection
+): Promise<SoccerSummarySource> {
+  if (baseSource.kind === 'local') {
+    throw new SoccerSummarySourceError(
+      'cloud_recording',
+      'Other recordings require a cloud game.'
+    )
+  }
+  if (baseSource.kind === 'canonical') {
+    throw new SoccerSummarySourceError(
+      'cloud_recording',
+      'Canonical finals cannot be replaced by a live recorder stream.'
+    )
+  }
+  const available = baseSource.recorders.find(
+    item => item.recorderId === recorder.recorderId
+  )
+  if (!available) {
+    throw new SoccerSummarySourceError(
+      'cloud_recording',
+      'The selected recorder is no longer available for this game.'
+    )
+  }
+  try {
+    const projection = await loadRecorder(baseSource.state, available)
+    return {
+      kind: available.isPrimary ? 'cloud_primary' : 'cloud_recording',
+      state: projection.state,
+      recorder: projection.recorder,
+      recorders: baseSource.recorders,
+      publication: null,
+      inspection: projection.inspection,
+      editable: false,
+    }
+  } catch (error) {
+    throw sourceError(
+      'cloud_recording',
+      error,
+      'The selected recorder stream could not load.'
+    )
   }
 }
 
