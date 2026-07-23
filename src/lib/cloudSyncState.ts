@@ -29,6 +29,9 @@ export function mergeCloudSyncState(
     next.lastSyncedAt = null
     next.lastSyncedGameFingerprint = null
     next.shotChartHydrationDroppedRows = 0
+    next.eventSyncBase = {}
+    next.eventConflicts = []
+    next.pendingEventConflictResolutions = []
   }
 
   return next

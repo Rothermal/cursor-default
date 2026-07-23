@@ -794,6 +794,26 @@ local-roster match and one existing cloud-team match.
 
 ---
 
+## 11k. Soccer offline recovery and same-recorder conflicts (SOC-5B)
+
+**Precondition:** Signed in on two browser profiles/devices with migrations 043 and 044 applied.
+Soccer remains development-only.
+
+| ID | Action | Expected |
+|---|---|---|
+| 11k.1 | Sync on device A, then open Soccer Cloud Games on device B and resume | Rules, opening roster, participants, event history, clock/match state, and same-recorder projection rebuild in a new parked game |
+| 11k.2 | Add an event offline on B, reconnect, then sync A | The unrelated event merges on both devices without a conflict and the checkpoint contains the union |
+| 11k.3 | Edit different events offline on A and B, then reconnect | Both revisions survive and sync; neither device silently replaces the other event |
+| 11k.4 | Edit the same event differently offline on A and B, then reconnect | Needs Attention appears; side-by-side local/cloud revisions are available and automatic retry pauses while the parked game stays dirty |
+| 11k.5 | Choose **Keep This Device** | A new revision above both copies uploads, the conflict audit resolves as local, and the checkpoint confirms |
+| 11k.6 | Reproduce and choose **Use Cloud Version** | The remote revision is adopted exactly, the audit resolves as remote, and the checkpoint confirms |
+| 11k.7 | Resolve while offline, reload, then reconnect | The choice and pending audit closure persist locally and complete on reconnect |
+| 11k.8 | Add and resolve a late participant on A, then resume/sync on B | Participant metadata is adopted before projection and all attributed events remain valid |
+| 11k.9 | Open another recorder's team soccer row without having a stream | The app does not create or open an empty aggregate/same-recorder soccer shell |
+| 11k.10 | Force a sync error and use **Export** | A one-game JSON recovery file downloads while local capture and discard protection remain intact |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.

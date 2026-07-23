@@ -35,6 +35,9 @@ export function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): C
     lastError: null,
     lastSyncedGameFingerprint: null,
     shotChartHydrationDroppedRows: 0,
+    eventSyncBase: {},
+    eventConflicts: [],
+    pendingEventConflictResolutions: [],
   }
 }
 
@@ -181,6 +184,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             typeof cs.shotChartHydrationDroppedRows === 'number'
               ? Math.max(0, Math.floor(cs.shotChartHydrationDroppedRows))
               : 0,
+          eventSyncBase:
+            cs.eventSyncBase && typeof cs.eventSyncBase === 'object'
+              ? cs.eventSyncBase
+              : {},
+          eventConflicts: Array.isArray(cs.eventConflicts) ? cs.eventConflicts : [],
+          pendingEventConflictResolutions: Array.isArray(cs.pendingEventConflictResolutions)
+            ? cs.pendingEventConflictResolutions
+            : [],
         },
       }
       return rebuildGameEventProjection(

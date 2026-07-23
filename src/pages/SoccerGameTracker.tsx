@@ -39,6 +39,7 @@ import SoccerScoreTimelineDialog from '../components/soccer/SoccerScoreTimelineD
 import SoccerShootoutManagementDialog, { type SoccerShootoutManagementKind } from '../components/soccer/SoccerShootoutManagementDialog'
 import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupDialog'
 import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
+import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from '../components/soccer/SoccerShotCaptureDialog'
@@ -77,7 +78,7 @@ type MarkerFamilyFilter = 'all' | 'shots' | 'defense' | 'incidents'
 
 export default function SoccerGameTracker() {
   const navigate = useNavigate()
-  const { state, dispatch } = useGame()
+  const { state, dispatch, flushCloudSync, resolveSoccerEventConflict } = useGame()
   const { user } = useAuth()
   const soccerState = state.sportGameState?.sportId === 'soccer'
     ? state.sportGameState
@@ -104,6 +105,8 @@ export default function SoccerGameTracker() {
   const [shootoutSetupOpen, setShootoutSetupOpen] = useState(false)
   const [shootoutManagement, setShootoutManagement] = useState<SoccerShootoutManagementKind | null>(null)
   const [reopenOpen, setReopenOpen] = useState(false)
+  const [conflictOpen, setConflictOpen] = useState(false)
+  const [syncBusy, setSyncBusy] = useState(false)
   const applyingRef = useRef(false)
 
   const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
@@ -121,6 +124,44 @@ export default function SoccerGameTracker() {
     applyingRef.current = false
     setIsApplying(false)
   }, [state])
+
+  const cloudConflicts = state.cloudSync.eventConflicts ?? []
+  useEffect(() => {
+    if (cloudConflicts.length > 0) setConflictOpen(true)
+  }, [cloudConflicts.length])
+
+  const exportRecovery = () => {
+    const blob = new Blob([
+      JSON.stringify({
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        kind: 'soccer-game-recovery',
+        gameState: state,
+      }, null, 2),
+    ], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `statkeeper-soccer-recovery-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const resolveConflict = (eventId: string, resolution: 'local' | 'remote') => {
+    const result = resolveSoccerEventConflict(eventId, resolution)
+    if (!result.ok) {
+      setError(result.reason)
+      return
+    }
+    if (cloudConflicts.length === 1) setConflictOpen(false)
+  }
+
+  const retrySync = async () => {
+    setSyncBusy(true)
+    const result = await flushCloudSync()
+    setSyncBusy(false)
+    if (!result.ok) setError(result.reason)
+  }
 
   useEffect(() => {
     if (!soccerState || !projection) return
@@ -347,6 +388,24 @@ export default function SoccerGameTracker() {
         </section>
 
         {error && <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+
+        {cloudConflicts.length > 0 ? (
+          <div className="mx-4 mt-4 flex items-center gap-3 border border-amber-300 bg-amber-50 px-3 py-3 text-amber-900">
+            <BadgeAlert size={20} className="shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">Cloud event conflict</p>
+              <p className="text-xs">{cloudConflicts.length} {cloudConflicts.length === 1 ? 'event needs' : 'events need'} review</p>
+            </div>
+            <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white">Review</button>
+          </div>
+        ) : state.cloudSync.status === 'error' ? (
+          <div className="mx-4 mt-4 flex items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
+            <BadgeAlert size={20} className="shrink-0" />
+            <p className="min-w-0 flex-1 truncate text-xs" title={state.cloudSync.lastError ?? undefined}>{state.cloudSync.lastError ?? 'Cloud sync needs attention.'}</p>
+            <button type="button" onClick={() => { void retrySync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-red-700 px-3 text-xs font-bold text-white disabled:opacity-50">{syncBusy ? 'Retrying...' : 'Retry'}</button>
+            <button type="button" onClick={exportRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
+          </div>
+        ) : null}
 
         {!healthy && mainTab !== 'timeline' && (
           <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-3">
@@ -656,6 +715,16 @@ export default function SoccerGameTracker() {
             editFieldEvent(event)
           }}
           onClose={() => setClusterEventIds(null)}
+        />
+      )}
+
+      {conflictOpen && cloudConflicts.length > 0 && (
+        <SoccerCloudConflictDialog
+          conflicts={cloudConflicts}
+          busy={syncBusy}
+          onResolve={resolveConflict}
+          onExport={exportRecovery}
+          onClose={() => setConflictOpen(false)}
         />
       )}
 

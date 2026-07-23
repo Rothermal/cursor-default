@@ -390,6 +390,22 @@ describe('gameParking', () => {
     ).toHaveLength(1)
   })
 
+  it('keeps conflicted records dirty while pausing automatic retry', () => {
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const record = getParkedGameRecord(summary.localGameId, 'user-1')!
+    const conflictedState: GameState = {
+      ...record.gameState,
+      cloudSync: {
+        ...record.gameState.cloudSync,
+        eventConflicts: [{ eventId: 'event-1' } as never],
+      },
+    }
+    saveParkedGameRecordState(summary.localGameId, conflictedState, 'user-1', { dirty: true })
+
+    expect(hasDirtyParkedGames('user-1')).toBe(true)
+    expect(listDirtyParkedGameRecords('user-1')).toEqual([])
+  })
+
   it('shows parked summaries as pending when the latest snapshot is still dirty', () => {
     const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
     const record = getParkedGameRecord(summary.localGameId, 'user-1')!

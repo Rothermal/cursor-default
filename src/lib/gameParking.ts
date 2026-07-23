@@ -657,6 +657,7 @@ export function listDirtyParkedGameRecords(
   return listParkedGameRecords(ownerId)
     .filter(record => {
       if (!record.sync.dirty) return false
+      if ((record.gameState.cloudSync.eventConflicts?.length ?? 0) > 0) return false
       if (!record.sync.nextAttemptAt) return true
       const nextMs = Date.parse(record.sync.nextAttemptAt)
       return Number.isNaN(nextMs) || nextMs <= nowMs
