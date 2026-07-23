@@ -302,6 +302,8 @@ docs/
 ├── PLAN_SOC_5B_OFFLINE_RECOVERY_AND_CONFLICTS.md # SOC-5B cloud resume and same-recorder conflicts
 ├── PLAN_SOC_5C_INDEPENDENT_RECORDERS_AND_PRIMARY.md # SOC-5C recorder presence and primary resolution
 ├── PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md # SOC-5D canonical publication and audited reopen
+├── PLAN_SOC_6_SUMMARY_AND_RELEASE.md # Reviewed SOC-6 summary, aggregates, settings, and release roadmap
+├── PLAN_SOC_6A_SUMMARY_FOUNDATION.md # Reviewed SOC-6A summary source and Overview implementation plan
 ├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
@@ -415,7 +417,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] **Soccer SOC-6** - complete summaries, field maps, settings, aggregates, regression QA, and production release ([SOC-5 plan](docs/PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer SOC-6** - complete summaries, field maps, settings, aggregates, regression QA, and production release ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
