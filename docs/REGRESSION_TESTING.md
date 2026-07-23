@@ -881,7 +881,7 @@ development, and at least one local match plus one team cloud match available.
 | 11n.9 | Introduce a projection diagnostic in a local, primary, or canonical stream | Last coherent score/context and recovery/Resume actions remain visible, while team comparison, leaders, and finalization are suppressed and diagnostics are shown |
 | 11n.10 | Leave the non-final cloud summary open, focus another window and return, then wait 30 seconds; force one refresh request to fail | Focus, manual Refresh, and the active-page interval reload only the effective primary; a transient failure keeps the last good Overview with a retry warning, and canonical finals do not poll |
 | 11n.11 | Use long team/player names, tied leaders, all-zero optional rows, extra time, penalties, suspended, and abandoned results at narrow mobile and desktop widths | Header columns remain stable, text wraps/truncates safely, ties remain visible, optional both-zero rows hide, and result context is explicit |
-| 11n.12 | Open `tab=players`, then a future or invalid `tab` query value | Players opens the shipped SOC-6B1 view; unsupported Timeline, Field, Shootout, or unknown values normalize to Overview |
+| 11n.12 | Open `tab=players`, `tab=timeline`, then a future or invalid `tab` query value | Players and Timeline open their shipped views; unsupported Field, Shootout, or unknown values normalize to Overview |
 | 11n.13 | Open legacy `/#/soccer/review` with `gameId`, `from`, `teamId`, and an unrelated parameter | It redirects to `/summary`, preserving only supported context and normalizing the tab to Overview |
 | 11n.14 | Re-run basketball local and cloud summary entry paths | Basketball still renders `GameSummary`; soccer source loading and direct cloud review are not invoked |
 
@@ -922,6 +922,7 @@ development, and at least one local match plus one team cloud match available.
 | 11p.8 | Trigger a validation failure while adding, correcting, or removing an event | Prior state remains intact, the active dialog/confirmation stays open where applicable, and the domain error is shown |
 | 11p.9 | Repeat correction review on remote primary, selected Other Recording, and canonical final sources | Add, Edit, Remove, and Restore controls are absent; owned cloud streams require **Open Tracker** before editing |
 | 11p.10 | Switch Overview/Players/Timeline, refresh, and test narrow mobile plus desktop widths | URL context and selected recorder persist, chips scroll without page overflow, rows remain readable, and basketball Summary is unchanged |
+| 11p.11 | Save a valid revision that makes later history semantically incomplete | The revision remains stored, Summary normalizes to Overview under the shared unhealthy-source policy, and diagnostics plus recovery/Open Tracker actions remain available |
 
 ---
 

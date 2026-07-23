@@ -17,9 +17,9 @@ import {
   parseSoccerInputTime,
   restoreSoccerHistoryEvent,
   SOCCER_SUMMARY_TIMELINE_FILTERS,
+  soccerEventMatchesTimelineFilter,
   soccerEventTimeLabel,
   soccerPeriodTimings,
-  soccerSummaryEventMatchesFilter,
   soccerSummaryTimelineReview,
   updateSoccerHistoryEvent,
   type SoccerLiveResult,
@@ -32,6 +32,7 @@ import {
   type SoccerSummaryTimelineFilter,
   type SoccerSummaryTimelineSection,
   type SoccerShotEvent,
+  type SoccerTimelineFilter,
   withSoccerTieResolution,
 } from '../../lib/soccer'
 import type {
@@ -62,6 +63,18 @@ const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
   { value: 'custom', label: 'Custom' },
 ]
 
+const LIVE_TIMELINE_FILTERS: ReadonlyArray<{
+  id: SoccerTimelineFilter
+  label: string
+}> = [
+  { id: 'all', label: 'All' },
+  { id: 'attacking', label: 'Attacking' },
+  { id: 'defensive', label: 'Defensive' },
+  { id: 'discipline', label: 'Discipline' },
+  { id: 'team_events', label: 'Team Events' },
+  { id: 'match_control', label: 'Match Control' },
+]
+
 export default function SoccerTimeline({
   state,
   inspection,
@@ -77,9 +90,13 @@ export default function SoccerTimeline({
 }: SoccerTimelineProps) {
   const [editing, setEditing] = useState<SoccerMatchEvent | null>(null)
   const [deleting, setDeleting] = useState<GameEvent | null>(null)
-  const [filter, setFilter] = useState<SoccerSummaryTimelineFilter>('all')
+  const [reviewFilter, setReviewFilter] =
+    useState<SoccerSummaryTimelineFilter>('all')
+  const [liveFilter, setLiveFilter] = useState<SoccerTimelineFilter>('all')
   const [removedOpen, setRemovedOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+  const [timelineError, setTimelineError] = useState<string | null>(null)
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
   const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
   const [scoreTimelineOpen, setScoreTimelineOpen] = useState(false)
@@ -87,8 +104,8 @@ export default function SoccerTimeline({
     useState<SoccerScoreAdjustmentEvent | null>(null)
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
   const review = useMemo(
-    () => soccerSummaryTimelineReview(state, inspection, filter),
-    [filter, inspection, state]
+    () => soccerSummaryTimelineReview(state, inspection, reviewFilter),
+    [inspection, reviewFilter, state]
   )
   const allEventsReview = useMemo(
     () => soccerSummaryTimelineReview(state, inspection, 'all'),
@@ -96,10 +113,22 @@ export default function SoccerTimeline({
   )
   const active = [...inspection.activeEvents]
     .reverse()
-    .filter(event => soccerSummaryEventMatchesFilter(event, filter))
+    .filter(event => soccerEventMatchesTimelineFilter(event, liveFilter))
   const deleted = [...inspection.deletedEvents]
     .reverse()
-    .filter(event => soccerSummaryEventMatchesFilter(event, filter))
+    .filter(event => soccerEventMatchesTimelineFilter(event, liveFilter))
+  const removedCount = presentation === 'review'
+    ? allEventsReview.removedCount
+    : inspection.deletedEvents.length
+
+  const restoreEvent = (event: GameEvent) => {
+    const result = restoreSoccerHistoryEvent(state, event.id)
+    if (!result.ok) {
+      setTimelineError(result.message)
+      return
+    }
+    if (onApply(result)) setTimelineError(null)
+  }
 
   const editEvent = (event: GameEvent) => {
     if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
@@ -176,9 +205,17 @@ export default function SoccerTimeline({
           </div>
           {allowAddEvent && !readOnly && <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add Event</button>}
         </div>
+        {timelineError && (
+          <p role="alert" className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {timelineError}
+          </p>
+        )}
         {presentation === 'review' ? (
           <>
-            <TimelineFilterChips filter={filter} onChange={setFilter} />
+            <TimelineFilterChips
+              filter={reviewFilter}
+              onChange={setReviewFilter}
+            />
             <ReviewSections
               sections={review.activeSections}
               readOnly={readOnly}
@@ -191,13 +228,13 @@ export default function SoccerTimeline({
             <label className="block text-xs font-bold uppercase text-slate-500">
               Event family
               <select
-                value={filter}
+                value={liveFilter}
                 onChange={event =>
-                  setFilter(event.target.value as SoccerSummaryTimelineFilter)
+                  setLiveFilter(event.target.value as SoccerTimelineFilter)
                 }
                 className="input-field mt-1"
               >
-                {SOCCER_SUMMARY_TIMELINE_FILTERS.map(item => (
+                {LIVE_TIMELINE_FILTERS.map(item => (
                   <option key={item.id} value={item.id}>{item.label}</option>
                 ))}
               </select>
@@ -218,10 +255,10 @@ export default function SoccerTimeline({
         )}
       </section>
 
-      {allEventsReview.removedCount > 0 && (
+      {removedCount > 0 && (
         <section>
           <button type="button" onClick={() => setRemovedOpen(value => !value)} className="flex min-h-10 w-full items-center justify-between border-y border-slate-200 text-sm font-bold text-slate-600">
-            <span>Removed Events ({allEventsReview.removedCount})</span>
+            <span>Removed Events ({removedCount})</span>
             {removedOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
           </button>
           {removedOpen && (
@@ -230,7 +267,7 @@ export default function SoccerTimeline({
                 sections={review.removedSections}
                 readOnly={readOnly}
                 removed
-                onRestore={event => onApply(restoreSoccerHistoryEvent(state, event.id))}
+                onRestore={restoreEvent}
               />
             ) : (
               <div className="divide-y divide-slate-200 border-b border-slate-200 opacity-70">
@@ -243,7 +280,7 @@ export default function SoccerTimeline({
                     onRestore={
                       readOnly
                         ? undefined
-                        : () => onApply(restoreSoccerHistoryEvent(state, event.id))
+                        : () => restoreEvent(event)
                     }
                   />
                 ))}
@@ -336,15 +373,23 @@ export default function SoccerTimeline({
         message="The event remains in the Timeline and can be restored. Later events may need correction."
         confirmLabel="Remove Event"
         cancelLabel="Cancel"
+        error={removeError}
         onConfirm={() => {
-          if (
-            deleting &&
-            onApply(deleteSoccerHistoryEvent(state, deleting.id))
-          ) {
+          if (!deleting) return
+          const result = deleteSoccerHistoryEvent(state, deleting.id)
+          if (!result.ok) {
+            setRemoveError(result.message)
+            return
+          }
+          if (onApply(result)) {
             setDeleting(null)
+            setRemoveError(null)
           }
         }}
-        onCancel={() => setDeleting(null)}
+        onCancel={() => {
+          setDeleting(null)
+          setRemoveError(null)
+        }}
       />
     </div>
   )

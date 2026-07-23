@@ -72,6 +72,7 @@ export default function SoccerSummary() {
   const sourceRef = useRef<SoccerSummarySource | null>(null)
   const selectedRecordingIdRef = useRef<string | null>(null)
   const playerViewGameKeyRef = useRef<string | null>(null)
+  const timelineApplyingRef = useRef(false)
 
   const refresh = useCallback(async (
     options: {
@@ -159,6 +160,11 @@ export default function SoccerSummary() {
     setPlayerSide('tracked')
     setPlayerCategory('attack')
   }, [activeLocalGameId, query.gameId])
+
+  useEffect(() => {
+    timelineApplyingRef.current = false
+    setTimelineBusy(false)
+  }, [state])
 
   useEffect(() => {
     if (source?.kind !== 'cloud_primary' && source?.kind !== 'cloud_recording') return
@@ -282,24 +288,21 @@ export default function SoccerSummary() {
     source.recorder.recorderId === user?.id
 
   const applyTimelineResult = (result: SoccerLiveResult): boolean => {
+    if (timelineApplyingRef.current) return false
     if (source.kind !== 'local' || !source.editable) {
-      setRefreshError('Open your local recorder stream before changing event history.')
       return false
     }
-    if (!result.ok) {
-      setRefreshError(result.message)
-      return false
-    }
+    if (!result.ok) return false
     const nextSource: SoccerSummarySource = {
       ...source,
       state: result.state,
       inspection: result.inspection,
     }
+    timelineApplyingRef.current = true
     setTimelineBusy(true)
     sourceRef.current = nextSource
     setSource(nextSource)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
-    window.setTimeout(() => setTimelineBusy(false), 0)
     return true
   }
 

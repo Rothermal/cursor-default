@@ -97,6 +97,13 @@ describe('soccer summary timeline', () => {
     expect(soccerSummaryEventMatchesFilter(foul, 'restarts')).toBe(true)
     expect(soccerSummaryEventMatchesFilter(foul, 'discipline')).toBe(true)
     expect(soccerSummaryEventMatchesFilter(foul, 'lineup')).toBe(true)
+
+    const noRestart = eventForFilter('soccer.foul', {
+      restart: 'none',
+      sanction: 'none',
+    })
+    expect(soccerSummaryEventMatchesFilter(noRestart, 'restarts')).toBe(false)
+    expect(soccerSummaryEventMatchesFilter(noRestart, 'discipline')).toBe(false)
   })
 
   it('orders oldest-first, groups periods, and separates removed events', () => {

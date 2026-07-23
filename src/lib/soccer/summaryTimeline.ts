@@ -107,7 +107,15 @@ export function soccerSummaryEventMatchesFilter(
   }
   if (filter === 'defense') return event.eventType === 'soccer.defensive_action'
   if (filter === 'restarts') {
-    return event.eventType === 'soccer.foul' ||
+    const restart = (event.payload as { restart?: unknown }).restart
+    return (
+      event.eventType === 'soccer.foul' &&
+      (
+        restart === 'direct_free_kick' ||
+        restart === 'indirect_free_kick' ||
+        restart === 'penalty'
+      )
+    ) ||
       event.eventType === 'soccer.team_event' ||
       (
         event.eventType === 'soccer.shot' &&

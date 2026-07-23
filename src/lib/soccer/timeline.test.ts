@@ -25,6 +25,7 @@ describe('soccer timeline helpers', () => {
     expect(soccerEventMatchesTimelineFilter({ eventType: 'soccer.card' }, 'discipline')).toBe(true)
     expect(soccerEventMatchesTimelineFilter({ eventType: 'soccer.team_event' }, 'team_events')).toBe(true)
     expect(soccerEventMatchesTimelineFilter({ eventType: 'soccer.foul' }, 'match_control')).toBe(false)
+    expect(soccerEventMatchesTimelineFilter({ eventType: 'soccer.shootout_kick' }, 'all')).toBe(true)
   })
 
   it('treats only goals, own goals, and score adjustments as scoring history rows', () => {

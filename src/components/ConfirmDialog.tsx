@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string
   cancelLabel?: string
   destructive?: boolean
+  error?: string | null
   onConfirm: () => void
   onCancel: () => void
 }
@@ -18,6 +19,7 @@ export default function ConfirmDialog({
   confirmLabel = 'Yes',
   cancelLabel = 'No',
   destructive = true,
+  error = null,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -49,6 +51,11 @@ export default function ConfirmDialog({
       >
         <h3 className="text-lg font-bold text-slate-800">{title}</h3>
         <p className="text-sm text-slate-600">{message}</p>
+        {error && (
+          <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
         <div className="flex gap-3 pt-1">
           <button
             type="button"
