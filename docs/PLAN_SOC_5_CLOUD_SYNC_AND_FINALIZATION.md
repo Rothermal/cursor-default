@@ -1,6 +1,6 @@
 # Plan: SOC-5 Cloud Sync and Finalization
 
-Status: In progress. Product decisions are complete; SOC-5A through SOC-5C are implemented.
+Status: Implemented. Product decisions are complete; SOC-5A through SOC-5D are implemented.
 
 ## 1. Goal
 
@@ -42,9 +42,14 @@ release QA, and production enablement remain SOC-6.
 
 - Restrict finalization to team owner/admin users, or the owner of a personal game.
 - Require a healthy, fully synced primary stream with no unresolved primary diagnostics.
-- Publish the canonical projection and lock the selected primary in one idempotent transaction.
+- Publish canonical setup/events, derive final scores, and lock the selected primary in one
+  idempotent transaction.
 - Permit audit-only completion of already queued non-primary uploads.
 - Add reason-required audited reopen; late primary changes require reopen.
+
+Implemented by migration 046, `src/lib/soccer/finalization.ts`, and
+`SoccerFinalizationPanel`. See
+[`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md).
 
 ## 3. Reviewed Decisions
 
@@ -97,8 +102,8 @@ release QA, and production enablement remain SOC-6.
     owner.
 22. Finalization requires a completed or abandoned match, selected healthy primary, full primary
     sync, and no primary conflicts or projection diagnostics.
-23. One idempotent server transaction locks the primary revision, stores the canonical projection,
-    and marks the cloud game final.
+23. One idempotent server transaction locks the primary revision, verifies and stores canonical
+    setup/events, derives final scores from stored events, and marks the cloud game final.
 24. Unsynced non-primary streams warn but do not block. Their already queued events may arrive
     later as audit-only history.
 
@@ -134,6 +139,9 @@ release QA, and production enablement remain SOC-6.
   Its stream fingerprint is client-computed comparison metadata and is not independently derived
   by PostgreSQL; neither value grants permission to delete local history.
 - Finalized canonical output is always reproducible from the locked primary stream and snapshots.
+- Late non-primary rows retain server `stored_at` receipt time. Client event timestamps support
+  offline ordering but are not proof that a late-arriving event was authored before finalization;
+  those rows remain non-canonical audit history.
 
 ## 5. Deferred Beyond SOC-5
 

@@ -122,6 +122,7 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/043_soccer_event_cloud_transport.sql` - SOC-5A team/personal game binding, game participant snapshots, personal-game event authorization, and verified recorder checkpoints
 - `supabase/migrations/044_soccer_event_recovery.sql` - SOC-5B immutable soccer setup snapshots, same-recorder conflict audit, and recovery RPCs
 - `supabase/migrations/045_soccer_recorder_resolution.sql` - SOC-5C independent team recorder binding, recorder presence, provisional primary selection, and audit history
+- `supabase/migrations/046_soccer_finalization_recovery.sql` - SOC-5D canonical publication, primary locking, final audit uploads, and reason-required reopen
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -276,7 +277,8 @@ supabase/
     ├── 042_game_events.sql
     ├── 043_soccer_event_cloud_transport.sql
     ├── 044_soccer_event_recovery.sql
-    └── 045_soccer_recorder_resolution.sql
+    ├── 045_soccer_recorder_resolution.sql
+    └── 046_soccer_finalization_recovery.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -299,6 +301,7 @@ docs/
 ├── PLAN_SOC_5A_CLOUD_EVENT_TRANSPORT.md # SOC-5A binding, snapshots, revision upload, and checkpoints
 ├── PLAN_SOC_5B_OFFLINE_RECOVERY_AND_CONFLICTS.md # SOC-5B cloud resume and same-recorder conflicts
 ├── PLAN_SOC_5C_INDEPENDENT_RECORDERS_AND_PRIMARY.md # SOC-5C recorder presence and primary resolution
+├── PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md # SOC-5D canonical publication and audited reopen
 ├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
@@ -408,10 +411,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Soccer cloud event transport (SOC-5A)** - idempotent team/personal cloud binding, game-scoped participant snapshots, revision-aware event upload, verified recorder checkpoints, and existing-local-game adoption through the parked queue ([plan](docs/PLAN_SOC_5A_CLOUD_EVENT_TRANSPORT.md))
 - [x] **Soccer offline recovery and same-recorder conflicts (SOC-5B)** - pull-before-push merge, event-aware cloud resume, durable competing revisions, explicit resolution, retry details, and recovery export ([plan](docs/PLAN_SOC_5B_OFFLINE_RECOVERY_AND_CONFLICTS.md))
 - [x] **Soccer independent recorders and primary resolution (SOC-5C)** - separate team recorder streams, compact presence, opt-in read-only detail, provisional owner/admin primary selection, and immutable selection history ([plan](docs/PLAN_SOC_5C_INDEPENDENT_RECORDERS_AND_PRIMARY.md))
+- [x] **Soccer finalization and recovery (SOC-5D)** - owner/admin readiness, primary conflict preparation and lock, append-only canonical publications, canonical final review, late non-primary audit uploads, and reason-required audited reopen ([plan](docs/PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md))
 
 ### What's Next
 
-- [ ] **Soccer SOC-5D through SOC-6** - finalization, canonical publication, summaries, settings, aggregates, QA, and release ([SOC-5 plan](docs/PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer SOC-6** - complete summaries, field maps, settings, aggregates, regression QA, and production release ([SOC-5 plan](docs/PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))

@@ -25,6 +25,7 @@ import {
   listDirtyParkedGameRecords,
   listParkedGames,
   loadActiveParkedGameState,
+  markParkedCloudGameReopened,
   MAX_PARKED_GAMES,
   parkActiveGame,
   ParkedGameStorageError,
@@ -706,6 +707,39 @@ describe('gameParking', () => {
     const remaining = saveActiveGameState(syncedFinal, 'user-1')
     expect(remaining).toEqual([])
     expect(getActiveLocalGameId('user-1')).toBeNull()
+  })
+
+  it('restores every matching parked soccer binding to in progress after cloud reopen', () => {
+    const base = gameState(soccer, 'Aces', 'Bears')
+    const bound = withLastSyncedGameFingerprint({
+      ...base,
+      eventStream: { version: 1, events: [] },
+      sportGameState: { sportId: 'soccer', version: 2 } as never,
+      cloudSync: {
+        ...base.cloudSync,
+        teamId: 'team-1',
+        gameId: 'game-1',
+        gameStatus: 'in_progress',
+        status: 'synced',
+      },
+    })
+    const [summary] = saveActiveGameState(bound, 'user-1')
+    saveParkedGameRecordState(summary.localGameId, {
+      ...bound,
+      cloudSync: {
+        ...bound.cloudSync,
+        gameStatus: 'final',
+      },
+    }, 'user-1')
+
+    markParkedCloudGameReopened('user-1', 'game-1')
+
+    const reopened = getParkedGameRecord(summary.localGameId, 'user-1')
+    expect(reopened?.gameState.cloudSync).toMatchObject({
+      gameStatus: 'in_progress',
+      status: 'idle',
+      lastError: null,
+    })
   })
 
   it('clearActiveParkedGame removes only the active record', () => {

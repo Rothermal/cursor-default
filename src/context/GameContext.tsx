@@ -54,7 +54,10 @@ import {
   createInitialState,
   gameReducer,
 } from '../lib/gameReducer'
-import { activeCloudSyncStateAction } from '../lib/cloudSyncState'
+import {
+  activeCloudSyncStateAction,
+  resolvedCloudGameStatus,
+} from '../lib/cloudSyncState'
 import {
   activateParkedGame,
   beginNewActiveParkedGame,
@@ -66,6 +69,7 @@ import {
   listParkedGameRecords,
   listParkedGames,
   loadActiveParkedGameState,
+  markParkedCloudGameReopened,
   parkActiveGame,
   parkedGameStorageErrorMessage,
   saveActiveGameState,
@@ -110,7 +114,10 @@ function hasSyncPrereqs(state: GameState, isConfigured: boolean, userId: string 
     state.sport &&
     state.gameInfo &&
     isCloudSyncEligible(state) &&
-    state.cloudSync.gameStatus !== 'final'
+    (
+      state.cloudSync.gameStatus !== 'final' ||
+      isSoccerEventCloudSyncEligible(state)
+    )
   )
 }
 
@@ -295,6 +302,7 @@ interface GameContextType {
   discardParkedGame: (localGameId: string) => boolean
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
+  markSoccerCloudGameReopened: (gameId: string) => void
   resolveSoccerEventConflict: (
     eventId: string,
     resolution: 'local' | 'remote'
@@ -778,10 +786,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           seasonId: synced.seasonId,
           teamId: synced.teamId,
           gameId: synced.gameId,
-          gameStatus:
-            'skippedFinalGame' in synced && synced.skippedFinalGame
-              ? 'final'
-              : 'in_progress',
+          gameStatus: resolvedCloudGameStatus(
+            snapshot.cloudSync.gameStatus,
+            synced
+          ),
           playerIdMap: synced.playerIdMap,
           status: 'synced',
           lastSyncedAt: synced.syncedAt,
@@ -927,6 +935,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }, [isOnline, runCloudSync, userId])
 
+  const markSoccerCloudGameReopened = useCallback((gameId: string) => {
+    try {
+      setParkedGames(markParkedCloudGameReopened(userId, gameId))
+      if (stateRef.current.cloudSync.gameId === gameId) {
+        dispatch({
+          type: 'SET_CLOUD_SYNC_STATE',
+          cloudSync: {
+            gameStatus: 'in_progress',
+            status: 'idle',
+            lastError: null,
+          },
+        })
+      }
+      setParkingError(null)
+    } catch (error) {
+      setParkingError(parkedGameStorageErrorMessage(error))
+    }
+  }, [userId])
+
   const resolveSoccerEventConflict = useCallback(
     (eventId: string, resolution: 'local' | 'remote') => {
       const current = stateRef.current
@@ -1058,6 +1085,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         resumeParkedGame,
         discardParkedGame,
         flushCloudSync,
+        markSoccerCloudGameReopened,
         resolveSoccerEventConflict,
       }}
     >

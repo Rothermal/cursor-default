@@ -10,7 +10,7 @@ the only source eligible for canonical review, while all other streams remain du
 available read-only.
 
 SOC-5C does not finalize, publish aggregates, lock a primary selection, or enable Soccer in
-production. Those remain SOC-5D and SOC-6.
+production. Finalization and locking shipped in SOC-5D; release remains SOC-6.
 
 ## 2. Shipped Contract
 
@@ -89,11 +89,12 @@ Automated coverage includes:
 Manual PostgreSQL verification remains required because this repository has no Supabase test
 harness. Use the SOC-5C matrix in `docs/REGRESSION_TESTING.md`.
 
-## 5. Deferred
+## 5. Follow-on Delivery
 
-- Primary lock, canonical snapshot publication, finalization, and audited reopen: SOC-5D.
+- Primary lock, canonical snapshot publication, finalization, and audited reopen: implemented
+  in SOC-5D.
 - Owner/admin resolution of another recorder's outstanding same-recorder conflicts during
-  finalization preparation: SOC-5D.
+  finalization preparation: implemented in SOC-5D for choosing either durable revision.
 - Soccer summary, field-map comparison, season aggregates, settings consolidation, full release
   QA, and production enablement: SOC-6.
 - Live cross-recorder co-editing, automatic stream blending, and deduplication: not planned.

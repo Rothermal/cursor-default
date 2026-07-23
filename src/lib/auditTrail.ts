@@ -106,6 +106,14 @@ export function formatAuditEvent(event: AuditEvent): string {
       const appRole = metadataLabel(event, 'app_role', 'user')
       return `${actor} changed ${target}: ${previousStatus}/${previousRole} to ${status}/${appRole}`
     }
+    case 'soccer_primary_recorder_changed':
+      return `${actor} selected ${target} as the soccer primary recorder`
+    case 'soccer_primary_conflict_resolved':
+      return `${actor} resolved a primary soccer stream conflict for ${target}`
+    case 'soccer_game_finalized':
+      return `${actor} finalized the soccer game using ${target}`
+    case 'soccer_game_reopened':
+      return `${actor} reopened the soccer game`
     default:
       return event.eventType.split('_').join(' ')
   }

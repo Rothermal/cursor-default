@@ -15,6 +15,17 @@ export function activeCloudSyncStateAction(
     : { type: 'SET_CLOUD_SYNC_STATE', cloudSync: cloudSyncPatch }
 }
 
+export function resolvedCloudGameStatus(
+  localStatus: string | null,
+  synced: { gameStatus?: string; skippedFinalGame?: boolean }
+): string {
+  if (typeof synced.gameStatus === 'string' && synced.gameStatus) {
+    return synced.gameStatus
+  }
+  if (synced.skippedFinalGame) return 'final'
+  return localStatus === 'final' ? 'final' : 'in_progress'
+}
+
 /**
  * Merge a partial cloud-sync patch into current state.
  *

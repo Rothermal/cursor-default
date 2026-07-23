@@ -154,6 +154,32 @@ describe('formatAuditEvent', () => {
     })).toBe('Coach One changed Coach Two: active/user to suspended/user')
   })
 
+  it('describes soccer primary and game lifecycle events', () => {
+    expect(formatAuditEvent({
+      ...baseEvent,
+      eventType: 'soccer_primary_recorder_changed',
+      metadata: {},
+    })).toBe('Coach One selected Coach Two as the soccer primary recorder')
+
+    expect(formatAuditEvent({
+      ...baseEvent,
+      eventType: 'soccer_primary_conflict_resolved',
+      metadata: {},
+    })).toBe('Coach One resolved a primary soccer stream conflict for Coach Two')
+
+    expect(formatAuditEvent({
+      ...baseEvent,
+      eventType: 'soccer_game_finalized',
+      metadata: {},
+    })).toBe('Coach One finalized the soccer game using Coach Two')
+
+    expect(formatAuditEvent({
+      ...baseEvent,
+      eventType: 'soccer_game_reopened',
+      metadata: {},
+    })).toBe('Coach One reopened the soccer game')
+  })
+
   it('uses safe fallbacks for blank actor/target/metadata and unknown types', () => {
     expect(formatAuditEvent({
       ...baseEvent,

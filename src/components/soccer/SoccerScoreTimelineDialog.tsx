@@ -21,6 +21,7 @@ interface SoccerScoreTimelineDialogProps {
   recorderUserId: string | null
   initialEdit: SoccerScoreAdjustmentEvent | null
   busy: boolean
+  readOnly?: boolean
   onApply: (result: SoccerLiveResult) => boolean
   onEditAttacking: (event: SoccerShotEvent | SoccerOwnGoalEvent) => void
   onClose: () => void
@@ -33,6 +34,7 @@ export default function SoccerScoreTimelineDialog({
   recorderUserId,
   initialEdit,
   busy,
+  readOnly = false,
   onApply,
   onEditAttacking,
   onClose,
@@ -47,8 +49,8 @@ export default function SoccerScoreTimelineDialog({
     Boolean(state.sportGameState.projection.shootout)
 
   useEffect(() => {
-    if (open) setEditing(correctionsLocked ? null : initialEdit)
-  }, [correctionsLocked, initialEdit, open])
+    if (open) setEditing(correctionsLocked || readOnly ? null : initialEdit)
+  }, [correctionsLocked, initialEdit, open, readOnly])
 
   if (!open) return null
   return (
@@ -78,7 +80,7 @@ export default function SoccerScoreTimelineDialog({
             <>
               {correctionsLocked ? (
                 <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Remove the shootout events before correcting the normal match score.</p>
-              ) : (
+              ) : readOnly ? null : (
                 <button type="button" onClick={() => setEditing('new')} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white"><Plus size={17} /> Add Score Adjustment</button>
               )}
               <div className="divide-y divide-slate-200 border-y border-slate-200">
@@ -87,7 +89,7 @@ export default function SoccerScoreTimelineDialog({
                     key={event.id}
                     event={event}
                     timeLabel={soccerEventTimeLabel(event, timings)}
-                    editable={!correctionsLocked}
+                    editable={!correctionsLocked && !readOnly}
                     onEdit={() => {
                       if (event.eventType === 'soccer.score_adjustment') {
                         setEditing(event as SoccerScoreAdjustmentEvent)

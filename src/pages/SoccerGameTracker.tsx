@@ -40,6 +40,7 @@ import SoccerShootoutManagementDialog, { type SoccerShootoutManagementKind } fro
 import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupDialog'
 import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
 import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
+import SoccerFinalizationPanel from '../components/soccer/SoccerFinalizationPanel'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
@@ -248,6 +249,7 @@ export default function SoccerGameTracker() {
 
   const healthy = inspection.complete
   const ended = projection.status === 'ended'
+  const cloudFinal = state.cloudSync.gameStatus === 'final'
   const shootoutActive = projection.status === 'shootout' && projection.shootout !== null
   const options = { recorderUserId: user?.id ?? null }
   const participants = Object.values(projection.participants)
@@ -255,7 +257,8 @@ export default function SoccerGameTracker() {
   const bench = participants.filter(participant => participant.status !== 'on_field')
   const visibleParticipants = lineupTab === 'on_field' ? onField : bench
   const capturePreferences = soccerState.capturePreferences
-  const fieldCaptureEnabled = healthy && projection.status === 'in_progress' && !isApplying
+  const fieldCaptureEnabled =
+    healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal
   const reviewPeriodId = projection.currentPeriodId
     ?? projection.completedPeriodIds[projection.completedPeriodIds.length - 1]
     ?? null
@@ -287,15 +290,19 @@ export default function SoccerGameTracker() {
     location: SoccerIncidentDraft['location'],
     mode: SoccerIncidentDraft['mode'] = 'live',
     event?: SoccerIncidentEvent
-  ) => setIncidentDraft({
-    kind,
-    teamSide: event?.teamSide ?? capturePreferences.teamSide,
-    location: event?.location ?? location,
-    mode,
-    event,
-  })
+  ) => {
+    if (cloudFinal) return
+    setIncidentDraft({
+      kind,
+      teamSide: event?.teamSide ?? capturePreferences.teamSide,
+      location: event?.location ?? location,
+      mode,
+      event,
+    })
+  }
 
   const editFieldEvent = (event: GameEvent) => {
+    if (cloudFinal) return
     if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
       setCaptureDraft({
         mode: 'edit',
@@ -310,6 +317,10 @@ export default function SoccerGameTracker() {
 
   const applyResult = (result: SoccerLiveResult): boolean => {
     if (applyingRef.current) return false
+    if (cloudFinal) {
+      setError('Reopen the cloud game before changing its event history.')
+      return false
+    }
     if (!result.ok) {
       setError(result.message)
       return false
@@ -353,7 +364,7 @@ export default function SoccerGameTracker() {
             </p>
           </div>
           {!ended && (
-            <button type="button" onClick={() => setActionsOpen(true)} disabled={!healthy || isApplying} className="h-9 w-9 grid place-items-center rounded-md bg-white/15 disabled:opacity-40" aria-label="Match actions" title="Match actions">
+            <button type="button" onClick={() => setActionsOpen(true)} disabled={!healthy || isApplying || cloudFinal} className="h-9 w-9 grid place-items-center rounded-md bg-white/15 disabled:opacity-40" aria-label="Match actions" title="Match actions">
               <MoreHorizontal size={21} />
             </button>
           )}
@@ -391,9 +402,15 @@ export default function SoccerGameTracker() {
           ) : ended ? (
             <div className="mt-5 space-y-2">
               <p className="text-sm font-bold text-slate-700">{matchResultLabel(projection, state.gameInfo.teamName, state.gameInfo.opponentName)}</p>
-              <button type="button" onClick={() => setReopenOpen(true)} className="w-full rounded-md bg-slate-800 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
-                <RotateCcw size={18} /> Reopen Match
-              </button>
+              {cloudFinal ? (
+                <p className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  This cloud result is locked. Use Cloud Finalization below to reopen it.
+                </p>
+              ) : (
+                <button type="button" onClick={() => setReopenOpen(true)} className="w-full rounded-md bg-slate-800 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                  <RotateCcw size={18} /> Reopen Match
+                </button>
+              )}
             </div>
           ) : projection.status === 'suspended' ? (
             <div className="mt-5 grid grid-cols-2 gap-2">
@@ -431,6 +448,30 @@ export default function SoccerGameTracker() {
             </div>
           )}
         </section>
+
+        {state.cloudSync.gameId && (
+          <SoccerFinalizationPanel
+            baseState={state}
+            currentUserId={user?.id ?? null}
+            refreshKey={state.cloudSync.lastSyncedAt}
+            flushCloudSync={flushCloudSync}
+            onFinalized={() => {
+              dispatch({
+                type: 'SET_CLOUD_SYNC_STATE',
+                cloudSync: { gameStatus: 'final' },
+              })
+              navigate(
+                `/soccer/review?gameId=${encodeURIComponent(state.cloudSync.gameId!)}`
+              )
+            }}
+            onReopened={() => {
+              dispatch({
+                type: 'SET_CLOUD_SYNC_STATE',
+                cloudSync: { gameStatus: 'in_progress' },
+              })
+            }}
+          />
+        )}
 
         {error && <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
@@ -666,7 +707,7 @@ export default function SoccerGameTracker() {
                     participant={participant}
                     projection={projection}
                     nowMs={nowMs}
-                    disabled={!healthy || ended}
+                    disabled={!healthy || ended || cloudFinal}
                     canResolve={participant.playerId === null && state.players.some(player => !participants.some(item => item.playerId === player.id))}
                     onRole={() => openDialog('roles', participant.participantId)}
                     onResolve={() => openDialog('resolve', participant.participantId)}
@@ -700,6 +741,7 @@ export default function SoccerGameTracker() {
                 setScoreTimelineOpen(true)
               }}
               allowAddEvent={!projection.shootout}
+              readOnly={cloudFinal}
             />
           )}
         </div>
@@ -817,6 +859,7 @@ export default function SoccerGameTracker() {
         recorderUserId={user?.id ?? null}
         initialEdit={scoreAdjustmentEdit}
         busy={isApplying}
+        readOnly={cloudFinal}
         onApply={result => {
           const applied = applyResult(result)
           if (applied && result.ok && !result.inspection.complete) setScoreTimelineOpen(false)

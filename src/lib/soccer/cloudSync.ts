@@ -30,6 +30,7 @@ interface SoccerCloudParticipant {
 
 interface SoccerGameBindingRow {
   game_id: string
+  game_status: string
   participant_id_map: Record<string, string>
   participants?: SoccerCloudParticipantRow[]
 }
@@ -72,6 +73,7 @@ export interface SyncSoccerEventGameResult {
   seasonId: string | null
   teamId: string | null
   gameId: string
+  gameStatus: string
   playerIdMap: Record<string, string>
   syncedAt: string
   syncedState: GameState
@@ -160,7 +162,7 @@ export async function syncSoccerEventGameToCloud({
   const participants = soccerCloudParticipants(sportState)
 
   const { data: bindingData, error: bindingError } = await supabase.rpc(
-    'bind_soccer_event_game_v3',
+    'bind_soccer_event_game_v4',
     {
       p_existing_game_id: state.cloudSync.gameId,
       p_client_local_game_id: localGameId,
@@ -177,7 +179,7 @@ export async function syncSoccerEventGameToCloud({
   if (bindingError) throw new Error(`Soccer game binding failed: ${bindingError.message}`)
 
   const binding = bindingData as SoccerGameBindingRow | null
-  if (!binding?.game_id || !binding.participant_id_map) {
+  if (!binding?.game_id || !binding.game_status || !binding.participant_id_map) {
     throw new Error('Soccer game binding returned an invalid response')
   }
 
@@ -328,6 +330,7 @@ export async function syncSoccerEventGameToCloud({
     seasonId: sportState.setup.sourceSeasonId,
     teamId: sportState.setup.sourceTeamId,
     gameId: binding.game_id,
+    gameStatus: binding.game_status,
     playerIdMap: binding.participant_id_map,
     syncedAt: checkpointData,
     syncedState,
