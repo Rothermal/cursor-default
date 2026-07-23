@@ -1,6 +1,6 @@
 # Plan: SOC-6A Summary Foundation
 
-Status: Product and implementation direction reviewed. Implementation is not started.
+Status: Implemented. SOC-6B detailed Players, Timeline, Field, and Shootout views remain next.
 
 Parent roadmap: [PLAN_SOC_6_SUMMARY_AND_RELEASE.md](PLAN_SOC_6_SUMMARY_AND_RELEASE.md)
 
@@ -74,6 +74,9 @@ SOC-6A does not remove production soccer gates, publish aggregates, or add socce
 - Use stable skeleton dimensions so the score/header layout does not jump.
 - Errors identify the failed authority source and offer explicit retry.
 - Never retain a stale primary after a transition to canonical final.
+- Persist cloud authority in the summary URL before a clean final can discard its local binding.
+- Keep the last good non-final cloud Overview visible when a background refresh fails; show a
+  retryable freshness warning instead of replacing it with a full-page error.
 - Refresh non-final cloud summaries:
   - on focus;
   - through manual retry/refresh;

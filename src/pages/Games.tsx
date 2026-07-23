@@ -20,6 +20,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { teamDisplayName } from '../lib/display'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameInfoPath } from '../lib/teamInfo'
+import { soccerSummaryPath } from '../lib/soccer/summary'
 import {
   acceptedTeamRole,
   canDeleteGame,
@@ -363,14 +364,22 @@ export default function Games() {
         return
       }
       if (game.status === 'final') {
-        navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
+        navigate(soccerSummaryPath({
+          gameId: game.id,
+          from: 'games',
+          teamId: game.team_id,
+        }))
         return
       }
       const canTrackSoccerGame = game.team_id
         ? canTrackGames(teamRole)
         : game.created_by === userId
       if (!canTrackSoccerGame) {
-        navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
+        navigate(soccerSummaryPath({
+          gameId: game.id,
+          from: 'games',
+          teamId: game.team_id,
+        }))
         return
       }
       setError(null)
@@ -419,7 +428,11 @@ export default function Games() {
         )
         if (!startIndependent) {
           setLoadingGameId(null)
-          navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
+          navigate(soccerSummaryPath({
+            gameId: game.id,
+            from: 'games',
+            teamId: game.team_id,
+          }))
           return
         }
         soccerGame = await createSoccerIndependentRecorderState(userId, game.id).catch(err => {

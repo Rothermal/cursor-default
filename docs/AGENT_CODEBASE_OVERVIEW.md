@@ -83,7 +83,7 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 | `/checkout` | GameCheckout | Multi-recorder stat checkout (cloud games) |
 | `/game` | GameTracker | Live stat entry, scoreboard, undo; basketball: inline court + event popup |
 | `/shot-chart` | ShotChart | **Legacy** — redirects to `/game` (court is inline now) |
-| `/summary` | GameSummary | Post-game review, finalize, sync |
+| `/summary` | GameSummary / SoccerSummary | Post-game review; soccer resolves local, effective-primary, or canonical-final authority |
 | `/settings` | Admin | Settings default/account section |
 | `/settings/account` | Admin | Account profile, display-name edit, connected sign-in methods, Google linking, sign out |
 | `/settings/app` | Admin | App/general settings, enabled sport toggles |
@@ -168,8 +168,9 @@ sources; SOC-5A mirrors healthy local event streams, SOC-5B resumes the same rec
 and SOC-5C lets additional authorized team recorders start independent streams against the same
 game while viewers inspect only the primary stream. SOC-5D review resolves the active canonical
 publication when final and uses the live primary only before finalization or after reopen.
-Legacy `/checkout` and
-`/summary` surfaces redirect active soccer games back into the soccer flow.
+Legacy `/checkout` redirects active soccer games back into the soccer flow. SOC-6A uses
+`/summary` for an Overview-only local/cloud soccer summary and redirects legacy
+`/soccer/review` links there without activating parked games.
 
 The `game_events` repository is wired into the automatic queue only for healthy soccer event
 games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
@@ -311,7 +312,7 @@ flowchart LR
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
-| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) | Reviewed next work: five SOC-6 slices; 6A summary source and Overview plan is ready for implementation |
+| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) | SOC-6A summary source and Overview shipped; SOC-6B detailed review is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

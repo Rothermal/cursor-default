@@ -5,6 +5,13 @@ import { computePlayerScore, sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
+import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
+import {
+  resolveSoccerRecorderOpenSource,
+  type SoccerRecorderOpenSource,
+} from '../lib/soccer/cloudOpen'
+import { createSoccerIndependentRecorderState } from '../lib/soccer/recorders'
+import { soccerSummaryPath } from '../lib/soccer/summary'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
 import {
   currentPeriodForCloudHydrate,
@@ -146,7 +153,14 @@ export default function GameInfo() {
   const fallbackTeamId = searchParams.get('teamId')
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
-  const { state, openGameSnapshot, parkingError } = useGame()
+  const {
+    state,
+    activeLocalGameId,
+    parkedGames,
+    openGameSnapshot,
+    resumeParkedGame,
+    parkingError,
+  } = useGame()
   const supabaseClient = supabase
 
   const [game, setGame] = useState<GameInfoGameRow | null>(null)
@@ -290,7 +304,97 @@ export default function GameInfo() {
   }, [gameId, isConfigured, supabaseClient, userId])
 
   const openFullGame = async () => {
-    if (!game || !user || (game.status !== 'final' && !canTrackGames(teamRole))) return
+    if (!game || !user) return
+    if (
+      game.status !== 'final' &&
+      !canTrackGames(teamRole) &&
+      sport?.id !== 'soccer'
+    ) return
+    if (sport?.id === 'soccer') {
+      if (!import.meta.env.DEV) {
+        setError('Soccer match review remains unavailable until the soccer release phase.')
+        return
+      }
+      if (game.status === 'final' || !canTrackGames(teamRole)) {
+        navigate(soccerSummaryPath({
+          gameId: game.id,
+          from: 'game-info',
+          teamId: team?.id ?? fallbackTeamId,
+        }))
+        return
+      }
+
+      setOpeningGame(true)
+      setError(null)
+      let source: SoccerRecorderOpenSource<GameState>
+      try {
+        source = await resolveSoccerRecorderOpenSource(
+          game.id,
+          activeLocalGameId,
+          parkedGames,
+          () => loadSoccerCloudGameById(user.id, game.id)
+        )
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Could not load soccer game')
+        setOpeningGame(false)
+        return
+      }
+
+      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+      if (source.kind === 'local') {
+        if (
+          hasActiveGame &&
+          activeLocalGameId !== source.localGameId &&
+          !window.confirm('Park your current game and resume this local recorder stream?')
+        ) {
+          setOpeningGame(false)
+          return
+        }
+        if (!resumeParkedGame(source.localGameId)) {
+          setOpeningGame(false)
+          return
+        }
+        setOpeningGame(false)
+        navigate('/game')
+        return
+      }
+
+      let soccerGame = source.kind === 'cloud' ? source.state : null
+      if (source.kind === 'empty') {
+        const startIndependent = window.confirm(
+          'Start your own independent recorder stream for this game? Select Cancel to open read-only review.'
+        )
+        if (!startIndependent) {
+          setOpeningGame(false)
+          navigate(soccerSummaryPath({
+            gameId: game.id,
+            from: 'game-info',
+            teamId: team?.id ?? fallbackTeamId,
+          }))
+          return
+        }
+        soccerGame = await createSoccerIndependentRecorderState(user.id, game.id).catch(caught => {
+          setError(caught instanceof Error ? caught.message : 'Could not start recorder stream')
+          return null
+        })
+      }
+      if (!soccerGame) {
+        setOpeningGame(false)
+        return
+      }
+      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+        setOpeningGame(false)
+        return
+      }
+      if (!openGameSnapshot(soccerGame)) {
+        setOpeningGame(false)
+        return
+      }
+      setOpeningGame(false)
+      navigate('/game')
+      return
+    }
+
     const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
     if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
       return
@@ -495,7 +599,7 @@ export default function GameInfo() {
               </section>
             )}
 
-            {game.status === 'final' || canTrackGames(teamRole) ? (
+            {sport?.id === 'soccer' || game.status === 'final' || canTrackGames(teamRole) ? (
               <button
                 type="button"
                 onClick={openFullGame}
@@ -504,7 +608,8 @@ export default function GameInfo() {
               >
                 {openingGame
                   ? 'Opening...'
-                  : game.status === 'final'
+                  : game.status === 'final' ||
+                      (sport?.id === 'soccer' && !canTrackGames(teamRole))
                     ? 'View full summary'
                     : 'Open game'}
               </button>

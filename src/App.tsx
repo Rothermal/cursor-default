@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider, useGame } from './context/GameContext'
 import { SettingsProvider } from './context/SettingsContext'
@@ -35,6 +35,8 @@ import SoccerGameSetup from './pages/SoccerGameSetup'
 import SoccerPlayerSetup from './pages/SoccerPlayerSetup'
 import SoccerGameTracker from './pages/SoccerGameTracker'
 import SoccerCloudReview from './pages/SoccerCloudReview'
+import SoccerSummary from './pages/SoccerSummary'
+import { isSoccerSummaryRoute } from './lib/soccer/summary'
 
 function GameSetupRoute() {
   const { state } = useGame()
@@ -65,8 +67,9 @@ function GameCheckoutRoute() {
 
 function GameSummaryRoute() {
   const { state } = useGame()
-  if (state.sport?.id !== 'soccer') return <GameSummary />
-  return <Navigate to={import.meta.env.DEV ? '/game' : '/'} replace />
+  const [searchParams] = useSearchParams()
+  if (!isSoccerSummaryRoute(state.sport?.id, searchParams)) return <GameSummary />
+  return import.meta.env.DEV ? <SoccerSummary /> : <Navigate to="/" replace />
 }
 
 function AppRoutes() {

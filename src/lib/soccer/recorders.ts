@@ -226,6 +226,10 @@ export async function createSoccerIndependentRecorderState(
   return kickoff.state
 }
 
+export async function loadSoccerCloudSummaryState(gameId: string): Promise<GameState> {
+  return (await loadSoccerCloudShell(gameId)).state
+}
+
 async function loadSoccerCloudShell(gameId: string): Promise<SoccerCloudShell> {
   if (!supabase) throw new Error('Supabase client not configured')
   const [

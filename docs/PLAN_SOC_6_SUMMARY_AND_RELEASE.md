@@ -1,6 +1,6 @@
 # Plan: SOC-6 Summary and Release
 
-Status: Product direction reviewed. Implementation is not started.
+Status: SOC-6A implemented. SOC-6B through SOC-6E remain planned.
 
 ## 1. Goal
 
@@ -26,7 +26,7 @@ SOC-1 through SOC-5D are implemented. The codebase already has:
   lineup/role intervals, discipline, and shootouts;
 - local parking plus recorder-owned cloud event transport;
 - canonical publication, final score derivation, manager finalization, and audited reopen;
-- a development-only live tracker and minimal cloud primary review;
+- a development-only live tracker and shared authority-aware Overview summary;
 - generic basketball-era summary, season, team, player, career, and tournament routes.
 
 Important implementation drift to resolve:
@@ -35,7 +35,7 @@ Important implementation drift to resolve:
 - the event projector emits the richer canonical `soc_*` stat family;
 - generic aggregate RPCs read `game_stats`, while soccer authority lives in canonical event
   publications;
-- `/summary` redirects soccer back to the tracker and `/soccer/review` is development-only;
+- detailed Players, Timeline, Field, and Shootout summary views remain deferred to SOC-6B;
 - soccer settings do not yet exist and current app settings are device-local;
 - production route and sport-availability gates still reject soccer.
 

@@ -354,6 +354,59 @@ export function soccerProjectionFromCanonicalSnapshot(
   recorder: SoccerRecorderSummary,
   snapshot: SoccerCanonicalSnapshot
 ): SoccerRecorderProjection {
+  const rebuilt = rebuildSoccerCanonicalSnapshot(baseState, recorder, snapshot)
+  const soccerState = rebuilt.state.sportGameState
+  if (
+    !rebuilt.inspection.complete ||
+    soccerState?.sportId !== 'soccer' ||
+    soccerState.projection.status !== 'ended' ||
+    (
+      soccerState.projection.endReason !== 'completed' &&
+      soccerState.projection.endReason !== 'abandoned'
+    )
+  ) {
+    throw new Error('Canonical soccer events do not reproduce a final match.')
+  }
+  return rebuilt
+}
+
+export function inspectSoccerCanonicalSnapshot(
+  baseState: GameState,
+  recorder: SoccerRecorderSummary,
+  snapshot: SoccerCanonicalSnapshot
+): SoccerRecorderProjection {
+  const rebuilt = rebuildSoccerCanonicalSnapshot(baseState, recorder, snapshot)
+  const soccerState = rebuilt.state.sportGameState
+  const reproducesFinal =
+    soccerState?.sportId === 'soccer' &&
+    soccerState.projection.status === 'ended' &&
+    (
+      soccerState.projection.endReason === 'completed' ||
+      soccerState.projection.endReason === 'abandoned'
+    )
+  if (!rebuilt.inspection.complete || reproducesFinal) return rebuilt
+  return {
+    ...rebuilt,
+    inspection: {
+      ...rebuilt.inspection,
+      complete: false,
+      diagnostics: [
+        ...rebuilt.inspection.diagnostics,
+        {
+          code: 'semantic_validation_failed',
+          message: 'Canonical soccer events do not reproduce a final match.',
+          eventId: null,
+        },
+      ],
+    },
+  }
+}
+
+function rebuildSoccerCanonicalSnapshot(
+  baseState: GameState,
+  recorder: SoccerRecorderSummary,
+  snapshot: SoccerCanonicalSnapshot
+): SoccerRecorderProjection {
   const stream = normalizeGameEventStream(snapshot.eventStream)
   const normalized = normalizeSportGameState({
     sportId: 'soccer',
@@ -376,18 +429,6 @@ export function soccerProjectionFromCanonicalSnapshot(
     gameEventRegistry,
     gameEventProjectors
   )
-  const soccerState = rebuilt.state.sportGameState
-  if (
-    !rebuilt.inspection.complete ||
-    soccerState?.sportId !== 'soccer' ||
-    soccerState.projection.status !== 'ended' ||
-    (
-      soccerState.projection.endReason !== 'completed' &&
-      soccerState.projection.endReason !== 'abandoned'
-    )
-  ) {
-    throw new Error('Canonical soccer events do not reproduce a final match.')
-  }
   return {
     recorder,
     state: rebuilt.state,
