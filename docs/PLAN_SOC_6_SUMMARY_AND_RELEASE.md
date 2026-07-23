@@ -1,6 +1,7 @@
 # Plan: SOC-6 Summary and Release
 
-Status: SOC-6A implemented. SOC-6B through SOC-6E remain planned.
+Status: SOC-6A implemented. SOC-6B detailed planning complete. SOC-6B through SOC-6E remain
+planned for implementation.
 
 ## 1. Goal
 
@@ -70,6 +71,9 @@ Exit condition: a local ended match, the non-final SOC-5C effective primary, and
 all open the same truthful Overview with correct edit/read-only behavior and no incomplete tabs.
 
 ### SOC-6B: Detailed match review
+
+Detailed plan:
+[PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md)
 
 Complete player, Timeline, field-map, and shootout review.
 
@@ -284,3 +288,7 @@ docs/PLAN_SOC_6E_RELEASE_HARDENING.md
 Phase planning should settle component boundaries, exact stat tables, RPC payload/pagination,
 settings reconciliation, migration numbering, and test fixtures without reopening the reviewed
 high-level product decisions.
+
+SOC-6B planning is complete and splits implementation into SOC-6B1 player review, SOC-6B2
+Timeline review, SOC-6B3 Field review, and SOC-6B4 Shootout review plus the detailed-summary
+release boundary.
