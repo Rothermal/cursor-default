@@ -207,13 +207,18 @@ describe('soccer event cloud sync helpers', () => {
   it('snapshots late participants from current projection after identity resolution', () => {
     const state = lateResolvedShotState()
     const sportState = assertHealthySoccerEventGame(state)
-    expect(soccerCloudParticipants(sportState)).toContainEqual(expect.objectContaining({
+    const participants = soccerCloudParticipants(sportState)
+    expect(participants).toContainEqual(expect.objectContaining({
       client_participant_id: 'participant-late',
       client_player_id: 'player-late',
       kind: 'player',
       display_name: 'Late Player',
       snapshot: expect.objectContaining({ addedDuringMatch: true }),
     }))
+    expect(participants.every(participant =>
+      !('currentStatus' in participant.snapshot) &&
+      !('currentRole' in participant.snapshot)
+    )).toBe(true)
   })
 
   it('builds a deterministic revision checkpoint for a healthy existing game', () => {

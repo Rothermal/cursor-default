@@ -5,6 +5,10 @@ import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
+import {
+  resolveSoccerRecorderOpenSource,
+  type SoccerRecorderOpenSource,
+} from '../lib/soccer/cloudOpen'
 import { createSoccerIndependentRecorderState } from '../lib/soccer/recorders'
 import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate, shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
@@ -79,7 +83,15 @@ export default function Games() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, isConfigured } = useAuth()
-  const { state, dispatch, openGameSnapshot, parkingError } = useGame()
+  const {
+    state,
+    dispatch,
+    activeLocalGameId,
+    parkedGames,
+    openGameSnapshot,
+    resumeParkedGame,
+    parkingError,
+  } = useGame()
   const userId = user?.id ?? null
   const supabaseClient = supabase
   const requestedSportId = searchParams.get('sport')
@@ -354,18 +366,54 @@ export default function Games() {
         navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
         return
       }
+      const canTrackSoccerGame = game.team_id
+        ? canTrackGames(teamRole)
+        : game.created_by === userId
+      if (!canTrackSoccerGame) {
+        navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
+        return
+      }
       setError(null)
       setLoadingGameId(game.id)
-      let soccerGame = await loadSoccerCloudGameById(userId, game.id).catch(err => {
+      if (state.sport?.id === 'soccer' && state.cloudSync.gameId === game.id) {
+        setLoadingGameId(null)
+        navigate('/game')
+        return
+      }
+      let source: SoccerRecorderOpenSource<GameState>
+      try {
+        source = await resolveSoccerRecorderOpenSource(
+          game.id,
+          activeLocalGameId,
+          parkedGames,
+          () => loadSoccerCloudGameById(userId, game.id)
+        )
+      } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not load soccer game')
-        return null
-      })
-      if (!soccerGame) {
-        if (!canTrackGames(teamRole)) {
+        setLoadingGameId(null)
+        return
+      }
+      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+      if (source.kind === 'local') {
+        if (
+          hasActiveGame &&
+          activeLocalGameId !== source.localGameId &&
+          !window.confirm('Park your current game and resume this local recorder stream?')
+        ) {
           setLoadingGameId(null)
-          navigate(`/soccer/review?gameId=${encodeURIComponent(game.id)}`)
           return
         }
+        if (!resumeParkedGame(source.localGameId)) {
+          setLoadingGameId(null)
+          return
+        }
+        setLoadingGameId(null)
+        navigate('/game')
+        return
+      }
+
+      let soccerGame = source.kind === 'cloud' ? source.state : null
+      if (source.kind === 'empty') {
         const startIndependent = window.confirm(
           'Start your own independent recorder stream for this game? Select Cancel to open read-only review.'
         )
@@ -383,7 +431,6 @@ export default function Games() {
         setLoadingGameId(null)
         return
       }
-      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
       if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
         setLoadingGameId(null)
         return

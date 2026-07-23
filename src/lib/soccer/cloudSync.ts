@@ -105,8 +105,6 @@ export function soccerCloudParticipants(
       snapshot: {
         initialStatus: origin?.initialStatus ?? null,
         initialRole: origin ? structuredClone(origin.initialRole) : null,
-        currentStatus: participant.status,
-        currentRole: structuredClone(participant.role),
         addedDuringMatch: origin === undefined,
       },
     }
@@ -357,7 +355,8 @@ export async function loadSoccerCloudGameById(
     ])
   if (gameError) throw new Error(`Soccer game load failed: ${gameError.message}`)
   if (setupError) throw new Error(`Soccer setup load failed: ${setupError.message}`)
-  if (!gameData || !setupData) return null
+  if (!gameData) throw new Error('Cloud soccer game is unavailable.')
+  if (!setupData) throw new Error('Cloud soccer setup is unavailable.')
 
   const gameRow = gameData as SoccerCloudGameRow
   const normalizedSportState = normalizeSportGameState({

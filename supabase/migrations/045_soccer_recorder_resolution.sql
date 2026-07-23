@@ -5,7 +5,7 @@ create table public.game_event_primary_recorders (
   recorded_by uuid not null references public.profiles (id),
   selected_by uuid not null references public.profiles (id),
   selected_at timestamptz not null default now(),
-  selection_source text not null default 'default'
+  selection_source text not null default 'selected'
     check (selection_source in ('default', 'selected')),
   locked_at timestamptz,
   locked_by uuid references public.profiles (id),
@@ -122,57 +122,6 @@ begin
   return v_primary;
 end;
 $$;
-
--- Persist a stable default for pre-045 games. Prefer a current creator stream, otherwise
--- the earliest current recorder checkpoint. A later stale checkpoint does not silently
--- switch canonical authority to another stream.
-insert into public.game_event_primary_recorders (
-  game_id, recorded_by, selected_by, selected_at, selection_source
-)
-select
-  g.id,
-  chosen.recorded_by,
-  chosen.recorded_by,
-  chosen.synced_at,
-  'default'
-from public.games g
-join lateral (
-  select cp.recorded_by, cp.synced_at
-  from public.game_event_stream_checkpoints cp
-  where cp.game_id = g.id
-    and public.is_game_event_checkpoint_current(cp.game_id, cp.recorded_by)
-  order by (cp.recorded_by = g.created_by) desc, cp.synced_at, cp.recorded_by
-  limit 1
-) chosen on true
-where g.sport_id = 'soccer'
-on conflict (game_id) do nothing;
-
-create or replace function public.assign_default_soccer_primary_recorder()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if public.is_game_event_checkpoint_current(new.game_id, new.recorded_by)
-     and exists (
-       select 1 from public.games g
-       where g.id = new.game_id and g.sport_id = 'soccer'
-     ) then
-    insert into public.game_event_primary_recorders (
-      game_id, recorded_by, selected_by, selected_at, selection_source
-    ) values (
-      new.game_id, new.recorded_by, new.recorded_by, new.synced_at, 'default'
-    )
-    on conflict (game_id) do nothing;
-  end if;
-  return new;
-end;
-$$;
-
-create trigger on_soccer_checkpoint_assign_primary
-  after insert or update on public.game_event_stream_checkpoints
-  for each row execute function public.assign_default_soccer_primary_recorder();
 
 create or replace function public.get_soccer_game_recorders(p_game_id uuid)
 returns table (
@@ -408,6 +357,11 @@ declare
   v_participants jsonb;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
+  if length(trim(coalesce(p_team_name, ''))) = 0
+     or length(trim(coalesce(p_opponent_name, ''))) = 0
+     or p_game_date is null then
+    raise exception 'Team, opponent, and game date are required';
+  end if;
   if p_existing_game_id is null then
     return public.bind_soccer_event_game_v2(
       null, p_client_local_game_id, p_source_team_id, p_source_season_id,
@@ -433,6 +387,16 @@ begin
     where s.game_id = v_game.id and s.setup_snapshot is not distinct from p_setup_snapshot
   ) then
     raise exception 'Soccer setup snapshot is incompatible';
+  end if;
+
+  -- Shared game headers remain creator-owned even when another recorder binds or syncs.
+  if v_game.created_by = v_user_id then
+    update public.games set
+      tracked_team_name = trim(p_team_name),
+      opponent_name = trim(p_opponent_name),
+      tournament_name = nullif(trim(coalesce(p_competition_name, '')), ''),
+      game_date = p_game_date
+    where id = v_game.id;
   end if;
 
   for v_item in select value from jsonb_array_elements(p_participants)
@@ -487,9 +451,17 @@ begin
           public.game_participants.client_player_id, excluded.client_player_id
         ) is null then excluded.participant_kind else 'player'
       end,
-      display_name = excluded.display_name,
-      jersey_number = excluded.jersey_number,
-      snapshot = excluded.snapshot,
+      display_name = case
+        when v_user_id = v_game.created_by then excluded.display_name
+        else public.game_participants.display_name
+      end,
+      jersey_number = case
+        when v_user_id = v_game.created_by then excluded.jersey_number
+        else public.game_participants.jersey_number
+      end,
+      -- Match participant snapshots are first-write identity/setup metadata. Recorder-specific
+      -- live status and role remain derived exclusively from that recorder's event stream.
+      snapshot = public.game_participants.snapshot,
       updated_at = now();
   end loop;
 
@@ -518,7 +490,6 @@ $$;
 
 revoke all on function public.is_game_event_checkpoint_current(uuid, uuid) from public;
 revoke all on function public.effective_soccer_primary_recorder(uuid) from public;
-revoke all on function public.assign_default_soccer_primary_recorder() from public;
 revoke all on function public.get_soccer_game_recorders(uuid) from public;
 revoke all on function public.get_soccer_primary_recorder_history(uuid) from public;
 revoke all on function public.set_soccer_primary_recorder(uuid, uuid) from public;

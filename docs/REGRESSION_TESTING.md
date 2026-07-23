@@ -821,7 +821,7 @@ and Soccer running in development.
 
 | ID | Action | Expected |
 |---|---|---|
-| 11l.1 | Recorder A creates, records, and syncs a team soccer game | Recorder presence shows A as the default primary with a current checkpoint |
+| 11l.1 | Recorder B checkpoints first, then creator A records and syncs the team soccer game | B is the temporary default only until A has a healthy checkpoint; presence then resolves A as default primary regardless of checkpoint race |
 | 11l.2 | Recorder B opens the same Cloud Game and confirms **Start your own independent recorder stream** | B receives the immutable setup/participants and three new kickoff events bound to the same game id; no A event is copied |
 | 11l.3 | A and B record different events and sync | Two recorder rows remain separate; each projection has its own score/timeline and event ownership |
 | 11l.4 | Open recorder streams from the tracker without enabling details | Compact count, primary name, checkpoint state, and conflict count appear; no other-recorder events enter the live timeline |
@@ -833,6 +833,9 @@ and Soccer running in development.
 | 11l.10 | Open a finalized soccer row before SOC-5D UI is enabled | Cloud Games routes to read-only primary review; no recorder stream is resumed or edited |
 | 11l.11 | Attempt to add another recorder to a personal soccer game | Server rejects the v3 bind |
 | 11l.12 | Record and sync basketball after migration 045 | Basketball aggregate sync, checkout primary behavior, and shot-chart review are unchanged |
+| 11l.13 | Recorder B has unsynced active or parked work bound to the game, then opens it from Cloud Games while their cloud stream is empty | The matching local slot resumes without a cloud load or new kickoff; active wins over parked, otherwise dirty work wins |
+| 11l.14 | Force the recorder cloud load or projection to fail, then open the game | The error is shown and no independent-stream prompt or replacement kickoff appears |
+| 11l.15 | A and B sync divergent substitutions/roles; B also changes their local game labels | Shared participant snapshots do not store either recorder's live role/status; B cannot replace shared names/numbers or game headers, while creator A can refresh header/profile metadata |
 
 ---
 

@@ -22,9 +22,13 @@ describe('migration 045 soccer recorder resolution contracts', () => {
   it('selects only current conflict-free recorder checkpoints through a manager RPC', () => {
     expect(sql).toContain('create or replace function public.is_game_event_checkpoint_current')
     expect(sql).toContain('create or replace function public.effective_soccer_primary_recorder')
-    expect(sql).toContain('create or replace function public.assign_default_soccer_primary_recorder')
-    expect(sql).toContain('on_soccer_checkpoint_assign_primary')
     expect(sql).toContain("selection_source in ('default', 'selected')")
+    expect(sql).not.toContain('assign_default_soccer_primary_recorder')
+    expect(sql).not.toContain('on_soccer_checkpoint_assign_primary')
+    expect(sql).toContain(
+      'if public.is_game_event_checkpoint_current(p_game_id, v_creator) then'
+    )
+    expect(sql).toContain('order by cp.synced_at, cp.recorded_by')
     expect(sql).toContain('create or replace function public.set_soccer_primary_recorder')
     expect(sql).toContain("public.current_team_role(v_game.team_id) in ('owner', 'admin')")
     expect(sql).toContain('primary recorder must have a current conflict-free checkpoint')
@@ -37,5 +41,16 @@ describe('migration 045 soccer recorder resolution contracts', () => {
     expect(sql).toContain('create or replace function public.bind_soccer_event_game_v3')
     expect(sql).toContain('if not public.can_track_game(v_game.id)')
     expect(sql).toContain('personal games cannot add another recorder')
+  })
+
+  it('keeps shared metadata stream-neutral and creator-owned', () => {
+    expect(sql).toContain('if v_game.created_by = v_user_id then')
+    expect(sql).toContain('tracked_team_name = trim(p_team_name)')
+    expect(sql).toContain(
+      'when v_user_id = v_game.created_by then excluded.display_name'
+    )
+    expect(sql).toContain(
+      'snapshot = public.game_participants.snapshot'
+    )
   })
 })

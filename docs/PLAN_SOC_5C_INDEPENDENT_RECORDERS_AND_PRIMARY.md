@@ -32,7 +32,11 @@ production. Those remain SOC-5D and SOC-6.
 - A second recorder starts from the immutable match setup and game participant snapshot, then
   creates their own opening-lineup, period-start, and clock-start events with new event ids.
 - No event is copied from another recorder. Personal games cannot add another recorder.
+- Cloud Games resumes an active or parked local binding before loading cloud state, preserving
+  unsynced work. Load or projection failures stop the open flow and never become a new kickoff.
 - An existing recorder resumes only their own stream through the SOC-5B merge/conflict path.
+- Shared participant snapshots contain setup/identity metadata only. Live role and status remain
+  recorder-derived; only the game creator can refresh shared names, numbers, and game headers.
 
 ### Read-only streams
 
@@ -49,6 +53,8 @@ production. Those remain SOC-5D and SOC-6.
 
 - `game_event_primary_recorders` stores an optional explicit selection. Until selected, the
   healthy creator checkpoint is preferred, then the earliest healthy checkpoint.
+- Automatic defaults are not persisted, so a healthy creator takes precedence even when another
+  recorder completed the first checkpoint. Explicit owner/admin selections remain durable.
 - Only a team owner/admin or personal-game owner can change the primary.
 - The target requires a current, conflict-free verified checkpoint. The UI also requires the
   event stream to project without diagnostics.
@@ -76,6 +82,7 @@ Automated coverage includes:
 - recorder RPC parsing and cloud-player actor mapping;
 - isolated read-only projection;
 - fresh independent kickoff bound to the existing cloud game;
+- local-binding precedence, empty-stream detection, and load-error propagation;
 - migration 045 RLS, role, audit, checkpoint-health, and v3 binding contracts;
 - existing SOC-5A/B transport and same-recorder recovery tests.
 
