@@ -5,6 +5,7 @@ import { createInitialCloudSyncState } from '../gameReducer'
 import { DEFAULT_SOCCER_MATCH_RULES } from './rules'
 import { createSoccerSportGameState } from './state'
 import {
+  loadSoccerSummaryRecordingSource,
   loadSoccerSummarySource,
   SoccerSummarySourceError,
   type SoccerSummarySourceDependencies,
@@ -193,5 +194,50 @@ describe('loadSoccerSummarySource', () => {
     invalid.sport = null
     await expect(loadSoccerSummarySource(invalid, null, dependencies()))
       .rejects.toBeInstanceOf(SoccerSummarySourceError)
+  })
+
+  it('loads another recorder as isolated read-only authority', async () => {
+    const deps = dependencies()
+    const other = {
+      ...recorder(),
+      recorderId: 'recorder-2',
+      displayName: 'Other Recorder',
+      isPrimary: false,
+    }
+    vi.mocked(deps.loadPrimary).mockResolvedValue({
+      recorders: [recorder(), other],
+      primary: projection(),
+    })
+    const primary = await loadSoccerSummarySource(state(), 'game-1', deps)
+    const otherProjection = projection()
+    otherProjection.recorder = other
+    const loadRecorder = vi.fn().mockResolvedValue(otherProjection)
+
+    const result = await loadSoccerSummaryRecordingSource(
+      primary,
+      other,
+      loadRecorder
+    )
+
+    expect(result.kind).toBe('cloud_recording')
+    expect(result.recorder).toEqual(other)
+    expect(result.recorders).toEqual([recorder(), other])
+    expect(result.editable).toBe(false)
+    expect(loadRecorder).toHaveBeenCalledWith(primary.state, other)
+  })
+
+  it('rejects alternate recorder review for canonical finals', async () => {
+    const finalState = state('final')
+    const deps = dependencies(finalState)
+    vi.mocked(deps.loadCanonical).mockResolvedValue(publication())
+    const canonical = await loadSoccerSummarySource(
+      finalState,
+      'game-1',
+      deps
+    )
+
+    await expect(
+      loadSoccerSummaryRecordingSource(canonical, recorder(), vi.fn())
+    ).rejects.toMatchObject({ authority: 'cloud_recording' })
   })
 })

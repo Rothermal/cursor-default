@@ -1,6 +1,6 @@
 # Plan: SOC-6B Detailed Match Review
 
-Status: Planned. Delivery is split into SOC-6B1 through SOC-6B4.
+Status: SOC-6B1 implemented. SOC-6B2 through SOC-6B4 remain planned.
 
 Parent roadmap: [PLAN_SOC_6_SUMMARY_AND_RELEASE.md](PLAN_SOC_6_SUMMARY_AND_RELEASE.md)
 
@@ -30,6 +30,8 @@ tabs and keeps later tabs hidden until their own acceptance boundary passes.
 
 ### SOC-6B1: Player review
 
+Status: Implemented.
+
 - Extend URL-backed summary tabs with `players`.
 - Add the shared detailed-review read-model boundary.
 - Add tracked-side player category tables and player detail sheets.
@@ -46,6 +48,8 @@ minutes, category totals, rates, and detail intervals for local, primary-cloud, 
 sources.
 
 ### SOC-6B2: Timeline review
+
+Status: Planned; next.
 
 - Extend URL-backed summary tabs with `timeline`.
 - Add oldest-first period-grouped review rows and the reviewed family filters.
