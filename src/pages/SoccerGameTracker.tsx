@@ -40,7 +40,6 @@ import SoccerShootoutManagementDialog, { type SoccerShootoutManagementKind } fro
 import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupDialog'
 import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
 import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
-import SoccerFinalizationPanel from '../components/soccer/SoccerFinalizationPanel'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
@@ -76,6 +75,7 @@ import {
   primarySoccerRecorder,
   type SoccerRecorderSummary,
 } from '../lib/soccer/recorders'
+import { soccerSummaryPath } from '../lib/soccer/summary'
 
 type MainTab = 'field' | 'lineup' | 'timeline'
 type LineupTab = 'on_field' | 'bench'
@@ -402,12 +402,19 @@ export default function SoccerGameTracker() {
           ) : ended ? (
             <div className="mt-5 space-y-2">
               <p className="text-sm font-bold text-slate-700">{matchResultLabel(projection, state.gameInfo.teamName, state.gameInfo.opponentName)}</p>
+              <button
+                type="button"
+                onClick={() => navigate(soccerSummaryPath({ from: 'tracker' }))}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white"
+              >
+                <Flag size={18} /> View Summary
+              </button>
               {cloudFinal ? (
                 <p className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  This cloud result is locked. Use Cloud Finalization below to reopen it.
+                  This cloud result is locked. Reopen it from Match Summary.
                 </p>
               ) : (
-                <button type="button" onClick={() => setReopenOpen(true)} className="w-full rounded-md bg-slate-800 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setReopenOpen(true)} className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 flex items-center justify-center gap-2">
                   <RotateCcw size={18} /> Reopen Match
                 </button>
               )}
@@ -448,30 +455,6 @@ export default function SoccerGameTracker() {
             </div>
           )}
         </section>
-
-        {state.cloudSync.gameId && (
-          <SoccerFinalizationPanel
-            baseState={state}
-            currentUserId={user?.id ?? null}
-            refreshKey={state.cloudSync.lastSyncedAt}
-            flushCloudSync={flushCloudSync}
-            onFinalized={() => {
-              dispatch({
-                type: 'SET_CLOUD_SYNC_STATE',
-                cloudSync: { gameStatus: 'final' },
-              })
-              navigate(
-                `/soccer/review?gameId=${encodeURIComponent(state.cloudSync.gameId!)}`
-              )
-            }}
-            onReopened={() => {
-              dispatch({
-                type: 'SET_CLOUD_SYNC_STATE',
-                cloudSync: { gameStatus: 'in_progress' },
-              })
-            }}
-          />
-        )}
 
         {error && <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 

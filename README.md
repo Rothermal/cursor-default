@@ -414,10 +414,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Soccer offline recovery and same-recorder conflicts (SOC-5B)** - pull-before-push merge, event-aware cloud resume, durable competing revisions, explicit resolution, retry details, and recovery export ([plan](docs/PLAN_SOC_5B_OFFLINE_RECOVERY_AND_CONFLICTS.md))
 - [x] **Soccer independent recorders and primary resolution (SOC-5C)** - separate team recorder streams, compact presence, opt-in read-only detail, provisional owner/admin primary selection, and immutable selection history ([plan](docs/PLAN_SOC_5C_INDEPENDENT_RECORDERS_AND_PRIMARY.md))
 - [x] **Soccer finalization and recovery (SOC-5D)** - owner/admin readiness, primary conflict preparation and lock, append-only canonical publications, canonical final review, late non-primary audit uploads, and reason-required audited reopen ([plan](docs/PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md))
+- [x] **Soccer summary foundation (SOC-6A)** - one Overview-only `/summary` for current local matches, effective cloud primaries, and canonical finals; direct cloud review preserves parked games, diagnostics suppress partial official totals, and finalization/reopen refresh authority in place ([plan](docs/PLAN_SOC_6A_SUMMARY_FOUNDATION.md))
 
 ### What's Next
 
-- [ ] **Soccer SOC-6** - complete summaries, field maps, settings, aggregates, regression QA, and production release ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer SOC-6B through SOC-6E** - add detailed match review and field maps, canonical aggregates, settings/defaults, regression QA, and production release ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))

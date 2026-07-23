@@ -863,6 +863,28 @@ migrations 043 through 046 applied, and Soccer running in development.
 | 11m.17 | Finalize and reopen a personal soccer game | Only the personal game creator may perform either action |
 | 11m.18 | Finalize a basketball game after migration 046 | Existing aggregate finalization, checkout, summary, and correction behavior are unchanged |
 
+## 11n. Soccer summary foundation and Overview (SOC-6A)
+
+**Precondition:** Migrations 043 through 046 applied for cloud cases, Soccer running in
+development, and at least one local match plus one team cloud match available.
+
+| ID | Action | Expected |
+|---|---|---|
+| 11n.1 | End a local-only match, remain in Tracker, then choose **View Summary** | `/summary?tab=overview&from=tracker` opens the local Overview without a cloud read; score, result, comparison, leaders, and match details match the local projection |
+| 11n.2 | Reopen the completed local match from Overview | Summary remains local and refreshes to non-final match context; an abandoned match requires a reason |
+| 11n.3 | Keep a local binding after its cloud game is final, then open `/summary` without `gameId` | Summary resolves the active canonical publication through the binding and exposes no local edit or local-reopen action |
+| 11n.4 | Open a non-final soccer game as a viewer from Cloud Games and Game Info | Direct `/summary?gameId=...` review uses the SOC-5C effective primary and does not activate, replace, or create a parked game |
+| 11n.5 | Open a canonical final while another basketball or soccer game is active | The active game id and parked-game list remain unchanged; Back returns through the constrained `from` context |
+| 11n.6 | Finalize an ended healthy primary from Overview as owner/admin | Summary stays on the current route and refreshes from `Synced Primary` to `Canonical Final`; scorer/viewer users do not see the action |
+| 11n.7 | Reopen a canonical final from Overview with a reason | Summary refreshes in place to `Synced Primary`; a matching owned parked stream offers **Resume Tracker** |
+| 11n.8 | Remove or invalidate the active canonical publication while the game remains final | Summary fails closed with canonical recovery guidance and never falls back to a live recorder or score-only row |
+| 11n.9 | Introduce a projection diagnostic in a local or primary stream | Last coherent score/context remain visible, while team comparison, leaders, and finalization are suppressed and diagnostics are shown |
+| 11n.10 | Leave the non-final cloud summary open, focus another window and return, then wait 30 seconds | Focus, manual Refresh, and the active-page interval reload only the effective primary; canonical finals do not poll |
+| 11n.11 | Use long team/player names, tied leaders, all-zero optional rows, extra time, penalties, suspended, and abandoned results at narrow mobile and desktop widths | Header columns remain stable, text wraps/truncates safely, ties remain visible, optional both-zero rows hide, and result context is explicit |
+| 11n.12 | Open a future or invalid `tab` query value | SOC-6A safely renders Overview and shows no incomplete Players, Timeline, Field, or Shootout tabs |
+| 11n.13 | Open legacy `/#/soccer/review` with `gameId`, `from`, `teamId`, and an unrelated parameter | It redirects to `/summary`, preserving only supported context and normalizing the tab to Overview |
+| 11n.14 | Re-run basketball local and cloud summary entry paths | Basketball still renders `GameSummary`; soccer source loading and direct cloud review are not invoked |
+
 ---
 
 ## 12. GitHub Pages deploy

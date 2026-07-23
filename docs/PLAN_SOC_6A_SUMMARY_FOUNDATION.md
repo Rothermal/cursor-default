@@ -1,6 +1,6 @@
 # Plan: SOC-6A Summary Foundation
 
-Status: Product and implementation direction reviewed. Implementation is not started.
+Status: Implemented. SOC-6B detailed Players, Timeline, Field, and Shootout views remain next.
 
 Parent roadmap: [PLAN_SOC_6_SUMMARY_AND_RELEASE.md](PLAN_SOC_6_SUMMARY_AND_RELEASE.md)
 
