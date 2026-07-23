@@ -163,7 +163,7 @@ describe('soccer event cloud sync helpers', () => {
     cloudMock.upsert.mockReset()
     cloudMock.load.mockReset()
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'bind_soccer_event_game_v2'
+      name === 'bind_soccer_event_game_v3'
         ? {
             data: {
               game_id: 'cloud-game-1',
@@ -207,13 +207,18 @@ describe('soccer event cloud sync helpers', () => {
   it('snapshots late participants from current projection after identity resolution', () => {
     const state = lateResolvedShotState()
     const sportState = assertHealthySoccerEventGame(state)
-    expect(soccerCloudParticipants(sportState)).toContainEqual(expect.objectContaining({
+    const participants = soccerCloudParticipants(sportState)
+    expect(participants).toContainEqual(expect.objectContaining({
       client_participant_id: 'participant-late',
       client_player_id: 'player-late',
       kind: 'player',
       display_name: 'Late Player',
       snapshot: expect.objectContaining({ addedDuringMatch: true }),
     }))
+    expect(participants.every(participant =>
+      !('currentStatus' in participant.snapshot) &&
+      !('currentRole' in participant.snapshot)
+    )).toBe(true)
   })
 
   it('builds a deterministic revision checkpoint for a healthy existing game', () => {
@@ -246,7 +251,7 @@ describe('soccer event cloud sync helpers', () => {
     })
     expect(cloudMock.upsert).toHaveBeenCalledTimes(3)
     expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
-      'bind_soccer_event_game_v2',
+      'bind_soccer_event_game_v3',
       'confirm_game_event_stream_checkpoint',
     ])
     expect(cloudMock.rpc.mock.calls[1]?.[1]).toMatchObject({
@@ -266,12 +271,12 @@ describe('soccer event cloud sync helpers', () => {
       localGameId: '20000000-0000-4000-8000-000000000001',
     })).rejects.toThrow('could not sync')
 
-    expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual(['bind_soccer_event_game_v2'])
+    expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual(['bind_soccer_event_game_v3'])
   })
 
   it('uploads a late resolved player actor with the refreshed participant map', async () => {
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'bind_soccer_event_game_v2'
+      name === 'bind_soccer_event_game_v3'
         ? {
             data: {
               game_id: 'cloud-game-1',
@@ -319,7 +324,7 @@ describe('soccer event cloud sync helpers', () => {
       error: null,
     })
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'bind_soccer_event_game_v2'
+      name === 'bind_soccer_event_game_v3'
         ? {
             data: {
               game_id: 'cloud-game-1',
@@ -407,7 +412,7 @@ describe('soccer event cloud sync helpers', () => {
       error: null,
     })
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'bind_soccer_event_game_v2'
+      name === 'bind_soccer_event_game_v3'
         ? {
             data: {
               game_id: 'cloud-game-1',

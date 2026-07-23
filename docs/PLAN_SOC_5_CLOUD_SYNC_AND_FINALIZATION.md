@@ -1,6 +1,6 @@
 # Plan: SOC-5 Cloud Sync and Finalization
 
-Status: In progress. Product decisions are complete; SOC-5A and SOC-5B are implemented.
+Status: In progress. Product decisions are complete; SOC-5A through SOC-5C are implemented.
 
 ## 1. Goal
 

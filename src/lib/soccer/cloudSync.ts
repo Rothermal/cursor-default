@@ -105,8 +105,6 @@ export function soccerCloudParticipants(
       snapshot: {
         initialStatus: origin?.initialStatus ?? null,
         initialRole: origin ? structuredClone(origin.initialRole) : null,
-        currentStatus: participant.status,
-        currentRole: structuredClone(participant.role),
         addedDuringMatch: origin === undefined,
       },
     }
@@ -162,7 +160,7 @@ export async function syncSoccerEventGameToCloud({
   const participants = soccerCloudParticipants(sportState)
 
   const { data: bindingData, error: bindingError } = await supabase.rpc(
-    'bind_soccer_event_game_v2',
+    'bind_soccer_event_game_v3',
     {
       p_existing_game_id: state.cloudSync.gameId,
       p_client_local_game_id: localGameId,
@@ -357,7 +355,8 @@ export async function loadSoccerCloudGameById(
     ])
   if (gameError) throw new Error(`Soccer game load failed: ${gameError.message}`)
   if (setupError) throw new Error(`Soccer setup load failed: ${setupError.message}`)
-  if (!gameData || !setupData) return null
+  if (!gameData) throw new Error('Cloud soccer game is unavailable.')
+  if (!setupData) throw new Error('Cloud soccer setup is unavailable.')
 
   const gameRow = gameData as SoccerCloudGameRow
   const normalizedSportState = normalizeSportGameState({

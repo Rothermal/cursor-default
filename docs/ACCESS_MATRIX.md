@@ -163,6 +163,9 @@ closed SEC0-15 in migration 039 with a PostgREST request gate and app-admin-only
 | Player merge RPCs | Owner/admin on every involved team can preview/execute | `024_player_merge_rpcs.sql` |
 | `player_merge_audit` | User reads only merges they performed | `025_player_merge_audit_select_policy.sql` |
 | `shot_chart` | Team members read; recorder writes/deletes own rows | `032_shot_chart.sql` |
+| Soccer `game_events` / checkpoints | Team members read; owner/admin/scorer writes only their own non-final recorder stream; viewers read only | Migrations 042–045 |
+| Soccer primary recorder RPC | Team owner/admin or personal-game owner selects a current conflict-free stream; scorer/viewer denied | `set_soccer_primary_recorder` in migration 045 |
+| Soccer primary history | Game readers can inspect immutable selection history; direct writes denied | Migration 045 |
 | `client_sync_errors` | User inserts/reads own rows | `033_client_sync_errors.sql` |
 | Authenticated app shell | Any authenticated Supabase user enters; no app status exists | `src/App.tsx`, `src/context/AuthContext.tsx` |
 | Local parked games | Device-local records scoped by stored owner id | `src/lib/gameParking.ts` |

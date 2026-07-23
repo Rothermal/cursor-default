@@ -814,6 +814,31 @@ Soccer remains development-only.
 
 ---
 
+## 11l. Soccer independent recorders and primary resolution (SOC-5C)
+
+**Precondition:** Two accepted team users plus one viewer, migrations 043 through 045 applied,
+and Soccer running in development.
+
+| ID | Action | Expected |
+|---|---|---|
+| 11l.1 | Recorder B checkpoints first, then creator A records and syncs the team soccer game | B is the temporary default only until A has a healthy checkpoint; presence then resolves A as default primary regardless of checkpoint race |
+| 11l.2 | Recorder B opens the same Cloud Game and confirms **Start your own independent recorder stream** | B receives the immutable setup/participants and three new kickoff events bound to the same game id; no A event is copied |
+| 11l.3 | A and B record different events and sync | Two recorder rows remain separate; each projection has its own score/timeline and event ownership |
+| 11l.4 | Open recorder streams from the tracker without enabling details | Compact count, primary name, checkpoint state, and conflict count appear; no other-recorder events enter the live timeline |
+| 11l.5 | Enable **Show stream details** and inspect the other recorder | A read-only score/status/timeline projection appears and the active recorder stream remains unchanged |
+| 11l.6 | As owner/admin, select B as primary | B must have a current conflict-free checkpoint and healthy projection; primary changes immediately and history records actor, old primary, new primary, and time |
+| 11l.7 | As scorer or viewer, attempt the primary RPC directly | Server denies the change; scorer may still write only their own stream and viewer remains read-only |
+| 11l.8 | Make B's stream dirty or create an unresolved B conflict after selection | B remains provisionally selected but shows Needs Attention; the stream is not finalization-ready |
+| 11l.9 | As viewer, open the soccer game from Cloud Games | `/#/soccer/review` shows only the primary projection with no live capture controls |
+| 11l.10 | Open a finalized soccer row before SOC-5D UI is enabled | Cloud Games routes to read-only primary review; no recorder stream is resumed or edited |
+| 11l.11 | Attempt to add another recorder to a personal soccer game | Server rejects the v3 bind |
+| 11l.12 | Record and sync basketball after migration 045 | Basketball aggregate sync, checkout primary behavior, and shot-chart review are unchanged |
+| 11l.13 | Recorder B has unsynced active or parked work bound to the game, then opens it from Cloud Games while their cloud stream is empty | The matching local slot resumes without a cloud load or new kickoff; active wins over parked, otherwise dirty work wins |
+| 11l.14 | Force the recorder cloud load or projection to fail, then open the game | The error is shown and no independent-stream prompt or replacement kickoff appears |
+| 11l.15 | A and B sync divergent substitutions/roles; B also changes their local game labels | Shared participant snapshots do not store either recorder's live role/status; B cannot replace shared names/numbers or game headers, while creator A can refresh header/profile metadata |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.
