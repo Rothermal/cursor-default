@@ -23,9 +23,12 @@ SOC-6A does not remove production soccer gates, publish aggregates, or add socce
 ### Route and source authority
 
 - `/summary` without `gameId` reads the current local soccer `GameState`.
+- If that local state is bound to a cloud-final game, its `gameId` becomes the canonical lookup;
+  the retained local copy is never editable summary authority.
 - `/summary?gameId=<uuid>` reads cloud state without hydrating `GameContext`, activating a parked
   record, or disturbing another active game.
-- A non-final cloud request reads the selected primary recorder stream.
+- A non-final cloud request reads the SOC-5C effective primary recorder stream: explicit manager
+  selection when present, otherwise the existing creator-preferring provisional default.
 - A final cloud request requires a healthy active canonical publication.
 - A final game with no healthy active publication fails closed with recovery guidance. It never
   falls back to a live recorder or a stored score-only view.
@@ -89,7 +92,7 @@ type SoccerSummarySource =
       state: GameState
       recorder: null
       publication: null
-      editable: true
+      editable: boolean
     }
   | {
       kind: 'cloud_primary'
@@ -116,6 +119,10 @@ must remain explicit. Components must not infer authority from a mixture of `gam
 - Require current `state.sport.id === 'soccer'`.
 - Reuse the current projected state and inspection without writing or cloning it into parking.
 - Keep local completion visibly distinct from canonical finalization.
+- Set `editable` only while `state.cloudSync.gameStatus !== 'final'`.
+- When a bound local state is cloud-final, load canonical authority through its `gameId`. If that
+  canonical load fails, show the fail-closed final error with `editable: false`; never expose
+  local event edits or local Reopen.
 - Do not expose Finalize until the game is cloud-bound and normal readiness checks pass.
 
 ### Cloud source
@@ -123,7 +130,10 @@ must remain explicit. Components must not infer authority from a mixture of `gam
 - Build on the SOC-5 recorder/canonical loaders.
 - Read cloud game status before choosing primary versus canonical authority.
 - For `final`, require an active canonical publication and successful deterministic rebuild.
-- For non-final, load only the selected primary into the main model.
+- For non-final, resolve `effective_soccer_primary_recorder` through the existing SOC-5C contract
+  and load only that effective primary into the main model. A recorder-dialog selection may
+  change the effective primary through its authorized RPC, but an arbitrary UI stream pick never
+  feeds Overview totals.
 - Other-recorder presence remains available through the existing recorder control but never enters
   Overview totals.
 - Do not call `openGameSnapshot`, `resumeParkedGame`, or aggregate cloud hydration.
@@ -248,6 +258,9 @@ Use a helper rather than scattered string construction. It should:
 Reuse `SoccerFinalizationPanel` and SOC-5 server contracts.
 
 - Show the full panel only for a healthy Overview source with a cloud game binding.
+- A non-final source may expose Finalize through normal readiness checks. A canonical cloud-final
+  source may expose only the authorized server Reopen action; it never exposes local Reopen or
+  event mutation.
 - Continue flushing the matching primary queue before finalization.
 - After success, reload cloud authority and require canonical source before rendering the final.
 - Do not navigate away or hydrate the final into `GameContext`.
@@ -277,6 +290,7 @@ Add focused coverage for:
 
 - summary query parsing and safe back-path fallback;
 - local route source with no cloud read;
+- bound cloud-final local route resolving canonical authority and remaining read-only;
 - direct non-final cloud primary source;
 - direct canonical-final source;
 - final game without active publication failing closed;
@@ -298,18 +312,20 @@ Add an SOC-6A section to `docs/REGRESSION_TESTING.md` covering:
 
 1. End a local-only match, remain in Tracker, and open editable local Summary.
 2. Reopen locally and verify Summary returns to non-final match context.
-3. Open a non-final selected primary as viewer without activating a parked game.
-4. Open a cloud final from Games while another basketball or soccer game is active.
-5. Verify the active/parked game remains unchanged.
-6. Finalize from Overview and observe in-place canonical transition.
-7. Reopen from Overview and observe in-place non-final transition.
-8. Exercise owner/admin/scorer/viewer visibility and actions.
-9. Force a missing/invalid canonical publication and verify fail-closed recovery.
-10. Force projection diagnostics and verify totals/leaders/finalization are suppressed.
-11. Verify focus/manual/30-second refresh for non-final review.
-12. Verify long names, ties, zero totals, abandoned results, extra time, and shootouts on narrow
+3. Retain a local cloud-final binding and verify `/summary` loads canonical authority without
+   local edit/Reopen controls.
+4. Open a non-final effective primary as viewer without activating a parked game.
+5. Open a cloud final from Games while another basketball or soccer game is active.
+6. Verify the active/parked game remains unchanged.
+7. Finalize from Overview and observe in-place canonical transition.
+8. Reopen from Overview and observe in-place non-final transition.
+9. Exercise owner/admin/scorer/viewer visibility and actions.
+10. Force a missing/invalid canonical publication and verify fail-closed recovery.
+11. Force projection diagnostics and verify totals/leaders/finalization are suppressed.
+12. Verify focus/manual/30-second refresh for non-final review.
+13. Verify long names, ties, zero totals, abandoned results, extra time, and shootouts on narrow
     mobile and desktop widths.
-13. Re-run basketball local and cloud summary entry paths.
+14. Re-run basketball local and cloud summary entry paths.
 
 ## 11. Deferred to Later SOC-6 Slices
 

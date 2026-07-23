@@ -55,18 +55,19 @@ Build the shared soccer summary read model and first production-quality summary 
 - Support current local state and direct cloud loading through `?gameId=`.
 - Redirect legacy `/soccer/review` links to the shared summary.
 - Resolve authority explicitly:
-  - current local recorder state for local/non-final owned work;
-  - selected cloud primary for non-final read-only review;
+  - current local recorder state for local/non-final owned work, never a cloud-final local copy;
+  - the SOC-5C effective primary for non-final read-only review;
   - active canonical publication for a finalized game.
-- Add the summary shell with `Overview`, `Players`, `Timeline`, and `Field` tabs.
-- Add a conditional `Shootout` tab only when a shootout exists.
+- Ship an Overview-only shell in 6A while reserving query-safe future tab ids internally.
+- Do not show disabled or incomplete Players, Timeline, Field, or Shootout tabs; 6B adds them only
+  when their complete views ship.
 - Ship Overview with score/result, regulation or extra-time decision context, conditional
   shootout result, side-by-side team totals, and compact leaders.
 - Keep the user in the tracker after match end and add an explicit Summary action.
 - Keep finalization/reopen access available from the appropriate summary state.
 
-Exit condition: a local ended match, a non-final cloud primary, and a canonical final all open
-the same truthful summary shell with correct edit/read-only behavior.
+Exit condition: a local ended match, the non-final SOC-5C effective primary, and a canonical final
+all open the same truthful Overview with correct edit/read-only behavior and no incomplete tabs.
 
 ### SOC-6B: Detailed match review
 
@@ -84,6 +85,8 @@ Complete player, Timeline, field-map, and shootout review.
 - Derive team and goalkeeper clean-sheet context. Every goalkeeper who played and conceded no
   goal during their own on-field interval receives credit; multiple qualifying keepers are
   labeled as a shared clean sheet.
+- The 6B phase Q&A must settle interval boundaries, own-goal treatment, and shootout exclusion
+  before clean-sheet derivation is implemented.
 - Timeline defaults oldest-first with period headings and family filters.
 - Local/current-recorder non-final review reuses revision editing.
 - Remote-primary and canonical-final review stay read-only and offer Resume or Reopen actions
@@ -107,6 +110,8 @@ unverified authority.
 - Add only a narrow compatibility map for pre-release development data using old soccer ids.
 - Add RLS-scoped, paginated RPCs that return the active canonical source needed for authorized
   season/team/player/career/tournament projection.
+- Instrument publication count, event count, payload bytes, and projection time during 6C; measure
+  the paginated client path before proposing any materialized cache.
 - Run the existing deterministic TypeScript projector over canonical setup/events and aggregate
   the resulting totals in the client.
 - Do not write client-supplied canonical soccer totals into `game_stats`.
@@ -180,8 +185,9 @@ required migrations, and production builds expose opt-in Soccer without weakenin
 | Summary source | Display authority | Editing |
 |---|---|---|
 | Local-only current match | Current healthy local event stream | Current recorder may revise |
-| Bound current recorder | Current healthy local stream until synced/finalized | Current recorder may revise |
-| Non-final remote cloud game | Selected primary cloud stream | Read-only; resume owned stream to edit |
+| Bound non-final current recorder | Current healthy local stream | Current recorder may revise |
+| Locally retained cloud-final binding | Active canonical setup/events via its cloud game id | Read-only; never offer local reopen |
+| Non-final remote cloud game | SOC-5C effective primary cloud stream | Read-only; resume owned stream to edit |
 | Final cloud game | Active canonical setup/events | Read-only; manager must reopen |
 | Reopened cloud game | Live selected primary after publication invalidation | Recorder revision flow resumes |
 

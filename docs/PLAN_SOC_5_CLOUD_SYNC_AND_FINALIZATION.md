@@ -11,7 +11,8 @@ revisions, records verified checkpoints, and later supports explicit conflict re
 primary-recorder selection, finalization, and audited reopen.
 
 SOC-5 does not enable Soccer in production. Summary, aggregates, settings consolidation,
-release QA, and production enablement remain SOC-6.
+release QA, and production enablement remain SOC-6; see
+[PLAN_SOC_6_SUMMARY_AND_RELEASE.md](PLAN_SOC_6_SUMMARY_AND_RELEASE.md).
 
 ## 2. Delivery Slices
 
@@ -147,5 +148,6 @@ Implemented by migration 046, `src/lib/soccer/finalization.ts`, and
 
 - Live collaborative co-editing of one stream.
 - Automatic merging of different recorders into one projection.
-- Production soccer enablement and complete summary/season UI (SOC-6).
+- Production soccer enablement and complete summary/season UI
+  ([SOC-6 roadmap](PLAN_SOC_6_SUMMARY_AND_RELEASE.md)).
 - Basketball migration to the shared event model (BKE roadmap).

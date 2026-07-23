@@ -303,6 +303,7 @@ docs/
 ├── PLAN_SOC_5C_INDEPENDENT_RECORDERS_AND_PRIMARY.md # SOC-5C recorder presence and primary resolution
 ├── PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md # SOC-5D canonical publication and audited reopen
 ├── PLAN_SOC_6_SUMMARY_AND_RELEASE.md # Reviewed SOC-6 summary, aggregates, settings, and release roadmap
+├── PLAN_SOC_6A_SUMMARY_FOUNDATION.md # Reviewed SOC-6A summary source and Overview implementation plan
 ├── PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md # Required post-SOC basketball event migration
 ├── PLAN_MULTI_GAME_PARKING.md # Roadmap: local parking + sync queue + cloud ordering hardening shipped
 ├── ACCESS_MATRIX.md       # Approved role/action contract and current security audit
