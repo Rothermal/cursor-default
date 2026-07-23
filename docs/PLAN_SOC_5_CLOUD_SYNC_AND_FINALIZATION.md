@@ -130,8 +130,9 @@ release QA, and production enablement remain SOC-6.
 - Event ids, sequence ownership, revisions, tombstones, and original timestamps survive transport.
 - Game participant ids are scoped to one match; optional source-player links provide continuity
   without making local or guest participants permanent roster entities.
-- A checkpoint is evidence that the cloud contains the recorder's exact event-id/revision set at a
-  fingerprint, not permission to delete local history.
+- A checkpoint is evidence that the cloud contains the recorder's exact event-id/revision set.
+  Its stream fingerprint is client-computed comparison metadata and is not independently derived
+  by PostgreSQL; neither value grants permission to delete local history.
 - Finalized canonical output is always reproducible from the locked primary stream and snapshots.
 
 ## 5. Deferred Beyond SOC-5
@@ -140,4 +141,3 @@ release QA, and production enablement remain SOC-6.
 - Automatic merging of different recorders into one projection.
 - Production soccer enablement and complete summary/season UI (SOC-6).
 - Basketball migration to the shared event model (BKE roadmap).
-

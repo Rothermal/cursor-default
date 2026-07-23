@@ -106,7 +106,10 @@ function createLocalGameId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()
   }
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+  const tail = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`
+    .slice(-12)
+    .padStart(12, '0')
+  return `00000000-0000-4000-8000-${tail}`
 }
 
 function nowIso(): string {

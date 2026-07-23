@@ -90,6 +90,7 @@ type CloudGameRow = {
   tournament_name: string | null
   tournament_id?: string | null
   season_id?: string | null
+  sport_id?: string | null
   game_date: string
   opponent_score: number | null
   home_team_score?: number | null
@@ -1004,7 +1005,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   // All optional columns (may not exist before their respective migrations)
   const allOptional =
-    'home_team_score,home_score_adjustment,tournament_id,notes,last_opened_at,season_id,home_team_player_id,opp_team_player_id'
+    'home_team_score,home_score_adjustment,tournament_id,notes,last_opened_at,season_id,sport_id,home_team_player_id,opp_team_player_id'
   const baseColumns =
     'id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at'
 
@@ -1013,6 +1014,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
     .select(`${baseColumns},${allOptional}`)
     .eq('created_by', userId)
     .not('team_id', 'is', null)
+    .is('sport_id', null)
     .in('status', ['in_progress', 'scheduled'])
     .order('last_opened_at', { ascending: false })
     .order('created_at', { ascending: false })
@@ -1035,12 +1037,18 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   const selectColumns = baseColumns + buildOptionalGameSelectSuffix(gaps)
 
-  const retry = await supabase
+  let retryQuery = supabase
     .from('games')
     .select(selectColumns)
     .eq('created_by', userId)
     .not('team_id', 'is', null)
     .in('status', ['in_progress', 'scheduled'])
+
+  if (!gaps.sportId) {
+    retryQuery = retryQuery.is('sport_id', null)
+  }
+
+  const retry = await retryQuery
     .order(!gaps.lastOpened ? 'last_opened_at' : 'created_at', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
@@ -1051,13 +1059,21 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
   }
 
   // Final fallback: base columns only (no optional columns at all).
-  if (hasAnyOptionalGameColumnGap(detectOptionalGameColumnGaps(retry.error))) {
-    const finalRetry = await supabase
+  const retryGaps = detectOptionalGameColumnGaps(retry.error)
+  if (hasAnyOptionalGameColumnGap(retryGaps)) {
+    const sportIdMissing = gaps.sportId || retryGaps.sportId
+    let finalQuery = supabase
       .from('games')
-      .select(baseColumns)
+      .select(baseColumns + (!sportIdMissing ? ',sport_id' : ''))
       .eq('created_by', userId)
       .not('team_id', 'is', null)
       .in('status', ['in_progress', 'scheduled'])
+
+    if (!sportIdMissing) {
+      finalQuery = finalQuery.is('sport_id', null)
+    }
+
+    const finalRetry = await finalQuery
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -1073,7 +1089,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
 export async function loadLatestCloudGame(userId: string): Promise<HydratedCloudGame | null> {
   const latestGame = await loadLatestGameRow(userId)
-  if (!latestGame) {
+  if (!latestGame || latestGame.sport_id) {
     return null
   }
 
@@ -1090,7 +1106,7 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
   const { data: gameRow, error: gameError } = await supabase
     .from('games')
     .select(
-      `${baseById},home_team_score,home_score_adjustment,tournament_id,notes,season_id,home_team_player_id,opp_team_player_id`
+      `${baseById},home_team_score,home_score_adjustment,tournament_id,notes,season_id,sport_id,home_team_player_id,opp_team_player_id`
     )
     .eq('id', gameId)
     .maybeSingle()
@@ -1113,14 +1129,22 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
     if (!gameRowFallback) {
       return null
     }
-    return hydrateCloudGameFromRow(userId, gameRowFallback as unknown as CloudGameRow)
+    const fallbackRow = gameRowFallback as unknown as CloudGameRow
+    if (fallbackRow.sport_id) {
+      return null
+    }
+    return hydrateCloudGameFromRow(userId, fallbackRow)
   }
 
   if (!gameRow) {
     return null
   }
 
-  return hydrateCloudGameFromRow(userId, gameRow as unknown as CloudGameRow)
+  const selectedRow = gameRow as unknown as CloudGameRow
+  if (selectedRow.sport_id) {
+    return null
+  }
+  return hydrateCloudGameFromRow(userId, selectedRow)
 }
 
 export interface GameShotChartReview {

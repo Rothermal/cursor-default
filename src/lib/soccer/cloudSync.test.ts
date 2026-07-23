@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { prepareSoccerKickoff } from './kickoff'
+import {
+  addSoccerMatchParticipant,
+  recordSoccerShot,
+  resolveSoccerParticipant,
+} from './live'
 import { resolveSoccerMatchRules } from './rules'
 import { createSoccerSportGameState } from './state'
 import type { SoccerMatchSetup } from './types'
@@ -95,6 +100,57 @@ function startedState(matchSetup = setup()): GameState {
   return result.state
 }
 
+function lateResolvedShotState(): GameState {
+  const initial = startedState()
+  const added = addSoccerMatchParticipant(initial, {
+    id: 'participant-late',
+    kind: 'anonymous',
+    playerId: null,
+    displayName: 'Trialist',
+    number: '17',
+    initialStatus: 'bench',
+    initialRole: { group: 'forward', label: null },
+  }, 'on_field', {
+    recorderUserId: 'user-1',
+    nowMs: Date.parse('2026-07-22T12:00:05.000Z'),
+    eventIds: ['10000000-0000-4000-8000-000000000004'],
+  })
+  if (!added.ok) throw new Error(added.message)
+  const withRosterPlayer: GameState = {
+    ...added.state,
+    players: [
+      ...added.state.players,
+      { id: 'player-late', name: 'Late Player', number: '17', stats: {} },
+    ],
+  }
+  const resolved = resolveSoccerParticipant(
+    withRosterPlayer,
+    'participant-late',
+    'player-late',
+    'Late Player',
+    '17',
+    {
+      recorderUserId: 'user-1',
+      nowMs: Date.parse('2026-07-22T12:00:06.000Z'),
+      eventIds: ['10000000-0000-4000-8000-000000000005'],
+    }
+  )
+  if (!resolved.ok) throw new Error(resolved.message)
+  const shot = recordSoccerShot(resolved.state, {
+    teamSide: 'tracked',
+    outcome: 'saved',
+    situation: 'open_play',
+    location: null,
+    shooter: { kind: 'participant', participantId: 'participant-late' },
+  }, {
+    recorderUserId: 'user-1',
+    nowMs: Date.parse('2026-07-22T12:00:07.000Z'),
+    eventIds: ['10000000-0000-4000-8000-000000000006'],
+  })
+  if (!shot.ok) throw new Error(shot.message)
+  return shot.state
+}
+
 describe('soccer event cloud sync helpers', () => {
   beforeEach(() => {
     cloudMock.rpc.mockReset()
@@ -114,7 +170,7 @@ describe('soccer event cloud sync helpers', () => {
   })
 
   it('creates personal snapshots without claiming permanent cloud players', () => {
-    expect(soccerCloudParticipants(createSoccerSportGameState(setup()).setup)).toEqual([
+    expect(soccerCloudParticipants(createSoccerSportGameState(setup()))).toEqual([
       expect.objectContaining({
         client_participant_id: 'participant-keeper',
         client_player_id: 'player-keeper',
@@ -130,8 +186,20 @@ describe('soccer event cloud sync helpers', () => {
   })
 
   it('retains source player links only for a selected cloud team', () => {
-    const participants = soccerCloudParticipants(createSoccerSportGameState(setup('team-1')).setup)
+    const participants = soccerCloudParticipants(createSoccerSportGameState(setup('team-1')))
     expect(participants[0]?.source_player_id).toBe('player-keeper')
+  })
+
+  it('snapshots late participants from current projection after identity resolution', () => {
+    const state = lateResolvedShotState()
+    const sportState = assertHealthySoccerEventGame(state)
+    expect(soccerCloudParticipants(sportState)).toContainEqual(expect.objectContaining({
+      client_participant_id: 'participant-late',
+      client_player_id: 'player-late',
+      kind: 'player',
+      display_name: 'Late Player',
+      snapshot: expect.objectContaining({ addedDuringMatch: true }),
+    }))
   })
 
   it('builds a deterministic revision checkpoint for a healthy existing game', () => {
@@ -185,5 +253,43 @@ describe('soccer event cloud sync helpers', () => {
     })).rejects.toThrow('could not sync')
 
     expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual(['bind_soccer_event_game'])
+  })
+
+  it('uploads a late resolved player actor with the refreshed participant map', async () => {
+    cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === 'bind_soccer_event_game'
+        ? {
+            data: {
+              game_id: 'cloud-game-1',
+              participant_id_map: {
+                'player-keeper': 'cloud-participant-1',
+                'player-late': 'cloud-participant-2',
+              },
+            },
+            error: null,
+          }
+        : { data: '2026-07-22T12:01:00.000Z', error: null }
+    ))
+
+    await syncSoccerEventGameToCloud({
+      state: lateResolvedShotState(),
+      userId: 'user-1',
+      localGameId: '20000000-0000-4000-8000-000000000001',
+    })
+
+    expect(cloudMock.rpc.mock.calls[0]?.[1]).toMatchObject({
+      p_participants: expect.arrayContaining([
+        expect.objectContaining({
+          client_participant_id: 'participant-late',
+          client_player_id: 'player-late',
+        }),
+      ]),
+    })
+    expect(cloudMock.upsert).toHaveBeenLastCalledWith(
+      'cloud-game-1',
+      'user-1',
+      expect.objectContaining({ eventType: 'soccer.shot' }),
+      expect.objectContaining({ 'player-late': 'cloud-participant-2' })
+    )
   })
 })

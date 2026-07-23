@@ -37,20 +37,29 @@ export interface SyncSoccerEventGameResult {
 }
 
 export function soccerCloudParticipants(
-  setup: SoccerSportGameState['setup']
+  sportState: SoccerSportGameState
 ): SoccerCloudParticipant[] {
-  return setup.participants.map(participant => ({
-    client_participant_id: participant.id,
-    client_player_id: participant.playerId,
-    source_player_id: setup.sourceTeamId ? participant.playerId : null,
-    kind: participant.kind,
-    display_name: participant.displayName,
-    jersey_number: participant.number,
-    snapshot: {
-      initialStatus: participant.initialStatus,
-      initialRole: structuredClone(participant.initialRole),
-    },
-  }))
+  const setupById = new Map(
+    sportState.setup.participants.map(participant => [participant.id, participant])
+  )
+  return Object.values(sportState.projection.participants).map(participant => {
+    const origin = setupById.get(participant.participantId)
+    return {
+      client_participant_id: participant.participantId,
+      client_player_id: participant.playerId,
+      source_player_id: sportState.setup.sourceTeamId ? participant.playerId : null,
+      kind: participant.playerId ? 'player' : origin?.kind ?? 'anonymous',
+      display_name: participant.displayName,
+      jersey_number: participant.number,
+      snapshot: {
+        initialStatus: origin?.initialStatus ?? null,
+        initialRole: origin ? structuredClone(origin.initialRole) : null,
+        currentStatus: participant.status,
+        currentRole: structuredClone(participant.role),
+        addedDuringMatch: origin === undefined,
+      },
+    }
+  })
 }
 
 export function soccerEventRevisionCheckpoint(state: GameState): Array<{
@@ -93,7 +102,7 @@ export async function syncSoccerEventGameToCloud({
 }: SyncSoccerEventGameInput): Promise<SyncSoccerEventGameResult> {
   if (!supabase) throw new Error('Supabase client not configured')
   const sportState = assertHealthySoccerEventGame(state)
-  const participants = soccerCloudParticipants(sportState.setup)
+  const participants = soccerCloudParticipants(sportState)
 
   const { data: bindingData, error: bindingError } = await supabase.rpc(
     'bind_soccer_event_game',

@@ -9,6 +9,7 @@ import {
   isMissingLastOpenedColumnError,
   isMissingNotesColumnError,
   isMissingSeasonIdColumnError,
+  isMissingSportIdColumnError,
   isMissingShotChartTableError,
   isMissingTeamStatsConfigColumnError,
   isMissingTournamentIdColumnError,
@@ -40,6 +41,7 @@ describe('cloudSyncHelpers missing-column detectors', () => {
       isMissingTournamentIdColumnError({ message: 'column tournament_id does not exist' })
     ).toBe(true)
     expect(isMissingSeasonIdColumnError({ message: 'column season_id does not exist' })).toBe(true)
+    expect(isMissingSportIdColumnError({ message: 'column games.sport_id does not exist' })).toBe(true)
   })
 
   it('detects notes with quoted or column-style messages', () => {

@@ -7,6 +7,7 @@ import {
   isMissingLastOpenedColumnError,
   isMissingNotesColumnError,
   isMissingSeasonIdColumnError,
+  isMissingSportIdColumnError,
   isMissingTournamentIdColumnError,
 } from './cloudSyncHelpers'
 
@@ -35,6 +36,7 @@ export type OptionalGameColumnGaps = {
   tournamentId: boolean
   notes: boolean
   seasonId: boolean
+  sportId: boolean
   teamPlaceholders: boolean
 }
 
@@ -163,6 +165,7 @@ export function detectOptionalGameColumnGaps(
     tournamentId: isMissingTournamentIdColumnError(error),
     notes: isMissingNotesColumnError(error),
     seasonId: isMissingSeasonIdColumnError(error),
+    sportId: isMissingSportIdColumnError(error),
     teamPlaceholders: isMissingGameTeamPlaceholderColumnError(error),
   }
 }
@@ -175,6 +178,7 @@ export function hasAnyOptionalGameColumnGap(gaps: OptionalGameColumnGaps): boole
     gaps.tournamentId ||
     gaps.notes ||
     gaps.seasonId ||
+    gaps.sportId ||
     gaps.teamPlaceholders
   )
 }
@@ -187,6 +191,7 @@ export function hasLoadByIdOptionalGameColumnGap(gaps: OptionalGameColumnGaps): 
     gaps.tournamentId ||
     gaps.notes ||
     gaps.seasonId ||
+    gaps.sportId ||
     gaps.teamPlaceholders
   )
 }
@@ -207,6 +212,7 @@ export function buildOptionalGameSelectSuffix(
     (!gaps.notes ? ',notes' : '') +
     (includeLastOpened && !gaps.lastOpened ? ',last_opened_at' : '') +
     (!gaps.seasonId ? ',season_id' : '') +
+    (!gaps.sportId ? ',sport_id' : '') +
     (!gaps.teamPlaceholders ? ',home_team_player_id,opp_team_player_id' : '')
   )
 }

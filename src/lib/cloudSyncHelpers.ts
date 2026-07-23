@@ -49,6 +49,11 @@ export function isMissingSeasonIdColumnError(error: { message?: string } | null)
   return error.message.includes('season_id') && error.message.includes('column')
 }
 
+export function isMissingSportIdColumnError(error: { message?: string } | null): boolean {
+  if (!error?.message) return false
+  return error.message.includes('sport_id') && error.message.includes('column')
+}
+
 export function isMissingTeamStatsConfigColumnError(error: { message?: string } | null): boolean {
   if (!error?.message) return false
   return error.message.includes('team_stats_config') && error.message.includes('column')

@@ -12,6 +12,7 @@ describe('migration 043 soccer event cloud contracts', () => {
     expect(sql).toContain('alter table public.games alter column team_id drop not null')
     expect(sql).toContain("cloud_scope in ('team', 'personal')")
     expect(sql).toContain("cloud_scope = 'personal' and team_id is null")
+    expect(sql).toContain('add column if not exists client_local_game_id text')
     expect(sql).toContain('create unique index if not exists idx_games_creator_local_game')
     expect(sql).not.toMatch(/insert into public\.teams/i)
     expect(sql).not.toMatch(/insert into public\.players/i)
@@ -40,5 +41,12 @@ describe('migration 043 soccer event cloud contracts', () => {
     expect(sql).toContain("g.cloud_scope = 'personal' and g.created_by = (select auth.uid())")
     expect(sql).toContain('public.can_track_team_games(g.team_id)')
     expect(sql).toContain('create or replace function public.upsert_game_event_revisioned')
+  })
+
+  it('allows one-way participant resolution but rejects player remapping', () => {
+    expect(sql).toContain('Participant identity cannot be remapped')
+    expect(sql).toContain('client_player_id = coalesce(')
+    expect(sql).toContain('gp.client_player_id is not null')
+    expect(sql).toContain("else 'player'")
   })
 })

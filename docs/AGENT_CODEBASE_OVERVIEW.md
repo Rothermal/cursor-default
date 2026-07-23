@@ -160,12 +160,13 @@ renders the anchored clock without per-second reducer writes and uses checked he
 `src/lib/soccer/live.ts` for periods, substitutions, roles, direction, rules, participant
 changes, history corrections, diagnostics, and match end/reopen. Production builds redirect
 those soccer route surfaces to the sport chooser until SOC-6. Cloud teams are read-only roster
-sources in this phase; soccer match events remain local-only. Legacy `/checkout` and
+sources; SOC-5A mirrors healthy local event streams but cloud resume is deferred. Legacy `/checkout` and
 `/summary` surfaces redirect active soccer games back into the soccer flow.
 
 The `game_events` repository is wired into the automatic queue only for healthy soccer event
 games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
-sport-owned setup exists; aggregate reducer mutations are disabled once an event stream is
+sport-owned setup exists, and soccer is also rejected as an aggregate sport before setup;
+aggregate reducer mutations are disabled once an event stream is
 initialized. A soccer record is clean only after the server verifies its exact recorder
 event-id/revision checkpoint.
 

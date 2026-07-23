@@ -306,6 +306,10 @@ export default function Games() {
 
   const handleOpenGame = async (game: GameRow) => {
     if (!userId) return
+    if (teamMap[game.team_id]?.seasons?.sport === 'soccer') {
+      setError('Resume this soccer match from its parked game on the Soccer dashboard.')
+      return
+    }
     const teamRole = teamRolesById[game.team_id] ?? null
     if (game.status !== 'final' && !canTrackGames(teamRole)) {
       navigate(gameInfoPath(game.id, game.team_id))
@@ -535,19 +539,28 @@ export default function Games() {
           )}
         </p>
         <div className="flex gap-2 mt-3">
-          <button
-            onClick={() => { void handleOpenGame(game) }}
-            disabled={loadingGameId === game.id}
-            className="btn-primary flex-1 py-2"
-          >
-            {loadingGameId === game.id
-              ? 'Loading...'
-              : game.status === 'final'
-                ? 'View Summary'
-                : canTrackGames(teamRole)
-                  ? 'Resume Game'
-                  : 'View Details'}
-          </button>
+          {sport?.id === 'soccer' ? (
+            <button
+              onClick={() => navigate(sportDashboardPath('soccer'))}
+              className="btn-secondary flex-1 py-2"
+            >
+              Soccer Dashboard
+            </button>
+          ) : (
+            <button
+              onClick={() => { void handleOpenGame(game) }}
+              disabled={loadingGameId === game.id}
+              className="btn-primary flex-1 py-2"
+            >
+              {loadingGameId === game.id
+                ? 'Loading...'
+                : game.status === 'final'
+                  ? 'View Summary'
+                  : canTrackGames(teamRole)
+                    ? 'Resume Game'
+                    : 'View Details'}
+            </button>
+          )}
           {canDeleteGame(teamRole) && (
             <button
               onClick={() => setConfirmDeleteGame(game)}

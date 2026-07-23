@@ -3,7 +3,7 @@
 alter table public.games alter column team_id drop not null;
 alter table public.games
   add column if not exists cloud_scope text not null default 'team',
-  add column if not exists client_local_game_id uuid,
+  add column if not exists client_local_game_id text,
   add column if not exists sport_id text,
   add column if not exists tracked_team_name text;
 
@@ -200,7 +200,7 @@ end;
 $$;
 
 create or replace function public.bind_soccer_event_game(
-  p_client_local_game_id uuid,
+  p_client_local_game_id text,
   p_source_team_id uuid,
   p_source_season_id uuid,
   p_team_name text,
@@ -223,7 +223,9 @@ declare
   v_participant_map jsonb;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
-  if p_client_local_game_id is null then raise exception 'Local game id is required'; end if;
+  if length(trim(coalesce(p_client_local_game_id, ''))) = 0 then
+    raise exception 'Local game id is required';
+  end if;
   if length(trim(coalesce(p_team_name, ''))) = 0
      or length(trim(coalesce(p_opponent_name, ''))) = 0 then
     raise exception 'Team and opponent names are required';
@@ -249,7 +251,7 @@ begin
   select g.id into v_game_id
   from public.games g
   where g.created_by = v_user_id
-    and g.client_local_game_id = p_client_local_game_id;
+    and g.client_local_game_id = trim(p_client_local_game_id);
 
   if found then
     if not exists (
@@ -276,7 +278,7 @@ begin
       nullif(trim(coalesce(p_competition_name, '')), ''), p_game_date,
       'in_progress', v_user_id,
       case when p_source_team_id is null then 'personal' else 'team' end,
-      p_client_local_game_id, 'soccer', trim(p_team_name)
+      trim(p_client_local_game_id), 'soccer', trim(p_team_name)
     )
     on conflict do nothing
     returning id into v_game_id;
@@ -285,7 +287,7 @@ begin
       select g.id into v_game_id
       from public.games g
       where g.created_by = v_user_id
-        and g.client_local_game_id = p_client_local_game_id
+        and g.client_local_game_id = trim(p_client_local_game_id)
         and g.status <> 'final'
         and g.sport_id = 'soccer'
         and g.team_id is not distinct from p_source_team_id;
@@ -319,8 +321,9 @@ begin
       select 1 from public.game_participants gp
       where gp.game_id = v_game_id
         and gp.client_participant_id = trim(v_item->>'client_participant_id')
-        and gp.client_player_id is distinct from
-          nullif(trim(coalesce(v_item->>'client_player_id', '')), '')
+        and gp.client_player_id is not null
+        and nullif(trim(coalesce(v_item->>'client_player_id', '')), '') is not null
+        and gp.client_player_id is distinct from nullif(trim(v_item->>'client_player_id'), '')
     ) then
       raise exception 'Participant identity cannot be remapped';
     end if;
@@ -339,8 +342,21 @@ begin
       coalesce(v_item->'snapshot', '{}'::jsonb)
     )
     on conflict (game_id, client_participant_id) do update set
-      source_player_id = excluded.source_player_id,
-      participant_kind = excluded.participant_kind,
+      client_player_id = coalesce(
+        public.game_participants.client_player_id,
+        excluded.client_player_id
+      ),
+      source_player_id = coalesce(
+        public.game_participants.source_player_id,
+        excluded.source_player_id
+      ),
+      participant_kind = case
+        when coalesce(
+          public.game_participants.client_player_id,
+          excluded.client_player_id
+        ) is null then excluded.participant_kind
+        else 'player'
+      end,
       display_name = excluded.display_name,
       jersey_number = excluded.jersey_number,
       snapshot = excluded.snapshot,
@@ -360,10 +376,10 @@ end;
 $$;
 
 revoke all on function public.bind_soccer_event_game(
-  uuid, uuid, uuid, text, text, text, date, jsonb
+  text, uuid, uuid, text, text, text, date, jsonb
 ) from public;
 grant execute on function public.bind_soccer_event_game(
-  uuid, uuid, uuid, text, text, text, date, jsonb
+  text, uuid, uuid, text, text, text, date, jsonb
 ) to authenticated;
 
 create or replace function public.confirm_game_event_stream_checkpoint(
@@ -538,4 +554,4 @@ $$;
 comment on table public.game_participants is
   'Immutable-in-scope participant identities snapshotted for one event-driven game.';
 comment on table public.game_event_stream_checkpoints is
-  'Server-verified latest recorder stream checkpoint; canonical resolution is deferred to SOC-5C/5D.';
+  'Server-verified recorder revision set with client fingerprint metadata; canonical resolution is deferred to SOC-5C/5D.';
