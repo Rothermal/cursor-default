@@ -393,7 +393,7 @@ export default function SoccerGameTracker() {
           <div className="mx-4 mt-4 flex items-center gap-3 border border-amber-300 bg-amber-50 px-3 py-3 text-amber-900">
             <BadgeAlert size={20} className="shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">Cloud event conflict</p>
+              <p className="text-sm font-bold">Needs Attention</p>
               <p className="text-xs">{cloudConflicts.length} {cloudConflicts.length === 1 ? 'event needs' : 'events need'} review</p>
             </div>
             <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white">Review</button>

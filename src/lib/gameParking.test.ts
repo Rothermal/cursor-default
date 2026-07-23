@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../types'
+import { activeCloudSyncStateAction } from './cloudSyncState'
+import { gameReducer } from './gameReducer'
 import { withLastSyncedGameFingerprint } from './gameSyncFingerprint'
 import {
   GAME_RECORD_KEY_PREFIX,
@@ -390,20 +392,45 @@ describe('gameParking', () => {
     ).toHaveLength(1)
   })
 
-  it('keeps conflicted records dirty while pausing automatic retry', () => {
+  it('hydrates active recovery conflicts, pauses retry, and resumes after resolution', () => {
     const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
     const record = getParkedGameRecord(summary.localGameId, 'user-1')!
-    const conflictedState: GameState = {
+    const recoveredState: GameState = {
       ...record.gameState,
+      notes: 'remote merge adopted',
       cloudSync: {
         ...record.gameState.cloudSync,
         eventConflicts: [{ eventId: 'event-1' } as never],
+        status: 'error',
+        lastError: 'Review competing event revisions before syncing.',
       },
     }
-    saveParkedGameRecordState(summary.localGameId, conflictedState, 'user-1', { dirty: true })
+    const activeAction = activeCloudSyncStateAction(
+      recoveredState,
+      { status: 'error', lastError: recoveredState.cloudSync.lastError },
+      true
+    )
+    const activeState = gameReducer(record.gameState, activeAction)
+    saveParkedGameRecordState(summary.localGameId, activeState, 'user-1', { dirty: true })
 
+    expect(activeAction.type).toBe('HYDRATE_STATE')
+    expect(activeState.notes).toBe('remote merge adopted')
+    expect(activeState.cloudSync.eventConflicts).toHaveLength(1)
     expect(hasDirtyParkedGames('user-1')).toBe(true)
     expect(listDirtyParkedGameRecords('user-1')).toEqual([])
+
+    const resolvedState: GameState = {
+      ...activeState,
+      cloudSync: {
+        ...activeState.cloudSync,
+        eventConflicts: [],
+        status: 'idle',
+        lastError: null,
+      },
+    }
+    saveParkedGameRecordState(summary.localGameId, resolvedState, 'user-1', { dirty: true })
+
+    expect(listDirtyParkedGameRecords('user-1')).toHaveLength(1)
   })
 
   it('shows parked summaries as pending when the latest snapshot is still dirty', () => {

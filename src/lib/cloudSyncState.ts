@@ -1,4 +1,19 @@
-import type { CloudSyncState } from '../types'
+import type { CloudSyncState, GameAction, GameState } from '../types'
+
+/**
+ * Active soccer recovery must replace the full reducer state. A metadata-only
+ * patch would leave React holding the pre-merge event stream, which the normal
+ * persistence effect could then write over the recovered parked snapshot.
+ */
+export function activeCloudSyncStateAction(
+  fullState: GameState,
+  cloudSyncPatch: Partial<CloudSyncState>,
+  adoptFullState: boolean
+): GameAction {
+  return adoptFullState
+    ? { type: 'HYDRATE_STATE', state: fullState }
+    : { type: 'SET_CLOUD_SYNC_STATE', cloudSync: cloudSyncPatch }
+}
 
 /**
  * Merge a partial cloud-sync patch into current state.

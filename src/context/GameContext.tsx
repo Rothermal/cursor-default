@@ -54,6 +54,7 @@ import {
   createInitialState,
   gameReducer,
 } from '../lib/gameReducer'
+import { activeCloudSyncStateAction } from '../lib/cloudSyncState'
 import {
   activateParkedGame,
   beginNewActiveParkedGame,
@@ -824,10 +825,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
         if (isStillActiveRecord) {
-          dispatch({
-            type: 'SET_CLOUD_SYNC_STATE',
-            cloudSync: cloudSyncPatch,
-          })
+          dispatch(activeCloudSyncStateAction(
+            nextState,
+            cloudSyncPatch,
+            'syncedState' in synced && localUnchanged
+          ))
         }
       } catch (error) {
         const networkish = isLikelyNetworkError(error)
@@ -857,13 +859,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           nextAttemptAt: retryMs > 0 ? new Date(Date.now() + retryMs).toISOString() : null,
         })
         if (getActiveLocalGameId(snapshotUserId) === record.localGameId) {
-          dispatch({
-            type: 'SET_CLOUD_SYNC_STATE',
-            cloudSync: {
-              status: networkish ? 'offline' : 'error',
-              lastError: networkish ? null : errMsg,
-            },
-          })
+          const errorPatch: Partial<CloudSyncState> = {
+            status: networkish ? 'offline' : 'error',
+            lastError: networkish ? null : errMsg,
+          }
+          dispatch(activeCloudSyncStateAction(errorState, errorPatch, canApplyRecovery))
         }
         if (!networkish && snapshotUserId) {
           void logClientSyncError(snapshotUserId, errMsg, latestState)

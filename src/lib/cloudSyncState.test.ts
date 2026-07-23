@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CloudSyncState } from '../types'
-import { mergeCloudSyncState } from './cloudSyncState'
+import { createInitialState, gameReducer } from './gameReducer'
+import { activeCloudSyncStateAction, mergeCloudSyncState } from './cloudSyncState'
 
 function base(overrides: Partial<CloudSyncState> = {}): CloudSyncState {
   return {
@@ -19,6 +20,45 @@ function base(overrides: Partial<CloudSyncState> = {}): CloudSyncState {
 }
 
 describe('mergeCloudSyncState', () => {
+  it('hydrates a recovered active payload instead of applying metadata only', () => {
+    const current = createInitialState()
+    const recovered = {
+      ...current,
+      notes: 'remote merge adopted',
+      cloudSync: {
+        ...current.cloudSync,
+        status: 'error' as const,
+        lastError: 'Review competing event revisions before syncing.',
+        eventConflicts: [{ eventId: 'event-1' } as never],
+      },
+    }
+
+    const action = activeCloudSyncStateAction(
+      recovered,
+      { status: 'error', lastError: recovered.cloudSync.lastError },
+      true
+    )
+    const next = gameReducer(current, action)
+
+    expect(action.type).toBe('HYDRATE_STATE')
+    expect(next.notes).toBe('remote merge adopted')
+    expect(next.cloudSync.eventConflicts).toHaveLength(1)
+  })
+
+  it('keeps metadata-only updates for sync paths without a recovered payload', () => {
+    const current = createInitialState()
+    const action = activeCloudSyncStateAction(
+      current,
+      { status: 'syncing', lastError: null },
+      false
+    )
+
+    expect(action).toEqual({
+      type: 'SET_CLOUD_SYNC_STATE',
+      cloudSync: { status: 'syncing', lastError: null },
+    })
+  })
+
   it('clears game binding when teamId changes without a new gameId', () => {
     const next = mergeCloudSyncState(base(), {
       teamId: 'team-b',
