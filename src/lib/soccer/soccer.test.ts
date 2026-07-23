@@ -803,7 +803,7 @@ describe('soccer match projection', () => {
   })
 
   it('keeps setup-only and event-backed matches out of legacy aggregate cloud sync', () => {
-    expect(isAggregateCloudSyncEligible({ ...state(), sportGameState: null })).toBe(true)
+    expect(isAggregateCloudSyncEligible({ ...state(), sportGameState: null })).toBe(false)
     expect(isAggregateCloudSyncEligible(state())).toBe(false)
     expect(isAggregateCloudSyncEligible(initializedState())).toBe(false)
   })

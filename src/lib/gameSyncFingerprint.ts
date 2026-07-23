@@ -30,7 +30,24 @@ export function buildGameSyncFingerprint(state: GameState): string {
 
 /** Sport-owned setup/events use their repository and cannot enter legacy aggregate auto-sync. */
 export function isAggregateCloudSyncEligible(state: GameState): boolean {
-  return state.eventStream === null && state.sportGameState === null
+  return (
+    state.sport?.id !== 'soccer' &&
+    state.eventStream === null &&
+    state.sportGameState === null
+  )
+}
+
+/** Soccer owns its event stream and setup snapshot; it syncs through the event repository. */
+export function isSoccerEventCloudSyncEligible(state: GameState): boolean {
+  return Boolean(
+    state.sport?.id === 'soccer' &&
+      state.eventStream !== null &&
+      state.sportGameState?.sportId === 'soccer'
+  )
+}
+
+export function isCloudSyncEligible(state: GameState): boolean {
+  return isAggregateCloudSyncEligible(state) || isSoccerEventCloudSyncEligible(state)
 }
 
 /**

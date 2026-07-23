@@ -148,7 +148,10 @@ shootout sequencing, and structured outcomes through pure APIs.
 SOC-4B exposes normal-match defense, foul, discipline, corner, and offside capture and review.
 SOC-4C adds the gated shootout setup and dedicated kick workspace, eligibility and goalkeeper
 management, shootout-scope cards, revisioned kick correction, separate shootout scoring, and
-explicit completed/suspended/abandoned outcomes. Soccer remains local-only and development-only.
+explicit completed/suspended/abandoned outcomes. SOC-5A adds idempotent team/personal cloud
+binding, game-scoped participant snapshots, revision uploads, and verified recorder checkpoints
+through the parked-game queue. Soccer remains development-only; cloud resume/conflicts,
+primary-recorder resolution, and finalization remain SOC-5B through SOC-5D.
 
 SOC-2B and SOC-2C add a development-only Soccer workspace through the normal chooser and
 dashboard. The shared `/setup`, `/players`, and `/game` routes select soccer-specific setup,
@@ -157,13 +160,15 @@ renders the anchored clock without per-second reducer writes and uses checked he
 `src/lib/soccer/live.ts` for periods, substitutions, roles, direction, rules, participant
 changes, history corrections, diagnostics, and match end/reopen. Production builds redirect
 those soccer route surfaces to the sport chooser until SOC-6. Cloud teams are read-only roster
-sources in this phase; soccer match events remain local-only. Legacy `/checkout` and
+sources; SOC-5A mirrors healthy local event streams but cloud resume is deferred. Legacy `/checkout` and
 `/summary` surfaces redirect active soccer games back into the soccer flow.
 
-The `game_events` repository remains isolated and is **not** part of the automatic cloud
-queue until SOC-5. Aggregate cloud sync is disabled as soon as sport-owned setup exists;
-aggregate reducer mutations are disabled once an event stream is initialized. Do not mark
-soccer setup or event streams cloud-synced through snapshot sync.
+The `game_events` repository is wired into the automatic queue only for healthy soccer event
+games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
+sport-owned setup exists, and soccer is also rejected as an aggregate sport before setup;
+aggregate reducer mutations are disabled once an event stream is
+initialized. A soccer record is clean only after the server verifies its exact recorder
+event-id/revision checkpoint.
 
 ### localStorage keys
 
@@ -232,8 +237,8 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 
 | Item | Detail |
 |------|--------|
-| Migrations | 42 files (`001`–`042`) in [`supabase/migrations/`](../supabase/migrations/) |
-| Tables | 20 core tables (profiles, account_access, access_audit_events, teams, players, games, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
+| Migrations | 43 files (`001`–`043`) in [`supabase/migrations/`](../supabase/migrations/) |
+| Tables | 22 core tables (profiles, account_access, access_audit_events, teams, players, games, game_participants, game_events, game_event_stream_checkpoints, stats, seasons, tournaments, shot_chart, team_invite_links, …) |
 | Auth | Email/password + Google OAuth (PKCE), account profile/identities, app access status; team RLS scoped via `team_members` roles (owner / admin / scorer / viewer) |
 | Schema source | Always read the migration file — pre-018 ERDs in INTEGRATION_PLAN are stale |
 | Destructive | Migration **018** redesigned seasons/roster — backup before applying on existing DBs |
@@ -257,6 +262,7 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 | `get_access_audit_events` | Team-scoped or app-admin-global access history |
 | `update_player_identity` | Creator/guardian identity-only player editing |
 | `merge_players_preview` / `merge_players_execute` | Player merge wizard |
+| `bind_soccer_event_game` / `confirm_game_event_stream_checkpoint` | SOC-5A game binding, participant snapshots, and verified recorder sync |
 
 Without Supabase env vars, `supabase.ts` returns `null` and the app skips auth (`isConfigured === false`).
 
@@ -290,7 +296,7 @@ flowchart LR
 |-----|-------|
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
-| [`PLAN_SOC_4_MATCH_EVENT_CATALOG.md`](PLAN_SOC_4_MATCH_EVENT_CATALOG.md) / [`PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md`](PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md) | SOC-4A-C complete; SOC-5 cloud sync/finalization planning is next |
+| [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5A_CLOUD_EVENT_TRANSPORT.md`](PLAN_SOC_5A_CLOUD_EVENT_TRANSPORT.md) | SOC-5 decisions and phases; SOC-5A transport implemented, SOC-5B conflict/resume is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) | Required follow-up: BKE-0 planning after SOC-1; no BKE-1+ implementation before SOC-5 |
 
 ### Held / waiting for feedback

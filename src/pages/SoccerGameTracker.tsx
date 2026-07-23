@@ -44,6 +44,7 @@ import SoccerShotCaptureDialog, {
 } from '../components/soccer/SoccerShotCaptureDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
+import type { GameState } from '../types'
 import type { GameEvent } from '../lib/gameEvents/types'
 import {
   endSoccerPeriod,
@@ -258,8 +259,11 @@ export default function SoccerGameTracker() {
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="font-bold truncate">{state.gameInfo.teamName} vs {state.gameInfo.opponentName}</h1>
-            <p className="text-xs text-emerald-100 truncate">
-              {currentSegment?.label ?? (ended ? 'Match ended' : nextSegment ? `${nextSegment.label} next` : 'Periods complete')}
+            <p className="flex min-w-0 items-center gap-2 text-xs text-emerald-100">
+              <span className="truncate">{currentSegment?.label ?? (ended ? 'Match ended' : nextSegment ? `${nextSegment.label} next` : 'Periods complete')}</span>
+              <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-semibold">
+                {soccerCloudStatusLabel(state)}
+              </span>
             </p>
           </div>
           {!ended && (
@@ -710,6 +714,14 @@ export default function SoccerGameTracker() {
       )}
     </div>
   )
+}
+
+function soccerCloudStatusLabel(state: GameState): string {
+  if (state.cloudSync.gameStatus === 'final') return 'Finalized'
+  if (state.cloudSync.status === 'error') return 'Needs Attention'
+  if (state.cloudSync.status === 'syncing') return 'Syncing'
+  if (state.cloudSync.status === 'synced') return 'Synced'
+  return 'Local'
 }
 
 function ParticipantRow({ participant, projection, nowMs, disabled, canResolve, onRole, onResolve }: {

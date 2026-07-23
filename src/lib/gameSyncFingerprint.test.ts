@@ -4,6 +4,7 @@ import {
   buildGameSyncFingerprint,
   canHydrateAsActiveGame,
   currentPeriodForCloudHydrate,
+  isAggregateCloudSyncEligible,
   shouldBlockDiscardUnsyncedGame,
   shouldBlockManualCloudHydrate,
   shouldDeferCloudResumeHydration,
@@ -55,6 +56,14 @@ function baseState(over: Partial<GameState> = {}): GameState {
 }
 
 describe('gameSyncFingerprint', () => {
+  it('never treats an empty soccer cloud shell as an aggregate-sync game', () => {
+    expect(isAggregateCloudSyncEligible(baseState({
+      sport: { ...sport, id: 'soccer', name: 'Soccer' },
+      eventStream: null,
+      sportGameState: null,
+    }))).toBe(false)
+  })
+
   it('includes the raw event stream and distinguishes legacy from initialized games', () => {
     const legacy = buildGameSyncFingerprint(baseState())
     const initialized = buildGameSyncFingerprint(

@@ -3,7 +3,7 @@
 Detailed implementation plan for soccer defensive actions, discipline, team events,
 shootouts, and structured match outcomes.
 
-Status: Complete. SOC-4A through SOC-4C are implemented; SOC-5 planning is next.
+Status: Complete. SOC-4A through SOC-4C are implemented; SOC-5A transport is now implemented.
 
 ---
 

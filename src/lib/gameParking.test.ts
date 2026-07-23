@@ -363,7 +363,10 @@ describe('gameParking', () => {
     const [first] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
     parkActiveGame('user-1')
     beginNewActiveParkedGame('user-1')
-    const [active] = saveActiveGameState(gameState(soccer, 'Aces', 'Hawks'), 'user-1')
+    const [active] = saveActiveGameState(
+      gameState({ ...soccer, id: 'football', name: 'Football' }, 'Aces', 'Hawks'),
+      'user-1'
+    )
 
     expect(listDirtyParkedGameRecords('user-1').map(record => record.localGameId)).toEqual([
       active.localGameId,
