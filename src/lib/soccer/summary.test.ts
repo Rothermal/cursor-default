@@ -57,7 +57,7 @@ describe('soccer summary navigation', () => {
     )
     expect(parsed).toEqual({
       gameId: 'game-1',
-      tab: 'overview',
+      tab: 'field',
       requestedTab: 'field',
       from: 'game-info',
       teamId: 'team-1',
@@ -65,6 +65,9 @@ describe('soccer summary navigation', () => {
     expect(soccerSummaryBackPath(parsed)).toBe(
       '/game-info?gameId=game-1&teamId=team-1'
     )
+    expect(
+      parseSoccerSummaryQuery(new URLSearchParams('tab=shootout')).tab
+    ).toBe('overview')
   })
 
   it('rejects unknown return contexts and uses the soccer dashboard', () => {

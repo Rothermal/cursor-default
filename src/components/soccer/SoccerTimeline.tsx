@@ -4,16 +4,17 @@ import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
 import SoccerIncidentCaptureDialog, {
   type SoccerIncidentDraft,
-  type SoccerIncidentEvent,
   type SoccerIncidentKind,
 } from './SoccerIncidentCaptureDialog'
 import SoccerScoreTimelineDialog from './SoccerScoreTimelineDialog'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from './SoccerShotCaptureDialog'
+import SoccerLocatedEventEditor from './SoccerLocatedEventEditor'
 import {
   deleteSoccerHistoryEvent,
   formatSoccerInputTime,
+  isSoccerLocatedEditableEvent,
   parseSoccerInputTime,
   restoreSoccerHistoryEvent,
   SOCCER_SUMMARY_TIMELINE_FILTERS,
@@ -24,14 +25,12 @@ import {
   updateSoccerHistoryEvent,
   type SoccerLiveResult,
   type SoccerMatchEvent,
-  type SoccerOwnGoalEvent,
   type SoccerMatchRules,
   type SoccerRole,
   type SoccerRoleGroup,
   type SoccerScoreAdjustmentEvent,
   type SoccerSummaryTimelineFilter,
   type SoccerSummaryTimelineSection,
-  type SoccerShotEvent,
   type SoccerTimelineFilter,
   withSoccerTieResolution,
 } from '../../lib/soccer'
@@ -102,6 +101,7 @@ export default function SoccerTimeline({
   const [scoreTimelineOpen, setScoreTimelineOpen] = useState(false)
   const [scoreAdjustmentEdit, setScoreAdjustmentEdit] =
     useState<SoccerScoreAdjustmentEvent | null>(null)
+  const [locatedEditing, setLocatedEditing] = useState<GameEvent | null>(null)
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
   const review = useMemo(
     () => presentation === 'review'
@@ -135,34 +135,10 @@ export default function SoccerTimeline({
   }
 
   const editEvent = (event: GameEvent) => {
-    if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
-      setCaptureDraft({
-        mode: 'edit',
-        teamSide: event.teamSide,
-        location: event.location,
-        event: event as SoccerShotEvent | SoccerOwnGoalEvent,
-      })
-      return
-    }
+    if (isSoccerLocatedEditableEvent(event)) return setLocatedEditing(event)
     if (event.eventType === 'soccer.score_adjustment') {
       setScoreAdjustmentEdit(event as SoccerScoreAdjustmentEvent)
       setScoreTimelineOpen(true)
-      return
-    }
-    if (
-      event.eventType === 'soccer.defensive_action' ||
-      event.eventType === 'soccer.foul' ||
-      (event.eventType === 'soccer.card' && event.period.id !== 'shootout') ||
-      event.eventType === 'soccer.team_event'
-    ) {
-      const incident = event as SoccerIncidentEvent
-      setIncidentDraft({
-        kind: incidentKind(incident),
-        teamSide: incident.teamSide,
-        location: incident.location,
-        mode: 'edit',
-        event: incident,
-      })
       return
     }
     setEditing(event as SoccerMatchEvent)
@@ -333,6 +309,17 @@ export default function SoccerTimeline({
         onApply={onApply}
         onTrackedParticipantUsed={onTrackedParticipantUsed}
         onClose={() => setCaptureDraft(null)}
+      />
+
+      <SoccerLocatedEventEditor
+        event={locatedEditing}
+        state={state}
+        recorderUserId={recorderUserId}
+        selectedParticipantId={selectedParticipantId}
+        busy={busy}
+        onApply={onApply}
+        onTrackedParticipantUsed={onTrackedParticipantUsed}
+        onClose={() => setLocatedEditing(null)}
       />
 
       <SoccerIncidentCaptureDialog
@@ -548,12 +535,6 @@ function HistoryRow({
 function formatEventTimestamp(value: string): string {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
-}
-
-function incidentKind(event: SoccerIncidentEvent): SoccerIncidentKind {
-  if (event.eventType === 'soccer.defensive_action') return 'defense'
-  if (event.eventType === 'soccer.team_event') return 'team_event'
-  return event.eventType === 'soccer.foul' ? 'foul' : 'card'
 }
 
 function eventContextDetail(event: GameEvent): string | null {

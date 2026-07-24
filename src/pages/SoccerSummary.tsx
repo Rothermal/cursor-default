@@ -7,6 +7,7 @@ import SoccerOverview from '../components/soccer-summary/SoccerOverview'
 import SoccerPlayers from '../components/soccer-summary/SoccerPlayers'
 import SoccerRecordingSelector from '../components/soccer-summary/SoccerRecordingSelector'
 import SoccerReviewTimeline from '../components/soccer-summary/SoccerReviewTimeline'
+import SoccerFieldReview from '../components/soccer-summary/SoccerFieldReview'
 import SoccerSummaryHeader from '../components/soccer-summary/SoccerSummaryHeader'
 import SoccerSummaryTabs from '../components/soccer-summary/SoccerSummaryTabs'
 import { useAuth } from '../context/AuthContext'
@@ -401,6 +402,7 @@ export default function SoccerSummary() {
         activeTab={query.tab}
         showPlayers={healthy}
         showTimeline={healthy}
+        showField={healthy}
         onChange={changeTab}
       />
       <SoccerRecordingSelector
@@ -461,6 +463,13 @@ export default function SoccerSummary() {
         />
       ) : query.tab === 'timeline' && healthy ? (
         <SoccerReviewTimeline
+          source={source}
+          recorderUserId={user?.id ?? null}
+          busy={timelineBusy}
+          onApply={applyTimelineResult}
+        />
+      ) : query.tab === 'field' && healthy ? (
+        <SoccerFieldReview
           source={source}
           recorderUserId={user?.id ?? null}
           busy={timelineBusy}

@@ -1,6 +1,6 @@
 # Plan: SOC-6B Detailed Match Review
 
-Status: SOC-6B1 and SOC-6B2 implemented. SOC-6B3 and SOC-6B4 remain planned.
+Status: SOC-6B1 through SOC-6B3 implemented. SOC-6B4 remains planned.
 
 Parent roadmap: [PLAN_SOC_6_SUMMARY_AND_RELEASE.md](PLAN_SOC_6_SUMMARY_AND_RELEASE.md)
 
@@ -64,7 +64,7 @@ available only through an owned local binding.
 
 ### SOC-6B3: Field review
 
-Status: Planned; next.
+Status: Implemented.
 
 - Extend URL-backed summary tabs with `field`.
 - Expand field-family classification to every located SOC-3/SOC-4 normal-match event.
