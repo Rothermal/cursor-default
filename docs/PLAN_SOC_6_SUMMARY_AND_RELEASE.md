@@ -292,3 +292,7 @@ high-level product decisions.
 
 SOC-6B is implemented through SOC-6B1 player review, SOC-6B2 Timeline review, SOC-6B3 Field
 review, and SOC-6B4 Shootout review plus the detailed-summary release boundary.
+
+SOC-6C focused Q&A and detailed implementation planning are complete in
+`docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md`. Delivery is split into SOC-6C1 stat contract/engine,
+SOC-6C2 source transport, SOC-6C3 team scopes, and SOC-6C4 player scopes/hardening.
