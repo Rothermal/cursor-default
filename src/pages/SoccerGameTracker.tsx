@@ -705,24 +705,13 @@ export default function SoccerGameTracker() {
               inspection={inspection}
               busy={isApplying}
               onApply={applyResult}
-              onAddEvent={kind => {
-                if (kind === 'shot') {
-                  setCaptureDraft({ mode: 'historical', teamSide: capturePreferences.teamSide, location: null })
-                } else {
-                  openIncident(kind, null, 'historical')
-                }
-              }}
-              onEditAttacking={event => setCaptureDraft({
-                mode: 'edit',
-                teamSide: event.teamSide,
-                location: event.location,
-                event,
+              recorderUserId={user?.id ?? null}
+              selectedParticipantId={capturePreferences.selectedParticipantId}
+              defaultTeamSide={capturePreferences.teamSide}
+              onTrackedParticipantUsed={participantId => dispatch({
+                type: 'SET_SOCCER_CAPTURE_PREFERENCES',
+                preferences: { selectedParticipantId: participantId, selectionInitialized: true },
               })}
-              onEditIncident={event => openIncident(incidentKind(event), event.location, 'edit', event)}
-              onEditScoreAdjustment={event => {
-                setScoreAdjustmentEdit(event)
-                setScoreTimelineOpen(true)
-              }}
               allowAddEvent={!projection.shootout}
               readOnly={cloudFinal}
             />

@@ -3,22 +3,27 @@ import type { SoccerSummaryTab } from '../../lib/soccer/summary'
 interface SoccerSummaryTabsProps {
   activeTab: SoccerSummaryTab
   showPlayers: boolean
+  showTimeline: boolean
   onChange: (tab: SoccerSummaryTab) => void
 }
 
 const TABS: Array<{ id: SoccerSummaryTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'players', label: 'Players' },
+  { id: 'timeline', label: 'Timeline' },
 ]
 
 export default function SoccerSummaryTabs({
   activeTab,
   showPlayers,
+  showTimeline,
   onChange,
 }: SoccerSummaryTabsProps) {
-  const tabs = showPlayers
-    ? TABS
-    : TABS.filter(tab => tab.id === 'overview')
+  const tabs = TABS.filter(tab =>
+    tab.id === 'overview' ||
+    (tab.id === 'players' && showPlayers) ||
+    (tab.id === 'timeline' && showTimeline)
+  )
   return (
     <nav
       className="sticky top-0 z-30 border-b border-slate-200 bg-white"
