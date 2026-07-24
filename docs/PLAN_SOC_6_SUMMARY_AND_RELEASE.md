@@ -1,6 +1,6 @@
 # Plan: SOC-6 Summary and Release
 
-Status: SOC-6A and SOC-6B1 implemented. SOC-6B2 through SOC-6E remain planned.
+Status: SOC-6A and SOC-6B implemented. SOC-6C through SOC-6E remain planned.
 
 ## 1. Goal
 
@@ -35,7 +35,7 @@ Important implementation drift to resolve:
 - the event projector emits the richer canonical `soc_*` stat family;
 - generic aggregate RPCs read `game_stats`, while soccer authority lives in canonical event
   publications;
-- detailed Players review is implemented; Timeline, Field, and Shootout views remain in SOC-6B;
+- detailed Players, Timeline, Field, and conditional Shootout review are implemented;
 - soccer settings do not yet exist and current app settings are device-local;
 - production route and sport-availability gates still reject soccer.
 
@@ -290,6 +290,5 @@ Phase planning should settle component boundaries, exact stat tables, RPC payloa
 settings reconciliation, migration numbering, and test fixtures without reopening the reviewed
 high-level product decisions.
 
-SOC-6B planning is complete and splits implementation into SOC-6B1 player review, SOC-6B2
-Timeline review, SOC-6B3 Field review, and SOC-6B4 Shootout review plus the detailed-summary
-release boundary.
+SOC-6B is implemented through SOC-6B1 player review, SOC-6B2 Timeline review, SOC-6B3 Field
+review, and SOC-6B4 Shootout review plus the detailed-summary release boundary.
