@@ -104,12 +104,16 @@ export default function SoccerTimeline({
     useState<SoccerScoreAdjustmentEvent | null>(null)
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
   const review = useMemo(
-    () => soccerSummaryTimelineReview(state, inspection, reviewFilter),
-    [inspection, reviewFilter, state]
+    () => presentation === 'review'
+      ? soccerSummaryTimelineReview(state, inspection, reviewFilter)
+      : null,
+    [inspection, presentation, reviewFilter, state]
   )
   const allEventsReview = useMemo(
-    () => soccerSummaryTimelineReview(state, inspection, 'all'),
-    [inspection, state]
+    () => presentation === 'review'
+      ? soccerSummaryTimelineReview(state, inspection, 'all')
+      : null,
+    [inspection, presentation, state]
   )
   const active = [...inspection.activeEvents]
     .reverse()
@@ -118,7 +122,7 @@ export default function SoccerTimeline({
     .reverse()
     .filter(event => soccerEventMatchesTimelineFilter(event, liveFilter))
   const removedCount = presentation === 'review'
-    ? allEventsReview.removedCount
+    ? allEventsReview?.removedCount ?? 0
     : inspection.deletedEvents.length
 
   const restoreEvent = (event: GameEvent) => {
@@ -217,7 +221,7 @@ export default function SoccerTimeline({
               onChange={setReviewFilter}
             />
             <ReviewSections
-              sections={review.activeSections}
+              sections={review?.activeSections ?? []}
               readOnly={readOnly}
               onEdit={editEvent}
               onDelete={setDeleting}
@@ -264,7 +268,7 @@ export default function SoccerTimeline({
           {removedOpen && (
             presentation === 'review' ? (
               <ReviewSections
-                sections={review.removedSections}
+                sections={review?.removedSections ?? []}
                 readOnly={readOnly}
                 removed
                 onRestore={restoreEvent}

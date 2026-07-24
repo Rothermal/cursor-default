@@ -162,6 +162,7 @@ export default function SoccerSummary() {
   }, [activeLocalGameId, query.gameId])
 
   useEffect(() => {
+    // Checked mutations return a fresh state; this marks the dispatch as committed.
     timelineApplyingRef.current = false
     setTimelineBusy(false)
   }, [state])
@@ -300,6 +301,7 @@ export default function SoccerSummary() {
     }
     timelineApplyingRef.current = true
     setTimelineBusy(true)
+    // Render the accepted result immediately while GameContext persists the same state.
     sourceRef.current = nextSource
     setSource(nextSource)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
