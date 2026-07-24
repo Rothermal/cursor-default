@@ -80,9 +80,12 @@ export default function SoccerFieldReview({
   }, [period, review.periodOptions])
 
   useEffect(() => {
-    setSelectedIds(current =>
-      current.filter(id => review.events.some(item => item.event.id === id))
-    )
+    setSelectedIds(current => {
+      const next = current.filter(id =>
+        review.events.some(item => item.event.id === id)
+      )
+      return next.length === current.length ? current : next
+    })
   }, [review.events])
 
   const toggleFamily = (family: SoccerFieldReviewFamily) => {
@@ -263,7 +266,6 @@ function Segmented<TValue extends string>({
 }) {
   return (
     <div>
-      <p className="sr-only">{label}</p>
       <div className="inline-flex border border-slate-300 bg-white" role="group" aria-label={label}>
         {options.map(option => (
           <button

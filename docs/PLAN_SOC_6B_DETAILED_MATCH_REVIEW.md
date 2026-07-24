@@ -462,7 +462,8 @@ pairing.
 - combined side/participant/family/period filtering;
 - regulation and extra-time aggregate periods;
 - deterministic clustering independent of input order;
-- filter-aware unknown count and Timeline handoff;
+- filter-aware unknown count with equivalent Timeline handoff when representable, otherwise the
+  matching detail-list fallback;
 - marker detail and edit authorization.
 
 ### SOC-6B4
