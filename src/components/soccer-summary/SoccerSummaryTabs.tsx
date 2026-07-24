@@ -5,6 +5,7 @@ interface SoccerSummaryTabsProps {
   showPlayers: boolean
   showTimeline: boolean
   showField: boolean
+  showShootout: boolean
   onChange: (tab: SoccerSummaryTab) => void
 }
 
@@ -13,6 +14,7 @@ const TABS: Array<{ id: SoccerSummaryTab; label: string }> = [
   { id: 'players', label: 'Players' },
   { id: 'timeline', label: 'Timeline' },
   { id: 'field', label: 'Field' },
+  { id: 'shootout', label: 'Shootout' },
 ]
 
 export default function SoccerSummaryTabs({
@@ -20,13 +22,15 @@ export default function SoccerSummaryTabs({
   showPlayers,
   showTimeline,
   showField,
+  showShootout,
   onChange,
 }: SoccerSummaryTabsProps) {
   const tabs = TABS.filter(tab =>
     tab.id === 'overview' ||
     (tab.id === 'players' && showPlayers) ||
     (tab.id === 'timeline' && showTimeline) ||
-    (tab.id === 'field' && showField)
+    (tab.id === 'field' && showField) ||
+    (tab.id === 'shootout' && showShootout)
   )
   return (
     <nav

@@ -10,6 +10,7 @@ import SoccerReviewTimeline from '../components/soccer-summary/SoccerReviewTimel
 import SoccerFieldReview from '../components/soccer-summary/SoccerFieldReview'
 import SoccerSummaryHeader from '../components/soccer-summary/SoccerSummaryHeader'
 import SoccerSummaryTabs from '../components/soccer-summary/SoccerSummaryTabs'
+import SoccerShootoutReview from '../components/soccer-summary/SoccerShootoutReview'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
@@ -226,6 +227,27 @@ export default function SoccerSummary() {
     source,
   ])
 
+  const shootoutAvailable = source?.state.sportGameState?.sportId === 'soccer' &&
+    source.state.sportGameState.projection.shootout !== null
+
+  useEffect(() => {
+    if (!source || query.tab !== 'shootout' || shootoutAvailable) return
+    navigate(soccerSummaryPath({
+      gameId: query.gameId,
+      tab: 'overview',
+      from: query.from,
+      teamId: query.teamId,
+    }), { replace: true })
+  }, [
+    navigate,
+    query.from,
+    query.gameId,
+    query.tab,
+    query.teamId,
+    shootoutAvailable,
+    source,
+  ])
+
   const openRecorders = async () => {
     const gameId = source?.state.cloudSync.gameId
     if (!gameId) return
@@ -403,6 +425,7 @@ export default function SoccerSummary() {
         showPlayers={healthy}
         showTimeline={healthy}
         showField={healthy}
+        showShootout={healthy && Boolean(soccerState.projection.shootout)}
         onChange={changeTab}
       />
       <SoccerRecordingSelector
@@ -475,6 +498,8 @@ export default function SoccerSummary() {
           busy={timelineBusy}
           onApply={applyTimelineResult}
         />
+      ) : query.tab === 'shootout' && healthy && soccerState.projection.shootout ? (
+        <SoccerShootoutReview source={source} />
       ) : (
         <SoccerOverview
           source={source}

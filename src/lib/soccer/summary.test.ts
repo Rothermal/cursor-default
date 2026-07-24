@@ -67,6 +67,9 @@ describe('soccer summary navigation', () => {
     )
     expect(
       parseSoccerSummaryQuery(new URLSearchParams('tab=shootout')).tab
+    ).toBe('shootout')
+    expect(
+      parseSoccerSummaryQuery(new URLSearchParams('tab=future')).tab
     ).toBe('overview')
   })
 
@@ -89,6 +92,13 @@ describe('soccer summary navigation', () => {
     ).toBe(
       '/summary?gameId=game+1&tab=players&from=team&teamId=team%2F1'
     )
+    expect(
+      soccerSummaryPath({
+        gameId: 'game-1',
+        tab: 'shootout',
+        from: 'games',
+      })
+    ).toBe('/summary?gameId=game-1&tab=shootout&from=games')
     expect(
       legacySoccerReviewSummaryPath(
         '?gameId=game-1&tab=timeline&from=games&junk=ignored'

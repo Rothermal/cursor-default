@@ -881,7 +881,7 @@ development, and at least one local match plus one team cloud match available.
 | 11n.9 | Introduce a projection diagnostic in a local, primary, or canonical stream | Last coherent score/context and recovery/Resume actions remain visible, while team comparison, leaders, and finalization are suppressed and diagnostics are shown |
 | 11n.10 | Leave the non-final cloud summary open, focus another window and return, then wait 30 seconds; force one refresh request to fail | Focus, manual Refresh, and the active-page interval reload only the effective primary; a transient failure keeps the last good Overview with a retry warning, and canonical finals do not poll |
 | 11n.11 | Use long team/player names, tied leaders, all-zero optional rows, extra time, penalties, suspended, and abandoned results at narrow mobile and desktop widths | Header columns remain stable, text wraps/truncates safely, ties remain visible, optional both-zero rows hide, and result context is explicit |
-| 11n.12 | Open `tab=players`, `tab=timeline`, `tab=field`, then a future or invalid `tab` query value | Players, Timeline, and Field open their shipped views; unsupported Shootout or unknown values normalize to Overview |
+| 11n.12 | Open `tab=players`, `tab=timeline`, `tab=field`, conditional `tab=shootout`, then a future or invalid tab value | Shipped tabs open their views; Shootout requires a started shootout; unavailable Shootout and unknown values normalize to Overview |
 | 11n.13 | Open legacy `/#/soccer/review` with `gameId`, `from`, `teamId`, and an unrelated parameter | It redirects to `/summary`, preserving only supported context and normalizing the tab to Overview |
 | 11n.14 | Re-run basketball local and cloud summary entry paths | Basketball still renders `GameSummary`; soccer source loading and direct cloud review are not invoked |
 
@@ -938,6 +938,21 @@ development, and at least one local match plus one team cloud match available.
 | 11q.8 | Repeat marker and cluster review on remote primary, selected Other Recording, and canonical final sources | Event detail remains available, but Edit is absent and no source is hydrated locally |
 | 11q.9 | Review a match containing score adjustments, lifecycle events, and shootout activity | Those events create no Field markers; normal-match located events remain complete and shootout stays isolated for SOC-6B4 |
 | 11q.10 | Test long participant labels, all filters, clusters, details, and the pitch at narrow mobile and desktop widths | Controls remain tappable, text does not overlap, the page has no horizontal overflow, and pitch dimensions remain stable |
+
+### 11r. Soccer summary Shootout (SOC-6B4)
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11r.1 | Open Summary before and after a shootout starts | Shootout is absent before the start event and appears as a sticky URL-backed tab afterward, including incomplete, suspended, reopened, or abandoned shootouts |
+| 11r.2 | Review a normal initial series and an early decision | Attempts pair by official round; an unneeded final-side attempt stays blank; score, initial progress, first side, winner, and next side are explicit |
+| 11r.3 | Record one or more retakes before the advancing attempt | Retakes remain beneath the same side/round, say **Retake - did not advance**, and do not increase official attempt or kick numbering |
+| 11r.4 | Record saved, missed, woodwork, and forfeited attempts | Every outcome remains visible with distinct treatment; forfeits count as official attempts and are explicitly labeled |
+| 11r.5 | Continue into sudden death | Round labels switch to Sudden Death numbering at the initial-series boundary and preserve paired attempts through the decision |
+| 11r.6 | Use two anonymous opponent slots with the same display text | The slots remain distinct in attempts and kicker summaries rather than merging by label |
+| 11r.7 | Review kicker and goalkeeper summaries | Kicker official attempts, goals, saved-against, misses, woodwork, retakes, and forfeits are correct; goalkeeper official attempts faced and saves are correct |
+| 11r.8 | Compare Overview score, Players rates/clean sheets, and Shootout before and after kicks | Shootout values remain scoped to Shootout and never enter normal score, player categories/rates, or clean-sheet calculations |
+| 11r.9 | Open local, primary-cloud, selected-recorder, and canonical-final Shootout attempts | All authorities show isolated read-only attempt detail; no direct Summary mutation path appears and correction remains in the owned local tracker |
+| 11r.10 | Refresh, Finalize, Reopen, force diagnostics, and test narrow mobile plus desktop widths | Valid Shootout URL context survives source transitions; diagnostics normalize to Overview; tabs, rounds, tables, and detail fit without page-level overflow; basketball Summary is unchanged |
 
 ---
 

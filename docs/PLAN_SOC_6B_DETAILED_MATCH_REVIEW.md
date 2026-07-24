@@ -1,6 +1,6 @@
 # Plan: SOC-6B Detailed Match Review
 
-Status: SOC-6B1 through SOC-6B3 implemented. SOC-6B4 remains planned.
+Status: Implemented.
 
 Parent roadmap: [PLAN_SOC_6_SUMMARY_AND_RELEASE.md](PLAN_SOC_6_SUMMARY_AND_RELEASE.md)
 
@@ -77,6 +77,8 @@ Exit condition: every located normal-match event can be reviewed without hiding 
 from totals or Timeline.
 
 ### SOC-6B4: Shootout review and release boundary
+
+Status: Implemented.
 
 - Add the conditional `shootout` tab only when a shootout actually started.
 - Add round-paired attempts, retakes, forfeits, sudden death, and game-scoped kicker/goalkeeper
@@ -405,8 +407,7 @@ src/components/soccer-summary/
   SoccerPlayerTable.tsx
   SoccerPlayerDetail.tsx
   SoccerReviewTimeline.tsx
-  SoccerReviewField.tsx
-  SoccerFieldEventDetail.tsx
+  SoccerFieldReview.tsx
   SoccerShootoutReview.tsx
 src/lib/soccer/
   summaryPlayers.ts

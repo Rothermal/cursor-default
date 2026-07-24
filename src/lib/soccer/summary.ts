@@ -1,6 +1,11 @@
 import type { SoccerMatchProjection, SoccerMatchRules } from './types'
 
-export type SoccerSummaryTab = 'overview' | 'players' | 'timeline' | 'field'
+export type SoccerSummaryTab =
+  | 'overview'
+  | 'players'
+  | 'timeline'
+  | 'field'
+  | 'shootout'
 export type SoccerSummaryFrom = 'tracker' | 'games' | 'game-info' | 'team'
 
 export interface SoccerSummaryQuery {
@@ -72,6 +77,7 @@ const VALID_TABS = new Set<SoccerSummaryTab>([
   'players',
   'timeline',
   'field',
+  'shootout',
 ])
 
 export function parseSoccerSummaryQuery(
