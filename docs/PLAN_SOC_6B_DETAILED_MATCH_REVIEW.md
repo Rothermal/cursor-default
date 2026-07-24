@@ -1,6 +1,6 @@
 # Plan: SOC-6B Detailed Match Review
 
-Status: SOC-6B1 and SOC-6B2 implemented. SOC-6B3 and SOC-6B4 remain planned.
+Status: SOC-6B1 through SOC-6B3 implemented. SOC-6B4 remains planned.
 
 Parent roadmap: [PLAN_SOC_6_SUMMARY_AND_RELEASE.md](PLAN_SOC_6_SUMMARY_AND_RELEASE.md)
 
@@ -64,7 +64,7 @@ available only through an owned local binding.
 
 ### SOC-6B3: Field review
 
-Status: Planned; next.
+Status: Implemented.
 
 - Extend URL-backed summary tabs with `field`.
 - Expand field-family classification to every located SOC-3/SOC-4 normal-match event.
@@ -462,7 +462,8 @@ pairing.
 - combined side/participant/family/period filtering;
 - regulation and extra-time aggregate periods;
 - deterministic clustering independent of input order;
-- filter-aware unknown count and Timeline handoff;
+- filter-aware unknown count with equivalent Timeline handoff when representable, otherwise the
+  matching detail-list fallback;
 - marker detail and edit authorization.
 
 ### SOC-6B4

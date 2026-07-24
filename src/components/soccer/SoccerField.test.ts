@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clusterSoccerMarkerPoints,
+  isSoccerLocatedEditableEvent,
   soccerFieldLocation,
   soccerFieldReviewEvents,
 } from '../../lib/soccer/field'
@@ -82,6 +83,28 @@ describe('soccer field coordinates', () => {
       ['a', 'b'], ['c'],
     ])
     expect(points[0]).toEqual({ id: 'a', x: 0.5, y: 0.5 })
+  })
+
+  it('clusters deterministically regardless of marker input order', () => {
+    const points = [
+      { id: 'c', x: 0.8, y: 0.8 },
+      { id: 'b', x: 0.52, y: 0.51 },
+      { id: 'a', x: 0.5, y: 0.5 },
+    ]
+    expect(clusterSoccerMarkerPoints(points).map(cluster => cluster.map(item => item.id))).toEqual([
+      ['a', 'b'], ['c'],
+    ])
+  })
+
+  it('keeps shootout cards out of the shared normal-match editor', () => {
+    expect(isSoccerLocatedEditableEvent({
+      eventType: 'soccer.card',
+      period: { id: 'regulation-1', order: 1 },
+    })).toBe(true)
+    expect(isSoccerLocatedEditableEvent({
+      eventType: 'soccer.card',
+      period: { id: 'shootout', order: 99 },
+    })).toBe(false)
   })
 })
 

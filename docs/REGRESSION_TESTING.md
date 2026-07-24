@@ -881,7 +881,7 @@ development, and at least one local match plus one team cloud match available.
 | 11n.9 | Introduce a projection diagnostic in a local, primary, or canonical stream | Last coherent score/context and recovery/Resume actions remain visible, while team comparison, leaders, and finalization are suppressed and diagnostics are shown |
 | 11n.10 | Leave the non-final cloud summary open, focus another window and return, then wait 30 seconds; force one refresh request to fail | Focus, manual Refresh, and the active-page interval reload only the effective primary; a transient failure keeps the last good Overview with a retry warning, and canonical finals do not poll |
 | 11n.11 | Use long team/player names, tied leaders, all-zero optional rows, extra time, penalties, suspended, and abandoned results at narrow mobile and desktop widths | Header columns remain stable, text wraps/truncates safely, ties remain visible, optional both-zero rows hide, and result context is explicit |
-| 11n.12 | Open `tab=players`, `tab=timeline`, then a future or invalid `tab` query value | Players and Timeline open their shipped views; unsupported Field, Shootout, or unknown values normalize to Overview |
+| 11n.12 | Open `tab=players`, `tab=timeline`, `tab=field`, then a future or invalid `tab` query value | Players, Timeline, and Field open their shipped views; unsupported Shootout or unknown values normalize to Overview |
 | 11n.13 | Open legacy `/#/soccer/review` with `gameId`, `from`, `teamId`, and an unrelated parameter | It redirects to `/summary`, preserving only supported context and normalizing the tab to Overview |
 | 11n.14 | Re-run basketball local and cloud summary entry paths | Basketball still renders `GameSummary`; soccer source loading and direct cloud review are not invoked |
 
@@ -923,6 +923,21 @@ development, and at least one local match plus one team cloud match available.
 | 11p.9 | Repeat correction review on remote primary, selected Other Recording, and canonical final sources | Add, Edit, Remove, and Restore controls are absent; owned cloud streams require **Open Tracker** before editing |
 | 11p.10 | Switch Overview/Players/Timeline, refresh, and test narrow mobile plus desktop widths | URL context and selected recorder persist, chips scroll without page overflow, rows remain readable, and basketball Summary is unchanged |
 | 11p.11 | Save a valid revision that makes later history semantically incomplete | The revision remains stored, Summary normalizes to Overview under the shared unhealthy-source policy, and diagnostics plus recovery/Open Tracker actions remain available |
+
+### 11q. Soccer summary Field (SOC-6B3)
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11q.1 | Open `/#/summary?tab=field` for a healthy local, effective-primary, selected-recorder, and canonical match | Every source renders the same field review without activating, hydrating, or blending another game or recorder |
+| 11q.2 | Review located shots, own goals, blocked shots, defensive actions, fouls, cards, corners, and offsides | Every normal-match family appears with side color and an event-specific marker; blocked shots appear under both Attack and Defense filters |
+| 11q.3 | Switch Normalized and Original orientation with both sides represented | Normalized mode rotates each event independently into a left-to-right attack; Original preserves each stored coordinate without rewriting history |
+| 11q.4 | Combine Both/Tracked/Opponent, multiple family chips, participant, Full Match/Regulation/Extra Time, and individual period filters | Filters update the loaded read model in place without a cloud reload; participant choices remain scoped to the selected side |
+| 11q.5 | Record overlapping locations in different storage orders, then select the cluster | Cluster membership/count remains deterministic and its event list is oldest first |
+| 11q.6 | Record matching events without locations, change filters, then select **Unknown location** | The count reflects every active filter and opens the matching unlocated event list; totals and Timeline still include those events |
+| 11q.7 | Select a marker on an editable local summary and correct its location or event details | Shared checked shot/incident editors update GameContext and every Summary tab; a failed correction preserves prior state and remains actionable |
+| 11q.8 | Repeat marker and cluster review on remote primary, selected Other Recording, and canonical final sources | Event detail remains available, but Edit is absent and no source is hydrated locally |
+| 11q.9 | Review a match containing score adjustments, lifecycle events, and shootout activity | Those events create no Field markers; normal-match located events remain complete and shootout stays isolated for SOC-6B4 |
+| 11q.10 | Test long participant labels, all filters, clusters, details, and the pitch at narrow mobile and desktop widths | Controls remain tappable, text does not overlap, the page has no horizontal overflow, and pitch dimensions remain stable |
 
 ---
 

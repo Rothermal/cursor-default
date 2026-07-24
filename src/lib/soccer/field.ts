@@ -1,4 +1,4 @@
-import type { GameEventLocation } from '../gameEvents/types'
+import type { GameEvent, GameEventLocation } from '../gameEvents/types'
 import type { SoccerAttackingDirection } from './types'
 
 export function soccerFieldLocation(
@@ -14,6 +14,17 @@ export function soccerFieldLocation(
     y: flipped ? 1 - y : y,
     attackingDirection,
   }
+}
+
+export function isSoccerLocatedEditableEvent(
+  event: Pick<GameEvent, 'eventType' | 'period'>
+): boolean {
+  return event.eventType === 'soccer.shot' ||
+    event.eventType === 'soccer.own_goal' ||
+    event.eventType === 'soccer.defensive_action' ||
+    event.eventType === 'soccer.foul' ||
+    (event.eventType === 'soccer.card' && event.period.id !== 'shootout') ||
+    event.eventType === 'soccer.team_event'
 }
 
 interface SoccerFieldEventCandidate {
@@ -62,15 +73,23 @@ export function clusterSoccerMarkerPoints<TPoint extends SoccerMarkerPoint>(
   points: TPoint[],
   threshold = 0.035
 ): TPoint[][] {
+  const ordered = [...points].sort(
+    (left, right) =>
+      left.x - right.x ||
+      left.y - right.y ||
+      left.id.localeCompare(right.id)
+  )
   const clusters: TPoint[][] = []
-  for (const point of points) {
+  for (const point of ordered) {
     const cluster = clusters.find(items => items.some(item =>
       Math.hypot(item.x - point.x, item.y - point.y) <= threshold
     ))
     if (cluster) cluster.push(point)
     else clusters.push([point])
   }
-  return clusters
+  return clusters.map(cluster =>
+    cluster.sort((left, right) => left.id.localeCompare(right.id))
+  )
 }
 
 function clamp(value: number): number {

@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react'
 import type { GameEventLocation, GameEventTeamSide } from '../../lib/gameEvents/types'
 import type { SoccerAttackingDirection } from '../../lib/soccer'
+import type { SoccerFieldReviewFamily } from '../../lib/soccer/summaryField'
 import { clusterSoccerMarkerPoints, soccerFieldLocation } from '../../lib/soccer/field'
 
 export type SoccerFieldMarkerKind =
@@ -27,6 +28,8 @@ interface SoccerFieldProps {
   onLocation: (location: GameEventLocation) => void
   onMarker?: (markerId: string) => void
   onCluster?: (markerIds: string[]) => void
+  presentation?: 'capture' | 'review'
+  legendFamilies?: readonly SoccerFieldReviewFamily[]
 }
 
 export default function SoccerField({
@@ -39,6 +42,8 @@ export default function SoccerField({
   onLocation,
   onMarker,
   onCluster,
+  presentation = 'capture',
+  legendFamilies,
 }: SoccerFieldProps) {
   const captureDirection = captureSide === 'tracked'
     ? trackedDirection
@@ -47,21 +52,23 @@ export default function SoccerField({
 
   return (
     <div>
-      <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase text-slate-600">
-          {displayDirection === 'left_to_right' ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
-          <span className="truncate">{captureSide === 'tracked' ? 'Tracked' : 'Opponent'} attack</span>
+      {presentation === 'capture' && (
+        <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase text-slate-600">
+            {displayDirection === 'left_to_right' ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
+            <span className="truncate">{captureSide === 'tracked' ? 'Tracked' : 'Opponent'} attack</span>
+          </div>
+          <button
+            type="button"
+            onClick={onFlip}
+            className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-slate-300 bg-white text-slate-600"
+            aria-label="Flip field view"
+            title="Flip field view"
+          >
+            <RefreshCw size={17} />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onFlip}
-          className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-slate-300 bg-white text-slate-600"
-          aria-label="Flip field view"
-          title="Flip field view"
-        >
-          <RefreshCw size={17} />
-        </button>
-      </div>
+      )}
 
       <div className="relative aspect-[100/64] w-full overflow-hidden rounded-md border-2 border-white bg-emerald-700 shadow-sm">
         <svg
@@ -113,28 +120,43 @@ export default function SoccerField({
             />
           ))}
         </svg>
-        {disabled && (
+        {disabled && presentation === 'capture' && (
           <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
             <span className="rounded-md bg-slate-950/75 px-3 py-1.5 text-xs font-bold text-white">Review only</span>
           </div>
         )}
       </div>
-      {markers.length > 0 && <MarkerLegend />}
+      {markers.length > 0 && (
+        <MarkerLegend families={legendFamilies} />
+      )}
     </div>
   )
 }
 
-function MarkerLegend() {
+function MarkerLegend({
+  families = ['attack', 'defense', 'restarts', 'discipline'],
+}: {
+  families?: readonly SoccerFieldReviewFamily[]
+}) {
+  const visible = new Set(families)
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-600" aria-label="Field marker legend">
       <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-yellow-400" />Tracked</span>
       <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" />Opponent</span>
-      <span className="flex items-center gap-1"><LegendGlyph kind="goal" />Goal</span>
-      <span className="flex items-center gap-1"><LegendGlyph kind="saved" />Shot</span>
-      <span className="flex items-center gap-1"><LegendGlyph kind="interception" />Defense</span>
-      <span className="flex items-center gap-1"><LegendGlyph kind="foul" />Foul</span>
-      <span className="flex items-center gap-1"><LegendGlyph kind="yellow_card" />Card</span>
-      <span className="flex items-center gap-1"><LegendGlyph kind="corner" />Team event</span>
+      {visible.has('attack') && (
+        <>
+          <span className="flex items-center gap-1"><LegendGlyph kind="goal" />Goal</span>
+          <span className="flex items-center gap-1"><LegendGlyph kind="saved" />Shot</span>
+        </>
+      )}
+      {visible.has('defense') && <span className="flex items-center gap-1"><LegendGlyph kind="interception" />Defense</span>}
+      {visible.has('restarts') && (
+        <>
+          <span className="flex items-center gap-1"><LegendGlyph kind="foul" />Foul</span>
+          <span className="flex items-center gap-1"><LegendGlyph kind="corner" />Restart</span>
+        </>
+      )}
+      {visible.has('discipline') && <span className="flex items-center gap-1"><LegendGlyph kind="yellow_card" />Card</span>}
     </div>
   )
 }
