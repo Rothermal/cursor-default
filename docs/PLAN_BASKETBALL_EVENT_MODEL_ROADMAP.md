@@ -3,11 +3,10 @@
 Required follow-up roadmap for moving basketball from its current counter/action-log/shot
 record combination onto the shared `GameEvent` foundation introduced by the soccer program.
 
-Status: Required future work. BKE-0 architecture planning may begin after SOC-1 stabilizes
-the shared event contract. No BKE-1 through BKE-4 implementation should begin until SOC-5
-proves offline persistence, cloud sync, independent recorder streams, and primary-recorder
-resolution unless a later planning decision explicitly changes that product-sequencing
-gate.
+Status: BKE-0 architecture planning is drafted in
+[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) and
+awaits review. SOC-5 is complete, so BKE-1 through BKE-5 implementation is gated only on that
+approval.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -199,14 +198,20 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 | Phase | Purpose | Dependency | Exit condition |
 |---|---|---|---|
 | BKE-0 | Architecture audit, basketball event catalog, projection contract, compatibility strategy, and F13 reconciliation | Stable SOC-1 shared event contract | Detailed migration design approved; no basketball code migration required |
-| BKE-1 | Court-originated shots and linked assist/rebound events on the shared local event model | SOC-5 complete and BKE-0 approved | New court actions round-trip through events while preserving current totals, shot views, and undo behavior |
+| BKE-1 | Sport-neutral `sportGameState` extraction, basketball setup/rules snapshot, and court-originated shots with linked assist/rebound | SOC-5 complete and BKE-0 approved | New court actions round-trip through events while preserving current totals, shot views, and undo behavior |
 | BKE-2 | Direct stat grid, score adjustments, team/period stats, and remaining basketball actions | SOC-5 complete and BKE-1 | Every new basketball live action has one event-backed source of truth |
 | BKE-3 | Editable basketball timeline/detail experience and F13 delivery | SOC-5 complete, shared edit/detail pattern proven, and BKE-2 | Users can review, edit, or delete supported basketball events with projections recalculated |
-| BKE-4 | Cloud event sync, recorder resolution, finalization/correction integration, historical hardening, and cutover | SOC-5 complete and BKE-3 stable | New basketball games sync as event-capable records; legacy games remain readable and unchanged |
+| BKE-4 | Generalized sport-neutral cloud RPC layer, basketball event sync, recorder resolution, finalization/correction integration, historical hardening, and cutover | SOC-5 complete and BKE-3 stable | New basketball games sync as event-capable records; soccer behavior unchanged; legacy games remain readable and unchanged |
+| BKE-5 | Basketball clock, age-level stoppage profiles, substitutions, and on-field intervals | BKE-4 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |
 
-BKE-0 planning does not need to wait for SOC-5. BKE-1 through BKE-4 implementation does not
+BKE-0 planning does not need to wait for SOC-5. BKE-1 through BKE-5 implementation does not
 need to wait for SOC-6 presentation work once SOC-5 has proven the shared event lifecycle
 and BKE-0 is approved.
+
+BKE-5 is a deliberate fast follower rather than part of BKE-1 through BKE-3. Basketball
+stoppage rules vary sharply by age level and competition, and the shared transport is
+payload-agnostic, so the BKE-0 catalog reserves the clock, stoppage, and substitution event
+types up front and BKE-5 implements them without an envelope, table, or ordering change.
 
 Recommended detailed plan names:
 
@@ -216,13 +221,16 @@ docs/PLAN_BKE_1_COURT_EVENTS.md
 docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md
 docs/PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md
 docs/PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md
+docs/PLAN_BKE_5_CLOCK_AND_LINEUPS.md
 ```
 
 ---
 
-## 8. Future Q&A Topics
+## 8. Q&A Topics
 
-BKE-0 should resolve at least:
+All eleven topics below are addressed in
+[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) §11,
+with recommendations for the open ones and the remaining questions carried into its §12.
 
 - Whether assist remains a linked event or an actor relationship on the made shot.
 - Whether a rebound is always separate and optionally linked to a missed shot.
@@ -232,11 +240,17 @@ BKE-0 should resolve at least:
   correction events.
 - How event-backed team pseudo-player stats map to period-scoped ids.
 - Whether basketball adds a match clock/substitution model or continues manual minutes.
+  **Resolved:** clock-ready catalog now, clock-less through BKE-4, clock delivered in BKE-5.
 - How finalized stat corrections interact with event editing.
 - Whether new cloud games project to existing `shot_chart` rows or summaries read events
   directly after cutover.
 - Which historical shot records, if any, can be losslessly promoted to events.
 - How the transition is feature-gated and rolled back if projection discrepancies appear.
+
+BKE-0 also settled one topic this roadmap did not anticipate: the shared event tables are
+sport-neutral but every binding, recorder, finalization, and reopen RPC in migrations 043-046
+is hard-gated on `sport_id = 'soccer'`. **Resolved:** BKE-4 generalizes that layer in place and
+keeps the soccer-named functions as thin wrappers.
 
 ---
 
@@ -282,12 +296,13 @@ equivalent action sequences before any cutover.
 
 ## 11. Documentation Handoff
 
-When BKE-0 begins:
+BKE-0 is drafted. Its review should confirm the open questions in its §12, after which:
 
-- review `docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md` and the completed SOC event phases,
-- review `docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`,
-- review completed F1-F9 and F12 plans,
-- inspect current reducers, cloud projections, shot review resolution, and correction RPCs,
-- update this roadmap with final phase boundaries,
-- add detailed BKE plans one phase at a time,
-- keep README, AGENTS, agent overview, and regression testing synchronized.
+- add detailed BKE plans one phase at a time, each with its own focused Q&A,
+- update this roadmap if phase boundaries move,
+- keep README, AGENTS, agent overview, and regression testing synchronized as phases ship.
+
+Background reading for any BKE phase: `docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md` and the
+completed SOC event phases, `docs/PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`, the completed F1-F9 and
+F12 plans, and the current reducers, cloud projections, shot review resolution, and correction
+RPCs.
