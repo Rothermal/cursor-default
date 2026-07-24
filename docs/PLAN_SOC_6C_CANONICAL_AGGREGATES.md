@@ -264,6 +264,26 @@ the duplicate player. Migration 041 predates `game_participants`; without this a
 key's `on delete set null` behavior would make finalized soccer participants unresolved. There is
 no uniqueness conflict on this column, so this remount needs no user-facing merge resolution.
 
+This fix may remain coupled to SOC-6C2 because Soccer stays development-only through SOC-6E and
+there is no supported production soccer aggregate history yet. Development environments can
+already contain finalized matches and merges, however, so migration 047 must not assume a clean
+database.
+
+Before installing the replacement merge RPC, perform a conservative repair:
+
+1. Find team-scope `game_participants` rows with null `source_player_id` and a UUID
+   `client_player_id`.
+2. Follow `player_merge_audit.duplicate_player_id -> survivor_player_id` recursively to the current
+   surviving player.
+3. Restore the link only when the final survivor still exists and belongs to the participant
+   game's team.
+4. Never recover from display name, jersey number, snapshot prose, or an unaudited UUID.
+5. Leave unprovable rows unresolved so SOC-6C reports them truthfully.
+
+Add `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` to report repairable,
+already-resolved, intentionally unresolved, and unprovable rows before the operator applies 047.
+Migration 047 should report repaired and remaining-unresolved counts with SQL notices.
+
 ### Publication-to-aggregate flow
 
 ```text
@@ -454,6 +474,7 @@ src/components/soccer-aggregates/SoccerPlayerAggregateTable.tsx
 src/components/soccer-aggregates/SoccerTeamAggregateOverview.tsx
 src/components/soccer-aggregates/SoccerAggregateGameList.tsx
 supabase/migrations/047_soccer_canonical_aggregate_sources.sql
+supabase/scripts/audit_soccer_participant_sources_pre_047.sql
 src/lib/soccer/migration047.test.ts
 ```
 
@@ -507,6 +528,7 @@ Acceptance:
 Scope:
 
 - add migration 047 and its grants/security-definer safeguards;
+- add the pre-047 source audit and audited-merge-lineage repair;
 - add both RPC parsers and full-pagination loaders;
 - extend player merge to remount `game_participants.source_player_id`, then use the current mapping
   so player merges take effect;
@@ -515,15 +537,26 @@ Scope:
 
 Acceptance:
 
+- static migration contract tests confirm the intended function signatures, predicates, ordering,
+  grants, merge remount statement, and conservative repair guards are present;
+- TypeScript tests prove response parsing, pagination/cursor behavior, cancellation, deduplication,
+  metrics, projection, and partial/error handling against mocked RPC responses;
+- manual Supabase verification proves the database behavior listed below;
 - only readable active completed publications are returned;
 - scope and player cursors are stable with equal timestamps;
 - max page size and malformed cursors are rejected;
 - season RPC does not leak inaccessible teams;
 - player RPC uses the stable-player index and returns no duplicate publications;
-- player merge preserves finalized soccer source links before deleting the duplicate;
+- a new player merge preserves finalized soccer source links before deleting the duplicate;
+- an audited historical merge repairs its null source link, while an unprovable null remains
+  unresolved;
 - unavailable migration never falls back to unverified totals;
 - reference projection is under two seconds and cooperative batches remain under 100 ms on the
   recorded development machine; hosted network time is measured separately, not asserted in CI.
+
+The RLS, keyset, historical repair, and merge assertions in this acceptance list are
+manual/integration-verified database behavior. Passing `migration047.test.ts` alone does not prove
+them.
 
 ### SOC-6C3 - Season, team, and tournament destinations
 
@@ -569,6 +602,11 @@ Acceptance:
 
 ### Automated
 
+Repository CI has no PostgreSQL/pgTAP runtime. `migration047.test.ts` is therefore a static SQL
+contract test: it can prove that required clauses are present in the migration text, but not that
+PostgreSQL executes their RLS, cursor, repair, or transaction behavior correctly. Behavioral proof
+for those items belongs to the manual Supabase matrix below.
+
 - canonical id uniqueness, category membership, aliases, and no legacy ids in Soccer config;
 - exact formatting for seconds above/below one hour;
 - appearance/start/DNP and current-roster-zero rows;
@@ -582,7 +620,8 @@ Acceptance:
 - duplicate publication ids are rejected/deduplicated deterministically;
 - cursor ties, final page, empty page, max limit, cancellation, stale load, focus dedupe;
 - capability, access, transport, and malformed payload errors;
-- migration 047 function signatures, filters, ordering, grants, and role checks;
+- migration 047 SQL text contains the reviewed signatures, filters, ordering, grants, role checks,
+  audited repair guards, and merge remount;
 - Leaderboard, Team, Tournament, Player, and Career route read-model integration;
 - existing basketball aggregate tests and production build.
 
@@ -595,6 +634,9 @@ Acceptance:
 - active publication invalidated by reopen while an aggregate page is open;
 - refinalized replacement publication;
 - player merge after finalization;
+- pre-047 audit against an already-null post-merge source link, then apply 047 and confirm the
+  audited link is repaired;
+- pre-047 audit with an unprovable null and confirm 047 leaves it unresolved;
 - unresolved participant then reopen/resolve/refinalize;
 - missing migration 047 environment;
 - 50-match performance fixture with progress and cancellation;
@@ -608,11 +650,13 @@ event count, projection time, longest cooperative batch, network time, and total
 
 1. Merge this plan.
 2. Implement SOC-6C1 with no backend dependency.
-3. Implement SOC-6C2 and have the operator apply migration 047.
-4. Verify the capability check in both migrated and unmigrated environments.
-5. Implement SOC-6C3.
-6. Implement SOC-6C4.
-7. Keep Soccer development-only through SOC-6C; production enablement remains SOC-6E.
+3. Implement SOC-6C2 and have the operator run the pre-047 source audit.
+4. Apply migration 047, review its repair notices, and rerun the audit.
+5. Manually verify RLS, equal-timestamp pagination, historical repair, and a new merge transaction.
+6. Verify the capability check in both migrated and unmigrated environments.
+7. Implement SOC-6C3.
+8. Implement SOC-6C4.
+9. Keep Soccer development-only through SOC-6C; production enablement remains SOC-6E.
 
 Every implementation PR must be independently buildable. C1 may ship before migration 047. C2
 must expose a truthful backend-update state before any route begins using the new RPCs. C3/C4 must
