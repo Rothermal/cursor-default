@@ -217,7 +217,9 @@ function goalkeeperSummaries(
       }
       summaries.set(id, summary)
     }
-    if (attempt.advances) summary.attemptsFaced += 1
+    if (attempt.advances && attempt.outcome !== 'forfeited') {
+      summary.attemptsFaced += 1
+    }
     if (attempt.outcome === 'saved') summary.saves += 1
   }
   return [...summaries.values()].sort(summarySort)

@@ -11,6 +11,7 @@ import {
   soccerSummaryShootoutReview,
   type SoccerShootoutAttemptReview,
   type SoccerShootoutKickerSummary,
+  type SoccerShootoutReview as SoccerShootoutReviewModel,
 } from '../../lib/soccer'
 import type { SoccerSummarySource } from '../../lib/soccer/summarySource'
 
@@ -35,15 +36,7 @@ export default function SoccerShootoutReview({
 
   const trackedName = source.state.gameInfo?.teamName ?? 'Tracked'
   const opponentName = source.state.gameInfo?.opponentName ?? 'Opponent'
-  const status = review.decided
-    ? `${review.winner === 'tracked' ? trackedName : opponentName} wins`
-    : review.endReason === 'abandoned'
-      ? 'Shootout abandoned'
-      : review.matchStatus === 'suspended'
-        ? 'Shootout suspended'
-    : review.suddenDeathRound
-      ? `Sudden death - round ${review.suddenDeathRound}`
-      : `${sideName(review.nextSide, trackedName, opponentName)} kicks next`
+  const status = shootoutStatus(review, trackedName, opponentName)
 
   return (
     <main className="mx-auto max-w-2xl pb-10">
@@ -101,10 +94,12 @@ export default function SoccerShootoutReview({
               </div>
               <AttemptStack
                 attempts={round.tracked}
+                sideLabel={trackedName}
                 onSelect={setSelected}
               />
               <AttemptStack
                 attempts={round.opponent}
+                sideLabel={opponentName}
                 onSelect={setSelected}
               />
             </div>
@@ -137,7 +132,11 @@ export default function SoccerShootoutReview({
             </thead>
             <tbody className="divide-y divide-slate-200">
               {review.kickers.map(kicker => (
-                <KickerRow key={`${kicker.teamSide}:${kicker.key}`} kicker={kicker} />
+                <KickerRow
+                  key={`${kicker.teamSide}:${kicker.key}`}
+                  kicker={kicker}
+                  sideLabel={sideName(kicker.teamSide, trackedName, opponentName)}
+                />
               ))}
             </tbody>
           </table>
@@ -216,9 +215,11 @@ function Progress({
 
 function AttemptStack({
   attempts,
+  sideLabel,
   onSelect,
 }: {
   attempts: SoccerShootoutAttemptReview[]
+  sideLabel: string
   onSelect: (attempt: SoccerShootoutAttemptReview) => void
 }) {
   if (attempts.length === 0) {
@@ -234,6 +235,7 @@ function AttemptStack({
           className={`flex min-h-9 w-full max-w-36 items-center justify-center gap-1 border px-2 text-[11px] font-bold ${
             outcomeTone(attempt.outcome)
           }`}
+          aria-label={`${sideLabel}, ${attempt.kickerLabel}: ${attempt.outcomeLabel}`}
           title={`${attempt.kickerLabel}: ${attempt.outcomeLabel}`}
         >
           <OutcomeIcon outcome={attempt.outcome} />
@@ -244,13 +246,19 @@ function AttemptStack({
   )
 }
 
-function KickerRow({ kicker }: { kicker: SoccerShootoutKickerSummary }) {
+function KickerRow({
+  kicker,
+  sideLabel,
+}: {
+  kicker: SoccerShootoutKickerSummary
+  sideLabel: string
+}) {
   return (
     <tr>
       <td className="max-w-48 px-2 py-2">
         <p className="truncate font-semibold text-slate-800">{kicker.label}</p>
         <p className="text-[10px] font-bold uppercase text-slate-400">
-          {kicker.teamSide}
+          {sideLabel}
         </p>
       </td>
       {[
@@ -376,4 +384,20 @@ function sideName(
   opponentName: string
 ): string {
   return side === 'tracked' ? trackedName : opponentName
+}
+
+function shootoutStatus(
+  review: SoccerShootoutReviewModel,
+  trackedName: string,
+  opponentName: string
+): string {
+  if (review.decided) {
+    return `${review.winner === 'tracked' ? trackedName : opponentName} wins`
+  }
+  if (review.endReason === 'abandoned') return 'Shootout abandoned'
+  if (review.matchStatus === 'suspended') return 'Shootout suspended'
+  if (review.suddenDeathRound) {
+    return `Sudden death - round ${review.suddenDeathRound}`
+  }
+  return `${sideName(review.nextSide, trackedName, opponentName)} kicks next`
 }

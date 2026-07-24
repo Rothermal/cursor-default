@@ -73,6 +73,10 @@ describe('soccer summary shootout review', () => {
       attempts: 1,
       forfeits: 1,
     })
+    expect(review?.goalkeepers.find(item => item.teamSide === 'tracked')).toMatchObject({
+      attemptsFaced: 0,
+      saves: 0,
+    })
   })
 
   it('labels sudden-death rounds from the official initial-series boundary', () => {
