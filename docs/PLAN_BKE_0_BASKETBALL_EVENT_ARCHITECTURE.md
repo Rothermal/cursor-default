@@ -4,7 +4,7 @@ Architecture audit, basketball event catalog, projection contract, compatibility
 F13 reconciliation for moving basketball onto the shared `GameEvent` foundation proven by the
 soccer program.
 
-Status: Draft, revision 3 — first and second review passes folded in. **Every** recommendation in §11 is a
+Status: Draft, revision 4 — three review passes folded in. **Every** recommendation in §11 is a
 proposal pending BKE-0 approval, including the clock phasing and the cloud RPC strategy; neither was
 settled outside this document and both are relabeled accordingly. §12 lists what still needs a
 focused Q&A pass, and §12a names the two authority decisions this approval must settle. No
@@ -413,8 +413,8 @@ needed. Basketball populates `label` from the snapshotted team designation so a 
 readable without resolving the roster. Rationale for keeping them out of the roster:
 the participant roster is the input to every future player, lineup, and minutes surface, and seeding
 it with two non-players contaminates all of them. This replaces the contradictory wording that
-previously appeared in §4.1 and §12; it is a single stated proposal, still open to challenge in the
-§12b questions.
+previously appeared in §4.1 and §12, and is stated here once as a single proposal **pending BKE-0
+approval** — it is no longer carried as an open question in §12b.
 
 **Where validation lives.** `GameEventDefinition.validate` (`gameEvents/registry.ts:8-15`) receives
 one event and nothing else, so it can enforce payload shape, actor roles, and envelope agreement —
@@ -499,6 +499,12 @@ Rules:
   streams each number from their own origin. The ordinal is a display projection that renumbers when
   an earlier shot is removed — if a stable-forever shot label is wanted instead, it needs its own
   immutable payload field and an explicit decision (§12b q5).
+- **The ordinal counts every attempt**, not only chart markers: all active `basketball.shot` events,
+  including free throws and unlocated field goals. They are one authoritative event family, and a
+  chart-only numbering would make the same shot "Shot 8" in the chart and "Shot 12" in a timeline or
+  player-detail list. The consequence is deliberate and must be visible in the UI: entering the detail
+  view by tapping a chart marker can land on a non-contiguous number, so the detail surface always
+  shows attempt type (FG vs FT, located vs not) beside the ordinal. Confirm at approval — §12b q5.
 - Capture preferences are never an input (§4.4). Two streams that differ only in preferences project
   identically.
 - Any unknown, malformed, unmappable, or unsupported event makes the stream incomplete. Incomplete
@@ -641,9 +647,22 @@ them, which is the same net effect the current linked-entry logic works to achie
 states the full count ("removes 24 chart shots and 9 linked rebounds").
 
 **Equivalence fixture requirement.** The BKE-1 fixture suite (§5) must include a game containing made
-and missed free throws and at least one unlocated field goal alongside charted shots, and assert that
-after clear-chart those events and their stats are **byte-identical** to the pre-clear projection.
-Without that case the regression is invisible: every located-only fixture passes either way.
+and missed free throws and at least one unlocated field goal alongside charted shots. "Everything
+preserved is byte-identical" would be the wrong assertion: a located and an unlocated field goal share
+the same `2pt` / `3pt` / `*_miss` stat ids, so clearing the charted attempts *must* move those
+combined counters. The fixture asserts three separable things:
+
+| Assertion | Scope |
+|---|---|
+| Event envelopes and revisions of the preserved free-throw and unlocated events are **byte-identical** before and after | The stream |
+| `ft` / `ft_miss` totals are **unchanged** | Stat ids the cleared events cannot contribute to |
+| `2pt` / `3pt` / `*_miss` totals and score decrease by **exactly** the removed charted attempts' contribution, leaving the unlocated attempts' contribution intact | Stat ids shared between charted and non-charted shots |
+
+The row assertion and the counter assertions fail independently and are both needed: the first
+catches a command whose *scope* is too wide (it tombstones events it should not), the last two catch
+a command with the right scope but the wrong *arithmetic* (it reverses a preserved event's
+contribution, or double-subtracts a shared one). Without a fixture containing free throws and an
+unlocated attempt, every located-only case passes either way.
 
 The command is not retargeted to "scrub locations only" either: its user meaning is *undo this
 chart's scoring*, and keeping the totals while deleting the positions would change what the button
@@ -827,7 +846,7 @@ strategy, which an earlier revision mislabeled as settled.
 | — | Restore symmetry | Grouped delete implies grouped restore; tombstoned dependents are recoverable via their retained `relatedEventId` (§6.2) |
 | — | Multi-event edits | Atomic `applyGameEventMutations` added to the shared engine in BKE-1; stale links cleared or tombstoned, never retained invalid (§6.2) |
 | — | Capture preferences | Resumable UI state; excluded from projection, fingerprint, and publication (§4.4) |
-| — | Shot number | Projected ordinal over active shots, never envelope `sequence` (§5, §8) |
+| — | Shot number | Projected ordinal over **all** active shots including free throws and unlocated attempts, never envelope `sequence` (§5, §8, §12b q5) |
 
 ---
 
@@ -871,11 +890,15 @@ If either proposed decision is rejected, §7 and §9 need revision before BKE-1 
    resolved season rules plus roster while preserving the current one-tap start wherever the resolved
    defaults are already sufficient — setup appears only when something genuinely must be chosen. The
    acceptable ceiling on that friction is the product call this question needs.
-5. **Stable shot label.** The projected shot ordinal (§5) renumbers when an earlier shot is removed.
-   Is that acceptable for F13's detail view, or does a shot need a label that never changes once
-   assigned? A stable label means an immutable payload field assigned at capture. *Recommendation:*
-   accept renumbering; the event `id` already provides durable identity, and a frozen label drifts
-   from display order after any correction. Confirm before BKE-3.
+5. **Shot ordinal: stability and population.** Two linked confirmations, both before BKE-3.
+   *Stability:* the projected ordinal (§5) renumbers when an earlier shot is removed.
+   *Recommendation:* accept renumbering; the event `id` already provides durable identity, and a
+   frozen label drifts from display order after any correction.
+   *Population:* the ordinal counts **all** attempts — free throws and unlocated field goals included
+   — not only charted markers. *Recommendation:* keep it that way; they are one shot event family,
+   and a chart-only count would give the same shot two different numbers in two surfaces. The cost is
+   that tapping a chart marker can open "Shot 8" with 7 not visible on the chart, so the detail view
+   shows attempt type beside the ordinal.
 
 *Closed by earlier revisions:* team pseudo-players as participants (now §4.5: team-kind actors, not
 participant rows) and the two authority questions (now §12a, decided at approval rather than
@@ -895,7 +918,7 @@ Every regression requirement in roadmap §9 maps to the phase that must cover it
 | Individual, team, and All shot-chart filters | BKE-1 |
 | Home/opponent score and manual corrections | BKE-2 |
 | Team fouls, timeouts, technicals, turnovers, period controls, bonus indicators | BKE-2 |
-| Clear Shot Chart: charted shots and linked rebounds removed; **free throws, unlocated field goals, and linked blocks survive unchanged** (§6.3) | BKE-1 |
+| Clear Shot Chart: charted shots and linked rebounds removed; free-throw, unlocated-field-goal, and linked-block **events survive byte-identical**; `ft` totals unchanged; shared `2pt`/`3pt` totals drop by exactly the charted contribution (§6.3) | BKE-1 |
 | Grouped restore after a grouped removal, and non-restoration of unlinked dependents (§6.2) | BKE-1, extended in BKE-3 |
 | Local parking, import/export, quota, cross-sport resume | BKE-1 |
 | Manual minutes increment, decrement, and edit, including signed/edited histories and the non-negative guard (§4.2) | BKE-2 |
