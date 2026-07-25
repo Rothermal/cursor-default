@@ -8,9 +8,11 @@
 > event-model program; see
 > [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md).
 >
-> **Hold note:** Do not start this plan independently. Reconcile its shot detail, linked
-> metadata, and correction requirements during BKE-0, then deliver the event-backed detail
-> surface in BKE-3 if that phase plan confirms the scope.
+> **Hold note:** Do not start this plan independently. BKE-0 has reconciled its shot detail,
+> linked metadata, and correction requirements — see
+> [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) §8.
+> The `ShotRecord` extension and `shot_chart` columns proposed below are **superseded** by the
+> event model; the product intent is preserved and delivered in BKE-3.
 
 ## Goal
 
