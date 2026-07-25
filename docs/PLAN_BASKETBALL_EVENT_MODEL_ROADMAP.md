@@ -247,8 +247,9 @@ docs/PLAN_BKE_5_CLOCK_AND_LINEUPS.md
 
 All eleven topics below are addressed in
 [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) §11, with
-the remaining questions carried into its §12. Every answer there is a **recommendation pending BKE-0
-approval** — including the two below, which an earlier revision of this roadmap marked resolved.
+the two authority decisions in its §12a and the remaining questions in its §12b. Every answer there
+is a **recommendation pending BKE-0 approval** — including the two below, which an earlier revision
+of this roadmap marked resolved.
 
 - Whether assist remains a linked event or an actor relationship on the made shot.
 - Whether a rebound is always separate and optionally linked to a missed shot.
@@ -272,9 +273,11 @@ is hard-gated on `sport_id = 'soccer'`. **Recommended:** BKE-4A generalizes that
 keeps the soccer-named functions as thin wrappers, proven by soccer parity tests before any
 basketball semantics land.
 
-Two questions remain genuinely open and are load-bearing before BKE-1 starts: whether event games
-adopt soccer's reasoned reopen and retire `stat_corrections`, and whether basketball aggregates move
-to canonical publications the way SOC-6C moves soccer's. See BKE-0 §12.
+Two authority decisions are requested at BKE-0 approval rather than deferred to a later phase:
+whether event games adopt soccer's reasoned reopen and retire `stat_corrections`, and whether
+basketball aggregates move to canonical publications the way SOC-6C moves soccer's. Both determine
+what the projector and cloud layer may treat as truth, so BKE-1 needs them settled; only their
+mechanics belong to BKE-4C and BKE-4D. See BKE-0 §12a.
 
 ---
 
@@ -321,7 +324,8 @@ equivalent action sequences before any cutover.
 
 ## 11. Documentation Handoff
 
-BKE-0 is drafted. Its review should confirm the open questions in its §12, after which:
+BKE-0 is drafted and twice revised. Its approval settles the two authority decisions in its §12a and
+confirms the remaining answers in its §12b, after which:
 
 - add detailed BKE plans one phase at a time, each with its own focused Q&A,
 - update this roadmap if phase boundaries move,
