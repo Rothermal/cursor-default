@@ -4,9 +4,9 @@ Required follow-up roadmap for moving basketball from its current counter/action
 record combination onto the shared `GameEvent` foundation introduced by the soccer program.
 
 Status: BKE-0 architecture planning is drafted in
-[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) and
-awaits review. SOC-5 is complete, so BKE-1 through BKE-5 implementation is gated only on that
-approval.
+[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md), revised
+after its first review pass, and awaits approval. SOC-5 is complete, so BKE-1 through BKE-5
+implementation is gated only on that approval.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -159,8 +159,10 @@ Historical preservation is a hard requirement.
 - Import/export and parking must preserve both legacy and event-capable game formats.
 - No migration may silently change historical scores or totals.
 
-A controlled transition may temporarily dual-write projections, but user actions must have
-one declared source of truth so counters and events cannot drift independently.
+A controlled transition may temporarily populate legacy aggregate rows, but they are **disposable
+compatibility projections derived from events, never a dual write** — user actions have exactly one
+declared source of truth so counters and events cannot drift independently. BKE-0 §7.1 defines their
+rebuild, versioning, fingerprint, and removal behavior.
 
 ---
 
@@ -198,17 +200,28 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 | Phase | Purpose | Dependency | Exit condition |
 |---|---|---|---|
 | BKE-0 | Architecture audit, basketball event catalog, projection contract, compatibility strategy, and F13 reconciliation | Stable SOC-1 shared event contract | Detailed migration design approved; no basketball code migration required |
-| BKE-1 | Sport-neutral `sportGameState` extraction, basketball setup/rules snapshot, and court-originated shots with linked assist/rebound | SOC-5 complete and BKE-0 approved | New court actions round-trip through events while preserving current totals, shot views, and undo behavior |
+| BKE-1 | Sport-neutral `sportGameState` extraction, atomic multi-event mutation in the shared engine, basketball setup/rules snapshot, and court-originated shots with linked assist/rebound | SOC-5 complete and BKE-0 approved | New court actions round-trip through events while preserving current totals, shot views, undo, and clear-chart behavior |
 | BKE-2 | Direct stat grid, score adjustments, team/period stats, and remaining basketball actions | SOC-5 complete and BKE-1 | Every new basketball live action has one event-backed source of truth |
 | BKE-3 | Editable basketball timeline/detail experience and F13 delivery | SOC-5 complete, shared edit/detail pattern proven, and BKE-2 | Users can review, edit, or delete supported basketball events with projections recalculated |
-| BKE-4 | Generalized sport-neutral cloud RPC layer, basketball event sync, recorder resolution, finalization/correction integration, historical hardening, and cutover | SOC-5 complete and BKE-3 stable | New basketball games sync as event-capable records; soccer behavior unchanged; legacy games remain readable and unchanged |
-| BKE-5 | Basketball clock, age-level stoppage profiles, substitutions, and on-field intervals | BKE-4 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |
+| BKE-4 | Generalized sport-neutral cloud RPC layer, basketball event sync, recorder resolution, finalization/correction integration, historical hardening, and cutover. **Splits into BKE-4A-4D** — see BKE-0 §9 | SOC-5 complete and BKE-3 stable | New basketball games sync as event-capable records; soccer behavior unchanged; legacy games remain readable and unchanged |
+| BKE-5 | Basketball clock, age-level stoppage profiles, substitutions, and on-court intervals | BKE-4 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |
+
+BKE-4 is too large for one implementation phase: it pairs a behavior-preserving generalization of the
+proven soccer SQL surface with basketball binding, sync, recorder resolution, finalization,
+corrections, aggregate compatibility, and rollout. BKE-0 §9 splits it into 4A neutral RPC extraction
+with soccer parity tests, 4B basketball bind/sync/recovery, 4C recorder/finalization/reopen, and 4D
+aggregate compatibility plus production cutover.
+
+**Gating:** because the reducer disables every legacy aggregate action the moment a stream exists,
+event-game creation stays behind an internal gate through BKE-3 and the user-visible per-game opt-in
+ships with BKE-4D, once capture and cloud lifecycle are both complete (BKE-0 §3.3, §10).
 
 BKE-0 planning does not need to wait for SOC-5. BKE-1 through BKE-5 implementation does not
 need to wait for SOC-6 presentation work once SOC-5 has proven the shared event lifecycle
 and BKE-0 is approved.
 
-BKE-5 is a deliberate fast follower rather than part of BKE-1 through BKE-3. Basketball
+BKE-5 is a proposed fast follower rather than part of BKE-1 through BKE-3, pending BKE-0 approval.
+Basketball
 stoppage rules vary sharply by age level and competition, and the shared transport is
 payload-agnostic, so the BKE-0 catalog reserves the clock, stoppage, and substitution event
 types up front and BKE-5 implements them without an envelope, table, or ordering change.
@@ -220,7 +233,11 @@ docs/PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md
 docs/PLAN_BKE_1_COURT_EVENTS.md
 docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md
 docs/PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md
-docs/PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md
+docs/PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md     # parent: strategy and the 4A-4D split
+docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md
+docs/PLAN_BKE_4B_BASKETBALL_TRANSPORT.md
+docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md
+docs/PLAN_BKE_4D_AGGREGATES_AND_CUTOVER.md
 docs/PLAN_BKE_5_CLOCK_AND_LINEUPS.md
 ```
 
@@ -229,8 +246,9 @@ docs/PLAN_BKE_5_CLOCK_AND_LINEUPS.md
 ## 8. Q&A Topics
 
 All eleven topics below are addressed in
-[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) §11,
-with recommendations for the open ones and the remaining questions carried into its §12.
+[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) §11, with
+the remaining questions carried into its §12. Every answer there is a **recommendation pending BKE-0
+approval** — including the two below, which an earlier revision of this roadmap marked resolved.
 
 - Whether assist remains a linked event or an actor relationship on the made shot.
 - Whether a rebound is always separate and optionally linked to a missed shot.
@@ -240,17 +258,23 @@ with recommendations for the open ones and the remaining questions carried into 
   correction events.
 - How event-backed team pseudo-player stats map to period-scoped ids.
 - Whether basketball adds a match clock/substitution model or continues manual minutes.
-  **Resolved:** clock-ready catalog now, clock-less through BKE-4, clock delivered in BKE-5.
+  **Recommended:** clock-ready catalog now, clock-less through BKE-4, clock delivered in BKE-5, with
+  `min` produced by a narrow `basketball.minutes_adjustment` event until then.
 - How finalized stat corrections interact with event editing.
 - Whether new cloud games project to existing `shot_chart` rows or summaries read events
   directly after cutover.
 - Which historical shot records, if any, can be losslessly promoted to events.
 - How the transition is feature-gated and rolled back if projection discrepancies appear.
 
-BKE-0 also settled one topic this roadmap did not anticipate: the shared event tables are
+BKE-0 also surfaced one topic this roadmap did not anticipate: the shared event tables are
 sport-neutral but every binding, recorder, finalization, and reopen RPC in migrations 043-046
-is hard-gated on `sport_id = 'soccer'`. **Resolved:** BKE-4 generalizes that layer in place and
-keeps the soccer-named functions as thin wrappers.
+is hard-gated on `sport_id = 'soccer'`. **Recommended:** BKE-4A generalizes that layer in place and
+keeps the soccer-named functions as thin wrappers, proven by soccer parity tests before any
+basketball semantics land.
+
+Two questions remain genuinely open and are load-bearing before BKE-1 starts: whether event games
+adopt soccer's reasoned reopen and retire `stat_corrections`, and whether basketball aggregates move
+to canonical publications the way SOC-6C moves soccer's. See BKE-0 §12.
 
 ---
 
@@ -260,7 +284,8 @@ Every BKE implementation phase must cover:
 
 - existing court tap, value override, player switch, assist prompt, rebound prompt, and
   popup stat-line behavior,
-- full stat-grid entry and decrement behavior,
+- full stat-grid entry and decrement behavior, including manual minutes,
+- clear-shot-chart behavior, including the linked assist/rebound stats it reverses today,
 - recent-events undo until the editable timeline replaces it,
 - individual, team, and All shot-chart filters,
 - home/opponent score behavior and manual corrections,
