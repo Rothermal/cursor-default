@@ -1,4 +1,5 @@
 import type { SportConfig } from '../types'
+import { soccerAggregateSportCategories } from '../lib/soccer/aggregateStats'
 
 export const sports: SportConfig[] = [
   {
@@ -297,49 +298,8 @@ export const sports: SportConfig[] = [
       gradient: 'from-emerald-600 to-teal-500',
     },
     scoreLabel: 'Goals',
-    keyStatIds: ['s_goal', 's_ast', 's_shot'],
-    categories: [
-      {
-        id: 'attack',
-        name: 'Attack',
-        color: 'emerald',
-        actions: [
-          { id: 's_goal', label: 'Goal', shortLabel: 'G', pointValue: 1 },
-          { id: 's_ast', label: 'Assist', shortLabel: 'A' },
-          { id: 's_shot', label: 'Shot', shortLabel: 'SH' },
-          { id: 'sot', label: 'On Target', shortLabel: 'SOT' },
-        ],
-      },
-      {
-        id: 's_defense',
-        name: 'Defense',
-        color: 'sky',
-        actions: [
-          { id: 's_tackle', label: 'Tackle', shortLabel: 'TKL' },
-          { id: 's_int', label: 'Interception', shortLabel: 'INT' },
-          { id: 'clearance', label: 'Clearance', shortLabel: 'CLR' },
-        ],
-      },
-      {
-        id: 'discipline',
-        name: 'Discipline',
-        color: 'amber',
-        actions: [
-          { id: 'foul', label: 'Foul', shortLabel: 'FL' },
-          { id: 'yellow', label: 'Yellow Card', shortLabel: 'YC' },
-          { id: 'red_card', label: 'Red Card', shortLabel: 'RC' },
-        ],
-      },
-      {
-        id: 'goalkeeping',
-        name: 'Goalkeeping',
-        color: 'violet',
-        actions: [
-          { id: 's_sv', label: 'Save', shortLabel: 'SV' },
-          { id: 's_ga', label: 'Goal Against', shortLabel: 'GA' },
-        ],
-      },
-    ],
+    keyStatIds: ['soc_goal', 'soc_ast', 'soc_shot'],
+    categories: soccerAggregateSportCategories(),
   },
 ]
 

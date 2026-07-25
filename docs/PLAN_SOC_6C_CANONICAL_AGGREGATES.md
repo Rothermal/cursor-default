@@ -1,6 +1,6 @@
 # SOC-6C Canonical Soccer Aggregates
 
-Status: Q&A complete; ready for implementation in four focused slices.
+Status: SOC-6C1 implemented; SOC-6C2 paginated canonical source transport is next.
 
 ## 1. Goal
 
@@ -34,7 +34,7 @@ per-90/per-standard-match rates.
 
 The implementation will use four reviewable slices:
 
-1. **SOC-6C1 - Canonical stat contract and aggregate engine**
+1. **SOC-6C1 - Canonical stat contract and aggregate engine (shipped)**
    - Replace legacy soccer `SportConfig` ids with the canonical `soc_*` catalog.
    - Add the narrow development compatibility map.
    - Add pure canonical-publication projection and cross-game aggregate helpers with fixtures.
@@ -522,6 +522,23 @@ Acceptance:
 - unresolved players never merge;
 - abandoned/shootout sources do not leak into ordinary totals;
 - basketball config/tests remain unchanged.
+
+Implementation:
+
+- `src/lib/soccer/aggregateStats.ts` owns the exact canonical catalog, conservative legacy
+  read aliases, category metadata, duration/rate formatting, and deterministic player ordering.
+- `src/lib/soccer/aggregateProjection.ts` rebuilds each isolated canonical snapshot with the
+  existing projector, derives normal-match player/team read models, and combines raw values by
+  stable cloud player id before calculating rates.
+- Unresolved participant instances remain match-scoped exclusions, abandoned and malformed
+  sources fail visibly, exact duplicate publications deduplicate, and conflicting duplicate
+  fingerprints produce partial quality.
+- Source management authority is retained on exclusions so later UI work can show detailed
+  diagnostics only for teams the viewer manages.
+- Focused fixtures cover canonical config, aliases, formatting, adjusted official scores,
+  player attribution, goalkeeper substitution/shared clean sheets, merged stable identities,
+  zero-appearance roster rows, unresolved identities, malformed/abandoned sources, and duplicate
+  publications.
 
 ### SOC-6C2 - Paginated canonical source transport
 
