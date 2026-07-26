@@ -19,6 +19,7 @@ import {
   resolveSoccerSettingsHierarchy,
   type SoccerPersonalSettings,
 } from '../../lib/soccer/settings'
+import { soccerSettingsFingerprint } from '../../lib/soccer/personalSettingsSync'
 import type { SoccerMatchSegment } from '../../lib/soccer/types'
 
 type SettingsSection = 'common' | 'match' | 'discipline' | 'substitutions' | 'advanced'
@@ -46,10 +47,10 @@ export default function SoccerSettings() {
   const [draftBaseRevision, setDraftBaseRevision] = useState(
     soccerSettingsSync.revision
   )
-  const previousSavedFingerprint = useRef(JSON.stringify(soccerSettings))
+  const previousSavedFingerprint = useRef(soccerSettingsFingerprint(soccerSettings))
   const [activeSection, setActiveSection] = useState<SettingsSection>('common')
   const dirty = useMemo(
-    () => JSON.stringify(draft) !== JSON.stringify(soccerSettings),
+    () => soccerSettingsFingerprint(draft) !== soccerSettingsFingerprint(soccerSettings),
     [draft, soccerSettings]
   )
   const effective = useMemo(
@@ -61,8 +62,8 @@ export default function SoccerSettings() {
 
   useEffect(() => {
     const previous = previousSavedFingerprint.current
-    const next = JSON.stringify(soccerSettings)
-    const current = JSON.stringify(draft)
+    const next = soccerSettingsFingerprint(soccerSettings)
+    const current = soccerSettingsFingerprint(draft)
     if (current === previous || current === next) {
       if (current !== next) setDraft(structuredClone(soccerSettings))
       setDraftBaseRevision(soccerSettingsSync.revision)

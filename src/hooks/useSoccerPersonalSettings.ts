@@ -61,22 +61,32 @@ export interface SoccerPersonalSettingsController {
   keepDevice: () => Promise<void>
 }
 
+export function shouldStartSoccerSettingsRefresh(
+  cloudEnabled: boolean,
+  refreshing: boolean
+): boolean {
+  return cloudEnabled && !refreshing
+}
+
 interface ControllerState {
   settings: SoccerPersonalSettings
   sync: SoccerSettingsSyncState
   cache: SportSettingsCacheRecord<SoccerPersonalSettings> | null
 }
 
-export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
+export function useSoccerPersonalSettings(
+  cloudEnabled = false
+): SoccerPersonalSettingsController {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const scope = soccerSettingsCacheScope(userId)
   const scopeKey = cacheScopeKey(scope)
   const [state, setState] = useState<ControllerState>(() =>
-    initialState(scope, Boolean(userId && isConfigured))
+    initialState(scope, Boolean(cloudEnabled && userId && isConfigured))
   )
   const stateRef = useRef(state)
   const requestRef = useRef(0)
+  const refreshingRef = useRef(false)
 
   useEffect(() => {
     stateRef.current = state
@@ -124,7 +134,7 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
       }
       const cache = createSoccerSettingsCacheRecord(parsed.settings, {
         revision: parsed.revision,
-        pendingBaseRevision: undefined,
+        pending: null,
         cloudUpdatedAt: parsed.updatedAt,
       })
       cacheAndCommit({
@@ -192,6 +202,9 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
   }, [cacheAndCommit, commit])
 
   const refresh = useCallback(async () => {
+    if (!shouldStartSoccerSettingsRefresh(cloudEnabled, refreshingRef.current)) return
+    refreshingRef.current = true
+    try {
     const requestId = ++requestRef.current
     const targetScope = soccerSettingsCacheScope(userId)
     const accountCache = validSoccerSettingsCache(
@@ -206,18 +219,10 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
       structuredClone(DEFAULT_SOCCER_PERSONAL_SETTINGS)
     const immediateSettings = accountCache?.settings ?? bootstrap
 
-    if (!userId || !isConfigured) {
-      const cache = accountCache ?? createSoccerSettingsCacheRecord(
-        immediateSettings,
-        {
-          revision: null,
-          pendingBaseRevision: undefined,
-          cloudUpdatedAt: null,
-        }
-      )
+    if (!cloudEnabled || !userId || !isConfigured) {
       cacheAndCommit({
         settings: immediateSettings,
-        cache,
+        cache: accountCache,
         sync: {
           status: 'local',
           revision: null,
@@ -264,8 +269,15 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
       return
     }
 
+    const reconciliationCache = loaded.status === 'missing' && !accountCache && anonymousCache
+      ? createSoccerSettingsCacheRecord(anonymousCache.settings, {
+          revision: null,
+          pending: { baseRevision: null },
+          cloudUpdatedAt: null,
+        })
+      : accountCache
     const decision = reconcileSoccerPersonalSettings(
-      accountCache,
+      reconciliationCache,
       loaded.status === 'loaded' ? loaded.record : null,
       bootstrap
     )
@@ -316,10 +328,24 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
       })
       return
     }
+    if (decision.action === 'use_local') {
+      commit({
+        settings: decision.settings,
+        cache: null,
+        sync: {
+          status: 'local',
+          revision: null,
+          error: null,
+          lastSyncedAt: null,
+          conflict: null,
+        },
+      })
+      return
+    }
 
     const pendingCache = createSoccerSettingsCacheRecord(decision.settings, {
       revision: decision.expectedRevision,
-      pendingBaseRevision: decision.expectedRevision,
+      pending: { baseRevision: decision.expectedRevision },
       cloudUpdatedAt: accountCache?.cloudUpdatedAt ?? null,
     })
     cacheAndCommit({
@@ -339,14 +365,22 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
       targetScope,
       requestId
     )
-  }, [applyCloudWrite, cacheAndCommit, commit, isConfigured, userId])
+    } finally {
+      refreshingRef.current = false
+    }
+  }, [applyCloudWrite, cacheAndCommit, cloudEnabled, commit, isConfigured, userId])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh, scopeKey])
+    if (cloudEnabled) {
+      void refresh()
+      return
+    }
+    const local = initialState(soccerSettingsCacheScope(userId), false)
+    commit(local)
+  }, [cloudEnabled, commit, refresh, scopeKey, userId])
 
   useEffect(() => {
-    if (!userId || !isConfigured || typeof window === 'undefined') return
+    if (!cloudEnabled || !userId || !isConfigured || typeof window === 'undefined') return
     const retry = () => void refresh()
     window.addEventListener('focus', retry)
     window.addEventListener('online', retry)
@@ -354,7 +388,7 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
       window.removeEventListener('focus', retry)
       window.removeEventListener('online', retry)
     }
-  }, [isConfigured, refresh, userId])
+  }, [cloudEnabled, isConfigured, refresh, userId])
 
   const save = useCallback(async (
     settings: SoccerPersonalSettings,
@@ -378,7 +412,7 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
     if (!userId || !isConfigured) {
       const cache = createSoccerSettingsCacheRecord(parsed.value, {
         revision: null,
-        pendingBaseRevision: undefined,
+        pending: null,
         cloudUpdatedAt: null,
       })
       cacheAndCommit({
@@ -417,7 +451,7 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
     const baseRevision = stateRef.current.sync.revision
     const cache = createSoccerSettingsCacheRecord(parsed.value, {
       revision: baseRevision,
-      pendingBaseRevision: baseRevision,
+      pending: { baseRevision },
       cloudUpdatedAt: stateRef.current.sync.lastSyncedAt,
     })
     cacheAndCommit({
@@ -441,7 +475,7 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
     const now = new Date().toISOString()
     const cache = createSoccerSettingsCacheRecord(conflict.cloud, {
       revision: conflict.cloudRevision,
-      pendingBaseRevision: undefined,
+      pending: null,
       cloudUpdatedAt: conflict.cloudUpdatedAt,
       now,
     })
@@ -465,7 +499,7 @@ export function useSoccerPersonalSettings(): SoccerPersonalSettingsController {
     const targetScope = soccerSettingsCacheScope(userId)
     const cache = createSoccerSettingsCacheRecord(conflict.device, {
       revision: conflict.cloudRevision,
-      pendingBaseRevision: conflict.cloudRevision,
+      pending: { baseRevision: conflict.cloudRevision },
       cloudUpdatedAt: stateRef.current.sync.lastSyncedAt,
     })
     cacheAndCommit({

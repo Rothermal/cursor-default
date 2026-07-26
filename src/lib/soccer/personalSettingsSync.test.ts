@@ -7,6 +7,7 @@ import {
 import {
   createSoccerSettingsCacheRecord,
   reconcileSoccerPersonalSettings,
+  soccerSettingsFingerprint,
 } from './personalSettingsSync'
 
 const now = '2026-07-26T12:00:00.000Z'
@@ -37,7 +38,7 @@ describe('personal soccer settings reconciliation', () => {
     const result = reconcileSoccerPersonalSettings(
       createSoccerSettingsCacheRecord(settings(false), {
         revision: 1,
-        pendingBaseRevision: undefined,
+        pending: null,
         cloudUpdatedAt: now,
         now,
       }),
@@ -54,7 +55,7 @@ describe('personal soccer settings reconciliation', () => {
   it('uploads a pending edit only from the matching cloud revision', () => {
     const local = createSoccerSettingsCacheRecord(settings(true), {
       revision: 2,
-      pendingBaseRevision: 2,
+      pending: { baseRevision: 2 },
       cloudUpdatedAt: now,
       now,
     })
@@ -64,17 +65,37 @@ describe('personal soccer settings reconciliation', () => {
       .toBe('conflict')
   })
 
-  it('initializes a missing cloud row from the available local defaults', () => {
+  it('keeps untouched built-in defaults local when no cloud or cache exists', () => {
     const result = reconcileSoccerPersonalSettings(
       null,
       null,
       settings(true)
     )
     expect(result).toMatchObject({
-      action: 'upload_local',
-      expectedRevision: null,
+      action: 'use_local',
       settings: { display: { fieldFlipped: true } },
     })
+  })
+
+  it('uploads a meaningful local profile when the cloud row is missing', () => {
+    const local = createSoccerSettingsCacheRecord(settings(true), {
+      revision: null,
+      pending: { baseRevision: null },
+      cloudUpdatedAt: null,
+      now,
+    })
+    expect(reconcileSoccerPersonalSettings(local, null)).toMatchObject({
+      action: 'upload_local',
+      expectedRevision: null,
+    })
+  })
+
+  it('fingerprints equivalent settings independently of object key order', () => {
+    const original = settings(true)
+    const reordered = reorderObjectKeys(original)
+    expect(soccerSettingsFingerprint(original)).toBe(
+      soccerSettingsFingerprint(reordered as SoccerPersonalSettings)
+    )
   })
 
   it('fails closed on an unsupported cloud schema', () => {
@@ -88,3 +109,13 @@ describe('personal soccer settings reconciliation', () => {
     })
   })
 })
+
+function reorderObjectKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(reorderObjectKeys)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value)
+      .reverse()
+      .map(([key, item]) => [key, reorderObjectKeys(item)])
+  )
+}

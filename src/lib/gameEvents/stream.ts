@@ -59,7 +59,7 @@ function canonicalizeJsonLike(value: unknown): unknown {
   )
 }
 
-function stableJson(value: unknown): string {
+export function stableJson(value: unknown): string {
   return JSON.stringify(canonicalizeJsonLike(value)) ?? String(value)
 }
 

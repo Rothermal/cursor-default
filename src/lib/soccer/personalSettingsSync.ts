@@ -3,6 +3,7 @@ import type {
   SportSettingsCacheScope,
 } from '../sportSettingsStorage'
 import type { SportSettingsCloudRecord } from '../sportSettingsCloud'
+import { stableJson } from '../gameEvents/stream'
 import {
   DEFAULT_SOCCER_PERSONAL_SETTINGS,
   SOCCER_SETTINGS_SCHEMA_VERSION,
@@ -20,6 +21,10 @@ export type SoccerPersonalSettingsReconciliation =
       action: 'upload_local'
       settings: SoccerPersonalSettings
       expectedRevision: number | null
+    }
+  | {
+      action: 'use_local'
+      settings: SoccerPersonalSettings
     }
   | {
       action: 'conflict'
@@ -89,18 +94,23 @@ export function reconcileSoccerPersonalSettings(
     }
   }
 
-  return {
-    action: 'upload_local',
-    settings: localRecord?.settings ?? structuredClone(bootstrapSettings),
-    expectedRevision: null,
-  }
+  return localRecord
+    ? {
+        action: 'upload_local',
+        settings: localRecord.settings,
+        expectedRevision: null,
+      }
+    : {
+        action: 'use_local',
+        settings: structuredClone(bootstrapSettings),
+      }
 }
 
 export function createSoccerSettingsCacheRecord(
   settings: SoccerPersonalSettings,
   options: {
     revision: number | null
-    pendingBaseRevision: number | null | undefined
+    pending: { baseRevision: number | null } | null
     cloudUpdatedAt: string | null
     now?: string
   }
@@ -112,12 +122,16 @@ export function createSoccerSettingsCacheRecord(
     schemaVersion: SOCCER_SETTINGS_SCHEMA_VERSION,
     revision: options.revision,
     settings: structuredClone(settings),
-    pending: options.pendingBaseRevision === undefined
-      ? null
-      : { baseRevision: options.pendingBaseRevision, savedAt: now },
+    pending: options.pending
+      ? { baseRevision: options.pending.baseRevision, savedAt: now }
+      : null,
     cloudUpdatedAt: options.cloudUpdatedAt,
     cachedAt: now,
   }
+}
+
+export function soccerSettingsFingerprint(settings: SoccerPersonalSettings): string {
+  return stableJson(settings)
 }
 
 export function soccerSettingsCacheScope(
@@ -133,7 +147,7 @@ function cloudRecordToCache(
 ): SportSettingsCacheRecord<SoccerPersonalSettings> {
   return createSoccerSettingsCacheRecord(settings, {
     revision: cloudRecord.revision,
-    pendingBaseRevision: undefined,
+    pending: null,
     cloudUpdatedAt: cloudRecord.updatedAt,
     now,
   })

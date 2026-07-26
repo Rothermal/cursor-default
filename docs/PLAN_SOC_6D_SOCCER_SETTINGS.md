@@ -336,6 +336,9 @@ Implemented personal settings:
 - The controller loads anonymous or user-keyed cache state first, reconciles in the background,
   bootstraps an absent cloud row from anonymous defaults only when appropriate, retains offline
   writes as pending, and retries on focus, reconnect, or Refresh.
+- Cloud reconciliation is active only while Soccer is enabled or the personal Soccer settings
+  route is open. Untouched built-in defaults do not create a cloud row, and refreshes are
+  single-flight so focus/reconnect events cannot race the same pending write.
 - Revision conflicts preserve both settings objects and require **Use Cloud** or
   **Keep This Device**. Account caches remain isolated and inactive after sign-out.
 
