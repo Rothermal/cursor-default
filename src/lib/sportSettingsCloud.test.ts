@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   isSportSettingsBackendUpdateRequired,
+  loadUserSportSettings,
+  parseSportSettingsTableRecord,
   parseSportSettingsSaveResult,
+  saveUserSportSettings,
   sportSettingsBackendMessage,
+  type SportSettingsCloudClient,
 } from './sportSettingsCloud'
 
 describe('sport settings cloud contracts', () => {
@@ -48,5 +52,57 @@ describe('sport settings cloud contracts', () => {
       message: 'permission denied for table user_sport_settings',
     })).toBe(false)
     expect(sportSettingsBackendMessage('user')).toContain('Local settings remain available')
+  })
+
+  it('parses direct table rows and loads the current user record', async () => {
+    const row = {
+      sport_id: 'soccer',
+      schema_version: 1,
+      revision: 3,
+      settings: { marker: 'cloud' },
+      updated_at: '2026-07-26T12:00:00.000Z',
+    }
+    expect(parseSportSettingsTableRecord(row)?.updatedBy).toBeNull()
+
+    const client = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: row, error: null }),
+          }),
+        }),
+      }),
+    } as unknown as SportSettingsCloudClient
+
+    await expect(loadUserSportSettings('soccer', client)).resolves.toMatchObject({
+      status: 'loaded',
+      record: { revision: 3, settings: { marker: 'cloud' } },
+    })
+  })
+
+  it('passes the expected revision to the personal settings RPC', async () => {
+    let args: Record<string, unknown> | null = null
+    const client = {
+      rpc: async (_name: string, nextArgs: Record<string, unknown>) => {
+        args = nextArgs
+        return {
+          data: {
+            status: 'conflict',
+            record: null,
+          },
+          error: null,
+        }
+      },
+    } as unknown as SportSettingsCloudClient
+
+    await expect(
+      saveUserSportSettings('soccer', 1, 4, { marker: 'device' }, client)
+    ).resolves.toEqual({ status: 'conflict', record: null })
+    expect(args).toMatchObject({
+      p_sport_id: 'soccer',
+      p_schema_version: 1,
+      p_expected_revision: 4,
+      p_settings: { marker: 'device' },
+    })
   })
 })

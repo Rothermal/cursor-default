@@ -4,6 +4,9 @@ import {
   SETTINGS_STORAGE_KEY,
   type AppSettings,
 } from '../lib/settingsStorage'
+import { useSoccerPersonalSettings } from '../hooks/useSoccerPersonalSettings'
+import type { SoccerPersonalSettings } from '../lib/soccer/settings'
+import type { SoccerSettingsSyncState } from '../hooks/useSoccerPersonalSettings'
 
 interface SettingsContextType {
   settings: AppSettings
@@ -11,12 +14,26 @@ interface SettingsContextType {
   toggleSport: (sportId: string) => void
   setSportEnabled: (sportId: string, enabled: boolean) => void
   setReboundPromptAfterMissEnabled: (enabled: boolean) => void
+  soccerSettings: SoccerPersonalSettings
+  soccerSettingsSync: SoccerSettingsSyncState
+  saveSoccerSettings: (
+    settings: SoccerPersonalSettings,
+    expectedRevision?: number | null
+  ) => Promise<boolean>
+  refreshSoccerSettings: () => Promise<void>
+  useCloudSoccerSettings: () => void
+  keepDeviceSoccerSettings: () => Promise<void>
+  setSoccerSettingsPageActive: (active: boolean) => void
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(loadSettingsFromStorage)
+  const [soccerSettingsPageActive, setSoccerSettingsPageActive] = useState(false)
+  const soccer = useSoccerPersonalSettings(
+    Boolean(settings.enabledSports.soccer) || soccerSettingsPageActive
+  )
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
@@ -65,6 +82,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         toggleSport,
         setSportEnabled,
         setReboundPromptAfterMissEnabled,
+        soccerSettings: soccer.settings,
+        soccerSettingsSync: soccer.sync,
+        saveSoccerSettings: soccer.save,
+        refreshSoccerSettings: soccer.refresh,
+        useCloudSoccerSettings: soccer.useCloud,
+        keepDeviceSoccerSettings: soccer.keepDevice,
+        setSoccerSettingsPageActive,
       }}
     >
       {children}
