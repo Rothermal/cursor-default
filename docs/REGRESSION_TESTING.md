@@ -954,6 +954,17 @@ development, and at least one local match plus one team cloud match available.
 | 11r.9 | Open local, primary-cloud, selected-recorder, and canonical-final Shootout attempts | All authorities show isolated read-only attempt detail; no direct Summary mutation path appears and correction remains in the owned local tracker |
 | 11r.10 | Refresh, Finalize, Reopen, force diagnostics, and test narrow mobile plus desktop widths | Valid Shootout URL context survives source transitions; diagnostics normalize to Overview; tabs, rounds, tables, and detail fit without page-level overflow; basketball Summary is unchanged |
 
+### 11s. Soccer canonical aggregate engine (SOC-6C1)
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11s.1 | Run `pnpm exec vitest run src/lib/soccer/aggregateStats.test.ts src/lib/soccer/aggregateProjection.test.ts` | The canonical catalog, aliases, formatting, projection, identity, quality, and combined-rate fixtures pass |
+| 11s.2 | Project a completed canonical fixture with one event goal plus a positive official score adjustment | Team W-D-L and goals for use the adjusted final score; player goals and assists include only attributed events |
+| 11s.3 | Aggregate two completed publications whose match participants map to the same stable cloud player id | Raw totals combine into one player row before rates are calculated; an active roster player with no appearance remains at `0 APP` |
+| 11s.4 | Remove the stable mapping from equivalent-looking participants in two matches | The instances never merge by name or number, their contributions are excluded, and aggregate quality is explicitly partial |
+| 11s.5 | Project abandoned, malformed, duplicate, and shootout-bearing sources | Abandoned and malformed sources do not enter normal totals; exact duplicates deduplicate; conflicting content is partial; shootout activity does not alter normal player stats |
+| 11s.6 | Re-run existing basketball config and aggregate tests | Basketball ids, categories, and legacy aggregate behavior remain unchanged |
+
 ---
 
 ## 12. GitHub Pages deploy

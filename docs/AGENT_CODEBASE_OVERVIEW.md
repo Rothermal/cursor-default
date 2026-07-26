@@ -172,6 +172,13 @@ Legacy `/checkout` redirects active soccer games back into the soccer flow. SOC-
 `/summary` for an Overview-only local/cloud soccer summary and redirects legacy
 `/soccer/review` links there without activating parked games.
 
+SOC-6B adds Players, Timeline, Field, and Shootout review to that shared Summary authority path.
+SOC-6C1 establishes the cross-game canonical read contract in
+`src/lib/soccer/aggregateStats.ts` and `src/lib/soccer/aggregateProjection.ts`: only healthy
+completed canonical publications project into totals, stable cloud player ids are the sole
+cross-match identity, unresolved participant instances stay excluded and visible, and rates are
+derived after raw values combine. Supabase transport and route integration begin in SOC-6C2.
+
 The `game_events` repository is wired into the automatic queue only for healthy soccer event
 games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
 sport-owned setup exists, and soccer is also rejected as an aggregate sport before setup;
@@ -312,7 +319,7 @@ flowchart LR
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
-| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) | SOC-6A Overview and all SOC-6B detailed match-review slices shipped; SOC-6C canonical aggregate Q&A and implementation plan complete |
+| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) | SOC-6A and SOC-6B shipped; SOC-6C1 canonical stat contract and pure aggregate engine shipped; SOC-6C2 transport is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md`](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) | Basketball migration onto the shared event model. BKE-0 architecture plan drafted, revised after its first review pass, and awaiting approval; BKE-1 through BKE-5 are gated on that approval, with BKE-4 split into 4A-4D |
 
 ### Held / waiting for feedback

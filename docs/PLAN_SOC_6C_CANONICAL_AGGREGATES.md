@@ -1,6 +1,6 @@
 # SOC-6C Canonical Soccer Aggregates
 
-Status: Q&A complete; ready for implementation in four focused slices.
+Status: SOC-6C1 implemented; SOC-6C2 paginated canonical source transport is next.
 
 ## 1. Goal
 
@@ -34,7 +34,7 @@ per-90/per-standard-match rates.
 
 The implementation will use four reviewable slices:
 
-1. **SOC-6C1 - Canonical stat contract and aggregate engine**
+1. **SOC-6C1 - Canonical stat contract and aggregate engine (shipped)**
    - Replace legacy soccer `SportConfig` ids with the canonical `soc_*` catalog.
    - Add the narrow development compatibility map.
    - Add pure canonical-publication projection and cross-game aggregate helpers with fixtures.
@@ -234,6 +234,9 @@ participantSourceMap,
 canManage
 ```
 
+`game.date` is the PostgreSQL `date` value serialized exactly as `YYYY-MM-DD`. The RPC must not
+return a `timestamptz` or full ISO datetime in this field.
+
 `participantSourceMap` maps match-local participant and player ids to the current
 `game_participants.source_player_id`. It is server-built and never inferred from names. `canManage`
 comes from current owner/admin authority for that item's team.
@@ -332,6 +335,12 @@ The exact first compatibility table is:
 Do not write aliases back into canonical snapshots. Keep the compatibility layer until a separate
 data-audit and migration plan explicitly removes it.
 
+SOC-6C1 exports and tests this map as a compatibility primitive but does not wire the generic
+legacy aggregate pages into canonical soccer reads. Those pages remain a development-only
+transition until SOC-6C3 routes soccer through canonical publications. SOC-6C3 must not mix
+legacy `game_stats` rows with canonical publication totals; any temporary pre-release fallback
+must apply this map explicitly and label its non-canonical source.
+
 ## 7. Route Experience
 
 Reuse the existing aggregate route URLs and navigation context. Soccer selects a soccer-specific
@@ -425,6 +434,8 @@ Sorting uses numeric raw values, then the reviewed deterministic tie-breakers.
 
 - Match result uses final canonical tracked/opponent score, including score adjustments.
 - Win/draw/loss is from the tracked team's perspective.
+- A normal match tied before a deciding shootout remains a draw in aggregate W-D-L. The shootout
+  winner stays in game-level result context and shootout attempts remain outside cross-game totals.
 - Team clean sheet derives from the completed normal-match score.
 - Player clean sheet reuses SOC-6B eligibility; both `credited` and `shared` add one `soc_cs`.
 - Own goals remain `soc_own_goal`; they affect the official team score but never `soc_goal`.
@@ -522,6 +533,23 @@ Acceptance:
 - unresolved players never merge;
 - abandoned/shootout sources do not leak into ordinary totals;
 - basketball config/tests remain unchanged.
+
+Implementation:
+
+- `src/lib/soccer/aggregateStats.ts` owns the exact canonical catalog, conservative legacy
+  read aliases, category metadata, duration/rate formatting, and deterministic player ordering.
+- `src/lib/soccer/aggregateProjection.ts` rebuilds each isolated canonical snapshot with the
+  existing projector, derives normal-match player/team read models, and combines raw values by
+  stable cloud player id before calculating rates.
+- Unresolved participant instances remain match-scoped exclusions, abandoned and malformed
+  sources fail visibly, exact duplicate publications deduplicate, and conflicting duplicate
+  fingerprints produce partial quality.
+- Source management authority is retained on exclusions so later UI work can show detailed
+  diagnostics only for teams the viewer manages.
+- Focused fixtures cover canonical config, aliases, formatting, adjusted official scores,
+  player attribution, goalkeeper substitution/shared clean sheets, merged stable identities,
+  zero-appearance roster rows, unresolved identities, malformed/abandoned sources, and duplicate
+  publications.
 
 ### SOC-6C2 - Paginated canonical source transport
 

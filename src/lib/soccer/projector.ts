@@ -1,4 +1,5 @@
 import type { GameState } from '../../types'
+import { soccerCanonicalStatsFromTotals } from './aggregateStats'
 import type {
   GameEvent,
   GameEventActor,
@@ -1189,47 +1190,23 @@ function buildProjection(
   for (const participant of Object.values(sportGameState.projection.participants)) {
     if (!participant.playerId || !statsByPlayerId[participant.playerId]) continue
     const stats = statsByPlayerId[participant.playerId]
-    stats.soc_start = (stats.soc_start ?? 0) + (participant.started ? 1 : 0)
-    stats.soc_app = (stats.soc_app ?? 0) + participant.appearances
     const activeMs = participant.totalActiveMs + (
       participant.activeSinceElapsedMs === null
         ? 0
         : Math.max(0, sportGameState.projection.clock.elapsedMs - participant.activeSinceElapsedMs)
     )
-    stats.soc_min_sec = (stats.soc_min_sec ?? 0) + Math.floor(activeMs / 1_000)
-    const attacking = sportGameState.projection.participantStats[participant.participantId]
-    if (!attacking) continue
-    stats.soc_goal = (stats.soc_goal ?? 0) + attacking.goals
-    stats.soc_own_goal = (stats.soc_own_goal ?? 0) + attacking.ownGoals
-    stats.soc_ast_primary = (stats.soc_ast_primary ?? 0) + attacking.primaryAssists
-    stats.soc_ast_secondary = (stats.soc_ast_secondary ?? 0) + attacking.secondaryAssists
-    stats.soc_ast = (stats.soc_ast ?? 0) + attacking.primaryAssists + attacking.secondaryAssists
-    stats.soc_shot = (stats.soc_shot ?? 0) + attacking.shots
-    stats.soc_sot = (stats.soc_sot ?? 0) + attacking.shotsOnTarget
-    stats.soc_key_pass = (stats.soc_key_pass ?? 0) + attacking.keyPasses
-    stats.soc_chance_created = (stats.soc_chance_created ?? 0) +
-      attacking.keyPasses + attacking.primaryAssists
-    stats.soc_pen_att = (stats.soc_pen_att ?? 0) + attacking.penaltyAttempts
-    stats.soc_pen_goal = (stats.soc_pen_goal ?? 0) + attacking.penaltyGoals
-    stats.soc_dfk_att = (stats.soc_dfk_att ?? 0) + attacking.directFreeKickAttempts
-    stats.soc_dfk_goal = (stats.soc_dfk_goal ?? 0) + attacking.directFreeKickGoals
-    stats.soc_gk_save = (stats.soc_gk_save ?? 0) + attacking.goalkeeperSaves
-    stats.soc_gk_ga = (stats.soc_gk_ga ?? 0) + attacking.goalkeeperGoalsAllowed
-    stats.soc_gk_sot_faced = (stats.soc_gk_sot_faced ?? 0) +
-      attacking.goalkeeperShotsOnTargetFaced
-    stats.soc_gk_pen_faced = (stats.soc_gk_pen_faced ?? 0) + attacking.goalkeeperPenaltiesFaced
-    stats.soc_gk_pen_save = (stats.soc_gk_pen_save ?? 0) + attacking.goalkeeperPenaltySaves
-    stats.soc_tkl_att = (stats.soc_tkl_att ?? 0) + attacking.tacklesAttempted
-    stats.soc_tkl_won = (stats.soc_tkl_won ?? 0) + attacking.tacklesWon
-    stats.soc_tkl_lost = (stats.soc_tkl_lost ?? 0) + attacking.tacklesLost
-    stats.soc_int = (stats.soc_int ?? 0) + attacking.interceptions
-    stats.soc_clear = (stats.soc_clear ?? 0) + attacking.clearances
-    stats.soc_recovery = (stats.soc_recovery ?? 0) + attacking.recoveries
-    stats.soc_block = (stats.soc_block ?? 0) + attacking.blockedShots
-    stats.soc_foul_committed = (stats.soc_foul_committed ?? 0) + attacking.foulsCommitted
-    stats.soc_foul_drawn = (stats.soc_foul_drawn ?? 0) + attacking.foulsDrawn
-    stats.soc_yellow = (stats.soc_yellow ?? 0) + attacking.yellowCards
-    stats.soc_red = (stats.soc_red ?? 0) + attacking.redCards
+    const canonical = soccerCanonicalStatsFromTotals(
+      sportGameState.projection.participantStats[participant.participantId] ??
+        emptyParticipantStats(),
+      {
+        appearances: participant.appearances,
+        started: participant.started,
+        activeSeconds: Math.floor(activeMs / 1_000),
+      }
+    )
+    for (const [id, value] of Object.entries(canonical)) {
+      stats[id] = (stats[id] ?? 0) + value
+    }
   }
   return {
     playerStatsById: statsByPlayerId,
