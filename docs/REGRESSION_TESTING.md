@@ -984,6 +984,19 @@ classifications, then apply migration 047 in a development Supabase project.
 | 11t.10 | Start two identical loads, cancel one, then change scope during another load | Identical work shares one request, one consumer abort does not cancel the other, and only the newest scope may publish |
 | 11t.11 | After applying 047, repeat basketball merge regression 4a.13 | Migration 047's replacement merge RPC retains migration 041 behavior: duplicate-player shot rows remount to the survivor before deletion |
 
+### 11u. Soccer aggregate destinations (SOC-6C3)
+
+| # | Scenario | Expected |
+|---|---|---|
+| 11u.1 | Open Soccer Season Stats with two readable teams and one inaccessible team in the season | Only readable canonical publications and roster rows appear; the page labels the readable-team boundary and reveals no inaccessible-team metadata |
+| 11u.2 | Open a Soccer Team Stats route with completed matches | Overview shows M, W-D-L, GF, GA, GD, CS and the eight For/Against totals; Players and Games match the canonical fixture |
+| 11u.3 | Open Soccer Tournament Stats, then edit placement as owner/admin | Overview/Players/Games use only the tournament canonical scope; placement and tournament/team navigation remain available |
+| 11u.4 | Add an active roster player with no appearance and retain a historical contributor no longer active | Participation includes the active player at 0 APP and the historical contributor with canonical totals |
+| 11u.5 | Review every category and Rank by option on a narrow mobile viewport | Attack opens first and ranks by Goals; every canonical stat and reviewed rate is selectable; tables expose at most five value columns and remain horizontally usable |
+| 11u.6 | Introduce one malformed or unresolved source and compare owner/admin with scorer/viewer | All roles see a generic partial notice; only a current manager of the affected team sees its detailed diagnostic and game link |
+| 11u.7 | Refresh manually, switch scope during loading, then return focus after a completed load | Progress advances through loading/projection, stale work cannot publish, focus reloads, and a failed refresh retains the last coherent result with a visible warning |
+| 11u.8 | Repeat Season, Team, and Tournament routes for Basketball | Existing resolved-stat and game-log RPC behavior and components remain unchanged |
+
 ---
 
 ## 12. GitHub Pages deploy

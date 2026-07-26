@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { teamDisplayName, playerDisplayName } from '../lib/display'
 import { playerInfoPath, teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { SoccerAggregateDestination } from '../components/soccer-aggregate/SoccerAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -166,6 +167,13 @@ export default function Leaderboard() {
       setSeasonStats([])
       return
     }
+    if (sport?.id === 'soccer') {
+      setPlayers([])
+      setSeasonStats([])
+      setLoadingStats(false)
+      setError(null)
+      return
+    }
 
     let cancelled = false
     const load = async () => {
@@ -211,7 +219,7 @@ export default function Leaderboard() {
     return () => {
       cancelled = true
     }
-  }, [selectedTeamId, supabaseClient])
+  }, [selectedTeamId, sport?.id, supabaseClient])
 
   const playerStatsMap = useMemo(() => {
     const map: Record<string, Record<string, number>> = {}
@@ -316,7 +324,11 @@ export default function Leaderboard() {
             <h1 className="text-lg font-bold">
               {scopedSport ? `${scopedSport.name} Season Stats` : 'Season Leaderboard'}
             </h1>
-            <p className="text-sm opacity-80">Resolved stats across finalized games</p>
+            <p className="text-sm opacity-80">
+              {sport?.id === 'soccer'
+                ? 'Canonical statistics across completed matches'
+                : 'Resolved stats across finalized games'}
+            </p>
           </div>
         </div>
       </header>
@@ -394,7 +406,17 @@ export default function Leaderboard() {
           )}
         </section>
 
-        {selectedTeam && (
+        {selectedTeam && sport?.id === 'soccer' && selectedSeasonId && (
+          <SoccerAggregateDestination
+            variant="season"
+            scope={{ type: 'season', id: selectedSeasonId }}
+            teamIds={filteredTeams.map(team => team.id)}
+            teamIdForLinks={selectedTeamId}
+            seasonId={selectedSeasonId}
+          />
+        )}
+
+        {selectedTeam && sport?.id !== 'soccer' && (
           <section className="card space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold text-slate-700">

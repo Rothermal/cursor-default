@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
+import { SoccerAggregateDestinationPage } from '../components/soccer-aggregate/SoccerAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -80,22 +81,13 @@ export default function TeamStats() {
       setLoading(true)
       setError(null)
 
-      const [teamRes, gamesRes, tourRes, logRes] = await Promise.all([
+      const [teamRes, tourRes] = await Promise.all([
         supabaseClient
           .from('teams')
           .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
           .eq('id', teamId)
           .single(),
-        supabaseClient
-          .from('games')
-          .select(
-            'id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,tournament_id'
-          )
-          .eq('team_id', teamId)
-          .eq('status', 'final')
-          .order('game_date', { ascending: false }),
         supabaseClient.from('tournaments').select('id,name,placement,url').eq('team_id', teamId),
-        supabaseClient.rpc('get_team_game_log', { p_team_id: teamId }),
       ])
 
       if (cancelled) return
@@ -106,9 +98,31 @@ export default function TeamStats() {
         return
       }
 
-      setTeam(teamRes.data as unknown as TeamRow)
-      setGames((gamesRes.data ?? []) as GameMeta[])
+      const teamData = teamRes.data as unknown as TeamRow
+      setTeam(teamData)
       setTournaments((tourRes.data ?? []) as TournamentRow[])
+      if (teamData.seasons.sport === 'soccer') {
+        setGames([])
+        setLogRows([])
+        setUseRpc(true)
+        setLoading(false)
+        return
+      }
+
+      const [gamesRes, logRes] = await Promise.all([
+        supabaseClient
+          .from('games')
+          .select(
+            'id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,tournament_id'
+          )
+          .eq('team_id', teamId)
+          .eq('status', 'final')
+          .order('game_date', { ascending: false }),
+        supabaseClient.rpc('get_team_game_log', { p_team_id: teamId }),
+      ])
+
+      if (cancelled) return
+      setGames((gamesRes.data ?? []) as GameMeta[])
 
       if (logRes.error && isMissingRpcError(logRes.error.message)) {
         setUseRpc(false)
@@ -283,6 +297,43 @@ export default function TeamStats() {
           Back
         </button>
       </div>
+    )
+  }
+
+  if (team.seasons.sport === 'soccer') {
+    return (
+      <SoccerAggregateDestinationPage
+        variant="team"
+        scope={{ type: 'team', id: teamId }}
+        teamIds={[teamId]}
+        teamIdForLinks={teamId}
+        seasonId={team.season_id}
+        title="Team stats"
+        subtitle={`${teamDisplayName(team)} · ${team.seasons.name}`}
+        backPath={teamInfoPath(teamId)}
+        overviewExtra={
+          <section className="space-y-2">
+            <h2 className="font-semibold text-slate-800">Explore</h2>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to={teamLeaderboardPath(teamId, team.season_id, true)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+              >
+                Season leaderboard
+              </Link>
+              {tournaments.map(tournament => (
+                <Link
+                  key={tournament.id}
+                  to={`/tournament-stats?tournamentId=${encodeURIComponent(tournament.id)}&teamId=${encodeURIComponent(teamId)}`}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                >
+                  {tournament.name}
+                </Link>
+              ))}
+            </div>
+          </section>
+        }
+      />
     )
   }
 
