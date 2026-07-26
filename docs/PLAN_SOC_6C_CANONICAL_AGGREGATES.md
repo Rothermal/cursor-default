@@ -625,9 +625,11 @@ Acceptance:
 
 Implementation:
 
-- `useSoccerAggregateDestination.ts` loads current active roster identities before the canonical
-  transport, aborts stale consumers, refreshes on request and focus/visibility return, retains the
-  last coherent result after a refresh failure, and reports page/projection progress.
+- `useSoccerAggregateDestination.ts` loads current active roster identities on a best-effort basis
+  before the canonical transport, aborts stale consumers, suppresses duplicate focus reloads,
+  refreshes on request and focus/visibility return, retains the last coherent result after a
+  refresh failure, and reports page/projection progress. A roster-read failure keeps canonical
+  results available with an explicit zero-appearance warning.
 - `SoccerAggregateDestination.tsx` provides shared loading, backend/access/error, empty, partial,
   and manager-only diagnostic states. Team and tournament scopes use Overview/Players/Games;
   season Leaderboard opens on Attack with Goals-first ordering.

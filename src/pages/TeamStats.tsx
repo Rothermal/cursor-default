@@ -104,7 +104,6 @@ export default function TeamStats() {
       if (teamData.seasons.sport === 'soccer') {
         setGames([])
         setLogRows([])
-        setUseRpc(true)
         setLoading(false)
         return
       }

@@ -5,6 +5,7 @@ import {
   soccerAggregateGenericQualityMessage,
   soccerAggregateManagedDiagnostics,
   soccerAggregateVisibleColumns,
+  shouldAutoRefreshSoccerAggregates,
   sortSoccerAggregatePlayers,
 } from './aggregateDestinations'
 import {
@@ -69,12 +70,54 @@ describe('soccer aggregate destination model', () => {
     )).toBe(true)
   })
 
+  it('uses category-specific tie breakers outside Attack', () => {
+    const scorer = player('scorer', 'Scorer', {
+      soc_goal: 5,
+      soc_gk_save: 3,
+      soc_gk_sot_faced: 8,
+    })
+    const keeper = player('keeper', 'Keeper', {
+      soc_gk_save: 3,
+      soc_gk_sot_faced: 4,
+    })
+    const goalkeeping = SOCCER_AGGREGATE_DESTINATION_CATEGORIES.find(
+      category => category.id === 'goalkeeping'
+    )!
+
+    expect(sortSoccerAggregatePlayers(
+      [scorer, keeper],
+      'soc_gk_save',
+      goalkeeping.rankingMetricIds
+    ).map(row => row.playerId)).toEqual(['keeper', 'scorer'])
+  })
+
   it('reveals diagnostic detail only for managed-team exclusions', () => {
     const aggregate = aggregateResult()
     expect(soccerAggregateGenericQualityMessage(aggregate)).toContain('2 canonical')
     expect(soccerAggregateManagedDiagnostics(aggregate)).toMatchObject([
       { publicationId: 'managed', message: 'Manager detail' },
     ])
+  })
+
+  it('does not auto-refresh while an identical load is active', () => {
+    expect(shouldAutoRefreshSoccerAggregates({
+      loading: true,
+      visible: true,
+      now: 1_000,
+      lastRefreshAt: 0,
+    })).toBe(false)
+    expect(shouldAutoRefreshSoccerAggregates({
+      loading: false,
+      visible: true,
+      now: 1_000,
+      lastRefreshAt: 0,
+    })).toBe(true)
+    expect(shouldAutoRefreshSoccerAggregates({
+      loading: false,
+      visible: true,
+      now: 1_100,
+      lastRefreshAt: 1_000,
+    })).toBe(false)
   })
 })
 
@@ -121,6 +164,14 @@ function aggregateResult(): SoccerAggregateResult {
         gameDate: '2026-07-24',
         message: 'Hidden scorer detail',
         canManage: false,
+      },
+      {
+        kind: 'abandoned_match',
+        publicationId: 'abandoned',
+        gameId: 'game-3',
+        gameDate: '2026-07-23',
+        message: 'Expected aggregate exclusion',
+        canManage: true,
       },
     ],
     metrics: {

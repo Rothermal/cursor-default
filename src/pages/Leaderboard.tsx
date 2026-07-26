@@ -94,6 +94,8 @@ export default function Leaderboard() {
     () => sports.find(s => s.id === selectedTeam?.seasons?.sport) ?? null,
     [selectedTeam?.seasons?.sport]
   )
+  const isSoccerDestination =
+    sport?.id === 'soccer' || scopedSport?.id === 'soccer'
 
   const pushLeaderboardParams = useCallback(
     (seasonId: string, teamId: string) => {
@@ -167,7 +169,7 @@ export default function Leaderboard() {
       setSeasonStats([])
       return
     }
-    if (sport?.id === 'soccer') {
+    if (isSoccerDestination) {
       setPlayers([])
       setSeasonStats([])
       setLoadingStats(false)
@@ -219,7 +221,7 @@ export default function Leaderboard() {
     return () => {
       cancelled = true
     }
-  }, [selectedTeamId, sport?.id, supabaseClient])
+  }, [isSoccerDestination, selectedTeamId, supabaseClient])
 
   const playerStatsMap = useMemo(() => {
     const map: Record<string, Record<string, number>> = {}
@@ -325,7 +327,7 @@ export default function Leaderboard() {
               {scopedSport ? `${scopedSport.name} Season Stats` : 'Season Leaderboard'}
             </h1>
             <p className="text-sm opacity-80">
-              {sport?.id === 'soccer'
+              {isSoccerDestination
                 ? 'Canonical statistics across completed matches'
                 : 'Resolved stats across finalized games'}
             </p>
@@ -363,7 +365,9 @@ export default function Leaderboard() {
 
         <section className="card space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold text-slate-700">Team</h2>
+            <h2 className="font-semibold text-slate-700">
+              {isSoccerDestination ? 'Team shortcuts' : 'Team'}
+            </h2>
             {selectedTeamId && (
               <button
                 type="button"
@@ -374,6 +378,12 @@ export default function Leaderboard() {
               </button>
             )}
           </div>
+          {isSoccerDestination && (
+            <p className="text-xs text-slate-500">
+              The leaderboard includes every readable team in this season. This selection controls
+              Team Stats and player links only.
+            </p>
+          )}
           {loadingTeams ? (
             <p className="text-sm text-slate-500 animate-pulse">Loading teams...</p>
           ) : filteredTeams.length === 0 ? (
@@ -406,17 +416,17 @@ export default function Leaderboard() {
           )}
         </section>
 
-        {selectedTeam && sport?.id === 'soccer' && selectedSeasonId && (
+        {isSoccerDestination && selectedSeasonId && (
           <SoccerAggregateDestination
             variant="season"
             scope={{ type: 'season', id: selectedSeasonId }}
             teamIds={filteredTeams.map(team => team.id)}
-            teamIdForLinks={selectedTeamId}
+            teamIdForLinks={selectedTeamId || null}
             seasonId={selectedSeasonId}
           />
         )}
 
-        {selectedTeam && sport?.id !== 'soccer' && (
+        {selectedTeam && !isSoccerDestination && (
           <section className="card space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold text-slate-700">

@@ -1,7 +1,6 @@
 import {
   SOCCER_AGGREGATE_CATEGORY_IDS,
   SOCCER_AGGREGATE_STAT_DEFINITIONS,
-  compareSoccerAggregatePlayerRows,
   formatSoccerAggregateRate,
   formatSoccerAggregateStat,
   type SoccerAggregateCategoryId,
@@ -24,6 +23,7 @@ export interface SoccerAggregateCategoryDestination {
   defaultMetricId: SoccerAggregateMetricId
   metricIds: SoccerAggregateMetricId[]
   defaultColumnIds: SoccerAggregateMetricId[]
+  rankingMetricIds: SoccerAggregateMetricId[]
 }
 
 const RATE_LABELS: Record<SoccerAggregateRateId, { label: string; shortLabel: string }> = {
@@ -77,6 +77,23 @@ const DEFAULT_COLUMNS: Record<
   ],
 }
 
+const RANKING_METRICS: Record<
+  SoccerAggregateCategoryId,
+  SoccerAggregateMetricId[]
+> = {
+  participation: ['soc_app', 'soc_start', 'soc_min_sec', 'soc_cs'],
+  attack: ['soc_goal', 'soc_ast', 'soc_sot', 'soc_min_sec'],
+  defense: ['soc_tkl_won', 'soc_tkl_att', 'tackle_win', 'soc_int', 'soc_clear'],
+  discipline: ['soc_foul_committed', 'soc_foul_drawn', 'soc_yellow', 'soc_red'],
+  goalkeeping: [
+    'soc_gk_save',
+    'goalkeeper_save',
+    'soc_gk_sot_faced',
+    'soc_gk_pen_save',
+    'soc_min_sec',
+  ],
+}
+
 export const SOCCER_AGGREGATE_DESTINATION_CATEGORIES:
 readonly SoccerAggregateCategoryDestination[] = SOCCER_AGGREGATE_CATEGORY_IDS.map(id => ({
   id,
@@ -89,6 +106,7 @@ readonly SoccerAggregateCategoryDestination[] = SOCCER_AGGREGATE_CATEGORY_IDS.ma
     ...(CATEGORY_RATES[id] ?? []),
   ],
   defaultColumnIds: DEFAULT_COLUMNS[id],
+  rankingMetricIds: RANKING_METRICS[id],
 }))
 
 const STAT_DEFINITIONS = new Map(
@@ -134,17 +152,19 @@ export function formatSoccerAggregateMetric(
 
 export function sortSoccerAggregatePlayers(
   players: SoccerAggregatePlayer[],
-  metricId: SoccerAggregateMetricId
+  metricId: SoccerAggregateMetricId,
+  tieBreakMetricIds: SoccerAggregateMetricId[] = RANKING_METRICS.attack
 ): SoccerAggregatePlayer[] {
   return [...players].sort((left, right) => {
-    const leftValue = soccerAggregateMetricValue(left, metricId)
-    const rightValue = soccerAggregateMetricValue(right, metricId)
-    if (leftValue !== rightValue) {
-      if (leftValue == null) return 1
-      if (rightValue == null) return -1
-      return rightValue - leftValue
+    for (const candidateId of [
+      metricId,
+      ...tieBreakMetricIds.filter(id => id !== metricId),
+    ]) {
+      const difference = compareMetricValues(left, right, candidateId)
+      if (difference !== 0) return difference
     }
-    return compareSoccerAggregatePlayerRows(left, right)
+    return left.displayName.localeCompare(right.displayName) ||
+      left.playerId.localeCompare(right.playerId)
   })
 }
 
@@ -164,17 +184,50 @@ export function soccerAggregateCategoryHasValues(
 export function soccerAggregateManagedDiagnostics(
   aggregate: SoccerAggregateResult
 ): SoccerAggregateExclusion[] {
-  return aggregate.exclusions.filter(exclusion => exclusion.canManage)
+  return aggregate.exclusions.filter(
+    exclusion => exclusion.canManage && exclusion.kind !== 'abandoned_match'
+  )
 }
 
 export function soccerAggregateGenericQualityMessage(
   aggregate: SoccerAggregateResult
 ): string | null {
   if (aggregate.quality !== 'partial') return null
-  const count = aggregate.exclusions.length
+  const count = aggregate.exclusions.filter(
+    exclusion => exclusion.kind !== 'abandoned_match'
+  ).length
   return count === 1
     ? 'One canonical match or player contribution could not be included.'
     : `${count} canonical matches or player contributions could not be included.`
+}
+
+export function shouldAutoRefreshSoccerAggregates({
+  loading,
+  visible,
+  now,
+  lastRefreshAt,
+  debounceMs = 250,
+}: {
+  loading: boolean
+  visible: boolean
+  now: number
+  lastRefreshAt: number
+  debounceMs?: number
+}): boolean {
+  return visible && !loading && now - lastRefreshAt >= debounceMs
+}
+
+function compareMetricValues(
+  left: SoccerAggregatePlayer,
+  right: SoccerAggregatePlayer,
+  metricId: SoccerAggregateMetricId
+): number {
+  const leftValue = soccerAggregateMetricValue(left, metricId)
+  const rightValue = soccerAggregateMetricValue(right, metricId)
+  if (leftValue === rightValue) return 0
+  if (leftValue == null) return 1
+  if (rightValue == null) return -1
+  return rightValue - leftValue
 }
 
 function isRateId(metricId: SoccerAggregateMetricId): metricId is SoccerAggregateRateId {

@@ -93,6 +93,7 @@ export function SoccerAggregateDestination({
     loading,
     refreshing,
     error,
+    rosterWarning,
     refresh,
   } = useSoccerAggregateDestination({ scope, teamIds })
   const [tab, setTab] = useState<DestinationTab>(
@@ -140,6 +141,11 @@ export function SoccerAggregateDestination({
       {error && result && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Refresh failed. Showing the last successfully loaded canonical statistics.
+        </div>
+      )}
+      {rosterWarning && result && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {rosterWarning}
         </div>
       )}
 
@@ -216,7 +222,12 @@ function ErrorState({
         title: 'Backend update required',
         detail: 'Apply the latest Supabase migrations before loading soccer statistics.',
       }
-    : code === 'access_denied'
+    : code === 'not_configured'
+      ? {
+          title: 'Supabase not configured',
+          detail: 'Configure Supabase before loading cloud soccer statistics.',
+        }
+      : code === 'access_denied'
       ? {
           title: 'Statistics unavailable',
           detail: 'You no longer have access to this soccer scope.',
@@ -506,8 +517,8 @@ function PlayerTable({
   seasonId: string | null
 }) {
   const sorted = useMemo(
-    () => sortSoccerAggregatePlayers(players, metricId),
-    [metricId, players]
+    () => sortSoccerAggregatePlayers(players, metricId, category.rankingMetricIds),
+    [category.rankingMetricIds, metricId, players]
   )
   const columns = soccerAggregateVisibleColumns(category, metricId)
   return (

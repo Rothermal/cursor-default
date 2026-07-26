@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { playerDisplayName } from '../lib/display'
+import { shouldAutoRefreshSoccerAggregates } from '../lib/soccer/aggregateDestinations'
 import {
   loadSoccerCanonicalAggregates,
   SoccerAggregateTransportError,
@@ -22,6 +23,7 @@ export interface SoccerAggregateDestinationState {
   loading: boolean
   refreshing: boolean
   error: SoccerAggregateTransportError | null
+  rosterWarning: string | null
   refresh: () => void
 }
 
@@ -47,7 +49,10 @@ export function useSoccerAggregateDestination({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<SoccerAggregateTransportError | null>(null)
   const [errorLoadKey, setErrorLoadKey] = useState<string | null>(null)
+  const [rosterWarning, setRosterWarning] = useState<string | null>(null)
+  const [warningLoadKey, setWarningLoadKey] = useState<string | null>(null)
   const [reloadVersion, setReloadVersion] = useState(0)
+  const loadingRef = useRef(false)
   const scopeKey = useMemo(() => JSON.stringify(scope), [scope])
   const hasScope = scopeKey !== 'null'
   const teamKey = useMemo(
@@ -57,22 +62,45 @@ export function useSoccerAggregateDestination({
   const refresh = useCallback(() => {
     setReloadVersion(version => version + 1)
   }, [])
+  const setLoadingState = useCallback((next: boolean) => {
+    loadingRef.current = next
+    setLoading(next)
+  }, [])
   const loadKey = hasScope ? `${scopeKey}:${teamKey}` : null
 
   useEffect(() => {
-    if (!enabled || !loadKey || !supabase) {
-      setLoading(false)
+    if (!enabled || !loadKey) {
+      setLoadingState(false)
       setResult(null)
       setResultLoadKey(null)
       setProgress(null)
+      setError(null)
+      setErrorLoadKey(null)
+      setRosterWarning(null)
+      setWarningLoadKey(null)
+      return
+    }
+    if (!supabase) {
+      setLoadingState(false)
+      setResult(null)
+      setResultLoadKey(null)
+      setProgress(null)
+      setError(new SoccerAggregateTransportError(
+        'not_configured',
+        'Supabase is not configured.'
+      ))
+      setErrorLoadKey(loadKey)
+      setRosterWarning(null)
+      setWarningLoadKey(null)
       return
     }
 
     const controller = new AbortController()
     let current = true
     const load = async () => {
-      setLoading(true)
+      setLoadingState(true)
       setError(null)
+      setRosterWarning(null)
       setProgress({
         stage: 'loading',
         pageCount: 0,
@@ -81,20 +109,19 @@ export function useSoccerAggregateDestination({
         projectionTotal: 0,
       })
       try {
-        const activeRoster = await loadActiveRoster(teamKey, controller.signal)
-        const loaded = await loadSoccerCanonicalAggregates(
+        const loaded = await loadSoccerAggregateDestinationData(
           JSON.parse(scopeKey) as SoccerCanonicalAggregateLoadScope,
-          {
-            signal: controller.signal,
-            activeRoster,
-            onProgress: next => {
-              if (current) setProgress(next)
-            },
+          teamKey,
+          controller.signal,
+          next => {
+            if (current) setProgress(next)
           }
         )
         if (!current) return
-        setResult(loaded)
+        setResult(loaded.result)
         setResultLoadKey(loadKey)
+        setRosterWarning(loaded.rosterWarning)
+        setWarningLoadKey(loadKey)
         setError(null)
         setErrorLoadKey(null)
       } catch (caught) {
@@ -104,7 +131,7 @@ export function useSoccerAggregateDestination({
         setError(normalized)
         setErrorLoadKey(loadKey)
       } finally {
-        if (current) setLoading(false)
+        if (current) setLoadingState(false)
       }
     }
 
@@ -113,15 +140,19 @@ export function useSoccerAggregateDestination({
       current = false
       controller.abort()
     }
-  }, [enabled, loadKey, reloadVersion, scopeKey, teamKey])
+  }, [enabled, loadKey, reloadVersion, scopeKey, setLoadingState, teamKey])
 
   useEffect(() => {
     if (!enabled || !hasScope) return
     let lastReloadAt = 0
     const reloadVisible = () => {
-      if (document.visibilityState !== 'visible') return
       const now = Date.now()
-      if (now - lastReloadAt < 250) return
+      if (!shouldAutoRefreshSoccerAggregates({
+        loading: loadingRef.current,
+        visible: document.visibilityState === 'visible',
+        now,
+        lastRefreshAt: lastReloadAt,
+      })) return
       lastReloadAt = now
       refresh()
     }
@@ -140,8 +171,44 @@ export function useSoccerAggregateDestination({
     loading,
     refreshing: loading && visibleResult !== null,
     error: errorLoadKey === loadKey ? error : null,
+    rosterWarning: warningLoadKey === loadKey ? rosterWarning : null,
     refresh,
   }
+}
+
+interface SoccerAggregateDestinationLoadDependencies {
+  rosterLoader?: typeof loadActiveRoster
+  aggregateLoader?: typeof loadSoccerCanonicalAggregates
+}
+
+export async function loadSoccerAggregateDestinationData(
+  scope: SoccerCanonicalAggregateLoadScope,
+  teamKey: string,
+  signal: AbortSignal,
+  onProgress?: (progress: SoccerAggregateLoadProgress) => void,
+  dependencies: SoccerAggregateDestinationLoadDependencies = {}
+): Promise<{
+  result: SoccerAggregateLoadResult
+  rosterWarning: string | null
+}> {
+  const rosterLoader = dependencies.rosterLoader ?? loadActiveRoster
+  const aggregateLoader = dependencies.aggregateLoader ?? loadSoccerCanonicalAggregates
+  let activeRoster: SoccerAggregateRosterPlayer[] = []
+  let rosterWarning: string | null = null
+  try {
+    activeRoster = await rosterLoader(teamKey, signal)
+  } catch (error) {
+    const normalized = normalizeDestinationError(error)
+    if (signal.aborted || normalized.code === 'aborted') throw normalized
+    rosterWarning =
+      'Current roster could not load. Zero-appearance players may be missing.'
+  }
+  const result = await aggregateLoader(scope, {
+    signal,
+    activeRoster,
+    onProgress,
+  })
+  return { result, rosterWarning }
 }
 
 async function loadActiveRoster(

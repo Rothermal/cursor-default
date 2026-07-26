@@ -996,6 +996,7 @@ classifications, then apply migration 047 in a development Supabase project.
 | 11u.6 | Introduce one malformed or unresolved source and compare owner/admin with scorer/viewer | All roles see a generic partial notice; only a current manager of the affected team sees its detailed diagnostic and game link |
 | 11u.7 | Refresh manually, switch scope during loading, then return focus after a completed load | Progress advances through loading/projection, stale work cannot publish, focus reloads, and a failed refresh retains the last coherent result with a visible warning |
 | 11u.8 | Repeat Season, Team, and Tournament routes for Basketball | Existing resolved-stat and game-log RPC behavior and components remain unchanged |
+| 11u.9 | Fail the active-roster read while canonical publications remain readable | Canonical totals still render with a warning that zero-appearance players may be missing |
 
 ---
 
