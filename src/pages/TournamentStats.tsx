@@ -8,6 +8,7 @@ import { teamDisplayName, playerDisplayName } from '../lib/display'
 import { acceptedTeamRole, canManageTeam } from '../lib/teamPermissions'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import { playerInfoPath, teamInfoPath, teamStatsPath } from '../lib/teamInfo'
+import { SoccerAggregateDestinationPage } from '../components/soccer-aggregate/SoccerAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -110,27 +111,13 @@ export default function TournamentStats() {
       setLoading(true)
       setError(null)
 
-      const [tourRes, teamRes, gamesRes, statsRpc, rosterRes] = await Promise.all([
+      const [tourRes, teamRes] = await Promise.all([
         supabaseClient.from('tournaments').select('id,name,placement,team_id,url').eq('id', tournamentId).single(),
         supabaseClient
           .from('teams')
           .select('id,name,nickname,season_id,seasons!inner(id,name,sport)')
           .eq('id', teamId)
           .single(),
-        supabaseClient
-          .from('games')
-          .select('id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment')
-          .eq('team_id', teamId)
-          .eq('tournament_id', tournamentId)
-          .eq('status', 'final')
-          .order('game_date', { ascending: false }),
-        supabaseClient.rpc('get_tournament_stats_resolved', { p_tournament_id: tournamentId }),
-        supabaseClient
-          .from('team_players')
-          .select('jersey_number,players!inner(id,first_name,last_name,nickname)')
-          .eq('team_id', teamId)
-          .eq('is_active', true)
-          .order('joined_at', { ascending: true }),
       ])
 
       if (cancelled) return
@@ -153,11 +140,41 @@ export default function TournamentStats() {
       }
 
       const teamData = teamRes.data as unknown as TeamRow
+      setTournament(tr)
+      setTeam(teamData)
+      if (teamData.seasons.sport === 'soccer') {
+        setGames([])
+        setStatRows([])
+        setPlayers([])
+        setGameLines([])
+        setWins(0)
+        setLosses(0)
+        setLoading(false)
+        return
+      }
+
+      const [gamesRes, statsRpc, rosterRes] = await Promise.all([
+        supabaseClient
+          .from('games')
+          .select('id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment')
+          .eq('team_id', teamId)
+          .eq('tournament_id', tournamentId)
+          .eq('status', 'final')
+          .order('game_date', { ascending: false }),
+        supabaseClient.rpc('get_tournament_stats_resolved', { p_tournament_id: tournamentId }),
+        supabaseClient
+          .from('team_players')
+          .select('jersey_number,players!inner(id,first_name,last_name,nickname)')
+          .eq('team_id', teamId)
+          .eq('is_active', true)
+          .order('joined_at', { ascending: true }),
+      ])
+
+      if (cancelled) return
+
       const sportCfg = sports.find(s => s.id === teamData.seasons.sport) ?? null
       const finals = (gamesRes.data ?? []) as GameMeta[]
 
-      setTournament(tr)
-      setTeam(teamData)
       setGames(finals)
 
       type RosterJoin = { jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null; nickname: string | null } }
@@ -393,6 +410,78 @@ export default function TournamentStats() {
           Back to team stats
         </button>
       </div>
+    )
+  }
+
+  if (team.seasons.sport === 'soccer') {
+    return (
+      <SoccerAggregateDestinationPage
+        variant="tournament"
+        scope={{ type: 'tournament', id: tournamentId }}
+        teamIds={[teamId]}
+        teamIdForLinks={teamId}
+        seasonId={team.season_id}
+        title={tournament.name}
+        subtitle={`${teamDisplayName(team)} · ${team.seasons.name}`}
+        backPath={teamInfoPath(teamId)}
+        overviewExtra={
+          <div className="space-y-4">
+            <section className="flex flex-wrap gap-2">
+              <Link
+                to={teamStatsPath(teamId)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+              >
+                Team stats
+              </Link>
+              {tournament.url && (
+                <a
+                  href={tournament.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                >
+                  Tournament site
+                </a>
+              )}
+            </section>
+            {(canEditPlacement || tournament.placement != null) && (
+              <section>
+                <h2 className="font-semibold text-slate-800 mb-2">Placement</h2>
+                {canEditPlacement ? (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex-1 min-w-[120px]">
+                      <span className="text-xs text-slate-500">Place</span>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={placementDraft}
+                        onChange={event => setPlacementDraft(event.target.value)}
+                        className="input-field mt-1"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { void handleSavePlacement() }}
+                      disabled={savingPlacement}
+                      className="btn-primary py-2 px-4"
+                    >
+                      {savingPlacement ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    {placementLabel(tournament.placement)}
+                  </p>
+                )}
+                {placementError && (
+                  <p className="text-xs text-red-600 mt-1">{placementError}</p>
+                )}
+              </section>
+            )}
+          </div>
+        }
+      />
     )
   }
 

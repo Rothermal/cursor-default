@@ -1,6 +1,6 @@
 # SOC-6C Canonical Soccer Aggregates
 
-Status: SOC-6C1 and SOC-6C2 implemented; SOC-6C3 aggregate destinations are next.
+Status: SOC-6C1 through SOC-6C3 implemented; SOC-6C4 player and career destinations are next.
 
 ## 1. Goal
 
@@ -622,6 +622,22 @@ Acceptance:
 - managers see only diagnostics for teams they manage;
 - scorers/viewers see generic quality notices;
 - mobile category tables remain readable without a single all-stat grid.
+
+Implementation:
+
+- `useSoccerAggregateDestination.ts` loads current active roster identities on a best-effort basis
+  before the canonical transport, aborts stale consumers, suppresses duplicate focus reloads,
+  refreshes on request and focus/visibility return, retains the last coherent result after a
+  refresh failure, and reports page/projection progress. A roster-read failure keeps canonical
+  results available with an explicit zero-appearance warning.
+- `SoccerAggregateDestination.tsx` provides shared loading, backend/access/error, empty, partial,
+  and manager-only diagnostic states. Team and tournament scopes use Overview/Players/Games;
+  season Leaderboard opens on Attack with Goals-first ordering.
+- Category ranking exposes every canonical player stat and all four reviewed rates through a
+  selected metric while limiting each mobile table to at most five value columns.
+- `Leaderboard`, `TeamStats`, and `TournamentStats` select their canonical soccer scope before any
+  legacy aggregate RPC. Current roster rows with zero appearances are combined with historical
+  contributors; non-soccer routes retain their existing RPCs and components.
 
 ### SOC-6C4 - Player, career, and hardening
 
