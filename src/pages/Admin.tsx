@@ -17,6 +17,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard from '../components/MergePlayerWizard'
 import AccountSettings from '../components/settings/AccountSettings'
 import AppAccessPanel from '../components/settings/AppAccessPanel'
+import SoccerSettings from '../components/settings/SoccerSettings'
 import AuditTrailPanel from '../components/AuditTrailPanel'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
@@ -699,7 +700,7 @@ export default function Admin() {
             </div>
             <div className="space-y-2">
               {sports.map(sport => {
-                const hasSettings = sport.id === 'basketball'
+                const hasSettings = sport.id === 'basketball' || sport.id === 'soccer'
                 const enabled = isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
                 return (
                   <Link
@@ -730,7 +731,9 @@ export default function Admin() {
           </section>
         )}
 
-        {settingsSection === 'sport' && selectedSettingsSport?.id !== 'basketball' && (
+        {settingsSection === 'sport' &&
+          selectedSettingsSport?.id !== 'basketball' &&
+          selectedSettingsSport?.id !== 'soccer' && (
           <section className="card space-y-2">
             <p className="text-lg font-semibold text-slate-700">
               {selectedSettingsSport ? `${selectedSettingsSport.icon} ${selectedSettingsSport.name}` : 'Sport'} settings
@@ -744,6 +747,10 @@ export default function Admin() {
               Back to Sports
             </Link>
           </section>
+        )}
+
+        {settingsSection === 'sport' && selectedSettingsSport?.id === 'soccer' && (
+          <SoccerSettings />
         )}
 
         {settingsSection === 'sport' && selectedSettingsSport?.id === 'basketball' && (

@@ -32,9 +32,22 @@ export const DEFAULT_SOCCER_MATCH_RULES: SoccerMatchRules = {
   allowUnusedGoalkeeperShootoutReplacement: false,
 }
 
-export type SoccerConfigurableRules = Omit<
+export type SoccerConfigurableRules = Pick<
   SoccerMatchRules,
-  'extraTimeAvailable' | 'shootoutAvailable'
+  | 'regulationSegments'
+  | 'extraTimeSegments'
+  | 'clockDirection'
+  | 'clockDisplay'
+  | 'maxOnFieldPlayers'
+  | 'allowReturnSubstitutions'
+  | 'substitutionLimit'
+  | 'substitutionWindowLimit'
+  | 'maxAssistsPerGoal'
+  | 'yellowCardExitPolicy'
+  | 'redCardReplacementPolicy'
+  | 'tieResolution'
+  | 'shootoutInitialKicksPerSide'
+  | 'allowUnusedGoalkeeperShootoutReplacement'
 >
 
 export type SoccerMatchRulesOverride = Partial<SoccerConfigurableRules>

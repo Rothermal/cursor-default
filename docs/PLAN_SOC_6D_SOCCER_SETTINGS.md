@@ -1,6 +1,6 @@
 # SOC-6D Soccer Settings and Default Hierarchy
 
-Status: SOC-6D1 implemented. SOC-6D2 through SOC-6D4 remain planned.
+Status: SOC-6D1 and SOC-6D2 implemented. SOC-6D3 and SOC-6D4 remain planned.
 
 ## 1. Goal
 
@@ -309,7 +309,7 @@ Implemented foundation:
 SOC-6D1 does not mount the settings cache in `SettingsContext`, synchronize it automatically, or
 change Match Setup. Those integrations belong to SOC-6D2 and SOC-6D3.
 
-### SOC-6D2: Personal settings and reconciliation
+### SOC-6D2: Personal settings and reconciliation (implemented)
 
 - Build Settings -> Sports -> Soccer with grouped compact controls.
 - Add editable preset bundles, section/all reset, effective preview, Save/Discard, and dirty state.
@@ -320,6 +320,27 @@ change Match Setup. Those integrations belong to SOC-6D2 and SOC-6D3.
 
 Exit condition: anonymous, authenticated, offline, reconnect, sign-out, and two-device conflict
 paths retain a deterministic setting value without blocking gameplay.
+
+Implemented personal settings:
+
+- `SettingsContext` mounts `useSoccerPersonalSettings` alongside the existing flat application
+  preferences without changing their storage contract.
+- `Settings -> Sports -> Soccer` exposes Common, Match Format, Discipline, Substitutions, and
+  Advanced sections with editable competition/format presets, section/all reset, effective
+  preview, dirty state, and explicit Save/Discard.
+- Personal field orientation remains in the display portion of the personal payload and does not
+  enter match rules or event coordinates.
+- `sportSettingsCloud.ts` reads the RLS-scoped user record and writes through
+  `save_user_sport_settings_revisioned`; malformed responses and missing migration capability are
+  fail-closed.
+- The controller loads anonymous or user-keyed cache state first, reconciles in the background,
+  bootstraps an absent cloud row from anonymous defaults only when appropriate, retains offline
+  writes as pending, and retries on focus, reconnect, or Refresh.
+- Revision conflicts preserve both settings objects and require **Use Cloud** or
+  **Keep This Device**. Account caches remain isolated and inactive after sign-out.
+
+SOC-6D2 does not read or write team settings and does not change Soccer Match Setup inheritance.
+Those integrations remain SOC-6D3.
 
 ### SOC-6D3: Shared team defaults and setup inheritance
 
