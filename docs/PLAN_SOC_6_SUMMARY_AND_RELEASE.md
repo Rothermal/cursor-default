@@ -138,15 +138,21 @@ follow the reviewed exclusion rules.
 
 ### SOC-6D: Soccer settings and default hierarchy
 
+Detailed plan:
+[PLAN_SOC_6D_SOCCER_SETTINGS.md](PLAN_SOC_6D_SOCCER_SETTINGS.md)
+
 Add grouped soccer configuration without turning every stat into a toggle.
 
 - Add account-synced soccer defaults for authenticated users.
 - Keep a local cache and full local-only fallback when Supabase is unavailable.
 - Resolve defaults in this order:
-  1. personal account defaults;
-  2. season/team soccer configuration;
-  3. per-match overrides.
-- Snapshot the resolved setup at kickoff. Later settings changes never rewrite existing games.
+  1. built-in app defaults;
+  2. personal account defaults;
+  3. shared team soccer overrides;
+  4. per-match overrides.
+- Store personal defaults as a complete profile and team/match layers as sparse overrides.
+- Snapshot the resolved setup when the user continues from Match Setup. Later settings changes
+  never rewrite existing games.
 - Configure core rule/display defaults:
   - count-up or countdown display;
   - period count and duration;
@@ -156,12 +162,14 @@ Add grouped soccer configuration without turning every stat into a toggle.
   - useful field-orientation preference.
 - Keep every implemented core event family available.
 - Add optional module toggles only when those advanced modules actually ship.
+- Keep display orientation personal while first-period attacking direction remains match-specific.
+- Use revision-aware sync and explicit conflict resolution rather than silent last-write-wins.
 - Soccer is disabled by default for normal discovery.
 - Disabling Soccer blocks new games and removes it from normal sport selection, but existing
   games, summaries, teams, and statistics remain accessible.
 
 Exit condition: account defaults follow a signed-in user across devices, local-only defaults still
-work, season/game overrides resolve predictably, and setup snapshots remain immutable.
+work, team/game overrides resolve predictably, and setup snapshots remain immutable.
 
 ### SOC-6E: Release hardening and enablement
 
@@ -227,9 +235,10 @@ required before it can enter cloud aggregates.
 
 - Account-backed defaults use a versioned schema and deep-merge missing keys.
 - Local settings remain usable offline and without authentication.
-- Server state wins after authenticated reconciliation; unsynced local changes require a
-  deterministic last-write/version rule defined in SOC-6D.
-- Season/team configuration is manager-owned.
+- Authenticated writes use revision-aware compare-and-swap; a conflict requires an explicit
+  **Use Cloud** or **Keep This Device** choice.
+- Shared configuration is team-scoped and owner/admin-managed.
+- Personal defaults are complete; team and match layers are sparse overrides.
 - Per-match overrides are explicit at setup and become part of the immutable match snapshot.
 - Disabling Soccer never hides or corrupts historical data.
 - A missing backend capability blocks new cloud soccer creation with a useful error, not the
@@ -296,3 +305,8 @@ review, and SOC-6B4 Shootout review plus the detailed-summary release boundary.
 SOC-6C focused Q&A and detailed implementation planning are complete in
 `docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md`. Delivery is split into SOC-6C1 stat contract/engine,
 SOC-6C2 source transport, SOC-6C3 team scopes, and SOC-6C4 player scopes/hardening.
+
+SOC-6D focused Q&A and detailed implementation planning are complete in
+`docs/PLAN_SOC_6D_SOCCER_SETTINGS.md`. Delivery is split into SOC-6D1 schema/resolver/local model,
+SOC-6D2 personal settings/sync, SOC-6D3 shared team defaults/setup inheritance, and SOC-6D4
+hardening/documentation.

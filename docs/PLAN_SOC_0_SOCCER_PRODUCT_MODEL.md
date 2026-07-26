@@ -5,7 +5,8 @@ supported sport. SOC-0 defines the stable direction for the soccer program. Each
 implementation phase in this document must receive its own detailed execution plan and
 Q&A review before code work begins.
 
-Status: SOC-1 through SOC-6C implemented; SOC-6D settings/defaults is next, followed by SOC-6E release.
+Status: SOC-1 through SOC-6C implemented; SOC-6D settings/defaults is planned in
+`PLAN_SOC_6D_SOCCER_SETTINGS.md`, followed by SOC-6E release.
 
 ---
 
@@ -172,8 +173,11 @@ cross-recorder event merging, or event deduplication.
 Rule precedence:
 
 ```text
-game override -> season soccer rules -> personal soccer defaults -> app defaults
+app defaults -> personal soccer defaults -> shared team overrides -> game overrides
 ```
+
+Later layers win per field. Personal defaults are complete; team and game layers are sparse
+overrides.
 
 The rule model should cover:
 
@@ -488,7 +492,7 @@ Add a separate shootout section only when a shootout exists.
 
 ## 10. Soccer Settings
 
-Settings -> Sports -> Soccer should avoid one toggle per stat. Use grouped modules.
+Settings -> Sports -> Soccer should avoid one toggle per stat. Use grouped rule sections.
 
 Core settings/rules:
 
@@ -500,7 +504,7 @@ Core settings/rules:
 - extra-time/shootout defaults,
 - field orientation preference where useful.
 
-Optional module groups:
+Potential future module groups:
 
 - Advanced Defending,
 - Chance Creation,
@@ -510,8 +514,9 @@ Optional module groups:
 - Possession,
 - Advanced Goalkeeping.
 
-Season and game rules override personal defaults. Settings only control available capture
-modules; disabling a module must not hide or corrupt historical events that used it.
+Team and game rules override personal defaults. Every implemented core event family remains
+available. Optional module toggles are added only when those advanced modules ship; disabling a
+future module must not hide or corrupt historical events that used it.
 
 ---
 

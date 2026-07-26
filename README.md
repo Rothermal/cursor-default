@@ -431,7 +431,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] **Soccer SOC-6D and SOC-6E** - add account/team/match settings defaults, complete release hardening, and enable opt-in production discovery ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer SOC-6D and SOC-6E** - add account/team/match settings defaults, complete release hardening, and enable opt-in production discovery ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [SOC-6D plan](docs/PLAN_SOC_6D_SOCCER_SETTINGS.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
