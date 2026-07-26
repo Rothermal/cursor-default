@@ -9,6 +9,7 @@ import {
 import type { SoccerMatchRules } from './types'
 
 export const SOCCER_SETTINGS_SCHEMA_VERSION = 1
+const MAX_STORED_INTEGER = 2_147_483_647
 
 export type SoccerSettingsLayer = 'personal' | 'team' | 'match'
 export type SoccerRuleSource = 'built_in' | SoccerSettingsLayer
@@ -198,6 +199,8 @@ function parseSoccerConfigurableRules(
 
   const segmentError = validateStoredSegments(value)
   if (segmentError) return invalid(segmentError)
+  const integerError = validateStoredIntegerBounds(value)
+  if (integerError) return invalid(integerError)
 
   const candidate = value as SoccerMatchRulesOverride
   try {
@@ -252,8 +255,10 @@ function validateStoredSegments(value: Record<string, unknown>): string | null {
         segment.kind !== group.kind ||
         !Number.isInteger(segment.order) ||
         Number(segment.order) < 0 ||
+        Number(segment.order) > MAX_STORED_INTEGER ||
         !Number.isInteger(segment.durationMs) ||
-        Number(segment.durationMs) <= 0
+        Number(segment.durationMs) <= 0 ||
+        Number(segment.durationMs) > MAX_STORED_INTEGER
       ) {
         return 'Stored match segment values are invalid.'
       }
@@ -262,6 +267,26 @@ function validateStoredSegments(value: Record<string, unknown>): string | null {
       if (combinedOrders.has(order)) return 'Match segment orders must be unique.'
       combinedIds.add(segment.id)
       combinedOrders.add(order)
+    }
+  }
+  return null
+}
+
+function validateStoredIntegerBounds(value: Record<string, unknown>): string | null {
+  const keys = [
+    'maxOnFieldPlayers',
+    'substitutionLimit',
+    'substitutionWindowLimit',
+    'maxAssistsPerGoal',
+    'shootoutInitialKicksPerSide',
+  ] as const
+  for (const key of keys) {
+    const candidate = value[key]
+    if (
+      typeof candidate === 'number' &&
+      Math.abs(candidate) > MAX_STORED_INTEGER
+    ) {
+      return `Stored soccer rule ${key} exceeds the supported integer range.`
     }
   }
   return null

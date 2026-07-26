@@ -59,6 +59,24 @@ describe('soccer settings schema', () => {
       error: 'Every stored match segment must use the exact schema.',
     })
   })
+
+  it('rejects integers outside the shared persisted range', () => {
+    expect(parseSoccerRulesOverride({
+      maxOnFieldPlayers: Number.POSITIVE_INFINITY,
+    })).toEqual({
+      ok: false,
+      error: 'Stored soccer rule maxOnFieldPlayers exceeds the supported integer range.',
+    })
+    expect(parseSoccerRulesOverride({
+      regulationSegments: [{
+        id: 'regulation-1',
+        label: 'First Half',
+        kind: 'regulation',
+        order: 1,
+        durationMs: 2_147_483_648,
+      }],
+    })).toMatchObject({ ok: false })
+  })
 })
 
 describe('soccer settings hierarchy', () => {

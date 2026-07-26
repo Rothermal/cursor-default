@@ -67,7 +67,9 @@ set search_path = public
 as $$
   select case
     when jsonb_typeof(p_value) is distinct from 'number' then false
-    else (p_value #>> '{}')::numeric = trunc((p_value #>> '{}')::numeric)
+    else
+      (p_value #>> '{}')::numeric = trunc((p_value #>> '{}')::numeric)
+      and abs((p_value #>> '{}')::numeric) <= 2147483647
   end;
 $$;
 
@@ -449,6 +451,27 @@ begin
       and sport_id = p_sport_id
       and revision = p_expected_revision
     returning * into v_saved;
+    if not found then
+      select *
+      into v_existing
+      from public.user_sport_settings
+      where user_id = v_user_id
+        and sport_id = p_sport_id;
+      if found then
+        return jsonb_build_object(
+          'status', 'conflict',
+          'record', public._sport_settings_record_json(
+            v_existing.sport_id,
+            v_existing.schema_version,
+            v_existing.revision,
+            v_existing.settings,
+            v_existing.updated_at,
+            null
+          )
+        );
+      end if;
+      return jsonb_build_object('status', 'conflict', 'record', null);
+    end if;
   else
     if p_expected_revision is not null then
       return jsonb_build_object('status', 'conflict', 'record', null);
@@ -590,6 +613,27 @@ begin
       and sport_id = p_sport_id
       and revision = p_expected_revision
     returning * into v_saved;
+    if not found then
+      select *
+      into v_existing
+      from public.team_sport_settings
+      where team_id = p_team_id
+        and sport_id = p_sport_id;
+      if found then
+        return jsonb_build_object(
+          'status', 'conflict',
+          'record', public._sport_settings_record_json(
+            v_existing.sport_id,
+            v_existing.schema_version,
+            v_existing.revision,
+            v_existing.settings,
+            v_existing.updated_at,
+            v_existing.updated_by
+          )
+        );
+      end if;
+      return jsonb_build_object('status', 'conflict', 'record', null);
+    end if;
   else
     if p_expected_revision is not null then
       return jsonb_build_object('status', 'conflict', 'record', null);

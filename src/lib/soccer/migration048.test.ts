@@ -36,6 +36,7 @@ describe('migration 048 sport settings contracts', () => {
     expect(sql).toContain('availability mirrors are derived from tieresolution')
     expect(sql).toContain('personal soccer rules must be complete')
     expect(sql).toContain('perform public._validate_soccer_segments')
+    expect(sql).toContain('abs((p_value #>> \'{}\')::numeric) <= 2147483647')
   })
 
   it('uses revision-aware RPC-only writes and normalizes create collisions', () => {
@@ -50,6 +51,7 @@ describe('migration 048 sport settings contracts', () => {
     expect(sql).toContain('on conflict (team_id, sport_id) do nothing')
     expect(sql).toContain("'status', 'conflict'")
     expect(sql).toContain('revision = revision + 1')
+    expect(sql.match(/if not found then/g)).toHaveLength(4)
     expect(sql).toContain('security definer')
     expect(sql).toContain('set search_path = public')
   })
