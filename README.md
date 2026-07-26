@@ -123,6 +123,8 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/044_soccer_event_recovery.sql` - SOC-5B immutable soccer setup snapshots, same-recorder conflict audit, and recovery RPCs
 - `supabase/migrations/045_soccer_recorder_resolution.sql` - SOC-5C independent team recorder binding, recorder presence, provisional primary selection, and audit history
 - `supabase/migrations/046_soccer_finalization_recovery.sql` - SOC-5D canonical publication, primary locking, final audit uploads, and reason-required reopen
+- `supabase/migrations/047_soccer_canonical_aggregate_sources.sql` - SOC-6C2 RLS/keyset canonical aggregate source RPCs, audited participant-link repair, and merge-safe stable identities
+   > Before **`047`**, run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` and review the repairable/unprovable participant counts.
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
    > **Migration 018 is destructive**: it drops `teams.sport`, `teams.season`, `players.team_id`, `players.jersey_number`, `players.position`, and `players.is_active` columns after migrating data to the new `seasons`, `team_players`, and `player_guardians` tables. Back up your database before running.
@@ -278,10 +280,12 @@ supabase/
     ├── 043_soccer_event_cloud_transport.sql
     ├── 044_soccer_event_recovery.sql
     ├── 045_soccer_recorder_resolution.sql
-    └── 046_soccer_finalization_recovery.sql
+    ├── 046_soccer_finalization_recovery.sql
+    └── 047_soccer_canonical_aggregate_sources.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
+├── audit_soccer_participant_sources_pre_047.sql
 └── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
 
 docs/
@@ -421,10 +425,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Soccer summary Field (SOC-6B3)** - canonical event markers, normalized/original coordinates, combined filters, deterministic clusters, unknown-location review, and local-only editing ([plan](docs/PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md))
 - [x] **Soccer summary Shootout (SOC-6B4)** - round-paired attempts, retakes, forfeits, sudden death, stable anonymous slots, and game-scoped kicker/goalkeeper summaries ([plan](docs/PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md))
 - [x] **Soccer canonical aggregate engine (SOC-6C1)** - exact `soc_*` stat contract, conservative legacy aliases, canonical-publication projection, stable-player aggregation, combined rates, and explicit identity/publication exclusions ([plan](docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md))
+- [x] **Soccer canonical aggregate transport (SOC-6C2)** - authorized keyset publication RPCs, audited merge-lineage repair, merge-safe source identities, full-page loading, cancellation/deduplication, cooperative projection, and metrics ([plan](docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md))
 
 ### What's Next
 
-- [ ] **Soccer SOC-6C2 through SOC-6E** - add paginated canonical source transport, aggregate destinations, settings/defaults, regression QA, and production release ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [SOC-6C plan](docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer SOC-6C3 through SOC-6E** - add aggregate destinations, settings/defaults, regression QA, and production release ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [SOC-6C plan](docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
