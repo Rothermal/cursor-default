@@ -5,9 +5,30 @@ import {
   parseSoccerRulesOverride,
   parseSoccerTeamSettings,
   resolveSoccerSettingsHierarchy,
+  soccerRulesOverrideFingerprint,
+  soccerRulesOverrideFromDifference,
 } from './settings'
 
 describe('soccer settings schema', () => {
+  it('stores only match fields that differ from inherited rules', () => {
+    const inherited = resolveSoccerSettingsHierarchy().rules
+    const desired = {
+      ...structuredClone(inherited),
+      maxOnFieldPlayers: 9,
+      allowReturnSubstitutions: true,
+    }
+    const override = soccerRulesOverrideFromDifference(inherited, desired)
+
+    expect(override).toEqual({
+      maxOnFieldPlayers: 9,
+      allowReturnSubstitutions: true,
+    })
+    expect(soccerRulesOverrideFingerprint({
+      allowReturnSubstitutions: true,
+      maxOnFieldPlayers: 9,
+    })).toBe(soccerRulesOverrideFingerprint(override))
+  })
+
   it('accepts the complete version-one personal settings profile', () => {
     expect(parseSoccerPersonalSettings(DEFAULT_SOCCER_PERSONAL_SETTINGS)).toEqual({
       ok: true,

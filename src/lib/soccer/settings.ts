@@ -47,7 +47,7 @@ export type SoccerSettingsParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: string }
 
-const CONFIGURABLE_RULE_KEYS = [
+export const CONFIGURABLE_SOCCER_RULE_KEYS = [
   'regulationSegments',
   'extraTimeSegments',
   'clockDirection',
@@ -64,7 +64,7 @@ const CONFIGURABLE_RULE_KEYS = [
   'allowUnusedGoalkeeperShootoutReplacement',
 ] as const satisfies ReadonlyArray<keyof SoccerConfigurableRules>
 
-const CONFIGURABLE_RULE_KEY_SET = new Set<string>(CONFIGURABLE_RULE_KEYS)
+const CONFIGURABLE_RULE_KEY_SET = new Set<string>(CONFIGURABLE_SOCCER_RULE_KEYS)
 const DERIVED_LEGACY_KEYS = new Set(['extraTimeAvailable', 'shootoutAvailable'])
 
 export const DEFAULT_SOCCER_PERSONAL_SETTINGS: SoccerPersonalSettings = {
@@ -72,6 +72,33 @@ export const DEFAULT_SOCCER_PERSONAL_SETTINGS: SoccerPersonalSettings = {
   display: {
     fieldFlipped: false,
   },
+}
+
+export function soccerRulesOverrideFromDifference(
+  inherited: SoccerMatchRules,
+  desired: SoccerMatchRules
+): SoccerMatchRulesOverride {
+  const inheritedRules = configurableSoccerRulesFromMatchRules(inherited)
+  const desiredRules = configurableSoccerRulesFromMatchRules(desired)
+  const override: SoccerMatchRulesOverride = {}
+  for (const key of CONFIGURABLE_SOCCER_RULE_KEYS) {
+    if (!sameStoredValue(inheritedRules[key], desiredRules[key])) {
+      assignConfigurableRule(override, key, desiredRules[key])
+    }
+  }
+  return override
+}
+
+export function soccerRulesOverrideFingerprint(
+  override: SoccerMatchRulesOverride
+): string {
+  const ordered: Record<string, unknown> = {}
+  for (const key of CONFIGURABLE_SOCCER_RULE_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(override, key)) {
+      ordered[key] = override[key]
+    }
+  }
+  return JSON.stringify(ordered)
 }
 
 export function parseSoccerPersonalSettings(
@@ -193,7 +220,7 @@ function parseSoccerConfigurableRules(
   const unknown = keys.find(key => !CONFIGURABLE_RULE_KEY_SET.has(key))
   if (unknown) return invalid(`Unknown soccer rule: ${unknown}.`)
   if (complete) {
-    const missing = CONFIGURABLE_RULE_KEYS.find(key => !(key in value))
+    const missing = CONFIGURABLE_SOCCER_RULE_KEYS.find(key => !(key in value))
     if (missing) return invalid(`Personal soccer rules are missing ${missing}.`)
   }
 
@@ -298,6 +325,10 @@ function assignConfigurableRule<Key extends keyof SoccerConfigurableRules>(
   value: SoccerConfigurableRules[Key]
 ): void {
   target[key] = structuredClone(value) as SoccerMatchRulesOverride[Key]
+}
+
+function sameStoredValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right)
 }
 
 function defaultSourceMap(): SoccerRuleSourceMap {

@@ -3,28 +3,24 @@ import { ChevronLeft, Cloud, Laptop } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
+import { useSettings } from '../context/SettingsContext'
+import { useSoccerTeamSettings } from '../hooks/useSoccerTeamSettings'
 import { supabase } from '../lib/supabase'
 import {
   createSoccerSportGameState,
-  detectSoccerCompetitionProfile,
-  detectRegulationPreset,
-  regulationSegmentsForPreset,
   reorderSoccerSegments,
-  resizeSoccerSegments,
-  resolveSoccerMatchRules,
-  soccerRulesForCompetitionProfile,
-  withSoccerTieResolution,
   validateSoccerMatchRules,
-  type SoccerMatchRules,
-  type SoccerCompetitionProfile,
-  type SoccerRegulationPreset,
 } from '../lib/soccer'
+import type { SoccerRuleSource } from '../lib/soccer/settings'
+import type { SoccerMatchRulesOverride } from '../lib/soccer/rules'
+import { resolveSoccerSetupRuleState } from '../lib/soccer/setupSettings'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
   acceptedTeamRole,
   canTrackGames,
   type TeamRole,
 } from '../lib/teamPermissions'
+import SoccerRulesOverrideEditor from '../components/soccer/SoccerRulesOverrideEditor'
 
 interface SoccerCloudTeam {
   id: string
@@ -43,6 +39,7 @@ export default function SoccerGameSetup() {
   const requestedTeamId = searchParams.get('teamId')
   const { state, dispatch, parkingError } = useGame()
   const { user, isConfigured } = useAuth()
+  const { soccerSettings } = useSettings()
   const soccerState = state.sportGameState?.sportId === 'soccer'
     ? state.sportGameState
     : null
@@ -71,10 +68,19 @@ export default function SoccerGameSetup() {
   const [direction, setDirection] = useState(
     existingSetup?.firstPeriodAttackingDirection ?? 'left_to_right'
   )
-  const [rules, setRules] = useState<SoccerMatchRules>(() =>
-    structuredClone(existingSetup?.rulesSnapshot ?? resolveSoccerMatchRules())
+  const [preservedSnapshot, setPreservedSnapshot] = useState(
+    existingSetup?.rulesSnapshot
+      ? structuredClone(existingSetup.rulesSnapshot)
+      : null
   )
-  const [competitionProfileOverride, setCompetitionProfileOverride] = useState<SoccerCompetitionProfile | null>(null)
+  const [matchOverrides, setMatchOverrides] = useState<SoccerMatchRulesOverride>({})
+  const teamSettings = useSoccerTeamSettings(
+    teamSource === 'cloud' && selectedTeamId ? selectedTeamId : null,
+    teamSource === 'cloud'
+  )
+  const selectedTeamSettings = teamSettings.scopeTeamId === selectedTeamId
+    ? teamSettings.settings.rules
+    : undefined
 
   useEffect(() => {
     if (state.eventStream?.events.length) navigate('/game', { replace: true })
@@ -150,31 +156,51 @@ export default function SoccerGameSetup() {
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [selectedTeamId, teams]
   )
-  const regulationPreset = detectRegulationPreset(rules)
-  const competitionProfile = competitionProfileOverride ?? detectSoccerCompetitionProfile(rules)
+  const setupRules = useMemo(
+    () => resolveSoccerSetupRuleState({
+      personalDefaults: soccerSettings.rules,
+      teamDefaults: teamSource === 'cloud' ? selectedTeamSettings : undefined,
+      matchOverrides,
+      preservedSnapshot,
+    }),
+    [
+      matchOverrides,
+      preservedSnapshot,
+      soccerSettings.rules,
+      selectedTeamSettings,
+      teamSource,
+    ]
+  )
+  const inheritedHierarchy = setupRules.inherited
+  const effectiveHierarchy = setupRules.effective
+  const rules = setupRules.rules
+  const displayedOverrides = setupRules.displayedOverrides
 
   if (invalidRoute) return null
 
-  const updateRules = (update: (current: SoccerMatchRules) => SoccerMatchRules) => {
-    setCompetitionProfileOverride(null)
-    setRules(current => reorderSoccerSegments(update(current)))
+  const updateMatchOverrides = (next: SoccerMatchRulesOverride) => {
+    setPreservedSnapshot(null)
+    setMatchOverrides(next)
   }
 
-  const applyPreset = (preset: SoccerRegulationPreset) => {
-    if (preset === 'custom') return
-    updateRules(current => ({
-      ...current,
-      regulationSegments: regulationSegmentsForPreset(preset),
-    }))
-  }
-
-  const applyCompetitionProfile = (profile: SoccerCompetitionProfile) => {
-    setCompetitionProfileOverride(profile === 'custom' ? 'custom' : null)
-    if (profile === 'custom') return
-    setRules(soccerRulesForCompetitionProfile(profile))
+  const releasePreservedSnapshot = () => {
+    if (!preservedSnapshot) return
+    setPreservedSnapshot(null)
+    setMatchOverrides({})
   }
 
   const handleContinue = () => {
+    if (
+      teamSource === 'cloud' &&
+      (
+        teamSettings.scopeTeamId !== selectedTeamId ||
+        teamSettings.status === 'idle' ||
+        teamSettings.status === 'loading'
+      )
+    ) {
+      setFormError('Wait for the selected team defaults to load.')
+      return
+    }
     const resolvedTeam = teamSource === 'cloud' ? selectedTeam?.name.trim() ?? '' : teamName.trim()
     if (!resolvedTeam || !opponentName.trim()) {
       setFormError('Team and opponent are required.')
@@ -263,13 +289,19 @@ export default function SoccerGameSetup() {
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="Team source">
             <ModeButton
               active={teamSource === 'local'}
-              onClick={() => setTeamSource('local')}
+              onClick={() => {
+                releasePreservedSnapshot()
+                setTeamSource('local')
+              }}
               icon={<Laptop size={17} />}
               label="Local"
             />
             <ModeButton
               active={teamSource === 'cloud'}
-              onClick={() => setTeamSource('cloud')}
+              onClick={() => {
+                releasePreservedSnapshot()
+                setTeamSource('cloud')
+              }}
               icon={<Cloud size={17} />}
               label="Cloud roster"
               disabled={!cloudAvailable}
@@ -282,6 +314,7 @@ export default function SoccerGameSetup() {
                 value={selectedTeamId}
                 onChange={event => {
                   const id = event.target.value
+                  if (id !== selectedTeamId) releasePreservedSnapshot()
                   setSelectedTeamId(id)
                   const team = teams.find(item => item.id === id)
                   if (team) setTeamName(team.name)
@@ -334,115 +367,63 @@ export default function SoccerGameSetup() {
         </section>
 
         <section className="border-t border-slate-200 pt-5 space-y-4">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Competition Rules</h2>
-          <label className="block text-sm font-medium text-slate-700">
-            Starting profile
-            <select
-              value={competitionProfile}
-              onChange={event => applyCompetitionProfile(event.target.value as SoccerCompetitionProfile)}
-              className="input-field mt-1"
-            >
-              <option value="ifab">IFAB</option>
-              <option value="high_school">U.S. High School</option>
-              <option value="custom">Custom</option>
-            </select>
-          </label>
-          <Segmented
-            label="Yellow-card exit"
-            value={rules.yellowCardExitPolicy}
-            options={[
-              { value: 'stay_on', label: 'Player stays on' },
-              { value: 'must_leave_may_replace', label: 'Must leave' },
-            ]}
-            onChange={value => updateRules(current => ({ ...current, yellowCardExitPolicy: value }))}
-          />
-          <label className="block text-sm font-medium text-slate-700">
-            Tie resolution
-            <select
-              value={rules.tieResolution}
-              onChange={event => updateRules(current => withSoccerTieResolution(
-                current,
-                event.target.value as SoccerMatchRules['tieResolution']
-              ))}
-              className="input-field mt-1"
-            >
-              <option value="draw_allowed">Draw allowed</option>
-              <option value="extra_time_then_shootout">Extra time, then shootout</option>
-              <option value="direct_to_shootout">Direct to shootout</option>
-            </select>
-          </label>
-          <p className="text-xs text-slate-500">Red cards play short. Competition-specific replacement remains unavailable.</p>
-        </section>
-
-        <section className="border-t border-slate-200 pt-5 space-y-4">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Regulation</h2>
-          <label className="block text-sm font-medium text-slate-700">
-            Format
-            <select value={regulationPreset} onChange={event => applyPreset(event.target.value as SoccerRegulationPreset)} className="input-field mt-1">
-              <option value="standard">2 x 45 minutes</option>
-              <option value="youth">2 x 30 minutes</option>
-              <option value="quarters">4 x 15 minutes</option>
-              <option value="custom">Custom</option>
-            </select>
-          </label>
-          <NumberField
-            label="Periods"
-            value={rules.regulationSegments.length}
-            min={1}
-            max={8}
-            onChange={count => updateRules(current => ({
-              ...current,
-              regulationSegments: resizeSoccerSegments(current.regulationSegments, 'regulation', count, 45),
-            }))}
-          />
-          <SegmentEditor
-            segments={rules.regulationSegments}
-            onChange={segments => updateRules(current => ({ ...current, regulationSegments: segments }))}
-          />
-        </section>
-
-        <section className="border-t border-slate-200 pt-5 space-y-4">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Clock and Lineup</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Segmented
-              label="Clock"
-              value={rules.clockDirection}
-              options={[{ value: 'count_up', label: 'Count up' }, { value: 'count_down', label: 'Count down' }]}
-              onChange={value => updateRules(current => ({ ...current, clockDirection: value }))}
-            />
-            <Segmented
-              label="Display"
-              value={rules.clockDisplay}
-              options={[{ value: 'continuous', label: 'Continuous' }, { value: 'per_period', label: 'Per period' }]}
-              onChange={value => updateRules(current => ({ ...current, clockDisplay: value }))}
-            />
+          <div>
+            <h2 className="text-sm font-bold uppercase text-slate-500">Competition Rules</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              {formatSourceSummary(effectiveHierarchy.sources)}
+            </p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <NumberField label="Players" value={rules.maxOnFieldPlayers} min={1} max={18} onChange={value => updateRules(current => ({ ...current, maxOnFieldPlayers: value }))} />
-            <NullableNumberField label="Substitutions" value={rules.substitutionLimit} onChange={value => updateRules(current => ({ ...current, substitutionLimit: value }))} />
-            <NullableNumberField label="Windows" value={rules.substitutionWindowLimit} onChange={value => updateRules(current => ({ ...current, substitutionWindowLimit: value }))} />
-            <NumberField label="Max assists" value={rules.maxAssistsPerGoal} min={0} max={2} onChange={value => updateRules(current => ({ ...current, maxAssistsPerGoal: value }))} />
-          </div>
-          <Toggle label="Allow return substitutions" checked={rules.allowReturnSubstitutions} onChange={checked => updateRules(current => ({ ...current, allowReturnSubstitutions: checked }))} />
-        </section>
 
-        <section className="border-t border-slate-200 pt-5 space-y-4">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Extra Time</h2>
-          <Toggle label="Extra time available" checked={rules.extraTimeAvailable} onChange={checked => updateRules(current => withSoccerTieResolution(current, checked ? 'extra_time_then_shootout' : current.shootoutAvailable ? 'direct_to_shootout' : 'draw_allowed'))} />
-          {rules.extraTimeAvailable && (
-            <>
-              <NumberField label="Extra-time periods" value={rules.extraTimeSegments.length} min={1} max={4} onChange={count => updateRules(current => ({
-                ...current,
-                extraTimeSegments: resizeSoccerSegments(current.extraTimeSegments, 'extra_time', count, 15, current.regulationSegments.length),
-              }))} />
-              <SegmentEditor segments={rules.extraTimeSegments} onChange={segments => updateRules(current => ({ ...current, extraTimeSegments: segments }))} />
-            </>
+          {preservedSnapshot && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              This setup's saved rule snapshot is retained. Editing a rule or choosing Inherit
+              creates a new snapshot from current defaults.
+            </div>
           )}
-          <Toggle label="Shootout available" checked={rules.shootoutAvailable} onChange={checked => updateRules(current => withSoccerTieResolution(current, checked ? current.extraTimeAvailable ? 'extra_time_then_shootout' : 'direct_to_shootout' : 'draw_allowed'))} />
+
+          {teamSource === 'cloud' &&
+            (teamSettings.status === 'cached' ||
+              teamSettings.status === 'backend_update_required' ||
+              teamSettings.status === 'error') && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {teamSettings.status === 'cached'
+                  ? 'Using the last synced team defaults while cloud refresh is unavailable.'
+                  : teamSettings.error ?? 'Shared team defaults are unavailable.'}
+              </div>
+            )}
+
+          {effectiveHierarchy.diagnostics.length > 0 && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {effectiveHierarchy.diagnostics.map(item => item.message).join(' ')}
+            </div>
+          )}
+
+          <SoccerRulesOverrideEditor
+            inherited={inheritedHierarchy.rules}
+            inheritedSources={inheritedHierarchy.sources}
+            override={displayedOverrides}
+            overrideLabel="Match override"
+            onChange={updateMatchOverrides}
+          />
         </section>
 
-        <button type="button" onClick={handleContinue} className="btn-primary w-full">
-          Continue to Match Roster
+        <button
+          type="button"
+          onClick={handleContinue}
+          disabled={teamSource === 'cloud' && (
+            teamSettings.scopeTeamId !== selectedTeamId ||
+            teamSettings.status === 'idle' ||
+            teamSettings.status === 'loading'
+          )}
+          className="btn-primary w-full disabled:opacity-50"
+        >
+          {teamSource === 'cloud' && (
+            teamSettings.scopeTeamId !== selectedTeamId ||
+            teamSettings.status === 'idle' ||
+            teamSettings.status === 'loading'
+          )
+            ? 'Loading Team Defaults...'
+            : 'Continue to Match Roster'}
         </button>
       </main>
     </div>
@@ -504,65 +485,16 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
   )
 }
 
-function NumberField({ label, value, min, max, onChange }: {
-  label: string
-  value: number
-  min: number
-  max: number
-  onChange: (value: number) => void
-}) {
-  return (
-    <label className="block text-sm font-medium text-slate-700">
-      {label}
-      <input type="number" value={value} min={min} max={max} onChange={event => onChange(Math.max(min, Math.min(max, Number(event.target.value) || min)))} className="input-field mt-1 px-3" />
-    </label>
-  )
-}
-
-function NullableNumberField({ label, value, onChange }: {
-  label: string
-  value: number | null
-  onChange: (value: number | null) => void
-}) {
-  return (
-    <label className="block text-sm font-medium text-slate-700">
-      {label}
-      <input type="number" value={value ?? ''} min={0} placeholder="Unlimited" onChange={event => onChange(event.target.value === '' ? null : Math.max(0, Number(event.target.value) || 0))} className="input-field mt-1 px-3" />
-    </label>
-  )
-}
-
-function Toggle({ label, checked, onChange }: {
-  label: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-}) {
-  return (
-    <label className="flex items-center justify-between gap-3 min-h-10 text-sm font-medium text-slate-700">
-      {label}
-      <input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} className="h-5 w-5 accent-emerald-600" />
-    </label>
-  )
-}
-
-function SegmentEditor({ segments, onChange }: {
-  segments: SoccerMatchRules['regulationSegments']
-  onChange: (segments: SoccerMatchRules['regulationSegments']) => void
-}) {
-  return (
-    <div className="space-y-2">
-      {segments.map((segment, index) => (
-        <div key={segment.id} className="grid grid-cols-[1fr_7rem] gap-2">
-          <label className="text-xs font-medium text-slate-500">
-            Label
-            <input value={segment.label} onChange={event => onChange(segments.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} className="input-field mt-1 py-2 px-3 text-sm" />
-          </label>
-          <label className="text-xs font-medium text-slate-500">
-            Minutes
-            <input type="number" min={1} max={240} value={Math.round(segment.durationMs / 60_000)} onChange={event => onChange(segments.map((item, itemIndex) => itemIndex === index ? { ...item, durationMs: Math.max(1, Number(event.target.value) || 1) * 60_000 } : item))} className="input-field mt-1 py-2 px-3 text-sm" />
-          </label>
-        </div>
-      ))}
-    </div>
-  )
+function formatSourceSummary(
+  sources: Record<string, SoccerRuleSource>
+): string {
+  const unique = new Set(Object.values(sources))
+  const labels = [
+    unique.has('personal') ? 'personal' : null,
+    unique.has('team') ? 'team' : null,
+    unique.has('match') ? 'match overrides' : null,
+  ].filter((value): value is string => Boolean(value))
+  return labels.length > 0
+    ? `Effective rules include ${labels.join(', ')}.`
+    : 'Using built-in soccer defaults.'
 }

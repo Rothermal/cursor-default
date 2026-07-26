@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, Cloud, RefreshCw, RotateCcw, Save } from 'lucide-react'
+import { Check, Cloud, RefreshCw, RotateCcw, Save, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../../context/SettingsContext'
 import {
   configurableSoccerRulesFromMatchRules,
@@ -33,6 +34,7 @@ const sections: Array<{ id: SettingsSection; label: string }> = [
 ]
 
 export default function SoccerSettings() {
+  const navigate = useNavigate()
   const {
     soccerSettings,
     soccerSettingsSync,
@@ -156,6 +158,15 @@ export default function SoccerSettings() {
           <RefreshCw size={17} className={soccerSettingsSync.status === 'checking' ? 'animate-spin' : ''} />
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate('/teams?sport=soccer')}
+        className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-blue-700"
+      >
+        <Users size={16} />
+        Team shared defaults
+      </button>
 
       {soccerSettingsSync.error && (
         <p className={`rounded-md border px-3 py-2 text-sm ${

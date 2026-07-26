@@ -79,6 +79,31 @@ describe('sport settings cache', () => {
     expect(loadSportSettingsCache({ kind: 'anonymous' }, 'soccer', storage)).toBeNull()
   })
 
+  it('isolates cached team defaults by account and team', () => {
+    const storage = new MemoryStorage()
+    saveSportSettingsCache(
+      { kind: 'team', userId: 'user-1', teamId: 'team-1' },
+      { ...record('team'), pending: null },
+      storage
+    )
+
+    expect(loadSportSettingsCache<{ marker: string }>(
+      { kind: 'team', userId: 'user-1', teamId: 'team-1' },
+      'soccer',
+      storage
+    )?.settings.marker).toBe('team')
+    expect(loadSportSettingsCache(
+      { kind: 'team', userId: 'user-1', teamId: 'team-2' },
+      'soccer',
+      storage
+    )).toBeNull()
+    expect(loadSportSettingsCache(
+      { kind: 'team', userId: 'user-2', teamId: 'team-1' },
+      'soccer',
+      storage
+    )).toBeNull()
+  })
+
   it('fails closed for corrupt or mismatched records', () => {
     const storage = new MemoryStorage()
     const key = sportSettingsCacheKey({ kind: 'anonymous' }, 'soccer')
