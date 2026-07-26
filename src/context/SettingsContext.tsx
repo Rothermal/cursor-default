@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
 import {
   loadSettingsFromStorage,
   SETTINGS_STORAGE_KEY,
@@ -8,7 +7,6 @@ import {
 import { useSoccerPersonalSettings } from '../hooks/useSoccerPersonalSettings'
 import type { SoccerPersonalSettings } from '../lib/soccer/settings'
 import type { SoccerSettingsSyncState } from '../hooks/useSoccerPersonalSettings'
-import { sportSettingsPath } from '../lib/settingsNavigation'
 
 interface SettingsContextType {
   settings: AppSettings
@@ -25,16 +23,16 @@ interface SettingsContextType {
   refreshSoccerSettings: () => Promise<void>
   useCloudSoccerSettings: () => void
   keepDeviceSoccerSettings: () => Promise<void>
+  setSoccerSettingsPageActive: (active: boolean) => void
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const location = useLocation()
   const [settings, setSettings] = useState<AppSettings>(loadSettingsFromStorage)
+  const [soccerSettingsPageActive, setSoccerSettingsPageActive] = useState(false)
   const soccer = useSoccerPersonalSettings(
-    Boolean(settings.enabledSports.soccer) ||
-      location.pathname === sportSettingsPath('soccer')
+    Boolean(settings.enabledSports.soccer) || soccerSettingsPageActive
   )
 
   useEffect(() => {
@@ -90,6 +88,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         refreshSoccerSettings: soccer.refresh,
         useCloudSoccerSettings: soccer.useCloud,
         keepDeviceSoccerSettings: soccer.keepDevice,
+        setSoccerSettingsPageActive,
       }}
     >
       {children}

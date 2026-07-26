@@ -40,6 +40,7 @@ export default function SoccerSettings() {
     refreshSoccerSettings,
     useCloudSoccerSettings,
     keepDeviceSoccerSettings,
+    setSoccerSettingsPageActive,
   } = useSettings()
   const [draft, setDraft] = useState<SoccerPersonalSettings>(() =>
     structuredClone(soccerSettings)
@@ -59,6 +60,11 @@ export default function SoccerSettings() {
   )
   const competitionProfile = detectSoccerCompetitionProfile(effective)
   const regulationPreset = detectRegulationPreset(effective)
+
+  useEffect(() => {
+    setSoccerSettingsPageActive(true)
+    return () => setSoccerSettingsPageActive(false)
+  }, [setSoccerSettingsPageActive])
 
   useEffect(() => {
     const previous = previousSavedFingerprint.current

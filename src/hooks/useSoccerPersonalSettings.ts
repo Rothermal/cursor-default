@@ -63,9 +63,10 @@ export interface SoccerPersonalSettingsController {
 
 export function shouldStartSoccerSettingsRefresh(
   cloudEnabled: boolean,
-  refreshing: boolean
+  refreshing: boolean,
+  writing: boolean
 ): boolean {
-  return cloudEnabled && !refreshing
+  return cloudEnabled && !refreshing && !writing
 }
 
 interface ControllerState {
@@ -87,6 +88,7 @@ export function useSoccerPersonalSettings(
   const stateRef = useRef(state)
   const requestRef = useRef(0)
   const refreshingRef = useRef(false)
+  const writingRef = useRef(false)
 
   useEffect(() => {
     stateRef.current = state
@@ -111,6 +113,9 @@ export function useSoccerPersonalSettings(
     targetScope: SportSettingsCacheScope,
     requestId: number
   ): Promise<boolean> => {
+    if (writingRef.current) return false
+    writingRef.current = true
+    try {
     const result = await saveUserSportSettings(
       'soccer',
       SOCCER_SETTINGS_SCHEMA_VERSION,
@@ -199,10 +204,17 @@ export function useSoccerPersonalSettings(
       },
     })
     return false
+    } finally {
+      writingRef.current = false
+    }
   }, [cacheAndCommit, commit])
 
   const refresh = useCallback(async () => {
-    if (!shouldStartSoccerSettingsRefresh(cloudEnabled, refreshingRef.current)) return
+    if (!shouldStartSoccerSettingsRefresh(
+      cloudEnabled,
+      refreshingRef.current,
+      writingRef.current
+    )) return
     refreshingRef.current = true
     try {
     const requestId = ++requestRef.current
