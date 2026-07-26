@@ -10,6 +10,7 @@ import type { GameState } from '../types'
 import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
+import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
@@ -117,8 +118,14 @@ export default function PlayerProfile() {
     const load = async () => {
       setLoading(true)
       setError(null)
+      setSeasonStats([])
+      setGameLog([])
+      setGameLogLines([])
+      setProfileHighGames({})
+      setProfileResolvedByGame({})
+      setLoadingProfileHighs(false)
 
-      const [teamRes, playerRes, statsRes, logRpcRes, gameStatsRes] = await Promise.all([
+      const [teamRes, playerRes] = await Promise.all([
         supabaseClient.from('teams').select('id,name,nickname,season_id,seasons!inner(id,name,sport)').eq('id', teamId).single(),
         supabaseClient
           .from('team_players')
@@ -126,12 +133,6 @@ export default function PlayerProfile() {
           .eq('team_id', teamId)
           .eq('player_id', playerId)
           .single(),
-        supabaseClient.rpc('get_season_stats_resolved', { p_team_id: teamId }),
-        supabaseClient.rpc('get_player_game_log', {
-          p_player_id: playerId,
-          p_team_id: teamId,
-        }),
-        supabaseClient.from('game_stats').select('game_id').eq('player_id', playerId),
       ])
 
       if (cancelled) return
@@ -146,13 +147,9 @@ export default function PlayerProfile() {
         setLoading(false)
         return
       }
-      if (statsRes.error) {
-        setError(statsRes.error.message)
-        setLoading(false)
-        return
-      }
 
-      setTeam(teamRes.data as unknown as TeamRow)
+      const teamData = teamRes.data as unknown as TeamRow
+      setTeam(teamData)
       const tp = playerRes.data as unknown as { jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null; nickname: string | null } }
       setPlayer({
         id: tp.players.id,
@@ -161,6 +158,28 @@ export default function PlayerProfile() {
         jersey_number: tp.jersey_number,
         nickname: tp.players.nickname,
       } as PlayerRow)
+
+      if (teamData.seasons.sport === 'soccer') {
+        setLoading(false)
+        return
+      }
+
+      const [statsRes, logRpcRes, gameStatsRes] = await Promise.all([
+        supabaseClient.rpc('get_season_stats_resolved', { p_team_id: teamId }),
+        supabaseClient.rpc('get_player_game_log', {
+          p_player_id: playerId,
+          p_team_id: teamId,
+        }),
+        supabaseClient.from('game_stats').select('game_id').eq('player_id', playerId),
+      ])
+
+      if (cancelled) return
+      if (statsRes.error) {
+        setError(statsRes.error.message)
+        setLoading(false)
+        return
+      }
+
       setSeasonStats((statsRes.data ?? []).filter((r: SeasonStatRow) => r.player_id === playerId) as SeasonStatRow[])
 
       if (!logRpcRes.error) {
@@ -379,9 +398,8 @@ export default function PlayerProfile() {
     0
   )
 
-  const careerQuery = seasonIdFromUrl
-    ? `playerId=${encodeURIComponent(playerId)}&sport=${encodeURIComponent(team.seasons.sport)}`
-    : `playerId=${encodeURIComponent(playerId)}&sport=${encodeURIComponent(team.seasons.sport)}`
+  const careerQuery =
+    `playerId=${encodeURIComponent(playerId)}&sport=${encodeURIComponent(team.seasons.sport)}`
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -414,13 +432,31 @@ export default function PlayerProfile() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
-        {(error || parkingError) && (
+        {(error || (team.seasons.sport !== 'soccer' ? parkingError : null)) && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
-            {error ?? parkingError}
+            {error ?? (team.seasons.sport !== 'soccer' ? parkingError : null)}
           </div>
         )}
 
-        {sport && seasonStats.length > 0 ? (
+        {team.seasons.sport === 'soccer' ? (
+          <SoccerPlayerAggregateDestination
+            variant="profile"
+            scope={{
+              type: 'player',
+              playerId,
+              teamId,
+              seasonId: seasonIdFromUrl ?? team.season_id,
+            }}
+            teamIds={[teamId]}
+            identity={{
+              playerId,
+              displayName: playerDisplayName(player),
+              number: player.jersey_number,
+              teamIds: [teamId],
+            }}
+            seasonName={team.seasons.name}
+          />
+        ) : sport && seasonStats.length > 0 ? (
           <PlayerStatSummaryTables
             sport={sport}
             statsRecord={seasonStatsRecord}
@@ -446,47 +482,49 @@ export default function PlayerProfile() {
           </section>
         )}
 
-        <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Game Log</h2>
-          {gameLog.length === 0 ? (
-            <p className="text-sm text-slate-500">No games yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {gameLog.map(game => {
-                const statMap = statsByGame.get(game.id) ?? {}
-                const line =
-                  sport && Object.keys(statMap).length > 0
-                    ? formatCompactGameStatLine(sport, statMap)
-                    : null
-                return (
-                  <div
-                    key={game.id}
-                    className="flex flex-col gap-1 rounded-xl border border-slate-200
-                               bg-white px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-700">{game.game_date}</p>
-                        <p className="text-sm text-slate-500">vs {game.opponent_name}</p>
+        {team.seasons.sport !== 'soccer' && (
+          <section className="card space-y-3">
+            <h2 className="font-semibold text-slate-700">Game Log</h2>
+            {gameLog.length === 0 ? (
+              <p className="text-sm text-slate-500">No games yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {gameLog.map(game => {
+                  const statMap = statsByGame.get(game.id) ?? {}
+                  const line =
+                    sport && Object.keys(statMap).length > 0
+                      ? formatCompactGameStatLine(sport, statMap)
+                      : null
+                  return (
+                    <div
+                      key={game.id}
+                      className="flex flex-col gap-1 rounded-xl border border-slate-200
+                                 bg-white px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-700">{game.game_date}</p>
+                          <p className="text-sm text-slate-500">vs {game.opponent_name}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleViewGame(game.id)}
+                          disabled={loadingGameId === game.id}
+                          className="btn-primary py-2 px-4 text-sm shrink-0"
+                        >
+                          {loadingGameId === game.id ? 'Loading...' : 'View'}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleViewGame(game.id)}
-                        disabled={loadingGameId === game.id}
-                        className="btn-primary py-2 px-4 text-sm shrink-0"
-                      >
-                        {loadingGameId === game.id ? 'Loading...' : 'View'}
-                      </button>
+                      {line && (
+                        <p className="text-xs text-slate-500 pl-0.5">{line}</p>
+                      )}
                     </div>
-                    {line && (
-                      <p className="text-xs text-slate-500 pl-0.5">{line}</p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   )

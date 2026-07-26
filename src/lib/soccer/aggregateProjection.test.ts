@@ -439,6 +439,16 @@ describe('soccer canonical aggregate projection', () => {
       cleanSheets: 2,
     })
     expect(result.games.map(game => game.gameId)).toEqual(['game-2', 'game-1'])
+    expect(result.games[0]).toMatchObject({
+      seasonId: 'season-1',
+      tournamentId: 'tournament-1',
+      playerStats: {
+        'cloud-striker': {
+          soc_app: 1,
+          soc_goal: 1,
+        },
+      },
+    })
     expect(result.quality).toBe('complete')
   })
 

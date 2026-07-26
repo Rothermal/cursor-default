@@ -8,6 +8,7 @@ import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate } from '../lib/gameSyncFingerprint'
 import { playerDisplayName } from '../lib/display'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
+import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import type { GameState } from '../types'
 
@@ -36,6 +37,7 @@ export default function CareerStats() {
   const [searchParams] = useSearchParams()
   const playerId = searchParams.get('playerId')
   const sportParam = searchParams.get('sport')
+  const isSoccerDestination = sportParam === 'soccer'
 
   const { isConfigured, user } = useAuth()
   const { state, openGameSnapshot, parkingError } = useGame()
@@ -58,8 +60,9 @@ export default function CareerStats() {
 
   const sportsInData = useMemo(() => {
     const set = new Set(rows.map(r => r.sport))
+    if (sportParam) set.add(sportParam)
     return [...set].sort()
-  }, [rows])
+  }, [rows, sportParam])
 
   useEffect(() => {
     if (!playerId || !isConfigured || !supabaseClient) {
@@ -71,15 +74,13 @@ export default function CareerStats() {
     const load = async () => {
       setLoading(true)
       setError(null)
+      setRows([])
 
-      const [playerRes, careerRes] = await Promise.all([
-        supabaseClient
-          .from('players')
-          .select('id,first_name,last_name,nickname')
-          .eq('id', playerId)
-          .single(),
-        supabaseClient.rpc('get_career_stats_resolved', { p_player_id: playerId }),
-      ])
+      const playerRes = await supabaseClient
+        .from('players')
+        .select('id,first_name,last_name,nickname')
+        .eq('id', playerId)
+        .single()
 
       if (cancelled) return
 
@@ -88,6 +89,17 @@ export default function CareerStats() {
         setLoading(false)
         return
       }
+      setPlayer(playerRes.data as PlayerMeta)
+
+      if (isSoccerDestination) {
+        setLoading(false)
+        return
+      }
+
+      const careerRes = await supabaseClient.rpc('get_career_stats_resolved', {
+        p_player_id: playerId,
+      })
+      if (cancelled) return
 
       if (careerRes.error) {
         setError(
@@ -99,7 +111,6 @@ export default function CareerStats() {
         return
       }
 
-      setPlayer(playerRes.data as PlayerMeta)
       setRows((careerRes.data ?? []) as CareerRow[])
       setLoading(false)
     }
@@ -108,7 +119,7 @@ export default function CareerStats() {
     return () => {
       cancelled = true
     }
-  }, [playerId, isConfigured, supabaseClient])
+  }, [playerId, isConfigured, isSoccerDestination, supabaseClient])
 
   useEffect(() => {
     if (sportsInData.length === 0) return
@@ -382,7 +393,7 @@ export default function CareerStats() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
-        {parkingError && (
+        {parkingError && !isSoccerDestination && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
             {parkingError}
           </div>
@@ -416,7 +427,18 @@ export default function CareerStats() {
           </section>
         )}
 
-        {filteredRows.length === 0 ? (
+        {isSoccerDestination && player ? (
+          <SoccerPlayerAggregateDestination
+            variant="career"
+            scope={{ type: 'career', playerId }}
+            teamIds={[]}
+            identity={{
+              playerId,
+              displayName: playerDisplayName(player),
+              number: null,
+            }}
+          />
+        ) : filteredRows.length === 0 ? (
           <p className="text-sm text-slate-500">No finalized career stats yet for this sport.</p>
         ) : (
           <>

@@ -998,6 +998,19 @@ classifications, then apply migration 047 in a development Supabase project.
 | 11u.8 | Repeat Season, Team, and Tournament routes for Basketball | Existing resolved-stat and game-log RPC behavior and components remain unchanged |
 | 11u.9 | Fail the active-roster read while canonical publications remain readable | Canonical totals still render with a warning that zero-appearance players may be missing |
 
+### 11v. Soccer player and career aggregates (SOC-6C4)
+
+| # | Scenario | Expected |
+|---|---|---|
+| 11v.1 | Open a soccer player from Season Stats and from Team roster | Player Profile uses the team/season-filtered canonical player scope; back and Career navigation retain their existing route context |
+| 11v.2 | Open a soccer player with no finalized appearance | Participation renders at zero; Attack, Defense, Discipline, and Goalkeeping stay hidden while all-zero |
+| 11v.3 | Open a player with values in several categories and reviewed rate denominators | Participation always renders, only nonzero additional categories render, and rates use combined canonical numerators/denominators |
+| 11v.4 | Open Career Stats for a player with multiple seasons or team stints | Career totals use one stable player identity; By season keeps team stints separate and each expanded stint agrees with its canonical games |
+| 11v.5 | Open a Profile or Career game row | The canonical Soccer Summary Players tab opens directly without parking or hydrating a legacy aggregate snapshot |
+| 11v.6 | Merge a finalized-match player into a survivor, then reopen Profile and Career | All historical credit appears once under the surviving player id and current player display name; the deleted id has no route totals |
+| 11v.7 | Test owner/admin/scorer/viewer plus malformed, unresolved, abandoned, reopened, personal, and shootout sources | RLS never broadens visibility; generic/manager diagnostics follow role; excluded source families do not enter player totals or history |
+| 11v.8 | Repeat Basketball Player Profile and Career Stats, including Best game links | Existing resolved-stat, game-log, high-game, cloud hydration, and Summary behavior remains unchanged |
+
 ---
 
 ## 12. GitHub Pages deploy

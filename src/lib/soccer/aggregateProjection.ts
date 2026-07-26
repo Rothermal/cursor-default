@@ -156,12 +156,15 @@ export interface SoccerAggregateGame {
   publicationId: string
   gameId: string
   teamId: string
+  seasonId: string | null
+  tournamentId: string | null
   date: string
   trackedTeamName: string
   opponentName: string
   trackedScore: number
   opponentScore: number
   result: 'win' | 'draw' | 'loss'
+  playerStats: Record<string, SoccerAggregateStats>
 }
 
 export interface SoccerAggregateMetrics {
@@ -692,12 +695,17 @@ function matchGameRow(match: EligibleSoccerAggregateMatch): SoccerAggregateGame 
     publicationId: match.publicationId,
     gameId: match.game.id,
     teamId: match.game.teamId,
+    seasonId: match.game.seasonId,
+    tournamentId: match.game.tournamentId,
     date: match.game.date,
     trackedTeamName: match.game.trackedTeamName,
     opponentName: match.game.opponentName,
     trackedScore,
     opponentScore,
     result: trackedScore > opponentScore ? 'win' : trackedScore < opponentScore ? 'loss' : 'draw',
+    playerStats: Object.fromEntries(
+      match.players.map(player => [player.playerId, structuredClone(player.stats)])
+    ),
   }
 }
 
