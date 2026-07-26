@@ -150,7 +150,8 @@ Add grouped soccer configuration without turning every stat into a toggle.
   2. personal account defaults;
   3. shared team soccer overrides;
   4. per-match overrides.
-- Store personal defaults as a complete profile and team/match layers as sparse overrides.
+- Store personal defaults as a complete configurable profile and team/match layers as sparse
+  overrides.
 - Snapshot the resolved setup when the user continues from Match Setup. Later settings changes
   never rewrite existing games.
 - Configure core rule/display defaults:
@@ -238,7 +239,8 @@ required before it can enter cloud aggregates.
 - Authenticated writes use revision-aware compare-and-swap; a conflict requires an explicit
   **Use Cloud** or **Keep This Device** choice.
 - Shared configuration is team-scoped and owner/admin-managed.
-- Personal defaults are complete; team and match layers are sparse overrides.
+- Personal defaults are complete across configurable fields; team and match layers are sparse
+  overrides.
 - Per-match overrides are explicit at setup and become part of the immutable match snapshot.
 - Disabling Soccer never hides or corrupts historical data.
 - A missing backend capability blocks new cloud soccer creation with a useful error, not the

@@ -18,8 +18,8 @@ built-in app defaults
   -> immutable match rules snapshot
 ```
 
-Later layers win per field. Personal settings are a complete profile. Team and match layers are
-sparse overrides so inherited changes remain visible and reversible.
+Later layers win per field. Personal settings are complete across the configurable fields. Team
+and match layers are sparse overrides so inherited changes remain visible and reversible.
 
 SOC-6D does not expose Soccer in production, add individual stat/event toggles, rewrite existing
 games, add Realtime subscriptions, or perform the broader application reskin. Production
@@ -65,6 +65,16 @@ Personal soccer settings expose every currently implemented pregame rule:
 - draw, extra-time, and shootout tie resolution;
 - initial shootout kicks per side;
 - unused-goalkeeper shootout replacement.
+
+`extraTimeAvailable` and `shootoutAvailable` are legacy compatibility mirrors derived from
+`tieResolution`. They are not independent settings, are never shown as separate controls, and are
+rejected if present in a stored personal, team, or match-default payload. The resolver derives
+both values when it builds the complete `SoccerMatchRules` snapshot.
+
+`regulationSegments` and `extraTimeSegments` each resolve atomically as one array-valued field.
+The UI may edit a segment's count, label, or duration, but saving any such change stores the
+complete array at that layer. Source labels and reset behavior apply to the whole segment array;
+SOC-6D does not introduce element-wise inheritance.
 
 These controls are grouped into Common, Match Format, Discipline, Substitutions, and Advanced
 sections. IFAB, U.S. High School, and future profiles are editable starting bundles rather than
@@ -112,8 +122,9 @@ a whole and replaced by the next valid inherited result. The UI shows a warning 
 diagnostic context to repair or reset the affected scope; it never silently applies a partially
 trusted object.
 
-Personal settings are a complete valid profile. Team and match settings store only fields that
-differ from their inherited values. Clearing an override resumes inheritance.
+Personal settings are complete and valid across the configurable fields. Team and match settings
+store only fields that differ from their inherited values. Clearing an override resumes
+inheritance.
 
 ### 4.2 Setup behavior
 
@@ -141,6 +152,8 @@ Anonymous local settings and account settings are separate scopes.
 
 - Signing out returns immediately to anonymous defaults.
 - Account caches are keyed by user id and remain inactive for other users.
+- Pending account edits remain in that account-keyed cache after sign-out. They are not applied to
+  the anonymous scope and resume reconciliation only when the same account signs in again.
 - On first sign-in, existing cloud defaults win.
 - Anonymous defaults may initialize a cloud profile only when that user has no cloud settings
   record.
@@ -211,7 +224,10 @@ claim.
 
 Team saves record `updated_at` and `updated_by` and append an immutable access-audit event
 containing the settings scope and changed field names. Audit payloads do not copy full before/after
-configuration objects.
+configuration objects. Migration 040 already accepts regex-valid text event types and exposes the
+fixed-`search_path` `record_access_audit_event` helper for internal use, so
+`soccer_settings_changed` requires no audit-table or event-type schema change; the team-settings
+write RPC calls the existing helper.
 
 ### 6.3 RPC behavior
 
@@ -222,8 +238,12 @@ Personal and team writes use narrow compare-and-swap RPCs:
 - update requires an exact current revision;
 - success increments revision and returns the saved row;
 - stale revisions return a stable conflict code and current revision;
+- a concurrent-create uniqueness collision is translated into that same stable conflict response
+  with the winning row and revision, rather than leaking a primary-key error;
 - payloads are validated for sport id, schema version, known keys, value ranges, and complete
   personal versus sparse team shape;
+- the persisted configurable schema rejects the derived legacy keys `extraTimeAvailable` and
+  `shootoutAvailable`;
 - security-definer functions set a fixed `search_path` and re-check active app access.
 
 The exact migration number is selected from the merged baseline when SOC-6D1 starts. The operator
@@ -239,6 +259,10 @@ New teams begin without a team override and therefore inherit the recorder's per
 Owners/admins may explicitly copy defaults from another accessible soccer team. There is no
 automatic season transition or cross-team copy.
 
+Migration 018 makes `teams.season_id` non-null in the supported schema. The settings RPC resolves
+the team's sport through that required season and fails closed if the relationship is missing,
+inaccessible, or malformed; it never treats an unresolved team as soccer-compatible.
+
 ## 7. Permissions Matrix
 
 | Capability | Anonymous | Account user | Team scorer | Team viewer | Team owner/admin |
@@ -248,7 +272,7 @@ automatic season transition or cross-team copy.
 | View effective team defaults | Local cache only | With access | Yes | Yes | Yes |
 | Edit shared team defaults | No | No | No | No | Yes |
 | Copy another team's defaults | No | No | No | No | Yes |
-| Apply match overrides while tracking | Yes | Yes | Yes | No | Yes |
+| Apply match overrides during setup | Yes | Yes | Yes | No | Yes |
 
 Existing team/game authorization remains authoritative. SOC-6D settings do not grant game,
 roster, player, or finalization access.
@@ -310,9 +334,12 @@ Automated coverage must include:
 
 - every resolver layer alone and in combination;
 - per-field source attribution and clearing sparse overrides;
-- complete personal versus sparse team/match schema validation;
+- complete configurable personal versus sparse team/match schema validation;
 - unknown versions, unknown keys, corrupt JSON, and invalid nested segments;
+- rejection of stored layers containing derived legacy availability keys;
+- atomic segment-array override, source attribution, and reset behavior;
 - personal and team RPC authorization plus stale-revision conflicts;
+- concurrent-create collision mapped to the normal settings conflict response;
 - sport mismatch and inaccessible-team rejection;
 - anonymous-to-account first initialization and existing-cloud precedence;
 - user-keyed cache isolation and sign-out restoration;
@@ -341,8 +368,9 @@ and account sign-out regression paths because SOC-6D changes shared settings inf
 - Automatic copying between teams or seasons.
 - Full before/after settings payloads in the access audit.
 - A broad settings/application visual reskin.
-- Migrating basketball settings into the generic account-backed sport-settings tables; the new
-  infrastructure should make that a future compatible change, not silently alter basketball now.
+- Migrating basketball settings into the generic account-backed sport-settings tables. Basketball
+  currently stores shared team-stat rules at season scope, so moving them to team scope is a
+  product and inheritance change requiring its own Q&A and migration plan, not a lift-and-shift.
 
 ## 11. Approved Decisions
 
@@ -351,7 +379,7 @@ The focused Q&A approved the recommended option for all 36 decisions:
 - team-scoped shared defaults;
 - built-in -> personal -> team -> match precedence;
 - generic versioned cloud storage;
-- complete personal and sparse shared/match settings;
+- complete configurable personal and sparse shared/match settings;
 - separate anonymous and account scopes;
 - revision-aware cross-device conflicts;
 - anonymous restoration on sign-out;
