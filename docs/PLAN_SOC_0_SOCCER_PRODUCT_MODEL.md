@@ -5,7 +5,7 @@ supported sport. SOC-0 defines the stable direction for the soccer program. Each
 implementation phase in this document must receive its own detailed execution plan and
 Q&A review before code work begins.
 
-Status: SOC-1 through SOC-6C implemented; SOC-6D settings/defaults is planned in
+Status: SOC-1 through SOC-6C and SOC-6D1 implemented; SOC-6D2 through SOC-6D4 are planned in
 `PLAN_SOC_6D_SOCCER_SETTINGS.md`, followed by SOC-6E release.
 
 ---

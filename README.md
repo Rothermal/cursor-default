@@ -124,6 +124,7 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/045_soccer_recorder_resolution.sql` - SOC-5C independent team recorder binding, recorder presence, provisional primary selection, and audit history
 - `supabase/migrations/046_soccer_finalization_recovery.sql` - SOC-5D canonical publication, primary locking, final audit uploads, and reason-required reopen
 - `supabase/migrations/047_soccer_canonical_aggregate_sources.sql` - SOC-6C2 RLS/keyset canonical aggregate source RPCs, audited participant-link repair, merge-safe stable identities, and retention of migration 041's basketball shot-chart remount
+- `supabase/migrations/048_soccer_settings_foundation.sql` - SOC-6D1 generic personal/team sport-settings tables, strict soccer schema validation, read-only RLS, revision-aware write RPCs, and shared-setting audit events
    > Before **`047`**, run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` and review the repairable/unprovable participant counts.
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
@@ -428,10 +429,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Soccer canonical aggregate transport (SOC-6C2)** - authorized keyset publication RPCs, audited merge-lineage repair, merge-safe source identities, full-page loading, cancellation/deduplication, cooperative projection, and metrics ([plan](docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md))
 - [x] **Soccer aggregate destinations (SOC-6C3)** - canonical season Leaderboard plus Team/Tournament Overview, Players, and Games; active-roster zero rows; compact category ranking; partial-quality authorization; and refresh/focus lifecycle ([plan](docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md))
 - [x] **Soccer player and career aggregates (SOC-6C4)** - stable-player canonical Profile/Career totals, Participation-at-zero, all-zero category suppression, season/team history, direct Summary links, and legacy-route regression guards ([plan](docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md))
+- [x] **Soccer settings foundation (SOC-6D1)** - strict configurable rule schema, source-aware built-in/personal/team/match resolution, anonymous and account-keyed local cache contracts, backend capability parsing, and migration 048 revision-aware personal/team storage ([plan](docs/PLAN_SOC_6D_SOCCER_SETTINGS.md))
 
 ### What's Next
 
-- [ ] **Soccer SOC-6D and SOC-6E** - add account/team/match settings defaults, complete release hardening, and enable opt-in production discovery ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [SOC-6D plan](docs/PLAN_SOC_6D_SOCCER_SETTINGS.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
+- [ ] **Soccer SOC-6D2 through SOC-6E** - add personal settings sync and UI, team/setup inheritance, release hardening, and opt-in production discovery ([SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md), [SOC-6D plan](docs/PLAN_SOC_6D_SOCCER_SETTINGS.md), [roadmap](docs/PLAN_SOC_0_SOCCER_PRODUCT_MODEL.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))
