@@ -167,6 +167,7 @@ export interface SoccerAggregateGame {
 export interface SoccerAggregateMetrics {
   sourceCount: number
   includedMatchCount: number
+  /** Rebuilt event count from included matches only, unlike transport fetch metrics. */
   eventCount: number
   unresolvedParticipantCount: number
   excludedContributionCount: number

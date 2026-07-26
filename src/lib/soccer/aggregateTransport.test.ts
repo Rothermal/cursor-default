@@ -124,13 +124,27 @@ describe('soccer canonical aggregate transport', () => {
     const rpc = vi.fn(() => pending)
     const client = rpcClient(rpc)
     const firstController = new AbortController()
+    const activeRoster = [
+      {
+        playerId: 'cloud-striker',
+        displayName: 'Sam Striker',
+        number: '9',
+        teamId: 'team-1',
+      },
+      {
+        playerId: 'cloud-reserve',
+        displayName: 'Casey Reserve',
+        number: '12',
+        teamId: 'team-1',
+      },
+    ]
     const first = loadSoccerCanonicalAggregates(
       { type: 'team', id: 'team-1' },
-      { client, signal: firstController.signal }
+      { client, signal: firstController.signal, activeRoster }
     )
     const second = loadSoccerCanonicalAggregates(
       { type: 'team', id: 'team-1' },
-      { client }
+      { client, activeRoster: [...activeRoster].reverse() }
     )
 
     const firstRejection = expect(first).rejects.toMatchObject({ code: 'aborted' })
@@ -148,6 +162,59 @@ describe('soccer canonical aggregate transport', () => {
       aggregate: { includedMatchCount: 1 },
     })
     expect(rpc).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts fresh when a consumer arrives after the shared load was aborted', async () => {
+    let rejectFirstUnderlying!: (reason: unknown) => void
+    let resolveReplacement!: (value: TestRpcResponse) => void
+    const replacement = new Promise<TestRpcResponse>(resolve => {
+      resolveReplacement = resolve
+    })
+    const rpc = vi.fn(() => {
+      if (rpc.mock.calls.length === 1) {
+        const request = new Promise<never>(() => undefined) as ReturnType<
+          SoccerAggregateRpcClient['rpc']
+        >
+        request.abortSignal = () => new Promise((_, reject) => {
+          rejectFirstUnderlying = reject
+        })
+        return request
+      }
+      return replacement
+    })
+    const client = rpcClient(rpc)
+    const controller = new AbortController()
+    const first = loadSoccerCanonicalAggregates(
+      { type: 'team', id: 'team-abort-handoff' },
+      { client, signal: controller.signal }
+    )
+    const firstRejection = expect(first).rejects.toMatchObject({ code: 'aborted' })
+
+    controller.abort()
+    const replacementLoad = loadSoccerCanonicalAggregates(
+      { type: 'team', id: 'team-abort-handoff' },
+      { client }
+    )
+    rejectFirstUnderlying(new DOMException('Aborted', 'AbortError'))
+    await firstRejection
+    await Promise.resolve()
+    const sharedReplacementLoad = loadSoccerCanonicalAggregates(
+      { type: 'team', id: 'team-abort-handoff' },
+      { client }
+    )
+    resolveReplacement({
+      data: {
+        items: [transportItem(source('publication-handoff', 'game-handoff'))],
+        nextCursor: null,
+      },
+      error: null,
+    })
+
+    await expect(Promise.all([
+      replacementLoad,
+      sharedReplacementLoad,
+    ])).resolves.toHaveLength(2)
+    expect(rpc).toHaveBeenCalledTimes(2)
   })
 
   it('cancels the underlying request after its final consumer leaves', async () => {
@@ -201,17 +268,20 @@ describe('soccer canonical aggregate transport', () => {
     )).rejects.toMatchObject({ code: 'access_denied' })
   })
 
-  it('rejects malformed page envelopes but isolates malformed publications', async () => {
+  it('rejects malformed page envelopes but isolates malformed publication items', async () => {
     const invalidPageClient = rpcClient(() => success({ nope: [] }))
     await expect(loadSoccerCanonicalAggregates(
       { type: 'team', id: 'team-invalid-page' },
       { client: invalidPageClient }
     )).rejects.toMatchObject({ code: 'invalid_payload' })
 
-    const malformed = transportItem(source('publication-bad', 'game-bad'))
-    ;(malformed as { canonicalSnapshot: unknown }).canonicalSnapshot = {}
+    const valid = transportItem(source('publication-good', 'game-good'))
+    const malformedEnvelope = transportItem(source('publication-envelope', 'game-envelope'))
+    ;(malformedEnvelope as { publicationNumber: unknown }).publicationNumber = 'bad'
+    const malformedSnapshot = transportItem(source('publication-bad', 'game-bad'))
+    ;(malformedSnapshot as { canonicalSnapshot: unknown }).canonicalSnapshot = {}
     const partialClient = rpcClient(() => success({
-      items: [malformed],
+      items: [valid, malformedEnvelope, malformedSnapshot],
       nextCursor: null,
     }))
     const loaded = await loadSoccerCanonicalAggregates(
@@ -220,10 +290,38 @@ describe('soccer canonical aggregate transport', () => {
     )
 
     expect(loaded.aggregate.quality).toBe('partial')
-    expect(loaded.aggregate.exclusions).toMatchObject([
-      { kind: 'malformed_publication', publicationId: 'publication-bad' },
-    ])
-    expect(loaded.metrics.malformedPublicationCount).toBe(1)
+    expect(loaded.aggregate.includedMatchCount).toBe(1)
+    expect(loaded.aggregate.exclusions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'malformed_publication',
+        publicationId: 'publication-envelope',
+      }),
+      expect.objectContaining({
+        kind: 'malformed_publication',
+        publicationId: 'publication-bad',
+      }),
+    ]))
+    expect(loaded.metrics).toMatchObject({
+      publicationCount: 3,
+      malformedPublicationCount: 2,
+    })
+  })
+
+  it('uses product-facing fallbacks for blank presentation labels', async () => {
+    const item = transportItem(source('publication-labels', 'game-labels'))
+    item.game.trackedTeamName = ' '
+    item.game.opponentName = ''
+    const client = rpcClient(() => success({ items: [item], nextCursor: null }))
+
+    const loaded = await loadSoccerCanonicalAggregates(
+      { type: 'team', id: 'team-labels' },
+      { client }
+    )
+
+    expect(loaded.aggregate.games[0]).toMatchObject({
+      trackedTeamName: 'Tracked team',
+      opponentName: 'Opponent',
+    })
   })
 
   it('rejects invalid page sizes before transport begins', async () => {

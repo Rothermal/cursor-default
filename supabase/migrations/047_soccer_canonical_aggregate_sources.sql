@@ -123,12 +123,22 @@ as $$
       and nullif(event.value->>'deletedAt', '') is null
     order by
       case
-        when event.value->>'sequence' ~ '^[0-9]+$'
+        when (event.value#>>'{period,order}') ~ '^-?[0-9]+$'
+          then (event.value#>>'{period,order}')::bigint
+        else 2147483647
+      end desc,
+      case
+        when (event.value->>'elapsedMs') ~ '^[0-9]+$'
+          then (event.value->>'elapsedMs')::bigint
+        else 9007199254740991
+      end desc,
+      case
+        when (event.value->>'sequence') ~ '^[0-9]+$'
           then (event.value->>'sequence')::bigint
         else -1
       end desc,
-      event.ordinality desc,
-      event.value->>'id' desc
+      event.value->>'id' desc,
+      event.ordinality desc
     limit 1
   ), false);
 $$;
@@ -161,6 +171,9 @@ as $$
     having count(distinct participant.source_player_id) = 1
   ) identity;
 $$;
+
+comment on function public._soccer_participant_source_map(uuid) is
+  'Private definer helper; callers must enforce can_read_game before requesting a source map.';
 
 revoke all on function public._soccer_canonical_snapshot_completed(jsonb) from public;
 revoke all on function public._soccer_participant_source_map(uuid) from public;
@@ -257,6 +270,7 @@ begin
         'snapshotFingerprint', ranked.snapshot_fingerprint,
         'finalizedAt', ranked.finalized_at,
         'eventCount', ranked.event_count,
+        -- SOC-6C pins serialized UTF-8 payload bytes; pg_column_size measures storage instead.
         'payloadBytes', octet_length(convert_to(ranked.canonical_snapshot::text, 'UTF8')),
         'game', jsonb_build_object(
           'id', ranked.game_id,
@@ -391,6 +405,7 @@ begin
         'snapshotFingerprint', ranked.snapshot_fingerprint,
         'finalizedAt', ranked.finalized_at,
         'eventCount', ranked.event_count,
+        -- SOC-6C pins serialized UTF-8 payload bytes; pg_column_size measures storage instead.
         'payloadBytes', octet_length(convert_to(ranked.canonical_snapshot::text, 'UTF8')),
         'game', jsonb_build_object(
           'id', ranked.game_id,

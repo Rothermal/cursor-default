@@ -591,10 +591,12 @@ Implementation:
 - Migration 047 adds active-publication keyset RPCs for scope and stable-player queries, exact
   calendar-date serialization, terminal completed-snapshot filtering, readable-team enforcement,
   a canonical-finalized index, conservative audited-lineage repair, and future merge remounting.
+  Its terminal-control helper mirrors TypeScript `compareGameEvents` ordering by period, elapsed
+  time, sequence, and id; this server prefilter remains paired with authoritative client rebuild.
 - `aggregateTransport.ts` validates every page/item envelope, drains all pages before publishing,
-  deduplicates publication ids, shares only identical in-flight work, isolates per-consumer aborts,
-  yields between deterministic projection batches, and returns typed errors plus structured
-  network/projection/quality metrics.
+  isolates malformed publication items as partial quality, deduplicates publication ids, shares
+  only identical in-flight work, isolates per-consumer aborts, yields between deterministic
+  projection batches, and returns typed errors plus structured network/projection/quality metrics.
 - The reviewed Windows development fixture contains 50 publications and 10,000 canonical events
   with an approximately 10 MB server-reported payload. On 2026-07-25 it projected in 596.4 ms
   (596.8 ms total mocked transport time); the largest five-publication batch was 75.7 ms. These

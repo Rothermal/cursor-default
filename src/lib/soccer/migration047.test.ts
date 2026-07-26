@@ -45,6 +45,8 @@ describe('migration 047 soccer aggregate source contracts', () => {
     expect(sql).toContain(
       'public._soccer_canonical_snapshot_completed(publication.canonical_snapshot)'
     )
+    expect(sql).toContain("event.value#>>'{period,order}'")
+    expect(sql).toContain("event.value->>'elapsedms'")
     expect(sql).toContain("event.value->>'sequence'")
     expect(sql).toContain(
       "p_scope_type = 'team' and game.team_id = p_scope_id"
@@ -72,6 +74,7 @@ describe('migration 047 soccer aggregate source contracts', () => {
       'order by publication.finalized_at desc, publication.id desc'
     )
     expect(sql).toContain('limit v_limit + 1')
+    expect(sql.match(/where itemized\.page_row = v_limit\s*(?:\r?\n)/g)).toHaveLength(2)
     expect(sql).toContain(
       'participant.source_player_id = p_player_id'
     )
@@ -124,6 +127,12 @@ describe('migration 047 soccer aggregate source contracts', () => {
     expect(mergeSql).toContain('where source_player_id = p_duplicate_id')
     expect(
       mergeSql.indexOf('update public.game_participants')
+    ).toBeLessThan(
+      mergeSql.indexOf('delete from public.players where id = p_duplicate_id')
+    )
+    expect(mergeSql).toContain('update public.shot_chart')
+    expect(
+      mergeSql.indexOf('update public.shot_chart')
     ).toBeLessThan(
       mergeSql.indexOf('delete from public.players where id = p_duplicate_id')
     )

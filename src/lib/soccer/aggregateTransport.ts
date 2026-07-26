@@ -60,6 +60,7 @@ export interface SoccerAggregateLoadProgress {
 export interface SoccerAggregateTransportMetrics {
   pageCount: number
   publicationCount: number
+  /** Server-reported events across every fetched publication, including excluded sources. */
   eventCount: number
   payloadBytes: number
   networkTimeMs: number
@@ -121,8 +122,16 @@ interface TransportSource extends SoccerCanonicalAggregateSource {
 }
 
 interface AggregatePage {
-  items: TransportSource[]
+  records: TransportRecord[]
   nextCursor: AggregateCursor | null
+}
+
+interface TransportRecord {
+  dedupeKey: string
+  source: TransportSource | null
+  exclusion: SoccerAggregateExclusion | null
+  transportEventCount: number
+  transportPayloadBytes: number
 }
 
 interface SharedLoad {
@@ -168,11 +177,16 @@ export function loadSoccerCanonicalAggregates(
     scope: normalizedScope(scope),
     pageSize,
     projectionBatchSize,
-    activeRoster: options.activeRoster ?? [],
+    activeRoster: normalizedRoster(options.activeRoster ?? []),
   })
   let shared = clientLoads.get(key)
+  if (shared?.controller.signal.aborted) {
+    clientLoads.delete(key)
+    shared = undefined
+  }
   if (!shared) {
     const controller = new AbortController()
+    const activeRoster = normalizedRoster(options.activeRoster ?? [])
     shared = {
       controller,
       promise: Promise.resolve(null as never),
@@ -183,7 +197,7 @@ export function loadSoccerCanonicalAggregates(
     const current = shared
     current.promise = executeAggregateLoad(scope, {
       signal: controller.signal,
-      activeRoster: options.activeRoster ?? [],
+      activeRoster,
       pageSize,
       projectionBatchSize,
       yieldControl: options.yieldControl ?? yieldToBrowser,
@@ -200,7 +214,7 @@ export function loadSoccerCanonicalAggregates(
         }
       },
     }).finally(() => {
-      clientLoads!.delete(key)
+      if (clientLoads!.get(key) === current) clientLoads!.delete(key)
       if (clientLoads!.size === 0) inFlightByClient.delete(clientKey)
     })
     clientLoads.set(key, current)
@@ -227,6 +241,8 @@ async function executeAggregateLoad(
 ): Promise<SoccerAggregateLoadResult> {
   const startedAt = options.now()
   const sources: TransportSource[] = []
+  const transportExclusions: SoccerAggregateExclusion[] = []
+  const transportRecords: TransportRecord[] = []
   const seenPublicationIds = new Set<string>()
   const seenCursors = new Set<string>()
   let cursor: AggregateCursor | null = null
@@ -252,25 +268,27 @@ async function executeAggregateLoad(
       options.signal
     )
     networkTimeMs += options.now() - networkStartedAt
-    const page = parseAggregatePage(response)
+    const page = parseAggregatePage(response, pageCount + 1)
     pageCount += 1
-    for (const source of page.items) {
-      if (seenPublicationIds.has(source.publicationId)) continue
-      seenPublicationIds.add(source.publicationId)
-      sources.push(source)
+    for (const record of page.records) {
+      if (seenPublicationIds.has(record.dedupeKey)) continue
+      seenPublicationIds.add(record.dedupeKey)
+      transportRecords.push(record)
+      if (record.source) sources.push(record.source)
+      if (record.exclusion) transportExclusions.push(record.exclusion)
     }
     cursor = page.nextCursor
     options.onProgress({
       stage: 'loading',
       pageCount,
-      publicationCount: sources.length,
+      publicationCount: transportRecords.length,
       projectedCount: 0,
       projectionTotal: 0,
     })
   } while (cursor)
 
   const matches: SoccerAggregateMatch[] = []
-  const exclusions: SoccerAggregateExclusion[] = []
+  const exclusions: SoccerAggregateExclusion[] = [...transportExclusions]
   const projectionStartedAt = options.now()
   let maxProjectionBatchMs = 0
 
@@ -289,7 +307,7 @@ async function executeAggregateLoad(
     options.onProgress({
       stage: 'projecting',
       pageCount,
-      publicationCount: sources.length,
+      publicationCount: transportRecords.length,
       projectedCount,
       projectionTotal: sources.length,
     })
@@ -304,18 +322,18 @@ async function executeAggregateLoad(
     matches,
     exclusions,
     options.activeRoster,
-    sources.length
+    transportRecords.length
   )
   const projectionTimeMs = options.now() - projectionStartedAt
   const metrics: SoccerAggregateTransportMetrics = {
     pageCount,
-    publicationCount: sources.length,
-    eventCount: sources.reduce(
-      (total, source) => total + source.transportEventCount,
+    publicationCount: transportRecords.length,
+    eventCount: transportRecords.reduce(
+      (total, record) => total + record.transportEventCount,
       0
     ),
-    payloadBytes: sources.reduce(
-      (total, source) => total + source.transportPayloadBytes,
+    payloadBytes: transportRecords.reduce(
+      (total, record) => total + record.transportPayloadBytes,
       0
     ),
     networkTimeMs,
@@ -330,7 +348,7 @@ async function executeAggregateLoad(
   options.onProgress({
     stage: 'complete',
     pageCount,
-    publicationCount: sources.length,
+    publicationCount: transportRecords.length,
     projectedCount: sources.length,
     projectionTotal: sources.length,
   })
@@ -390,7 +408,7 @@ async function requestPage(
   }
 }
 
-function parseAggregatePage(value: unknown): AggregatePage {
+function parseAggregatePage(value: unknown, pageNumber: number): AggregatePage {
   if (!isPlainObject(value) || !Array.isArray(value.items)) {
     throw invalidPayload('Aggregate publication page is invalid.')
   }
@@ -398,8 +416,48 @@ function parseAggregatePage(value: unknown): AggregatePage {
     ? null
     : parseCursor(value.nextCursor)
   return {
-    items: value.items.map(parseTransportSource),
+    records: value.items.map((item, index) =>
+      parseTransportRecord(item, pageNumber, index)
+    ),
     nextCursor,
+  }
+}
+
+function parseTransportRecord(
+  value: unknown,
+  pageNumber: number,
+  itemIndex: number
+): TransportRecord {
+  try {
+    const source = parseTransportSource(value)
+    return {
+      dedupeKey: source.publicationId,
+      source,
+      exclusion: null,
+      transportEventCount: source.transportEventCount,
+      transportPayloadBytes: source.transportPayloadBytes,
+    }
+  } catch (error) {
+    const row = isPlainObject(value) ? value : null
+    const game = row && isPlainObject(row.game) ? row.game : null
+    const publicationId = optionalString(row?.publicationId) ??
+      `malformed-page-${pageNumber}-item-${itemIndex + 1}`
+    return {
+      dedupeKey: publicationId,
+      source: null,
+      exclusion: {
+        kind: 'malformed_publication',
+        publicationId,
+        gameId: optionalString(game?.id) ?? 'unknown',
+        gameDate: optionalString(game?.date) ?? '',
+        message: error instanceof Error
+          ? error.message
+          : 'Aggregate publication item is invalid.',
+        canManage: row?.canManage === true,
+      },
+      transportEventCount: optionalNonNegativeInteger(row?.eventCount),
+      transportPayloadBytes: optionalNonNegativeInteger(row?.payloadBytes),
+    }
   }
 }
 
@@ -465,9 +523,10 @@ function parseTransportSource(value: unknown): TransportSource {
       teamId: nullableString(game.teamId, 'team id'),
       seasonId: nullableString(game.seasonId, 'season id'),
       tournamentId: nullableString(game.tournamentId, 'tournament id'),
-      trackedTeamName: requiredString(game.trackedTeamName, 'tracked team name'),
-      opponentName: requiredString(game.opponentName, 'opponent name'),
+      trackedTeamName: displayString(game.trackedTeamName, 'Tracked team'),
+      opponentName: displayString(game.opponentName, 'Opponent'),
     },
+    // C1 deliberately owns semantic snapshot validation and catches rebuild failures.
     canonicalSnapshot:
       value.canonicalSnapshot as unknown as SoccerCanonicalSnapshot,
     participantSourceMap,
@@ -544,6 +603,17 @@ function aggregateScope(
   return isPlayerAggregateScope(scope)
     ? { type: scope.type, id: scope.playerId }
     : { type: scope.type, id: scope.id }
+}
+
+function normalizedRoster(
+  roster: SoccerAggregateRosterPlayer[]
+): SoccerAggregateRosterPlayer[] {
+  return [...roster].sort((left, right) =>
+    left.playerId.localeCompare(right.playerId) ||
+    left.teamId.localeCompare(right.teamId) ||
+    left.displayName.localeCompare(right.displayName) ||
+    (left.number ?? '').localeCompare(right.number ?? '')
+  )
 }
 
 function validateLoadInput(
@@ -626,6 +696,20 @@ function requiredString(value: unknown, label: string): string {
 function nullableString(value: unknown, label: string): string | null {
   if (value === null) return null
   return requiredString(value, label)
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+function displayString(value: unknown, fallback: string): string {
+  return optionalString(value) ?? fallback
+}
+
+function optionalNonNegativeInteger(value: unknown): number {
+  return Number.isInteger(value) && (value as number) >= 0
+    ? value as number
+    : 0
 }
 
 function requiredNonNegativeInteger(

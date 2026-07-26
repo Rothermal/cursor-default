@@ -123,7 +123,7 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/044_soccer_event_recovery.sql` - SOC-5B immutable soccer setup snapshots, same-recorder conflict audit, and recovery RPCs
 - `supabase/migrations/045_soccer_recorder_resolution.sql` - SOC-5C independent team recorder binding, recorder presence, provisional primary selection, and audit history
 - `supabase/migrations/046_soccer_finalization_recovery.sql` - SOC-5D canonical publication, primary locking, final audit uploads, and reason-required reopen
-- `supabase/migrations/047_soccer_canonical_aggregate_sources.sql` - SOC-6C2 RLS/keyset canonical aggregate source RPCs, audited participant-link repair, and merge-safe stable identities
+- `supabase/migrations/047_soccer_canonical_aggregate_sources.sql` - SOC-6C2 RLS/keyset canonical aggregate source RPCs, audited participant-link repair, merge-safe stable identities, and retention of migration 041's basketball shot-chart remount
    > Before **`047`**, run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` and review the repairable/unprovable participant counts.
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
