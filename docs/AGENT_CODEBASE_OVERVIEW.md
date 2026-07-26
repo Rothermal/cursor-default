@@ -182,8 +182,10 @@ derived after raw values combine. SOC-6C2 adds the RLS/keyset source RPCs in mig
 loads, isolates consumer cancellation, projects cooperatively, and reports typed failures and
 metrics. SOC-6C3 routes Soccer Leaderboard, Team Stats, and Tournament Stats through those
 canonical sources with shared category tables, active-roster zero rows, Overview/Players/Games,
-partial-quality authorization, and refresh/focus lifecycle behavior. Player Profile and Career
-Stats remain SOC-6C4.
+partial-quality authorization, and refresh/focus lifecycle behavior. SOC-6C4 adds stable-player
+Profile and Career destinations with Participation-at-zero, all-zero category suppression,
+canonical per-game/season history, direct Summary links, and route guards that keep legacy
+aggregate RPCs exclusive to non-soccer sports.
 
 The `game_events` repository is wired into the automatic queue only for healthy soccer event
 games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
@@ -272,8 +274,8 @@ Helpers live in [`src/lib/gameSyncFingerprint.ts`](../src/lib/gameSyncFingerprin
 | RPC | Used for |
 |-----|----------|
 | `get_game_stats_resolved` | Game Summary, hydration of final games, analytics |
-| `get_season_stats_resolved` | Leaderboard, Player Profile |
-| `get_career_stats_resolved` | Career Stats |
+| `get_season_stats_resolved` | Non-soccer Leaderboard and Player Profile |
+| `get_career_stats_resolved` | Non-soccer Career Stats |
 | `get_tournament_stats_resolved` | Tournament Stats |
 | `get_game_team_stats` | Game Summary team tab |
 | `get_player_game_log` / `get_team_game_log` | Profile / team game lists |
@@ -326,7 +328,7 @@ flowchart LR
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
-| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) | SOC-6A and SOC-6B shipped; SOC-6C1 engine, SOC-6C2 transport, and SOC-6C3 season/team/tournament destinations shipped; SOC-6C4 is next |
+| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) | SOC-6A, SOC-6B, and SOC-6C shipped; SOC-6D settings/defaults is next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md`](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) | Basketball migration onto the shared event model. BKE-0 architecture plan drafted, revised after its first review pass, and awaiting approval; BKE-1 through BKE-5 are gated on that approval, with BKE-4 split into 4A-4D |
 
 ### Held / waiting for feedback

@@ -35,4 +35,27 @@ describe('soccer aggregate destination route contracts', () => {
       source.indexOf("rpc('get_tournament_stats_resolved'")
     )
   })
+
+  it('routes Player Profile soccer scopes before legacy season RPCs', () => {
+    const source = page('PlayerProfile')
+    const guard = "if (teamData.seasons.sport === 'soccer')"
+    expect(source).toContain("type: 'player'")
+    expect(source).toContain('seasonId: seasonIdFromUrl ?? team.season_id')
+    expect(source).toContain(guard)
+    expect(source.indexOf(guard)).toBeLessThan(
+      source.indexOf("rpc('get_season_stats_resolved'")
+    )
+  })
+
+  it('routes Career Stats soccer scopes before the legacy career RPC', () => {
+    const source = page('CareerStats')
+    const guard = 'if (isSoccerDestination)'
+    expect(source).toContain("scope={{ type: 'career', playerId }}")
+    expect(source).toContain("from('team_players')")
+    expect(source).toContain('availableSports')
+    expect(source).toContain(guard)
+    expect(source.indexOf(guard)).toBeLessThan(
+      source.indexOf("rpc('get_career_stats_resolved'")
+    )
+  })
 })

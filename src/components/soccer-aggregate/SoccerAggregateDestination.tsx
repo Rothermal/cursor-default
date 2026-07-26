@@ -136,8 +136,8 @@ export function SoccerAggregateDestination({
         </button>
       </div>
 
-      {loading && !result && <LoadingState progress={progress} />}
-      {error && !result && <ErrorState code={error.code} refresh={refresh} />}
+      {loading && !result && <SoccerAggregateLoadingState progress={progress} />}
+      {error && !result && <SoccerAggregateErrorState code={error.code} refresh={refresh} />}
       {error && result && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Refresh failed. Showing the last successfully loaded canonical statistics.
@@ -156,10 +156,10 @@ export function SoccerAggregateDestination({
               Refreshing canonical matches...
             </p>
           )}
-          <QualityNotice aggregate={aggregate} />
+          <SoccerAggregateQualityNotice aggregate={aggregate} />
 
           {aggregate.includedMatchCount === 0 ? (
-            <EmptyState
+            <SoccerAggregateEmptyState
               title="No completed canonical matches"
               detail="Finalize a soccer match to include it in these statistics."
             />
@@ -191,7 +191,7 @@ export function SoccerAggregateDestination({
   )
 }
 
-function LoadingState({
+export function SoccerAggregateLoadingState({
   progress,
 }: {
   progress: ReturnType<typeof useSoccerAggregateDestination>['progress']
@@ -210,7 +210,7 @@ function LoadingState({
   )
 }
 
-function ErrorState({
+export function SoccerAggregateErrorState({
   code,
   refresh,
 }: {
@@ -258,7 +258,11 @@ function ErrorState({
   )
 }
 
-function QualityNotice({ aggregate }: { aggregate: SoccerAggregateResult }) {
+export function SoccerAggregateQualityNotice({
+  aggregate,
+}: {
+  aggregate: SoccerAggregateResult
+}) {
   const generic = soccerAggregateGenericQualityMessage(aggregate)
   const managed = soccerAggregateManagedDiagnostics(aggregate)
   if (!generic) return null
@@ -341,7 +345,7 @@ function Overview({
     : aggregate.teams[0]
   if (!team) {
     return (
-      <EmptyState
+      <SoccerAggregateEmptyState
         title="No team totals"
         detail="The included matches did not produce a readable team summary."
       />
@@ -448,7 +452,7 @@ function Players({
 
   if (aggregate.players.length === 0) {
     return (
-      <EmptyState
+      <SoccerAggregateEmptyState
         title="No resolved players"
         detail="Match totals are available, but no participant has a stable cloud player identity."
       />
@@ -494,7 +498,7 @@ function Players({
           seasonId={seasonId}
         />
       ) : (
-        <EmptyState
+        <SoccerAggregateEmptyState
           title={`No ${category.label.toLowerCase()} statistics`}
           detail="Choose another category or record this statistic in a completed match."
         />
@@ -581,7 +585,12 @@ function PlayerTable({
 
 function Games({ games }: { games: SoccerAggregateGame[] }) {
   if (games.length === 0) {
-    return <EmptyState title="No games" detail="No completed canonical matches are in this scope." />
+    return (
+      <SoccerAggregateEmptyState
+        title="No games"
+        detail="No completed canonical matches are in this scope."
+      />
+    )
   }
   return (
     <section className="space-y-2">
@@ -615,7 +624,13 @@ function Games({ games }: { games: SoccerAggregateGame[] }) {
   )
 }
 
-function EmptyState({ title, detail }: { title: string; detail: string }) {
+export function SoccerAggregateEmptyState({
+  title,
+  detail,
+}: {
+  title: string
+  detail: string
+}) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-5 text-center">
       <p className="font-semibold text-slate-700">{title}</p>

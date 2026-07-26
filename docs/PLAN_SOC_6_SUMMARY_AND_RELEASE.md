@@ -1,6 +1,6 @@
 # Plan: SOC-6 Summary and Release
 
-Status: SOC-6A, SOC-6B, and SOC-6C1 through SOC-6C3 implemented. SOC-6C4 through SOC-6E remain planned.
+Status: SOC-6A, SOC-6B, and SOC-6C implemented. SOC-6D and SOC-6E remain planned.
 
 ## 1. Goal
 

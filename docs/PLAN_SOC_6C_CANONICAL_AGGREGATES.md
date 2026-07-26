@@ -1,6 +1,6 @@
 # SOC-6C Canonical Soccer Aggregates
 
-Status: SOC-6C1 through SOC-6C3 implemented; SOC-6C4 player and career destinations are next.
+Status: SOC-6C1 through SOC-6C4 implemented. SOC-6C is complete.
 
 ## 1. Goal
 
@@ -44,7 +44,7 @@ The implementation will use four reviewable slices:
 3. **SOC-6C3 - Season, team, and tournament destinations**
    - Route soccer scopes through the canonical loader and aggregate engine.
    - Preserve existing basketball and legacy-sport behavior.
-4. **SOC-6C4 - Player, career, and release hardening**
+4. **SOC-6C4 - Player, career, and release hardening (shipped)**
    - Add soccer player/career views and manager-only unresolved exclusion reporting.
    - Complete performance measurements, regression coverage, docs, and failure states.
 
@@ -649,6 +649,20 @@ Scope:
 - verify merged-player credit follows current stable identity;
 - complete the full role, route, malformed-source, capability, and basketball regression matrix;
 - update README, agent docs, and roadmap status.
+
+Implementation:
+
+- `aggregatePlayerDestinations.ts` selects one requested stable player, keeps Participation
+  visible at zero, suppresses other all-zero categories, filters game history by stable player
+  identity, and rebuilds career season/team stints from canonical per-game totals.
+- Player/career canonical game rows retain season/tournament ids and only the requested stable
+  player's per-game totals so Career Stats can derive stint history without legacy `game_stats`
+  or extra aggregate RPCs. Team/season/tournament rows do not retain per-game player maps.
+- `SoccerPlayerAggregateDestination.tsx` provides shared profile/career totals, reviewed rates,
+  direct canonical Summary links, season/team history, manager-only diagnostics, and guarded
+  refresh behavior.
+- `PlayerProfile` and `CareerStats` select their soccer scope before any legacy resolved-stat,
+  game-log, high-game, or `game_stats` read. Basketball retains the existing route loaders and UI.
 
 Acceptance:
 
