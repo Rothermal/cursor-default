@@ -50,6 +50,7 @@ export const SOCCER_CANONICAL_STAT_IDS = [
 
 export type SoccerCanonicalStatId = typeof SOCCER_CANONICAL_STAT_IDS[number]
 export type SoccerAggregateStats = Record<SoccerCanonicalStatId, number>
+export type SoccerProjectorCanonicalStats = Omit<SoccerAggregateStats, 'soc_cs'>
 export type SoccerAggregateStatFormat = 'integer' | 'duration'
 
 export interface SoccerAggregateStatDefinition {
@@ -147,7 +148,6 @@ export interface SoccerCanonicalParticipation {
   appearances: number
   started: boolean
   activeSeconds: number
-  cleanSheet: boolean
 }
 
 const DEFINITION_BY_ID = new Map(
@@ -193,13 +193,12 @@ export function normalizeSoccerAggregateStats(
 export function soccerCanonicalStatsFromTotals(
   totals: SoccerParticipantStatTotals,
   participation: SoccerCanonicalParticipation
-): SoccerAggregateStats {
+): SoccerProjectorCanonicalStats {
   const appeared = participation.appearances > 0
   return {
     soc_app: appeared ? 1 : 0,
     soc_start: appeared && participation.started ? 1 : 0,
     soc_min_sec: Math.max(0, finiteInteger(participation.activeSeconds)),
-    soc_cs: participation.cleanSheet ? 1 : 0,
     soc_goal: totals.goals,
     soc_own_goal: totals.ownGoals,
     soc_ast: totals.primaryAssists + totals.secondaryAssists,

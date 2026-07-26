@@ -566,14 +566,18 @@ function aggregateRecorder(snapshot: SoccerCanonicalSnapshot): SoccerRecorderSum
 }
 
 function statsFromReviewRow(row: SoccerPlayerReviewRow): SoccerAggregateStats {
-  return soccerCanonicalStatsFromTotals(row.stats, {
-    appearances: row.appearances,
-    started: row.lineupStatus === 'starter',
-    activeSeconds: Math.floor(row.minutesMs / 1_000),
-    cleanSheet:
+  return {
+    ...soccerCanonicalStatsFromTotals(row.stats, {
+      appearances: row.appearances,
+      started: row.lineupStatus === 'starter',
+      activeSeconds: Math.floor(row.minutesMs / 1_000),
+    }),
+    soc_cs:
       row.cleanSheet.status === 'credited' ||
-      row.cleanSheet.status === 'shared',
-  })
+      row.cleanSheet.status === 'shared'
+        ? 1
+        : 0,
+  }
 }
 
 function stablePlayerId(

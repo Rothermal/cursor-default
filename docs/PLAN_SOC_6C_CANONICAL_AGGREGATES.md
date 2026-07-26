@@ -234,6 +234,9 @@ participantSourceMap,
 canManage
 ```
 
+`game.date` is the PostgreSQL `date` value serialized exactly as `YYYY-MM-DD`. The RPC must not
+return a `timestamptz` or full ISO datetime in this field.
+
 `participantSourceMap` maps match-local participant and player ids to the current
 `game_participants.source_player_id`. It is server-built and never inferred from names. `canManage`
 comes from current owner/admin authority for that item's team.

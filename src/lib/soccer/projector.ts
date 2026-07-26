@@ -1,8 +1,5 @@
 import type { GameState } from '../../types'
-import {
-  SOCCER_CANONICAL_STAT_IDS,
-  soccerCanonicalStatsFromTotals,
-} from './aggregateStats'
+import { soccerCanonicalStatsFromTotals } from './aggregateStats'
 import type {
   GameEvent,
   GameEventActor,
@@ -1205,11 +1202,10 @@ function buildProjection(
         appearances: participant.appearances,
         started: participant.started,
         activeSeconds: Math.floor(activeMs / 1_000),
-        cleanSheet: false,
       }
     )
-    for (const id of SOCCER_CANONICAL_STAT_IDS) {
-      stats[id] = (stats[id] ?? 0) + canonical[id]
+    for (const [id, value] of Object.entries(canonical)) {
+      stats[id] = (stats[id] ?? 0) + value
     }
   }
   return {

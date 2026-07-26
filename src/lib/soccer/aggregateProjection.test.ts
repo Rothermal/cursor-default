@@ -338,20 +338,26 @@ describe('soccer canonical aggregate projection', () => {
       soc_shot: 1,
       soc_sot: 1,
     })
-    expect(striker.stats).toEqual(
-      fixture.state.players.find(player => player.id === 'striker-local')?.stats
-    )
+    const projectedStriker = fixture.state.players
+      .find(player => player.id === 'striker-local')?.stats
+    expect(withoutCleanSheet(striker.stats)).toEqual(projectedStriker)
+    expect(projectedStriker).not.toHaveProperty('soc_cs')
     expect(
       result.match.players.reduce((sum, player) => sum + player.stats.soc_goal, 0)
     ).toBe(1)
-    expect(result.match.players.find(player => player.playerId === 'cloud-keeper-a')?.stats)
-      .toMatchObject({
+    const keeper = result.match.players
+      .find(player => player.playerId === 'cloud-keeper-a')!
+    expect(keeper.stats).toMatchObject({
         soc_ast: 1,
         soc_ast_primary: 1,
         soc_gk_save: 1,
         soc_cs: 1,
         soc_min_sec: 30,
       })
+    const projectedKeeper = fixture.state.players
+      .find(player => player.id === 'keeper-local-a')?.stats
+    expect(withoutCleanSheet(keeper.stats)).toEqual(projectedKeeper)
+    expect(projectedKeeper).not.toHaveProperty('soc_cs')
     expect(result.match.players.find(player => player.playerId === 'cloud-keeper-b')?.stats)
       .toMatchObject({
         soc_app: 1,
@@ -553,4 +559,10 @@ describe('soccer canonical aggregate projection', () => {
 
 function uuid(index: number): string {
   return `10000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+}
+
+function withoutCleanSheet(stats: Record<string, number>): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(stats).filter(([id]) => id !== 'soc_cs')
+  )
 }
