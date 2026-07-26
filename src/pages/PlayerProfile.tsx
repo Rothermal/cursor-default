@@ -447,7 +447,7 @@ export default function PlayerProfile() {
               teamId,
               seasonId: seasonIdFromUrl ?? team.season_id,
             }}
-            teamIds={[teamId]}
+            teamIds={[]}
             identity={{
               playerId,
               displayName: playerDisplayName(player),

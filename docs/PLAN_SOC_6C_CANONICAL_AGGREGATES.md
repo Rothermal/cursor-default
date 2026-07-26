@@ -655,9 +655,9 @@ Implementation:
 - `aggregatePlayerDestinations.ts` selects one requested stable player, keeps Participation
   visible at zero, suppresses other all-zero categories, filters game history by stable player
   identity, and rebuilds career season/team stints from canonical per-game totals.
-- Canonical aggregate game rows retain season/tournament ids and isolated per-player canonical
-  totals so Career Stats can derive stint history without legacy `game_stats` or extra aggregate
-  RPCs.
+- Player/career canonical game rows retain season/tournament ids and only the requested stable
+  player's per-game totals so Career Stats can derive stint history without legacy `game_stats`
+  or extra aggregate RPCs. Team/season/tournament rows do not retain per-game player maps.
 - `SoccerPlayerAggregateDestination.tsx` provides shared profile/career totals, reviewed rates,
   direct canonical Summary links, season/team history, manager-only diagnostics, and guarded
   refresh behavior.

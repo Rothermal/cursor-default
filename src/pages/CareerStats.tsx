@@ -10,6 +10,7 @@ import { playerDisplayName } from '../lib/display'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
+import { careerSportOptions } from '../lib/careerSportOptions'
 import type { GameState } from '../types'
 
 interface CareerRow {
@@ -46,6 +47,7 @@ export default function CareerStats() {
 
   const [player, setPlayer] = useState<PlayerMeta | null>(null)
   const [rows, setRows] = useState<CareerRow[]>([])
+  const [availableSports, setAvailableSports] = useState<string[]>([])
   const [selectedSport, setSelectedSport] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -59,10 +61,12 @@ export default function CareerStats() {
   const [loadingSegmentKey, setLoadingSegmentKey] = useState<string | null>(null)
 
   const sportsInData = useMemo(() => {
-    const set = new Set(rows.map(r => r.sport))
-    if (sportParam) set.add(sportParam)
-    return [...set].sort()
-  }, [rows, sportParam])
+    return careerSportOptions(
+      rows.map(row => row.sport),
+      availableSports,
+      sportParam
+    )
+  }, [availableSports, rows, sportParam])
 
   useEffect(() => {
     if (!playerId || !isConfigured || !supabaseClient) {
@@ -75,12 +79,19 @@ export default function CareerStats() {
       setLoading(true)
       setError(null)
       setRows([])
+      setAvailableSports([])
 
-      const playerRes = await supabaseClient
-        .from('players')
-        .select('id,first_name,last_name,nickname')
-        .eq('id', playerId)
-        .single()
+      const [playerRes, membershipsRes] = await Promise.all([
+        supabaseClient
+          .from('players')
+          .select('id,first_name,last_name,nickname')
+          .eq('id', playerId)
+          .single(),
+        supabaseClient
+          .from('team_players')
+          .select('team_id')
+          .eq('player_id', playerId),
+      ])
 
       if (cancelled) return
 
@@ -90,6 +101,24 @@ export default function CareerStats() {
         return
       }
       setPlayer(playerRes.data as PlayerMeta)
+
+      const teamIds = [...new Set(
+        ((membershipsRes.data ?? []) as Array<{ team_id: string }>)
+          .map(row => row.team_id)
+      )]
+      if (!membershipsRes.error && teamIds.length > 0) {
+        const teamsRes = await supabaseClient
+          .from('teams')
+          .select('id,seasons!inner(sport)')
+          .in('id', teamIds)
+        if (cancelled) return
+        if (!teamsRes.error) {
+          const sportIds = ((teamsRes.data ?? []) as unknown as Array<{
+            seasons: { sport: string }
+          }>).map(row => row.seasons.sport)
+          setAvailableSports([...new Set(sportIds)].sort())
+        }
+      }
 
       if (isSoccerDestination) {
         setLoading(false)

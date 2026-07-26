@@ -51,6 +51,8 @@ describe('soccer aggregate destination route contracts', () => {
     const source = page('CareerStats')
     const guard = 'if (isSoccerDestination)'
     expect(source).toContain("scope={{ type: 'career', playerId }}")
+    expect(source).toContain("from('team_players')")
+    expect(source).toContain('availableSports')
     expect(source).toContain(guard)
     expect(source.indexOf(guard)).toBeLessThan(
       source.indexOf("rpc('get_career_stats_resolved'")

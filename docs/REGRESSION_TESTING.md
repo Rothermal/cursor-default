@@ -1010,6 +1010,7 @@ classifications, then apply migration 047 in a development Supabase project.
 | 11v.6 | Merge a finalized-match player into a survivor, then reopen Profile and Career | All historical credit appears once under the surviving player id and current player display name; the deleted id has no route totals |
 | 11v.7 | Test owner/admin/scorer/viewer plus malformed, unresolved, abandoned, reopened, personal, and shootout sources | RLS never broadens visibility; generic/manager diagnostics follow role; excluded source families do not enter player totals or history |
 | 11v.8 | Repeat Basketball Player Profile and Career Stats, including Best game links | Existing resolved-stat, game-log, high-game, cloud hydration, and Summary behavior remains unchanged |
+| 11v.9 | Open Career for a player rostered in both soccer and basketball, then switch sports in both directions | Both sports remain selectable; Soccer uses canonical publications only, while Basketball loads the existing resolved career rows |
 
 ---
 

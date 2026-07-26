@@ -164,7 +164,8 @@ export interface SoccerAggregateGame {
   trackedScore: number
   opponentScore: number
   result: 'win' | 'draw' | 'loss'
-  playerStats: Record<string, SoccerAggregateStats>
+  /** Retained only for player/career scopes and only for the requested stable player. */
+  playerStats?: Record<string, SoccerAggregateStats>
 }
 
 export interface SoccerAggregateMetrics {
@@ -491,7 +492,7 @@ export function aggregateSoccerMatches(
     teams: [...teams.values()].sort((left, right) =>
       left.teamName.localeCompare(right.teamName) || left.teamId.localeCompare(right.teamId)
     ),
-    games: included.map(match => matchGameRow(match)),
+    games: included.map(match => matchGameRow(match, scope)),
     exclusions,
     metrics: {
       sourceCount,
@@ -688,9 +689,17 @@ function compareMatches(
     left.publicationId.localeCompare(right.publicationId)
 }
 
-function matchGameRow(match: EligibleSoccerAggregateMatch): SoccerAggregateGame {
+function matchGameRow(
+  match: EligibleSoccerAggregateMatch,
+  scope: SoccerAggregateScope
+): SoccerAggregateGame {
   const trackedScore = match.teamResult.goalsFor
   const opponentScore = match.teamResult.goalsAgainst
+  const playerId =
+    (scope.type === 'player' || scope.type === 'career') ? scope.id : null
+  const player = playerId
+    ? match.players.find(candidate => candidate.playerId === playerId)
+    : null
   return {
     publicationId: match.publicationId,
     gameId: match.game.id,
@@ -703,9 +712,9 @@ function matchGameRow(match: EligibleSoccerAggregateMatch): SoccerAggregateGame 
     trackedScore,
     opponentScore,
     result: trackedScore > opponentScore ? 'win' : trackedScore < opponentScore ? 'loss' : 'draw',
-    playerStats: Object.fromEntries(
-      match.players.map(player => [player.playerId, structuredClone(player.stats)])
-    ),
+    ...(playerId && player
+      ? { playerStats: { [playerId]: structuredClone(player.stats) } }
+      : {}),
   }
 }
 

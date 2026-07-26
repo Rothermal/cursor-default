@@ -439,7 +439,13 @@ describe('soccer canonical aggregate projection', () => {
       cleanSheets: 2,
     })
     expect(result.games.map(game => game.gameId)).toEqual(['game-2', 'game-1'])
-    expect(result.games[0]).toMatchObject({
+    expect(result.games[0]).not.toHaveProperty('playerStats')
+
+    const playerResult = aggregateSoccerCanonicalSources(
+      { type: 'career', id: 'cloud-striker' },
+      [first, second]
+    )
+    expect(playerResult.games[0]).toMatchObject({
       seasonId: 'season-1',
       tournamentId: 'tournament-1',
       playerStats: {
@@ -449,6 +455,8 @@ describe('soccer canonical aggregate projection', () => {
         },
       },
     })
+    expect(Object.keys(playerResult.games[0].playerStats ?? {}))
+      .toEqual(['cloud-striker'])
     expect(result.quality).toBe('complete')
   })
 

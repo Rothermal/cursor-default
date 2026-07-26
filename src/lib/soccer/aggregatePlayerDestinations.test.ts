@@ -79,15 +79,15 @@ describe('soccer player aggregate destinations', () => {
         ]),
       ],
       games: [
-        game('game-1', 'season-2', 'team-2', {
-          'player-1': stats({ soc_app: 1, soc_goal: 2, soc_shot: 3 }),
-        }, '2026-07-20'),
-        game('game-2', 'season-1', 'team-1', {
-          'player-1': stats({ soc_app: 1, soc_goal: 1, soc_shot: 2 }),
-        }, '2025-07-20'),
         game('game-3', 'season-1', 'team-1', {
           'player-1': stats({ soc_app: 1, soc_shot: 1 }),
         }, '2025-07-10'),
+        game('game-2', 'season-1', 'team-1', {
+          'player-1': stats({ soc_app: 1, soc_goal: 1, soc_shot: 2 }),
+        }, '2025-07-20'),
+        game('game-1', 'season-2', 'team-2', {
+          'player-1': stats({ soc_app: 1, soc_goal: 2, soc_shot: 3 }),
+        }, '2026-07-20'),
       ],
     })
 
@@ -107,6 +107,12 @@ describe('soccer player aggregate destinations', () => {
       soc_shot: 3,
     })
     expect(segments[1].player.rates.goal_conversion?.value).toBeCloseTo(1 / 3)
+    expect(segments[1]).toMatchObject({
+      newestGameDate: '2025-07-20',
+      oldestGameDate: '2025-07-10',
+    })
+    expect(segments[1].games.map(gameRow => gameRow.gameId))
+      .toEqual(['game-2', 'game-3'])
   })
 })
 

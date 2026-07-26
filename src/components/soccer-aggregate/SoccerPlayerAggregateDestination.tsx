@@ -17,6 +17,7 @@ import type {
   SoccerAggregateGame,
   SoccerAggregatePlayer,
 } from '../../lib/soccer/aggregateProjection'
+import type { SoccerAggregateStats } from '../../lib/soccer/aggregateStats'
 import type { SoccerCanonicalAggregateLoadScope } from '../../lib/soccer/aggregateTransport'
 import { soccerSummaryPath } from '../../lib/soccer/summary'
 import { supabase } from '../../lib/supabase'
@@ -52,19 +53,33 @@ export function SoccerPlayerAggregateDestination({
     refresh,
   } = useSoccerAggregateDestination({ scope, teamIds })
   const aggregate = result?.aggregate ?? null
+  const identityTeamKey = [...new Set(identity.teamIds ?? [])].sort().join(',')
+  const stableIdentity = useMemo<SoccerAggregatePlayerIdentity>(() => ({
+    playerId: identity.playerId,
+    displayName: identity.displayName,
+    number: identity.number,
+    teamIds: identityTeamKey ? identityTeamKey.split(',') : [],
+  }), [
+    identity.displayName,
+    identity.number,
+    identity.playerId,
+    identityTeamKey,
+  ])
   const player = useMemo(
-    () => aggregate ? selectSoccerAggregatePlayer(aggregate, identity) : null,
-    [aggregate, identity]
+    () => aggregate ? selectSoccerAggregatePlayer(aggregate, stableIdentity) : null,
+    [aggregate, stableIdentity]
   )
   const games = useMemo(
-    () => aggregate ? soccerPlayerAggregateGames(aggregate, identity.playerId) : [],
-    [aggregate, identity.playerId]
+    () => aggregate
+      ? soccerPlayerAggregateGames(aggregate, stableIdentity.playerId)
+      : [],
+    [aggregate, stableIdentity.playerId]
   )
   const segments = useMemo(
     () => aggregate && variant === 'career'
-      ? soccerPlayerCareerSegments(aggregate, identity)
+      ? soccerPlayerCareerSegments(aggregate, stableIdentity)
       : [],
-    [aggregate, identity, variant]
+    [aggregate, stableIdentity, variant]
   )
   const seasonNames = useSoccerAggregateSeasonNames(
     segments.map(segment => segment.seasonId)
@@ -129,12 +144,12 @@ export function SoccerPlayerAggregateDestination({
             <PlayerGameHistory
               title={seasonName ? `${seasonName} game history` : 'Game history'}
               games={games}
-              playerId={identity.playerId}
+              playerId={stableIdentity.playerId}
             />
           ) : (
             <CareerHistory
               segments={segments}
-              playerId={identity.playerId}
+              playerId={stableIdentity.playerId}
               seasonNames={seasonNames}
             />
           )}
@@ -273,7 +288,7 @@ function PlayerGameHistory({
                   {game.date} vs {game.opponentName}
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {compactGameLine(game.playerStats[playerId])}
+                  {compactGameLine(game.playerStats?.[playerId])}
                 </p>
               </div>
               <span className={`font-bold shrink-0 ${
@@ -294,7 +309,7 @@ function PlayerGameHistory({
   )
 }
 
-function compactGameLine(stats: SoccerAggregateGame['playerStats'][string]): string {
+function compactGameLine(stats: SoccerAggregateStats | undefined): string {
   if (!stats) return 'Canonical player detail unavailable'
   return [
     `${stats.soc_goal} G`,
