@@ -1,4 +1,5 @@
 import type { StatCategory, StatColor } from '../../types'
+import type { SoccerParticipantStatTotals } from './types'
 
 export const SOCCER_AGGREGATE_CATEGORY_IDS = [
   'participation',
@@ -142,6 +143,13 @@ export type SoccerAggregateRates = Record<
   SoccerAggregateRate | null
 >
 
+export interface SoccerCanonicalParticipation {
+  appearances: number
+  started: boolean
+  activeSeconds: number
+  cleanSheet: boolean
+}
+
 const DEFINITION_BY_ID = new Map(
   SOCCER_AGGREGATE_STAT_DEFINITIONS.map(definition => [definition.id, definition])
 )
@@ -182,7 +190,49 @@ export function normalizeSoccerAggregateStats(
   return normalized
 }
 
-export function addSoccerAggregateStats(
+export function soccerCanonicalStatsFromTotals(
+  totals: SoccerParticipantStatTotals,
+  participation: SoccerCanonicalParticipation
+): SoccerAggregateStats {
+  const appeared = participation.appearances > 0
+  return {
+    soc_app: appeared ? 1 : 0,
+    soc_start: appeared && participation.started ? 1 : 0,
+    soc_min_sec: Math.max(0, finiteInteger(participation.activeSeconds)),
+    soc_cs: participation.cleanSheet ? 1 : 0,
+    soc_goal: totals.goals,
+    soc_own_goal: totals.ownGoals,
+    soc_ast: totals.primaryAssists + totals.secondaryAssists,
+    soc_ast_primary: totals.primaryAssists,
+    soc_ast_secondary: totals.secondaryAssists,
+    soc_shot: totals.shots,
+    soc_sot: totals.shotsOnTarget,
+    soc_key_pass: totals.keyPasses,
+    soc_chance_created: totals.keyPasses + totals.primaryAssists,
+    soc_pen_att: totals.penaltyAttempts,
+    soc_pen_goal: totals.penaltyGoals,
+    soc_dfk_att: totals.directFreeKickAttempts,
+    soc_dfk_goal: totals.directFreeKickGoals,
+    soc_tkl_att: totals.tacklesAttempted,
+    soc_tkl_won: totals.tacklesWon,
+    soc_tkl_lost: totals.tacklesLost,
+    soc_int: totals.interceptions,
+    soc_clear: totals.clearances,
+    soc_recovery: totals.recoveries,
+    soc_block: totals.blockedShots,
+    soc_foul_committed: totals.foulsCommitted,
+    soc_foul_drawn: totals.foulsDrawn,
+    soc_yellow: totals.yellowCards,
+    soc_red: totals.redCards,
+    soc_gk_save: totals.goalkeeperSaves,
+    soc_gk_ga: totals.goalkeeperGoalsAllowed,
+    soc_gk_sot_faced: totals.goalkeeperShotsOnTargetFaced,
+    soc_gk_pen_faced: totals.goalkeeperPenaltiesFaced,
+    soc_gk_pen_save: totals.goalkeeperPenaltySaves,
+  }
+}
+
+export function addSoccerAggregateStatsInPlace(
   target: SoccerAggregateStats,
   source: SoccerAggregateStats
 ): SoccerAggregateStats {
@@ -210,7 +260,7 @@ export function formatSoccerAggregateDuration(totalSeconds: number): string {
   const remainder = seconds % 60
   return hours > 0
     ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
-    : `${minutes}:${String(remainder).padStart(2, '0')}`
+    : `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
 }
 
 export function formatSoccerAggregateRate(

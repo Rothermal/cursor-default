@@ -23,6 +23,7 @@ import { createSoccerSportGameState } from './state'
 import type { SoccerMatchSetup } from './types'
 import {
   aggregateSoccerCanonicalSources,
+  aggregateSoccerMatches,
   projectSoccerCanonicalAggregateSource,
   type SoccerCanonicalAggregateSource,
 } from './aggregateProjection'
@@ -276,9 +277,9 @@ function recorderProjection(state: GameState): SoccerRecorderProjection {
 function source(
   publicationId = 'publication-1',
   gameId = 'game-1',
-  reason: 'completed' | 'abandoned' = 'completed'
+  reason: 'completed' | 'abandoned' = 'completed',
+  projection = endedProjection(reason)
 ): SoccerCanonicalAggregateSource {
-  const projection = endedProjection(reason)
   return {
     publicationId,
     publicationNumber: 1,
@@ -312,7 +313,10 @@ function source(
 
 describe('soccer canonical aggregate projection', () => {
   it('rebuilds a completed source and derives adjusted results and shared clean sheets', () => {
-    const result = projectSoccerCanonicalAggregateSource(source())
+    const fixture = endedProjection()
+    const result = projectSoccerCanonicalAggregateSource(
+      source('publication-1', 'game-1', 'completed', fixture)
+    )
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -334,6 +338,9 @@ describe('soccer canonical aggregate projection', () => {
       soc_shot: 1,
       soc_sot: 1,
     })
+    expect(striker.stats).toEqual(
+      fixture.state.players.find(player => player.id === 'striker-local')?.stats
+    )
     expect(
       result.match.players.reduce((sum, player) => sum + player.stats.soc_goal, 0)
     ).toBe(1)
@@ -483,6 +490,40 @@ describe('soccer canonical aggregate projection', () => {
         soc_gk_pen_faced: 0,
         soc_gk_pen_save: 0,
       })
+  })
+
+  it('fails visibly for ineligible source metadata at both engine entry points', () => {
+    const invalidSource = source('publication-ineligible', 'game-ineligible')
+    invalidSource.game.date = '2026-02-30'
+    const sourceResult = aggregateSoccerCanonicalSources(
+      { type: 'team', id: 'team-1' },
+      [invalidSource]
+    )
+    expect(sourceResult).toMatchObject({
+      quality: 'partial',
+      includedMatchCount: 0,
+      exclusions: [expect.objectContaining({ kind: 'ineligible_source' })],
+    })
+
+    const projected = projectSoccerCanonicalAggregateSource(source())
+    expect(projected.ok).toBe(true)
+    if (!projected.ok) return
+    const directResult = aggregateSoccerMatches(
+      { type: 'team', id: 'team-1' },
+      [{
+        ...projected.match,
+        game: { ...projected.match.game, teamId: null },
+      }]
+    )
+    expect(directResult).toMatchObject({
+      quality: 'partial',
+      includedMatchCount: 0,
+      players: [],
+      teams: [],
+      games: [],
+      exclusions: [expect.objectContaining({ kind: 'ineligible_source' })],
+    })
+    expect(directResult.metrics.eventCount).toBe(0)
   })
 
   it('deduplicates identical publication ids and fails visibly on conflicting content', () => {

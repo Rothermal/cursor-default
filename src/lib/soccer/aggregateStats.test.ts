@@ -74,7 +74,8 @@ describe('soccer canonical aggregate stat contract', () => {
   })
 
   it('formats aggregate seconds and combined rates at their boundaries', () => {
-    expect(formatSoccerAggregateDuration(0)).toBe('0:00')
+    expect(formatSoccerAggregateDuration(0)).toBe('00:00')
+    expect(formatSoccerAggregateDuration(303)).toBe('05:03')
     expect(formatSoccerAggregateDuration(3_599)).toBe('59:59')
     expect(formatSoccerAggregateDuration(3_600)).toBe('1:00:00')
     expect(formatSoccerAggregateDuration(3_661)).toBe('1:01:01')

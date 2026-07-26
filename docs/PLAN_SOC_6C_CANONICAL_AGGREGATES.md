@@ -332,6 +332,12 @@ The exact first compatibility table is:
 Do not write aliases back into canonical snapshots. Keep the compatibility layer until a separate
 data-audit and migration plan explicitly removes it.
 
+SOC-6C1 exports and tests this map as a compatibility primitive but does not wire the generic
+legacy aggregate pages into canonical soccer reads. Those pages remain a development-only
+transition until SOC-6C3 routes soccer through canonical publications. SOC-6C3 must not mix
+legacy `game_stats` rows with canonical publication totals; any temporary pre-release fallback
+must apply this map explicitly and label its non-canonical source.
+
 ## 7. Route Experience
 
 Reuse the existing aggregate route URLs and navigation context. Soccer selects a soccer-specific
@@ -425,6 +431,8 @@ Sorting uses numeric raw values, then the reviewed deterministic tie-breakers.
 
 - Match result uses final canonical tracked/opponent score, including score adjustments.
 - Win/draw/loss is from the tracked team's perspective.
+- A normal match tied before a deciding shootout remains a draw in aggregate W-D-L. The shootout
+  winner stays in game-level result context and shootout attempts remain outside cross-game totals.
 - Team clean sheet derives from the completed normal-match score.
 - Player clean sheet reuses SOC-6B eligibility; both `credited` and `shared` add one `soc_cs`.
 - Own goals remain `soc_own_goal`; they affect the official team score but never `soc_goal`.

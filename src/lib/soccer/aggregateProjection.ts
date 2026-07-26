@@ -12,9 +12,10 @@ import {
   type SoccerPlayerReviewRow,
 } from './summaryPlayers'
 import {
-  addSoccerAggregateStats,
+  addSoccerAggregateStatsInPlace,
   compareSoccerAggregatePlayerRows,
   emptySoccerAggregateStats,
+  soccerCanonicalStatsFromTotals,
   soccerAggregateRates,
   type SoccerAggregateRates,
   type SoccerAggregateStats,
@@ -138,6 +139,7 @@ export interface SoccerAggregatePlayer {
   displayName: string
   number: string | null
   teamIds: string[]
+  /** Included match sources, including DNP roster rows. Use soc_app for games played. */
   matchIds: string[]
   stats: SoccerAggregateStats
   rates: SoccerAggregateRates
@@ -195,6 +197,10 @@ export type SoccerAggregateSourceProjection =
   | { ok: true; match: SoccerAggregateMatch }
   | { ok: false; exclusion: SoccerAggregateExclusion }
 
+type EligibleSoccerAggregateMatch = SoccerAggregateMatch & {
+  game: SoccerAggregateSourceGame & { teamId: string }
+}
+
 export function projectSoccerCanonicalAggregateSource(
   source: SoccerCanonicalAggregateSource
 ): SoccerAggregateSourceProjection {
@@ -209,9 +215,13 @@ export function projectSoccerCanonicalAggregateSource(
   if (
     source.game.status !== 'final' ||
     source.game.cloudScope !== 'team' ||
-    !source.game.teamId
+    !source.game.teamId ||
+    !isIsoDate(source.game.date)
   ) {
-    return exclusion('ineligible_source', 'Only final team-scoped games can aggregate.')
+    return exclusion(
+      'ineligible_source',
+      'Only final team-scoped games with an ISO calendar date can aggregate.'
+    )
   }
   if (source.canonicalSnapshot.gameId !== source.game.id) {
     return exclusion('malformed_publication', 'Canonical snapshot game identity does not match.')
@@ -342,9 +352,25 @@ export function aggregateSoccerMatches(
   sourceCount = matches.length + initialExclusions.length
 ): SoccerAggregateResult {
   const exclusions = [...initialExclusions]
-  const uniqueMatches = new Map<string, SoccerAggregateMatch>()
+  const eligibleMatches: EligibleSoccerAggregateMatch[] = []
+  for (const match of matches) {
+    if (isEligibleAggregateMatch(match)) {
+      eligibleMatches.push(match)
+      continue
+    }
+    exclusions.push({
+      kind: 'ineligible_source',
+      publicationId: match.publicationId,
+      gameId: match.game.id,
+      gameDate: match.game.date,
+      message: 'Aggregate matches require a final team scope and ISO calendar date.',
+      canManage: match.canManage,
+    })
+  }
+
+  const uniqueMatches = new Map<string, EligibleSoccerAggregateMatch>()
   const conflictedPublicationIds = new Set<string>()
-  for (const match of [...matches].sort(compareMatches)) {
+  for (const match of [...eligibleMatches].sort(compareMatches)) {
     if (conflictedPublicationIds.has(match.publicationId)) continue
     const existing = uniqueMatches.get(match.publicationId)
     if (!existing) {
@@ -371,7 +397,6 @@ export function aggregateSoccerMatches(
 
   for (const match of included) {
     const teamId = match.game.teamId
-    if (!teamId) continue
     for (const unresolved of match.unresolvedParticipants) {
       exclusions.push({
         kind: 'unresolved_participant',
@@ -398,10 +423,9 @@ export function aggregateSoccerMatches(
         })
         continue
       }
-      addSoccerAggregateStats(existing.stats, row.stats)
+      addSoccerAggregateStatsInPlace(existing.stats, row.stats)
       if (!existing.teamIds.includes(teamId)) existing.teamIds.push(teamId)
       if (!existing.matchIds.includes(match.game.id)) existing.matchIds.push(match.game.id)
-      existing.rates = soccerAggregateRates(existing.stats)
     }
 
     const existingTeam = teams.get(teamId)
@@ -444,10 +468,11 @@ export function aggregateSoccerMatches(
   const malformed = exclusions.filter(item =>
     item.kind === 'malformed_publication' || item.kind === 'duplicate_publication'
   )
+  const hasPartialExclusion = exclusions.some(item => item.kind !== 'abandoned_match')
   const dates = included.map(match => match.game.date).sort()
   return {
     scope,
-    quality: unresolved.length > 0 || malformed.length > 0 ? 'partial' : 'complete',
+    quality: hasPartialExclusion ? 'partial' : 'complete',
     includedMatchCount: included.length,
     newestMatchDate: dates[dates.length - 1] ?? null,
     oldestMatchDate: dates[0] ?? null,
@@ -541,42 +566,14 @@ function aggregateRecorder(snapshot: SoccerCanonicalSnapshot): SoccerRecorderSum
 }
 
 function statsFromReviewRow(row: SoccerPlayerReviewRow): SoccerAggregateStats {
-  const source = row.stats
-  return {
-    soc_app: row.appearances > 0 ? 1 : 0,
-    soc_start: row.appearances > 0 && row.lineupStatus === 'starter' ? 1 : 0,
-    soc_min_sec: Math.max(0, Math.floor(row.minutesMs / 1_000)),
-    soc_cs: row.cleanSheet.status === 'credited' || row.cleanSheet.status === 'shared' ? 1 : 0,
-    soc_goal: source.goals,
-    soc_own_goal: source.ownGoals,
-    soc_ast: source.primaryAssists + source.secondaryAssists,
-    soc_ast_primary: source.primaryAssists,
-    soc_ast_secondary: source.secondaryAssists,
-    soc_shot: source.shots,
-    soc_sot: source.shotsOnTarget,
-    soc_key_pass: source.keyPasses,
-    soc_chance_created: source.keyPasses + source.primaryAssists,
-    soc_pen_att: source.penaltyAttempts,
-    soc_pen_goal: source.penaltyGoals,
-    soc_dfk_att: source.directFreeKickAttempts,
-    soc_dfk_goal: source.directFreeKickGoals,
-    soc_tkl_att: source.tacklesAttempted,
-    soc_tkl_won: source.tacklesWon,
-    soc_tkl_lost: source.tacklesLost,
-    soc_int: source.interceptions,
-    soc_clear: source.clearances,
-    soc_recovery: source.recoveries,
-    soc_block: source.blockedShots,
-    soc_foul_committed: source.foulsCommitted,
-    soc_foul_drawn: source.foulsDrawn,
-    soc_yellow: source.yellowCards,
-    soc_red: source.redCards,
-    soc_gk_save: source.goalkeeperSaves,
-    soc_gk_ga: source.goalkeeperGoalsAllowed,
-    soc_gk_sot_faced: source.goalkeeperShotsOnTargetFaced,
-    soc_gk_pen_faced: source.goalkeeperPenaltiesFaced,
-    soc_gk_pen_save: source.goalkeeperPenaltySaves,
-  }
+  return soccerCanonicalStatsFromTotals(row.stats, {
+    appearances: row.appearances,
+    started: row.lineupStatus === 'starter',
+    activeSeconds: Math.floor(row.minutesMs / 1_000),
+    cleanSheet:
+      row.cleanSheet.status === 'credited' ||
+      row.cleanSheet.status === 'shared',
+  })
 }
 
 function stablePlayerId(
@@ -603,7 +600,9 @@ function mergeMatchPlayers(
   const appearances = Math.max(stats.soc_app, right.stats.soc_app)
   const starts = Math.max(stats.soc_start, right.stats.soc_start)
   const cleanSheets = Math.max(stats.soc_cs, right.stats.soc_cs)
-  addSoccerAggregateStats(stats, right.stats)
+  // A merge preserves every historical participant contribution. Appearance/start/clean-sheet
+  // credit is match-scoped, while time and event totals retain all recorded stints.
+  addSoccerAggregateStatsInPlace(stats, right.stats)
   stats.soc_app = appearances
   stats.soc_start = starts
   stats.soc_cs = cleanSheets
@@ -672,19 +671,22 @@ function nonZeroContributionCount(stats: SoccerAggregateStats): number {
   return Object.values(stats).filter(value => value !== 0).length
 }
 
-function compareMatches(left: SoccerAggregateMatch, right: SoccerAggregateMatch): number {
+function compareMatches(
+  left: EligibleSoccerAggregateMatch,
+  right: EligibleSoccerAggregateMatch
+): number {
   return right.game.date.localeCompare(left.game.date) ||
     right.finalizedAt.localeCompare(left.finalizedAt) ||
     left.publicationId.localeCompare(right.publicationId)
 }
 
-function matchGameRow(match: SoccerAggregateMatch): SoccerAggregateGame {
+function matchGameRow(match: EligibleSoccerAggregateMatch): SoccerAggregateGame {
   const trackedScore = match.teamResult.goalsFor
   const opponentScore = match.teamResult.goalsAgainst
   return {
     publicationId: match.publicationId,
     gameId: match.game.id,
-    teamId: match.game.teamId!,
+    teamId: match.game.teamId,
     date: match.game.date,
     trackedTeamName: match.game.trackedTeamName,
     opponentName: match.game.opponentName,
@@ -692,6 +694,24 @@ function matchGameRow(match: SoccerAggregateMatch): SoccerAggregateGame {
     opponentScore,
     result: trackedScore > opponentScore ? 'win' : trackedScore < opponentScore ? 'loss' : 'draw',
   }
+}
+
+function isEligibleAggregateMatch(
+  match: SoccerAggregateMatch
+): match is EligibleSoccerAggregateMatch {
+  return (
+    match.game.status === 'final' &&
+    match.game.cloudScope === 'team' &&
+    typeof match.game.teamId === 'string' &&
+    match.game.teamId.length > 0 &&
+    isIsoDate(match.game.date)
+  )
+}
+
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
 }
 
 function addTeamResult(
