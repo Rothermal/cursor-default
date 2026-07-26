@@ -1,6 +1,6 @@
 # SOC-6D Soccer Settings and Default Hierarchy
 
-Status: Planned. Product Q&A complete; all decisions in this document are approved.
+Status: SOC-6D1 implemented. SOC-6D2 through SOC-6D4 remain planned.
 
 ## 1. Goal
 
@@ -279,7 +279,7 @@ roster, player, or finalization access.
 
 ## 8. Delivery Slices
 
-### SOC-6D1: Schema, resolver, and local model
+### SOC-6D1: Schema, resolver, and local model (implemented)
 
 - Add versioned personal, team, display-preference, source-metadata, and conflict types.
 - Refactor the soccer rule resolver to built-in -> personal -> team -> match.
@@ -291,6 +291,23 @@ roster, player, or finalization access.
 
 Exit condition: pure tests prove hierarchy, source attribution, validation, snapshot compatibility,
 and revision conflicts; the migration can be applied without changing existing games.
+
+Implemented foundation:
+
+- `src/lib/soccer/settings.ts` owns soccer settings schema version 1, strict configurable-layer
+  parsing, source attribution, whole-layer fallback diagnostics, and personal/team/display types.
+- `src/lib/soccer/rules.ts` now resolves built-in -> personal -> team -> match configurable fields
+  while legacy match-snapshot normalization still accepts the derived availability mirrors.
+- `src/lib/sportSettingsStorage.ts` owns anonymous and user-keyed versioned local cache records,
+  pending-write metadata, and account isolation.
+- `src/lib/sportSettingsCloud.ts` owns cloud record/result parsing and backend-update
+  classification for later sync surfaces.
+- Migration `048_soccer_settings_foundation.sql` adds generic personal/team sport-settings tables,
+  read-only RLS, strict soccer schema validation, revision-aware write RPCs, manager-only shared
+  writes, concurrent-create conflict normalization, and `soccer_settings_changed` audit events.
+
+SOC-6D1 does not mount the settings cache in `SettingsContext`, synchronize it automatically, or
+change Match Setup. Those integrations belong to SOC-6D2 and SOC-6D3.
 
 ### SOC-6D2: Personal settings and reconciliation
 

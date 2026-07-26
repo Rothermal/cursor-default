@@ -32,37 +32,23 @@ export const DEFAULT_SOCCER_MATCH_RULES: SoccerMatchRules = {
   allowUnusedGoalkeeperShootoutReplacement: false,
 }
 
-export type SoccerMatchRulesOverride = {
-  regulationSegments?: SoccerMatchRules['regulationSegments']
-  extraTimeSegments?: SoccerMatchRules['extraTimeSegments']
-  extraTimeAvailable?: boolean
-  shootoutAvailable?: boolean
-  clockDirection?: SoccerMatchRules['clockDirection']
-  clockDisplay?: SoccerMatchRules['clockDisplay']
-  maxOnFieldPlayers?: number
-  allowReturnSubstitutions?: boolean
-  substitutionLimit?: number | null
-  substitutionWindowLimit?: number | null
-  maxAssistsPerGoal?: number
-  yellowCardExitPolicy?: SoccerMatchRules['yellowCardExitPolicy']
-  redCardReplacementPolicy?: SoccerMatchRules['redCardReplacementPolicy']
-  tieResolution?: SoccerMatchRules['tieResolution']
-  shootoutInitialKicksPerSide?: number
-  allowUnusedGoalkeeperShootoutReplacement?: boolean
-}
+export type SoccerConfigurableRules = Omit<
+  SoccerMatchRules,
+  'extraTimeAvailable' | 'shootoutAvailable'
+>
+
+export type SoccerMatchRulesOverride = Partial<SoccerConfigurableRules>
 
 export interface SoccerRuleLayers {
-  appDefaults?: SoccerMatchRulesOverride | null
   personalDefaults?: SoccerMatchRulesOverride | null
-  seasonRules?: SoccerMatchRulesOverride | null
+  teamDefaults?: SoccerMatchRulesOverride | null
   gameOverrides?: SoccerMatchRulesOverride | null
 }
 
 export function resolveSoccerMatchRules(layers: SoccerRuleLayers = {}): SoccerMatchRules {
   const orderedLayers = [
-    layers.appDefaults,
     layers.personalDefaults,
-    layers.seasonRules,
+    layers.teamDefaults,
     layers.gameOverrides,
   ]
   const resolved = orderedLayers.reduce<SoccerMatchRules>((rules, layer) => ({
@@ -74,15 +60,20 @@ export function resolveSoccerMatchRules(layers: SoccerRuleLayers = {}): SoccerMa
     extraTimeSegments: DEFAULT_SOCCER_MATCH_RULES.extraTimeSegments.map(segment => ({ ...segment })),
   })
 
-  const tieResolutionWasSet = orderedLayers.some(layer => layer?.tieResolution !== undefined)
-  const legacyAvailabilityWasSet = orderedLayers.some(layer =>
-    layer?.extraTimeAvailable !== undefined || layer?.shootoutAvailable !== undefined
-  )
-  synchronizeTieResolution(resolved, tieResolutionWasSet || !legacyAvailabilityWasSet)
+  synchronizeTieResolution(resolved, true)
 
   const error = validateSoccerMatchRules(resolved)
   if (error) throw new Error(error)
   return structuredClone(resolved)
+}
+
+export function configurableSoccerRulesFromMatchRules(
+  rules: SoccerMatchRules
+): SoccerConfigurableRules {
+  const configurable = structuredClone(rules) as Partial<SoccerMatchRules>
+  delete configurable.extraTimeAvailable
+  delete configurable.shootoutAvailable
+  return configurable as SoccerConfigurableRules
 }
 
 export function normalizeSoccerMatchRules(value: unknown): SoccerMatchRules | null {

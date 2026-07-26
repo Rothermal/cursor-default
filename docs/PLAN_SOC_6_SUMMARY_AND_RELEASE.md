@@ -1,6 +1,6 @@
 # Plan: SOC-6 Summary and Release
 
-Status: SOC-6A, SOC-6B, and SOC-6C implemented. SOC-6D and SOC-6E remain planned.
+Status: SOC-6A through SOC-6C and SOC-6D1 implemented. SOC-6D2 through SOC-6E remain planned.
 
 ## 1. Goal
 
@@ -311,4 +311,5 @@ SOC-6C2 source transport, SOC-6C3 team scopes, and SOC-6C4 player scopes/hardeni
 SOC-6D focused Q&A and detailed implementation planning are complete in
 `docs/PLAN_SOC_6D_SOCCER_SETTINGS.md`. Delivery is split into SOC-6D1 schema/resolver/local model,
 SOC-6D2 personal settings/sync, SOC-6D3 shared team defaults/setup inheritance, and SOC-6D4
-hardening/documentation.
+hardening/documentation. SOC-6D1 is implemented with migration 048 and the versioned local/cloud
+settings foundation.
