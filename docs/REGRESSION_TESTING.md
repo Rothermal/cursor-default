@@ -965,6 +965,25 @@ development, and at least one local match plus one team cloud match available.
 | 11s.5 | Project abandoned, malformed, duplicate, and shootout-bearing sources | Abandoned and malformed sources do not enter normal totals; exact duplicates deduplicate; conflicting content is partial; shootout activity does not alter normal player stats |
 | 11s.6 | Re-run existing basketball config and aggregate tests | Basketball ids, categories, and legacy aggregate behavior remain unchanged |
 
+### 11t. Soccer canonical aggregate transport (SOC-6C2)
+
+**Precondition:** Run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql`, review its
+classifications, then apply migration 047 in a development Supabase project.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11t.1 | Run `pnpm exec vitest run src/lib/soccer/migration047.test.ts src/lib/soccer/aggregateTransport.test.ts` | RPC contracts, parsing, keyset cursors, deduplication, cancellation, typed failures, metrics, partial quality, and the 50-match fixture pass |
+| 11t.2 | Call each RPC with limit 0/51 and with only one cursor field | The server rejects invalid limits and incomplete cursor pairs |
+| 11t.3 | Create active/inactive, completed/abandoned/reopened, team/personal, and readable/unreadable publications | Only readable active completed team publications enter results |
+| 11t.4 | Finalize publications with equal timestamps, then drain pages at a small limit | Every publication appears once in stable `(finalized_at, publication_id)` descending order |
+| 11t.5 | Query a multi-team season as a user who can read only one team | Only that team's publications return; no inaccessible team names or counts leak |
+| 11t.6 | Query a player with optional team/season filters | Results use `game_participants.source_player_id`, contain no duplicate publications, and filters only narrow visibility |
+| 11t.7 | Merge a player referenced by a finalized soccer participant | The source link remounts to the survivor before duplicate deletion and remains aggregate-eligible |
+| 11t.8 | Seed one audited historical null source and one unprovable null, then apply 047 | The audited chain repairs only when its survivor exists on the game team; the unprovable row remains unresolved and visible as partial quality |
+| 11t.9 | Run the client before applying 047 | It returns `backend_update_required` and never falls back to legacy `game_stats` or resolved-stat RPCs |
+| 11t.10 | Start two identical loads, cancel one, then change scope during another load | Identical work shares one request, one consumer abort does not cancel the other, and only the newest scope may publish |
+| 11t.11 | After applying 047, repeat basketball merge regression 4a.13 | Migration 047's replacement merge RPC retains migration 041 behavior: duplicate-player shot rows remount to the survivor before deletion |
+
 ---
 
 ## 12. GitHub Pages deploy
@@ -998,7 +1017,7 @@ development, and at least one local match plus one team cloud match available.
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`043_soccer_event_cloud_transport.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025** and **041**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**; shared events **042**; soccer event transport **043**.
+- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`047_soccer_canonical_aggregate_sources.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025** and **041**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**; shared events **042**; soccer cloud lifecycle **043–046**; soccer aggregate transport **047** (run its participant-source audit first).
 
 ---
 
