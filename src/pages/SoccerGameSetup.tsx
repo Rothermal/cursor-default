@@ -185,6 +185,7 @@ export default function SoccerGameSetup() {
 
   const releasePreservedSnapshot = () => {
     if (!preservedSnapshot) return
+    // Preserved snapshots never populate matchOverrides; team/source changes start fresh inheritance.
     setPreservedSnapshot(null)
     setMatchOverrides({})
   }

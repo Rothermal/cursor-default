@@ -1,4 +1,5 @@
 import { isPlainObject } from '../gameEvents/envelope'
+import { stableJson } from '../gameEvents/stream'
 import {
   DEFAULT_SOCCER_MATCH_RULES,
   configurableSoccerRulesFromMatchRules,
@@ -98,7 +99,7 @@ export function soccerRulesOverrideFingerprint(
       ordered[key] = override[key]
     }
   }
-  return JSON.stringify(ordered)
+  return stableJson(ordered)
 }
 
 export function parseSoccerPersonalSettings(
@@ -328,7 +329,7 @@ function assignConfigurableRule<Key extends keyof SoccerConfigurableRules>(
 }
 
 function sameStoredValue(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return stableJson(left) === stableJson(right)
 }
 
 function defaultSourceMap(): SoccerRuleSourceMap {

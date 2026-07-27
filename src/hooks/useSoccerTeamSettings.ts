@@ -62,6 +62,7 @@ export function useSoccerTeamSettings(
   const [conflict, setConflict] = useState<SoccerTeamSettings | null>(null)
   const requestRef = useRef(0)
   const loadingRef = useRef(false)
+  const writingRef = useRef(false)
   const cloudConflictRef = useRef<{
     settings: SoccerTeamSettings
     revision: number
@@ -69,7 +70,12 @@ export function useSoccerTeamSettings(
   } | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!active || !teamId || !userId || !isConfigured || loadingRef.current) return
+    if (!shouldStartSoccerTeamSettingsRefresh(
+      active && Boolean(teamId && userId && isConfigured),
+      loadingRef.current,
+      writingRef.current
+    )) return
+    if (!teamId || !userId) return
     loadingRef.current = true
     const requestId = ++requestRef.current
     const scope = soccerTeamSettingsCacheScope(userId, teamId)
@@ -205,80 +211,89 @@ export function useSoccerTeamSettings(
       setError(parsed.error)
       return false
     }
+    if (writingRef.current) return false
+    writingRef.current = true
+    const requestId = ++requestRef.current
     setStatus('saving')
     setError(null)
-    let result
     try {
-      result = await saveTeamSportSettings(
-        teamId,
-        'soccer',
-        SOCCER_SETTINGS_SCHEMA_VERSION,
-        expectedRevision,
-        parsed.value
-      )
-    } catch (saveError) {
-      setStatus('error')
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : 'Shared team settings could not be saved.'
-      )
-      return false
-    }
-    if (result.status === 'applied' && result.record) {
-      const saved = parseCloudSoccerTeamSettings(result.record)
-      if (!saved) {
+      let result
+      try {
+        result = await saveTeamSportSettings(
+          teamId,
+          'soccer',
+          SOCCER_SETTINGS_SCHEMA_VERSION,
+          expectedRevision,
+          parsed.value
+        )
+      } catch (saveError) {
+        if (requestId !== requestRef.current) return false
         setStatus('error')
-        setError('Shared soccer defaults returned invalid saved data.')
+        setError(
+          saveError instanceof Error
+            ? saveError.message
+            : 'Shared team settings could not be saved.'
+        )
         return false
       }
-      const scope = soccerTeamSettingsCacheScope(userId, teamId)
-      saveSportSettingsCache(
-        scope,
-        createSoccerTeamSettingsCacheRecord(saved.settings, {
-          revision: saved.revision,
-          cloudUpdatedAt: saved.updatedAt,
-        })
-      )
-      setSettings(saved.settings)
-      setRevision(saved.revision)
-      setLastSyncedAt(saved.updatedAt)
-      setConflict(null)
-      cloudConflictRef.current = null
-      setStatus('synced')
-      return true
-    }
-    if (result.status === 'conflict') {
-      const current = result.record
-        ? parseCloudSoccerTeamSettings(result.record)
-        : null
-      if (current) {
-        cloudConflictRef.current = {
-          settings: current.settings,
-          revision: current.revision,
-          updatedAt: current.updatedAt,
+      if (requestId !== requestRef.current) return false
+      if (result.status === 'applied' && result.record) {
+        const saved = parseCloudSoccerTeamSettings(result.record)
+        if (!saved) {
+          setStatus('error')
+          setError('Shared soccer defaults returned invalid saved data.')
+          return false
         }
-        setConflict(current.settings)
+        const scope = soccerTeamSettingsCacheScope(userId, teamId)
+        saveSportSettingsCache(
+          scope,
+          createSoccerTeamSettingsCacheRecord(saved.settings, {
+            revision: saved.revision,
+            cloudUpdatedAt: saved.updatedAt,
+          })
+        )
+        setSettings(saved.settings)
+        setRevision(saved.revision)
+        setLastSyncedAt(saved.updatedAt)
+        setConflict(null)
+        cloudConflictRef.current = null
+        setStatus('synced')
+        return true
       }
-      setStatus('conflict')
+      if (result.status === 'conflict') {
+        const current = result.record
+          ? parseCloudSoccerTeamSettings(result.record)
+          : null
+        if (current) {
+          cloudConflictRef.current = {
+            settings: current.settings,
+            revision: current.revision,
+            updatedAt: current.updatedAt,
+          }
+          setConflict(current.settings)
+        }
+        setStatus('conflict')
+        setError(
+          current
+            ? null
+            : 'Shared defaults changed. Refresh before saving again.'
+        )
+        return false
+      }
+      setStatus(
+        result.status === 'backend_update_required'
+          ? 'backend_update_required'
+          : 'error'
+      )
       setError(
-        current
-          ? null
-          : 'Shared defaults changed. Refresh before saving again.'
+        result.status === 'backend_update_required' || result.status === 'error'
+          ? result.error
+          : 'Shared team settings are unavailable.'
       )
       return false
+    } finally {
+      writingRef.current = false
     }
-    setStatus(
-      result.status === 'backend_update_required'
-        ? 'backend_update_required'
-        : 'error'
-    )
-    setError(
-      result.status === 'backend_update_required' || result.status === 'error'
-        ? result.error
-        : 'Shared team settings are unavailable.'
-    )
-    return false
   }, [active, isConfigured, teamId, userId])
 
   const useCloud = useCallback(() => {
@@ -313,4 +328,12 @@ export function useSoccerTeamSettings(
     save,
     useCloud,
   }
+}
+
+export function shouldStartSoccerTeamSettingsRefresh(
+  cloudEnabled: boolean,
+  loading: boolean,
+  writing: boolean
+): boolean {
+  return cloudEnabled && !loading && !writing
 }
