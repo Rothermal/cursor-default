@@ -4,6 +4,7 @@ import {
   parseSoccerPersonalSettings,
   parseSoccerRulesOverride,
   parseSoccerTeamSettings,
+  resolveSoccerOverrideEditorRules,
   resolveSoccerSettingsHierarchy,
   soccerRulesOverrideFingerprint,
   soccerRulesOverrideFromDifference,
@@ -267,5 +268,26 @@ describe('soccer settings hierarchy', () => {
     expect(withTeam.sources.maxOnFieldPlayers).toBe('team')
     expect(cleared.rules.maxOnFieldPlayers).toBe(9)
     expect(cleared.sources.maxOnFieldPlayers).toBe('personal')
+  })
+})
+
+describe('soccer override editor rule resolution', () => {
+  it('does not throw when an override has an empty segment label', () => {
+    const inherited = resolveSoccerSettingsHierarchy().rules
+    const override = {
+      regulationSegments: inherited.regulationSegments.map((segment, index) =>
+        index === 0 ? { ...segment, label: '' } : segment
+      ),
+    }
+
+    expect(() => resolveSoccerOverrideEditorRules(inherited, override)).not.toThrow()
+    expect(resolveSoccerOverrideEditorRules(inherited, override)).toEqual(inherited)
+  })
+
+  it('applies a valid override when segment labels remain non-empty', () => {
+    const inherited = resolveSoccerSettingsHierarchy().rules
+    const override = { maxOnFieldPlayers: 9 }
+
+    expect(resolveSoccerOverrideEditorRules(inherited, override).maxOnFieldPlayers).toBe(9)
   })
 })

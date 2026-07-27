@@ -90,6 +90,25 @@ export function soccerRulesOverrideFromDifference(
   return override
 }
 
+/**
+ * Editor render path for team/match overrides. `resolveSoccerMatchRules` throws on
+ * invalid intermediate input (e.g. a blank segment label while typing); fall back to
+ * inherited rules so Match Setup / Team Settings cannot white-screen.
+ */
+export function resolveSoccerOverrideEditorRules(
+  inherited: SoccerMatchRules,
+  override: SoccerMatchRulesOverride
+): SoccerMatchRules {
+  try {
+    return resolveSoccerMatchRules({
+      personalDefaults: configurableSoccerRulesFromMatchRules(inherited),
+      gameOverrides: override,
+    })
+  } catch {
+    return structuredClone(inherited)
+  }
+}
+
 export function soccerRulesOverrideFingerprint(
   override: SoccerMatchRulesOverride
 ): string {
