@@ -14,7 +14,7 @@ import {
 import type { SoccerRuleSource } from '../lib/soccer/settings'
 import type { SoccerMatchRulesOverride } from '../lib/soccer/rules'
 import { resolveSoccerSetupRuleState } from '../lib/soccer/setupSettings'
-import { SPORT_SETTINGS_STORAGE_ERROR } from '../lib/sportSettingsStorage'
+import { soccerTeamSettingsStatusMessage } from '../lib/soccer/teamSettingsSync'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
   acceptedTeamRole,
@@ -259,6 +259,10 @@ export default function SoccerGameSetup() {
     navigate('/players')
   }
 
+  const teamDefaultsStatusMessage = teamSource === 'cloud'
+    ? soccerTeamSettingsStatusMessage(teamSettings.status, teamSettings.error)
+    : null
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-emerald-700 text-white px-4 py-4">
@@ -383,18 +387,9 @@ export default function SoccerGameSetup() {
             </div>
           )}
 
-          {teamSource === 'cloud' &&
-            (Boolean(teamSettings.error) ||
-              teamSettings.status === 'cached' ||
-              teamSettings.status === 'backend_update_required' ||
-              teamSettings.status === 'error') && (
+          {teamDefaultsStatusMessage && (
               <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                {teamSettings.error === SPORT_SETTINGS_STORAGE_ERROR
-                  ? 'Team defaults loaded, but they could not be cached on this device. They remain available for this session.'
-                  : teamSettings.error ??
-                  (teamSettings.status === 'cached'
-                  ? 'Using the last synced team defaults while cloud refresh is unavailable.'
-                  : 'Shared team defaults are unavailable.')}
+                {teamDefaultsStatusMessage}
               </div>
             )}
 

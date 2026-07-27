@@ -135,6 +135,33 @@ describe('soccer settings schema', () => {
     })
   })
 
+  it('rejects blank or whitespace-only segment labels', () => {
+    expect(parseSoccerRulesOverride({
+      regulationSegments: [{
+        id: 'regulation-1',
+        label: '',
+        kind: 'regulation',
+        order: 1,
+        durationMs: 45 * 60_000,
+      }],
+    })).toEqual({
+      ok: false,
+      error: 'Stored match segment values are invalid.',
+    })
+    expect(parseSoccerRulesOverride({
+      regulationSegments: [{
+        id: 'regulation-1',
+        label: '   ',
+        kind: 'regulation',
+        order: 1,
+        durationMs: 45 * 60_000,
+      }],
+    })).toEqual({
+      ok: false,
+      error: 'Stored match segment values are invalid.',
+    })
+  })
+
   it('rejects integers outside the shared persisted range', () => {
     expect(parseSoccerRulesOverride({
       maxOnFieldPlayers: Number.POSITIVE_INFINITY,

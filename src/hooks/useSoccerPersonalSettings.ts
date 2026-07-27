@@ -69,6 +69,19 @@ export function shouldStartSoccerSettingsRefresh(
   return cloudEnabled && !refreshing && !writing
 }
 
+/** Serialize cloud writes so concurrent saves cannot interleave CAS revisions. */
+export function shouldBeginSoccerSettingsWrite(writing: boolean): boolean {
+  return !writing
+}
+
+/** Drop late responses after a newer refresh/save bumped the request counter. */
+export function isCurrentSoccerSettingsRequest(
+  requestId: number,
+  currentRequestId: number
+): boolean {
+  return requestId === currentRequestId
+}
+
 interface ControllerState {
   settings: SoccerPersonalSettings
   sync: SoccerSettingsSyncState
@@ -123,7 +136,7 @@ export function useSoccerPersonalSettings(
     targetScope: SportSettingsCacheScope,
     requestId: number
   ): Promise<boolean> => {
-    if (writingRef.current) return false
+    if (!shouldBeginSoccerSettingsWrite(writingRef.current)) return false
     writingRef.current = true
     try {
     const result = await saveUserSportSettings(
@@ -132,7 +145,7 @@ export function useSoccerPersonalSettings(
       expectedRevision,
       settings
     )
-    if (requestId !== requestRef.current) return false
+    if (!isCurrentSoccerSettingsRequest(requestId, requestRef.current)) return false
 
     if (result.status === 'applied' && result.record) {
       const parsed = parseCloudSoccerRecord(result.record)
@@ -269,7 +282,7 @@ export function useSoccerPersonalSettings(
     })
 
     const loaded = await loadUserSportSettings('soccer')
-    if (requestId !== requestRef.current) return
+    if (!isCurrentSoccerSettingsRequest(requestId, requestRef.current)) return
     if (loaded.status === 'backend_update_required' || loaded.status === 'error') {
       commit({
         ...stateRef.current,

@@ -20,6 +20,10 @@ import {
   soccerTeamSettingsCacheScope,
   validSoccerTeamSettingsCache,
 } from '../lib/soccer/teamSettingsSync'
+import {
+  isCurrentSoccerSettingsRequest,
+  shouldBeginSoccerSettingsWrite,
+} from './useSoccerPersonalSettings'
 
 export type SoccerTeamSettingsStatus =
   | 'idle'
@@ -100,7 +104,7 @@ export function useSoccerTeamSettings(
 
     try {
       const loaded = await loadTeamSportSettings(teamId, 'soccer')
-      if (requestId !== requestRef.current) return
+      if (!isCurrentSoccerSettingsRequest(requestId, requestRef.current)) return
       if (loaded.status === 'loaded') {
         const parsed = parseCloudSoccerTeamSettings(loaded.record)
         if (!parsed) {
@@ -150,7 +154,7 @@ export function useSoccerTeamSettings(
       )
       setError(loaded.error)
     } catch (loadError) {
-      if (requestId !== requestRef.current) return
+      if (!isCurrentSoccerSettingsRequest(requestId, requestRef.current)) return
       setStatus(cached ? 'cached' : 'error')
       setError(
         loadError instanceof Error
@@ -213,7 +217,7 @@ export function useSoccerTeamSettings(
       setError(parsed.error)
       return false
     }
-    if (writingRef.current) return false
+    if (!shouldBeginSoccerSettingsWrite(writingRef.current)) return false
     writingRef.current = true
     const requestId = ++requestRef.current
     setStatus('saving')
@@ -229,7 +233,7 @@ export function useSoccerTeamSettings(
           parsed.value
         )
       } catch (saveError) {
-        if (requestId !== requestRef.current) return false
+        if (!isCurrentSoccerSettingsRequest(requestId, requestRef.current)) return false
         setStatus('error')
         setError(
           saveError instanceof Error
@@ -238,7 +242,7 @@ export function useSoccerTeamSettings(
         )
         return false
       }
-      if (requestId !== requestRef.current) return false
+      if (!isCurrentSoccerSettingsRequest(requestId, requestRef.current)) return false
       if (result.status === 'applied' && result.record) {
         const saved = parseCloudSoccerTeamSettings(result.record)
         if (!saved) {

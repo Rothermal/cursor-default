@@ -3,6 +3,7 @@ import type {
   SportSettingsCacheRecord,
   SportSettingsCacheScope,
 } from '../sportSettingsStorage'
+import { SPORT_SETTINGS_STORAGE_ERROR } from '../sportSettingsStorage'
 import {
   SOCCER_SETTINGS_SCHEMA_VERSION,
   parseSoccerTeamSettings,
@@ -53,4 +54,28 @@ export function createSoccerTeamSettingsCacheRecord(
     cloudUpdatedAt: options.cloudUpdatedAt,
     cachedAt: now,
   }
+}
+
+/**
+ * Match Setup banner copy for shared team defaults. Cache-write failures keep
+ * the loaded defaults for the session and must not read as "defaults unavailable".
+ */
+export function soccerTeamSettingsStatusMessage(
+  status: string,
+  error: string | null
+): string | null {
+  if (error === SPORT_SETTINGS_STORAGE_ERROR) {
+    return 'Team defaults loaded, but they could not be cached on this device. They remain available for this session.'
+  }
+  if (error) return error
+  if (status === 'cached') {
+    return 'Using the last synced team defaults while cloud refresh is unavailable.'
+  }
+  if (
+    status === 'backend_update_required' ||
+    status === 'error'
+  ) {
+    return 'Shared team defaults are unavailable.'
+  }
+  return null
 }

@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import {
+  isCurrentSoccerSettingsRequest,
+  shouldBeginSoccerSettingsWrite,
+} from './useSoccerPersonalSettings'
 import { shouldStartSoccerTeamSettingsRefresh } from './useSoccerTeamSettings'
 
 describe('shared soccer settings refresh guard', () => {
@@ -7,5 +11,10 @@ describe('shared soccer settings refresh guard', () => {
     expect(shouldStartSoccerTeamSettingsRefresh(false, false, false)).toBe(false)
     expect(shouldStartSoccerTeamSettingsRefresh(true, true, false)).toBe(false)
     expect(shouldStartSoccerTeamSettingsRefresh(true, false, true)).toBe(false)
+  })
+
+  it('shares the personal write and stale-request guards for team defaults', () => {
+    expect(shouldBeginSoccerSettingsWrite(true)).toBe(false)
+    expect(isCurrentSoccerSettingsRequest(1, 2)).toBe(false)
   })
 })
