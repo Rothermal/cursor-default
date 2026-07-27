@@ -134,7 +134,10 @@ export default function SoccerTeamSettingsPanel({
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <div
+        className="flex flex-wrap items-center gap-2 text-xs text-slate-500"
+        aria-live="polite"
+      >
         <span>{statusLabel(team.status)}</span>
         {dirty && <span className="font-semibold text-amber-700">Unsaved changes</span>}
         {!mayEdit && (
@@ -143,13 +146,13 @@ export default function SoccerTeamSettingsPanel({
       </div>
 
       {(team.error || copyError) && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {copyError ?? team.error}
         </p>
       )}
 
       {team.conflict && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
+        <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
           <p className="text-sm font-semibold text-amber-900">
             Another manager changed these defaults.
           </p>
@@ -225,7 +228,7 @@ export default function SoccerTeamSettingsPanel({
       )}
 
       {editorOpen && mayEdit && (
-        <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur">
+        <div className="sticky bottom-0 -mx-4 grid grid-cols-1 gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:grid-cols-2">
           <button
             type="button"
             className="btn-secondary"

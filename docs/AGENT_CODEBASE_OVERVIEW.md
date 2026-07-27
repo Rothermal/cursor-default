@@ -201,6 +201,12 @@ provides owner/admin shared editing and compatible-team copy while scorer/viewer
 read-only. Soccer Match Setup resolves built-in, personal, selected-team, and sparse match layers
 with per-field source labels, preserves existing snapshots until deliberate edits, and persists a
 new complete snapshot only on Continue.
+SOC-6D4 contains browser-storage failures without losing coherent in-session settings, keeps
+invalid or unsupported cached/cloud objects out of the hierarchy, verifies that shared audit
+failure rolls back the same settings transaction, and hardens keyboard/status/reset and narrow
+layout behavior. The automated and operator checks are mapped in
+`docs/REGRESSION_SOC_6D_SETTINGS.md`. No migration follows 048 for SOC-6D4, and Soccer remains
+development-only until SOC-6E.
 
 The `game_events` repository is wired into the automatic queue only for healthy soccer event
 games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
@@ -343,7 +349,7 @@ flowchart LR
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
-| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) | SOC-6A through SOC-6C and SOC-6D1-D3 shipped; SOC-6D4 hardening is next |
+| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) | SOC-6A through SOC-6D shipped; SOC-6E release readiness and production discovery are next |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md`](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) | Basketball migration onto the shared event model. BKE-0 architecture plan drafted, revised after its first review pass, and awaiting approval; BKE-1 through BKE-5 are gated on that approval, with BKE-4 split into 4A-4D |
 
 ### Held / waiting for feedback

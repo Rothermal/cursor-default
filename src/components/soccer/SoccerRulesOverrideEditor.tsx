@@ -544,7 +544,7 @@ function SegmentRows({ segments, disabled, onChange }: {
     <div className="space-y-2">
       {segments.map((segment, index) => (
         <div key={segment.id} className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
-          <label className="text-xs font-medium text-slate-500">
+          <label className="min-w-0 text-xs font-medium text-slate-500">
             Label
             <input
               value={segment.label}
@@ -552,7 +552,7 @@ function SegmentRows({ segments, disabled, onChange }: {
               onChange={event => onChange(segments.map((item, itemIndex) =>
                 itemIndex === index ? { ...item, label: event.target.value } : item
               ))}
-              className="input-field mt-1 px-3 py-2 text-sm disabled:bg-slate-100"
+              className="input-field mt-1 min-w-0 w-full px-3 py-2 text-sm disabled:bg-slate-100"
             />
           </label>
           <label className="text-xs font-medium text-slate-500">

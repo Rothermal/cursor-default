@@ -108,6 +108,25 @@ describe('personal soccer settings reconciliation', () => {
       revision: 5,
     })
   })
+
+  it('retains a coherent local cache when the cloud schema is unsupported', () => {
+    const local = createSoccerSettingsCacheRecord(settings(true), {
+      revision: 4,
+      pending: null,
+      cloudUpdatedAt: now,
+      now,
+    })
+    const result = reconcileSoccerPersonalSettings(local, {
+      ...cloud(5, settings(false)),
+      schemaVersion: 2,
+    })
+
+    expect(result).toMatchObject({
+      action: 'invalid_cloud',
+      settings: { display: { fieldFlipped: true } },
+      revision: 5,
+    })
+  })
 })
 
 function reorderObjectKeys(value: unknown): unknown {

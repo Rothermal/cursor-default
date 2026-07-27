@@ -1017,6 +1017,27 @@ classifications, then apply migration 047 in a development Supabase project.
 | 11v.8 | Repeat Basketball Player Profile and Career Stats, including Best game links | Existing resolved-stat, game-log, high-game, cloud hydration, and Summary behavior remains unchanged |
 | 11v.9 | Open Career for a player rostered in both soccer and basketball, then switch sports in both directions | Both sports remain selectable; Soccer uses canonical publications only, while Basketball loads the existing resolved career rows |
 
+### 11w. Soccer settings and default hierarchy (SOC-6D)
+
+**Precondition:** Apply migration 048 before cloud-sync or shared-team checks. SOC-6D4 adds no
+additional migration.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 11w.1 | Run `pnpm test`, `pnpm lint`, and `pnpm build` | Settings schema, hierarchy, cache, cloud/RPC, migration, snapshot, production-gate, and existing sport regressions pass |
+| 11w.2 | Edit personal defaults anonymously, sign in to an account with established cloud defaults, then sign out | Established cloud values win while signed in; anonymous values return after sign-out; account caches never cross users |
+| 11w.3 | Edit personal defaults offline, reconnect, and create a two-session revision conflict | Pending edits remain account-scoped; reconnect retries; Use Cloud and Keep This Device each produce the selected coherent result |
+| 11w.4 | Corrupt a Soccer cache, block browser storage, or return schema version 2 | The invalid object is not partially applied; the app remains usable and reports inherited/session-only behavior |
+| 11w.5 | Review/save team defaults as owner, admin, scorer, and viewer | Owner/admin may save; scorer/viewer remain read-only; migration/RLS enforcement agrees with the UI |
+| 11w.6 | Fail the audit helper during a shared settings save | The settings write rolls back in the same transaction and no unaudited shared value is reported as saved |
+| 11w.7 | Use Settings and Match Setup at 320 px and desktop widths with long period labels | Inputs and actions remain visible without incoherent overlap; team Save stacks on narrow screens |
+| 11w.8 | Navigate personal setting tabs by keyboard and trigger Reset All | Arrow/Home/End move tab focus and selection; status/errors announce; Reset All confirms and remains unsaved until Save |
+| 11w.9 | Park a Soccer setup, change personal/team defaults, then resume it | The parked match retains its fixed snapshot; a new setup resolves current built-in -> personal -> team -> match values |
+| 11w.10 | Run production availability tests and repeat Basketball settings/setup/park/sign-out smoke checks | Soccer remains unavailable in production until SOC-6E and Basketball behavior is unchanged |
+
+See [the detailed SOC-6D matrix](REGRESSION_SOC_6D_SETTINGS.md) for automated evidence and the
+full operator checklist.
+
 ---
 
 ## 12. GitHub Pages deploy
@@ -1050,7 +1071,7 @@ classifications, then apply migration 047 in a development Supabase project.
 - **HashRouter:** In-app links use hash routes (e.g. `/#/game`, `/#/teams`).  
 - **Shot chart SVG (dev QA):** `/#/dev/shot-chart` — see **§4d** above (`ShotChartPreview.tsx` + optional auth bypass in `App.tsx` only in dev). End-user court capture is inline on `/#/game` — see **§4e**; legacy `/#/shot-chart` redirects there.
 - **localStorage:** Game and settings key `statkeeper_game`; clear to reset local state.  
-- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`047_soccer_canonical_aggregate_sources.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025** and **041**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**; shared events **042**; soccer cloud lifecycle **043–046**; soccer aggregate transport **047** (run its participant-source audit first).
+- **Migrations:** If a cloud feature fails, confirm the migrations listed in [README.md](../README.md) through **`048_soccer_settings_foundation.sql`** are applied in order. Seasons and roster integrity need **019** (run `supabase/scripts/audit_data_integrity_pre_019.sql` first on legacy DBs). Player merge needs **024**/**025** and **041**; team stats **028–031**; shot chart **032**; diagnostics **033**; Google profiles **034**; team security **035–038**; app access **039**; access audit **040**; shared events **042**; soccer cloud lifecycle **043–046**; soccer aggregate transport **047** (run its participant-source audit first); soccer settings cloud sync and team defaults need **048**.
 
 ---
 

@@ -100,6 +100,41 @@ describe('soccer settings schema', () => {
     })
   })
 
+  it('rejects unknown keys at every persisted object boundary', () => {
+    expect(parseSoccerPersonalSettings({
+      ...DEFAULT_SOCCER_PERSONAL_SETTINGS,
+      futureSetting: true,
+    })).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({
+      rules: { unknownRule: true },
+    })).toEqual({
+      ok: false,
+      error: 'Unknown soccer rule: unknownRule.',
+    })
+  })
+
+  it('rejects duplicate segment identities and incorrect segment kinds', () => {
+    const segment = {
+      id: 'regulation-1',
+      label: 'First Half',
+      kind: 'regulation' as const,
+      order: 1,
+      durationMs: 45 * 60_000,
+    }
+    expect(parseSoccerRulesOverride({
+      regulationSegments: [segment, { ...segment, label: 'Second Half', order: 2 }],
+    })).toMatchObject({
+      ok: false,
+      error: 'Match segment ids must be unique.',
+    })
+    expect(parseSoccerRulesOverride({
+      regulationSegments: [{ ...segment, kind: 'extra_time' }],
+    })).toMatchObject({
+      ok: false,
+      error: 'Stored match segment values are invalid.',
+    })
+  })
+
   it('rejects integers outside the shared persisted range', () => {
     expect(parseSoccerRulesOverride({
       maxOnFieldPlayers: Number.POSITIVE_INFINITY,
@@ -213,5 +248,24 @@ describe('soccer settings hierarchy', () => {
     expect(withTeam.sources.regulationSegments).toBe('team')
     expect(inherited.rules.regulationSegments).toEqual(personal.regulationSegments)
     expect(inherited.sources.regulationSegments).toBe('personal')
+  })
+
+  it('resumes inheritance when a sparse override is cleared', () => {
+    const personal = structuredClone(DEFAULT_SOCCER_PERSONAL_SETTINGS.rules)
+    personal.maxOnFieldPlayers = 9
+
+    const withTeam = resolveSoccerSettingsHierarchy({
+      personalDefaults: personal,
+      teamDefaults: { maxOnFieldPlayers: 7 },
+    })
+    const cleared = resolveSoccerSettingsHierarchy({
+      personalDefaults: personal,
+      teamDefaults: {},
+    })
+
+    expect(withTeam.rules.maxOnFieldPlayers).toBe(7)
+    expect(withTeam.sources.maxOnFieldPlayers).toBe('team')
+    expect(cleared.rules.maxOnFieldPlayers).toBe(9)
+    expect(cleared.sources.maxOnFieldPlayers).toBe('personal')
   })
 })
