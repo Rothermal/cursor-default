@@ -16,6 +16,7 @@ import {
   mapShotRows,
   parsePlayerName,
   parseSeasonTeamStatsConfig,
+  unmappedPlayerResolveMode,
 } from './cloudSyncHelpers'
 
 describe('cloudSyncHelpers missing-column detectors', () => {
@@ -111,6 +112,32 @@ describe('parsePlayerName', () => {
 
   it('keeps single-token names as firstName only', () => {
     expect(parsePlayerName('Kobe')).toEqual({ firstName: 'Kobe', lastName: '' })
+  })
+})
+
+describe('unmappedPlayerResolveMode', () => {
+  it('reuses an exact team match when found', () => {
+    expect(
+      unmappedPlayerResolveMode({ teamMatchFound: true, jerseyNumber: '12' })
+    ).toBe('reuse_team_match')
+    expect(
+      unmappedPlayerResolveMode({ teamMatchFound: true, jerseyNumber: '' })
+    ).toBe('reuse_team_match')
+  })
+
+  it('creates a distinct player when jersey is set and no team match exists', () => {
+    expect(
+      unmappedPlayerResolveMode({ teamMatchFound: false, jerseyNumber: '23' })
+    ).toBe('create_distinct')
+  })
+
+  it('falls back to owned/create by name only when jersey is empty', () => {
+    expect(
+      unmappedPlayerResolveMode({ teamMatchFound: false, jerseyNumber: '' })
+    ).toBe('reuse_or_create_owned')
+    expect(
+      unmappedPlayerResolveMode({ teamMatchFound: false, jerseyNumber: '  ' })
+    ).toBe('reuse_or_create_owned')
   })
 })
 

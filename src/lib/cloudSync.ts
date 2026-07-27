@@ -22,6 +22,7 @@ import {
   mapShotRows,
   parsePlayerName,
   parseSeasonTeamStatsConfig,
+  unmappedPlayerResolveMode,
   type RemoteShotRow,
 } from './cloudSyncHelpers'
 import {
@@ -515,41 +516,37 @@ async function ensurePlayerId(
     return remoteId
   }
 
-  const { data: existingOnTeam, error: junctionLookupError } = await supabase
+  // Prefer exact name+jersey when jersey is set so siblings / same-named
+  // teammates (different numbers) do not collapse onto one cloud player.
+  let teamLookup = supabase
     .from('team_players')
     .select('player_id, players!inner(id, first_name, last_name)')
     .eq('team_id', teamId)
     .eq('players.first_name', firstName)
     .eq('players.last_name', lastName)
-    .limit(1)
+  if (jerseyNumber) {
+    teamLookup = teamLookup.eq('jersey_number', jerseyNumber)
+  }
+  const { data: existingOnTeam, error: junctionLookupError } = await teamLookup.limit(1)
 
-  if (!junctionLookupError && existingOnTeam && existingOnTeam.length > 0) {
-    const playerId = (existingOnTeam[0] as { player_id: string }).player_id
+  const teamMatchFound = !junctionLookupError && Boolean(existingOnTeam && existingOnTeam.length > 0)
+  const resolveMode = unmappedPlayerResolveMode({ teamMatchFound, jerseyNumber })
+
+  if (resolveMode === 'reuse_team_match') {
+    const playerId = (existingOnTeam![0] as { player_id: string }).player_id
+    // Never rewrite jersey on reuse: name-only matches with an empty local
+    // number must not clear a cloud jersey, and jersey-matched rows already agree.
     await supabase
       .from('team_players')
-      .update({ jersey_number: jerseyNumber, is_active: true })
+      .update({ is_active: true })
       .eq('team_id', teamId)
       .eq('player_id', playerId)
     return playerId
   }
 
-  const { data: ownedPlayers, error: lookupError } = await supabase
-    .from('players')
-    .select('id')
-    .eq('created_by', userId)
-    .eq('first_name', firstName)
-    .eq('last_name', lastName)
-    .limit(1)
-
-  if (lookupError) {
-    throw new Error(`Player lookup failed: ${lookupError.message}`)
-  }
-
   let playerId: string
 
-  if (ownedPlayers && ownedPlayers.length > 0) {
-    playerId = ownedPlayers[0].id as string
-  } else {
+  if (resolveMode === 'create_distinct') {
     const { data: createdPlayer, error: createError } = await supabase
       .from('players')
       .insert({ first_name: firstName, last_name: lastName, created_by: userId })
@@ -559,14 +556,46 @@ async function ensurePlayerId(
     if (createError || !createdPlayer) {
       throw new Error(`Player creation failed: ${createError?.message ?? 'unknown error'}`)
     }
-
     playerId = createdPlayer.id as string
+  } else {
+    const { data: ownedPlayers, error: lookupError } = await supabase
+      .from('players')
+      .select('id')
+      .eq('created_by', userId)
+      .eq('first_name', firstName)
+      .eq('last_name', lastName)
+      .limit(1)
+
+    if (lookupError) {
+      throw new Error(`Player lookup failed: ${lookupError.message}`)
+    }
+
+    if (ownedPlayers && ownedPlayers.length > 0) {
+      playerId = ownedPlayers[0].id as string
+    } else {
+      const { data: createdPlayer, error: createError } = await supabase
+        .from('players')
+        .insert({ first_name: firstName, last_name: lastName, created_by: userId })
+        .select('id')
+        .single()
+
+      if (createError || !createdPlayer) {
+        throw new Error(`Player creation failed: ${createError?.message ?? 'unknown error'}`)
+      }
+
+      playerId = createdPlayer.id as string
+    }
   }
 
   await supabase
     .from('team_players')
     .upsert(
-      { team_id: teamId, player_id: playerId, jersey_number: jerseyNumber, is_active: true },
+      {
+        team_id: teamId,
+        player_id: playerId,
+        jersey_number: jerseyNumber || null,
+        is_active: true,
+      },
       { onConflict: 'team_id,player_id' }
     )
 

@@ -20,12 +20,15 @@ vi.mock('./supabase', () => ({
         return {
           select: () => {
             mock.ops.push('team_players.select')
+            // Support name-only (3 eq) and name+jersey (4 eq) lookups before limit().
+            const terminal = {
+              limit: () => Promise.resolve({ data: [], error: null }),
+              eq: () => terminal,
+            }
             return {
               eq: () => ({
                 eq: () => ({
-                  eq: () => ({
-                    limit: () => Promise.resolve({ data: [], error: null }),
-                  }),
+                  eq: () => terminal,
                 }),
               }),
             }
@@ -33,6 +36,14 @@ vi.mock('./supabase', () => ({
           upsert: () => {
             mock.ops.push('team_players.upsert')
             return Promise.resolve({ error: null })
+          },
+          update: () => {
+            mock.ops.push('team_players.update')
+            return {
+              eq: () => ({
+                eq: () => Promise.resolve({ error: null }),
+              }),
+            }
           },
         }
       }
@@ -276,7 +287,9 @@ describe('syncGameSnapshotToCloud hardening', () => {
 
     expect(gameInsertIndex).toBeGreaterThan(-1)
     expect(mock.ops.indexOf('team_players.select')).toBeLessThan(gameInsertIndex)
-    expect(mock.ops.indexOf('players.select')).toBeLessThan(gameInsertIndex)
+    // Jersey-set locals without a team match create a distinct player (no name-only
+    // owned lookup) so same-named teammates cannot collapse onto one cloud row.
+    expect(mock.ops.indexOf('players.insert')).toBeLessThan(gameInsertIndex)
     expect(mock.ops.indexOf('team_players.upsert')).toBeLessThan(gameInsertIndex)
     expect(mock.ops.indexOf('game_stats.upsert')).toBeGreaterThan(gameInsertIndex)
     expect(mock.ops).toContain('games.delete')

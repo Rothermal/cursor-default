@@ -147,6 +147,28 @@ export function parsePlayerName(fullName: string): { firstName: string; lastName
   }
 }
 
+/**
+ * Resolve strategy when `playerIdMap` has no entry for a local player.
+ *
+ * Name-only team matching collapses siblings / same-named teammates (e.g. two
+ * "Alex Kim" jerseys) onto one cloud `players` row and used to overwrite the
+ * survivor's jersey. When a jersey is set and no exact name+jersey teammate
+ * exists, create a distinct player instead of reusing by name.
+ */
+export type UnmappedPlayerResolveMode =
+  | 'reuse_team_match'
+  | 'create_distinct'
+  | 'reuse_or_create_owned'
+
+export function unmappedPlayerResolveMode(args: {
+  teamMatchFound: boolean
+  jerseyNumber: string
+}): UnmappedPlayerResolveMode {
+  if (args.teamMatchFound) return 'reuse_team_match'
+  if (args.jerseyNumber.trim().length > 0) return 'create_distinct'
+  return 'reuse_or_create_owned'
+}
+
 export function getSeasonFromDate(dateIso: string): string {
   const date = new Date(dateIso)
   if (Number.isNaN(date.getTime())) {
