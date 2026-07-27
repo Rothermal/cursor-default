@@ -13,6 +13,7 @@ import AccessUnavailable from '../components/AccessUnavailable'
 import TeamInviteLinksPanel from '../components/TeamInviteLinksPanel'
 import AuditTrailPanel from '../components/AuditTrailPanel'
 import PlayerGuardiansDialog from '../components/PlayerGuardiansDialog'
+import SoccerTeamSettingsPanel from '../components/settings/SoccerTeamSettingsPanel'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
@@ -1780,6 +1781,30 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           )}
           </section>
         )}
+
+        {isManagementRoute &&
+          !managementRouteMessage &&
+          selectedTeam?.seasons.sport === 'soccer' && (
+            <section className="card">
+              <SoccerTeamSettingsPanel
+                key={selectedTeam.id}
+                teamId={selectedTeam.id}
+                teamName={teamDisplayName(selectedTeam)}
+                mayEdit={mayManageRoster}
+                copyOptions={teams
+                  .filter(team =>
+                    team.id !== selectedTeam.id &&
+                    team.seasons.sport === 'soccer' &&
+                    Boolean(teamRolesById[team.id])
+                  )
+                  .map(team => ({
+                    id: team.id,
+                    name: `${teamDisplayName(team)} (${team.seasons.name})`,
+                  }))}
+                onAuditChange={() => setAuditRefresh(value => value + 1)}
+              />
+            </section>
+          )}
 
         <ConfirmDialog
           open={confirmDeleteTeam !== null}

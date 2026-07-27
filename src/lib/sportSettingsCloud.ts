@@ -43,18 +43,43 @@ interface SportSettingsQueryResult {
   error: SupabaseLikeError | null
 }
 
+interface SportSettingsCloudFilter {
+  eq: (column: string, value: string) => SportSettingsCloudFilter
+  maybeSingle: () => Promise<SportSettingsQueryResult>
+}
+
 export interface SportSettingsCloudClient {
   from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        maybeSingle: () => Promise<SportSettingsQueryResult>
-      }
-    }
+    select: (columns: string) => SportSettingsCloudFilter
   }
   rpc: (
     functionName: string,
     args: Record<string, unknown>
   ) => Promise<SportSettingsQueryResult>
+}
+
+export async function loadTeamSportSettings<TSettings = unknown>(
+  teamId: string,
+  sportId: string,
+  client: SportSettingsCloudClient | null =
+    supabase as unknown as SportSettingsCloudClient | null
+): Promise<SportSettingsCloudLoadResult<TSettings>> {
+  if (!client) return { status: 'not_configured' }
+
+  const { data, error } = await client
+    .from('team_sport_settings')
+    .select('sport_id,schema_version,revision,settings,updated_at,updated_by')
+    .eq('team_id', teamId)
+    .eq('sport_id', sportId)
+    .maybeSingle()
+
+  if (error) return cloudFailure(error, 'team')
+  if (data === null) return { status: 'missing' }
+
+  const record = parseSportSettingsTableRecord<TSettings>(data)
+  return record
+    ? { status: 'loaded', record }
+    : { status: 'error', error: 'Shared team settings returned an invalid record.' }
 }
 
 export async function loadUserSportSettings<TSettings = unknown>(
@@ -104,6 +129,36 @@ export async function saveUserSportSettings<TSettings>(
   return result ?? {
     status: 'error',
     error: 'Cloud sport settings returned an invalid save result.',
+  }
+}
+
+export async function saveTeamSportSettings<TSettings>(
+  teamId: string,
+  sportId: string,
+  schemaVersion: number,
+  expectedRevision: number | null,
+  settings: TSettings,
+  client: SportSettingsCloudClient | null =
+    supabase as unknown as SportSettingsCloudClient | null
+): Promise<SportSettingsCloudWriteResult<TSettings>> {
+  if (!client) return { status: 'not_configured' }
+
+  const { data, error } = await client.rpc(
+    'save_team_sport_settings_revisioned',
+    {
+      p_team_id: teamId,
+      p_sport_id: sportId,
+      p_schema_version: schemaVersion,
+      p_expected_revision: expectedRevision,
+      p_settings: settings,
+    }
+  )
+  if (error) return cloudFailure(error, 'team')
+
+  const result = parseSportSettingsSaveResult<TSettings>(data)
+  return result ?? {
+    status: 'error',
+    error: 'Shared team settings returned an invalid save result.',
   }
 }
 

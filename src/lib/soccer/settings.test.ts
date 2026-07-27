@@ -5,9 +5,49 @@ import {
   parseSoccerRulesOverride,
   parseSoccerTeamSettings,
   resolveSoccerSettingsHierarchy,
+  soccerRulesOverrideFingerprint,
+  soccerRulesOverrideFromDifference,
 } from './settings'
 
 describe('soccer settings schema', () => {
+  it('stores only match fields that differ from inherited rules', () => {
+    const inherited = resolveSoccerSettingsHierarchy().rules
+    const desired = {
+      ...structuredClone(inherited),
+      maxOnFieldPlayers: 9,
+      allowReturnSubstitutions: true,
+    }
+    const override = soccerRulesOverrideFromDifference(inherited, desired)
+
+    expect(override).toEqual({
+      maxOnFieldPlayers: 9,
+      allowReturnSubstitutions: true,
+    })
+    expect(soccerRulesOverrideFingerprint({
+      allowReturnSubstitutions: true,
+      maxOnFieldPlayers: 9,
+    })).toBe(soccerRulesOverrideFingerprint(override))
+  })
+
+  it('ignores json object key order in nested segment comparisons', () => {
+    const inherited = resolveSoccerSettingsHierarchy().rules
+    const desired = structuredClone(inherited)
+    desired.regulationSegments = desired.regulationSegments.map(segment => ({
+      durationMs: segment.durationMs,
+      order: segment.order,
+      kind: segment.kind,
+      label: segment.label,
+      id: segment.id,
+    }))
+
+    expect(soccerRulesOverrideFromDifference(inherited, desired)).toEqual({})
+    expect(soccerRulesOverrideFingerprint({
+      regulationSegments: inherited.regulationSegments,
+    })).toBe(soccerRulesOverrideFingerprint({
+      regulationSegments: desired.regulationSegments,
+    }))
+  })
+
   it('accepts the complete version-one personal settings profile', () => {
     expect(parseSoccerPersonalSettings(DEFAULT_SOCCER_PERSONAL_SETTINGS)).toEqual({
       ok: true,

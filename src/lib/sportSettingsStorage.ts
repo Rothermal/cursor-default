@@ -6,6 +6,7 @@ export const SPORT_SETTINGS_CACHE_VERSION = 1
 export type SportSettingsCacheScope =
   | { kind: 'anonymous' }
   | { kind: 'user'; userId: string }
+  | { kind: 'team'; userId: string; teamId: string }
 
 export interface SportSettingsPendingWrite {
   baseRevision: number | null
@@ -30,7 +31,9 @@ export function sportSettingsCacheKey(
   const normalizedSportId = requiredIdentity(sportId, 'Sport id')
   const scopeKey = scope.kind === 'anonymous'
     ? 'anonymous'
-    : `user:${encodeURIComponent(requiredIdentity(scope.userId, 'User id'))}`
+    : scope.kind === 'user'
+      ? `user:${encodeURIComponent(requiredIdentity(scope.userId, 'User id'))}`
+      : `team:${encodeURIComponent(requiredIdentity(scope.userId, 'User id'))}:${encodeURIComponent(requiredIdentity(scope.teamId, 'Team id'))}`
   return `${SPORT_SETTINGS_CACHE_KEY_PREFIX}${scopeKey}:${encodeURIComponent(normalizedSportId)}`
 }
 

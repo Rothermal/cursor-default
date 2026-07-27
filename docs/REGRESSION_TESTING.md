@@ -644,6 +644,9 @@ checks.
 |------|--------|----------|
 | 11c.1 | Open the sport chooser with Soccer disabled in persisted settings | A Soccer development-preview card is available; Settings labels it Preview and does not offer a toggle |
 | 11c.2 | Start a new Soccer match and edit regulation preset/count, period labels/durations, clock display, player maximum, substitution limits, extra time, and shootout availability | Valid rules remain stable while segment count changes; Continue blocks invalid or incomplete match rules |
+| 11c.2a | Set a personal default, select a soccer team with a different shared override, then change one rule in Match Setup | Effective values and per-field labels follow built-in -> personal -> team -> match precedence; Inherit removes only the selected match override |
+| 11c.2b | Change between two accessible soccer teams after adding a match override | Team-inherited fields re-resolve for the new team while the explicit match override remains |
+| 11c.2c | Reopen an existing setup after changing personal/team defaults | Its saved snapshot remains unchanged until a deliberate team/rule edit or Inherit action; Continue writes the newly resolved complete snapshot |
 | 11c.3 | Use a local team source, enter match information, continue, and add local players | The Match Roster step lists players and allows selecting only this match's participants |
 | 11c.4 | Return to setup, choose an accessible cloud soccer team, and continue | Its active roster loads read-only; no cloud game is created and `cloudSync` remains unbound |
 | 11c.5 | Add a game-only participant while using a cloud roster, then return between roster and lineup steps | The anonymous participant keeps one stable match-local identity |
@@ -653,6 +656,8 @@ checks.
 | 11c.9 | Background the tab briefly, return, park the match, then resume it | The displayed clock advances from its persisted anchor and resume returns to `/game` |
 | 11c.10 | Build for production, open an existing soccer Team Info page or `/#/setup?teamId=<soccer-team>`, and attempt to reach a stale/imported active soccer setup through `/setup`, `/players`, `/checkout`, `/game`, or `/summary` | Team Info hides Start Game, the team deep-link does not create or bind a soccer session, Soccer cards are absent, and active soccer route surfaces redirect to the sport chooser |
 | 11c.11 | Start and track a basketball game | Existing setup, roster, checkout, tracker, parking, and cloud behavior are unchanged |
+| 11c.12 | Open Team Manage for a soccer team as owner/admin, scorer, and viewer | Owner/admin can save sparse shared defaults and copy an accessible soccer team's defaults; scorer/viewer see read-only effective values; non-soccer teams show no soccer editor |
+| 11c.13 | Disconnect after loading team defaults, reopen Match Setup, then attempt to edit shared defaults | The cached team values remain available and labeled for setup; shared Save is unavailable until reconnect and refresh |
 
 ---
 

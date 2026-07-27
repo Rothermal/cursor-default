@@ -1,6 +1,6 @@
 # SOC-6D Soccer Settings and Default Hierarchy
 
-Status: SOC-6D1 and SOC-6D2 implemented. SOC-6D3 and SOC-6D4 remain planned.
+Status: SOC-6D1 through SOC-6D3 implemented. SOC-6D4 remains planned.
 
 ## 1. Goal
 
@@ -345,7 +345,7 @@ Implemented personal settings:
 SOC-6D2 does not read or write team settings and does not change Soccer Match Setup inheritance.
 Those integrations remain SOC-6D3.
 
-### SOC-6D3: Shared team defaults and setup inheritance
+### SOC-6D3: Shared team defaults and setup inheritance (implemented)
 
 - Add the Team Manage soccer-default editor and personal-settings shortcut.
 - Enforce owner/admin writes and scorer/viewer read-only presentation in both UI and backend.
@@ -356,6 +356,21 @@ Those integrations remain SOC-6D3.
 
 Exit condition: team settings are shared safely, match setup resolves all four layers, and changing
 settings cannot mutate an existing game's snapshot.
+
+Implementation notes:
+
+- `useSoccerTeamSettings` loads account-and-team-scoped cache state first, refreshes the accepted
+  member's RLS-scoped record, and keeps shared writes online-only and revision-aware.
+- Team Manage exposes the shared editor only for soccer teams. Owner/admin users can save and copy
+  another accessible soccer team's sparse overrides; scorer/viewer users receive the same
+  effective preview without mutation controls.
+- `SoccerRulesOverrideEditor` provides per-field sources and removes individual sparse overrides
+  through Inherit. Team rules remain separate from personal field orientation.
+- Soccer Match Setup resolves built-in, personal, selected-team, and sparse match layers. Team
+  changes retain explicit in-session match overrides; an existing setup snapshot remains fixed
+  until a deliberate team/rule reset or edit.
+- Continue persists only the complete resolved `rulesSnapshot`. Later settings changes do not
+  mutate active, parked, ended, cloud-bound, or finalized games.
 
 ### SOC-6D4: Hardening and documentation
 
