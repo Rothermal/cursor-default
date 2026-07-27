@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { Check, Cloud, RefreshCw, RotateCcw, Save, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../../context/SettingsContext'
@@ -22,6 +29,7 @@ import {
 } from '../../lib/soccer/settings'
 import { soccerSettingsFingerprint } from '../../lib/soccer/personalSettingsSync'
 import type { SoccerMatchSegment } from '../../lib/soccer/types'
+import ConfirmDialog from '../ConfirmDialog'
 
 type SettingsSection = 'common' | 'match' | 'discipline' | 'substitutions' | 'advanced'
 
@@ -52,6 +60,7 @@ export default function SoccerSettings() {
   )
   const previousSavedFingerprint = useRef(soccerSettingsFingerprint(soccerSettings))
   const [activeSection, setActiveSection] = useState<SettingsSection>('common')
+  const [confirmResetAll, setConfirmResetAll] = useState(false)
   const dirty = useMemo(
     () => soccerSettingsFingerprint(draft) !== soccerSettingsFingerprint(soccerSettings),
     [draft, soccerSettings]
@@ -137,12 +146,32 @@ export default function SoccerSettings() {
     }))
   }
 
+  const handleSectionKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number
+  ) => {
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % sections.length
+    else if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + sections.length) % sections.length
+    } else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = sections.length - 1
+    else return
+
+    event.preventDefault()
+    const nextSection = sections[nextIndex]
+    setActiveSection(nextSection.id)
+    requestAnimationFrame(() => {
+      document.getElementById(`soccer-settings-tab-${nextSection.id}`)?.focus()
+    })
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-800">Soccer</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" aria-live="polite">
             <SyncStatus status={soccerSettingsSync.status} />
             {dirty && <span className="text-xs font-semibold text-amber-700">Unsaved changes</span>}
           </div>
@@ -169,8 +198,10 @@ export default function SoccerSettings() {
       </button>
 
       {soccerSettingsSync.error && (
-        <p className={`rounded-md border px-3 py-2 text-sm ${
-          soccerSettingsSync.status === 'backend_update_required'
+        <p role="alert" className={`rounded-md border px-3 py-2 text-sm ${
+          soccerSettingsSync.status === 'backend_update_required' ||
+          soccerSettingsSync.status === 'local' ||
+          soccerSettingsSync.status === 'synced'
             ? 'border-amber-200 bg-amber-50 text-amber-800'
             : 'border-red-200 bg-red-50 text-red-700'
         }`}>
@@ -179,7 +210,7 @@ export default function SoccerSettings() {
       )}
 
       {soccerSettingsSync.conflict && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-3">
+        <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-3">
           <p className="text-sm font-semibold text-amber-900">Settings changed on another device.</p>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" className="btn-secondary text-sm px-3" onClick={useCloudSoccerSettings}>
@@ -207,13 +238,17 @@ export default function SoccerSettings() {
 
       <div className="overflow-x-auto border-b border-slate-200">
         <div className="flex min-w-max" role="tablist" aria-label="Soccer settings sections">
-          {sections.map(section => (
+          {sections.map((section, index) => (
             <button
               key={section.id}
+              id={`soccer-settings-tab-${section.id}`}
               type="button"
               role="tab"
               aria-selected={activeSection === section.id}
+              aria-controls="soccer-settings-panel"
+              tabIndex={activeSection === section.id ? 0 : -1}
               onClick={() => setActiveSection(section.id)}
+              onKeyDown={event => handleSectionKeyDown(event, index)}
               className={`h-10 px-3 text-sm font-semibold border-b-2 ${
                 activeSection === section.id
                   ? 'border-emerald-600 text-emerald-700'
@@ -226,7 +261,13 @@ export default function SoccerSettings() {
         </div>
       </div>
 
-      <div className="min-h-[20rem]">
+      <div
+        id="soccer-settings-panel"
+        role="tabpanel"
+        aria-labelledby={`soccer-settings-tab-${activeSection}`}
+        tabIndex={0}
+        className="min-h-[20rem]"
+      >
         {activeSection === 'common' && (
           <div className="space-y-4">
             <Segmented
@@ -441,7 +482,7 @@ export default function SoccerSettings() {
         </button>
         <button
           type="button"
-          onClick={() => setDraft(structuredClone(DEFAULT_SOCCER_PERSONAL_SETTINGS))}
+          onClick={() => setConfirmResetAll(true)}
           className="h-10 px-2 text-sm font-semibold text-slate-600"
         >
           Reset All
@@ -476,6 +517,20 @@ export default function SoccerSettings() {
           Save
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmResetAll}
+        title="Reset Soccer Defaults"
+        message="Reset all personal soccer rules and display preferences to the built-in defaults? The reset remains unsaved until you choose Save."
+        confirmLabel="Reset Defaults"
+        cancelLabel="Keep Changes"
+        destructive={false}
+        onConfirm={() => {
+          setDraft(structuredClone(DEFAULT_SOCCER_PERSONAL_SETTINGS))
+          setConfirmResetAll(false)
+        }}
+        onCancel={() => setConfirmResetAll(false)}
+      />
     </section>
   )
 }
@@ -612,15 +667,15 @@ function SegmentRows({ segments, onChange }: {
   return (
     <div className="space-y-2">
       {segments.map((segment, index) => (
-        <div key={segment.id} className="grid grid-cols-[1fr_6rem] gap-2">
-          <label className="text-xs font-medium text-slate-500">
+        <div key={segment.id} className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
+          <label className="min-w-0 text-xs font-medium text-slate-500">
             Period {index + 1}
             <input
               value={segment.label}
               onChange={event => onChange(segments.map(item =>
                 item.id === segment.id ? { ...item, label: event.target.value } : item
               ))}
-              className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2"
+              className="mt-1 min-w-0 w-full rounded-md border border-slate-200 bg-white px-3 py-2"
             />
           </label>
           <label className="text-xs font-medium text-slate-500">

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   loadSportSettingsCache,
   saveSportSettingsCache,
+  SPORT_SETTINGS_STORAGE_ERROR,
   sportSettingsCacheKey,
   type SportSettingsCacheRecord,
 } from './sportSettingsStorage'
@@ -112,5 +113,50 @@ describe('sport settings cache', () => {
 
     storage.setItem(key, JSON.stringify({ ...record('wrong'), sportId: 'basketball' }))
     expect(loadSportSettingsCache({ kind: 'anonymous' }, 'soccer', storage)).toBeNull()
+  })
+
+  it('fails closed for unsupported versions and malformed pending writes', () => {
+    const storage = new MemoryStorage()
+    const key = sportSettingsCacheKey({ kind: 'anonymous' }, 'soccer')
+
+    storage.setItem(key, JSON.stringify({ ...record('future'), version: 2 }))
+    expect(loadSportSettingsCache({ kind: 'anonymous' }, 'soccer', storage)).toBeNull()
+
+    storage.setItem(key, JSON.stringify({
+      ...record('bad-pending'),
+      pending: { baseRevision: 0, savedAt: '' },
+    }))
+    expect(loadSportSettingsCache({ kind: 'anonymous' }, 'soccer', storage)).toBeNull()
+  })
+
+  it('contains browser storage read failures', () => {
+    const storage = {
+      getItem: () => {
+        throw new Error('storage blocked')
+      },
+    }
+
+    expect(loadSportSettingsCache(
+      { kind: 'anonymous' },
+      'soccer',
+      storage
+    )).toBeNull()
+  })
+
+  it('reports browser storage write failures without throwing', () => {
+    const storage = {
+      setItem: () => {
+        throw new Error('quota exceeded')
+      },
+    }
+
+    expect(saveSportSettingsCache(
+      { kind: 'anonymous' },
+      record('session-only'),
+      storage
+    )).toEqual({
+      ok: false,
+      error: SPORT_SETTINGS_STORAGE_ERROR,
+    })
   })
 })

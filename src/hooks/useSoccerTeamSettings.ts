@@ -112,16 +112,17 @@ export function useSoccerTeamSettings(
           revision: parsed.revision,
           cloudUpdatedAt: parsed.updatedAt,
         })
-        saveSportSettingsCache(scope, cache)
+        const cacheResult = saveSportSettingsCache(scope, cache)
         setSettings(parsed.settings)
         setRevision(parsed.revision)
         setLastSyncedAt(parsed.updatedAt)
+        setError(cacheResult.ok ? null : cacheResult.error)
         setStatus('synced')
         return
       }
       if (loaded.status === 'missing') {
         const empty = structuredClone(EMPTY_SOCCER_TEAM_SETTINGS)
-        saveSportSettingsCache(
+        const cacheResult = saveSportSettingsCache(
           scope,
           createSoccerTeamSettingsCacheRecord(empty, {
             revision: null,
@@ -131,6 +132,7 @@ export function useSoccerTeamSettings(
         setSettings(empty)
         setRevision(null)
         setLastSyncedAt(null)
+        setError(cacheResult.ok ? null : cacheResult.error)
         setStatus('missing')
         return
       }
@@ -245,7 +247,7 @@ export function useSoccerTeamSettings(
           return false
         }
         const scope = soccerTeamSettingsCacheScope(userId, teamId)
-        saveSportSettingsCache(
+        const cacheResult = saveSportSettingsCache(
           scope,
           createSoccerTeamSettingsCacheRecord(saved.settings, {
             revision: saved.revision,
@@ -257,6 +259,7 @@ export function useSoccerTeamSettings(
         setLastSyncedAt(saved.updatedAt)
         setConflict(null)
         cloudConflictRef.current = null
+        setError(cacheResult.ok ? null : cacheResult.error)
         setStatus('synced')
         return true
       }
@@ -300,7 +303,7 @@ export function useSoccerTeamSettings(
     const current = cloudConflictRef.current
     if (!current || !teamId || !userId) return
     const scope = soccerTeamSettingsCacheScope(userId, teamId)
-    saveSportSettingsCache(
+    const cacheResult = saveSportSettingsCache(
       scope,
       createSoccerTeamSettingsCacheRecord(current.settings, {
         revision: current.revision,
@@ -312,7 +315,7 @@ export function useSoccerTeamSettings(
     setLastSyncedAt(current.updatedAt)
     setConflict(null)
     cloudConflictRef.current = null
-    setError(null)
+    setError(cacheResult.ok ? null : cacheResult.error)
     setStatus('synced')
   }, [teamId, userId])
 

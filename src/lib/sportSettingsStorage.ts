@@ -24,6 +24,13 @@ export interface SportSettingsCacheRecord<TSettings = unknown> {
   cachedAt: string
 }
 
+export type SportSettingsCacheSaveResult =
+  | { ok: true }
+  | { ok: false; error: string }
+
+export const SPORT_SETTINGS_STORAGE_ERROR =
+  'Device storage is unavailable. Changes remain available for this session only.'
+
 export function sportSettingsCacheKey(
   scope: SportSettingsCacheScope,
   sportId: string
@@ -55,13 +62,20 @@ export function saveSportSettingsCache<TSettings>(
   scope: SportSettingsCacheScope,
   record: SportSettingsCacheRecord<TSettings>,
   storage: Pick<Storage, 'setItem'> = localStorage
-): void {
-  const parsed = parseSportSettingsCacheRecord<TSettings>(record, record.sportId)
-  if (!parsed) throw new Error('Sport settings cache record is invalid.')
-  storage.setItem(
-    sportSettingsCacheKey(scope, record.sportId),
-    JSON.stringify(parsed)
-  )
+): SportSettingsCacheSaveResult {
+  try {
+    const parsed = parseSportSettingsCacheRecord<TSettings>(record, record.sportId)
+    if (!parsed) {
+      return { ok: false, error: 'Sport settings cache record is invalid.' }
+    }
+    storage.setItem(
+      sportSettingsCacheKey(scope, record.sportId),
+      JSON.stringify(parsed)
+    )
+    return { ok: true }
+  } catch {
+    return { ok: false, error: SPORT_SETTINGS_STORAGE_ERROR }
+  }
 }
 
 export function parseSportSettingsCacheRecord<TSettings = unknown>(

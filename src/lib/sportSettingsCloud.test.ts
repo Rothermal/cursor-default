@@ -54,6 +54,36 @@ describe('sport settings cloud contracts', () => {
       message: 'permission denied for table user_sport_settings',
     })).toBe(false)
     expect(sportSettingsBackendMessage('user')).toContain('Local settings remain available')
+    expect(sportSettingsBackendMessage('team')).toContain('Shared team settings')
+  })
+
+  it('rejects malformed load and save responses', async () => {
+    const loadClient = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: { sport_id: 'soccer', schema_version: 1 },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    } as unknown as SportSettingsCloudClient
+    await expect(loadUserSportSettings('soccer', loadClient)).resolves.toEqual({
+      status: 'error',
+      error: 'Cloud sport settings returned an invalid record.',
+    })
+
+    const saveClient = {
+      rpc: async () => ({ data: { status: 'applied', record: null }, error: null }),
+    } as unknown as SportSettingsCloudClient
+    await expect(
+      saveUserSportSettings('soccer', 1, null, { rules: {} }, saveClient)
+    ).resolves.toEqual({
+      status: 'error',
+      error: 'Cloud sport settings returned an invalid save result.',
+    })
   })
 
   it('parses direct table rows and loads the current user record', async () => {

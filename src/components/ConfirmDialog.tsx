@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -24,6 +24,7 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null)
+  const titleId = useId()
 
   useEffect(() => {
     if (open) confirmRef.current?.focus()
@@ -46,10 +47,13 @@ export default function ConfirmDialog({
       onClick={onCancel}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 space-y-4"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+        <h3 id={titleId} className="text-lg font-bold text-slate-800">{title}</h3>
         <p className="text-sm text-slate-600">{message}</p>
         {error && (
           <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

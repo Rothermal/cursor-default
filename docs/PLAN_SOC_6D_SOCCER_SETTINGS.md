@@ -1,6 +1,6 @@
 # SOC-6D Soccer Settings and Default Hierarchy
 
-Status: SOC-6D1 through SOC-6D3 implemented. SOC-6D4 remains planned.
+Status: SOC-6D1 through SOC-6D4 implemented.
 
 ## 1. Goal
 
@@ -372,7 +372,7 @@ Implementation notes:
 - Continue persists only the complete resolved `rulesSnapshot`. Later settings changes do not
   mutate active, parked, ended, cloud-bound, or finalized games.
 
-### SOC-6D4: Hardening and documentation
+### SOC-6D4: Hardening and documentation (implemented)
 
 - Handle unavailable migrations, stale caches, invalid schemas, corrupt local data, and failed
   audit writes without weakening authorization.
@@ -383,6 +383,24 @@ Implementation notes:
 
 Exit condition: all automated tests and the SOC-6D manual matrix pass, cross-device sync is
 predictable, and existing soccer and basketball workflows retain their previous behavior.
+
+Implementation notes:
+
+- Cache reads already failed closed for corrupt JSON and unsupported record shapes. Cache writes
+  now return a result instead of throwing; personal and team controllers retain coherent
+  in-session/cloud state and display a device-storage warning when persistence is unavailable.
+- Unsupported personal/team cloud schemas remain outside the active hierarchy. Personal settings
+  retain the last coherent local value; team settings retain a valid account/team-scoped cache or
+  inherit safely.
+- Migration 048 records the shared-settings audit event inside the same write function and before
+  returning success. An audit failure therefore rolls back the settings change rather than
+  weakening authorization or creating unaudited shared state.
+- Personal section tabs implement arrow, Home, and End navigation with matching tab/tabpanel
+  relationships. Status and failure messages are announced, full reset requires confirmation,
+  and segment/action layouts remain usable on narrow screens and with long labels.
+- Automated and operator coverage is mapped in `REGRESSION_SOC_6D_SETTINGS.md` and summarized in
+  `REGRESSION_TESTING.md`. SOC-6D4 requires no migration after 048.
+- Production Soccer availability remains explicitly gated until SOC-6E.
 
 ## 9. Test Matrix
 

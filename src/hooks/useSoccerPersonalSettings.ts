@@ -102,9 +102,19 @@ export function useSoccerPersonalSettings(
   const cacheAndCommit = useCallback((
     next: ControllerState,
     targetScope: SportSettingsCacheScope
-  ) => {
-    if (next.cache) saveSportSettingsCache(targetScope, next.cache)
-    commit(next)
+  ): void => {
+    const cacheResult = next.cache
+      ? saveSportSettingsCache(targetScope, next.cache)
+      : { ok: true as const }
+    commit(cacheResult.ok
+      ? next
+      : {
+          ...next,
+          sync: {
+            ...next.sync,
+            error: cacheResult.error,
+          },
+        })
   }, [commit])
 
   const applyCloudWrite = useCallback(async (

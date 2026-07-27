@@ -14,6 +14,7 @@ import {
 import type { SoccerRuleSource } from '../lib/soccer/settings'
 import type { SoccerMatchRulesOverride } from '../lib/soccer/rules'
 import { resolveSoccerSetupRuleState } from '../lib/soccer/setupSettings'
+import { SPORT_SETTINGS_STORAGE_ERROR } from '../lib/sportSettingsStorage'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
   acceptedTeamRole,
@@ -280,7 +281,7 @@ export default function SoccerGameSetup() {
 
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-6">
         {(formError || teamsError || parkingError) && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {formError ?? teamsError ?? parkingError}
           </div>
         )}
@@ -370,31 +371,35 @@ export default function SoccerGameSetup() {
         <section className="border-t border-slate-200 pt-5 space-y-4">
           <div>
             <h2 className="text-sm font-bold uppercase text-slate-500">Competition Rules</h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500" aria-live="polite">
               {formatSourceSummary(effectiveHierarchy.sources)}
             </p>
           </div>
 
           {preservedSnapshot && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <div role="status" className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
               This setup's saved rule snapshot is retained. Editing a rule or choosing Inherit
               creates a new snapshot from current defaults.
             </div>
           )}
 
           {teamSource === 'cloud' &&
-            (teamSettings.status === 'cached' ||
+            (Boolean(teamSettings.error) ||
+              teamSettings.status === 'cached' ||
               teamSettings.status === 'backend_update_required' ||
               teamSettings.status === 'error') && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                {teamSettings.status === 'cached'
+              <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {teamSettings.error === SPORT_SETTINGS_STORAGE_ERROR
+                  ? 'Team defaults loaded, but they could not be cached on this device. They remain available for this session.'
+                  : teamSettings.error ??
+                  (teamSettings.status === 'cached'
                   ? 'Using the last synced team defaults while cloud refresh is unavailable.'
-                  : teamSettings.error ?? 'Shared team defaults are unavailable.'}
+                  : 'Shared team defaults are unavailable.')}
               </div>
             )}
 
           {effectiveHierarchy.diagnostics.length > 0 && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {effectiveHierarchy.diagnostics.map(item => item.message).join(' ')}
             </div>
           )}
