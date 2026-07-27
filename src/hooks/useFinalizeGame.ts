@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 import { shouldBlockDiscardUnsyncedGame, shouldPreserveLocalAfterFinalizeSuccess } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { useTeamRole } from './useTeamRole'
-import { canTrackGames } from '../lib/teamPermissions'
+import { canFinalizeBoundCloudGame } from '../lib/cloudGameAccess'
 
 /**
  * Finalize an in-progress cloud game: flush sync → mark final → clear local → reset.
@@ -23,15 +23,14 @@ export function useFinalizeGame() {
   const stateRef = useRef(state)
   stateRef.current = state
 
-  const isFinalCloudGame = state.cloudSync.gameStatus === 'final'
-  const canFinalizeCloudGame = Boolean(
-    isConfigured &&
-      user &&
-      supabase &&
-      state.cloudSync.gameId &&
-      !isFinalCloudGame &&
-      canTrackGames(teamAccess.role)
-  )
+  const canFinalizeCloudGame = canFinalizeBoundCloudGame({
+    isConfigured,
+    hasUser: Boolean(user),
+    hasSupabase: Boolean(supabase),
+    gameId: state.cloudSync.gameId,
+    gameStatus: state.cloudSync.gameStatus,
+    role: teamAccess.role,
+  })
 
   const handleFinalizeCloudGame = async () => {
     if (!canFinalizeCloudGame || !state.cloudSync.gameId) return

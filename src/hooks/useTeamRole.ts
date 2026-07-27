@@ -3,21 +3,38 @@ import { useAuth } from '../context/AuthContext'
 import { parseTeamRole, type TeamRole } from '../lib/teamPermissions'
 import { supabase } from '../lib/supabase'
 
-interface TeamRoleResult {
+export interface TeamRoleResult {
   role: TeamRole | null
   loading: boolean
   error: string | null
 }
 
+interface StoredTeamRoleResult extends TeamRoleResult {
+  teamId: string | null
+}
+
+/**
+ * Fail closed across team switches: never surface a prior team's role while the
+ * requested team is still loading.
+ */
+export function selectTeamRoleView(
+  requestedTeamId: string | null | undefined,
+  stored: StoredTeamRoleResult
+): TeamRoleResult {
+  if (!requestedTeamId) return { role: null, loading: false, error: null }
+  if (stored.teamId !== requestedTeamId) return { role: null, loading: true, error: null }
+  return { role: stored.role, loading: stored.loading, error: stored.error }
+}
+
 export function useTeamRole(teamId: string | null | undefined): TeamRoleResult {
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
-  const [result, setResult] = useState<{
-    teamId: string | null
-    role: TeamRole | null
-    loading: boolean
-    error: string | null
-  }>({ teamId: null, role: null, loading: false, error: null })
+  const [result, setResult] = useState<StoredTeamRoleResult>({
+    teamId: null,
+    role: null,
+    loading: false,
+    error: null,
+  })
 
   useEffect(() => {
     if (!teamId) {
@@ -55,7 +72,5 @@ export function useTeamRole(teamId: string | null | undefined): TeamRoleResult {
     }
   }, [isConfigured, teamId, userId])
 
-  if (!teamId) return { role: null, loading: false, error: null }
-  if (result.teamId !== teamId) return { role: null, loading: true, error: null }
-  return { role: result.role, loading: result.loading, error: result.error }
+  return selectTeamRoleView(teamId, result)
 }
