@@ -1,7 +1,8 @@
 # SOC-6E Soccer Release Hardening and Enablement
 
-Status: release candidate implemented through SOC-6E3; target-deployment operator evidence and
-final sign-off remain pending in `REGRESSION_SOC_6E_RELEASE.md`.
+Status: implemented through SOC-6E3 and approved for an owner-only opt-in rollout with
+post-deployment validation. Broader release evidence remains pending in
+`REGRESSION_SOC_6E_RELEASE.md`.
 
 ## 1. Goal
 
@@ -269,9 +270,10 @@ remains.
 ### SOC-6E3: Production enablement and sign-off
 
 Implementation status: release policy and documentation complete. The production build now offers
-Soccer as an opt-in sport while keeping the device default off. Target Supabase, deployed
-GitHub Pages, browser/PWA, role, multi-sport, and Basketball sign-off remain operator work and
-must be recorded before this phase is marked complete.
+Soccer as an opt-in sport while keeping the device default off. The owner accepted
+post-deployment validation for the initial single-user rollout because no production Soccer games
+exist. Target Supabase, deployed GitHub Pages, browser/PWA, role, multi-sport, and Basketball
+evidence remains the iteration checklist and is required before access materially broadens.
 
 - Flip the explicit production release policy for Soccer.
 - Confirm no Soccer route/review component still contains an environment access gate; those

@@ -1,7 +1,7 @@
 # SOC-6E Soccer Release Regression Matrix
 
-Status: SOC-6E3 release candidate implemented; preliminary and final deployed operator evidence
-pending.
+Status: SOC-6E3 approved for an owner-only opt-in rollout; post-deployment validation and broader
+release evidence remain pending.
 
 ## Purpose
 
@@ -215,10 +215,15 @@ SOC-6E implementation is present in the release candidate, but final sign-off re
 - no correctness, authorization, data-loss, recovery, accessibility, responsive-layout, PWA, or
   Basketball blocker remains.
 
-The SOC-6E3 branch flips the centralized production release policy. Until the operator record is
-complete, keep its PR in draft and treat the build as an unsigned release candidate. Any blocker
-requires stopping rollout or restoring the unreleased SOC-6E2 policy; rollback does not reverse
-migration 049 or hide existing Soccer data.
+For the initial owner-only rollout, the owner accepted post-deployment validation on 2026-07-28:
+there are no existing Soccer games, the owner is the only current user, Soccer is disabled by
+default, and rollback preserves existing records. The full matrix remains the regression and
+iteration checklist rather than a pre-merge gate for this rollout. Complete it before materially
+broadening access or relying on Soccer for production match history.
+
+Any blocker found after deployment requires disabling Soccer on the device while evaluating the
+issue or restoring the unreleased SOC-6E2 policy. Rollback does not reverse migration 049 or hide
+existing Soccer data.
 
 ### Sign-off
 
@@ -226,4 +231,4 @@ migration 049 or hide existing Soccer data.
 |---|---|---|---|
 | SOC-6E2 development/staging | Pending | Pending | Pending |
 | SOC-6E2 unreleased production | Pending | Pending | Pending |
-| SOC-6E3 released production | Pending | Pending | Pending |
+| SOC-6E3 owner-only rollout | Rothermal | 2026-07-28 | Approved post-deployment validation for the opt-in, default-off release in PR #251 |

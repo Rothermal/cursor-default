@@ -1,7 +1,8 @@
 # Plan: SOC-6 Summary and Release
 
-Status: SOC-6A through SOC-6E3 implemented. Soccer is an opt-in production sport; final deployed
-operator sign-off remains tracked in `REGRESSION_SOC_6E_RELEASE.md`.
+Status: SOC-6A through SOC-6E3 implemented. Soccer is approved as an owner-only opt-in production
+sport; post-deployment and broader-release evidence remains tracked in
+`REGRESSION_SOC_6E_RELEASE.md`.
 
 ## 1. Goal
 

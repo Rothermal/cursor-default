@@ -5,8 +5,9 @@ supported sport. SOC-0 defines the stable direction for the soccer program. Each
 implementation phase in this document must receive its own detailed execution plan and
 Q&A review before code work begins.
 
-Status: SOC-1 through SOC-6E3 implemented. Soccer is an opt-in production sport; final deployed
-operator sign-off is tracked in `REGRESSION_SOC_6E_RELEASE.md`.
+Status: SOC-1 through SOC-6E3 implemented. Soccer is approved as an owner-only opt-in production
+sport; post-deployment and broader-release evidence is tracked in
+`REGRESSION_SOC_6E_RELEASE.md`.
 
 ---
 
