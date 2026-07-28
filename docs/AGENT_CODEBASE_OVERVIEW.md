@@ -216,6 +216,10 @@ development mode. Migration 049 adds an authenticated read-only capability hands
 complete Soccer cloud boundary. Team Info, team setup deep links, and Soccer cloud-source
 continuation verify that contract before replacing an active game or committing cloud authority;
 failures preserve the current game and offer an explicit local-only path.
+SOC-6E2 hardens malformed legacy settings, keeps direct development checks on an explicit
+diagnostic/policy allowlist, and consolidates release evidence in
+`docs/REGRESSION_SOC_6E_RELEASE.md`. Development/staging and unreleased-production operator
+results remain required before SOC-6E3.
 
 The `game_events` repository is wired into the automatic queue only for healthy soccer event
 games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
@@ -358,7 +362,7 @@ flowchart LR
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
-| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E1 shipped; SOC-6E2 release hardening is next |
+| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E1 shipped; SOC-6E2 hardening/matrix implemented with operator evidence pending |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md`](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) | Basketball migration onto the shared event model. BKE-0 architecture plan drafted, revised after its first review pass, and awaiting approval; BKE-1 through BKE-5 are gated on that approval, with BKE-4 split into 4A-4D |
 
 ### Held / waiting for feedback

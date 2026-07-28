@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -13,6 +13,19 @@ function between(value: string, start: string, end: string): string {
   return value.slice(startIndex, endIndex)
 }
 
+function sourceFiles(directory: string): string[] {
+  return readdirSync(resolve(process.cwd(), directory), { withFileTypes: true })
+    .flatMap(entry => {
+      const path = `${directory}/${entry.name}`
+      return entry.isDirectory() ? sourceFiles(path) : [path]
+    })
+    .filter(path =>
+      /\.(ts|tsx)$/.test(path) &&
+      !path.endsWith('.test.ts') &&
+      !path.endsWith('.test.tsx')
+    )
+}
+
 describe('SOC-6E1 release entry guards', () => {
   it('keeps existing Soccer routes independent of development mode', () => {
     const app = source('src/App.tsx')
@@ -21,6 +34,28 @@ describe('SOC-6E1 release entry guards', () => {
     expect(app).toContain('<Route path="/soccer/review" element={<SoccerCloudReview />} />')
     expect(source('src/pages/Games.tsx')).not.toContain('import.meta.env.DEV')
     expect(source('src/pages/GameInfo.tsx')).not.toContain('import.meta.env.DEV')
+  })
+
+  it('keeps direct development checks limited to centralized policy and diagnostics', () => {
+    // Extend this allowlist only for dev diagnostics, never feature availability decisions.
+    const directChecks = Object.fromEntries(
+      sourceFiles('src')
+        .map(path => [
+          path,
+          source(path).split('import.meta.env.DEV').length - 1,
+        ] as const)
+        .filter(([, count]) => count > 0)
+    )
+
+    expect(directChecks).toEqual({
+      'src/App.tsx': 2,
+      'src/lib/soccer/aggregateTransport.ts': 1,
+      'src/lib/sportAvailability.ts': 1,
+    })
+    expect(source('src/App.tsx')).toContain('/dev/shot-chart')
+    expect(source('src/lib/soccer/aggregateTransport.ts')).toContain(
+      '[StatKeeper] Soccer aggregate load'
+    )
   })
 
   it('preflights Team Info cloud starts before confirmation or game mutation', () => {

@@ -47,9 +47,16 @@ describe('loadSoccerReleaseCapabilities', () => {
     await expect(
       loadSoccerReleaseCapabilities(clientWith({ contractVersion: 0 }))
     ).resolves.toMatchObject({ status: 'backend_update_required' })
-    await expect(
-      loadSoccerReleaseCapabilities(clientWith({ contractVersion: 2 }))
-    ).resolves.toMatchObject({ status: 'client_update_required' })
+    const staleClient = await loadSoccerReleaseCapabilities(
+      clientWith({ contractVersion: 2 })
+    )
+    expect(staleClient).toMatchObject({
+      status: 'client_update_required',
+    })
+    if (staleClient.status === 'ready') {
+      throw new Error('expected a stale-client capability result')
+    }
+    expect(staleClient.error).toContain('close and reopen')
   })
 
   it('distinguishes missing backend, authentication, access, and offline failures', async () => {
