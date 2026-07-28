@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, Cloud, Laptop } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -13,9 +13,14 @@ import {
 } from '../lib/soccer'
 import type { SoccerRuleSource } from '../lib/soccer/settings'
 import type { SoccerMatchRulesOverride } from '../lib/soccer/rules'
+import {
+  ensureSoccerReleaseCapabilities,
+  type SoccerReleaseCapabilityResult,
+} from '../lib/soccer/releaseCapabilities'
 import { resolveSoccerSetupRuleState } from '../lib/soccer/setupSettings'
 import { SPORT_SETTINGS_STORAGE_ERROR } from '../lib/sportSettingsStorage'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import {
   acceptedTeamRole,
   canTrackGames,
@@ -33,6 +38,9 @@ interface SoccerCloudTeam {
 }
 
 type TeamSource = 'local' | 'cloud'
+type CapabilityState =
+  | { status: 'idle' | 'loading' }
+  | SoccerReleaseCapabilityResult
 
 export default function SoccerGameSetup() {
   const navigate = useNavigate()
@@ -40,12 +48,21 @@ export default function SoccerGameSetup() {
   const requestedTeamId = searchParams.get('teamId')
   const { state, dispatch, parkingError } = useGame()
   const { user, isConfigured } = useAuth()
-  const { soccerSettings } = useSettings()
+  const { soccerSettings, isSportEnabled } = useSettings()
   const soccerState = state.sportGameState?.sportId === 'soccer'
     ? state.sportGameState
     : null
   const existingSetup = soccerState?.setup ?? null
   const cloudAvailable = Boolean(isConfigured && user && supabase)
+  const availability = getSportAvailabilityPolicy('soccer', isSportEnabled('soccer'))
+  const cloudSourceAvailable = cloudAvailable && (
+    availability.canStartNewGame || Boolean(existingSetup?.sourceTeamId)
+  )
+  const requestedCloudSourceBlocked = Boolean(
+    requestedTeamId &&
+    !availability.canStartNewGame &&
+    !existingSetup?.sourceTeamId
+  )
 
   const [teamName, setTeamName] = useState(state.gameInfo?.teamName ?? '')
   const [opponentName, setOpponentName] = useState(state.gameInfo?.opponentName ?? '')
@@ -54,7 +71,9 @@ export default function SoccerGameSetup() {
     state.gameInfo?.date ?? new Date().toISOString().slice(0, 10)
   )
   const [teamSource, setTeamSource] = useState<TeamSource>(
-    requestedTeamId || existingSetup?.sourceTeamId ? 'cloud' : 'local'
+    existingSetup?.sourceTeamId || (requestedTeamId && availability.canStartNewGame)
+      ? 'cloud'
+      : 'local'
   )
   const [teams, setTeams] = useState<SoccerCloudTeam[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState(
@@ -63,6 +82,9 @@ export default function SoccerGameSetup() {
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [teamsError, setTeamsError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [capabilityState, setCapabilityState] = useState<CapabilityState>({ status: 'idle' })
+  const [capabilityAttempt, setCapabilityAttempt] = useState(0)
+  const forceCapabilityCheck = useRef(false)
   const [designation, setDesignation] = useState(
     existingSetup?.trackedTeamDesignation ?? 'home'
   )
@@ -93,7 +115,7 @@ export default function SoccerGameSetup() {
   }, [invalidRoute, navigate])
 
   useEffect(() => {
-    if (invalidRoute || !cloudAvailable || !user || !supabase) return
+    if (invalidRoute || teamSource !== 'cloud' || !cloudAvailable || !user || !supabase) return
     let cancelled = false
 
     const loadTeams = async () => {
@@ -153,6 +175,33 @@ export default function SoccerGameSetup() {
     return () => { cancelled = true }
   }, [cloudAvailable, existingSetup?.sourceTeamId, invalidRoute, requestedTeamId, teamSource, user])
 
+  useEffect(() => {
+    if (teamSource !== 'cloud') {
+      setCapabilityState({ status: 'idle' })
+      return
+    }
+    if (!cloudAvailable || !user) {
+      setCapabilityState({
+        status: 'not_configured',
+        error: 'Cloud Soccer requires Supabase configuration.',
+      })
+      return
+    }
+
+    let cancelled = false
+    setCapabilityState({ status: 'loading' })
+    const force = forceCapabilityCheck.current
+    forceCapabilityCheck.current = false
+    void ensureSoccerReleaseCapabilities(user.id, {
+      force,
+    }).then(result => {
+      if (!cancelled) setCapabilityState(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [capabilityAttempt, cloudAvailable, teamSource, user])
+
   const selectedTeam = useMemo(
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [selectedTeamId, teams]
@@ -176,6 +225,21 @@ export default function SoccerGameSetup() {
   const effectiveHierarchy = setupRules.effective
   const rules = setupRules.rules
   const displayedOverrides = setupRules.displayedOverrides
+  const teamDefaultsLoading = teamSource === 'cloud' && (
+    teamSettings.scopeTeamId !== selectedTeamId ||
+    teamSettings.status === 'idle' ||
+    teamSettings.status === 'loading'
+  )
+  const capabilityLoading = teamSource === 'cloud' && (
+    capabilityState.status === 'idle' ||
+    capabilityState.status === 'loading'
+  )
+  const cloudPrerequisitesLoading = teamDefaultsLoading || capabilityLoading
+  const cloudCapabilityError =
+    teamSource === 'cloud' &&
+    'error' in capabilityState
+      ? capabilityState.error
+      : null
 
   if (invalidRoute) return null
 
@@ -191,7 +255,21 @@ export default function SoccerGameSetup() {
     setMatchOverrides({})
   }
 
+  const useLocalMatch = () => {
+    releasePreservedSnapshot()
+    setTeamSource('local')
+    setFormError(null)
+  }
+
   const handleContinue = () => {
+    if (teamSource === 'cloud' && capabilityState.status !== 'ready') {
+      setFormError(
+        'error' in capabilityState
+          ? capabilityState.error
+          : 'Wait for Soccer cloud support to be checked.'
+      )
+      return
+    }
     if (
       teamSource === 'cloud' &&
       (
@@ -285,16 +363,20 @@ export default function SoccerGameSetup() {
             {formError ?? teamsError ?? parkingError}
           </div>
         )}
+        {requestedCloudSourceBlocked && (
+          <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {availability.releaseStage === 'unreleased'
+              ? 'Cloud Soccer match creation is coming soon. This setup remains local.'
+              : 'Enable Soccer in Settings to start from a cloud team. This setup remains local.'}
+          </div>
+        )}
 
         <section className="space-y-3">
           <h2 className="text-sm font-bold uppercase text-slate-500">Team Source</h2>
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="Team source">
             <ModeButton
               active={teamSource === 'local'}
-              onClick={() => {
-                releasePreservedSnapshot()
-                setTeamSource('local')
-              }}
+              onClick={useLocalMatch}
               icon={<Laptop size={17} />}
               label="Local"
             />
@@ -306,7 +388,7 @@ export default function SoccerGameSetup() {
               }}
               icon={<Cloud size={17} />}
               label="Cloud roster"
-              disabled={!cloudAvailable}
+              disabled={!cloudSourceAvailable}
             />
           </div>
           {teamSource === 'cloud' ? (
@@ -383,20 +465,53 @@ export default function SoccerGameSetup() {
             </div>
           )}
 
+          {teamSource === 'cloud' && cloudPrerequisitesLoading && !cloudCapabilityError && (
+            <div role="status" className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              Checking cloud support and loading team defaults...
+            </div>
+          )}
+
+          {teamSource === 'cloud' && cloudCapabilityError && (
+            <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 space-y-2">
+              <p>{cloudCapabilityError}</p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    forceCapabilityCheck.current = true
+                    setCapabilityAttempt(value => value + 1)
+                  }}
+                  className="font-semibold underline"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={useLocalMatch}
+                  className="font-semibold underline"
+                >
+                  Use Local Match
+                </button>
+              </div>
+            </div>
+          )}
+
           {teamSource === 'cloud' &&
+            !cloudPrerequisitesLoading &&
+            !cloudCapabilityError &&
             (Boolean(teamSettings.error) ||
               teamSettings.status === 'cached' ||
               teamSettings.status === 'backend_update_required' ||
               teamSettings.status === 'error') && (
-              <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                {teamSettings.error === SPORT_SETTINGS_STORAGE_ERROR
-                  ? 'Team defaults loaded, but they could not be cached on this device. They remain available for this session.'
-                  : teamSettings.error ??
-                  (teamSettings.status === 'cached'
-                  ? 'Using the last synced team defaults while cloud refresh is unavailable.'
-                  : 'Shared team defaults are unavailable.')}
-              </div>
-            )}
+                <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {teamSettings.error === SPORT_SETTINGS_STORAGE_ERROR
+                    ? 'Team defaults loaded, but they could not be cached on this device. They remain available for this session.'
+                    : teamSettings.error ??
+                    (teamSettings.status === 'cached'
+                    ? 'Using the last synced team defaults while cloud refresh is unavailable.'
+                    : 'Shared team defaults are unavailable.')}
+                </div>
+              )}
 
           {effectiveHierarchy.diagnostics.length > 0 && (
             <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -417,18 +532,14 @@ export default function SoccerGameSetup() {
           type="button"
           onClick={handleContinue}
           disabled={teamSource === 'cloud' && (
-            teamSettings.scopeTeamId !== selectedTeamId ||
-            teamSettings.status === 'idle' ||
-            teamSettings.status === 'loading'
+            cloudPrerequisitesLoading || capabilityState.status !== 'ready'
           )}
           className="btn-primary w-full disabled:opacity-50"
         >
-          {teamSource === 'cloud' && (
-            teamSettings.scopeTeamId !== selectedTeamId ||
-            teamSettings.status === 'idle' ||
-            teamSettings.status === 'loading'
-          )
-            ? 'Loading Team Defaults...'
+          {teamSource === 'cloud' && cloudPrerequisitesLoading
+            ? 'Preparing Cloud Setup...'
+            : teamSource === 'cloud' && capabilityState.status !== 'ready'
+              ? 'Cloud Setup Unavailable'
             : 'Continue to Match Roster'}
         </button>
       </main>

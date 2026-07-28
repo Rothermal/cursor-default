@@ -41,19 +41,18 @@ import { isSoccerSummaryRoute } from './lib/soccer/summary'
 function GameSetupRoute() {
   const { state } = useGame()
   if (state.sport?.id !== 'soccer') return <GameSetup />
-  return import.meta.env.DEV ? <SoccerGameSetup /> : <Navigate to="/" replace />
+  return <SoccerGameSetup />
 }
 
 function PlayerSetupRoute() {
   const { state } = useGame()
   if (state.sport?.id !== 'soccer') return <PlayerSetup />
-  return import.meta.env.DEV ? <SoccerPlayerSetup /> : <Navigate to="/" replace />
+  return <SoccerPlayerSetup />
 }
 
 function GameTrackerRoute() {
   const { state } = useGame()
   if (state.sport?.id !== 'soccer') return <GameTracker />
-  if (!import.meta.env.DEV) return <Navigate to="/" replace />
   return state.eventStream?.events.length
     ? <SoccerGameTracker />
     : <Navigate to="/players" replace />
@@ -62,14 +61,14 @@ function GameTrackerRoute() {
 function GameCheckoutRoute() {
   const { state } = useGame()
   if (state.sport?.id !== 'soccer') return <GameCheckout />
-  return <Navigate to={import.meta.env.DEV ? '/players' : '/'} replace />
+  return <Navigate to="/players" replace />
 }
 
 function GameSummaryRoute() {
   const { state } = useGame()
   const [searchParams] = useSearchParams()
   if (!isSoccerSummaryRoute(state.sport?.id, searchParams)) return <GameSummary />
-  return import.meta.env.DEV ? <SoccerSummary /> : <Navigate to="/" replace />
+  return <SoccerSummary />
 }
 
 function AppRoutes() {
@@ -174,9 +173,7 @@ function AppRoutes() {
             <Route path="/team/season" element={<SeasonInfo />} />
             <Route path="/game-info" element={<GameInfo />} />
             <Route path="/games" element={<Games />} />
-            {import.meta.env.DEV && (
-              <Route path="/soccer/review" element={<SoccerCloudReview />} />
-            )}
+            <Route path="/soccer/review" element={<SoccerCloudReview />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/player" element={<PlayerProfile />} />
             <Route path="/player-info" element={<PlayerProfile />} />

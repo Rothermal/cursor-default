@@ -25,7 +25,8 @@ import {
   type TeamInfoGame,
 } from '../lib/teamInfo'
 import { acceptedTeamRole, canTrackGames } from '../lib/teamPermissions'
-import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 
 interface TeamRow {
   id: string
@@ -79,6 +80,8 @@ export default function TeamInfo() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [startGameError, setStartGameError] = useState<string | null>(null)
+  const [startingGame, setStartingGame] = useState(false)
+  const [offerLocalSoccer, setOfferLocalSoccer] = useState(false)
   const [activeSegment, setActiveSegment] = useState<TeamInfoSegment>('overview')
   const myRole = useMemo(() => {
     const member = teamMembers.find(candidate => candidate.user_id === user?.id)
@@ -89,9 +92,10 @@ export default function TeamInfo() {
     () => (team ? sports.find(item => item.id === team.seasons.sport) ?? null : null),
     [team]
   )
-  const sportAvailable = Boolean(
-    sport && isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
-  )
+  const sportAvailability = sport
+    ? getSportAvailabilityPolicy(sport.id, isSportEnabled(sport.id))
+    : null
+  const sportAvailable = Boolean(sportAvailability?.canStartNewGame)
 
   const record = useMemo(
     () => computeTeamRecord(sport, games, statsTotalsByGameId),
@@ -139,12 +143,43 @@ export default function TeamInfo() {
     [gamesWithScores]
   )
 
-  const handleStartGame = () => {
+  const startLocalSoccerGame = () => {
+    if (!sport || sport.id !== 'soccer') return
+    setStartGameError(null)
+    setOfferLocalSoccer(false)
+    const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
+    if (
+      hasActiveGame &&
+      !window.confirm('Park your current game and start a local Soccer match?')
+    ) {
+      return
+    }
+    if (!startNewGame(sport)) return
+    navigate('/setup')
+  }
+
+  const handleStartGame = async () => {
     if (!team || !sport || !canTrackGames(myRole)) return
     setStartGameError(null)
+    setOfferLocalSoccer(false)
     if (!sportAvailable) {
-      setStartGameError(`${sport.name} game tracking is not available.`)
+      setStartGameError(
+        sportAvailability?.releaseStage === 'unreleased'
+          ? `${sport.name} is coming soon.`
+          : `Enable ${sport.name} in Settings before starting a game.`
+      )
       return
+    }
+    if (sport.id === 'soccer') {
+      if (!user) return
+      setStartingGame(true)
+      const capability = await ensureSoccerReleaseCapabilities(user.id)
+      setStartingGame(false)
+      if (capability.status !== 'ready') {
+        setStartGameError(capability.error)
+        setOfferLocalSoccer(true)
+        return
+      }
     }
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
     if (
@@ -320,19 +355,31 @@ export default function TeamInfo() {
             Back to Teams
           </button>
           <div className="flex items-center gap-3">
-            {team && sport && sportAvailable && !loading && canTrackGames(myRole) && (
+            {team && sport && !loading && canTrackGames(myRole) && (
               <button
                 type="button"
-                onClick={handleStartGame}
-                className="btn-primary py-2 px-3 text-sm"
+                onClick={() => void handleStartGame()}
+                disabled={startingGame}
+                className="btn-primary py-2 px-3 text-sm disabled:opacity-50"
               >
-                Start Game
+                {startingGame ? 'Checking...' : 'Start Game'}
               </button>
             )}
             {(startGameError || parkingError) && (
-              <p className="text-xs text-red-600 max-w-[12rem] text-right">
-                {startGameError ?? parkingError}
-              </p>
+              <div className="max-w-[14rem] text-right">
+                <p className="text-xs text-red-600">
+                  {startGameError ?? parkingError}
+                </p>
+                {offerLocalSoccer && (
+                  <button
+                    type="button"
+                    onClick={startLocalSoccerGame}
+                    className="mt-1 text-xs font-semibold text-blue-600 underline"
+                  >
+                    Start Local Match
+                  </button>
+                )}
+              </div>
             )}
             {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
           </div>
