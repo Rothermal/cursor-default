@@ -136,7 +136,7 @@ function parseCapabilities(value: unknown): SoccerReleaseCapabilityResult {
   if (Number(version) > SOCCER_RELEASE_CONTRACT_VERSION) {
     return {
       status: 'client_update_required',
-      error: 'This app is out of date. Reload or update the app before starting a cloud Soccer match.',
+      error: 'This app is out of date. Reload it before starting a cloud Soccer match. If this message returns in the installed app, close and reopen the app once more.',
     }
   }
 

@@ -4,7 +4,6 @@ import {
   loadSettingsFromStorage,
   mergeStoredSettings,
   SETTINGS_STORAGE_KEY,
-  type AppSettings,
 } from './settingsStorage'
 
 describe('mergeStoredSettings', () => {
@@ -24,6 +23,31 @@ describe('mergeStoredSettings', () => {
     expect(merged.courtCapture.reboundPromptAfterMiss).toBe(true)
     expect(merged.enabledSports).toEqual(DEFAULT_SETTINGS.enabledSports)
   })
+
+  it('rejects malformed nested settings instead of treating them as enabled', () => {
+    const merged = mergeStoredSettings({
+      enabledSports: {
+        basketball: 1,
+        soccer: 'yes',
+        futureSport: true,
+      },
+      courtCapture: {
+        reboundPromptAfterMiss: 'yes',
+      },
+    })
+
+    expect(merged.enabledSports.basketball).toBe(true)
+    expect(merged.enabledSports.soccer).toBe(false)
+    expect(merged.enabledSports.futureSport).toBe(true)
+    expect(merged.courtCapture.reboundPromptAfterMiss).toBe(false)
+  })
+
+  it.each([null, [], 'settings', 3])(
+    'returns defaults for a non-object stored value: %j',
+    stored => {
+      expect(mergeStoredSettings(stored)).toEqual(DEFAULT_SETTINGS)
+    }
+  )
 })
 
 describe('loadSettingsFromStorage', () => {
@@ -58,7 +82,7 @@ describe('loadSettingsFromStorage', () => {
   })
 
   it('merges saved JSON over defaults', () => {
-    const saved: Partial<AppSettings> = {
+    const saved = {
       enabledSports: { hockey: true },
       courtCapture: { reboundPromptAfterMiss: true },
     }
@@ -72,5 +96,13 @@ describe('loadSettingsFromStorage', () => {
   it('returns defaults on corrupt JSON', () => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, '{not-json')
     expect(loadSettingsFromStorage()).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('keeps Soccer disabled for syntactically valid malformed JSON', () => {
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ enabledSports: { soccer: 'true' } })
+    )
+    expect(loadSettingsFromStorage().enabledSports.soccer).toBe(false)
   })
 })

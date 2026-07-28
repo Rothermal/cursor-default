@@ -1,6 +1,7 @@
 # SOC-6E Soccer Release Hardening and Enablement
 
-Status: in progress; focused Q&A complete; SOC-6E1 implemented.
+Status: in progress; focused Q&A complete; SOC-6E1 implemented; SOC-6E2 hardening and operator
+matrix implemented with development/staging evidence pending.
 
 ## 1. Goal
 
@@ -232,6 +233,10 @@ Exit condition: production discovery remains off, but availability decisions and
 are complete, fail closed, and cannot disturb an existing game on failure.
 
 ### SOC-6E2: Release hardening and regression evidence
+
+Implementation status: automated hardening and the consolidated release matrix are complete.
+Development/staging and unreleased-production operator results must still be recorded in
+`docs/REGRESSION_SOC_6E_RELEASE.md` before SOC-6E3.
 
 - Consolidate all SOC-1 through SOC-6D automated/manual coverage into
   `docs/REGRESSION_SOC_6E_RELEASE.md`.
