@@ -76,6 +76,10 @@ read `import.meta.env.DEV` directly to decide Soccer access. SOC-6E1 replaces al
 development checks with that policy while production release state remains off. SOC-6E3 changes
 only the centralized production release value.
 
+This release stage is Soccer-specific. Basketball, baseball, football, and hockey retain their
+current `enabledInSettings` availability behavior; SOC-6E does not assign those sports a release
+stage or change whether their existing toggles expose them.
+
 When Soccer is disabled:
 
 - Sport Select omits Soccer as a new workspace.
@@ -128,16 +132,23 @@ The RPC:
 
 - requires active app access and uses a fixed `search_path`;
 - returns a versioned release contract, not table contents or user data;
-- represents the required 043-049 Soccer transport, recovery, recorder, finalization, aggregate,
-  and settings backend boundary;
+- represents the required 043 through 048 Soccer transport, recovery, recorder, finalization,
+  aggregate, and settings boundary plus the 049 handshake;
 - grants no write authority and does not replace the authorization checks in operational RPCs.
 
-The client accepts only the exact supported contract version. Missing RPC/schema-cache errors map
-to `backend_update_required`; authentication/access failures retain their existing typed meaning;
-network/offline failures remain retryable and must not be mislabeled as a missing migration;
-malformed or unsupported responses fail closed. A successful result may be cached only in memory
-for the current authenticated session. Sign-out, account change, or explicit retry
-clears/rechecks it.
+The client accepts only the exact supported contract version and compares valid integer versions
+before classifying the result:
+
+- a missing RPC/schema cache or older server contract maps to `backend_update_required`;
+- a newer server contract maps to `client_update_required` with Update/Reload App guidance for a
+  stale PWA shell;
+- authentication/access failures retain their existing typed meaning;
+- network/offline failures remain retryable and are not mislabeled as migration failures;
+- malformed responses fail closed as an invalid capability response.
+
+The client does not optimistically ignore fields from a newer contract. A successful exact-version
+result may be cached only in memory for the current authenticated session. Sign-out, account
+change, or explicit retry clears/rechecks it.
 
 Migration 049 is a capability handshake only. It does not add product data, backfill records, or
 change existing RLS.
@@ -150,6 +161,9 @@ the active game or continue into a cloud-bound roster.
 - Team deep links load team role, sport, and capabilities before `startNewGame`.
 - A local Soccer setup checks capabilities when the user deliberately selects a cloud team and
   before Continue commits that source.
+- Capability loading and the SOC-6D3 team-defaults load start together for the selected team.
+  Continue waits for both to reach a usable terminal state and exposes one combined loading/failure
+  surface rather than two sequential blocking waits.
 - Capability failure leaves the current active/parked game unchanged.
 - The error identifies the backend update requirement and offers an explicit local-match path.
 - Choosing local is a user action; it does not silently copy a cloud roster, claim future sync, or
@@ -179,6 +193,8 @@ adding a telemetry system or new sensitive payloads.
 - Replace Soccer-specific `import.meta.env.DEV` guards in App routes, Cloud Games, Game Info,
   dashboard/chooser, and settings with the centralized policy. Dev-only diagnostic tools remain
   environment-gated.
+- Leave non-availability development diagnostics such as the aggregate transport development log
+  unchanged.
 - Make the Soccer switch functional in development preview, keep it disabled/Coming soon in
   unreleased production, and keep the stored preference off by default.
 - Preserve disabled-Soccer access to active, parked, team, game, summary, and aggregate
@@ -188,7 +204,11 @@ adding a telemetry system or new sensitive payloads.
   transitions.
 - Add an actionable local path that does not silently reuse cloud authority.
 - Add pure tests for every release/preference/history combination, malformed capability responses,
-  account changes, missing migration, and no-mutation-on-failure behavior.
+  older/newer contract versions, account changes, missing migration, concurrent team-default and
+  capability loading, and no-mutation-on-failure behavior.
+- Rewrite `src/lib/sportAvailability.test.ts`, which intentionally pins the current
+  development-only Soccer behavior, and add unchanged-availability cases for Basketball,
+  baseball, football, and hockey.
 
 Primary boundaries:
 
@@ -272,11 +292,14 @@ reachable when disabled, and the documented release/rollback checks pass.
 At minimum, tests must prove:
 
 - build release state and device preference independently control new-game discovery;
+- Basketball, baseball, football, and hockey retain their current `enabledInSettings` behavior;
 - disabled Soccer never hides active, parked, cloud, final, team, player, or aggregate records;
 - every direct new-game entry checks availability before state mutation;
 - legacy and malformed stored settings keep Soccer disabled by default;
 - migration 049 exposes only the expected capability contract;
-- missing, malformed, stale, or inaccessible capabilities fail closed;
+- missing, malformed, older-server, newer-server/stale-client, offline, or inaccessible
+  capabilities fail closed with the correct operator direction;
+- team defaults and capabilities load concurrently behind one cloud-source continuation state;
 - capability cache isolation follows the authenticated session;
 - capability failure preserves the current active and parked game identities;
 - local-only Soccer remains usable without Supabase;
