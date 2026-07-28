@@ -37,6 +37,7 @@ describe('SOC-6E1 release entry guards', () => {
   })
 
   it('keeps direct development checks limited to centralized policy and diagnostics', () => {
+    // Extend this allowlist only for dev diagnostics, never feature availability decisions.
     const directChecks = Object.fromEntries(
       sourceFiles('src')
         .map(path => [
