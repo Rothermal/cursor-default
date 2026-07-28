@@ -16,7 +16,7 @@ import {
   sportTeamsPath,
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
-import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 
 function activeSyncStatusLabel(status: string, lastError: string | null): string | null {
   switch (status) {
@@ -59,9 +59,9 @@ export default function SportDashboard() {
   const knownSportIds = sports.map(sport => sport.id)
   const validSportId = isKnownSportId(sportId, knownSportIds) ? sportId : null
   const sport = sports.find(item => item.id === validSportId) ?? null
-  const sportEnabled = sport
-    ? isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
-    : false
+  const availability = sport
+    ? getSportAvailabilityPolicy(sport.id, isSportEnabled(sport.id))
+    : null
 
   const parkedForSport = useMemo(
     () =>
@@ -102,6 +102,14 @@ export default function SportDashboard() {
     if (!sport) return
     setDashboardError(null)
     clearParkingError()
+    if (!availability?.canStartNewGame) {
+      setDashboardError(
+        availability?.releaseStage === 'unreleased'
+          ? `${sport.name} is coming soon. Existing matches and cloud history remain available.`
+          : `Enable ${sport.name} in Settings before starting a new game.`
+      )
+      return
+    }
     if (
       hasActiveGame &&
       !window.confirm(`Park your current game and start a new ${sport.name} game?`)
@@ -150,7 +158,7 @@ export default function SportDashboard() {
     )
   }
 
-  if (!sportEnabled) {
+  if (!availability?.discoverable && sport.id !== 'soccer') {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <section className="card max-w-md w-full text-center">
@@ -191,6 +199,28 @@ export default function SportDashboard() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
+        {!availability?.canStartNewGame && (
+          <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900">
+              {availability?.releaseStage === 'unreleased'
+                ? `${sport.name} is coming soon`
+                : `${sport.name} is disabled`}
+            </p>
+            <p className="text-xs text-amber-800 mt-1">
+              Existing local matches and cloud history remain available. New matches are disabled.
+            </p>
+            {availability?.toggleAvailable && (
+              <button
+                type="button"
+                onClick={() => navigate('/settings/app')}
+                className="mt-2 text-xs font-semibold text-amber-900 underline"
+              >
+                Open Settings
+              </button>
+            )}
+          </section>
+        )}
+
         {(parkingError || dashboardError) && (
           <div className="card bg-amber-50 border-amber-200 text-amber-800 text-sm">
             {dashboardError ?? parkingError}
@@ -216,7 +246,12 @@ export default function SportDashboard() {
                 {hasActiveForSport ? 'Continue the active local game.' : `Start a new ${sport.name} game.`}
               </p>
             </div>
-            <button type="button" onClick={handleStartNew} className="btn-primary py-2 px-4 text-sm">
+            <button
+              type="button"
+              onClick={handleStartNew}
+              disabled={!availability?.canStartNewGame}
+              className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
+            >
               New Game
             </button>
           </div>

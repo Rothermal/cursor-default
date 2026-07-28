@@ -125,7 +125,8 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/046_soccer_finalization_recovery.sql` - SOC-5D canonical publication, primary locking, final audit uploads, and reason-required reopen
 - `supabase/migrations/047_soccer_canonical_aggregate_sources.sql` - SOC-6C2 RLS/keyset canonical aggregate source RPCs, audited participant-link repair, merge-safe stable identities, and retention of migration 041's basketball shot-chart remount
 - `supabase/migrations/048_soccer_settings_foundation.sql` - SOC-6D1 generic personal/team sport-settings tables, strict soccer schema validation, read-only RLS, revision-aware write RPCs, and shared-setting audit events
-   > Apply **`048`** before testing account-synced personal Soccer defaults or shared team defaults. SOC-6D4 adds client hardening and documentation only; it has no additional migration.
+- `supabase/migrations/049_soccer_release_capabilities.sql` - SOC-6E1 authenticated read-only handshake for the complete Soccer cloud contract
+   > Apply **`049`** before testing cloud-team Soccer starts. Missing or stale capability contracts fail closed while local-only Soccer and existing/history access remain available.
    > Before **`047`**, run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` and review the repairable/unprovable participant counts.
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
@@ -283,7 +284,9 @@ supabase/
     ├── 044_soccer_event_recovery.sql
     ├── 045_soccer_recorder_resolution.sql
     ├── 046_soccer_finalization_recovery.sql
-    └── 047_soccer_canonical_aggregate_sources.sql
+    ├── 047_soccer_canonical_aggregate_sources.sql
+    ├── 048_soccer_settings_foundation.sql
+    └── 049_soccer_release_capabilities.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -434,10 +437,11 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Soccer personal settings (SOC-6D2)** - compact grouped personal defaults, editable presets, explicit Save/Discard and reset, anonymous/account cache isolation, cloud reconciliation, offline pending writes, and explicit revision-conflict choices ([plan](docs/PLAN_SOC_6D_SOCCER_SETTINGS.md))
 - [x] **Soccer team defaults and setup inheritance (SOC-6D3)** - owner/admin shared team overrides, scorer/viewer read-only review, compatible-team copy, account/team cache isolation, source-labeled built-in/personal/team/match setup resolution, sparse match resets, and immutable setup snapshots ([plan](docs/PLAN_SOC_6D_SOCCER_SETTINGS.md))
 - [x] **Soccer settings hardening (SOC-6D4)** - fail-closed schema/cache handling, non-crashing device-storage failures, transactional audit-write verification, keyboard and narrow-screen refinements, reset confirmation, and a settings regression matrix ([plan](docs/PLAN_SOC_6D_SOCCER_SETTINGS.md), [regression matrix](docs/REGRESSION_SOC_6D_SETTINGS.md))
+- [x] **Soccer availability and cloud capability preflight (SOC-6E1)** - centralized preview/release/discovery/history policy, production-safe existing Soccer routes, migration 049 capability handshake, account-scoped strict parsing, and preflight-before-mutation cloud entry with explicit local fallback ([plan](docs/PLAN_SOC_6E_RELEASE_HARDENING.md))
 
 ### What's Next
 
-- [ ] **Soccer SOC-6E** - three planned slices for availability/capability preflight, release regression hardening, and final opt-in production discovery; Soccer remains development-only until SOC-6E3 ([detailed plan](docs/PLAN_SOC_6E_RELEASE_HARDENING.md), [SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md))
+- [ ] **Soccer SOC-6E2/SOC-6E3** - complete release regression evidence, then flip the centralized opt-in production release flag after sign-off; production Soccer discovery remains off until SOC-6E3 ([detailed plan](docs/PLAN_SOC_6E_RELEASE_HARDENING.md), [SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md))
 - [ ] **Basketball event-model migration (BKE-0 through BKE-4)** — required post-foundation redesign that unifies counters, action log, shot records, linked assists/rebounds, editing, and F13 on the shared event platform while preserving historical games ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))

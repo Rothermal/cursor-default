@@ -359,10 +359,6 @@ export default function Games() {
       game.sport_id ?? (game.team_id ? teamMap[game.team_id]?.seasons?.sport : null)
     const teamRole = game.team_id ? teamRolesById[game.team_id] ?? null : null
     if (gameSportId === 'soccer') {
-      if (!import.meta.env.DEV) {
-        setError('Soccer cloud review remains unavailable until the soccer release phase.')
-        return
-      }
       if (game.status === 'final') {
         navigate(soccerSummaryPath({
           gameId: game.id,

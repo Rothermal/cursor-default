@@ -1,6 +1,6 @@
 # SOC-6E Soccer Release Hardening and Enablement
 
-Status: planned; focused Q&A complete.
+Status: in progress; focused Q&A complete; SOC-6E1 implemented.
 
 ## 1. Goal
 
@@ -185,6 +185,9 @@ adding a telemetry system or new sensitive payloads.
 ## 6. Delivery Plan
 
 ### SOC-6E1: Availability policy and capability preflight
+
+Implementation status: complete. Production release remains off; apply migration 049 before
+testing cloud-team Soccer starts.
 
 - Replace the broad availability helper with explicit released/discoverable/new-game and
   existing-record decisions.

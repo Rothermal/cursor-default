@@ -20,7 +20,7 @@ import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { hasUnsyncedParkedBindingForCloudTeam } from '../lib/gameParking'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
-import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import {
   acceptedTeamRole,
   canClaimPlayerGuardianship,
@@ -110,13 +110,18 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const isManagementRoute = mode === 'manage'
   const supabaseClient = supabase
   const enabledSports = useMemo(
-    () => sports.filter(s => isSportWorkspaceAvailable(s.id, isSportEnabled(s.id))),
+    () => sports.filter(
+      s => getSportAvailabilityPolicy(s.id, isSportEnabled(s.id)).discoverable
+    ),
     [isSportEnabled]
   )
   const scopedSport = useMemo(
     () => sports.find(sport => sport.id === requestedSportId) ?? null,
     [requestedSportId]
   )
+  const scopedAvailability = scopedSport
+    ? getSportAvailabilityPolicy(scopedSport.id, isSportEnabled(scopedSport.id))
+    : null
   const scopedSportEnabled = Boolean(
     scopedSport && enabledSports.some(sport => sport.id === scopedSport.id)
   )
@@ -730,7 +735,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     if (!userId || !supabaseClient || !newTeamName.trim()) return
     setError(null)
     if (scopedSportDisabled) {
-      setError(`${scopedSport!.name} is disabled. Enable it in Settings before creating teams.`)
+      setError(
+        scopedAvailability?.releaseStage === 'unreleased'
+          ? `${scopedSport!.name} team creation is coming soon.`
+          : `${scopedSport!.name} is disabled. Enable it in Settings before creating teams.`
+      )
       return
     }
     setCreatingTeam(true)
@@ -1230,14 +1239,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
               />
               {scopedSportDisabled && (
                 <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center justify-between gap-2">
-                  <span>{scopedSport!.name} is disabled. Enable it before creating teams in this sport.</span>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/settings/app')}
-                    className="font-semibold underline shrink-0"
-                  >
-                    Settings
-                  </button>
+                  <span>
+                    {scopedAvailability?.releaseStage === 'unreleased'
+                      ? `${scopedSport!.name} team creation is coming soon. Existing teams remain available.`
+                      : `${scopedSport!.name} is disabled. Enable it before creating teams in this sport.`}
+                  </span>
+                  {scopedAvailability?.toggleAvailable && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/settings/app')}
+                      className="font-semibold underline shrink-0"
+                    >
+                      Settings
+                    </button>
+                  )}
                 </div>
               )}
               <div>
