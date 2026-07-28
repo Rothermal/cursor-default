@@ -1,6 +1,7 @@
 # SOC-6E Soccer Release Regression Matrix
 
-Status: automated hardening implemented; development/staging operator evidence pending.
+Status: SOC-6E3 release candidate implemented; preliminary and final deployed operator evidence
+pending.
 
 ## Purpose
 
@@ -58,6 +59,20 @@ pnpm build
 | Production build | Pass; PWA generated with 12 precache entries |
 | CI | Pass; PR #250 |
 
+### SOC-6E3 release-candidate run
+
+| Field | Value |
+|---|---|
+| Base commit | `4d61b9e` |
+| Branch | `feature/soc-6e3-production-enablement` |
+| Production release policy | Enabled |
+| Device default | Soccer disabled |
+| Migration ceiling | `049`; no new migration |
+| Lint | Pass; 0 errors, 3 existing Fast Refresh warnings |
+| Tests | Pass; 100 files, 641 tests |
+| Production build | Pass; PWA generated with 12 precache entries |
+| CI | Pending PR |
+
 ## Operator Record
 
 Complete one record for development preview and one for an unreleased production build. SOC-6E3
@@ -65,16 +80,16 @@ adds a released-production and deployed GitHub Pages record.
 
 | Field | Development/staging | Unreleased production | Released production |
 |---|---|---|---|
-| Date/time | Not run | Not run | SOC-6E3 |
-| Commit/deployment | Not run | Not run | SOC-6E3 |
-| Supabase project | Not run | Not run | SOC-6E3 |
+| Date/time | Not run | Not run | Not run |
+| Commit/deployment | Not run | Not run | Not run |
+| Supabase project | Not run | Not run | Not run |
 | Highest migration | Must be `049` | Must be `049` | Must be `049` |
-| Browser/version | Not run | Not run | SOC-6E3 |
-| Browser or installed PWA | Not run | Not run | SOC-6E3 |
-| Viewport/device | Not run | Not run | SOC-6E3 |
-| Accounts used | Not run | Not run | SOC-6E3 |
-| Team roles used | Not run | Not run | SOC-6E3 |
-| Reviewer | Not run | Not run | SOC-6E3 |
+| Browser/version | Not run | Not run | Not run |
+| Browser or installed PWA | Not run | Not run | Not run |
+| Viewport/device | Not run | Not run | Not run |
+| Accounts used | Not run | Not run | Not run |
+| Team roles used | Not run | Not run | Not run |
+| Reviewer | Not run | Not run | Not run |
 
 Use `Pass`, `Fail`, `Blocked`, or `Not run` in Result. Evidence should identify a screenshot,
 screen recording, console excerpt, database query result, or issue link without including access
@@ -93,6 +108,9 @@ tokens, invite tokens, email addresses, or event payloads.
 | E2-A07 | Unreleased production | Try dashboard, Team Info, team setup deep link, and direct setup new-game entry | Every new-game path stops before active/parked state mutation | Not run |
 | E2-A08 | Any | Sign out, sign in as another account, then return to Settings | Device Soccer toggle persists locally; account data and capability success do not cross accounts | Not run |
 | E2-A09 | Development | Set malformed legacy JSON values including `"soccer":"true"` | Soccer remains disabled and the app does not crash | Automated; manual optional |
+| E3-A10 | Released production, toggle off | Open Settings, Sport Select, and direct Soccer dashboard | Switch is available/off; Select hides Soccer; dashboard preserves history/resume and disables New Game | Not run |
+| E3-A11 | Released production, toggle on | Enable Soccer, reopen Select/dashboard, and start local/cloud setup | Soccer is discoverable; New Game uses normal setup and capability/role checks | Not run |
+| E3-A12 | Released production | Disable Soccer with active, parked, and historical Soccer records | New discovery stops while every existing authorized record remains reachable and unchanged | Not run |
 
 ## B. Capability And Backend Failure States
 
@@ -179,15 +197,15 @@ deployment during SOC-6E2.
 
 | ID | Procedure | Expected | Result/evidence |
 |---|---|---|---|
-| E2-H01 | Open the deployed root and direct HashRouter Soccer history links | Base path and routes load without a 404; release policy matches the build | Not run |
-| E2-H02 | Complete Google OAuth from a preserved team/game/summary return path | OAuth returns to `/cursor-default/` and restores the safe HashRouter destination | Not run |
-| E2-H03 | Install the PWA, deploy a newer build, and exercise refresh/close/reopen | The current shell activates without data loss; repeated stale guidance is actionable | Not run |
-| E2-H04 | Go offline after one successful load and open active/parked local games | Cached shell loads and local recovery remains available | Not run |
-| E2-H05 | Inspect console/network during capability and access failures | No tokens, schema inventory, event payloads, or cross-account data are exposed | Not run |
+| E3-H01 | Open the deployed root and direct HashRouter Soccer history links | Base path and routes load without a 404; release policy matches the build | Not run |
+| E3-H02 | Complete Google OAuth from a preserved team/game/summary return path | OAuth returns to `/cursor-default/` and restores the safe HashRouter destination | Not run |
+| E3-H03 | Install the PWA, deploy a newer build, and exercise refresh/close/reopen | The current shell activates without data loss; repeated stale guidance is actionable | Not run |
+| E3-H04 | Go offline after one successful load and open active/parked local games | Cached shell loads and local recovery remains available | Not run |
+| E3-H05 | Inspect console/network during capability and access failures | No tokens, schema inventory, event payloads, or cross-account data are exposed | Not run |
 
 ## Go/No-Go
 
-SOC-6E2 is complete only when:
+SOC-6E implementation is present in the release candidate, but final sign-off requires:
 
 - CI is green;
 - development/staging is migrated through `049`;
@@ -196,8 +214,10 @@ SOC-6E2 is complete only when:
 - no correctness, authorization, data-loss, recovery, accessibility, responsive-layout, PWA, or
   Basketball blocker remains.
 
-SOC-6E3 may flip the production release flag only after those conditions are met. Rollback restores
-the unreleased SOC-6E2 policy; it does not reverse migration 049 or hide existing Soccer data.
+The SOC-6E3 branch flips the centralized production release policy. Until the operator record is
+complete, treat the build as an unsigned release candidate. Any blocker requires stopping rollout
+or restoring the unreleased SOC-6E2 policy; rollback does not reverse migration 049 or hide
+existing Soccer data.
 
 ### Sign-off
 

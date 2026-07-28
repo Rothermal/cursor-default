@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { getSportAvailabilityPolicy } from './sportAvailability'
+import {
+  getSportAvailabilityPolicy,
+  SOCCER_RELEASED_IN_PRODUCTION,
+} from './sportAvailability'
 
 describe('getSportAvailabilityPolicy', () => {
   it('keeps the development Soccer preview behind the user toggle', () => {
@@ -47,6 +50,27 @@ describe('getSportAvailabilityPolicy', () => {
       toggleAvailable: true,
       discoverable: true,
       canStartNewGame: true,
+    })
+  })
+
+  it('ships Soccer as opt-in in production', () => {
+    expect(SOCCER_RELEASED_IN_PRODUCTION).toBe(true)
+    expect(
+      getSportAvailabilityPolicy('soccer', false, { development: false })
+    ).toEqual({
+      releaseStage: 'released',
+      toggleAvailable: true,
+      discoverable: false,
+      canStartNewGame: false,
+      canAccessExisting: true,
+    })
+    expect(
+      getSportAvailabilityPolicy('soccer', true, { development: false })
+    ).toMatchObject({
+      releaseStage: 'released',
+      discoverable: true,
+      canStartNewGame: true,
+      canAccessExisting: true,
     })
   })
 

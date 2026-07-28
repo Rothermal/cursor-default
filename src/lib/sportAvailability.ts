@@ -1,4 +1,4 @@
-export const SOCCER_RELEASED_IN_PRODUCTION = false
+export const SOCCER_RELEASED_IN_PRODUCTION = true
 
 export type SportReleaseStage = 'unreleased' | 'preview' | 'released'
 

@@ -163,8 +163,8 @@ roster, kickoff, and live tracker pages while a soccer game is active. `SoccerGa
 renders the anchored clock without per-second reducer writes and uses checked helpers in
 `src/lib/soccer/live.ts` for periods, substitutions, roles, direction, rules, participant
 changes, history corrections, diagnostics, and match end/reopen. SOC-6E1 keeps those existing
-record routes available in production while centralized policy still blocks production Soccer
-discovery and new-game creation until SOC-6E3. Cloud teams are read-only roster
+record routes available in production, and SOC-6E3 makes new Soccer discovery and creation a
+device-local production opt-in. Cloud teams are read-only roster
 sources; SOC-5A mirrors healthy local event streams, SOC-5B resumes the same recorder from cloud,
 and SOC-5C lets additional authorized team recorders start independent streams against the same
 game while viewers inspect only the primary stream. SOC-5D review resolves the active canonical
@@ -206,20 +206,20 @@ SOC-6D4 contains browser-storage failures without losing coherent in-session set
 invalid or unsupported cached/cloud objects out of the hierarchy, verifies that shared audit
 failure rolls back the same settings transaction, and hardens keyboard/status/reset and narrow
 layout behavior. The automated and operator checks are mapped in
-`docs/REGRESSION_SOC_6D_SETTINGS.md`. No migration follows 048 for SOC-6D4, and Soccer remains
-undiscoverable in production until SOC-6E3.
+`docs/REGRESSION_SOC_6D_SETTINGS.md`. No migration follows 048 for SOC-6D4.
 
 SOC-6E1 centralizes release, discovery/new-game, and existing-record policy in
 `src/lib/sportAvailability.ts`. Development preview now respects the device Soccer toggle;
-production release remains off. Existing local and cloud Soccer routes no longer depend on
-development mode. Migration 049 adds an authenticated read-only capability handshake for the
+SOC-6E3 enables the same opt-in policy in production while the stored default remains off.
+Existing local and cloud Soccer routes do not depend on development mode. Migration 049 adds an
+authenticated read-only capability handshake for the
 complete Soccer cloud boundary. Team Info, team setup deep links, and Soccer cloud-source
 continuation verify that contract before replacing an active game or committing cloud authority;
 failures preserve the current game and offer an explicit local-only path.
 SOC-6E2 hardens malformed legacy settings, keeps direct development checks on an explicit
 diagnostic/policy allowlist, and consolidates release evidence in
 `docs/REGRESSION_SOC_6E_RELEASE.md`. Development/staging and unreleased-production operator
-results remain required before SOC-6E3.
+results plus final deployed production evidence remain required for release sign-off.
 
 The `game_events` repository is wired into the automatic queue only for healthy soccer event
 games through `src/lib/soccer/cloudSync.ts`. Aggregate cloud sync remains disabled as soon as
@@ -362,7 +362,7 @@ flowchart LR
 | [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) / [`PLAN_ADMIN_SECURITY_ROADMAP.md`](PLAN_ADMIN_SECURITY_ROADMAP.md) | SEC-0 through SEC-6 complete; later audit event-family expansion is documented in SEC-6 |
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
-| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E1 shipped; SOC-6E2 hardening/matrix implemented with operator evidence pending |
+| [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; Soccer is a production opt-in with final operator evidence pending |
 | [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md`](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) | Basketball migration onto the shared event model. BKE-0 architecture plan drafted, revised after its first review pass, and awaiting approval; BKE-1 through BKE-5 are gated on that approval, with BKE-4 split into 4A-4D |
 
 ### Held / waiting for feedback
