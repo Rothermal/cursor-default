@@ -72,6 +72,7 @@ pnpm build
 | Tests | Pass; 100 files, 641 tests |
 | Production build | Pass; PWA generated with 12 precache entries |
 | CI | Pass; PR #251 |
+| Merge deployment gate | Lint, test, then production build on the exact merged commit |
 
 ## Operator Record
 
@@ -215,9 +216,9 @@ SOC-6E implementation is present in the release candidate, but final sign-off re
   Basketball blocker remains.
 
 The SOC-6E3 branch flips the centralized production release policy. Until the operator record is
-complete, treat the build as an unsigned release candidate. Any blocker requires stopping rollout
-or restoring the unreleased SOC-6E2 policy; rollback does not reverse migration 049 or hide
-existing Soccer data.
+complete, keep its PR in draft and treat the build as an unsigned release candidate. Any blocker
+requires stopping rollout or restoring the unreleased SOC-6E2 policy; rollback does not reverse
+migration 049 or hide existing Soccer data.
 
 ### Sign-off
 

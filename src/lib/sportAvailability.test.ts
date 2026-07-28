@@ -41,6 +41,18 @@ describe('getSportAvailabilityPolicy', () => {
 
   it('uses the normal toggle after the production release flag is enabled', () => {
     expect(
+      getSportAvailabilityPolicy('soccer', false, {
+        development: false,
+        soccerReleasedInProduction: true,
+      })
+    ).toEqual({
+      releaseStage: 'released',
+      toggleAvailable: true,
+      discoverable: false,
+      canStartNewGame: false,
+      canAccessExisting: true,
+    })
+    expect(
       getSportAvailabilityPolicy('soccer', true, {
         development: false,
         soccerReleasedInProduction: true,
@@ -55,23 +67,6 @@ describe('getSportAvailabilityPolicy', () => {
 
   it('ships Soccer as opt-in in production', () => {
     expect(SOCCER_RELEASED_IN_PRODUCTION).toBe(true)
-    expect(
-      getSportAvailabilityPolicy('soccer', false, { development: false })
-    ).toEqual({
-      releaseStage: 'released',
-      toggleAvailable: true,
-      discoverable: false,
-      canStartNewGame: false,
-      canAccessExisting: true,
-    })
-    expect(
-      getSportAvailabilityPolicy('soccer', true, { development: false })
-    ).toMatchObject({
-      releaseStage: 'released',
-      discoverable: true,
-      canStartNewGame: true,
-      canAccessExisting: true,
-    })
   })
 
   it.each(['basketball', 'baseball', 'football', 'hockey'])(

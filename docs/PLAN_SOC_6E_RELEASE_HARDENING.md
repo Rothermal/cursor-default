@@ -298,8 +298,10 @@ It disables new Soccer discovery while preserving all existing and historical So
 data because those routes were separated from release state in SOC-6E1.
 
 Concrete rollback: set `SOCCER_RELEASED_IN_PRODUCTION` in `src/lib/sportAvailability.ts` back to
-`false`, build, and redeploy. Do not reverse migration 049, disable the Soccer device preference,
-or alter existing local/cloud games.
+`false`, update its shipped-value assertion in `src/lib/sportAvailability.test.ts`, run lint,
+tests, and the production build, then redeploy. The policy-behavior tests remain explicit and
+continue to verify both released and unreleased states. Do not reverse migration 049, disable the
+Soccer device preference, or alter existing local/cloud games.
 
 Exit condition: a production build exposes opt-in Soccer to every user, existing records remain
 reachable when disabled, and the documented release/rollback checks pass.
