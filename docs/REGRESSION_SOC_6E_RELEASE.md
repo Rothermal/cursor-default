@@ -71,7 +71,7 @@ pnpm build
 | Lint | Pass; 0 errors, 3 existing Fast Refresh warnings |
 | Tests | Pass; 100 files, 641 tests |
 | Production build | Pass; PWA generated with 12 precache entries |
-| CI | Pending PR |
+| CI | Pass; PR #251 |
 
 ## Operator Record
 
