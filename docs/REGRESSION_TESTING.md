@@ -1033,7 +1033,7 @@ additional migration.
 | 11w.7 | Use Settings and Match Setup at 320 px and desktop widths with long period labels | Inputs and actions remain visible without incoherent overlap; team Save stacks on narrow screens |
 | 11w.8 | Navigate personal setting tabs by keyboard and trigger Reset All | Arrow/Home/End move tab focus and selection; status/errors announce; Reset All confirms and remains unsaved until Save |
 | 11w.9 | Park a Soccer setup, change personal/team defaults, then resume it | The parked match retains its fixed snapshot; a new setup resolves current built-in -> personal -> team -> match values |
-| 11w.10 | Run production availability tests and repeat Basketball settings/setup/park/sign-out smoke checks | Before SOC-6E3, Soccer discovery/new games remain unavailable, existing records remain reachable, and Basketball is unchanged |
+| 11w.10 | Run production availability tests and repeat Basketball settings/setup/park/sign-out smoke checks | Soccer is hidden by default, becomes available after device opt-in, existing records remain reachable when disabled, and Basketball is unchanged |
 
 See [the detailed SOC-6D matrix](REGRESSION_SOC_6D_SETTINGS.md) for automated evidence and the
 full operator checklist.

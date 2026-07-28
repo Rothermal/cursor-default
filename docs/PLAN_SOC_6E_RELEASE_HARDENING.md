@@ -1,7 +1,8 @@
 # SOC-6E Soccer Release Hardening and Enablement
 
-Status: in progress; focused Q&A complete; SOC-6E1 implemented; SOC-6E2 hardening and operator
-matrix implemented with development/staging evidence pending.
+Status: implemented through SOC-6E3 and approved for an owner-only opt-in rollout with
+post-deployment validation. Broader release evidence remains pending in
+`REGRESSION_SOC_6E_RELEASE.md`.
 
 ## 1. Goal
 
@@ -187,8 +188,8 @@ adding a telemetry system or new sensitive payloads.
 
 ### SOC-6E1: Availability policy and capability preflight
 
-Implementation status: complete. Production release remains off; apply migration 049 before
-testing cloud-team Soccer starts.
+Implementation status: complete. At SOC-6E1 delivery the production release remained off; SOC-6E3
+now enables it. Apply migration 049 before enabling cloud-team Soccer starts.
 
 - Replace the broad availability helper with explicit released/discoverable/new-game and
   existing-record decisions.
@@ -268,6 +269,12 @@ remains.
 
 ### SOC-6E3: Production enablement and sign-off
 
+Implementation status: release policy and documentation complete. The production build now offers
+Soccer as an opt-in sport while keeping the device default off. The owner accepted
+post-deployment validation for the initial single-user rollout because no production Soccer games
+exist. Target Supabase, deployed GitHub Pages, browser/PWA, role, multi-sport, and Basketball
+evidence remains the iteration checklist and is required before access materially broadens.
+
 - Flip the explicit production release policy for Soccer.
 - Confirm no Soccer route/review component still contains an environment access gate; those
   replacements belong to SOC-6E1. Dev-only tools such as the shot-chart preview remain gated.
@@ -291,6 +298,12 @@ Go/no-go requires:
 Rollback redeploys the SOC-6E2 release policy, not a data migration or a reversal of migration 049.
 It disables new Soccer discovery while preserving all existing and historical Soccer access and
 data because those routes were separated from release state in SOC-6E1.
+
+Concrete rollback: set `SOCCER_RELEASED_IN_PRODUCTION` in `src/lib/sportAvailability.ts` back to
+`false`, update its shipped-value assertion in `src/lib/sportAvailability.test.ts`, run lint,
+tests, and the production build, then redeploy. The policy-behavior tests remain explicit and
+continue to verify both released and unreleased states. Do not reverse migration 049, disable the
+Soccer device preference, or alter existing local/cloud games.
 
 Exit condition: a production build exposes opt-in Soccer to every user, existing records remain
 reachable when disabled, and the documented release/rollback checks pass.

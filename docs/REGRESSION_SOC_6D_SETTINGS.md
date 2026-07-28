@@ -56,7 +56,7 @@ Record browser/device, account ids, team role, migration state, and result for e
 | Status announcements | Trigger saving, pending, cloud error, storage warning, and conflict | Meaningful status/error text is exposed to assistive technology |
 | Narrow layout | Test 320 px width with 120-character segment labels and team save controls | Inputs shrink within tracks; actions remain readable and do not overlap |
 | Basketball regression | Repeat Basketball app settings, sport settings, setup, active/parked restore, and sign-out | Existing Basketball storage and workflows are unchanged |
-| Production gate | Build production, inspect discovery/new-game paths, then open an existing Soccer setup/tracker route | Before SOC-6E3, discovery and new games remain unavailable while existing records remain reachable |
+| Production availability | Build production, inspect Settings/Select with Soccer off and on, then open an existing Soccer setup/tracker route | Soccer remains hidden from discovery by default, becomes available after opt-in, and existing records stay reachable in either state |
 
 ## Failure Interpretation
 
