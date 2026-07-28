@@ -20,6 +20,7 @@ export type SoccerReleaseCapabilityResult =
         | 'backend_update_required'
         | 'client_update_required'
         | 'offline'
+        | 'authentication_required'
         | 'access_denied'
         | 'invalid_response'
         | 'error'
@@ -80,29 +81,34 @@ function isMissingCapabilityRpc(error: CapabilityRpcError): boolean {
   )
 }
 
-function isAccessError(error: CapabilityRpcError): boolean {
+function isAuthenticationError(error: CapabilityRpcError): boolean {
   const message = combinedErrorText(error)
   return (
-    error.code === '42501' ||
     error.code === 'PGRST301' ||
-    message.includes('app_access_') ||
-    message.includes('permission denied') ||
-    message.includes('not authorized') ||
     message.includes('authentication required') ||
     message.includes('jwt')
   )
 }
 
+function isAccessError(error: CapabilityRpcError): boolean {
+  const message = combinedErrorText(error)
+  return (
+    error.code === '42501' ||
+    message.includes('app_access_') ||
+    message.includes('permission denied') ||
+    message.includes('not authorized')
+  )
+}
+
 function isNetworkError(error: CapabilityRpcError): boolean {
+  if (error.code) return false
   const message = combinedErrorText(error)
   return (
     message.includes('failed to fetch') ||
     message.includes('networkerror') ||
     message.includes('network error') ||
     message.includes('load failed') ||
-    message.includes('offline') ||
-    message.includes('timed out') ||
-    message.includes('timeout')
+    message.includes('offline')
   )
 }
 
@@ -172,6 +178,12 @@ export async function loadSoccerReleaseCapabilities(
         return {
           status: 'backend_update_required',
           error: 'Soccer cloud games require the latest backend update.',
+        }
+      }
+      if (isAuthenticationError(error)) {
+        return {
+          status: 'authentication_required',
+          error: 'Sign in again before starting a cloud Soccer match.',
         }
       }
       if (isAccessError(error)) {

@@ -24,7 +24,35 @@ describe('migration 049 Soccer release capability contract', () => {
     )
   })
 
-  it('returns the exact versioned 043 through 049 boundary without product data writes', () => {
+  it('fails closed unless the operational 043 through 048 boundary is present', () => {
+    expect(sql).toContain("to_regclass('public.game_participants')")
+    expect(sql).toContain("to_regclass('public.game_event_stream_checkpoints')")
+    expect(sql).toContain("to_regclass('public.game_event_setup_snapshots')")
+    expect(sql).toContain("to_regclass('public.game_event_conflicts')")
+    expect(sql).toContain("to_regclass('public.game_event_primary_recorders')")
+    expect(sql).toContain("to_regclass('public.game_event_primary_recorder_audit')")
+    expect(sql).toContain("to_regclass('public.game_event_canonical_publications')")
+    expect(sql).toContain("to_regclass('public.user_sport_settings')")
+    expect(sql).toContain("to_regclass('public.team_sport_settings')")
+    expect(sql).toContain(
+      "'public.bind_soccer_event_game_v4(uuid,text,uuid,uuid,text,text,text,date,jsonb,jsonb)'"
+    )
+    expect(sql).toContain(
+      "'public.get_soccer_scope_aggregate_publications(text,uuid,timestamptz,uuid,integer)'"
+    )
+    expect(sql).toContain(
+      "'public.get_soccer_player_aggregate_publications(uuid,uuid,uuid,timestamptz,uuid,integer)'"
+    )
+    expect(sql).toContain(
+      "'public.save_user_sport_settings_revisioned(text,integer,bigint,jsonb)'"
+    )
+    expect(sql).toContain(
+      "'public.save_team_sport_settings_revisioned(uuid,text,integer,bigint,jsonb)'"
+    )
+    expect(sql).toContain("return jsonb_build_object('contractversion', 0)")
+  })
+
+  it('returns the exact current contract without product data writes', () => {
     expect(sql).toContain("'contractversion', 1")
     expect(sql).toContain("'migration', 49")
     expect(sql).toContain("'eventtransportversion', 4")

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, Cloud, Laptop } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -84,6 +84,7 @@ export default function SoccerGameSetup() {
   const [formError, setFormError] = useState<string | null>(null)
   const [capabilityState, setCapabilityState] = useState<CapabilityState>({ status: 'idle' })
   const [capabilityAttempt, setCapabilityAttempt] = useState(0)
+  const forceCapabilityCheck = useRef(false)
   const [designation, setDesignation] = useState(
     existingSetup?.trackedTeamDesignation ?? 'home'
   )
@@ -189,8 +190,10 @@ export default function SoccerGameSetup() {
 
     let cancelled = false
     setCapabilityState({ status: 'loading' })
+    const force = forceCapabilityCheck.current
+    forceCapabilityCheck.current = false
     void ensureSoccerReleaseCapabilities(user.id, {
-      force: capabilityAttempt > 0,
+      force,
     }).then(result => {
       if (!cancelled) setCapabilityState(result)
     })
@@ -474,7 +477,10 @@ export default function SoccerGameSetup() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => setCapabilityAttempt(value => value + 1)}
+                  onClick={() => {
+                    forceCapabilityCheck.current = true
+                    setCapabilityAttempt(value => value + 1)
+                  }}
                   className="font-semibold underline"
                 >
                   Retry

@@ -16,6 +16,38 @@ begin
     raise insufficient_privilege using message = 'APP_ACCESS_UNAVAILABLE';
   end if;
 
+  -- Fail closed when 049 was applied without the complete operational boundary.
+  -- Return an older contract instead of object names so the client can give safe
+  -- backend migration guidance without exposing schema details.
+  if
+    to_regclass('public.game_participants') is null
+    or to_regclass('public.game_event_stream_checkpoints') is null
+    or to_regclass('public.game_event_setup_snapshots') is null
+    or to_regclass('public.game_event_conflicts') is null
+    or to_regclass('public.game_event_primary_recorders') is null
+    or to_regclass('public.game_event_primary_recorder_audit') is null
+    or to_regclass('public.game_event_canonical_publications') is null
+    or to_regclass('public.user_sport_settings') is null
+    or to_regclass('public.team_sport_settings') is null
+    or to_regprocedure(
+      'public.bind_soccer_event_game_v4(uuid,text,uuid,uuid,text,text,text,date,jsonb,jsonb)'
+    ) is null
+    or to_regprocedure(
+      'public.get_soccer_scope_aggregate_publications(text,uuid,timestamptz,uuid,integer)'
+    ) is null
+    or to_regprocedure(
+      'public.get_soccer_player_aggregate_publications(uuid,uuid,uuid,timestamptz,uuid,integer)'
+    ) is null
+    or to_regprocedure(
+      'public.save_user_sport_settings_revisioned(text,integer,bigint,jsonb)'
+    ) is null
+    or to_regprocedure(
+      'public.save_team_sport_settings_revisioned(uuid,text,integer,bigint,jsonb)'
+    ) is null
+  then
+    return jsonb_build_object('contractVersion', 0);
+  end if;
+
   return jsonb_build_object(
     'contractVersion', 1,
     'migration', 49,

@@ -53,4 +53,11 @@ describe('SOC-6E1 release entry guards', () => {
     expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_CLOUD_SYNC_STATE'"))
     expect(setup).toContain('Use Local Match')
   })
+
+  it('forces only an explicit capability retry and restores normal session caching', () => {
+    const setup = source('src/pages/SoccerGameSetup.tsx')
+    expect(setup).toContain('const force = forceCapabilityCheck.current')
+    expect(setup).toContain('forceCapabilityCheck.current = false')
+    expect(setup).not.toContain('force: capabilityAttempt > 0')
+  })
 })

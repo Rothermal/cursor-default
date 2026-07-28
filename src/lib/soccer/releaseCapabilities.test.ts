@@ -52,7 +52,13 @@ describe('loadSoccerReleaseCapabilities', () => {
     ).resolves.toMatchObject({ status: 'client_update_required' })
   })
 
-  it('distinguishes missing backend, access, and offline failures', async () => {
+  it('distinguishes missing backend, authentication, access, and offline failures', async () => {
+    await expect(
+      loadSoccerReleaseCapabilities(clientWith(null, {
+        code: 'PGRST301',
+        message: 'JWT expired',
+      }))
+    ).resolves.toMatchObject({ status: 'authentication_required' })
     await expect(
       loadSoccerReleaseCapabilities(clientWith(null, {
         code: 'PGRST202',
@@ -70,6 +76,15 @@ describe('loadSoccerReleaseCapabilities', () => {
         message: 'TypeError: Failed to fetch',
       }))
     ).resolves.toMatchObject({ status: 'offline' })
+  })
+
+  it('does not mislabel coded database timeouts as offline', async () => {
+    await expect(
+      loadSoccerReleaseCapabilities(clientWith(null, {
+        code: '57014',
+        message: 'canceling statement due to statement timeout',
+      }))
+    ).resolves.toMatchObject({ status: 'error' })
   })
 })
 
