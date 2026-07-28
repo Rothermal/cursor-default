@@ -65,8 +65,16 @@ After SOC-6E3, Soccer appears in normal production discovery only when:
 - `enabledSports.soccer` is true on the current device.
 
 The preference stays device-local across sign-in and sign-out and defaults to false. App Settings
-always exposes the Soccer switch and Soccer-specific settings route. Development builds retain an
-explicit preview path until SOC-6E3 so release work can be tested before the production switch.
+always exposes the Soccer row and Soccer-specific settings route. Before SOC-6E3, the production
+row remains disabled and labeled Coming soon; a development preview build makes the switch
+interactive and still respects the stored device toggle. After SOC-6E3, the same switch becomes
+interactive in production. Development no longer forces Soccer visible when the device toggle is
+off.
+
+One centralized release policy owns `preview` versus `released` state. Feature components do not
+read `import.meta.env.DEV` directly to decide Soccer access. SOC-6E1 replaces all scattered Soccer
+development checks with that policy while production release state remains off. SOC-6E3 changes
+only the centralized production release value.
 
 When Soccer is disabled:
 
@@ -92,12 +100,29 @@ Disabling Soccer cannot delete, rewrite, hide, or auto-finalize an existing reco
 must express discovery/new-game access separately from existing-record access. Historical routes
 must not depend on `import.meta.env.DEV` or the device toggle.
 
+### 4.3 Surface matrix
+
+| Surface | Unreleased production | Released, toggle off | Released, toggle on |
+|---|---|---|---|
+| App Settings Soccer row | Coming soon; switch disabled | Switch available/off | Switch available/on |
+| Sport Select | Hidden | Hidden | Discoverable |
+| Direct Soccer dashboard | Existing active/parked and history links only | Existing active/parked and history links only | Full dashboard plus New Game |
+| Team Start Game / new-game deep link | Block before state mutation | Prompt to enable Soccer | Allowed after role/capability checks |
+| Existing local setup/players/tracker | Allowed | Allowed | Allowed |
+| Cloud Games / Game Info / Summary | Allowed by source health and role | Allowed by source health and role | Allowed by source health and role |
+| Team/player/aggregate history | Allowed by existing authorization | Allowed by existing authorization | Allowed by existing authorization |
+
+The direct dashboard keeps Teams, Cloud Games, and Season Stats available as historical/contextual
+destinations even when New Game is unavailable.
+
 ## 5. Cloud Capability Contract
 
 ### 5.1 Backend handshake
 
-SOC-6E1 adds migration `049_soccer_release_capabilities.sql` with a narrow authenticated RPC such
-as `get_soccer_release_capabilities`.
+Based on the current merged baseline, SOC-6E1 adds migration
+`049_soccer_release_capabilities.sql` with a narrow authenticated RPC such as
+`get_soccer_release_capabilities`. The implementer must re-check the merged migration sequence and
+renumber it if 049 has been occupied before SOC-6E1 starts.
 
 The RPC:
 
@@ -108,9 +133,11 @@ The RPC:
 - grants no write authority and does not replace the authorization checks in operational RPCs.
 
 The client accepts only the exact supported contract version. Missing RPC/schema-cache errors map
-to `backend_update_required`; malformed or unsupported responses fail closed. A successful result
-may be cached only in memory for the current authenticated session. Sign-out, account change, or
-explicit retry clears/rechecks it.
+to `backend_update_required`; authentication/access failures retain their existing typed meaning;
+network/offline failures remain retryable and must not be mislabeled as a missing migration;
+malformed or unsupported responses fail closed. A successful result may be cached only in memory
+for the current authenticated session. Sign-out, account change, or explicit retry
+clears/rechecks it.
 
 Migration 049 is a capability handshake only. It does not add product data, backfill records, or
 change existing RLS.
@@ -127,11 +154,19 @@ the active game or continue into a cloud-bound roster.
 - The error identifies the backend update requirement and offers an explicit local-match path.
 - Choosing local is a user action; it does not silently copy a cloud roster, claim future sync, or
   create a cloud binding.
-- Supabase-unconfigured and offline users may continue local-only Soccer when the device has
-  enabled it.
+- Supabase-unconfigured and offline users may continue local-only Soccer when the release policy
+  offers Soccer and the device has enabled it.
+- Capability preflight never gates historical reads, existing-game resume, recovery export,
+  settings repair, or local-only play. Those paths retain their own authorization and source-health
+  checks even when migration 049 is missing.
 
 Operational RPC errors remain authoritative after preflight. Capability success never bypasses
 normal CAS, RLS, team-role, finalization, or conflict checks.
+
+Expected capability states use normal UI status and errors. A missing migration or offline
+preflight is not written as a client sync failure because no game sync has started. Unexpected
+operational sync failures continue through the existing client-sync diagnostic path without
+adding a telemetry system or new sensitive payloads.
 
 ## 6. Delivery Plan
 
@@ -139,9 +174,13 @@ normal CAS, RLS, team-role, finalization, or conflict checks.
 
 - Replace the broad availability helper with explicit released/discoverable/new-game and
   existing-record decisions.
-- Keep the production release flag off while making the policy independently testable.
-- Enable the Soccer switch in App Settings, keep it off by default, and remove Preview/Coming soon
-  copy that conflates release stage with the user's preference.
+- Add one centralized Soccer release-stage value and keep its production state off while making
+  every policy decision independently testable.
+- Replace Soccer-specific `import.meta.env.DEV` guards in App routes, Cloud Games, Game Info,
+  dashboard/chooser, and settings with the centralized policy. Dev-only diagnostic tools remain
+  environment-gated.
+- Make the Soccer switch functional in development preview, keep it disabled/Coming soon in
+  unreleased production, and keep the stored preference off by default.
 - Preserve disabled-Soccer access to active, parked, team, game, summary, and aggregate
   destinations while blocking new-game entry.
 - Add migration 049 and a typed capability parser/loader with backend-update classification.
@@ -155,10 +194,15 @@ Primary boundaries:
 
 - `src/lib/sportAvailability.ts`
 - `src/lib/soccer/releaseCapabilities.ts`
+- `src/App.tsx`
 - `src/pages/Admin.tsx`
 - `src/pages/GameSetup.tsx`
 - `src/pages/SoccerGameSetup.tsx`
-- team/dashboard new-game entry points
+- `src/pages/SportSelect.tsx`
+- `src/pages/SportDashboard.tsx`
+- `src/pages/Games.tsx`
+- `src/pages/GameInfo.tsx`
+- team new-game entry points
 - `supabase/migrations/049_soccer_release_capabilities.sql`
 
 Exit condition: production discovery remains off, but availability decisions and cloud preflight
@@ -177,6 +221,10 @@ are complete, fail closed, and cannot disturb an existing game on failure.
   hierarchy, and migrations 043-049 failure states.
 - Verify direct historical access while Soccer is disabled and every new-game entry remains
   blocked.
+- Verify an unreleased production build permits existing/history routes but keeps every Soccer
+  discovery and new-game path off.
+- Verify a development preview with the device toggle on exercises the same route components that
+  the released production policy will expose; do not add a separate staging-only route tree.
 - Verify capability checks do not replace operational authorization or leak backend details.
 - Fix only release-blocking correctness, authorization, recovery, accessibility, and responsive
   issues found by the matrix. Record non-blocking visual polish separately.
@@ -193,10 +241,10 @@ remains.
 ### SOC-6E3: Production enablement and sign-off
 
 - Flip the explicit production release policy for Soccer.
-- Remove remaining Soccer `import.meta.env.DEV` route/review guards while retaining dev-only tools
-  such as the shot-chart preview.
-- Route setup, players, tracker, summary, Cloud Games, and Game Info through normal authority and
-  existing-record checks.
+- Confirm no Soccer route/review component still contains an environment access gate; those
+  replacements belong to SOC-6E1. Dev-only tools such as the shot-chart preview remain gated.
+- Exercise setup, players, tracker, summary, Cloud Games, and Game Info through the already-shipped
+  normal authority and existing-record checks.
 - Confirm Soccer remains off by default and is discoverable only after the device toggle is
   enabled.
 - Run the final production build against the complete manual matrix, including a deployed
@@ -212,8 +260,9 @@ Go/no-go requires:
 - no open correctness, access-control, data-loss, recovery, or incoherent mobile-layout blocker;
 - Basketball and multi-game/multi-sport smoke paths green.
 
-Rollback is a code/deployment release-policy reversal, not a data migration. It disables new
-Soccer discovery while preserving all existing and historical Soccer access and data.
+Rollback redeploys the SOC-6E2 release policy, not a data migration or a reversal of migration 049.
+It disables new Soccer discovery while preserving all existing and historical Soccer access and
+data because those routes were separated from release state in SOC-6E1.
 
 Exit condition: a production build exposes opt-in Soccer to every user, existing records remain
 reachable when disabled, and the documented release/rollback checks pass.
@@ -232,6 +281,7 @@ At minimum, tests must prove:
 - capability failure preserves the current active and parked game identities;
 - local-only Soccer remains usable without Supabase;
 - production routes use authority/source health rather than development mode;
+- no Soccer feature component performs its own `import.meta.env.DEV` availability decision;
 - Basketball availability, setup, cloud sync, summary, aggregates, and court capture are unchanged.
 
 Standard validation remains:
@@ -256,6 +306,10 @@ team role, and pass/fail evidence for:
 - narrow mobile capture/setup/settings and desktop review/aggregate surfaces;
 - GitHub Pages HashRouter/OAuth return paths and production PWA refresh;
 - existing Basketball end-to-end regression.
+
+SOC-6E2 records preliminary manual results against development preview and unreleased production
+builds. SOC-6E3 records the final released-production pass with date, deployed commit, migration
+level, browser/PWA mode, and reviewer. CI alone cannot satisfy manual sign-off.
 
 ## 9. Deferred
 
