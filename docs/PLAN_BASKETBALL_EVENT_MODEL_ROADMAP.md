@@ -299,7 +299,8 @@ Every BKE implementation phase must cover:
   popup stat-line behavior,
 - full stat-grid entry and decrement behavior, including manual minutes,
 - clear-shot-chart behavior, including the linked assist/rebound stats it reverses today,
-- recent-events undo until the editable timeline replaces it,
+- recent-events one-tap undo/restore for single events and durable multi-event capture-command
+  groups until the editable Timeline replaces it,
 - individual, team, and All shot-chart filters,
 - approved event-derived home/opponent score behavior and structured corrections,
 - team pseudo-player fouls, timeouts, technicals, turnovers, period controls, and bonus

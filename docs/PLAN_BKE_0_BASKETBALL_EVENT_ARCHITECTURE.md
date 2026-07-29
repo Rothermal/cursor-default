@@ -344,6 +344,15 @@ shot has been recorded. Court capture appends the shot and linked assist atomica
 capture appends an unlinked assist. A block likewise remains valid when the denied attempt was not
 tracked and survives correction of that attempt.
 
+**Capture-command identity.** Every Basketball payload may carry an immutable
+`captureCommandId: string | null`. A UI command that atomically appends more than one event assigns
+one generated id to every member; a single-event command leaves it null. This is Basketball-owned
+payload metadata, not a generic-envelope or database-column change. It does not affect projection,
+ordering, relationships, or canonical aggregates. `relatedEventId` still owns semantic linkage;
+`captureCommandId` says only that the events were recorded by one user gesture. The distinction lets
+F12 reverse a made shot plus assist, or a miss plus prompted rebound, as one durable undo unit after
+reload without treating a later manually linked event as part of the original capture.
+
 **Possession and defense**
 
 | Event | Payload | Actors |
@@ -438,7 +447,8 @@ An **assist is a separate event** with an optional made-shot link. Soccer's acto
 not copied blindly: Basketball's full stat grid already records assists independently, and BKE-2
 must not make that action impossible or fabricate a shot. F7's "Made → Assisted by?" flow appends
 the shot and assist in one atomic command, with the assist pointing to the shot. The Timeline may
-present that linked pair as one play while preserving two editable facts.
+present that linked pair as one play while preserving two editable facts. Both events share one
+`captureCommandId`, so F12 also treats that capture as one undo unit before the Timeline ships.
 
 A **rebound also stays separate** with an optional missed-shot link. It is a distinct possession
 outcome, can occur without any preceding tracked shot, and can be team-attributed. F9's prompt
@@ -508,6 +518,7 @@ projector, which downgrades rather than rejects (see "stale links" below).
 | `attempt: 'field_goal'` requires `value === 2 \| 3` | `basketball.shot` |
 | `zone !== null` requires `location !== null`, and `zone` must be the zone that `location` falls in | `basketball.shot` |
 | `value === 3` requires a `zone`/`location` outside the arc when located | `basketball.shot` |
+| `captureCommandId` is null or a non-empty generated id and cannot change after revision 1 | every Basketball event |
 | `deltaMinutes` is a non-zero integer | `basketball.minutes_adjustment` |
 | `delta` is a non-zero integer; `reason` is a known code; `official_correction` requires a non-empty `note` | `basketball.score_adjustment` |
 | team-attributed events carry a `team` actor (with its required `label`) and no player actor | `foul`, `timeout`, `turnover: 'team'` |
@@ -539,6 +550,7 @@ can exist (§4.1).
 | `relatedEventId` must reference an active, missed, opposite-side `attempt: 'field_goal'` shot | `basketball.block` |
 | `relatedEventId` must reference an active `basketball.turnover` on the opposite side, and may not be combined with a `turnover_by` actor | `basketball.steal` |
 | Every `relatedEventId` must resolve **within the same game stream** | all linked events |
+| One multi-event append assigns one previously unused `captureCommandId` to every member; later link/edit commands preserve each event's original group and never absorb events into it | grouped capture commands |
 
 A link that fails these rules is rejected at capture/edit time. A link that *becomes* invalid later
 is handled by the staleness policy in §6.
@@ -608,17 +620,19 @@ Rules:
 
 ## 6. Correction, Undo, and Decrement
 
-- **Undo** tombstones the newest active event (revisioned delete); restore is another revisioned
-  mutation. This is the SOC-1 contract and it already works.
+- **Undo** targets the newest active Basketball capture unit. A single-event command tombstones that
+  event; events sharing the newest non-null `captureCommandId` are tombstoned together through the
+  atomic multi-event mutation. Restore of an immediate grouped undo restores that same group. This
+  is a Basketball command-layer rule over the SOC-1 revision contract, not a generic envelope change.
 - **Score corrections** use `basketball.score_adjustment` with a signed delta and structured reason,
   replacing `homeScoreAdjustment`. Quick scoreboard taps use the automatic `scoreboard_control`
   reason; an official correction requires a note. The projector forces `homeScoreAdjustment: 0`
   anyway
   (`projection.ts:93`), so event games have exactly one adjustment mechanism.
 - **F12 Recent events** reads the ordered active stream instead of `actionLog` (which the projector
-  clears). Recommendation: keep strict newest-first removal through BKE-2 and deliver arbitrary
-  removal with the BKE-3 timeline, where the consequence of removing a linked event can actually be
-  shown (§6.2).
+  clears). Recommendation: keep strict newest-capture-unit removal through BKE-2, displaying one row
+  for a grouped court gesture and its included facts, and deliver arbitrary removal with the BKE-3
+  Timeline, where the consequence of removing a linked event can actually be shown (§6.2).
 
 ### 6.1 Decrement is a per-stat contract, not one rule
 
@@ -644,9 +658,9 @@ total — matching today's `DECREMENT_STAT` guard (`gameReducer.ts:299-303`). No
 writes a negative correction event; the compensating `basketball.minutes_adjustment` is the single
 exception and exists only because minutes have no other producing event.
 
-Until BKE-3 ships the detail editor, any decrement whose contract row says "revise" or names a
-multi-event consequence is available only where the corresponding capture flow already exists — BKE-2
-must not ship a stat-grid button that silently does the wrong thing.
+Until BKE-3 ships the detail editor, any decrement that names a multi-event consequence is available
+only where the corresponding capture flow already exists — BKE-2 must not ship a stat-grid button
+that silently does the wrong thing.
 
 ### 6.2 Linked-event integrity and multi-event mutations
 
@@ -654,6 +668,12 @@ must not ship a stat-grid button that silently does the wrong thing.
 revise exactly one event; only `addGameEvents` is a batch. F13-class edits break that assumption — a
 made shot becoming a miss, a shooter changing side, or a shot being removed can each invalidate an
 assist, rebound, or block that points at it.
+
+`addGameEvents` already makes a multi-event append all-or-nothing. The Basketball command layer adds
+the same immutable `captureCommandId` to every event created by one multi-event capture. F12 resolves
+the newest active event to that persisted command group and uses the mutation below to remove or
+restore all still-active members atomically. It never infers grouping from adjacency, timestamps, or
+`relatedEventId`.
 
 **Required platform addition — lands in BKE-1A:** a validated atomic multi-event mutation,
 `applyGameEventMutations(state, [{ update | delete | restore }...])`, that validates every member,
@@ -1039,7 +1059,9 @@ BKE-0 is approved.
     valid.
 18. Which relationships must be durable beyond assist/rebound: block-to-shot, steal-to-turnover,
     foul-to-free-throw trip, and substitution-to-lineup window?
-19. Confirm F12 stays newest-first until BKE-3 provides consequence-aware arbitrary Timeline edits.
+19. Confirm F12 stays newest-capture-unit-first until BKE-3 provides arbitrary Timeline edits:
+    multi-event court commands share an immutable `captureCommandId` and undo/restore in one tap,
+    while independently recorded or later-linked events remain separate units.
 20. Confirm event-game score always remains made-shot points plus adjustments and intentionally
     retires the legacy absolute-score freeze after a scoreboard tap.
 
@@ -1067,7 +1089,7 @@ Every regression requirement in roadmap §9 maps to the phase that must cover it
 |---|---|
 | Court tap, value override, player switch, assist prompt, rebound prompt, popup stat line | BKE-1C |
 | Full stat-grid entry and decrement | BKE-2 |
-| Recent-events undo | BKE-1C, replaced by BKE-3 |
+| Recent-events one-tap undo/restore for single events and durable `captureCommandId` groups | BKE-1C, replaced by BKE-3 |
 | Individual, team, and All shot-chart filters | BKE-1C |
 | Home/opponent event-derived score, quick adjustments, and reasoned corrections | BKE-2 |
 | Team fouls, timeouts, technicals, turnovers, period controls, bonus indicators | BKE-2 |
