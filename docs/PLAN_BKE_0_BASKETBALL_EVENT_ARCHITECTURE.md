@@ -399,6 +399,12 @@ This prevents awarded count, one-and-one, foul source, technical context, or ret
 drifting across duplicated attempt payloads. Direct stat-grid free throws may leave both trip fields
 null; the projector counts them normally without inventing context.
 
+Attempt positions are historical labels and never renumber after correction. A trip may temporarily
+or permanently have no active attempts: it contributes no shooting totals and the Timeline flags it
+as empty for review, but it remains an independently recorded award/context fact until explicitly
+removed. This supports recording the trip before its attempts and avoids silently deleting context
+when the last attempt is corrected.
+
 There is **no `assist` or `blocked_by` actor on the shot**. Both are separate events with optional
 links, and each relationship has exactly one owner. This differs intentionally from Soccer's
 goal/assist actor model because Basketball must preserve direct stat-grid `ast` entry when no made
@@ -654,7 +660,7 @@ can exist (§4.1).
 
 | Rule | Applies to |
 |---|---|
-| An assist link must reference an active made `basketball.shot`; assister and shooter must differ | `basketball.assist` |
+| An assist link must reference an active made `basketball.shot` whose attempt is a field goal; assister and shooter must differ | `basketball.assist` |
 | A linked assister must have the **same** `teamSide` as the shot | `basketball.assist` |
 | `freeThrowTripId` references an active same-side `basketball.free_throw_trip`; attempt positions are unique and bounded by its maximum | grouped free-throw shots |
 | `sourceFoulEventId`, when present, references an active `basketball.foul` in the same stream | `basketball.free_throw_trip` |
@@ -760,10 +766,11 @@ linked assist changes the detail attached to a made shot even though the shot it
 | `blk` | `basketball.block` | Tombstone the newest matching active event. |
 | `to`, `team_turnover` | `basketball.turnover` | Tombstone the newest matching active event. |
 | `min` | `basketball.minutes_adjustment` | Append `deltaMinutes: -1` when projected minutes are ≥ 1; disabled otherwise. Never tombstones, because adjustments carry arbitrary signed values (§4.2). |
-| `team_foul_pN`, `team_to_used_pN`, `team_tech` | qualifying `basketball.foul` / charged `basketball.timeout` | Tombstone the newest matching active event **for that period**, resolved by event `period.id`; the confirmation names any player/disqualification consequence. |
+| `team_foul_pN`, `team_to_used_pN`, `team_tech` | qualifying `basketball.foul` / charged `basketball.timeout` | Tombstone the newest matching active event **for that period**, resolved by event `period.id`; the confirmation names any player/disqualification consequence. Removing a foul atomically clears source links from surviving free-throw trips/ejections (§6.2). |
 | `ast` | `basketball.assist` | Tombstone the newest matching assist. A linked shot remains untouched. |
-| `2pt`, `3pt`, `ft`, `*_miss` | `basketball.shot` | Tombstone the newest matching shot; in the same atomic mutation tombstone active linked `assist` and `rebound` events and **unlink** (not remove) active linked `block` events (§6.2). The UI states the consequence before applying. |
-| `pf` | `basketball.foul`, player actor | Tombstone the foul. Because one foul can project to both the player and the team total, the confirmation names both effects. A foul whose player and team contributions need to diverge is an edit in BKE-3, not a decrement. |
+| `2pt`, `3pt`, `2pt_miss`, `3pt_miss` | field-goal `basketball.shot` | Tombstone the newest matching shot; in the same atomic mutation tombstone active linked `assist` and `rebound` events and **unlink** (not remove) active linked `block` events (§6.2). The UI states the consequence before applying. |
+| `ft`, `ft_miss` | free-throw `basketball.shot` | Tombstone the newest matching attempt and any linked rebound in the same atomic mutation. Its trip survives; remaining attempt positions stay sparse and an emptied trip is visibly flagged, not auto-removed (§6.2). |
+| `pf` | `basketball.foul`, player actor | Tombstone the foul and atomically clear `sourceFoulEventId` / `relatedFoulEventId` from surviving trips or ejections. Because one foul can project to both player and team totals, the confirmation names those effects plus every unlinked dependent. The trip attempts and ejection survive. A foul whose player and team contributions need to diverge is an edit in BKE-3, not a decrement. |
 
 Where no matching active event exists, the control is disabled rather than producing a negative
 total — matching today's `DECREMENT_STAT` guard (`gameReducer.ts:299-303`). No decrement path ever
@@ -779,7 +786,8 @@ that silently does the wrong thing.
 `updateGameEvent`, `deleteGameEvent`, and `restoreGameEvent` (`gameEvents/mutations.ts:154-210`) each
 revise exactly one event; only `addGameEvents` is a batch. F13-class edits break that assumption — a
 made shot becoming a miss, a shooter changing side, or a shot being removed can each invalidate an
-assist, rebound, or block that points at it.
+assist, rebound, or block that points at it. The same applies when a foul supplies free-throw/ejection
+context or a trip groups free-throw attempts.
 
 `addGameEvents` already makes a multi-event append all-or-nothing. The Basketball command layer adds
 the same immutable `captureCommandId` to every event created by one multi-event capture. F12 resolves
@@ -806,7 +814,11 @@ is resolved, not ignored:
 |---|---|
 | Linked shot is tombstoned | Linked `assist` and `rebound` events are tombstoned in the same atomic mutation after confirmation. A linked `block` is **unlinked, not removed** and survives as a standalone defensive stat |
 | Linked shot is edited so the link becomes invalid (made ⇄ missed, side or shooter change) | The dependent event's `relatedEventId` is cleared to `null` in the same atomic mutation; assist/rebound/block totals survive as standalone stats, and the Timeline flags them as unlinked for review |
-| Link points at a missing or already-tombstoned event on load | Projector treats it as `null`, records a diagnostic, and **does not** mark the stream incomplete — a dangling advisory link is not a projection failure |
+| Source foul is tombstoned or edited so it no longer supports a trip/ejection link | Clear each surviving trip's `sourceFoulEventId` and ejection's `relatedFoulEventId` in the same atomic mutation. Free-throw attempts, trip context, and explicit ejection remain authoritative and the Timeline flags the cleared relationship. A same-command `captureCommandId` undo may still remove all grouped facts |
+| Free-throw trip is tombstoned | Clear `freeThrowTripId` and `tripAttemptNumber` on every active attempt in the same atomic mutation. Attempts survive as ungrouped free throws and retain their totals |
+| Free-throw trip edit would invalidate an existing source foul or attempt position | Reject the single edit. BKE-3 must submit one atomic command that also clears/revises every invalid relationship; unaffected attempt positions never renumber |
+| Free-throw attempt is tombstoned | Its trip survives. Remaining attempt positions stay unchanged even when sparse; a trip with no active attempts remains visible and is flagged as empty for review |
+| Link points at a missing or already-tombstoned event on load | Projector treats `relatedEventId`, `sourceFoulEventId`, `relatedFoulEventId`, or the free-throw trip pair as absent, records a diagnostic, and **does not** mark the stream incomplete — a dangling advisory link is not a projection failure |
 | Link points outside the game stream | Rejected at capture/edit time (§4.5); if present on load it is treated as dangling |
 
 **Why linked assists/rebounds and blocks part company on removal.** Today's
@@ -829,6 +841,8 @@ unlinked, and the user may explicitly remove or re-link them in BKE-3.
 - A dependent that was **unlinked** rather than tombstoned (blocks, and any link cleared by an edit)
   is not re-linked automatically on restore. Re-linking is an explicit edit, because the projector
   cannot know the user still means the same relationship.
+- Restoring a foul or trip likewise does not re-link surviving trips, ejections, or attempts that
+  were cleared when it was removed. The Timeline offers explicit validated re-linking.
 
 Retaining a knowingly-invalid link is never an option: it would let the timeline assert a
 relationship the data no longer supports.
@@ -1104,6 +1118,7 @@ approval.
 | — | Settings ownership | Versioned built-ins → personal defaults → team defaults → match overrides; the complete match snapshot is immutable, while display/capture preferences stay personal and non-authoritative (§3.6, §4.1) |
 | — | Rollout fallback | Explicit per-game opt-in after capability preflight; unsupported cloud creation leaves state untouched and offers only clearly labeled supported legacy-cloud/local-only choices (§10) |
 | — | Aggregate quality | Traditional totals, approved rates, participation, and history across all destinations; advanced metrics require complete coverage, and healthy-subset results must disclose partial quality, exclusions, and manager diagnostics (§3.6) |
+| — | Shot clock | Deliberately deferred to a separately planned add-on; BKE-6 supplies only the approved game clock. No shot-clock event names are reserved before that product Q&A (§12b q3, §14) |
 
 ---
 
@@ -1131,7 +1146,7 @@ durable aggregate authority for event games, the way SOC-6C makes them for socce
 Soccer received a dedicated product-model pass before its event catalog was implemented.
 Basketball needs the same treatment. Today's stat grid remains the compatibility floor, but it must
 not silently define the ceiling for a redesigned system. Run these as organized batches of four,
-record the chosen option and rationale, and fold the answers back into §§4, 9, 11, and 13 before
+record the chosen option and rationale, and fold the answers back into §§4, 6, 9, 11, and 13 before
 BKE-0 is approved.
 
 **Batch A — competition format and setup (approved)**
@@ -1239,6 +1254,7 @@ Every regression requirement in roadmap §9 maps to the phase that must cover it
 | Multi-event mutation atomicity, including all-or-nothing failure (§6.2) | BKE-1A |
 | Stale-link resolution across edits (§6.2) | BKE-3 |
 | Optional assist/rebound/block/steal/free-throw-trip relationships and derived substitution intervals | BKE-1C, BKE-2, BKE-6 |
+| Foul/trip removal unlinks surviving dependents atomically; free-throw attempt positions remain stable and empty trips stay reviewable (§6.2) | BKE-2, BKE-3 |
 | Soccer RPC parity against the generalized layer — no observable change | BKE-4A |
 | Offline tracking and retry | BKE-4B |
 | Independent recorder checkout and primary resolution | BKE-4C |
@@ -1273,6 +1289,8 @@ pattern in §11a-11r.
 - Changing how legacy aggregate games resolve their rules — the immutable snapshot in §4.1 applies to
   new event games only.
 - Exposing an incomplete event game to users to hit an earlier rollout date (§10).
+- Implementing a shot clock inside BKE-1 through BKE-6; it requires a separately approved add-on
+  with its own event and rules Q&A.
 
 ---
 

@@ -346,6 +346,8 @@ Every BKE implementation phase must cover:
   charged versus neutral timeout behavior,
 - optional possession event families staying absent from core streams and possession-dependent
   metrics staying hidden without complete coverage,
+- foul/trip correction preserving independent facts, stable free-throw attempt positions, and
+  visible empty-trip review,
 - local parking, import/export, quota handling, and cross-sport resume,
 - offline tracking and retry,
 - independent recorder checkout and primary resolution,
@@ -379,6 +381,7 @@ results rather than being hidden as parity exceptions.
 - Implementing held F11 controls without a separate product decision.
 - Real-time collaborative editing across recorder streams unless the shared platform later
   adds that capability.
+- Implementing shot-clock tracking in BKE-1 through BKE-6; it remains a separately planned add-on.
 
 ---
 
