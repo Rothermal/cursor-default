@@ -272,7 +272,7 @@ describe('soccer settings hierarchy', () => {
 })
 
 describe('soccer override editor rule resolution', () => {
-  it('does not throw when an override has an empty segment label', () => {
+  it('falls back to inherited rules and reports why when an override cannot resolve', () => {
     const inherited = resolveSoccerSettingsHierarchy().rules
     const override = {
       regulationSegments: inherited.regulationSegments.map((segment, index) =>
@@ -281,13 +281,16 @@ describe('soccer override editor rule resolution', () => {
     }
 
     expect(() => resolveSoccerOverrideEditorRules(inherited, override)).not.toThrow()
-    expect(resolveSoccerOverrideEditorRules(inherited, override)).toEqual(inherited)
+    const resolved = resolveSoccerOverrideEditorRules(inherited, override)
+    expect(resolved.rules).toEqual(inherited)
+    expect(resolved.error).toBeTruthy()
   })
 
-  it('applies a valid override when segment labels remain non-empty', () => {
+  it('applies a valid override without reporting an error', () => {
     const inherited = resolveSoccerSettingsHierarchy().rules
-    const override = { maxOnFieldPlayers: 9 }
+    const resolved = resolveSoccerOverrideEditorRules(inherited, { maxOnFieldPlayers: 9 })
 
-    expect(resolveSoccerOverrideEditorRules(inherited, override).maxOnFieldPlayers).toBe(9)
+    expect(resolved.rules.maxOnFieldPlayers).toBe(9)
+    expect(resolved.error).toBeNull()
   })
 })

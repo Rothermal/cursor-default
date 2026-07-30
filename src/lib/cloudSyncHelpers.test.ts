@@ -16,7 +16,7 @@ import {
   mapShotRows,
   parsePlayerName,
   parseSeasonTeamStatsConfig,
-  unmappedPlayerResolveMode,
+  resolveUnmappedPlayer,
 } from './cloudSyncHelpers'
 
 describe('cloudSyncHelpers missing-column detectors', () => {
@@ -115,29 +115,59 @@ describe('parsePlayerName', () => {
   })
 })
 
-describe('unmappedPlayerResolveMode', () => {
-  it('reuses an exact team match when found', () => {
-    expect(
-      unmappedPlayerResolveMode({ teamMatchFound: true, jerseyNumber: '12' })
-    ).toBe('reuse_team_match')
-    expect(
-      unmappedPlayerResolveMode({ teamMatchFound: true, jerseyNumber: '' })
-    ).toBe('reuse_team_match')
+describe('resolveUnmappedPlayer', () => {
+  it('reuses an exact name+jersey teammate without touching its jersey', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: '7' },
+        { playerId: 'b', jerseyNumber: '12' },
+      ],
+      jerseyNumber: '12',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'b', adoptJersey: false })
   })
 
-  it('creates a distinct player when jersey is set and no team match exists', () => {
-    expect(
-      unmappedPlayerResolveMode({ teamMatchFound: false, jerseyNumber: '23' })
-    ).toBe('create_distinct')
+  it('adopts a jersey onto the lone unnumbered teammate instead of duplicating them', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [{ playerId: 'a', jerseyNumber: null }],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'a', adoptJersey: true })
   })
 
-  it('falls back to owned/create by name only when jersey is empty', () => {
-    expect(
-      unmappedPlayerResolveMode({ teamMatchFound: false, jerseyNumber: '' })
-    ).toBe('reuse_or_create_owned')
-    expect(
-      unmappedPlayerResolveMode({ teamMatchFound: false, jerseyNumber: '  ' })
-    ).toBe('reuse_or_create_owned')
+  it('creates a distinct player when every same-name teammate has a different number', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: '7' },
+        { playerId: 'b', jerseyNumber: '12' },
+      ],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'create_distinct' })
+  })
+
+  it('creates a distinct player when several teammates are unnumbered and ambiguous', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: null },
+        { playerId: 'b', jerseyNumber: '' },
+      ],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'create_distinct' })
+  })
+
+  it('reuses deterministically when the local player has no jersey', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'b', jerseyNumber: '12' },
+        { playerId: 'a', jerseyNumber: '7' },
+      ],
+      jerseyNumber: '  ',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'a', adoptJersey: false })
+  })
+
+  it('falls back by name only when no same-name teammate exists', () => {
+    expect(resolveUnmappedPlayer({ candidates: [], jerseyNumber: '' }))
+      .toEqual({ mode: 'reuse_or_create_owned' })
+    expect(resolveUnmappedPlayer({ candidates: [], jerseyNumber: '23' }))
+      .toEqual({ mode: 'create_distinct' })
   })
 })
 

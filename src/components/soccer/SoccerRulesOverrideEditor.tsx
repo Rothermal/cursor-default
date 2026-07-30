@@ -38,7 +38,8 @@ export default function SoccerRulesOverrideEditor({
   readOnly = false,
   onChange,
 }: Props) {
-  const effective = resolveSoccerOverrideEditorRules(inherited, override)
+  const { rules: effective, error: overrideError } =
+    resolveSoccerOverrideEditorRules(inherited, override)
   const regulationPreset = detectRegulationPreset(effective)
   const competitionProfile = detectSoccerCompetitionProfile(effective)
 
@@ -64,6 +65,15 @@ export default function SoccerRulesOverrideEditor({
 
   return (
     <div className="space-y-5">
+      {overrideError && (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        >
+          Saved rules could not be applied and inherited values are shown instead. Reset this scope
+          or edit a value to repair it. ({overrideError})
+        </div>
+      )}
       <RuleGroup title="Profile">
         <RuleField
           source={profileSource(override, inheritedSources, overrideLabel)}

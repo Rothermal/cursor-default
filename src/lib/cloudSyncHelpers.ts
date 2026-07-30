@@ -147,26 +147,63 @@ export function parsePlayerName(fullName: string): { firstName: string; lastName
   }
 }
 
+/** Same-name teammate already on the cloud roster, with whatever jersey it carries. */
+export interface TeamPlayerCandidate {
+  playerId: string
+  jerseyNumber: string | null
+}
+
+export type UnmappedPlayerResolution =
+  | { mode: 'reuse_team_match'; playerId: string; adoptJersey: boolean }
+  | { mode: 'create_distinct' }
+  | { mode: 'reuse_or_create_owned' }
+
 /**
  * Resolve strategy when `playerIdMap` has no entry for a local player.
  *
- * Name-only team matching collapses siblings / same-named teammates (e.g. two
- * "Alex Kim" jerseys) onto one cloud `players` row and used to overwrite the
- * survivor's jersey. When a jersey is set and no exact name+jersey teammate
- * exists, create a distinct player instead of reusing by name.
+ * Name-only team matching collapsed siblings / same-named teammates (e.g. two
+ * "Alex Kim" jerseys) onto one cloud `players` row and overwrote the survivor's
+ * jersey. Matching on name+jersey alone fixes that but splits the far more common
+ * case of a number changing or being entered for the first time, silently creating
+ * a duplicate person. The rules below distinguish the two:
+ *
+ * - an exact name+jersey teammate is the same person — reuse it;
+ * - a lone same-name teammate with no jersey is the same person who just got a
+ *   number — reuse it and adopt the jersey;
+ * - a same-name teammate whose jersey is set and different is a different person —
+ *   create a distinct player;
+ * - with no local jersey we cannot tell numbered teammates apart, so reuse the
+ *   existing row deterministically rather than proliferating rows.
  */
-export type UnmappedPlayerResolveMode =
-  | 'reuse_team_match'
-  | 'create_distinct'
-  | 'reuse_or_create_owned'
-
-export function unmappedPlayerResolveMode(args: {
-  teamMatchFound: boolean
+export function resolveUnmappedPlayer(args: {
+  candidates: TeamPlayerCandidate[]
   jerseyNumber: string
-}): UnmappedPlayerResolveMode {
-  if (args.teamMatchFound) return 'reuse_team_match'
-  if (args.jerseyNumber.trim().length > 0) return 'create_distinct'
-  return 'reuse_or_create_owned'
+}): UnmappedPlayerResolution {
+  const jersey = args.jerseyNumber.trim()
+  // Stable ordering keeps resolution deterministic across syncs.
+  const candidates = [...args.candidates].sort((left, right) =>
+    left.playerId.localeCompare(right.playerId)
+  )
+
+  if (candidates.length === 0) {
+    return jersey ? { mode: 'create_distinct' } : { mode: 'reuse_or_create_owned' }
+  }
+
+  if (!jersey) {
+    return { mode: 'reuse_team_match', playerId: candidates[0].playerId, adoptJersey: false }
+  }
+
+  const exact = candidates.find(candidate => (candidate.jerseyNumber ?? '').trim() === jersey)
+  if (exact) {
+    return { mode: 'reuse_team_match', playerId: exact.playerId, adoptJersey: false }
+  }
+
+  const unnumbered = candidates.filter(candidate => !(candidate.jerseyNumber ?? '').trim())
+  if (unnumbered.length === 1) {
+    return { mode: 'reuse_team_match', playerId: unnumbered[0].playerId, adoptJersey: true }
+  }
+
+  return { mode: 'create_distinct' }
 }
 
 export function getSeasonFromDate(dateIso: string): string {

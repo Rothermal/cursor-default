@@ -22,8 +22,9 @@ import {
   mapShotRows,
   parsePlayerName,
   parseSeasonTeamStatsConfig,
-  unmappedPlayerResolveMode,
+  resolveUnmappedPlayer,
   type RemoteShotRow,
+  type TeamPlayerCandidate,
 } from './cloudSyncHelpers'
 import {
   aggregateStatsByPlayer,
@@ -516,37 +517,40 @@ async function ensurePlayerId(
     return remoteId
   }
 
-  // Prefer exact name+jersey when jersey is set so siblings / same-named
-  // teammates (different numbers) do not collapse onto one cloud player.
-  let teamLookup = supabase
+  // Fetch every same-name teammate with its jersey and decide locally: filtering by
+  // jersey in SQL cannot tell "same person, new number" from "different person".
+  const { data: existingOnTeam, error: junctionLookupError } = await supabase
     .from('team_players')
-    .select('player_id, players!inner(id, first_name, last_name)')
+    .select('player_id, jersey_number, players!inner(id, first_name, last_name)')
     .eq('team_id', teamId)
     .eq('players.first_name', firstName)
     .eq('players.last_name', lastName)
-  if (jerseyNumber) {
-    teamLookup = teamLookup.eq('jersey_number', jerseyNumber)
-  }
-  const { data: existingOnTeam, error: junctionLookupError } = await teamLookup.limit(1)
 
-  const teamMatchFound = !junctionLookupError && Boolean(existingOnTeam && existingOnTeam.length > 0)
-  const resolveMode = unmappedPlayerResolveMode({ teamMatchFound, jerseyNumber })
+  const candidates: TeamPlayerCandidate[] = junctionLookupError
+    ? []
+    : ((existingOnTeam ?? []) as Array<{ player_id: string; jersey_number: string | null }>).map(
+        row => ({ playerId: row.player_id, jerseyNumber: row.jersey_number })
+      )
+  const resolution = resolveUnmappedPlayer({ candidates, jerseyNumber })
 
-  if (resolveMode === 'reuse_team_match') {
-    const playerId = (existingOnTeam![0] as { player_id: string }).player_id
-    // Never rewrite jersey on reuse: name-only matches with an empty local
-    // number must not clear a cloud jersey, and jersey-matched rows already agree.
+  if (resolution.mode === 'reuse_team_match') {
+    // Only adopt a jersey onto a teammate that had none. Never rewrite or clear an
+    // existing cloud jersey from a local roster that disagrees.
     await supabase
       .from('team_players')
-      .update({ is_active: true })
+      .update(
+        resolution.adoptJersey
+          ? { jersey_number: jerseyNumber, is_active: true }
+          : { is_active: true }
+      )
       .eq('team_id', teamId)
-      .eq('player_id', playerId)
-    return playerId
+      .eq('player_id', resolution.playerId)
+    return resolution.playerId
   }
 
   let playerId: string
 
-  if (resolveMode === 'create_distinct') {
+  if (resolution.mode === 'create_distinct') {
     const { data: createdPlayer, error: createError } = await supabase
       .from('players')
       .insert({ first_name: firstName, last_name: lastName, created_by: userId })
@@ -587,6 +591,9 @@ async function ensurePlayerId(
     }
   }
 
+  // New/owned rows own their jersey outright, so an empty local number normalizes to
+  // null here. The reuse path above deliberately differs: it never touches a jersey
+  // it did not create.
   await supabase
     .from('team_players')
     .upsert(
