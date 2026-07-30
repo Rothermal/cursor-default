@@ -5,8 +5,8 @@ record combination onto the shared `GameEvent` foundation introduced by the socc
 
 Status: BKE-0 architecture planning is drafted in
 [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md), revised
-against the completed SOC-6 program, and awaits its focused Basketball product-model Q&A plus
-approval. BKE-1 through BKE-6 implementation is gated on that approval.
+against the completed SOC-6 program. Product-model Q&A Batches A-F and the authority decisions are
+approved; final BKE-0 approval remains. BKE-1 through BKE-6 implementation is gated on that approval.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -103,9 +103,10 @@ One shot event should retain:
 - shooter,
 - made/missed outcome,
 - 1PT/2PT/3PT value,
-- court location and zone when available,
+- normalized court location when available, with zone derived from snapshotted geometry,
+- value-source metadata for court defaults, quick entry, or explicit override,
+- optional free-throw trip reference and attempt position,
 - period and event time when basketball timing exists,
-- optional related rebound event,
 - recorder and stable event id.
 
 Derived projections include score, field-goal/free-throw makes and attempts, shooting
@@ -117,14 +118,19 @@ Candidate event families include:
 
 - rebound with offensive/defensive outcome and optional related missed shot;
 - separate assist with optional related made shot, preserving direct stat-grid capture;
+- free-throw trip context with separate attempt events;
 - steal,
 - block with optional related opponent attempt,
 - turnover,
-- foul,
+- structured foul and explicit ejection,
 - minutes/substitution or playing-time event if later enabled,
 - structured signed score adjustment/unattributed score,
-- team foul, timeout, technical, and team turnover,
+- charged-team and neutral administrative timeout, technical, and team turnover,
 - period change and other basketball match-state events.
+
+Jump ball, held ball, alternating-possession arrow, and possession-state events reserve stable
+family names for an optional later module. Core event games do not require a complete possession
+stream, and possession-dependent metrics remain hidden until source coverage is complete.
 
 The detailed plans must decide which relationships live inside one event payload and which
 use separate linked event ids. The model should support one user flow without pretending
@@ -209,11 +215,11 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 |---|---|---|---|
 | BKE-0 | Architecture audit, product-model Q&A, event catalog, authority, compatibility, settings/release strategy, and F13 reconciliation | Completed SOC-6 program | Detailed migration design approved; no Basketball code migration required |
 | BKE-1 | Shared-engine extraction through court capture. **Splits into BKE-1A-1C** — see BKE-0 §9 | BKE-0 approved | Generic refactors preserve Soccer; Basketball setup/projector and court workflows pass approved parity fixtures |
-| BKE-2 | Direct stat grid, event-derived score adjustments, team/period stats, and remaining Basketball actions | BKE-1C | Every new Basketball live action has one event-backed source of truth |
+| BKE-2 | Direct stat grid, event-derived score adjustments, team/period stats, fouls/ejections, timeouts, and remaining Basketball actions | BKE-1C | Every new Basketball live action has one event-backed source of truth |
 | BKE-3 | Editable Basketball Timeline/detail experience and F13 delivery | BKE-2 | Users can review, revise, remove, restore, and re-link supported local events |
 | BKE-4 | Generalized cloud lifecycle, authority-aware Summary, canonical aggregates, capability negotiation, and release readiness. **Splits into BKE-4A-4E** — see BKE-0 §9 | BKE-3 stable | New Basketball games sync and publish canonically behind the internal gate; Soccer remains unchanged; legacy games remain readable |
 | BKE-5 | Built-in/personal/team/match Basketball settings, rule profiles, and event-model rollout | BKE-4E | Defaults resolve with source metadata, setup fixes a complete immutable rules snapshot, and the user opt-in ships |
-| BKE-6 | Basketball clock, stoppage profiles, substitutions, disqualification, and on-court intervals | BKE-5 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |
+| BKE-6 | Basketball clock, stoppage profiles, substitutions, and on-court intervals | BKE-5 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |
 
 BKE-1 is split so the generic state/mutation refactor, deterministic Basketball foundation, and
 visible court cutover each receive an independent proof. BKE-4 is split into 4A neutral RPC
@@ -253,15 +259,15 @@ docs/PLAN_BKE_6_CLOCK_AND_LINEUPS.md
 
 ## 8. Q&A Topics
 
-The architecture recommendations are summarized in BKE-0 §11. Before approval, BKE-0 §12b requires
-a 24-question Basketball product-model session in six batches:
+The architecture decisions are summarized in BKE-0 §11. BKE-0 §12b records the completed
+24-question Basketball product-model session in six batches:
 
-- competition format and setup;
-- participants, opponents, and staff;
-- scoring, shooting, and free throws;
-- fouls, possession, and administration;
-- capture, relationships, and corrections;
-- authority, settings, aggregates, and rollout.
+- competition format and setup — **approved**;
+- participants, opponents, and staff — **approved**;
+- scoring, shooting, and free throws — **approved**;
+- fouls, possession, and administration — **approved**;
+- capture, relationships, and corrections — **approved**;
+- authority, settings, aggregates, and rollout — **approved**.
 
 This pass is required because the current Basketball stat grid is a compatibility baseline, not a
 complete definition of the redesigned product. It must settle rule profiles, overtime, clock scope,
@@ -269,7 +275,7 @@ opponent detail, staff discipline, lineup expectations, free-throw trips, foul a
 classification, optional possession tracking, event relationships, score behavior, settings
 ownership, aggregate destinations, and release fallback.
 
-Current architectural recommendations include separate linked/unlinked assist events, optional
+Approved product decisions include separate linked/unlinked assist events, optional
 rebound links, opponent participants allowed but not required, event-derived score plus structured
 adjustments, per-stat decrement behavior, team-kind actors for team totals, manual minute events
 until BKE-6, reasoned reopen for final corrections, canonical aggregate authority, no historical
@@ -279,15 +285,46 @@ BKE-0 also surfaced one topic this roadmap did not anticipate: the shared event 
 sport-neutral but every binding, recorder, finalization, and reopen RPC in migrations 043-046
 is hard-gated on `sport_id = 'soccer'`. **Recommended:** BKE-4A generalizes that layer in place and
 keeps the soccer-named functions as thin wrappers, proven by soccer parity tests before any
-basketball semantics land.
+basketball semantics land. Batch D also requires the shared event side type and migration 042 row
+constraint to admit `neutral`; event definitions retain the authority to reject neutral where it
+does not apply, so existing Soccer behavior remains unchanged.
 
 Completed SOC-6 also added migration 047 canonical aggregate transport, migration 048's generic
 sport-settings tables, and migration 049's capability handshake. BKE-4D, BKE-4E, and BKE-5 adopt
 those contracts explicitly, with rollout following settings rather than preceding them.
 
-Two authority decisions remain required at BKE-0 approval: event games use reasoned reopen and
-republish instead of `stat_corrections`, and canonical publications become Basketball aggregate
-authority. Their mechanics belong to BKE-4C and BKE-4E. See BKE-0 §12a.
+Batch F approved the two authority decisions: event games use reasoned reopen and republish instead
+of `stat_corrections`, and canonical publications become Basketball aggregate authority. Their
+mechanics belong to BKE-4C and BKE-4E. See BKE-0 §12a.
+
+Approved Batch A selects all existing named profiles as editable bundles, explicit stable
+regulation/overtime segments with dynamic overtime, anchored game-clock scope with shot clock
+deferred, and a defaults-first setup fast path that still writes a complete immutable snapshot.
+
+Approved Batch B keeps opponent rosters optional, activates on-court-five/substitution tracking for
+anchored-clock games, preserves stable match participant identity through corrections and cloud
+resolution, and represents staff incidents with labeled actors without mandatory staff setup.
+
+Approved Batch C ships the traditional box score plus safe derived rates, gates possession/lineup
+advanced metrics on complete source data, derives zones from normalized coordinates, preserves
+unlocated attempts and value overrides, models structured free-throw trips as context plus separate
+attempts, and numbers field goals separately from free throws.
+
+Approved Batch D makes structured foul events authoritative for player/team totals, bonus, and
+threshold disqualification; uses incident-linked technical/flagrant/double fouls plus explicit
+ejections; models charged-team and neutral official/media timeouts under snapshotted profile rules;
+and reserves possession event families as an optional completeness-gated module.
+
+Approved Batch E preserves separate linked/unlinked assists plus optional validated rebound, block,
+steal, and free-throw-trip relationships; derives lineup windows directly from substitution events;
+groups only same-command events for F12 newest-first undo; and makes shot points plus signed
+adjustments the sole event-game score authority.
+
+Approved Batch F uses versioned built-ins plus personal/team defaults and immutable match snapshots,
+keeps capture/display preferences personal and non-authoritative, requires explicit per-game opt-in
+with capability preflight and no silent fallback, and exposes canonical traditional aggregates and
+approved rates across every destination with completeness-gated advanced metrics and disclosed
+partial quality.
 
 ---
 
@@ -305,16 +342,23 @@ Every BKE implementation phase must cover:
 - approved event-derived home/opponent score behavior and structured corrections,
 - team pseudo-player fouls, timeouts, technicals, turnovers, period controls, and bonus
   indicators,
+- structured foul counting, incident groups, threshold disqualification, explicit ejections, and
+  charged versus neutral timeout behavior,
+- optional possession event families staying absent from core streams and possession-dependent
+  metrics staying hidden without complete coverage,
 - local parking, import/export, quota handling, and cross-sport resume,
 - offline tracking and retry,
 - independent recorder checkout and primary resolution,
 - explicit local/primary/alternate/canonical Summary authority and all-recorder review,
 - fail-closed unhealthy canonical finals and read-only remote sources,
-- finalized games and stat corrections,
+- finalized games, reasoned reopen/republication, and legacy-only stat corrections,
 - legacy aggregate-only and shot-chart games,
-- season, career, tournament, team, and player canonical aggregate views,
-- built-in/personal/team/match settings resolution,
-- backend capability negotiation, creation rollback, and uninterrupted historical access,
+- season, career, tournament, team, and player canonical aggregate views with partial-quality
+  labels, excluded counts, and manager diagnostics,
+- built-in/personal/team/match settings resolution with separate personal capture/display
+  preferences,
+- backend capability negotiation, explicit per-game opt-in and fallback, creation rollback, and
+  uninterrupted historical access,
 - mobile court, Timeline, popup, stat-grid, Summary, and settings ergonomics.
 
 Projection tests should compare event-derived totals against the current reducer for
@@ -340,8 +384,8 @@ results rather than being hidden as parity exceptions.
 
 ## 11. Documentation Handoff
 
-BKE-0 revision 5 is drafted. Its approval follows the §12 product-model Q&A and settles the two
-authority decisions in §12a, after which:
+BKE-0 revision 6 has completed the §12 product-model Q&A and settled both authority decisions in
+§12a. After final BKE-0 approval:
 
 - add the BKE-1 parent and BKE-1A plan, then detailed BKE plans one implementation slice at a time,
 - update this roadmap if phase boundaries move,
