@@ -4,11 +4,11 @@ Architecture audit, basketball event catalog, projection contract, compatibility
 F13 reconciliation for moving basketball onto the shared `GameEvent` foundation proven by the
 soccer program.
 
-Status: Draft, revision 5 — updated against the completed SOC-6 summary, canonical aggregate,
-settings, and release program. **Every** recommendation in §11 remains a proposal pending BKE-0
-approval. §12 now requires a focused Basketball product-model Q&A before the event catalog is
-frozen; the current basketball counter grid is a compatibility baseline, not a complete product
-definition. No basketball code changes belong to BKE-0.
+Status: Draft, revision 6 — updated against the completed SOC-6 summary, canonical aggregate,
+settings, and release program. Product-model Q&A Batches A-F and the §12a authority decisions are
+approved. The architecture is ready for final BKE-0 approval. The current basketball counter grid is
+a compatibility baseline, not a complete product definition. No basketball code changes belong to
+BKE-0.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -53,16 +53,22 @@ during BKE-0.
 
 ## 3. Architecture Audit
 
-### 3.1 The shared platform is reusable with one addition
+### 3.1 The shared platform is reusable with two additions
 
 `src/lib/gameEvents/` is sport-neutral and needs no change to its envelope, storage, ordering, or
-projection model for basketball. It needs exactly one capability added — an atomic multi-event
-mutation for edits that touch a linked pair (§6.2) — which is sport-neutral and equally useful to
-soccer:
+projection model for Basketball events except for one backward-compatible side widening. It needs:
+
+1. an atomic multi-event mutation for edits that touch linked facts (§6.2); and
+2. `GameEventTeamSide` widened from `tracked | opponent` to
+   `tracked | opponent | neutral` for official/media timeouts and other genuinely neutral
+   administrative events approved in Batch D.
+
+Both are sport-neutral. Existing Soccer definitions keep their current side validation and event
+payloads unchanged.
 
 | Capability | File | Basketball relevance |
 |---|---|---|
-| Event envelope, actors, period, location, diagnostics | `types.ts` | `elapsedMs` is already `number \| null`; `location` is normalized `0..1`; actors are role-tagged `player \| staff \| team \| unknown` |
+| Event envelope, actors, period, location, diagnostics | `types.ts` | `elapsedMs` is already `number \| null`; `location` is normalized `0..1`; actors are role-tagged `player \| staff \| team \| unknown`; BKE-1A adds the neutral side |
 | Definitions keyed by `(sportId, eventType)` with sequential migrations and validation | `registry.ts` | Basketball registers beside soccer; duplicate keys throw |
 | Projector registry and full deterministic rebuild | `projection.ts` | One pure projector per sport |
 | initialize / add / addBatch / update / delete / restore | `mutations.ts` | Revisioned edits and tombstones, atomic full rebuild per accepted mutation. **Batch is append-only**: update/delete/restore are one event each (`mutations.ts:154-210`) — see §6.2 |
@@ -170,6 +176,7 @@ The tables are sport-neutral: `game_events`, `game_participants`, `game_event_st
 
 | Gate | Where |
 |---|---|
+| Event rows reject a neutral side | `042:17` — `team_side in ('tracked', 'opponent')` |
 | Binding filters `g.sport_id = 'soccer'` | `043:261,292`, `044:85`, `045:375`, `046:738` |
 | Recorder presence, primary history, primary selection | `045:109,155,276` |
 | Manage/audit authority, readiness, canonical read, finalize, reopen | `046:58,86,126,281,331,341,518,579` |
@@ -190,7 +197,8 @@ SOC-6 added two more reusable boundaries that the earlier BKE draft did not incl
 **Recommendation (pending BKE-0 approval):** BKE-4 generalizes this layer rather than duplicating it.
 Add sport-neutral functions (`bind_event_game`, `finalize_event_game`,
 `get_event_game_recorders`, `get_canonical_publication`, `reopen_event_game`, and peers), relax the
-publication `sport_id` constraint to an allow-list, make the games trigger consult the
+event `team_side` constraint to include `neutral`, relax the publication `sport_id` constraint to an
+allow-list, make the games trigger consult the
 event-capable sport list instead of a literal, and keep every existing `*_soccer_*` function as a
 thin wrapper that forwards with `p_sport_id => 'soccer'`. Shipped soccer behavior and client call
 sites remain untouched; a parallel basketball RPC family would fork roughly two thousand lines of
@@ -227,6 +235,18 @@ proved contracts:
    event-backed games. Disabling or rolling back that creation path never hides, rewrites, or blocks
    recovery of existing local, cloud, or canonical event games.
 
+**Approved Batch F authority and aggregate contract:**
+
+- Canonical publications are the durable aggregate authority for event games. Final corrections use
+  reasoned reopen and republication; `stat_corrections` remains legacy-only.
+- Team, player, season, career, and tournament destinations expose traditional totals, approved
+  denominator-safe rates, participation, and game/season history from authorized publications.
+- Possession, lineup, plus-minus, usage, and similar advanced metrics remain unavailable unless
+  their source coverage is complete.
+- One unhealthy game source still fails closed. A cross-game read may isolate malformed
+  publications and render the healthy subset only with a prominent partial-quality label, excluded
+  record count, and manager diagnostics. It never silently presents that subset as complete.
+
 These are architecture requirements, not optional UI polish. BKE-4 through BKE-6 carry their mechanics,
 and every earlier phase must shape its types so those mechanics do not require another authority
 rewrite.
@@ -260,6 +280,18 @@ BasketballSportGameState
 clockModel: 'none' | 'anchored'    // 'none' for BKE-1..5; 'anchored' unlocked by BKE-6
 ```
 
+**Approved Batch A format contract:**
+
+- Youth, NFHS, NCAA, NBA, FIBA, and Custom are versioned, editable starting profiles rather than
+  permanently locked rule authorities.
+- Regulation and overtime use explicit stable segment ids, labels, and durations. Overtime segments
+  are appended dynamically as required; profile rules determine foul and timeout resets/carryover.
+- BKE-6 delivers the anchored game clock with count-up/countdown display, start/pause/adjust,
+  stoppages, and optional tenths display. Shot-clock tracking is reserved for a separate add-on.
+- Setup follows a defaults-first fast path: resolve saved rules, team, and roster automatically,
+  block only on missing required choices, retain full editing, and always write a complete immutable
+  snapshot before the game starts.
+
 Snapshotting at setup matches soccer and addresses a real current weakness: today a mid-season change
 to `seasons.team_stats_config` retroactively changes how a completed game's bonus banner reads,
 because `resolveTeamStatsConfig` re-resolves at render time.
@@ -282,6 +314,17 @@ account-backed settings UI arrives later. Capture/display preferences such as re
 selected participant, court orientation, and shot-value override are not match rules and never
 change projection or canonical publication.
 
+**Approved Batch F settings ownership:**
+
+- Built-ins are versioned editable starting profiles.
+- Personal settings choose the preferred profile and sparse rule defaults; authenticated values are
+  account-scoped and anonymous values remain device-scoped.
+- Team settings provide shared sparse defaults and follow the existing owner/admin edit boundary.
+- Setup resolves built-in → personal → team → explicit match overrides and writes one complete,
+  immutable match snapshot before tip-off.
+- Display and capture preferences remain personal and non-authoritative. They never enter the match
+  snapshot, projection, fingerprint, or canonical publication.
+
 `BasketballMatchParticipant` reuses soccer's participant idea: a stable match-local `participantId`,
 optional resolved `playerId`, display name, number, initial status, and — unlike soccer —
 
@@ -297,11 +340,22 @@ extend that registry later without mutating setup, and `basketball.participant_r
 stable cloud `playerId` to the same match-local `participantId`. Historical events continue to use
 `participantId`; later resolution never requires rewriting their actor payloads.
 
+**Approved Batch B participant contract:**
+
+- Opponent setup is team-only by default. A recorder may add a complete or partial opponent roster
+  before or during the game; individual opponent tracking is never required to start.
+- Setup records starter, bench, or DNP status. Anchored-clock games track the on-court five and
+  substitutions; position and captain are optional metadata, not rigid roles.
+- `participantId` survives late additions, display-name/number corrections, cloud resolution, and
+  player merges. Duplicate jersey numbers warn but remain valid.
+- Staff setup is optional. A technical or ejection may create a durable labeled `staff` actor;
+  reusable staff rosters remain an additive future feature.
+
 **Why participants carry a side and soccer's do not.** `GameEventActor` has no side field; only the
 envelope does (`gameEvents/types.ts:12-33`). Soccer gets away with that because its roster is
 tracked-team-only, so `validateActorSide` (`soccer/projector.ts:849-876`) can treat "has a
 `participantId`" as "is on the tracked side" and require opponent actors to be label/`unknown`/team
-rows with no participant. Basketball intends to allow opponent participants (§12b q3), which breaks
+rows with no participant. Basketball allows optional opponent participants (§12b q5), which breaks
 that inference immediately: a shot plus linked assist could reference actors from either roster and
 nothing would say which is wrong. Making the side part of participant identity
 keeps §4.5's same-side and opposite-side rules deterministic, and lets a future opponent roster land
@@ -315,17 +369,17 @@ period, score, end reason, and result.
 
 Namespaced `basketball.*`, schema version 1. Clock-less at rest, clock-ready by construction.
 
-**Catalog status:** the events below are the architecture baseline needed to preserve today's
-Basketball behavior. They are not frozen until the §12 product-model Q&A reviews the desired
-Basketball statistics, rule levels, foul/free-throw model, staff discipline, possession state,
-timeouts, periods/overtime, and lineup expectations. New answers may enrich payloads or add event
-families; they may not introduce a second aggregate authority.
+**Catalog status:** the events below are the approved product-model baseline from the §12 Q&A. Phase
+planning may refine TypeScript names and split payload objects, but it must preserve the approved
+statistics, rule levels, foul/free-throw model, staff discipline, optional possession boundary,
+timeouts, periods/overtime, lineup expectations, and single aggregate authority.
 
 **Scoring and shooting**
 
 | Event | Payload | Actors |
 |---|---|---|
-| `basketball.shot` | `value: 1 \| 2 \| 3`, `made: boolean`, `attempt: 'field_goal' \| 'free_throw'`, `zone: ShotZone \| null` | `shooter` (required) |
+| `basketball.free_throw_trip` | `maximumAttempts: 1 \| 2 \| 3`, `oneAndOne: boolean`, `sourceFoulEventId: string \| null`, `technical: boolean`, `possessionRetained: boolean` | — |
+| `basketball.shot` | `value: 1 \| 2 \| 3`, `made: boolean`, `attempt: 'field_goal' \| 'free_throw'`, `valueSource: 'court' \| 'manual_override' \| 'quick_entry' \| 'free_throw'`, `freeThrowTripId: string \| null`, `tripAttemptNumber: number \| null` | `shooter` (required) |
 | `basketball.assist` | `relatedEventId: string \| null` | `assister` |
 | `basketball.score_adjustment` | `delta: number` (signed), `reason: 'scoreboard_control' \| 'unattributed_score' \| 'official_correction'`, `note: string \| null` | `team` |
 
@@ -333,9 +387,23 @@ Envelope `location` carries court coordinates; `teamSide` carries tracked/oppone
 unlocated quick actions set `location: null`, and remain statistically authoritative — exactly the
 rule SOC-6 settled for soccer's unlocated events.
 
-There is **no `located` boolean**. "Located" is `location !== null`, derived wherever it is needed;
-storing both invites a stream where they disagree and forces every reader to pick a winner. §4.5
-gives the full validation contract.
+There is **no persisted `located` boolean or shot zone**. "Located" is `location !== null`; normalized
+court coordinates plus snapshotted court geometry derive the zone. Storing a second editable zone
+would let it disagree with the coordinates. A located field goal defaults its 2PT/3PT value from
+geometry, but `valueSource: 'manual_override'` preserves the current explicit value override without
+moving or falsifying the recorded location. §4.5 gives the full validation contract.
+
+Each free throw remains a `basketball.shot`. A structured trip is owned once by a
+`basketball.free_throw_trip` event, and attempts reference that event plus their 1-based position.
+This prevents awarded count, one-and-one, foul source, technical context, or retained possession from
+drifting across duplicated attempt payloads. Direct stat-grid free throws may leave both trip fields
+null; the projector counts them normally without inventing context.
+
+Attempt positions are historical labels and never renumber after correction. A trip may temporarily
+or permanently have no active attempts: it contributes no shooting totals and the Timeline flags it
+as empty for review, but it remains an independently recorded award/context fact until explicitly
+removed. This supports recording the trip before its attempts and avoids silently deleting context
+when the last attempt is corrected.
 
 There is **no `assist` or `blocked_by` actor on the shot**. Both are separate events with optional
 links, and each relationship has exactly one owner. This differs intentionally from Soccer's
@@ -368,6 +436,11 @@ stream may omit them, and projection never requires a link to compute a stat. Th
 for *integrity* — a link that exists must be valid, and §6.2 defines what happens when an edit would
 invalidate one.
 
+The free-throw trip owns its optional source-foul link. BKE-6 substitution events directly define
+on-court interval boundaries; they do not point to separately persisted "lineup window" records.
+That keeps every durable relationship owned once and leaves lineup windows as deterministic
+projections.
+
 The `turnover_by` actor on `basketball.steal` and its `relatedEventId` are **mutually exclusive**, for
 the same reason the shot has no `blocked_by`: when the turnover is its own event, that event owns who
 committed it; the actor exists only for the common case where the opponent's turnover is not tracked
@@ -377,14 +450,30 @@ as an event of its own. Validation rejects a steal carrying both.
 
 | Event | Payload | Actors |
 |---|---|---|
-| `basketball.foul` | provisional foul classification, shooting context, and `countsToTeamTotal` | `committed_by` (player, staff, or team), optional `drawn_by` |
-| `basketball.timeout` | `kind: 'full' \| 'short'` | `team` |
+| `basketball.foul` | semantic `class`, foul `context`, team-control context, `incidentId: string \| null`, and optional reasoned official counting override | `committed_by` (player, staff, or team), optional `drawn_by` |
+| `basketball.ejection` | `reason`, `source: 'automatic_threshold' \| 'official_ruling'`, `relatedFoulEventId: string \| null` | `subject` (player or staff) |
+| `basketball.timeout` | profile-owned `kind`, `chargedSide: 'tracked' \| 'opponent' \| null`, and optional label | `team` only when charged |
 | `basketball.minutes_adjustment` | `deltaMinutes: number` (signed, non-zero integer) | `player` (required) |
 | `basketball.period_started` / `basketball.period_ended` | `periodId: string` | — |
 | `basketball.match_roster_added` | `participant`, `destination` | — |
 | `basketball.participant_resolved` | `participantId`, `playerId`, `displayName`, `number` | — |
 | `basketball.match_ended` | `reason: 'completed' \| 'suspended' \| 'abandoned'` | — |
 | `basketball.match_reopened` | `reason: string \| null` | — |
+
+Foul projection, not independent counter entry, owns personal/team totals, bonus state, and
+profile-specific disqualification thresholds. A quick unattributed team-foul action creates a
+team-kind `basketball.foul`; a player foul normally contributes to both the player and team totals
+according to the snapshotted profile. A reasoned official override handles exceptional rulings
+without creating a second counter authority.
+
+Technical, flagrant/intentional, double, and multi-party fouls remain foul events. Events from one
+official incident share `incidentId`; each sanctioned actor still has an independently editable
+event. Threshold disqualification is derived, while `basketball.ejection` records the official fact
+that a player or staff member must leave.
+
+Charged team timeouts use that side in both the envelope and `chargedSide`. Media and official
+timeouts use `teamSide: 'neutral'`, `chargedSide: null`, and no team actor. The rule snapshot owns
+duration, inventory, period/overtime carryover, and which profile-specific classes consume inventory.
 
 `basketball.minutes_adjustment` exists because `min` is the one basketball stat with no natural
 producing event under `clockModel: 'none'`, and `INCREMENT_STAT` / `DECREMENT_STAT` are no-ops once a
@@ -416,11 +505,19 @@ adjustment-derived minutes forever — BKE-6 changes no historical game's totals
 **Reserved — defined in the catalog, not implemented until BKE-6**
 
 `basketball.clock_started`, `basketball.clock_paused`, `basketball.clock_adjusted`,
-`basketball.stoppage`, `basketball.substitution_window`, `basketball.role_changed`.
+`basketball.stoppage`, `basketball.substitution`, `basketball.role_changed`.
 
 Reserving them now costs nothing at the transport layer — `game_events` stores one row per event with
 JSONB payload — and guarantees BKE-6 needs no envelope, table, or ordering change. Until BKE-6 they
 are unregistered, so a stream containing one quarantines rather than silently mis-projecting.
+
+**Reserved optional possession module**
+
+`basketball.jump_ball`, `basketball.held_ball`, `basketball.possession_changed`, and
+`basketball.possession_arrow_set` are reserved for a separately approved add-on. Core event games do
+not require a complete possession stream, and possession-dependent metrics stay unavailable until
+the module reports complete source coverage. Reserving names and neutral-side compatibility now
+prevents a later envelope redesign without adding unsupported events to the initial registry.
 
 **Coverage check.** Every stat id in the basketball `SportConfig` (`src/config/sports.ts:17-99`) has a
 producing event, with no orphans:
@@ -434,12 +531,28 @@ producing event, with no orphans:
 | `stl` | `basketball.steal` |
 | `blk` | `basketball.block` — sole representation; no `blocked_by` actor exists |
 | `to` | `basketball.turnover` — `kind: 'player'` |
-| `pf` | `basketball.foul` — player actor |
+| `pf` | `basketball.foul` — qualifying player actor under the snapshotted profile |
 | `min` | `basketball.minutes_adjustment` under `clockModel: 'none'`; interval-derived in BKE-6 |
-| `team_foul_pN` | `basketball.foul` — team actor, period from event |
-| `team_to_used_pN` | `basketball.timeout` — team actor, period from event |
-| `team_tech` | `basketball.foul` — `kind: 'technical'`, team actor |
+| `team_foul_pN` | Every qualifying player/team/staff `basketball.foul`; period and counting rules come from the event plus profile |
+| `team_to_used_pN` | Charged `basketball.timeout`; neutral official/media timeouts do not increment it |
+| `team_tech` | Qualifying technical-class `basketball.foul` attributed to that side, including player, staff, or team actors |
 | `team_turnover` | `basketball.turnover` — `kind: 'team'` |
+
+Disqualified/ejected availability is also projected from qualifying foul thresholds plus explicit
+`basketball.ejection` events. It is match state rather than a `SportConfig` counter.
+
+**Approved Batch C statistics contract:**
+
+- First release preserves the complete traditional box score and derives shooting percentages,
+  effective field-goal percentage, true-shooting percentage, assist-to-turnover ratio, and
+  denominator-safe rates from canonical totals.
+- Possession, lineup, plus-minus, usage, and similar advanced metrics render only when their required
+  source events are complete. They never guess missing possessions or lineups and remain additive
+  modules rather than release blockers for the core box score.
+- Normalized coordinates are authoritative for location and zone. Located and unlocated field goals
+  are equally valid statistics; the explicit 2PT/3PT override records its source.
+- Structured free throws use one context event plus separate attempt events. Field-goal ordinals
+  count located and unlocated field goals only; free throws use trip/attempt labels.
 
 ### 4.3 Linking: separate facts with optional relationships
 
@@ -496,12 +609,12 @@ needed. Basketball populates `label` from the snapshotted team designation so a 
 readable without resolving the roster. Rationale for keeping them out of the roster:
 the participant roster is the input to every future player, lineup, and minutes surface, and seeding
 it with two non-players contaminates all of them. This replaces the contradictory wording that
-previously appeared in §4.1 and §12, and is stated here once as a single proposal **pending BKE-0
-approval** — it is no longer carried as an open question in §12b.
+previously appeared in §4.1 and §12. Batch B settles this representation as an input to final BKE-0
+approval.
 
 **Staff are labeled actors, not player participants.** A coach or bench technical can use a
 `staff`-kind actor with a durable label even when that person is not represented in the tracked
-roster. §12 decides whether a future staff setup roster is useful, but the event envelope must not
+roster. Batch B defers reusable staff rosters as an additive feature; the event envelope must not
 force a coach's discipline onto a player or anonymous team actor.
 
 **Where validation lives.** `GameEventDefinition.validate` (`gameEvents/registry.ts:8-15`) receives
@@ -514,14 +627,18 @@ projector, which downgrades rather than rejects (see "stale links" below).
 
 | Rule | Applies to |
 |---|---|
-| `attempt: 'free_throw'` requires `value === 1`, `location === null`, `zone === null` | `basketball.shot` |
-| `attempt: 'field_goal'` requires `value === 2 \| 3` | `basketball.shot` |
-| `zone !== null` requires `location !== null`, and `zone` must be the zone that `location` falls in | `basketball.shot` |
-| `value === 3` requires a `zone`/`location` outside the arc when located | `basketball.shot` |
+| `attempt: 'free_throw'` requires `value === 1`, `valueSource === 'free_throw'`, `location === null`, and both trip fields either null or populated | `basketball.shot` |
+| `attempt: 'field_goal'` requires `value === 2 \| 3`, no free-throw trip fields, and `valueSource !== 'free_throw'` | `basketball.shot` |
+| A located field goal derives its zone from location; its value must match geometry unless `valueSource === 'manual_override'` | `basketball.shot` |
+| An unlocated field goal requires `valueSource === 'quick_entry'` or `'manual_override'` | `basketball.shot` |
+| `maximumAttempts` is 1-3; one-and-one permits a conditional second attempt; source foul is nullable | `basketball.free_throw_trip` |
 | `captureCommandId` is null or a non-empty generated id and cannot change after revision 1 | every Basketball event |
 | `deltaMinutes` is a non-zero integer | `basketball.minutes_adjustment` |
 | `delta` is a non-zero integer; `reason` is a known code; `official_correction` requires a non-empty `note` | `basketball.score_adjustment` |
-| team-attributed events carry a `team` actor (with its required `label`) and no player actor | `foul`, `timeout`, `turnover: 'team'` |
+| A team-kind foul or turnover carries a `team` actor (with its required label) and no player actor | `foul`, `turnover: 'team'` |
+| Foul class/context and any reasoned counting override must be recognized by the snapshotted profile; `incidentId`, when present, is non-empty | `basketball.foul` |
+| A charged timeout has `teamSide === chargedSide` and one matching `team` actor; an official/media timeout has `teamSide: 'neutral'`, `chargedSide: null`, and no actors | `basketball.timeout` |
+| `teamSide: 'neutral'` is accepted only by event definitions that explicitly permit a neutral administrative event | every Basketball event |
 
 **Actor/side validation** (needs the effective participant registry: setup plus preceding active
 roster/resolution events):
@@ -543,12 +660,15 @@ can exist (§4.1).
 
 | Rule | Applies to |
 |---|---|
-| An assist link must reference an active made `basketball.shot`; assister and shooter must differ | `basketball.assist` |
+| An assist link must reference an active made `basketball.shot` whose attempt is a field goal; assister and shooter must differ | `basketball.assist` |
 | A linked assister must have the **same** `teamSide` as the shot | `basketball.assist` |
+| `freeThrowTripId` references an active same-side `basketball.free_throw_trip`; attempt positions are unique and bounded by its maximum | grouped free-throw shots |
+| `sourceFoulEventId`, when present, references an active `basketball.foul` in the same stream | `basketball.free_throw_trip` |
 | `relatedEventId` must reference an active `basketball.shot` with `made === false` | `basketball.rebound` |
 | `kind: 'defensive'` links to an opposite-side missed shot; `kind: 'offensive'` to a same-side one | `basketball.rebound` |
 | `relatedEventId` must reference an active, missed, opposite-side `attempt: 'field_goal'` shot | `basketball.block` |
 | `relatedEventId` must reference an active `basketball.turnover` on the opposite side, and may not be combined with a `turnover_by` actor | `basketball.steal` |
+| `relatedFoulEventId`, when present, references an active foul involving the ejected subject and the ejection side matches that foul | `basketball.ejection` |
 | Every `relatedEventId` must resolve **within the same game stream** | all linked events |
 | One multi-event append assigns one previously unused `captureCommandId` to every member; later link/edit commands preserve each event's original group and never absorb events into it | grouped capture commands |
 
@@ -585,8 +705,9 @@ Rules:
   side score-button tap does not freeze an absolute `homeTeamScore` that ignores later player shots.
   Equivalence tests must assert the approved event behavior after score controls rather than claim
   byte-for-byte legacy semantics that the target model intentionally retires.
-- **Shot ordinal.** The displayed shot number is the 1-based index of the shot in the ordered list of
-  active `basketball.shot` events, derived in the **shot-review projection** and keyed by event id.
+- **Field-goal ordinal.** The displayed shot number is the 1-based index in the ordered list of
+  active `basketball.shot` events whose `attempt === 'field_goal'`, including located and unlocated
+  attempts. It is derived in the **shot-review projection** and keyed by event id.
   `ShotRecord` is unchanged: it stays `{ id, x, y, made, shotType, zone, playerId, timestamp }`
   (`src/types.ts:11-20`) so the `shot_chart` mapping in `cloudSync.ts` needs no migration and §8's
   "the `ShotRecord` extension is superseded" stays true. The ordinal lives on a separate
@@ -596,14 +717,11 @@ Rules:
   timeouts consume values in between; it is supplied by the caller rather than assigned by the engine
   (`mutations.ts:66-153` validates uniqueness of `id`, not of `sequence`); and independent recorder
   streams each number from their own origin. The ordinal is a display projection that renumbers when
-  an earlier shot is removed — if a stable-forever shot label is wanted instead, it needs its own
-  immutable payload field and an explicit decision (§12b q5).
-- **The ordinal counts every attempt**, not only chart markers: all active `basketball.shot` events,
-  including free throws and unlocated field goals. They are one authoritative event family, and a
-  chart-only numbering would make the same shot "Shot 8" in the chart and "Shot 12" in a timeline or
-  player-detail list. The consequence is deliberate and must be visible in the UI: entering the detail
-  view by tapping a chart marker can land on a non-contiguous number, so the detail surface always
-  shows attempt type (FG vs FT, located vs not) beside the ordinal. Confirm at approval — §12b q5.
+  an earlier field goal is removed; event `id` remains its durable identity.
+- **Free throws use trip labels, not field-goal ordinals.** A structured attempt displays its trip
+  order and attempt position, such as "FT trip 4, attempt 2 of 2." An ungrouped direct-grid free throw
+  is labeled as an ungrouped FT attempt. This matches Basketball's distinction between FGA and FTA
+  without assigning one event two competing shot numbers.
 - Capture preferences are never an input (§4.4). Two streams that differ only in preferences project
   identically.
 - Any unknown, malformed, unmappable, or unsupported event makes the stream incomplete. Incomplete
@@ -648,10 +766,11 @@ linked assist changes the detail attached to a made shot even though the shot it
 | `blk` | `basketball.block` | Tombstone the newest matching active event. |
 | `to`, `team_turnover` | `basketball.turnover` | Tombstone the newest matching active event. |
 | `min` | `basketball.minutes_adjustment` | Append `deltaMinutes: -1` when projected minutes are ≥ 1; disabled otherwise. Never tombstones, because adjustments carry arbitrary signed values (§4.2). |
-| `team_foul_pN`, `team_to_used_pN`, `team_tech` | `basketball.foul` / `basketball.timeout`, team actor | Tombstone the newest matching active event **for that period**, resolved by event `period.id`. |
+| `team_foul_pN`, `team_to_used_pN`, `team_tech` | qualifying `basketball.foul` / charged `basketball.timeout` | Tombstone the newest matching active event **for that period**, resolved by event `period.id`; the confirmation names any player/disqualification consequence. Removing a foul atomically clears source links from surviving free-throw trips/ejections (§6.2). |
 | `ast` | `basketball.assist` | Tombstone the newest matching assist. A linked shot remains untouched. |
-| `2pt`, `3pt`, `ft`, `*_miss` | `basketball.shot` | Tombstone the newest matching shot; in the same atomic mutation tombstone active linked `assist` and `rebound` events and **unlink** (not remove) active linked `block` events (§6.2). The UI states the consequence before applying. |
-| `pf` | `basketball.foul`, player actor | Tombstone the foul. Because one foul can project to both the player and the team total, the confirmation names both effects. A foul whose player and team contributions need to diverge is an edit in BKE-3, not a decrement. |
+| `2pt`, `3pt`, `2pt_miss`, `3pt_miss` | field-goal `basketball.shot` | Tombstone the newest matching shot; in the same atomic mutation tombstone active linked `assist` and `rebound` events and **unlink** (not remove) active linked `block` events (§6.2). The UI states the consequence before applying. |
+| `ft`, `ft_miss` | free-throw `basketball.shot` | Tombstone the newest matching attempt and any linked rebound in the same atomic mutation. Its trip survives; remaining attempt positions stay sparse and an emptied trip is visibly flagged, not auto-removed (§6.2). |
+| `pf` | `basketball.foul`, player actor | Tombstone the foul and atomically clear `sourceFoulEventId` / `relatedFoulEventId` from surviving trips or ejections. Because one foul can project to both player and team totals, the confirmation names those effects plus every unlinked dependent. The trip attempts and ejection survive. A foul whose player and team contributions need to diverge is an edit in BKE-3, not a decrement. |
 
 Where no matching active event exists, the control is disabled rather than producing a negative
 total — matching today's `DECREMENT_STAT` guard (`gameReducer.ts:299-303`). No decrement path ever
@@ -667,7 +786,8 @@ that silently does the wrong thing.
 `updateGameEvent`, `deleteGameEvent`, and `restoreGameEvent` (`gameEvents/mutations.ts:154-210`) each
 revise exactly one event; only `addGameEvents` is a batch. F13-class edits break that assumption — a
 made shot becoming a miss, a shooter changing side, or a shot being removed can each invalidate an
-assist, rebound, or block that points at it.
+assist, rebound, or block that points at it. The same applies when a foul supplies free-throw/ejection
+context or a trip groups free-throw attempts.
 
 `addGameEvents` already makes a multi-event append all-or-nothing. The Basketball command layer adds
 the same immutable `captureCommandId` to every event created by one multi-event capture. F12 resolves
@@ -680,7 +800,7 @@ restore all still-active members atomically. It never infers grouping from adjac
 applies all or none, and rebuilds the projection once. Without it, "remove this shot and its rebound"
 is two mutations with a visible invalid state between them, and a failure halfway leaves the stream
 inconsistent. This is a sport-neutral change, benefits soccer's timeline equally, and is the only
-engine change the BKE program requires.
+new mutation operation the BKE program requires; §3.1 separately widens the shared side type.
 
 It lands in **BKE-1A**, before BKE-1C can produce a multi-event correction: clear-chart (§6.3)
 tombstones many shots plus their dependents in one command, and undoing a shot that already has a
@@ -694,7 +814,11 @@ is resolved, not ignored:
 |---|---|
 | Linked shot is tombstoned | Linked `assist` and `rebound` events are tombstoned in the same atomic mutation after confirmation. A linked `block` is **unlinked, not removed** and survives as a standalone defensive stat |
 | Linked shot is edited so the link becomes invalid (made ⇄ missed, side or shooter change) | The dependent event's `relatedEventId` is cleared to `null` in the same atomic mutation; assist/rebound/block totals survive as standalone stats, and the Timeline flags them as unlinked for review |
-| Link points at a missing or already-tombstoned event on load | Projector treats it as `null`, records a diagnostic, and **does not** mark the stream incomplete — a dangling advisory link is not a projection failure |
+| Source foul is tombstoned or edited so it no longer supports a trip/ejection link | Clear each surviving trip's `sourceFoulEventId` and ejection's `relatedFoulEventId` in the same atomic mutation. Free-throw attempts, trip context, and explicit ejection remain authoritative and the Timeline flags the cleared relationship. A same-command `captureCommandId` undo may still remove all grouped facts |
+| Free-throw trip is tombstoned | Clear `freeThrowTripId` and `tripAttemptNumber` on every active attempt in the same atomic mutation. Attempts survive as ungrouped free throws and retain their totals |
+| Free-throw trip edit would invalidate an existing source foul or attempt position | Reject the single edit. BKE-3 must submit one atomic command that also clears/revises every invalid relationship; unaffected attempt positions never renumber |
+| Free-throw attempt is tombstoned | Its trip survives. Remaining attempt positions stay unchanged even when sparse; a trip with no active attempts remains visible and is flagged as empty for review |
+| Link points at a missing or already-tombstoned event on load | Projector treats `relatedEventId`, `sourceFoulEventId`, `relatedFoulEventId`, or the free-throw trip pair as absent, records a diagnostic, and **does not** mark the stream incomplete — a dangling advisory link is not a projection failure |
 | Link points outside the game stream | Rejected at capture/edit time (§4.5); if present on load it is treated as dangling |
 
 **Why linked assists/rebounds and blocks part company on removal.** Today's
@@ -717,6 +841,8 @@ unlinked, and the user may explicitly remove or re-link them in BKE-3.
 - A dependent that was **unlinked** rather than tombstoned (blocks, and any link cleared by an edit)
   is not re-linked automatically on restore. Re-linking is an explicit edit, because the projector
   cannot know the user still means the same relationship.
+- Restoring a foul or trip likewise does not re-link surviving trips, ejections, or attempts that
+  were cleared when it was removed. The Timeline offers explicit validated re-linking.
 
 Retaining a knowingly-invalid link is never an option: it would let the timeline assert a
 relationship the data no longer supports.
@@ -837,8 +963,8 @@ the event model instead:
 | F13 requirement | Event-model answer |
 |---|---|
 | Durable shot identity | Event `id` — stable across every revision (`mutations.ts:154-180` preserves it) |
-| Shot number shown to the user | Projected shot ordinal over ordered active `basketball.shot` events (§5). **Not** envelope `sequence`, which counts every event type and is caller-supplied |
-| Shooter, result, value, zone, location | `basketball.shot` payload plus envelope `location` |
+| Shot number shown to the user | Projected field-goal ordinal over ordered active field-goal attempts (§5). Free throws use trip/attempt labels. **Not** envelope `sequence`, which counts every event type |
+| Shooter, result, value, zone, location | `basketball.shot` payload plus envelope `location`; zone derives from snapshotted court geometry |
 | Linked assist | `basketball.assist` with optional `relatedEventId` (§4.3) |
 | Linked rebound | `basketball.rebound` with `relatedEventId` |
 | Editable shooter/result/value/links | `updateGameEvent` revision, full projection rebuild; edits that invalidate a link use the atomic multi-event mutation and stale-link policy in §6.2 |
@@ -856,18 +982,18 @@ and builds on the atomic multi-event mutation that BKE-1A adds to the shared eng
 | Phase | Purpose | Depends on | Exit condition |
 |---|---|---|---|
 | BKE-0 | This architecture plus focused Basketball product-model Q&A | Completed SOC-6 program | Product catalog, authority, compatibility, settings, release, and phase contracts approved |
-| BKE-1A | Sport-neutral `sportGameState` extraction and atomic multi-event mutation | BKE-0 approved | Soccer behavior remains identical; generic state dispatch and all-or-nothing mutations are independently proven |
+| BKE-1A | Sport-neutral `sportGameState` extraction, neutral event-side widening, and atomic multi-event mutation | BKE-0 approved | Soccer behavior remains identical; generic state dispatch, definition-scoped neutral validation, and all-or-nothing mutations are independently proven |
 | BKE-1B | Basketball setup, participants, rules snapshot, event definitions, projector, and parity fixtures | BKE-1A | An internal fixture game rebuilds deterministic state with no live UI cutover |
 | BKE-1C | Court shots, linked/unlinked assists and rebounds, undo, clear chart, filters, and popup parity | BKE-1B | Court workflows round-trip through events and approved equivalence fixtures pass. **Internal gate only** |
-| BKE-2 | Stat grid, score adjustments, team/period stats, fouls, timeouts, minutes adjustments, and remaining actions | BKE-1C | Every new Basketball live action has one event-backed source of truth. **Internal gate only** |
+| BKE-2 | Stat grid, score adjustments, team/period stats, fouls, ejections, timeouts, minutes adjustments, and remaining actions | BKE-1C | Every new Basketball live action has one event-backed source of truth. **Internal gate only** |
 | BKE-3 | Editable Basketball Timeline and event detail; F13 delivery | BKE-2 | Users can review, revise, remove, restore, and re-link supported local events. **Internal gate only** |
-| BKE-4A | Sport-neutral RPC extraction: neutral functions, `*_soccer_*` wrappers, publication constraint relaxed to an allow-list, games trigger consults the event-capable sport list | BKE-3 stable | Soccer parity — every existing soccer test and RPC call site passes unchanged against the generalized layer. No basketball behavior yet |
+| BKE-4A | Sport-neutral RPC extraction: neutral functions, `*_soccer_*` wrappers, event-side constraint widened to `neutral`, publication constraint relaxed to an allow-list, games trigger consults the event-capable sport list | BKE-3 stable | Soccer parity — every existing soccer test and RPC call site passes unchanged against the generalized layer. No basketball behavior yet |
 | BKE-4B | Basketball binding, event transport, offline sync and recovery | BKE-4A | An internally-gated basketball event game syncs, recovers offline, and round-trips its stream |
 | BKE-4C | Recorder resolution, primary selection, finalization, reopen, correction integration | BKE-4B | Multi-recorder basketball games resolve a primary and finalize; the §12a a1 correction model is implemented |
 | BKE-4D | Authority-aware Summary for local, primary, alternate recorder, and canonical sources | BKE-4C | Final sources fail closed, remote sources stay read-only, and every Basketball detail view uses one explicit authority |
 | BKE-4E | Canonical aggregate transport/readers, compatibility retirement plan, capability handshake, and release readiness | BKE-4D | Season/career/team/player/tournament destinations agree and backend capability preflight is ready; the internal gate remains closed |
 | BKE-5 | Built-in/personal/team/match settings hierarchy, Basketball rule profiles, and event-model rollout | BKE-4E | Defaults resolve with source metadata, every new game fixes a complete immutable rules snapshot, and **the user-visible per-game opt-in ships** |
-| BKE-6 | Clock, stoppage profiles, substitutions, disqualification, and on-court intervals | BKE-5 | Opt-in `clockModel: 'anchored'` games derive real minutes and lineup intervals; clock-less games remain unaffected |
+| BKE-6 | Clock, stoppage profiles, substitutions, and on-court intervals | BKE-5 | Opt-in `clockModel: 'anchored'` games derive real minutes and lineup intervals; clock-less games remain unaffected |
 
 **Why BKE-1 splits.** The former BKE-1 mixed a generic refactor, a new atomic mutation primitive, a
 new sport state, a projector, setup, and the complete court workflow. The 1A-1C split gives each PR
@@ -930,13 +1056,14 @@ production user to prove correctness.
 
 Rules that apply once the opt-in is open:
 
-- New basketball games opt into the event model; existing and in-progress games never convert
-  mid-flight.
+- New basketball games use an explicit per-game event-model opt-in; existing and in-progress games
+  never convert mid-flight.
 - The opt-in is resolved at setup and snapshotted into `BasketballMatchSetup`, so a game's authority
   cannot change after tip-off.
 - Backend capability preflight happens before replacing or parking an active game for a cloud-team
-  event flow. Capability failure leaves existing state untouched and offers explicit legacy or
-  local-only paths where supported.
+  event flow. Capability failure leaves existing state untouched and explicitly offers a supported
+  legacy-cloud path, a local-only event path, or both. The UI states the durability/sync consequence
+  before selection and never silently downgrades the requested authority.
 - Rollback is turning the setting off: new games return to the aggregate path. Already-created event
   games keep their streams and stay readable — they are never downgraded to counters.
 - Rollout policy never gates historical access, recovery export, existing event-game resume, or
@@ -952,21 +1079,21 @@ and durable on its own.
 
 ## 11. Recommended Decisions
 
-These answer the eleven questions in roadmap §8. **Nothing here is approved yet** — every row is a
-recommendation this document proposes and the BKE-0 review decides, including rows 7 and the cloud
-strategy, which an earlier revision mislabeled as settled.
+These answer the original eleven questions in roadmap §8 plus decisions discovered during the
+product-model Q&A. Batches A-F are approved and every row below is a settled input to final BKE-0
+approval.
 
 | # | Question | Recommendation |
 |---|---|---|
 | 1 | Assist: linked event or actor relationship? | Separate `basketball.assist` with optional made-shot link, preserving direct stat-grid capture (§4.3) |
 | 2 | Rebound always separate and optionally linked? | Yes — separate event, optional `relatedEventId` (§4.3) |
-| 3 | Opponent-attributed events without an opponent roster? | Allow opponent participants in the schema now, but never require opponent roster setup; team-kind and `unknown` actors stay valid. Never fabricate opponent participants; participants carry `teamSide` (§4.1, §12b q3) |
+| 3 | Opponent-attributed events without an opponent roster? | Allow opponent participants in the schema now, but never require opponent roster setup; team-kind and `unknown` actors stay valid. Never fabricate opponent participants; participants carry `teamSide` (§4.1, §12b q5) |
 | 4 | Manual score adjustments vs event-derived scoring? | Always event-derived score plus signed structured adjustments; quick controls use an automatic reason, official corrections require a note, and legacy absolute-score freezing retires (§5, §6) |
 | 5 | Decrement: delete newest matching event or explicit correction? | Per-stat contract (§6.1): tombstone standalone facts, append negative minute adjustments, and confirm multi-event shot/foul consequences. No blanket rule |
 | 6 | Team pseudo-player stats and period-scoped ids? | Team-kind **actors**, not participant rows, projecting into `__team_home__` / `__team_opp__`; period-scoped ids derived from event `period.id`, emitting the id strings the UI reads today (§4.5, §5) |
 | 7 | Match clock and substitutions, or manual minutes? | Clock-ready catalog now, settings/rule profiles in BKE-5, clock in BKE-6; `min` produced by `basketball.minutes_adjustment` until then (§4.2, §9) |
-| 8 | Finalized `stat_corrections` vs event editing? | Reasoned reopen and republication; `stat_corrections` retires for event games and stays valid for legacy games. **Authority model decided at BKE-0 approval**; mechanics delivered in BKE-4C (§12 a1) |
-| 9 | Project to `shot_chart`/`game_stats`, or read events directly? | Disposable compatibility projections during transition (§7.1), with canonical publications as durable aggregate authority. **Authority decided at BKE-0 approval**; reader migration delivered in BKE-4E (§12a a2) |
+| 8 | Finalized `stat_corrections` vs event editing? | Reasoned reopen and republication; `stat_corrections` retires for event games and stays valid for legacy games. Approved in Batch F; mechanics delivered in BKE-4C (§12a a1) |
+| 9 | Project to `shot_chart`/`game_stats`, or read events directly? | Disposable compatibility projections during transition (§7.1), with canonical publications as durable aggregate authority. Approved in Batch F; reader migration delivered in BKE-4E (§12a a2) |
 | 10 | Which historical shots can be promoted to events? | None. No backfill (§7) |
 | 11 | How is the transition gated and rolled back? | Internal gate through BKE-4E, capability-backed opt-in at BKE-5, snapshotted at setup; existing records remain accessible (§10) |
 | — | Cloud RPC strategy | Generalize in place, Soccer functions become wrappers, split across BKE-4A-4E (§3.5, §9) |
@@ -979,101 +1106,125 @@ strategy, which an earlier revision mislabeled as settled.
 | — | Restore symmetry | Grouped delete implies grouped restore; tombstoned dependents are recoverable via their retained `relatedEventId` (§6.2) |
 | — | Multi-event edits | Atomic `applyGameEventMutations` added to the shared engine in BKE-1A; stale links cleared or tombstoned, never retained invalid (§6.2) |
 | — | Capture preferences | Resumable UI state; excluded from projection, fingerprint, and publication (§4.4) |
-| — | Shot number | Projected ordinal over **all** active shots including free throws and unlocated attempts, never envelope `sequence` (§5, §8, §12b q5) |
+| — | Shot number | Projected ordinal over active **field-goal attempts**, located or unlocated; free throws use trip/attempt labels; ordinals renumber after correction (§5, §8, §12b q12) |
+| — | Neutral event side | Widen the shared side union and SQL constraint to include `neutral`; only definitions such as official/media timeout may accept it, preserving Soccer behavior (§3.1, §4.5) |
+| — | Foul authority | Structured foul events and the match rule snapshot derive personal/team totals, bonus, and threshold disqualification; reasoned overrides cover exceptional rulings (§4.2) |
+| — | Ejections | Threshold disqualification remains derived; explicit `basketball.ejection` records an official player/staff removal and may link to its foul (§4.2) |
+| — | Timeouts | Charged team timeouts use a side and team actor; media/official timeouts are neutral and consume no team inventory. The profile owns classes, inventory, and carryover (§4.2) |
+| — | Possession module | Reserve event names now, but keep jump-ball/arrow/possession tracking optional and completeness-gate every dependent metric (§4.2, §12b q16) |
+| — | Optional event relationships | Preserve validated optional links for assist/rebound/block-to-shot, steal-to-turnover, and free-throw-trip-to-foul. Substitutions derive lineup windows instead of linking to a second record (§4.2, §4.3) |
+| — | Capture-unit undo | F12 removes/restores the newest immutable `captureCommandId` group in one tap; later independent events or links stay separate until BKE-3 Timeline editing (§6) |
+| — | Score authority | Made-shot points plus signed adjustments are the sole event-game score authority; no absolute freeze or checkpoint authority survives (§5, §6) |
+| — | Settings ownership | Versioned built-ins → personal defaults → team defaults → match overrides; the complete match snapshot is immutable, while display/capture preferences stay personal and non-authoritative (§3.6, §4.1) |
+| — | Rollout fallback | Explicit per-game opt-in after capability preflight; unsupported cloud creation leaves state untouched and offers only clearly labeled supported legacy-cloud/local-only choices (§10) |
+| — | Aggregate quality | Traditional totals, approved rates, participation, and history across all destinations; advanced metrics require complete coverage, and healthy-subset results must disclose partial quality, exclusions, and manager diagnostics (§3.6) |
+| — | Shot clock | Deliberately deferred to a separately planned add-on; BKE-6 supplies only the approved game clock. No shot-clock event names are reserved before that product Q&A (§12b q3, §14) |
 
 ---
 
 ## 12. Decisions Requested and Remaining Questions
 
-The two authority questions are **decided at BKE-0 approval**, not deferred to a later phase. They
-determine what the projector and cloud layer are allowed to treat as truth, which BKE-1B needs before
-it writes a line of projector code; only their *mechanics* belong to BKE-4C and BKE-4E.
+The two authority questions are approved through Batch F. They determine what the projector and
+cloud layer are allowed to treat as truth before BKE-1B writes projector code; only their
+*mechanics* belong to BKE-4C and BKE-4E.
 
-### 12a. Authority decisions requested at BKE-0 approval
+### 12a. Approved authority decisions
 
 **a1. Finalized corrections.** Soccer requires reasoned reopen plus republication for any change to a
-final game. *Proposed decision:* basketball event games adopt the same model and retire
+final game. **Approved:** basketball event games adopt the same model and retire
 `stat_corrections`; legacy aggregate games keep `stat_corrections` exactly as today. An overlay on top
 of event-derived totals would reintroduce a second authority — precisely what §7 forbids — and reopen
 reuses the RPCs BKE-4A already generalizes. **Delivered in BKE-4C.**
 
-**a2. Aggregate authority after cutover.** *Proposed decision:* canonical publications become the
+**a2. Aggregate authority after cutover.** **Approved:** canonical publications become the
 durable aggregate authority for event games, the way SOC-6C makes them for soccer; `game_stats` and
 `shot_chart` receive disposable compatibility rows only until each reader migrates (§7.1).
 **Delivered in BKE-4E**, whose scope is sized by this answer.
-
-If either proposed decision is rejected, §7 and §9 need revision before BKE-1B starts.
 
 ### 12b. Required Basketball product-model Q&A
 
 Soccer received a dedicated product-model pass before its event catalog was implemented.
 Basketball needs the same treatment. Today's stat grid remains the compatibility floor, but it must
 not silently define the ceiling for a redesigned system. Run these as organized batches of four,
-record the chosen option and rationale, and fold the answers back into §§4, 9, 11, and 13 before
+record the chosen option and rationale, and fold the answers back into §§4, 6, 9, 11, and 13 before
 BKE-0 is approved.
 
-**Batch A — competition format and setup**
+**Batch A — competition format and setup (approved)**
 
-1. Which rule profiles are first-class at release: youth, NFHS, NCAA, NBA, FIBA, and Custom?
-2. How are regulation periods, dynamic overtime periods, labels, durations, foul resets, and timeout
-   resets represented?
-3. Which clock behaviors belong in BKE-6: count down, stoppages, tenths, shot clock, and
-   period/game-local display?
-4. How much setup is acceptable when saved defaults already resolve every required field?
+1. **Profiles:** Youth, NFHS, NCAA, NBA, FIBA, and Custom ship as versioned, editable starting
+   bundles.
+2. **Periods:** Regulation and overtime are explicit stable segments with profile-owned reset rules;
+   overtime segments are added dynamically.
+3. **Clock scope:** BKE-6 ships an anchored game clock with configurable count-up/countdown display,
+   start/pause/adjust, stoppages, and optional tenths. Shot clock is a later add-on.
+4. **Setup friction:** Use the defaults-first fast path; show only missing required choices while
+   preserving full editing and a complete immutable start snapshot.
 
-**Batch B — participants, opponents, and staff**
+**Batch B — participants, opponents, and staff (approved)**
 
-5. Is opponent tracking team-only by default with an optional full opponent participant roster?
-6. Which lineup facts are required: starters, bench, on-court five, positions/roles, captain, and
-   temporary role changes?
-7. How do late participants, jersey changes, unresolved cloud players, duplicate numbers, and player
-   merges retain stable match identity?
-8. Are coaches/staff snapshotted in setup, or represented as durable labeled actors only when they
-   receive a technical, ejection, or other administrative event?
+5. **Opponent tracking:** Team-only by default, with optional complete/partial opponent rosters and
+   late additions.
+6. **Lineups:** Record starter/bench/DNP; anchored-clock games track the on-court five and
+   substitutions. Positions and captain remain optional metadata.
+7. **Identity:** Stable `participantId` survives late additions, corrections, cloud resolution, and
+   merges. Duplicate numbers warn but are allowed.
+8. **Staff:** No mandatory staff setup; incidents use durable labeled staff actors, with reusable
+   staff rosters deferred.
 
-**Batch C — scoring, shooting, and free throws**
+**Batch C — scoring, shooting, and free throws (approved)**
 
-9. Which traditional and advanced Basketball stats are first-release requirements, and which are
-   derived only when possession/lineup data is complete?
-10. Which shot zones and coordinate rules are authoritative, and do quick/unlocated attempts remain
-    valid everywhere?
-11. Do free throws carry a `tripId`, sequence position, awarded count, one-and-one state, source foul,
-    technical context, and retained-possession result?
-12. Does the displayed shot ordinal include all attempts and renumber after correction, as §5
-    recommends?
+9. **Statistics:** Ship the complete traditional box score plus denominator-safe shooting, eFG%,
+   TS%, assist-to-turnover, and rate derivations. Possession/lineup/plus-minus/usage metrics require
+   complete supporting events and remain additive.
+10. **Shot geometry:** Normalized coordinates and snapshotted court geometry derive zone; quick and
+    unlocated attempts remain valid, and an explicit 2PT/3PT override records its source.
+11. **Free throws:** Keep each attempt as a shot event and use an optional trip context for sequence,
+    maximum awards, one-and-one, source foul, technical, and retained-possession state. Direct-grid
+    attempts may remain ungrouped.
+12. **Numbering:** Number all field-goal attempts, located or unlocated, and renumber after
+    correction. Free throws use trip/attempt labels; event ids remain stable.
 
-**Batch D — fouls, possession, and administration**
+**Batch D — fouls, possession, and administration (approved)**
 
-13. What foul taxonomy is needed, and exactly which player/staff/team fouls count toward personal,
-    team, bonus, and disqualification totals under each profile?
-14. How are technicals, flagrant/intentional fouls, double fouls, ejections, and player
-    disqualification represented?
-15. Which timeout classes and inventories are needed, including full, short/30-second, media,
-    official, and profile-specific carryover?
-16. Are jump balls, alternating-possession arrow, held balls, possessions, and possession outcomes
-    first-release events, optional modules, or explicit future work?
+13. **Foul authority:** Capture structured foul class/context and let the snapshotted profile derive
+    player/team totals, bonus, and threshold disqualification. Team-kind fouls remain available for
+    unattributed calls; exceptional counting uses a reasoned official override.
+14. **Discipline:** Technical, flagrant/intentional, double, and multi-party calls remain
+    incident-linked foul events. Threshold disqualification is derived; an explicit ejection event
+    records an official player/staff removal.
+15. **Timeouts:** The rule profile owns timeout classes, inventories, and carryover. Charged team
+    timeouts use that side and team actor; media/official timeouts are neutral and do not consume team
+    inventory.
+16. **Possession:** Reserve jump-ball, held-ball, possession-arrow, and possession-state event
+    families as an optional future module. Core tracking and release do not require them; dependent
+    metrics require complete module coverage.
 
-**Batch E — capture, relationships, and corrections**
+**Batch E — capture, relationships, and corrections (approved)**
 
-17. Confirm separate linked/unlinked assist events so both F7 and direct stat-grid capture remain
-    valid.
-18. Which relationships must be durable beyond assist/rebound: block-to-shot, steal-to-turnover,
-    foul-to-free-throw trip, and substitution-to-lineup window?
-19. Confirm F12 stays newest-capture-unit-first until BKE-3 provides arbitrary Timeline edits:
-    multi-event court commands share an immutable `captureCommandId` and undo/restore in one tap,
-    while independently recorded or later-linked events remain separate units.
-20. Confirm event-game score always remains made-shot points plus adjustments and intentionally
-    retires the legacy absolute-score freeze after a scoreboard tap.
+17. **Assists:** Keep a separate `basketball.assist` event with an optional made-shot link. F7 court
+    capture and direct stat-grid assists remain equally valid.
+18. **Relationships:** Preserve optional validated block-to-shot, steal-to-turnover, and
+    free-throw-trip-to-foul links in addition to assist/rebound. Substitution events directly derive
+    lineup windows instead of linking to redundant records. Totals never require a relationship.
+19. **F12:** Undo/restore the newest immutable `captureCommandId` group in one tap. Independent or
+    later-linked events remain separate capture units; arbitrary correction belongs to BKE-3.
+20. **Score:** Event-game score is made-shot points plus signed adjustments. Quick controls use an
+    automatic reason, official corrections require a note, and the legacy absolute-score freeze
+    retires.
 
-**Batch F — authority, settings, aggregates, and rollout**
+**Batch F — authority, settings, aggregates, and rollout (approved)**
 
-21. Confirm §12a's canonical publication and reasoned reopen authority.
-22. Which Basketball options are built-in, personal, team, match-specific, display-only, or capture
-    preferences in the BKE-5 hierarchy?
-23. Should BKE-5 event-backed creation be an explicit per-game opt-in during rollout, and when may an
-    unavailable backend offer legacy or local-only fallback?
-24. Which season/team/player/career/tournament categories and rates must BKE-4E expose, and how are
-    partial-quality canonical aggregates labeled?
+21. **Authority:** Canonical publications are event-game aggregate authority. Final corrections use
+    reasoned reopen and republication; `stat_corrections` remains legacy-only.
+22. **Settings:** Resolve versioned built-ins → personal defaults → team defaults → explicit match
+    overrides into a complete immutable snapshot. Display and capture preferences remain personal
+    and non-authoritative.
+23. **Rollout:** Require explicit per-game opt-in and backend capability preflight. Never silently
+    downgrade; leave existing state untouched and clearly offer supported legacy-cloud or local-only
+    paths with their consequences.
+24. **Aggregates:** Expose traditional totals, approved rates, participation, and history across
+    team/player/season/career/tournament destinations. Advanced metrics require complete coverage;
+    healthy-subset results disclose partial quality, excluded counts, and manager diagnostics.
 
 The Q&A may add catalog fields or phases. It may not weaken the settled architecture invariants:
 stable event ids, one authority per game, no fabricated historical backfill, isolated recorder
@@ -1098,20 +1249,26 @@ Every regression requirement in roadmap §9 maps to the phase that must cover it
 | Local parking, import/export, quota, and cross-sport resume | BKE-1B/1C |
 | Manual minutes increment, decrement, and edit, including signed/edited histories and the non-negative guard (§4.2) | BKE-2 |
 | Actor/side validation against participant roster, opponent attribution, and staff labels (§4.5) | BKE-1B |
+| Generic neutral-side validation with unchanged Soccer definitions; cloud row constraint parity | BKE-1A, BKE-4A |
 | Per-stat decrement contract, including standalone `ast` removal and confirmed multi-event removals (§6.1) | BKE-2, completed in BKE-3 |
 | Multi-event mutation atomicity, including all-or-nothing failure (§6.2) | BKE-1A |
 | Stale-link resolution across edits (§6.2) | BKE-3 |
+| Optional assist/rebound/block/steal/free-throw-trip relationships and derived substitution intervals | BKE-1C, BKE-2, BKE-6 |
+| Foul/trip removal unlinks surviving dependents atomically; free-throw attempt positions remain stable and empty trips stay reviewable (§6.2) | BKE-2, BKE-3 |
 | Soccer RPC parity against the generalized layer — no observable change | BKE-4A |
 | Offline tracking and retry | BKE-4B |
 | Independent recorder checkout and primary resolution | BKE-4C |
-| Finalized games and stat corrections | BKE-4C (implements §12a a1) |
+| Finalized games, reasoned reopen/republication, and legacy-only stat corrections | BKE-4C (implements §12a a1) |
 | Local/primary/alternate/canonical Summary authority, read-only remote review, and fail-closed diagnostics | BKE-4D |
 | Existing-record access independent of rollout and device preference | BKE-4D/4E/5 |
 | Legacy aggregate-only and shot-chart games, including their unchanged retroactive bonus behavior (§4.1) | Every phase |
-| Season, career, tournament, team, and player canonical aggregates | BKE-4E (implements §12a a2) |
-| Backend capability version, legacy/local fallback, and stale-client handling | BKE-4E |
-| Built-in/personal/team/match settings resolution, immutable setup snapshots, rollout, and rollback | BKE-5 |
-| Anchored clock, substitutions, disqualification, and on-court intervals | BKE-6 |
+| Season, career, tournament, team, and player canonical aggregates; complete/partial quality labeling and diagnostics | BKE-4E (implements §12a a2) |
+| Backend capability version, explicit legacy/local fallback, no silent downgrade, and stale-client handling | BKE-4E, BKE-5 |
+| Built-in/personal/team/match settings resolution, non-authoritative personal preferences, immutable setup snapshots, per-game opt-in, and rollback | BKE-5 |
+| Structured fouls, team totals, bonus, threshold disqualification, incident grouping, and explicit ejections | BKE-2 |
+| Charged timeout classes, neutral official/media timeouts, profile inventory, and carryover | BKE-2 |
+| Optional possession families remain absent from core streams and dependent metrics remain unavailable without complete coverage | BKE-1B, BKE-4E |
+| Anchored clock, substitutions, and on-court intervals | BKE-6 |
 | Mobile court, Timeline, popup, stat-grid, Summary, and settings ergonomics | BKE-1C, BKE-3, BKE-4D, BKE-5 |
 
 Each phase adds its own numbered section to `docs/REGRESSION_TESTING.md`, following the SOC-1..SOC-6B
@@ -1132,6 +1289,8 @@ pattern in §11a-11r.
 - Changing how legacy aggregate games resolve their rules — the immutable snapshot in §4.1 applies to
   new event games only.
 - Exposing an incomplete event game to users to hit an earlier rollout date (§10).
+- Implementing a shot clock inside BKE-1 through BKE-6; it requires a separately approved add-on
+  with its own event and rules Q&A.
 
 ---
 
@@ -1139,8 +1298,7 @@ pattern in §11a-11r.
 
 Before BKE-1A begins:
 
-- complete the §12 product-model Q&A and fold every approved answer into this document;
-- mark the §12a authority decisions approved or revise §§7 and 9;
+- obtain final BKE-0 approval for this completed product model and authority contract;
 - add the BKE-1 parent and BKE-1A plan with their focused implementation Q&A;
 - update the roadmap phase table if boundaries move;
 - keep `README.md`, `AGENTS.md`, `docs/AGENT_CODEBASE_OVERVIEW.md`, and
