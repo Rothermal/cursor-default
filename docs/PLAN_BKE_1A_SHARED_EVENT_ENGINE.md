@@ -32,7 +32,8 @@ BKE-1A exits when:
 - Rename the Soccer-specific normalizer and keep Soccer creation/validation in `src/lib/soccer/`.
 - Move app-wide imports in core types, persistence, reducer, context, and fingerprint code to the
   neutral module.
-- Make aggregate sync eligibility capability-shaped: no event stream and no sport-owned state.
+- Replace the Soccer exclusion in aggregate sync eligibility with an explicit, fail-closed legacy
+  aggregate capability while still requiring no event stream and no sport-owned state.
 - Widen `GameEventTeamSide` to `tracked | opponent | neutral`.
 - Add definition-scoped allowed-side validation with a compatibility default of
   `tracked | opponent`.
@@ -59,6 +60,7 @@ Create a neutral module with this ownership:
 src/lib/sportGameState/
   types.ts   # SportGameState discriminated union
   state.ts   # normalizeSportGameState dispatch + fingerprint projection
+  capabilities.ts # explicit legacy aggregate cloud-sync support
 ```
 
 The initial union contains only `SoccerSportGameState`. BKE-1B adds
@@ -70,7 +72,8 @@ normalization. The neutral dispatcher:
 
 1. checks that the value is an object with a string `sportId`;
 2. dispatches `soccer` to the Soccer normalizer;
-3. returns `null` for unknown sports in BKE-1A; and
+3. returns `null` for unknown sports in BKE-1A without treating that result as permission to use
+   legacy aggregate sync; and
 4. never guesses a sport from the active `GameState.sport` value.
 
 Core consumers move from `lib/soccer/state` to `lib/sportGameState/state`:
@@ -87,14 +90,23 @@ concrete `SoccerSportGameState` result.
 The fingerprint remains setup-only and excludes rebuildable projection and personal capture
 preferences. Existing Soccer fingerprints must not change.
 
-`isAggregateCloudSyncEligible` becomes true only when:
+`null` is not proof that a sport has no event model. It can also mean a malformed or unsupported
+sport-owned snapshot failed normalization. Aggregate sync therefore becomes true only when:
 
 ```text
-eventStream === null && sportGameState === null
+sportSupportsLegacyAggregateCloudSync(sport.id)
+  && eventStream === null
+  && sportGameState === null
 ```
 
-The current `sport.id !== 'soccer'` special case becomes unnecessary. Soccer event sync eligibility
-stays Soccer-specific until the generalized cloud program in BKE-4.
+The capability is explicit and fail-closed. In BKE-1A it preserves the existing generic aggregate
+path for the configured Basketball, Baseball, Football, and Hockey sports. Soccer and unknown sport
+ids return false even when both state fields are `null`. This protects corrupted or unsupported
+Soccer setup snapshots from falling through to `syncGameSnapshotToCloud`, while preventing a future
+sport from inheriting a cloud authority model merely because its normalizer is not installed.
+
+This replaces the hard-coded Soccer exclusion rather than deleting its safety property. Soccer
+event sync eligibility stays Soccer-specific until the generalized cloud program in BKE-4.
 
 ## 4. Definition-Scoped Neutral Sides
 
@@ -171,6 +183,7 @@ Expected files:
 ```text
 src/lib/sportGameState/types.ts                 new
 src/lib/sportGameState/state.ts                 new
+src/lib/sportGameState/capabilities.ts          new, fail-closed cloud authority capability
 src/lib/soccer/types.ts                         remove neutral alias ownership
 src/lib/soccer/state.ts                         Soccer-specific normalizer
 src/types.ts                                    neutral type import
@@ -197,8 +210,13 @@ Focused tests must prove:
 
 - missing, valid Soccer v1/v2, malformed, and unknown sport states normalize as before;
 - parked/imported Soccer state and sync fingerprints remain stable;
-- aggregate Basketball remains aggregate-cloud eligible;
+- configured legacy Basketball, Baseball, Football, and Hockey games remain aggregate-cloud
+  eligible when both authority fields are `null`;
+- Soccer remains ineligible for aggregate sync when its event stream and sport state are both
+  `null`, including after malformed setup normalization;
 - Soccer event games remain ineligible for aggregate sync and eligible for Soccer event sync;
+- a sport id unknown to the capability registry remains ineligible for aggregate sync even when
+  both authority fields are `null`;
 - the generic envelope accepts neutral;
 - a default existing definition rejects neutral;
 - an opted-in fixture definition accepts neutral;

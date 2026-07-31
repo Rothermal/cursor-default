@@ -93,7 +93,7 @@ These are the only blockers to basketball populating `GameState.sportGameState`:
 | `sportGameStateForFingerprint` lives in the soccer module | `src/lib/soccer/state.ts:101-108`, imported at `src/lib/gameSyncFingerprint.ts:3` | Moves to the sport-neutral home |
 | Core domain types import from the soccer module | `src/types.ts:6` | Import from the sport-neutral home |
 | Registry/projector singletons are composed from soccer only | `src/lib/gameEvents/runtime.ts:6-7` | Compose soccer + basketball definitions and projectors |
-| Aggregate sync eligibility hardcodes the sport id | `src/lib/gameSyncFingerprint.ts:32-38` | Becomes capability-based: a game is aggregate-eligible when it has no event stream and no sport-owned setup, regardless of sport |
+| Aggregate sync eligibility hardcodes the sport id | `src/lib/gameSyncFingerprint.ts:32-38` | Becomes capability-based and fail-closed: only a sport explicitly supporting legacy aggregate sync is eligible, and only when it has no event stream and no sport-owned setup. Soccer and unknown sports remain ineligible even when both fields are `null` |
 | Sport workspace availability is a soccer special case | `src/lib/sportAvailability.ts` | Extend when basketball event games become opt-in |
 
 **Recommended first move in BKE-1A:** extract `src/lib/sportGameState/` (union type, dispatching

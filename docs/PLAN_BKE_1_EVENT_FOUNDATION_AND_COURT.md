@@ -51,6 +51,8 @@ Detailed plans:
 - Basketball owns its participants, rules, payload validation, relationships, and projection.
 - `elapsedMs` remains `null` through BKE-5. BKE-6 owns the Basketball clock and lineups.
 - BKE-1 adds no Supabase migration and does not wire Basketball events into automatic cloud sync.
+- Cloud authority fails closed: a missing or invalid sport-owned snapshot never grants aggregate
+  sync unless the sport explicitly supports the legacy aggregate path.
 - Projection diagnostics fail closed. Incomplete streams cannot present authoritative totals or
   pass release gates.
 
