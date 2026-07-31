@@ -162,30 +162,40 @@ export type UnmappedPlayerResolution =
  * Resolve strategy when `playerIdMap` has no entry for a local player.
  *
  * Name-only team matching collapsed siblings / same-named teammates (e.g. two
- * "Alex Kim" jerseys) onto one cloud `players` row and overwrote the survivor's
- * jersey. Matching on name+jersey alone fixes that but splits the far more common
- * case of a number changing or being entered for the first time, silently creating
- * a duplicate person. The rules below distinguish the two:
+ * "Alex Kim" rows) onto one cloud `players` row and overwrote the survivor's
+ * jersey. Two things prevent that here:
  *
- * - an exact name+jersey teammate is the same person — reuse it;
- * - a lone same-name teammate with no jersey is the same person who just got a
- *   number — reuse it and adopt the jersey;
- * - a same-name teammate whose jersey is set and different is a different person —
- *   create a distinct player;
- * - with no local jersey we cannot tell numbered teammates apart, so reuse the
- *   existing row deterministically rather than proliferating rows.
+ * 1. `claimedPlayerIds` — cloud rows another local player already resolved to in
+ *    this sync are never offered again, so two same-named locals cannot merge even
+ *    when neither carries a number.
+ * 2. Jersey comparison against the remaining candidates:
+ *    - an exact name+jersey teammate is the same person — reuse it;
+ *    - a lone same-name teammate with no jersey is the same person who just got a
+ *      number — reuse it and adopt the jersey.
+ *
+ * What this deliberately does **not** do is resolve a changed number. Local
+ * "John Smith #23" against cloud "John Smith #12" is indistinguishable from two
+ * same-named teammates, so it creates a distinct player rather than guessing.
+ * That case is normally covered by the durable `playerIdMap`, which short-circuits
+ * before any of this runs; it only surfaces for a player who has never synced. A
+ * split identity is recoverable through player merge, whereas a wrong merge is not.
  */
 export function resolveUnmappedPlayer(args: {
   candidates: TeamPlayerCandidate[]
   jerseyNumber: string
+  claimedPlayerIds?: ReadonlySet<string>
 }): UnmappedPlayerResolution {
   const jersey = args.jerseyNumber.trim()
+  const claimed = args.claimedPlayerIds ?? new Set<string>()
   // Stable ordering keeps resolution deterministic across syncs.
-  const candidates = [...args.candidates].sort((left, right) =>
-    left.playerId.localeCompare(right.playerId)
-  )
+  const candidates = [...args.candidates]
+    .filter(candidate => !claimed.has(candidate.playerId))
+    .sort((left, right) => left.playerId.localeCompare(right.playerId))
 
   if (candidates.length === 0) {
+    // Every same-name teammate is already spoken for by another local player, so
+    // this must be a different person even without a number to prove it.
+    if (args.candidates.length > 0) return { mode: 'create_distinct' }
     return jersey ? { mode: 'create_distinct' } : { mode: 'reuse_or_create_owned' }
   }
 

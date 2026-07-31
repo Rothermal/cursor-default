@@ -153,7 +153,7 @@ describe('resolveUnmappedPlayer', () => {
     })).toEqual({ mode: 'create_distinct' })
   })
 
-  it('reuses deterministically when the local player has no jersey', () => {
+  it('reuses deterministically when a lone unnumbered local player has no rival claim', () => {
     expect(resolveUnmappedPlayer({
       candidates: [
         { playerId: 'b', jerseyNumber: '12' },
@@ -168,6 +168,41 @@ describe('resolveUnmappedPlayer', () => {
       .toEqual({ mode: 'reuse_or_create_owned' })
     expect(resolveUnmappedPlayer({ candidates: [], jerseyNumber: '23' }))
       .toEqual({ mode: 'create_distinct' })
+  })
+
+  it('never offers a cloud row another local player already claimed', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: '7' },
+        { playerId: 'b', jerseyNumber: '12' },
+      ],
+      jerseyNumber: '7',
+      claimedPlayerIds: new Set(['a']),
+    })).toEqual({ mode: 'create_distinct' })
+  })
+
+  it('keeps two unnumbered same-name locals apart across a first sync', () => {
+    // Both local "Alex Kim"s are unmapped and unnumbered. Reusing by name alone would
+    // collapse them onto one cloud row and lose the second player's stats.
+    const candidates = [{ playerId: 'cloud-alex', jerseyNumber: null }]
+    const claimedPlayerIds = new Set<string>()
+
+    const first = resolveUnmappedPlayer({ candidates, jerseyNumber: '', claimedPlayerIds })
+    expect(first).toEqual({ mode: 'reuse_team_match', playerId: 'cloud-alex', adoptJersey: false })
+    claimedPlayerIds.add('cloud-alex')
+
+    expect(resolveUnmappedPlayer({ candidates, jerseyNumber: '', claimedPlayerIds }))
+      .toEqual({ mode: 'create_distinct' })
+  })
+
+  it('splits rather than guesses when a never-synced player has a new number', () => {
+    // Documented trade-off: local "#23" against cloud "#12" is indistinguishable from a
+    // same-named teammate. The durable playerIdMap covers this for any player that has
+    // synced before; a split identity is recoverable via merge, a wrong merge is not.
+    expect(resolveUnmappedPlayer({
+      candidates: [{ playerId: 'cloud-john', jerseyNumber: '12' }],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'create_distinct' })
   })
 })
 

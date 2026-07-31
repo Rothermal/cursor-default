@@ -495,7 +495,9 @@ async function ensurePlayerId(
   player: Player,
   teamId: string,
   userId: string,
-  existingRemoteId: string | undefined
+  existingRemoteId: string | undefined,
+  /** Cloud players another local player already resolved to in this sync. */
+  claimedPlayerIds: ReadonlySet<string> = new Set<string>()
 ): Promise<string> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
@@ -526,17 +528,21 @@ async function ensurePlayerId(
     .eq('players.first_name', firstName)
     .eq('players.last_name', lastName)
 
-  const candidates: TeamPlayerCandidate[] = junctionLookupError
-    ? []
-    : ((existingOnTeam ?? []) as Array<{ player_id: string; jersey_number: string | null }>).map(
-        row => ({ playerId: row.player_id, jerseyNumber: row.jersey_number })
-      )
-  const resolution = resolveUnmappedPlayer({ candidates, jerseyNumber })
+  // Never resolve identity from a failed lookup: an empty candidate list would look
+  // like "no such teammate" and create a duplicate person from missing information.
+  if (junctionLookupError) {
+    throw new Error(`Team roster lookup failed: ${junctionLookupError.message}`)
+  }
+
+  const candidates: TeamPlayerCandidate[] = (
+    (existingOnTeam ?? []) as Array<{ player_id: string; jersey_number: string | null }>
+  ).map(row => ({ playerId: row.player_id, jerseyNumber: row.jersey_number }))
+  const resolution = resolveUnmappedPlayer({ candidates, jerseyNumber, claimedPlayerIds })
 
   if (resolution.mode === 'reuse_team_match') {
     // Only adopt a jersey onto a teammate that had none. Never rewrite or clear an
     // existing cloud jersey from a local roster that disagrees.
-    await supabase
+    const { error: reuseError } = await supabase
       .from('team_players')
       .update(
         resolution.adoptJersey
@@ -545,6 +551,10 @@ async function ensurePlayerId(
       )
       .eq('team_id', teamId)
       .eq('player_id', resolution.playerId)
+
+    if (reuseError) {
+      throw new Error(`Team roster link failed: ${reuseError.message}`)
+    }
     return resolution.playerId
   }
 
@@ -594,7 +604,7 @@ async function ensurePlayerId(
   // New/owned rows own their jersey outright, so an empty local number normalizes to
   // null here. The reuse path above deliberately differs: it never touches a jersey
   // it did not create.
-  await supabase
+  const { error: rosterLinkError } = await supabase
     .from('team_players')
     .upsert(
       {
@@ -605,6 +615,12 @@ async function ensurePlayerId(
       },
       { onConflict: 'team_id,player_id' }
     )
+
+  // A player id whose roster link failed would sync stats against a team the player
+  // is not on, so fail here rather than returning a half-linked identity.
+  if (rosterLinkError) {
+    throw new Error(`Team roster link failed: ${rosterLinkError.message}`)
+  }
 
   return playerId
 }
@@ -804,14 +820,20 @@ export async function syncGameSnapshotToCloud({
   // This shrinks the orphan window: failures in player/team-player setup no longer
   // leave an in-progress cloud game without stats.
   const nextPlayerIdMap: Record<string, string> = {}
+  // Cloud rows already spoken for. Seeded from the durable map so an unmapped local
+  // player cannot claim a mapped teammate's row regardless of roster order, then grown
+  // as the loop resolves, so two same-named locals never collapse onto one cloud player.
+  const claimedPlayerIds = new Set<string>(Object.values(state.cloudSync.playerIdMap))
   for (const player of state.players) {
     const remotePlayerId = await ensurePlayerId(
       player,
       teamId,
       userId,
-      state.cloudSync.playerIdMap[player.id]
+      state.cloudSync.playerIdMap[player.id],
+      claimedPlayerIds
     )
     nextPlayerIdMap[player.id] = remotePlayerId
+    claimedPlayerIds.add(remotePlayerId)
   }
 
   const ensuredGame = await ensureGame(state, userId, teamId, seasonId)

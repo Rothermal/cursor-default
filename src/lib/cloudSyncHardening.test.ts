@@ -9,6 +9,10 @@ const mock = vi.hoisted(() => ({
   linkUpdateError: null as string | null,
   gameDeleteError: null as string | null,
   existingGameStatus: 'in_progress' as string,
+  teamPlayerCandidates: [] as Array<{ player_id: string; jersey_number: string | null }>,
+  teamPlayersLookupError: null as string | null,
+  teamPlayersUpdateError: null as string | null,
+  teamPlayersUpsertError: null as string | null,
 }))
 
 vi.mock('./supabase', () => ({
@@ -20,11 +24,20 @@ vi.mock('./supabase', () => ({
         return {
           select: () => {
             mock.ops.push('team_players.select')
-            // Support name-only (3 eq) and name+jersey (4 eq) lookups before limit().
-            const terminal = {
-              limit: () => Promise.resolve({ data: [], error: null }),
-              eq: () => terminal,
+            const result = {
+              data: mock.teamPlayerCandidates,
+              error: mock.teamPlayersLookupError
+                ? { message: mock.teamPlayersLookupError }
+                : null,
             }
+            // Support lookups that terminate on limit() and ones that await the builder
+            // directly, at any eq() depth.
+            const terminal: Record<string, unknown> = {
+              limit: () => Promise.resolve(result),
+              then: (onOk: (v: typeof result) => unknown, onErr: (e: unknown) => unknown) =>
+                Promise.resolve(result).then(onOk, onErr),
+            }
+            terminal.eq = () => terminal
             return {
               eq: () => ({
                 eq: () => ({
@@ -35,13 +48,22 @@ vi.mock('./supabase', () => ({
           },
           upsert: () => {
             mock.ops.push('team_players.upsert')
-            return Promise.resolve({ error: null })
+            return Promise.resolve({
+              error: mock.teamPlayersUpsertError
+                ? { message: mock.teamPlayersUpsertError }
+                : null,
+            })
           },
           update: () => {
             mock.ops.push('team_players.update')
             return {
               eq: () => ({
-                eq: () => Promise.resolve({ error: null }),
+                eq: () =>
+                  Promise.resolve({
+                    error: mock.teamPlayersUpdateError
+                      ? { message: mock.teamPlayersUpdateError }
+                      : null,
+                  }),
               }),
             }
           },
@@ -230,6 +252,47 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.linkUpdateError = null
     mock.gameDeleteError = null
     mock.existingGameStatus = 'in_progress'
+    mock.teamPlayerCandidates = []
+    mock.teamPlayersLookupError = null
+    mock.teamPlayersUpdateError = null
+    mock.teamPlayersUpsertError = null
+  })
+
+  it('fails closed when the same-name teammate lookup errors', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersLookupError = 'roster read denied'
+
+    // An errored lookup looks identical to "no such teammate", so resolving identity from
+    // it would silently create a duplicate person out of missing information.
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster lookup failed'
+    )
+    expect(mock.ops).not.toContain('games.insert')
+  })
+
+  it('fails when linking a reused teammate to the roster errors', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayerCandidates = [{ player_id: 'cloud-1', jersey_number: '1' }]
+    mock.teamPlayersUpdateError = 'roster link denied'
+
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster link failed'
+    )
+    // Proves the failure came from the reuse path, not the create path.
+    expect(mock.ops).toContain('team_players.update')
+    expect(mock.ops).not.toContain('team_players.upsert')
+  })
+
+  it('fails when linking a newly created player to the roster errors', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersUpsertError = 'roster link denied'
+
+    // A player id whose roster link failed would sync stats against a team the player is
+    // not on, so a half-linked identity must not be returned.
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster link failed'
+    )
+    expect(mock.ops).toContain('team_players.upsert')
   })
 
   it('rejects setup-only sport state before aggregate cloud writes', async () => {
