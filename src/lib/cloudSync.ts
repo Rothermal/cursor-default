@@ -654,6 +654,43 @@ async function ensurePlayerId(
   return playerId
 }
 
+/**
+ * Neutralise stat rows a relinked player left on the cloud player it used to share.
+ *
+ * Only rows this recorder owns are touched — the upsert conflict target includes
+ * `recorded_by`, and RLS scopes writes to the caller — so a co-recorder's rows for the
+ * same player are never zeroed.
+ */
+async function clearStatsFromRelinkedPlayer(
+  userId: string,
+  gameId: string,
+  staleStatIdsBySharedPlayerId: Map<string, Set<string>>
+): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  const zeroRows = [...staleStatIdsBySharedPlayerId].flatMap(([playerId, statIds]) =>
+    [...statIds].map(statId => ({
+      game_id: gameId,
+      player_id: playerId,
+      recorded_by: userId,
+      stat_id: statId,
+      value: 0,
+    }))
+  )
+
+  if (zeroRows.length === 0) return
+
+  const { error } = await supabase
+    .from('game_stats')
+    .upsert(zeroRows, { onConflict: 'game_id,player_id,recorded_by,stat_id' })
+
+  if (error) {
+    throw new Error(`Stats relink cleanup failed: ${error.message}`)
+  }
+}
+
 async function upsertGameStats(
   state: GameState,
   userId: string,
@@ -855,12 +892,31 @@ export async function syncGameSnapshotToCloud({
   // it and a distinct cloud player is created instead.
   const playerIdMap = { ...state.cloudSync.playerIdMap }
   const repairedPlayerLinks: string[] = []
+  // Stat rows the moved players already wrote under the shared cloud id. Relinking alone
+  // leaves them behind, because `upsertGameStats` only writes the keys each player
+  // currently has and never clears one written under a different mapping.
+  const staleStatIdsBySharedPlayerId = new Map<string, Set<string>>()
   for (const duplicate of duplicateMappings) {
-    for (const localPlayerId of duplicate.localPlayerIds.slice(1)) {
+    const [keeperLocalId, ...movedLocalIds] = duplicate.localPlayerIds
+    const statsFor = (localId: string) =>
+      Object.keys(state.players.find(player => player.id === localId)?.stats ?? {})
+    const keeperStatIds = new Set(statsFor(keeperLocalId))
+    const staleStatIds = staleStatIdsBySharedPlayerId.get(duplicate.remotePlayerId) ?? new Set()
+
+    for (const localPlayerId of movedLocalIds) {
       delete playerIdMap[localPlayerId]
       repairedPlayerLinks.push(
         state.players.find(player => player.id === localPlayerId)?.name ?? localPlayerId
       )
+      // Keys the keeper still owns are overwritten with its own values by the normal
+      // snapshot upsert, so only the moved player's exclusive keys need clearing.
+      for (const statId of statsFor(localPlayerId)) {
+        if (!keeperStatIds.has(statId)) staleStatIds.add(statId)
+      }
+    }
+
+    if (staleStatIds.size > 0) {
+      staleStatIdsBySharedPlayerId.set(duplicate.remotePlayerId, staleStatIds)
     }
   }
   if (repairedPlayerLinks.length > 0) {
@@ -907,6 +963,14 @@ export async function syncGameSnapshotToCloud({
       nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
       nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
     )
+
+    // Zero out what the moved players left on the shared cloud player before writing the
+    // snapshot, so the keeper's totals stop counting someone else's stats. Skipped for a
+    // game this sync just created, which cannot have prior rows. There is no `game_stats`
+    // DELETE policy, so a zero value is the available way to neutralise a row.
+    if (!ensuredGame.created && staleStatIdsBySharedPlayerId.size > 0) {
+      await clearStatsFromRelinkedPlayer(userId, gameId, staleStatIdsBySharedPlayerId)
+    }
 
     await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
 

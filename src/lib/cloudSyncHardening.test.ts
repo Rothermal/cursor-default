@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({
   teamPlayersLookupError: null as string | null,
   teamPlayersUpdateError: null as string | null,
   teamPlayersUpsertError: null as string | null,
+  statUpserts: [] as Array<Array<{ player_id: string; stat_id: string; value: number }>>,
 }))
 
 vi.mock('./supabase', () => ({
@@ -156,8 +157,11 @@ vi.mock('./supabase', () => ({
 
       if (table === 'game_stats') {
         return {
-          upsert: () => {
+          upsert: (rows: unknown) => {
             mock.ops.push('game_stats.upsert')
+            mock.statUpserts.push(
+              rows as Array<{ player_id: string; stat_id: string; value: number }>
+            )
             return Promise.resolve({
               error: mock.gameStatsError ? { message: mock.gameStatsError } : null,
             })
@@ -264,6 +268,7 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.teamPlayersLookupError = null
     mock.teamPlayersUpdateError = null
     mock.teamPlayersUpsertError = null
+    mock.statUpserts.length = 0
   })
 
   it('fails closed when the same-name teammate lookup errors', async () => {
@@ -359,6 +364,71 @@ describe('syncGameSnapshotToCloud hardening', () => {
     // First local keeps the row; the second is re-resolved onto a different player.
     expect(result.playerIdMap['local-1']).toBe(shared)
     expect(result.playerIdMap['local-2']).not.toBe(shared)
+  })
+
+  it('clears the moved player stats left on the shared cloud player', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+
+    // Disjoint stats: an earlier sync wrote both pts and reb under `shared`. Relinking
+    // alone would leave reb there, so the keeper keeps counting the other player's board.
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    const moved = result.playerIdMap['local-2']
+    expect(moved).not.toBe(shared)
+
+    const [cleanup, snapshot] = mock.statUpserts
+    // Only the moved player's exclusive key is zeroed; pts still belongs to the keeper.
+    expect(cleanup).toEqual([
+      { game_id: 'game-1', player_id: shared, recorded_by: 'user-1', stat_id: 'reb', value: 0 },
+    ])
+    // Cleanup lands before the snapshot, so the keeper's real values win any overlap.
+    expect(snapshot).toContainEqual(
+      expect.objectContaining({ player_id: shared, stat_id: 'pts', value: 2 })
+    )
+    expect(snapshot).toContainEqual(
+      expect.objectContaining({ player_id: moved, stat_id: 'reb', value: 1 })
+    )
+    expect(snapshot).not.toContainEqual(
+      expect.objectContaining({ player_id: shared, stat_id: 'reb' })
+    )
+  })
+
+  it('does not write cleanup rows for a game this sync just created', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+
+    // No prior rows can exist, so zeroing would only add noise.
+    await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: null,
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(mock.statUpserts).toHaveLength(1)
+    expect(mock.statUpserts[0]).not.toContainEqual(expect.objectContaining({ value: 0 }))
   })
 
   it('leaves a one-to-one map untouched and reports no repair', async () => {
