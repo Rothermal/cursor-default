@@ -799,6 +799,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
             'shotChartCloudSync' in synced && synced.shotChartCloudSync === 'synced'
               ? 0
               : snapshot.cloudSync.shotChartHydrationDroppedRows,
+          // Sticky until a sync completes with nothing left to repair, so the notice
+          // survives the re-render that follows the repairing sync.
+          repairedPlayerLinks:
+            'repairedPlayerLinks' in synced ? synced.repairedPlayerLinks : undefined,
           lastSyncedGameFingerprint: buildGameSyncFingerprint(syncedPayloadState),
           eventSyncBase: localUnchanged
             ? syncedPayloadState.cloudSync.eventSyncBase ?? {}

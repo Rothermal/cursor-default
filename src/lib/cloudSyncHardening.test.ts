@@ -9,6 +9,13 @@ const mock = vi.hoisted(() => ({
   linkUpdateError: null as string | null,
   gameDeleteError: null as string | null,
   existingGameStatus: 'in_progress' as string,
+  teamPlayerCandidates: [] as Array<{ player_id: string; jersey_number: string | null }>,
+  teamPlayersLookupError: null as string | null,
+  teamPlayersUpdateError: null as string | null,
+  teamPlayersUpsertError: null as string | null,
+  statUpserts: [] as Array<Array<{ player_id: string; stat_id: string; value: number }>>,
+  gameCheckouts: [] as Array<{ player_id: string; user_id: string; is_primary: boolean }>,
+  checkoutUpserts: [] as Array<Array<{ player_id: string; user_id: string; is_primary: boolean }>>,
 }))
 
 vi.mock('./supabase', () => ({
@@ -20,25 +27,62 @@ vi.mock('./supabase', () => ({
         return {
           select: () => {
             mock.ops.push('team_players.select')
+            const result = {
+              data: mock.teamPlayerCandidates,
+              error: mock.teamPlayersLookupError
+                ? { message: mock.teamPlayersLookupError }
+                : null,
+            }
+            // Support lookups that terminate on limit() and ones that await the builder
+            // directly, at any eq() depth.
+            const terminal: Record<string, unknown> = {
+              limit: () => Promise.resolve(result),
+              then: (onOk: (v: typeof result) => unknown, onErr: (e: unknown) => unknown) =>
+                Promise.resolve(result).then(onOk, onErr),
+            }
+            terminal.eq = () => terminal
             return {
               eq: () => ({
                 eq: () => ({
-                  eq: () => ({
-                    limit: () => Promise.resolve({ data: [], error: null }),
-                  }),
+                  eq: () => terminal,
                 }),
               }),
             }
           },
           upsert: () => {
             mock.ops.push('team_players.upsert')
-            return Promise.resolve({ error: null })
+            return Promise.resolve({
+              error: mock.teamPlayersUpsertError
+                ? { message: mock.teamPlayersUpsertError }
+                : null,
+            })
+          },
+          update: () => {
+            mock.ops.push('team_players.update')
+            return {
+              eq: () => ({
+                eq: () =>
+                  Promise.resolve({
+                    error: mock.teamPlayersUpdateError
+                      ? { message: mock.teamPlayersUpdateError }
+                      : null,
+                  }),
+              }),
+            }
           },
         }
       }
 
       if (table === 'players') {
         return {
+          delete: () => {
+            mock.ops.push('players.delete')
+            return {
+              eq: () => ({
+                eq: () => Promise.resolve({ error: null }),
+              }),
+            }
+          },
           select: () => {
             mock.ops.push('players.select')
             return {
@@ -115,8 +159,11 @@ vi.mock('./supabase', () => ({
 
       if (table === 'game_stats') {
         return {
-          upsert: () => {
+          upsert: (rows: unknown) => {
             mock.ops.push('game_stats.upsert')
+            mock.statUpserts.push(
+              rows as Array<{ player_id: string; stat_id: string; value: number }>
+            )
             return Promise.resolve({
               error: mock.gameStatsError ? { message: mock.gameStatsError } : null,
             })
@@ -141,6 +188,26 @@ vi.mock('./supabase', () => ({
           },
           insert: () => {
             mock.ops.push('shot_chart.insert')
+            return Promise.resolve({ error: null })
+          },
+        }
+      }
+
+      if (table === 'player_checkouts') {
+        return {
+          select: () => {
+            mock.ops.push('player_checkouts.select')
+            return {
+              eq: () => ({
+                in: () => Promise.resolve({ data: mock.gameCheckouts, error: null }),
+              }),
+            }
+          },
+          upsert: (rows: unknown) => {
+            mock.ops.push('player_checkouts.upsert')
+            mock.checkoutUpserts.push(
+              rows as Array<{ player_id: string; user_id: string; is_primary: boolean }>
+            )
             return Promise.resolve({ error: null })
           },
         }
@@ -219,6 +286,294 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.linkUpdateError = null
     mock.gameDeleteError = null
     mock.existingGameStatus = 'in_progress'
+    mock.teamPlayerCandidates = []
+    mock.teamPlayersLookupError = null
+    mock.teamPlayersUpdateError = null
+    mock.teamPlayersUpsertError = null
+    mock.statUpserts.length = 0
+    mock.gameCheckouts.length = 0
+    mock.checkoutUpserts.length = 0
+  })
+
+  it('fails closed when the same-name teammate lookup errors', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersLookupError = 'roster read denied'
+
+    // An errored lookup looks identical to "no such teammate", so resolving identity from
+    // it would silently create a duplicate person out of missing information.
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster lookup failed'
+    )
+    expect(mock.ops).not.toContain('games.insert')
+  })
+
+  it('fails when linking a reused teammate to the roster errors', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayerCandidates = [{ player_id: 'cloud-1', jersey_number: '1' }]
+    mock.teamPlayersUpdateError = 'roster link denied'
+
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster link failed'
+    )
+    // Proves the failure came from the reuse path, not the create path.
+    expect(mock.ops).toContain('team_players.update')
+    expect(mock.ops).not.toContain('team_players.upsert')
+  })
+
+  it('fails when linking a newly created player to the roster errors', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersUpsertError = 'roster link denied'
+
+    // A player id whose roster link failed would sync stats against a team the player is
+    // not on, so a half-linked identity must not be returned.
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster link failed'
+    )
+    expect(mock.ops).toContain('team_players.upsert')
+  })
+
+  it('deletes the player it created when the roster link fails', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersUpsertError = 'roster link denied'
+
+    // The unlinked row is invisible to the candidate query, which joins team_players, so
+    // leaving it behind would orphan one player per retry.
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster link failed'
+    )
+    expect(mock.ops.indexOf('players.delete')).toBeGreaterThan(
+      mock.ops.indexOf('team_players.upsert')
+    )
+  })
+
+  it('does not delete a player it only found when the roster link fails', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersUpsertError = 'roster link denied'
+    // Blank jersey with no same-name teammate falls back to owned-by-name, where the
+    // mocked players.select returns an existing row rather than inserting one.
+    mock.teamPlayerCandidates = []
+
+    await expect(
+      syncGameSnapshotToCloud({
+        state: state({ players: [{ id: 'local-1', name: 'One Player', number: '', stats: {} }] }),
+        userId: 'user-1',
+      })
+    ).rejects.toThrow('Team roster link failed')
+    expect(mock.ops).not.toContain('players.insert')
+    expect(mock.ops).not.toContain('players.delete')
+  })
+
+  it('repairs a duplicate cloud player link instead of blocking the sync', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+
+    // A map corrupted by the old name-only matching bypasses candidate resolution
+    // entirely, since a valid existing mapping short-circuits it. Failing here would be
+    // worse than repairing: the only manual fix deletes the player's stats and shots.
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: {} },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: {} },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(result.repairedPlayerLinks).toEqual(['Alex Kim'])
+    // First local keeps the row; the second is re-resolved onto a different player.
+    expect(result.playerIdMap['local-1']).toBe(shared)
+    expect(result.playerIdMap['local-2']).not.toBe(shared)
+  })
+
+  it('clears the moved player stats left on the shared cloud player', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+
+    // Disjoint stats: an earlier sync wrote both pts and reb under `shared`. Relinking
+    // alone would leave reb there, so the keeper keeps counting the other player's board.
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    const moved = result.playerIdMap['local-2']
+    expect(moved).not.toBe(shared)
+
+    const [cleanup, snapshot] = mock.statUpserts
+    // Only the moved player's exclusive key is zeroed; pts still belongs to the keeper.
+    expect(cleanup).toEqual([
+      { game_id: 'game-1', player_id: shared, recorded_by: 'user-1', stat_id: 'reb', value: 0 },
+    ])
+    // Cleanup lands before the snapshot, so the keeper's real values win any overlap.
+    expect(snapshot).toContainEqual(
+      expect.objectContaining({ player_id: shared, stat_id: 'pts', value: 2 })
+    )
+    expect(snapshot).toContainEqual(
+      expect.objectContaining({ player_id: moved, stat_id: 'reb', value: 1 })
+    )
+    expect(snapshot).not.toContainEqual(
+      expect.objectContaining({ player_id: shared, stat_id: 'reb' })
+    )
+  })
+
+  it('carries the recorder checkout across to the relinked player', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    // This recorder had checked out the shared row and was chosen as primary for it.
+    mock.gameCheckouts = [{ player_id: shared, user_id: 'user-1', is_primary: true }]
+
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    const moved = result.playerIdMap['local-2']
+    // Without this, get_game_stats_resolved finds no primary checkout for the moved
+    // player and stops resolving their stats as primary.
+    expect(mock.checkoutUpserts).toEqual([
+      [{ game_id: 'game-1', player_id: moved, user_id: 'user-1', is_primary: true }],
+    ])
+  })
+
+  it('copies no checkout when this recorder never checked the shared player out', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    // Another recorder may hold a checkout on the shared row, but this device cannot
+    // prove their map was corrupted too, so their assignment is never duplicated.
+    mock.gameCheckouts = []
+
+    await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(mock.checkoutUpserts).toEqual([])
+  })
+
+  it('never rewrites a checkout this recorder already holds on the relink target', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    const moved = 'remote-player-1'
+    // Already deliberately non-primary on the target; the repair must not promote it.
+    mock.gameCheckouts = [
+      { player_id: shared, user_id: 'user-1', is_primary: true },
+      { player_id: moved, user_id: 'user-1', is_primary: false },
+    ]
+
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(result.playerIdMap['local-2']).toBe(moved)
+    expect(mock.checkoutUpserts).toEqual([])
+  })
+
+  it('does not claim primary when another recorder already holds it on the target', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    const moved = 'remote-player-1'
+    mock.gameCheckouts = [
+      { player_id: shared, user_id: 'user-1', is_primary: true },
+      { player_id: moved, user_id: 'user-2', is_primary: true },
+    ]
+
+    await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    // Two primaries would make get_game_stats_resolved pick between them arbitrarily.
+    expect(mock.checkoutUpserts).toEqual([
+      [{ game_id: 'game-1', player_id: moved, user_id: 'user-1', is_primary: false }],
+    ])
+  })
+
+  it('does not write cleanup rows for a game this sync just created', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+
+    // No prior rows can exist, so zeroing would only add noise.
+    await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: null,
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(mock.statUpserts).toHaveLength(1)
+    expect(mock.statUpserts[0]).not.toContainEqual(expect.objectContaining({ value: 0 }))
+  })
+
+  it('leaves a one-to-one map untouched and reports no repair', async () => {
+    mock.gameStatsError = null
+
+    const result = await syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })
+
+    expect(result.repairedPlayerLinks).toBeUndefined()
   })
 
   it('rejects setup-only sport state before aggregate cloud writes', async () => {
@@ -276,7 +631,9 @@ describe('syncGameSnapshotToCloud hardening', () => {
 
     expect(gameInsertIndex).toBeGreaterThan(-1)
     expect(mock.ops.indexOf('team_players.select')).toBeLessThan(gameInsertIndex)
-    expect(mock.ops.indexOf('players.select')).toBeLessThan(gameInsertIndex)
+    // Jersey-set locals without a team match create a distinct player (no name-only
+    // owned lookup) so same-named teammates cannot collapse onto one cloud row.
+    expect(mock.ops.indexOf('players.insert')).toBeLessThan(gameInsertIndex)
     expect(mock.ops.indexOf('team_players.upsert')).toBeLessThan(gameInsertIndex)
     expect(mock.ops.indexOf('game_stats.upsert')).toBeGreaterThan(gameInsertIndex)
     expect(mock.ops).toContain('games.delete')

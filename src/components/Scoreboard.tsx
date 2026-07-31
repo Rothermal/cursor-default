@@ -90,6 +90,12 @@ export default function Scoreboard() {
       {gameInfo.tournamentName && (
         <p className="text-center text-xs opacity-60 mt-2">{gameInfo.tournamentName}</p>
       )}
+      {cloudSync.repairedPlayerLinks && cloudSync.repairedPlayerLinks.length > 0 && (
+        <p role="alert" className="text-center text-[11px] mt-1 rounded bg-amber-500/25 px-2 py-1">
+          Fixed a duplicate cloud link for {cloudSync.repairedPlayerLinks.join(', ')}. Earlier
+          syncs of this game merged their stats — check those totals in the cloud.
+        </p>
+      )}
       {syncLabel && (
         <p className="text-center text-[11px] opacity-70 mt-1">{syncLabel}</p>
       )}

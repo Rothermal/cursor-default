@@ -22,7 +22,10 @@ import {
   mapShotRows,
   parsePlayerName,
   parseSeasonTeamStatsConfig,
+  findDuplicatePlayerMappings,
+  resolveUnmappedPlayer,
   type RemoteShotRow,
+  type TeamPlayerCandidate,
 } from './cloudSyncHelpers'
 import {
   aggregateStatsByPlayer,
@@ -57,6 +60,8 @@ export interface SyncGameSnapshotResult {
   skippedFinalGame?: boolean
   /** When set, `shot_chart` was left unchanged (see `CloudSyncState.shotChartHydrationDroppedRows`). */
   shotChartCloudSync?: ShotChartCloudSyncMode
+  /** Players whose duplicate cloud link was repaired during this sync, by display name. */
+  repairedPlayerLinks?: string[]
 }
 
 export interface HydratedCloudGame {
@@ -493,7 +498,9 @@ async function ensurePlayerId(
   player: Player,
   teamId: string,
   userId: string,
-  existingRemoteId: string | undefined
+  existingRemoteId: string | undefined,
+  /** Cloud players another local player already resolved to in this sync. */
+  claimedPlayerIds: ReadonlySet<string> = new Set<string>()
 ): Promise<string> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
@@ -515,41 +522,59 @@ async function ensurePlayerId(
     return remoteId
   }
 
+  // Fetch every same-name teammate with its jersey and decide locally: filtering by
+  // jersey in SQL cannot tell "same person, new number" from "different person".
   const { data: existingOnTeam, error: junctionLookupError } = await supabase
     .from('team_players')
-    .select('player_id, players!inner(id, first_name, last_name)')
+    .select('player_id, jersey_number, is_active, players!inner(id, first_name, last_name)')
     .eq('team_id', teamId)
     .eq('players.first_name', firstName)
     .eq('players.last_name', lastName)
-    .limit(1)
 
-  if (!junctionLookupError && existingOnTeam && existingOnTeam.length > 0) {
-    const playerId = (existingOnTeam[0] as { player_id: string }).player_id
-    await supabase
-      .from('team_players')
-      .update({ jersey_number: jerseyNumber, is_active: true })
-      .eq('team_id', teamId)
-      .eq('player_id', playerId)
-    return playerId
+  // Never resolve identity from a failed lookup: an empty candidate list would look
+  // like "no such teammate" and create a duplicate person from missing information.
+  if (junctionLookupError) {
+    throw new Error(`Team roster lookup failed: ${junctionLookupError.message}`)
   }
 
-  const { data: ownedPlayers, error: lookupError } = await supabase
-    .from('players')
-    .select('id')
-    .eq('created_by', userId)
-    .eq('first_name', firstName)
-    .eq('last_name', lastName)
-    .limit(1)
+  const candidates: TeamPlayerCandidate[] = (
+    (existingOnTeam ?? []) as Array<{
+      player_id: string
+      jersey_number: string | null
+      is_active: boolean | null
+    }>
+  ).map(row => ({
+    playerId: row.player_id,
+    jerseyNumber: row.jersey_number,
+    isActive: row.is_active !== false,
+  }))
+  const resolution = resolveUnmappedPlayer({ candidates, jerseyNumber, claimedPlayerIds })
 
-  if (lookupError) {
-    throw new Error(`Player lookup failed: ${lookupError.message}`)
+  if (resolution.mode === 'reuse_team_match') {
+    // Only adopt a jersey onto a teammate that had none. Never rewrite or clear an
+    // existing cloud jersey from a local roster that disagrees.
+    const { error: reuseError } = await supabase
+      .from('team_players')
+      .update(
+        resolution.adoptJersey
+          ? { jersey_number: jerseyNumber, is_active: true }
+          : { is_active: true }
+      )
+      .eq('team_id', teamId)
+      .eq('player_id', resolution.playerId)
+
+    if (reuseError) {
+      throw new Error(`Team roster link failed: ${reuseError.message}`)
+    }
+    return resolution.playerId
   }
 
   let playerId: string
+  // Only set when this call inserted the row, so a failed roster link can clean up
+  // after itself without ever deleting a player it merely found.
+  let createdPlayerId: string | null = null
 
-  if (ownedPlayers && ownedPlayers.length > 0) {
-    playerId = ownedPlayers[0].id as string
-  } else {
+  if (resolution.mode === 'create_distinct') {
     const { data: createdPlayer, error: createError } = await supabase
       .from('players')
       .insert({ first_name: firstName, last_name: lastName, created_by: userId })
@@ -559,18 +584,192 @@ async function ensurePlayerId(
     if (createError || !createdPlayer) {
       throw new Error(`Player creation failed: ${createError?.message ?? 'unknown error'}`)
     }
-
     playerId = createdPlayer.id as string
+    createdPlayerId = playerId
+  } else {
+    const { data: ownedPlayers, error: lookupError } = await supabase
+      .from('players')
+      .select('id')
+      .eq('created_by', userId)
+      .eq('first_name', firstName)
+      .eq('last_name', lastName)
+      .limit(1)
+
+    if (lookupError) {
+      throw new Error(`Player lookup failed: ${lookupError.message}`)
+    }
+
+    if (ownedPlayers && ownedPlayers.length > 0) {
+      playerId = ownedPlayers[0].id as string
+    } else {
+      const { data: createdPlayer, error: createError } = await supabase
+        .from('players')
+        .insert({ first_name: firstName, last_name: lastName, created_by: userId })
+        .select('id')
+        .single()
+
+      if (createError || !createdPlayer) {
+        throw new Error(`Player creation failed: ${createError?.message ?? 'unknown error'}`)
+      }
+
+      playerId = createdPlayer.id as string
+      createdPlayerId = playerId
+    }
   }
 
-  await supabase
+  // New/owned rows own their jersey outright, so an empty local number normalizes to
+  // null here. The reuse path above deliberately differs: it never touches a jersey
+  // it did not create.
+  const { error: rosterLinkError } = await supabase
     .from('team_players')
     .upsert(
-      { team_id: teamId, player_id: playerId, jersey_number: jerseyNumber, is_active: true },
+      {
+        team_id: teamId,
+        player_id: playerId,
+        jersey_number: jerseyNumber || null,
+        is_active: true,
+      },
       { onConflict: 'team_id,player_id' }
     )
 
+  // A player id whose roster link failed would sync stats against a team the player
+  // is not on, so fail here rather than returning a half-linked identity.
+  if (rosterLinkError) {
+    // The unlinked row is invisible to the candidate query (it joins `team_players`),
+    // so leaving it behind would orphan one player per retry. Best effort: never let a
+    // cleanup failure mask the error that actually stopped the sync.
+    if (createdPlayerId) {
+      const { error: cleanupError } = await supabase
+        .from('players')
+        .delete()
+        .eq('id', createdPlayerId)
+        .eq('created_by', userId)
+      if (cleanupError) {
+        console.warn('[StatKeeper] Failed to clean up unlinked player row', cleanupError.message)
+      }
+    }
+    throw new Error(`Team roster link failed: ${rosterLinkError.message}`)
+  }
+
   return playerId
+}
+
+/**
+ * Neutralise stat rows a relinked player left on the cloud player it used to share.
+ *
+ * Only rows this recorder owns are touched — the upsert conflict target includes
+ * `recorded_by`, and RLS scopes writes to the caller — so a co-recorder's rows for the
+ * same player are never zeroed.
+ */
+async function clearStatsFromRelinkedPlayer(
+  userId: string,
+  gameId: string,
+  staleStatIdsBySharedPlayerId: Map<string, Set<string>>
+): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+
+  const zeroRows = [...staleStatIdsBySharedPlayerId].flatMap(([playerId, statIds]) =>
+    [...statIds].map(statId => ({
+      game_id: gameId,
+      player_id: playerId,
+      recorded_by: userId,
+      stat_id: statId,
+      value: 0,
+    }))
+  )
+
+  if (zeroRows.length === 0) return
+
+  const { error } = await supabase
+    .from('game_stats')
+    .upsert(zeroRows, { onConflict: 'game_id,player_id,recorded_by,stat_id' })
+
+  if (error) {
+    throw new Error(`Stats relink cleanup failed: ${error.message}`)
+  }
+}
+
+/**
+ * Carry this recorder's checkout across to a player that was relinked off a shared id.
+ *
+ * Only the caller's own row is copied, and deliberately so. A checkout means "this user
+ * is recording the player at that cloud id". This device can prove that *its own* map had
+ * both locals on the shared id, so its user was recording both. It cannot know whether
+ * another recorder's map was corrupted the same way, and copying their row would assert
+ * they record a player they may never have seen — potentially making them primary for it,
+ * which is the same wrong-authority problem this repair exists to fix. `is_primary` is
+ * carried over rather than forced true for the same reason, and only into a target that
+ * has no primary yet.
+ *
+ * The read-then-insert is not atomic, so two devices repairing onto the same target at
+ * once could both see the vacancy and both claim primary. Closing that needs a partial
+ * unique index on `(game_id, player_id) where is_primary`, which would also change how
+ * the existing checkout screen behaves — deliberately out of scope here.
+ */
+async function copyOwnCheckoutToRelinkedPlayers(
+  userId: string,
+  gameId: string,
+  relinks: Array<{ fromPlayerId: string; toPlayerId: string }>
+): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+  if (relinks.length === 0) return
+
+  // Read the target's checkouts too, not just the source's. Copying blind can promote
+  // this recorder over one already primary on the target, and `player_checkouts` only
+  // enforces `unique(game_id, player_id, user_id)` — nothing stops two primaries, and
+  // `get_game_stats_resolved` breaks a two-primary tie arbitrarily.
+  const { data: checkouts, error: lookupError } = await supabase
+    .from('player_checkouts')
+    .select('player_id, user_id, is_primary')
+    .eq('game_id', gameId)
+    .in('player_id', [
+      ...new Set(relinks.flatMap(relink => [relink.fromPlayerId, relink.toPlayerId])),
+    ])
+
+  if (lookupError) {
+    throw new Error(`Checkout relink lookup failed: ${lookupError.message}`)
+  }
+
+  const checkoutRows = (checkouts ?? []) as Array<{
+    player_id: string
+    user_id: string
+    is_primary: boolean
+  }>
+  const ownCheckout = (playerId: string) =>
+    checkoutRows.find(row => row.player_id === playerId && row.user_id === userId)
+  const hasPrimary = (playerId: string) =>
+    checkoutRows.some(row => row.player_id === playerId && row.is_primary)
+
+  const rows = relinks.flatMap(relink => {
+    const source = ownCheckout(relink.fromPlayerId)
+    // Nothing to carry across, or this recorder already has an assignment on the target
+    // that is not ours to rewrite.
+    if (!source || ownCheckout(relink.toPlayerId)) return []
+    return [
+      {
+        game_id: gameId,
+        player_id: relink.toPlayerId,
+        user_id: userId,
+        // Only claim primary into a vacancy. Someone else already holding it there
+        // outranks a claim inherited from a different player's row.
+        is_primary: source.is_primary && !hasPrimary(relink.toPlayerId),
+      },
+    ]
+  })
+
+  if (rows.length === 0) return
+
+  const { error: insertError } = await supabase
+    .from('player_checkouts')
+    .upsert(rows, { onConflict: 'game_id,player_id,user_id', ignoreDuplicates: true })
+
+  if (insertError) {
+    throw new Error(`Checkout relink failed: ${insertError.message}`)
+  }
 }
 
 async function upsertGameStats(
@@ -761,6 +960,57 @@ export async function syncGameSnapshotToCloud({
     }
   }
 
+  // An already-corrupted map bypasses every protection below, because a valid existing
+  // mapping short-circuits candidate resolution entirely. Repair it rather than failing:
+  // the only manual fix available would be removing the player from the roster, which
+  // deletes the very stats and shots the recorder is trying to sync.
+  const duplicateMappings = findDuplicatePlayerMappings(
+    state.cloudSync.playerIdMap,
+    state.players.filter(player => !isTeamPseudoPlayer(player)).map(player => player.id)
+  )
+  // The first local player keeps the cloud row; the rest drop their mapping and fall
+  // through to normal resolution, where `claimedPlayerIds` stops them re-collapsing onto
+  // it and a distinct cloud player is created instead.
+  const playerIdMap = { ...state.cloudSync.playerIdMap }
+  const repairedPlayerLinks: string[] = []
+  // Stat rows the moved players already wrote under the shared cloud id. Relinking alone
+  // leaves them behind, because `upsertGameStats` only writes the keys each player
+  // currently has and never clears one written under a different mapping.
+  const staleStatIdsBySharedPlayerId = new Map<string, Set<string>>()
+  // Local players moved off a shared cloud id, so their checkout can follow them once
+  // the loop below has resolved what they moved to.
+  const relinkedFromSharedPlayerId = new Map<string, string>()
+  for (const duplicate of duplicateMappings) {
+    const [keeperLocalId, ...movedLocalIds] = duplicate.localPlayerIds
+    const statsFor = (localId: string) =>
+      Object.keys(state.players.find(player => player.id === localId)?.stats ?? {})
+    const keeperStatIds = new Set(statsFor(keeperLocalId))
+    const staleStatIds = staleStatIdsBySharedPlayerId.get(duplicate.remotePlayerId) ?? new Set()
+
+    for (const localPlayerId of movedLocalIds) {
+      delete playerIdMap[localPlayerId]
+      relinkedFromSharedPlayerId.set(localPlayerId, duplicate.remotePlayerId)
+      repairedPlayerLinks.push(
+        state.players.find(player => player.id === localPlayerId)?.name ?? localPlayerId
+      )
+      // Keys the keeper still owns are overwritten with its own values by the normal
+      // snapshot upsert, so only the moved player's exclusive keys need clearing.
+      for (const statId of statsFor(localPlayerId)) {
+        if (!keeperStatIds.has(statId)) staleStatIds.add(statId)
+      }
+    }
+
+    if (staleStatIds.size > 0) {
+      staleStatIdsBySharedPlayerId.set(duplicate.remotePlayerId, staleStatIds)
+    }
+  }
+  if (repairedPlayerLinks.length > 0) {
+    console.warn(
+      `[StatKeeper] Repaired duplicate cloud player links: ${repairedPlayerLinks.join(', ')}. ` +
+        'Earlier syncs of this game merged their stats in the cloud.'
+    )
+  }
+
   const seasonId = await ensureSeason(state, userId)
   const teamId = await ensureTeam(state, userId, seasonId)
 
@@ -768,14 +1018,20 @@ export async function syncGameSnapshotToCloud({
   // This shrinks the orphan window: failures in player/team-player setup no longer
   // leave an in-progress cloud game without stats.
   const nextPlayerIdMap: Record<string, string> = {}
+  // Cloud rows already spoken for. Seeded from the durable map so an unmapped local
+  // player cannot claim a mapped teammate's row regardless of roster order, then grown
+  // as the loop resolves, so two same-named locals never collapse onto one cloud player.
+  const claimedPlayerIds = new Set<string>(Object.values(playerIdMap))
   for (const player of state.players) {
     const remotePlayerId = await ensurePlayerId(
       player,
       teamId,
       userId,
-      state.cloudSync.playerIdMap[player.id]
+      playerIdMap[player.id],
+      claimedPlayerIds
     )
     nextPlayerIdMap[player.id] = remotePlayerId
+    claimedPlayerIds.add(remotePlayerId)
   }
 
   const ensuredGame = await ensureGame(state, userId, teamId, seasonId)
@@ -792,6 +1048,29 @@ export async function syncGameSnapshotToCloud({
       nextPlayerIdMap[TEAM_PLAYER_HOME_ID],
       nextPlayerIdMap[TEAM_PLAYER_OPP_ID]
     )
+
+    // Zero out what the moved players left on the shared cloud player before writing the
+    // snapshot, so the keeper's totals stop counting someone else's stats. Skipped for a
+    // game this sync just created, which cannot have prior rows. There is no `game_stats`
+    // DELETE policy, so a zero value is the available way to neutralise a row.
+    if (!ensuredGame.created && staleStatIdsBySharedPlayerId.size > 0) {
+      await clearStatsFromRelinkedPlayer(userId, gameId, staleStatIdsBySharedPlayerId)
+    }
+
+    // A checkout keyed by the shared cloud id no longer covers the player that moved off
+    // it, so `get_game_stats_resolved` would stop seeing a primary for them.
+    if (!ensuredGame.created && relinkedFromSharedPlayerId.size > 0) {
+      await copyOwnCheckoutToRelinkedPlayers(
+        userId,
+        gameId,
+        [...relinkedFromSharedPlayerId]
+          .map(([localPlayerId, fromPlayerId]) => ({
+            fromPlayerId,
+            toPlayerId: nextPlayerIdMap[localPlayerId],
+          }))
+          .filter(relink => relink.toPlayerId && relink.toPlayerId !== relink.fromPlayerId)
+      )
+    }
 
     await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
 
@@ -831,6 +1110,7 @@ export async function syncGameSnapshotToCloud({
     playerIdMap: nextPlayerIdMap,
     syncedAt: new Date().toISOString(),
     shotChartCloudSync,
+    ...(repairedPlayerLinks.length > 0 ? { repairedPlayerLinks } : {}),
   }
 }
 

@@ -1,8 +1,6 @@
 import { RotateCcw } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
-  configurableSoccerRulesFromMatchRules,
-  resolveSoccerMatchRules,
   withSoccerTieResolution,
   type SoccerMatchRulesOverride,
 } from '../../lib/soccer/rules'
@@ -17,6 +15,7 @@ import {
   type SoccerRegulationPreset,
 } from '../../lib/soccer/setupRules'
 import {
+  resolveSoccerOverrideEditorRules,
   soccerRulesOverrideFromDifference,
   type SoccerRuleSourceMap,
 } from '../../lib/soccer/settings'
@@ -39,10 +38,8 @@ export default function SoccerRulesOverrideEditor({
   readOnly = false,
   onChange,
 }: Props) {
-  const effective = resolveSoccerMatchRules({
-    personalDefaults: configurableSoccerRulesFromMatchRules(inherited),
-    gameOverrides: override,
-  })
+  const { rules: effective, error: overrideError } =
+    resolveSoccerOverrideEditorRules(inherited, override)
   const regulationPreset = detectRegulationPreset(effective)
   const competitionProfile = detectSoccerCompetitionProfile(effective)
 
@@ -68,6 +65,15 @@ export default function SoccerRulesOverrideEditor({
 
   return (
     <div className="space-y-5">
+      {overrideError && (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        >
+          Saved rules could not be applied and inherited values are shown instead. Reset this scope
+          or edit a value to repair it. ({overrideError})
+        </div>
+      )}
       <RuleGroup title="Profile">
         <RuleField
           source={profileSource(override, inheritedSources, overrideLabel)}
@@ -546,13 +552,12 @@ function SegmentRows({ segments, disabled, onChange }: {
         <div key={segment.id} className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
           <label className="min-w-0 text-xs font-medium text-slate-500">
             Label
-            <input
+            <SegmentLabelInput
               value={segment.label}
               disabled={disabled}
-              onChange={event => onChange(segments.map((item, itemIndex) =>
-                itemIndex === index ? { ...item, label: event.target.value } : item
+              onCommit={label => onChange(segments.map((item, itemIndex) =>
+                itemIndex === index ? { ...item, label } : item
               ))}
-              className="input-field mt-1 min-w-0 w-full px-3 py-2 text-sm disabled:bg-slate-100"
             />
           </label>
           <label className="text-xs font-medium text-slate-500">
@@ -577,6 +582,40 @@ function SegmentRows({ segments, disabled, onChange }: {
         </div>
       ))}
     </div>
+  )
+}
+
+/** Keep blank mid-edit labels local until blur so parent resolve cannot throw. */
+function SegmentLabelInput({
+  value,
+  disabled,
+  onCommit,
+}: {
+  value: string
+  disabled: boolean
+  onCommit: (label: string) => void
+}) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  return (
+    <input
+      value={draft}
+      disabled={disabled}
+      onChange={event => setDraft(event.target.value)}
+      onBlur={() => {
+        const trimmed = draft.trim()
+        if (!trimmed) {
+          setDraft(value)
+          return
+        }
+        if (trimmed !== value) onCommit(trimmed)
+        else if (draft !== value) setDraft(value)
+      }}
+      className="input-field mt-1 min-w-0 w-full px-3 py-2 text-sm disabled:bg-slate-100"
+    />
   )
 }
 

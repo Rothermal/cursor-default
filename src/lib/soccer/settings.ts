@@ -90,6 +90,39 @@ export function soccerRulesOverrideFromDifference(
   return override
 }
 
+export interface SoccerOverrideEditorRules {
+  rules: SoccerMatchRules
+  /** Set when the override could not resolve and inherited values are shown instead. */
+  error: string | null
+}
+
+/**
+ * Editor render path for team/match overrides. `resolveSoccerMatchRules` throws on
+ * invalid input, which must never take the render path down — but a stored override
+ * that cannot resolve is a repairable problem the user has to see, per the settings
+ * contract that rejects an invalid layer *and* surfaces a diagnostic. Callers render
+ * `error` rather than silently substituting inheritance.
+ */
+export function resolveSoccerOverrideEditorRules(
+  inherited: SoccerMatchRules,
+  override: SoccerMatchRulesOverride
+): SoccerOverrideEditorRules {
+  try {
+    return {
+      rules: resolveSoccerMatchRules({
+        personalDefaults: configurableSoccerRulesFromMatchRules(inherited),
+        gameOverrides: override,
+      }),
+      error: null,
+    }
+  } catch (error) {
+    return {
+      rules: structuredClone(inherited),
+      error: error instanceof Error ? error.message : 'Soccer rules are invalid.',
+    }
+  }
+}
+
 export function soccerRulesOverrideFingerprint(
   override: SoccerMatchRulesOverride
 ): string {

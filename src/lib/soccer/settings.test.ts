@@ -4,6 +4,7 @@ import {
   parseSoccerPersonalSettings,
   parseSoccerRulesOverride,
   parseSoccerTeamSettings,
+  resolveSoccerOverrideEditorRules,
   resolveSoccerSettingsHierarchy,
   soccerRulesOverrideFingerprint,
   soccerRulesOverrideFromDifference,
@@ -267,5 +268,29 @@ describe('soccer settings hierarchy', () => {
     expect(withTeam.sources.maxOnFieldPlayers).toBe('team')
     expect(cleared.rules.maxOnFieldPlayers).toBe(9)
     expect(cleared.sources.maxOnFieldPlayers).toBe('personal')
+  })
+})
+
+describe('soccer override editor rule resolution', () => {
+  it('falls back to inherited rules and reports why when an override cannot resolve', () => {
+    const inherited = resolveSoccerSettingsHierarchy().rules
+    const override = {
+      regulationSegments: inherited.regulationSegments.map((segment, index) =>
+        index === 0 ? { ...segment, label: '' } : segment
+      ),
+    }
+
+    expect(() => resolveSoccerOverrideEditorRules(inherited, override)).not.toThrow()
+    const resolved = resolveSoccerOverrideEditorRules(inherited, override)
+    expect(resolved.rules).toEqual(inherited)
+    expect(resolved.error).toBeTruthy()
+  })
+
+  it('applies a valid override without reporting an error', () => {
+    const inherited = resolveSoccerSettingsHierarchy().rules
+    const resolved = resolveSoccerOverrideEditorRules(inherited, { maxOnFieldPlayers: 9 })
+
+    expect(resolved.rules.maxOnFieldPlayers).toBe(9)
+    expect(resolved.error).toBeNull()
   })
 })

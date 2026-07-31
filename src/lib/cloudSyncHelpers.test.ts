@@ -16,6 +16,8 @@ import {
   mapShotRows,
   parsePlayerName,
   parseSeasonTeamStatsConfig,
+  findDuplicatePlayerMappings,
+  resolveUnmappedPlayer,
 } from './cloudSyncHelpers'
 
 describe('cloudSyncHelpers missing-column detectors', () => {
@@ -111,6 +113,183 @@ describe('parsePlayerName', () => {
 
   it('keeps single-token names as firstName only', () => {
     expect(parsePlayerName('Kobe')).toEqual({ firstName: 'Kobe', lastName: '' })
+  })
+})
+
+describe('resolveUnmappedPlayer', () => {
+  it('reuses an exact name+jersey teammate without touching its jersey', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: '7', isActive: true },
+        { playerId: 'b', jerseyNumber: '12', isActive: true },
+      ],
+      jerseyNumber: '12',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'b', adoptJersey: false })
+  })
+
+  it('adopts a jersey onto the lone unnumbered teammate instead of duplicating them', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [{ playerId: 'a', jerseyNumber: null, isActive: true }],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'a', adoptJersey: true })
+  })
+
+  it('creates a distinct player when every same-name teammate has a different number', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: '7', isActive: true },
+        { playerId: 'b', jerseyNumber: '12', isActive: true },
+      ],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'create_distinct' })
+  })
+
+  it('creates a distinct player when several teammates are unnumbered and ambiguous', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: null, isActive: true },
+        { playerId: 'b', jerseyNumber: '', isActive: true },
+      ],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'create_distinct' })
+  })
+
+  it('reuses deterministically when a lone unnumbered local player has no rival claim', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'b', jerseyNumber: '12', isActive: true },
+        { playerId: 'a', jerseyNumber: '7', isActive: true },
+      ],
+      jerseyNumber: '  ',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'a', adoptJersey: false })
+  })
+
+  it('falls back by name only when no same-name teammate exists', () => {
+    expect(resolveUnmappedPlayer({ candidates: [], jerseyNumber: '' }))
+      .toEqual({ mode: 'reuse_or_create_owned' })
+    expect(resolveUnmappedPlayer({ candidates: [], jerseyNumber: '23' }))
+      .toEqual({ mode: 'create_distinct' })
+  })
+
+  it('never offers a cloud row another local player already claimed', () => {
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'a', jerseyNumber: '7', isActive: true },
+        { playerId: 'b', jerseyNumber: '12', isActive: true },
+      ],
+      jerseyNumber: '7',
+      claimedPlayerIds: new Set(['a']),
+    })).toEqual({ mode: 'create_distinct' })
+  })
+
+  it('keeps two unnumbered same-name locals apart across a first sync', () => {
+    // Both local "Alex Kim"s are unmapped and unnumbered. Reusing by name alone would
+    // collapse them onto one cloud row and lose the second player's stats.
+    const candidates = [{ playerId: 'cloud-alex', jerseyNumber: null, isActive: true }]
+    const claimedPlayerIds = new Set<string>()
+
+    const first = resolveUnmappedPlayer({ candidates, jerseyNumber: '', claimedPlayerIds })
+    expect(first).toEqual({ mode: 'reuse_team_match', playerId: 'cloud-alex', adoptJersey: false })
+    claimedPlayerIds.add('cloud-alex')
+
+    expect(resolveUnmappedPlayer({ candidates, jerseyNumber: '', claimedPlayerIds }))
+      .toEqual({ mode: 'create_distinct' })
+  })
+
+  it('never reactivates a deactivated row on a name-only match', () => {
+    // The repro: a deactivated Alex Kim on the cloud roster, and a different Alex Kim
+    // late-added with no number. Reusing would reactivate the row and write the new
+    // player's stats onto it — the irreversible outcome a split is preferred over.
+    expect(resolveUnmappedPlayer({
+      candidates: [{ playerId: 'cloud-old', jerseyNumber: null, isActive: false }],
+      jerseyNumber: '',
+    })).toEqual({ mode: 'create_distinct' })
+
+    // Same for the adopt-a-jersey inference, which is also name-only.
+    expect(resolveUnmappedPlayer({
+      candidates: [{ playerId: 'cloud-old', jerseyNumber: null, isActive: false }],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'create_distinct' })
+  })
+
+  it('prefers an active teammate over a deactivated row wearing the same number', () => {
+    // Sorted by id, the deactivated row comes first; roster status must still win.
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'cloud-a-old', jerseyNumber: '23', isActive: false },
+        { playerId: 'cloud-b-current', jerseyNumber: '23', isActive: true },
+      ],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'cloud-b-current', adoptJersey: false })
+  })
+
+  it('reclaims a deactivated row when the number still matches exactly', () => {
+    // A returning player who kept their jersey is the one signal strong enough to
+    // reactivate; the caller sets is_active back to true.
+    expect(resolveUnmappedPlayer({
+      candidates: [{ playerId: 'cloud-old', jerseyNumber: '23', isActive: false }],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'cloud-old', adoptJersey: false })
+  })
+
+  it('converges instead of duplicating an unnumbered player every game', () => {
+    // playerIdMap is per game and starts empty, so this runs afresh each game. Once a
+    // row exists and is active, later games must reuse it rather than mint another.
+    const afterFirstGame = [{ playerId: 'cloud-new', jerseyNumber: null, isActive: true }]
+    expect(resolveUnmappedPlayer({ candidates: afterFirstGame, jerseyNumber: '' })).toEqual({
+      mode: 'reuse_team_match',
+      playerId: 'cloud-new',
+      adoptJersey: false,
+    })
+
+    // Still converges with the deactivated stranger from the case above alongside it.
+    const withDeactivated = [
+      { playerId: 'cloud-old', jerseyNumber: null, isActive: false },
+      ...afterFirstGame,
+    ]
+    expect(resolveUnmappedPlayer({ candidates: withDeactivated, jerseyNumber: '' })).toEqual({
+      mode: 'reuse_team_match',
+      playerId: 'cloud-new',
+      adoptJersey: false,
+    })
+  })
+
+  it('splits rather than guesses when a never-synced player has a new number', () => {
+    // Documented trade-off: local "#23" against cloud "#12" is indistinguishable from a
+    // same-named teammate. The durable playerIdMap covers this for any player that has
+    // synced before; a split identity is recoverable via merge, a wrong merge is not.
+    expect(resolveUnmappedPlayer({
+      candidates: [{ playerId: 'cloud-john', jerseyNumber: '12', isActive: true }],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'create_distinct' })
+  })
+})
+
+describe('findDuplicatePlayerMappings', () => {
+  it('returns nothing for a one-to-one map', () => {
+    expect(
+      findDuplicatePlayerMappings({ 'local-1': 'cloud-1', 'local-2': 'cloud-2' }, [
+        'local-1',
+        'local-2',
+      ])
+    ).toEqual([])
+  })
+
+  it('reports locals that share a cloud player in roster order', () => {
+    expect(
+      findDuplicatePlayerMappings(
+        { 'local-1': 'cloud-1', 'local-2': 'cloud-1', 'local-3': 'cloud-3' },
+        ['local-1', 'local-2', 'local-3']
+      )
+    ).toEqual([{ remotePlayerId: 'cloud-1', localPlayerIds: ['local-1', 'local-2'] }])
+  })
+
+  it('ignores map entries for players no longer on the roster', () => {
+    // The reducer prunes these, but a stale entry must not be reported as a collision
+    // the user cannot act on.
+    expect(
+      findDuplicatePlayerMappings({ 'local-1': 'cloud-1', 'removed': 'cloud-1' }, ['local-1'])
+    ).toEqual([])
   })
 })
 
