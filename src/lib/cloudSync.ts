@@ -700,7 +700,13 @@ async function clearStatsFromRelinkedPlayer(
  * another recorder's map was corrupted the same way, and copying their row would assert
  * they record a player they may never have seen — potentially making them primary for it,
  * which is the same wrong-authority problem this repair exists to fix. `is_primary` is
- * preserved rather than forced true for the same reason.
+ * carried over rather than forced true for the same reason, and only into a target that
+ * has no primary yet.
+ *
+ * The read-then-insert is not atomic, so two devices repairing onto the same target at
+ * once could both see the vacancy and both claim primary. Closing that needs a partial
+ * unique index on `(game_id, player_id) where is_primary`, which would also change how
+ * the existing checkout screen behaves — deliberately out of scope here.
  */
 async function copyOwnCheckoutToRelinkedPlayers(
   userId: string,
@@ -712,38 +718,54 @@ async function copyOwnCheckoutToRelinkedPlayers(
   }
   if (relinks.length === 0) return
 
-  const { data: ownCheckouts, error: lookupError } = await supabase
+  // Read the target's checkouts too, not just the source's. Copying blind can promote
+  // this recorder over one already primary on the target, and `player_checkouts` only
+  // enforces `unique(game_id, player_id, user_id)` — nothing stops two primaries, and
+  // `get_game_stats_resolved` breaks a two-primary tie arbitrarily.
+  const { data: checkouts, error: lookupError } = await supabase
     .from('player_checkouts')
-    .select('player_id, is_primary')
+    .select('player_id, user_id, is_primary')
     .eq('game_id', gameId)
-    .eq('user_id', userId)
-    .in('player_id', [...new Set(relinks.map(relink => relink.fromPlayerId))])
+    .in('player_id', [
+      ...new Set(relinks.flatMap(relink => [relink.fromPlayerId, relink.toPlayerId])),
+    ])
 
   if (lookupError) {
     throw new Error(`Checkout relink lookup failed: ${lookupError.message}`)
   }
 
-  const isPrimaryByPlayerId = new Map(
-    ((ownCheckouts ?? []) as Array<{ player_id: string; is_primary: boolean }>).map(row => [
-      row.player_id,
-      row.is_primary,
-    ])
-  )
+  const checkoutRows = (checkouts ?? []) as Array<{
+    player_id: string
+    user_id: string
+    is_primary: boolean
+  }>
+  const ownCheckout = (playerId: string) =>
+    checkoutRows.find(row => row.player_id === playerId && row.user_id === userId)
+  const hasPrimary = (playerId: string) =>
+    checkoutRows.some(row => row.player_id === playerId && row.is_primary)
 
-  const rows = relinks
-    .filter(relink => isPrimaryByPlayerId.has(relink.fromPlayerId))
-    .map(relink => ({
-      game_id: gameId,
-      player_id: relink.toPlayerId,
-      user_id: userId,
-      is_primary: isPrimaryByPlayerId.get(relink.fromPlayerId) ?? true,
-    }))
+  const rows = relinks.flatMap(relink => {
+    const source = ownCheckout(relink.fromPlayerId)
+    // Nothing to carry across, or this recorder already has an assignment on the target
+    // that is not ours to rewrite.
+    if (!source || ownCheckout(relink.toPlayerId)) return []
+    return [
+      {
+        game_id: gameId,
+        player_id: relink.toPlayerId,
+        user_id: userId,
+        // Only claim primary into a vacancy. Someone else already holding it there
+        // outranks a claim inherited from a different player's row.
+        is_primary: source.is_primary && !hasPrimary(relink.toPlayerId),
+      },
+    ]
+  })
 
   if (rows.length === 0) return
 
   const { error: insertError } = await supabase
     .from('player_checkouts')
-    .upsert(rows, { onConflict: 'game_id,player_id,user_id' })
+    .upsert(rows, { onConflict: 'game_id,player_id,user_id', ignoreDuplicates: true })
 
   if (insertError) {
     throw new Error(`Checkout relink failed: ${insertError.message}`)

@@ -14,7 +14,7 @@ const mock = vi.hoisted(() => ({
   teamPlayersUpdateError: null as string | null,
   teamPlayersUpsertError: null as string | null,
   statUpserts: [] as Array<Array<{ player_id: string; stat_id: string; value: number }>>,
-  ownCheckouts: [] as Array<{ player_id: string; is_primary: boolean }>,
+  gameCheckouts: [] as Array<{ player_id: string; user_id: string; is_primary: boolean }>,
   checkoutUpserts: [] as Array<Array<{ player_id: string; user_id: string; is_primary: boolean }>>,
 }))
 
@@ -199,9 +199,7 @@ vi.mock('./supabase', () => ({
             mock.ops.push('player_checkouts.select')
             return {
               eq: () => ({
-                eq: () => ({
-                  in: () => Promise.resolve({ data: mock.ownCheckouts, error: null }),
-                }),
+                in: () => Promise.resolve({ data: mock.gameCheckouts, error: null }),
               }),
             }
           },
@@ -293,7 +291,7 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.teamPlayersUpdateError = null
     mock.teamPlayersUpsertError = null
     mock.statUpserts.length = 0
-    mock.ownCheckouts.length = 0
+    mock.gameCheckouts.length = 0
     mock.checkoutUpserts.length = 0
   })
 
@@ -437,7 +435,7 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.gameStatsError = null
     const shared = '11111111-1111-4111-8111-111111111111'
     // This recorder had checked out the shared row and was chosen as primary for it.
-    mock.ownCheckouts = [{ player_id: shared, is_primary: true }]
+    mock.gameCheckouts = [{ player_id: shared, user_id: 'user-1', is_primary: true }]
 
     const result = await syncGameSnapshotToCloud({
       state: state({
@@ -467,7 +465,7 @@ describe('syncGameSnapshotToCloud hardening', () => {
     const shared = '11111111-1111-4111-8111-111111111111'
     // Another recorder may hold a checkout on the shared row, but this device cannot
     // prove their map was corrupted too, so their assignment is never duplicated.
-    mock.ownCheckouts = []
+    mock.gameCheckouts = []
 
     await syncGameSnapshotToCloud({
       state: state({
@@ -485,6 +483,65 @@ describe('syncGameSnapshotToCloud hardening', () => {
     })
 
     expect(mock.checkoutUpserts).toEqual([])
+  })
+
+  it('never rewrites a checkout this recorder already holds on the relink target', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    const moved = 'remote-player-1'
+    // Already deliberately non-primary on the target; the repair must not promote it.
+    mock.gameCheckouts = [
+      { player_id: shared, user_id: 'user-1', is_primary: true },
+      { player_id: moved, user_id: 'user-1', is_primary: false },
+    ]
+
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(result.playerIdMap['local-2']).toBe(moved)
+    expect(mock.checkoutUpserts).toEqual([])
+  })
+
+  it('does not claim primary when another recorder already holds it on the target', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    const moved = 'remote-player-1'
+    mock.gameCheckouts = [
+      { player_id: shared, user_id: 'user-1', is_primary: true },
+      { player_id: moved, user_id: 'user-2', is_primary: true },
+    ]
+
+    await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    // Two primaries would make get_game_stats_resolved pick between them arbitrarily.
+    expect(mock.checkoutUpserts).toEqual([
+      [{ game_id: 'game-1', player_id: moved, user_id: 'user-1', is_primary: false }],
+    ])
   })
 
   it('does not write cleanup rows for a game this sync just created', async () => {
