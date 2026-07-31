@@ -4,11 +4,10 @@ Architecture audit, basketball event catalog, projection contract, compatibility
 F13 reconciliation for moving basketball onto the shared `GameEvent` foundation proven by the
 soccer program.
 
-Status: Draft, revision 6 — updated against the completed SOC-6 summary, canonical aggregate,
+Status: Approved, revision 6 — updated against the completed SOC-6 summary, canonical aggregate,
 settings, and release program. Product-model Q&A Batches A-F and the §12a authority decisions are
-approved. The architecture is ready for final BKE-0 approval. The current basketball counter grid is
-a compatibility baseline, not a complete product definition. No basketball code changes belong to
-BKE-0.
+approved. BKE-1 planning is active. The current basketball counter grid is a compatibility baseline,
+not a complete product definition. No basketball code changes belong to BKE-0.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 

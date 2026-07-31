@@ -3,10 +3,9 @@
 Required follow-up roadmap for moving basketball from its current counter/action-log/shot
 record combination onto the shared `GameEvent` foundation introduced by the soccer program.
 
-Status: BKE-0 architecture planning is drafted in
-[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md), revised
-against the completed SOC-6 program. Product-model Q&A Batches A-F and the authority decisions are
-approved; final BKE-0 approval remains. BKE-1 through BKE-6 implementation is gated on that approval.
+Status: BKE-0 architecture and product-model decisions are approved in
+[PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md).
+BKE-1 planning is active; implementation begins with the BKE-1A shared-engine phase.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
