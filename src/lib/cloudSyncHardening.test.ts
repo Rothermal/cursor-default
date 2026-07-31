@@ -72,6 +72,14 @@ vi.mock('./supabase', () => ({
 
       if (table === 'players') {
         return {
+          delete: () => {
+            mock.ops.push('players.delete')
+            return {
+              eq: () => ({
+                eq: () => Promise.resolve({ error: null }),
+              }),
+            }
+          },
           select: () => {
             mock.ops.push('players.select')
             return {
@@ -293,6 +301,64 @@ describe('syncGameSnapshotToCloud hardening', () => {
       'Team roster link failed'
     )
     expect(mock.ops).toContain('team_players.upsert')
+  })
+
+  it('deletes the player it created when the roster link fails', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersUpsertError = 'roster link denied'
+
+    // The unlinked row is invisible to the candidate query, which joins team_players, so
+    // leaving it behind would orphan one player per retry.
+    await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
+      'Team roster link failed'
+    )
+    expect(mock.ops.indexOf('players.delete')).toBeGreaterThan(
+      mock.ops.indexOf('team_players.upsert')
+    )
+  })
+
+  it('does not delete a player it only found when the roster link fails', async () => {
+    mock.gameStatsError = null
+    mock.teamPlayersUpsertError = 'roster link denied'
+    // Blank jersey with no same-name teammate falls back to owned-by-name, where the
+    // mocked players.select returns an existing row rather than inserting one.
+    mock.teamPlayerCandidates = []
+
+    await expect(
+      syncGameSnapshotToCloud({
+        state: state({ players: [{ id: 'local-1', name: 'One Player', number: '', stats: {} }] }),
+        userId: 'user-1',
+      })
+    ).rejects.toThrow('Team roster link failed')
+    expect(mock.ops).not.toContain('players.insert')
+    expect(mock.ops).not.toContain('players.delete')
+  })
+
+  it('refuses to sync when two roster players share one cloud player', async () => {
+    mock.gameStatsError = null
+
+    // A map corrupted by the old name-only matching bypasses candidate resolution
+    // entirely, since a valid existing mapping short-circuits it.
+    await expect(
+      syncGameSnapshotToCloud({
+        state: state({
+          players: [
+            { id: 'local-1', name: 'Alex Kim', number: '', stats: {} },
+            { id: 'local-2', name: 'Alex Kim', number: '', stats: {} },
+          ],
+          cloudSync: {
+            ...state().cloudSync,
+            playerIdMap: {
+              'local-1': '11111111-1111-4111-8111-111111111111',
+              'local-2': '11111111-1111-4111-8111-111111111111',
+            },
+          },
+        }),
+        userId: 'user-1',
+      })
+    ).rejects.toThrow(/Cloud player links are corrupted: Alex Kim and Alex Kim/)
+    // Fails before any write.
+    expect(mock.ops).toEqual([])
   })
 
   it('rejects setup-only sport state before aggregate cloud writes', async () => {

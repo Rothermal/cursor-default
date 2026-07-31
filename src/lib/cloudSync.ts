@@ -22,6 +22,7 @@ import {
   mapShotRows,
   parsePlayerName,
   parseSeasonTeamStatsConfig,
+  findDuplicatePlayerMappings,
   resolveUnmappedPlayer,
   type RemoteShotRow,
   type TeamPlayerCandidate,
@@ -523,7 +524,7 @@ async function ensurePlayerId(
   // jersey in SQL cannot tell "same person, new number" from "different person".
   const { data: existingOnTeam, error: junctionLookupError } = await supabase
     .from('team_players')
-    .select('player_id, jersey_number, players!inner(id, first_name, last_name)')
+    .select('player_id, jersey_number, is_active, players!inner(id, first_name, last_name)')
     .eq('team_id', teamId)
     .eq('players.first_name', firstName)
     .eq('players.last_name', lastName)
@@ -535,8 +536,16 @@ async function ensurePlayerId(
   }
 
   const candidates: TeamPlayerCandidate[] = (
-    (existingOnTeam ?? []) as Array<{ player_id: string; jersey_number: string | null }>
-  ).map(row => ({ playerId: row.player_id, jerseyNumber: row.jersey_number }))
+    (existingOnTeam ?? []) as Array<{
+      player_id: string
+      jersey_number: string | null
+      is_active: boolean | null
+    }>
+  ).map(row => ({
+    playerId: row.player_id,
+    jerseyNumber: row.jersey_number,
+    isActive: row.is_active !== false,
+  }))
   const resolution = resolveUnmappedPlayer({ candidates, jerseyNumber, claimedPlayerIds })
 
   if (resolution.mode === 'reuse_team_match') {
@@ -559,6 +568,9 @@ async function ensurePlayerId(
   }
 
   let playerId: string
+  // Only set when this call inserted the row, so a failed roster link can clean up
+  // after itself without ever deleting a player it merely found.
+  let createdPlayerId: string | null = null
 
   if (resolution.mode === 'create_distinct') {
     const { data: createdPlayer, error: createError } = await supabase
@@ -571,6 +583,7 @@ async function ensurePlayerId(
       throw new Error(`Player creation failed: ${createError?.message ?? 'unknown error'}`)
     }
     playerId = createdPlayer.id as string
+    createdPlayerId = playerId
   } else {
     const { data: ownedPlayers, error: lookupError } = await supabase
       .from('players')
@@ -598,6 +611,7 @@ async function ensurePlayerId(
       }
 
       playerId = createdPlayer.id as string
+      createdPlayerId = playerId
     }
   }
 
@@ -619,6 +633,19 @@ async function ensurePlayerId(
   // A player id whose roster link failed would sync stats against a team the player
   // is not on, so fail here rather than returning a half-linked identity.
   if (rosterLinkError) {
+    // The unlinked row is invisible to the candidate query (it joins `team_players`),
+    // so leaving it behind would orphan one player per retry. Best effort: never let a
+    // cleanup failure mask the error that actually stopped the sync.
+    if (createdPlayerId) {
+      const { error: cleanupError } = await supabase
+        .from('players')
+        .delete()
+        .eq('id', createdPlayerId)
+        .eq('created_by', userId)
+      if (cleanupError) {
+        console.warn('[StatKeeper] Failed to clean up unlinked player row', cleanupError.message)
+      }
+    }
     throw new Error(`Team roster link failed: ${rosterLinkError.message}`)
   }
 
@@ -819,6 +846,25 @@ export async function syncGameSnapshotToCloud({
   // Resolve players and roster links before inserting a brand-new `games` row.
   // This shrinks the orphan window: failures in player/team-player setup no longer
   // leave an in-progress cloud game without stats.
+  // An already-corrupted map bypasses every protection below, because a valid existing
+  // mapping short-circuits candidate resolution entirely. Detect it before any write
+  // rather than silently merging two players' stats for another game.
+  const duplicateMappings = findDuplicatePlayerMappings(
+    state.cloudSync.playerIdMap,
+    state.players.filter(player => !isTeamPseudoPlayer(player)).map(player => player.id)
+  )
+  if (duplicateMappings.length > 0) {
+    const nameFor = (localId: string) =>
+      state.players.find(player => player.id === localId)?.name ?? localId
+    const collisions = duplicateMappings
+      .map(duplicate => duplicate.localPlayerIds.map(nameFor).join(' and '))
+      .join('; ')
+    throw new Error(
+      `Cloud player links are corrupted: ${collisions} point at the same cloud player. ` +
+        'Remove and re-add one of them on the player setup screen to relink, then sync again.'
+    )
+  }
+
   const nextPlayerIdMap: Record<string, string> = {}
   // Cloud rows already spoken for. Seeded from the durable map so an unmapped local
   // player cannot claim a mapped teammate's row regardless of roster order, then grown
