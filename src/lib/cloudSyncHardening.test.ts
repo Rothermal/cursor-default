@@ -14,6 +14,8 @@ const mock = vi.hoisted(() => ({
   teamPlayersUpdateError: null as string | null,
   teamPlayersUpsertError: null as string | null,
   statUpserts: [] as Array<Array<{ player_id: string; stat_id: string; value: number }>>,
+  ownCheckouts: [] as Array<{ player_id: string; is_primary: boolean }>,
+  checkoutUpserts: [] as Array<Array<{ player_id: string; user_id: string; is_primary: boolean }>>,
 }))
 
 vi.mock('./supabase', () => ({
@@ -191,6 +193,28 @@ vi.mock('./supabase', () => ({
         }
       }
 
+      if (table === 'player_checkouts') {
+        return {
+          select: () => {
+            mock.ops.push('player_checkouts.select')
+            return {
+              eq: () => ({
+                eq: () => ({
+                  in: () => Promise.resolve({ data: mock.ownCheckouts, error: null }),
+                }),
+              }),
+            }
+          },
+          upsert: (rows: unknown) => {
+            mock.ops.push('player_checkouts.upsert')
+            mock.checkoutUpserts.push(
+              rows as Array<{ player_id: string; user_id: string; is_primary: boolean }>
+            )
+            return Promise.resolve({ error: null })
+          },
+        }
+      }
+
       if (table === 'client_sync_errors') {
         return {
           insert: () => {
@@ -269,6 +293,8 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.teamPlayersUpdateError = null
     mock.teamPlayersUpsertError = null
     mock.statUpserts.length = 0
+    mock.ownCheckouts.length = 0
+    mock.checkoutUpserts.length = 0
   })
 
   it('fails closed when the same-name teammate lookup errors', async () => {
@@ -405,6 +431,60 @@ describe('syncGameSnapshotToCloud hardening', () => {
     expect(snapshot).not.toContainEqual(
       expect.objectContaining({ player_id: shared, stat_id: 'reb' })
     )
+  })
+
+  it('carries the recorder checkout across to the relinked player', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    // This recorder had checked out the shared row and was chosen as primary for it.
+    mock.ownCheckouts = [{ player_id: shared, is_primary: true }]
+
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    const moved = result.playerIdMap['local-2']
+    // Without this, get_game_stats_resolved finds no primary checkout for the moved
+    // player and stops resolving their stats as primary.
+    expect(mock.checkoutUpserts).toEqual([
+      [{ game_id: 'game-1', player_id: moved, user_id: 'user-1', is_primary: true }],
+    ])
+  })
+
+  it('copies no checkout when this recorder never checked the shared player out', async () => {
+    mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
+    // Another recorder may hold a checkout on the shared row, but this device cannot
+    // prove their map was corrupted too, so their assignment is never duplicated.
+    mock.ownCheckouts = []
+
+    await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: { pts: 2 } },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: { reb: 1 } },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          gameId: 'game-1',
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(mock.checkoutUpserts).toEqual([])
   })
 
   it('does not write cleanup rows for a game this sync just created', async () => {

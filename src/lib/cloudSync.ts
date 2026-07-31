@@ -691,6 +691,65 @@ async function clearStatsFromRelinkedPlayer(
   }
 }
 
+/**
+ * Carry this recorder's checkout across to a player that was relinked off a shared id.
+ *
+ * Only the caller's own row is copied, and deliberately so. A checkout means "this user
+ * is recording the player at that cloud id". This device can prove that *its own* map had
+ * both locals on the shared id, so its user was recording both. It cannot know whether
+ * another recorder's map was corrupted the same way, and copying their row would assert
+ * they record a player they may never have seen — potentially making them primary for it,
+ * which is the same wrong-authority problem this repair exists to fix. `is_primary` is
+ * preserved rather than forced true for the same reason.
+ */
+async function copyOwnCheckoutToRelinkedPlayers(
+  userId: string,
+  gameId: string,
+  relinks: Array<{ fromPlayerId: string; toPlayerId: string }>
+): Promise<void> {
+  if (!supabase) {
+    throw new Error('Supabase client not configured')
+  }
+  if (relinks.length === 0) return
+
+  const { data: ownCheckouts, error: lookupError } = await supabase
+    .from('player_checkouts')
+    .select('player_id, is_primary')
+    .eq('game_id', gameId)
+    .eq('user_id', userId)
+    .in('player_id', [...new Set(relinks.map(relink => relink.fromPlayerId))])
+
+  if (lookupError) {
+    throw new Error(`Checkout relink lookup failed: ${lookupError.message}`)
+  }
+
+  const isPrimaryByPlayerId = new Map(
+    ((ownCheckouts ?? []) as Array<{ player_id: string; is_primary: boolean }>).map(row => [
+      row.player_id,
+      row.is_primary,
+    ])
+  )
+
+  const rows = relinks
+    .filter(relink => isPrimaryByPlayerId.has(relink.fromPlayerId))
+    .map(relink => ({
+      game_id: gameId,
+      player_id: relink.toPlayerId,
+      user_id: userId,
+      is_primary: isPrimaryByPlayerId.get(relink.fromPlayerId) ?? true,
+    }))
+
+  if (rows.length === 0) return
+
+  const { error: insertError } = await supabase
+    .from('player_checkouts')
+    .upsert(rows, { onConflict: 'game_id,player_id,user_id' })
+
+  if (insertError) {
+    throw new Error(`Checkout relink failed: ${insertError.message}`)
+  }
+}
+
 async function upsertGameStats(
   state: GameState,
   userId: string,
@@ -896,6 +955,9 @@ export async function syncGameSnapshotToCloud({
   // leaves them behind, because `upsertGameStats` only writes the keys each player
   // currently has and never clears one written under a different mapping.
   const staleStatIdsBySharedPlayerId = new Map<string, Set<string>>()
+  // Local players moved off a shared cloud id, so their checkout can follow them once
+  // the loop below has resolved what they moved to.
+  const relinkedFromSharedPlayerId = new Map<string, string>()
   for (const duplicate of duplicateMappings) {
     const [keeperLocalId, ...movedLocalIds] = duplicate.localPlayerIds
     const statsFor = (localId: string) =>
@@ -905,6 +967,7 @@ export async function syncGameSnapshotToCloud({
 
     for (const localPlayerId of movedLocalIds) {
       delete playerIdMap[localPlayerId]
+      relinkedFromSharedPlayerId.set(localPlayerId, duplicate.remotePlayerId)
       repairedPlayerLinks.push(
         state.players.find(player => player.id === localPlayerId)?.name ?? localPlayerId
       )
@@ -970,6 +1033,21 @@ export async function syncGameSnapshotToCloud({
     // DELETE policy, so a zero value is the available way to neutralise a row.
     if (!ensuredGame.created && staleStatIdsBySharedPlayerId.size > 0) {
       await clearStatsFromRelinkedPlayer(userId, gameId, staleStatIdsBySharedPlayerId)
+    }
+
+    // A checkout keyed by the shared cloud id no longer covers the player that moved off
+    // it, so `get_game_stats_resolved` would stop seeing a primary for them.
+    if (!ensuredGame.created && relinkedFromSharedPlayerId.size > 0) {
+      await copyOwnCheckoutToRelinkedPlayers(
+        userId,
+        gameId,
+        [...relinkedFromSharedPlayerId]
+          .map(([localPlayerId, fromPlayerId]) => ({
+            fromPlayerId,
+            toPlayerId: nextPlayerIdMap[localPlayerId],
+          }))
+          .filter(relink => relink.toPlayerId && relink.toPlayerId !== relink.fromPlayerId)
+      )
     }
 
     await upsertGameStats(state, userId, gameId, nextPlayerIdMap)
