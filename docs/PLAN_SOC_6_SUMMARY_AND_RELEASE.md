@@ -1,6 +1,8 @@
 # Plan: SOC-6 Summary and Release
 
-Status: SOC-6A through SOC-6C and SOC-6D1 implemented. SOC-6D2 through SOC-6E remain planned.
+Status: SOC-6A through SOC-6E3 implemented. Soccer is approved as an owner-only opt-in production
+sport; post-deployment and broader-release evidence remains tracked in
+`REGRESSION_SOC_6E_RELEASE.md`.
 
 ## 1. Goal
 
@@ -307,6 +309,11 @@ review, and SOC-6B4 Shootout review plus the detailed-summary release boundary.
 SOC-6C focused Q&A and detailed implementation planning are complete in
 `docs/PLAN_SOC_6C_CANONICAL_AGGREGATES.md`. Delivery is split into SOC-6C1 stat contract/engine,
 SOC-6C2 source transport, SOC-6C3 team scopes, and SOC-6C4 player scopes/hardening.
+
+SOC-6D is implemented through settings foundation, personal reconciliation, shared team/setup
+inheritance, and hardening. SOC-6E focused Q&A and detailed planning are complete in
+`docs/PLAN_SOC_6E_RELEASE_HARDENING.md`; delivery is split into SOC-6E1 availability/capability,
+SOC-6E2 regression hardening, and SOC-6E3 production enablement.
 
 SOC-6D focused Q&A and detailed implementation planning are complete in
 `docs/PLAN_SOC_6D_SOCCER_SETTINGS.md`. Delivery is split into SOC-6D1 schema/resolver/local model,

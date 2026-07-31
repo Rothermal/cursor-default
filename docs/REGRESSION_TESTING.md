@@ -1033,10 +1033,23 @@ additional migration.
 | 11w.7 | Use Settings and Match Setup at 320 px and desktop widths with long period labels | Inputs and actions remain visible without incoherent overlap; team Save stacks on narrow screens |
 | 11w.8 | Navigate personal setting tabs by keyboard and trigger Reset All | Arrow/Home/End move tab focus and selection; status/errors announce; Reset All confirms and remains unsaved until Save |
 | 11w.9 | Park a Soccer setup, change personal/team defaults, then resume it | The parked match retains its fixed snapshot; a new setup resolves current built-in -> personal -> team -> match values |
-| 11w.10 | Run production availability tests and repeat Basketball settings/setup/park/sign-out smoke checks | Soccer remains unavailable in production until SOC-6E and Basketball behavior is unchanged |
+| 11w.10 | Run production availability tests and repeat Basketball settings/setup/park/sign-out smoke checks | Soccer is hidden by default, becomes available after device opt-in, existing records remain reachable when disabled, and Basketball is unchanged |
 
 See [the detailed SOC-6D matrix](REGRESSION_SOC_6D_SETTINGS.md) for automated evidence and the
 full operator checklist.
+
+---
+
+## 11x. Soccer release hardening and enablement (SOC-6E)
+
+SOC-6E separates production release, device discovery/new-game permission, and existing-record
+access. Its consolidated matrix covers development preview, unreleased and released production,
+capabilities through migration 049, PWA/offline recovery, multi-sport parking, roles, recorders,
+finalization, summaries, aggregates, settings, responsive/accessibility checks, and Basketball.
+
+Use [the SOC-6E release matrix](REGRESSION_SOC_6E_RELEASE.md) as the operator record. SOC-6E2
+requires the development/staging and unreleased-production passes; SOC-6E3 repeats release-sensitive
+rows against the deployed released build. CI alone is not release sign-off.
 
 ---
 

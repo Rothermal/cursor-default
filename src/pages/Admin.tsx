@@ -23,7 +23,7 @@ import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePl
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { isMissingTeamStatsConfigColumnError } from '../lib/cloudSyncHelpers'
-import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import {
   exportParkedGames,
   getParkedGameStorageInfo,
@@ -120,7 +120,9 @@ export default function Admin() {
   const userId = user?.id ?? null
 
   const enabledSports = useMemo(
-    () => sports.filter(s => isSportWorkspaceAvailable(s.id, isSportEnabled(s.id))),
+    () => sports.filter(
+      s => getSportAvailabilityPolicy(s.id, isSportEnabled(s.id)).discoverable
+    ),
     [isSportEnabled]
   )
   const enabledCount = enabledSports.length
@@ -154,7 +156,9 @@ export default function Admin() {
   const [seasonsError, setSeasonsError] = useState<string | null>(null)
   const [newSeasonName, setNewSeasonName] = useState('')
   const [newSeasonSport, setNewSeasonSport] = useState(
-    () => sports.find(s => isSportWorkspaceAvailable(s.id, isSportEnabled(s.id)))?.id ?? sports[0]?.id ?? ''
+    () => sports.find(
+      s => getSportAvailabilityPolicy(s.id, isSportEnabled(s.id)).discoverable
+    )?.id ?? sports[0]?.id ?? ''
   )
   const [newSeasonStartDate, setNewSeasonStartDate] = useState('')
   const [newSeasonEndDate, setNewSeasonEndDate] = useState('')
@@ -636,8 +640,11 @@ export default function Admin() {
 
             <div className="space-y-2">
               {sports.map(sport => {
-                const isSoccerPreview = sport.id === 'soccer'
-                const enabled = isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
+                const availability = getSportAvailabilityPolicy(
+                  sport.id,
+                  isSportEnabled(sport.id)
+                )
+                const enabled = availability.discoverable
                 return (
                   <div
                     key={sport.id}
@@ -651,8 +658,12 @@ export default function Admin() {
                       <div>
                         <span className="font-medium text-slate-700">{sport.name}</span>
                         <p className="text-xs text-slate-400">
-                          {isSoccerPreview
-                            ? import.meta.env.DEV ? 'Development preview' : 'Coming soon'
+                          {availability.releaseStage
+                            ? availability.releaseStage === 'preview'
+                              ? 'Development preview'
+                              : availability.releaseStage === 'unreleased'
+                                ? 'Coming soon'
+                                : 'Full match tracking'
                             : `${sport.categories.reduce((n, c) => n + c.actions.length, 0)} stats across ${sport.categories.length} categories`}
                         </p>
                       </div>
@@ -661,15 +672,15 @@ export default function Admin() {
                     <button
                       type="button"
                       onClick={() => toggleSport(sport.id)}
-                      disabled={isSoccerPreview}
+                      disabled={!availability.toggleAvailable}
                       className={`
                         relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
                         ${enabled ? 'bg-blue-600' : 'bg-slate-300'}
-                        ${isSoccerPreview ? 'cursor-not-allowed opacity-70' : ''}
+                        ${!availability.toggleAvailable ? 'cursor-not-allowed opacity-70' : ''}
                       `}
                       role="switch"
                       aria-checked={enabled}
-                      aria-label={isSoccerPreview ? `${sport.name} preview availability` : `Toggle ${sport.name}`}
+                      aria-label={`Toggle ${sport.name}`}
                     >
                       <span
                         className={`
@@ -701,7 +712,10 @@ export default function Admin() {
             <div className="space-y-2">
               {sports.map(sport => {
                 const hasSettings = sport.id === 'basketball' || sport.id === 'soccer'
-                const enabled = isSportWorkspaceAvailable(sport.id, isSportEnabled(sport.id))
+                const availability = getSportAvailabilityPolicy(
+                  sport.id,
+                  isSportEnabled(sport.id)
+                )
                 return (
                   <Link
                     key={sport.id}
@@ -720,9 +734,11 @@ export default function Admin() {
                       </span>
                     </span>
                     <span className="text-xs font-semibold text-slate-400">
-                      {sport.id === 'soccer' && import.meta.env.DEV
+                      {availability.releaseStage === 'preview'
                         ? 'Preview'
-                        : enabled ? 'Enabled' : 'Disabled'}
+                        : availability.releaseStage === 'unreleased'
+                          ? 'Coming soon'
+                          : availability.discoverable ? 'Enabled' : 'Disabled'}
                     </span>
                   </Link>
                 )

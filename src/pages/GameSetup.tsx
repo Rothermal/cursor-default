@@ -8,7 +8,8 @@ import { supabase } from '../lib/supabase'
 import { teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { isSportWorkspaceAvailable } from '../lib/sportAvailability'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 import {
   acceptedTeamRole,
   canManageTeam,
@@ -91,6 +92,7 @@ export default function GameSetup() {
   const [setupError, setSetupError] = useState<string | null>(null)
   const [loadingRequestedTeamSport, setLoadingRequestedTeamSport] = useState(false)
   const [requestedTeamSportError, setRequestedTeamSportError] = useState<string | null>(null)
+  const [requestedLocalFallbackSportId, setRequestedLocalFallbackSportId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!requestedTeamId || !isCloudFlow || !supabase) return
@@ -100,6 +102,7 @@ export default function GameSetup() {
     const loadRequestedTeamSport = async () => {
       setLoadingRequestedTeamSport(true)
       setRequestedTeamSportError(null)
+      setRequestedLocalFallbackSportId(null)
       const [{ data, error }, { data: roleData, error: roleError }] = await Promise.all([
         client
           .from('teams')
@@ -129,10 +132,33 @@ export default function GameSetup() {
         setLoadingRequestedTeamSport(false)
         return
       }
-      if (!isSportWorkspaceAvailable(requestedSport.id, isSportEnabled(requestedSport.id))) {
-        setRequestedTeamSportError(`${requestedSport.name} game tracking is not available.`)
+      const availability = getSportAvailabilityPolicy(
+        requestedSport.id,
+        isSportEnabled(requestedSport.id)
+      )
+      if (!availability.canStartNewGame) {
+        setRequestedTeamSportError(
+          availability.releaseStage === 'unreleased'
+            ? `${requestedSport.name} is coming soon.`
+            : `Enable ${requestedSport.name} in Settings before starting a game.`
+        )
         setLoadingRequestedTeamSport(false)
         return
+      }
+      if (requestedSport.id === 'soccer') {
+        if (!userId) {
+          setRequestedTeamSportError('Sign in before starting a cloud Soccer match.')
+          setLoadingRequestedTeamSport(false)
+          return
+        }
+        const capability = await ensureSoccerReleaseCapabilities(userId)
+        if (cancelled) return
+        if (capability.status !== 'ready') {
+          setRequestedTeamSportError(capability.error)
+          setRequestedLocalFallbackSportId(requestedSport.id)
+          setLoadingRequestedTeamSport(false)
+          return
+        }
       }
 
       const hasActiveGame = Boolean(state.sport && state.players.length > 0)
@@ -166,7 +192,7 @@ export default function GameSetup() {
       cancelled = true
     }
     // Re-run on sport/team/roster identity only — not every local stat tick.
-  }, [dispatch, isCloudFlow, isSportEnabled, navigate, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport])
+  }, [dispatch, isCloudFlow, isSportEnabled, navigate, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -393,6 +419,21 @@ export default function GameSetup() {
     requestedTeamId && !loadingTeams && !selectedTeam
   )
 
+  const startRequestedTeamLocally = () => {
+    const requestedSport = sports.find(item => item.id === requestedLocalFallbackSportId)
+    if (!requestedSport) return
+    const hasActiveGame = Boolean(state.sport && state.players.length > 0)
+    if (
+      hasActiveGame &&
+      !window.confirm(`Park your current game and start a local ${requestedSport.name} match?`)
+    ) {
+      return
+    }
+    if (!startNewGame(requestedSport)) return
+    setRequestedLocalFallbackSportId(null)
+    navigate('/setup', { replace: true })
+  }
+
   if (!sport) {
     if (requestedTeamId && isCloudFlow) {
       return (
@@ -405,9 +446,24 @@ export default function GameSetup() {
                 : parkingError ?? requestedTeamSportError ?? 'Preparing game setup...'}
             </p>
             {requestedTeamSportError && (
-              <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
-                Back to Cloud Teams
-              </button>
+              <div className="space-y-2">
+                {requestedLocalFallbackSportId && (
+                  <button
+                    type="button"
+                    onClick={startRequestedTeamLocally}
+                    className="btn-primary w-full"
+                  >
+                    Start Local Match
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate('/teams')}
+                  className="btn-secondary w-full"
+                >
+                  Back to Cloud Teams
+                </button>
+              </div>
             )}
           </div>
         </div>

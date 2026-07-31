@@ -7,6 +7,7 @@ import {
   APP_ACCESS_DENIED_EVENT,
   type AppAccessDenial,
 } from '../lib/appAccessSignal'
+import { clearSoccerReleaseCapabilityCache } from '../lib/soccer/releaseCapabilities'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -34,7 +35,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [appAccessLoading, setAppAccessLoading] = useState(false)
   const [appAccessError, setAppAccessError] = useState<string | null>(null)
   const appAccessRequest = useRef(0)
+  const capabilityUserId = useRef<string | null>(null)
   const configured = isSupabaseConfigured()
+
+  useEffect(() => {
+    const nextUserId = user?.id ?? null
+    if (capabilityUserId.current !== nextUserId) {
+      clearSoccerReleaseCapabilityCache()
+      capabilityUserId.current = nextUserId
+    }
+  }, [user?.id])
 
   useEffect(() => {
     if (!supabase) {
@@ -142,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAppAccess(null)
     setAppAccessError(null)
     setAppAccessLoading(false)
+    clearSoccerReleaseCapabilityCache()
     clearPersistedGameStorage()
     await supabase.auth.signOut()
   }, [])

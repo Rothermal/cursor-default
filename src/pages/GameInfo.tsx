@@ -311,10 +311,6 @@ export default function GameInfo() {
       sport?.id !== 'soccer'
     ) return
     if (sport?.id === 'soccer') {
-      if (!import.meta.env.DEV) {
-        setError('Soccer match review remains unavailable until the soccer release phase.')
-        return
-      }
       if (game.status === 'final' || !canTrackGames(teamRole)) {
         navigate(soccerSummaryPath({
           gameId: game.id,
