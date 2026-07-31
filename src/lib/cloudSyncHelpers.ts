@@ -218,8 +218,13 @@ export function resolveUnmappedPlayer(args: {
   }
 
   if (jersey) {
-    // The one signal strong enough to reclaim a deactivated row.
-    const exact = available.find(candidate => (candidate.jerseyNumber ?? '').trim() === jersey)
+    // The one signal strong enough to reclaim a deactivated row — but a teammate still
+    // on the roster always wins over one that was taken off it, whatever the id order.
+    const wearsJersey = (candidate: TeamPlayerCandidate) =>
+      (candidate.jerseyNumber ?? '').trim() === jersey
+    const exact =
+      available.find(candidate => candidate.isActive && wearsJersey(candidate)) ??
+      available.find(wearsJersey)
     if (exact) {
       return { mode: 'reuse_team_match', playerId: exact.playerId, adoptJersey: false }
     }

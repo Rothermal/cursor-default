@@ -60,6 +60,8 @@ export interface SyncGameSnapshotResult {
   skippedFinalGame?: boolean
   /** When set, `shot_chart` was left unchanged (see `CloudSyncState.shotChartHydrationDroppedRows`). */
   shotChartCloudSync?: ShotChartCloudSyncMode
+  /** Players whose duplicate cloud link was repaired during this sync, by display name. */
+  repairedPlayerLinks?: string[]
 }
 
 export interface HydratedCloudGame {
@@ -840,42 +842,51 @@ export async function syncGameSnapshotToCloud({
     }
   }
 
+  // An already-corrupted map bypasses every protection below, because a valid existing
+  // mapping short-circuits candidate resolution entirely. Repair it rather than failing:
+  // the only manual fix available would be removing the player from the roster, which
+  // deletes the very stats and shots the recorder is trying to sync.
+  const duplicateMappings = findDuplicatePlayerMappings(
+    state.cloudSync.playerIdMap,
+    state.players.filter(player => !isTeamPseudoPlayer(player)).map(player => player.id)
+  )
+  // The first local player keeps the cloud row; the rest drop their mapping and fall
+  // through to normal resolution, where `claimedPlayerIds` stops them re-collapsing onto
+  // it and a distinct cloud player is created instead.
+  const playerIdMap = { ...state.cloudSync.playerIdMap }
+  const repairedPlayerLinks: string[] = []
+  for (const duplicate of duplicateMappings) {
+    for (const localPlayerId of duplicate.localPlayerIds.slice(1)) {
+      delete playerIdMap[localPlayerId]
+      repairedPlayerLinks.push(
+        state.players.find(player => player.id === localPlayerId)?.name ?? localPlayerId
+      )
+    }
+  }
+  if (repairedPlayerLinks.length > 0) {
+    console.warn(
+      `[StatKeeper] Repaired duplicate cloud player links: ${repairedPlayerLinks.join(', ')}. ` +
+        'Earlier syncs of this game merged their stats in the cloud.'
+    )
+  }
+
   const seasonId = await ensureSeason(state, userId)
   const teamId = await ensureTeam(state, userId, seasonId)
 
   // Resolve players and roster links before inserting a brand-new `games` row.
   // This shrinks the orphan window: failures in player/team-player setup no longer
   // leave an in-progress cloud game without stats.
-  // An already-corrupted map bypasses every protection below, because a valid existing
-  // mapping short-circuits candidate resolution entirely. Detect it before any write
-  // rather than silently merging two players' stats for another game.
-  const duplicateMappings = findDuplicatePlayerMappings(
-    state.cloudSync.playerIdMap,
-    state.players.filter(player => !isTeamPseudoPlayer(player)).map(player => player.id)
-  )
-  if (duplicateMappings.length > 0) {
-    const nameFor = (localId: string) =>
-      state.players.find(player => player.id === localId)?.name ?? localId
-    const collisions = duplicateMappings
-      .map(duplicate => duplicate.localPlayerIds.map(nameFor).join(' and '))
-      .join('; ')
-    throw new Error(
-      `Cloud player links are corrupted: ${collisions} point at the same cloud player. ` +
-        'Remove and re-add one of them on the player setup screen to relink, then sync again.'
-    )
-  }
-
   const nextPlayerIdMap: Record<string, string> = {}
   // Cloud rows already spoken for. Seeded from the durable map so an unmapped local
   // player cannot claim a mapped teammate's row regardless of roster order, then grown
   // as the loop resolves, so two same-named locals never collapse onto one cloud player.
-  const claimedPlayerIds = new Set<string>(Object.values(state.cloudSync.playerIdMap))
+  const claimedPlayerIds = new Set<string>(Object.values(playerIdMap))
   for (const player of state.players) {
     const remotePlayerId = await ensurePlayerId(
       player,
       teamId,
       userId,
-      state.cloudSync.playerIdMap[player.id],
+      playerIdMap[player.id],
       claimedPlayerIds
     )
     nextPlayerIdMap[player.id] = remotePlayerId
@@ -935,6 +946,7 @@ export async function syncGameSnapshotToCloud({
     playerIdMap: nextPlayerIdMap,
     syncedAt: new Date().toISOString(),
     shotChartCloudSync,
+    ...(repairedPlayerLinks.length > 0 ? { repairedPlayerLinks } : {}),
   }
 }
 

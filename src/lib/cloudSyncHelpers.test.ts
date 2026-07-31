@@ -212,6 +212,17 @@ describe('resolveUnmappedPlayer', () => {
     })).toEqual({ mode: 'create_distinct' })
   })
 
+  it('prefers an active teammate over a deactivated row wearing the same number', () => {
+    // Sorted by id, the deactivated row comes first; roster status must still win.
+    expect(resolveUnmappedPlayer({
+      candidates: [
+        { playerId: 'cloud-a-old', jerseyNumber: '23', isActive: false },
+        { playerId: 'cloud-b-current', jerseyNumber: '23', isActive: true },
+      ],
+      jerseyNumber: '23',
+    })).toEqual({ mode: 'reuse_team_match', playerId: 'cloud-b-current', adoptJersey: false })
+  })
+
   it('reclaims a deactivated row when the number still matches exactly', () => {
     // A returning player who kept their jersey is the one signal strong enough to
     // reactivate; the caller sets is_active back to true.

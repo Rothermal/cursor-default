@@ -334,31 +334,39 @@ describe('syncGameSnapshotToCloud hardening', () => {
     expect(mock.ops).not.toContain('players.delete')
   })
 
-  it('refuses to sync when two roster players share one cloud player', async () => {
+  it('repairs a duplicate cloud player link instead of blocking the sync', async () => {
     mock.gameStatsError = null
+    const shared = '11111111-1111-4111-8111-111111111111'
 
     // A map corrupted by the old name-only matching bypasses candidate resolution
-    // entirely, since a valid existing mapping short-circuits it.
-    await expect(
-      syncGameSnapshotToCloud({
-        state: state({
-          players: [
-            { id: 'local-1', name: 'Alex Kim', number: '', stats: {} },
-            { id: 'local-2', name: 'Alex Kim', number: '', stats: {} },
-          ],
-          cloudSync: {
-            ...state().cloudSync,
-            playerIdMap: {
-              'local-1': '11111111-1111-4111-8111-111111111111',
-              'local-2': '11111111-1111-4111-8111-111111111111',
-            },
-          },
-        }),
-        userId: 'user-1',
-      })
-    ).rejects.toThrow(/Cloud player links are corrupted: Alex Kim and Alex Kim/)
-    // Fails before any write.
-    expect(mock.ops).toEqual([])
+    // entirely, since a valid existing mapping short-circuits it. Failing here would be
+    // worse than repairing: the only manual fix deletes the player's stats and shots.
+    const result = await syncGameSnapshotToCloud({
+      state: state({
+        players: [
+          { id: 'local-1', name: 'Alex Kim', number: '', stats: {} },
+          { id: 'local-2', name: 'Alex Kim', number: '', stats: {} },
+        ],
+        cloudSync: {
+          ...state().cloudSync,
+          playerIdMap: { 'local-1': shared, 'local-2': shared },
+        },
+      }),
+      userId: 'user-1',
+    })
+
+    expect(result.repairedPlayerLinks).toEqual(['Alex Kim'])
+    // First local keeps the row; the second is re-resolved onto a different player.
+    expect(result.playerIdMap['local-1']).toBe(shared)
+    expect(result.playerIdMap['local-2']).not.toBe(shared)
+  })
+
+  it('leaves a one-to-one map untouched and reports no repair', async () => {
+    mock.gameStatsError = null
+
+    const result = await syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })
+
+    expect(result.repairedPlayerLinks).toBeUndefined()
   })
 
   it('rejects setup-only sport state before aggregate cloud writes', async () => {

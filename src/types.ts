@@ -217,6 +217,12 @@ export interface CloudSyncState {
    * cloud rows while this is positive and local `shotChart` is empty.
    */
   shotChartHydrationDroppedRows: number
+  /**
+   * Names of players whose cloud link was repaired because two roster entries pointed at
+   * one cloud player. Their stats for earlier syncs of this game were merged in the
+   * cloud, so the recorder should check those totals. Cleared by the next clean sync.
+   */
+  repairedPlayerLinks?: string[]
   /** Last cloud-confirmed same-recorder event payloads, keyed by event id. */
   eventSyncBase?: Record<string, GameEventSyncBaseEntry>
   /** Competing same-event revisions that require an explicit recorder choice. */
