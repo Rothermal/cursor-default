@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { sports } from '../../config/sports'
 import { resolveSoccerMatchRules } from '../soccer/rules'
 import { createSoccerSportGameState } from '../soccer/state'
 import type { SoccerMatchSetup } from '../soccer/types'
 import { sportSupportsLegacyAggregateCloudSync } from './capabilities'
-import { normalizeSportGameState, sportGameStateForFingerprint } from './state'
+import {
+  normalizeSportGameState,
+  sportGameStateForFingerprint,
+  sportSupportsEventGameState,
+} from './state'
 
 function soccerSetup(): SoccerMatchSetup {
   return {
@@ -41,11 +46,18 @@ describe('sport game state dispatch', () => {
     })
   })
 
-  it('grants legacy aggregate cloud sync only to configured legacy sports', () => {
-    expect(['basketball', 'baseball', 'football', 'hockey'].map(
-      sportSupportsLegacyAggregateCloudSync
-    )).toEqual([true, true, true, true])
+  it('declares an authoritative state path for every configured sport', () => {
+    for (const sport of sports) {
+      expect(
+        sportSupportsLegacyAggregateCloudSync(sport.id) ||
+          sportSupportsEventGameState(sport.id),
+        `${sport.id} must declare legacy aggregate or event-state support`
+      ).toBe(true)
+    }
+
     expect(sportSupportsLegacyAggregateCloudSync('soccer')).toBe(false)
+    expect(sportSupportsEventGameState('soccer')).toBe(true)
     expect(sportSupportsLegacyAggregateCloudSync('future-sport')).toBe(false)
+    expect(sportSupportsEventGameState('future-sport')).toBe(false)
   })
 })

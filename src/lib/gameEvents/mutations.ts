@@ -217,6 +217,8 @@ export function applyGameEventMutations<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
+  // Atomic batches use append-strict semantics: unlike the single-event revision helpers, their
+  // final projection must be complete. A one-item batch is therefore not always interchangeable.
   if (!state.eventStream) {
     return failed(state, 'stream_not_initialized', 'Initialize the event stream before editing events.')
   }
