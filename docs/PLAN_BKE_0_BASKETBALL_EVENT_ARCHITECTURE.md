@@ -4,11 +4,10 @@ Architecture audit, basketball event catalog, projection contract, compatibility
 F13 reconciliation for moving basketball onto the shared `GameEvent` foundation proven by the
 soccer program.
 
-Status: Draft, revision 6 — updated against the completed SOC-6 summary, canonical aggregate,
+Status: Approved, revision 6 — updated against the completed SOC-6 summary, canonical aggregate,
 settings, and release program. Product-model Q&A Batches A-F and the §12a authority decisions are
-approved. The architecture is ready for final BKE-0 approval. The current basketball counter grid is
-a compatibility baseline, not a complete product definition. No basketball code changes belong to
-BKE-0.
+approved. BKE-1 planning is active. The current basketball counter grid is a compatibility baseline,
+not a complete product definition. No basketball code changes belong to BKE-0.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -94,7 +93,7 @@ These are the only blockers to basketball populating `GameState.sportGameState`:
 | `sportGameStateForFingerprint` lives in the soccer module | `src/lib/soccer/state.ts:101-108`, imported at `src/lib/gameSyncFingerprint.ts:3` | Moves to the sport-neutral home |
 | Core domain types import from the soccer module | `src/types.ts:6` | Import from the sport-neutral home |
 | Registry/projector singletons are composed from soccer only | `src/lib/gameEvents/runtime.ts:6-7` | Compose soccer + basketball definitions and projectors |
-| Aggregate sync eligibility hardcodes the sport id | `src/lib/gameSyncFingerprint.ts:32-38` | Becomes capability-based: a game is aggregate-eligible when it has no event stream and no sport-owned setup, regardless of sport |
+| Aggregate sync eligibility hardcodes the sport id | `src/lib/gameSyncFingerprint.ts:32-38` | Becomes capability-based and fail-closed: only a sport explicitly supporting legacy aggregate sync is eligible, and only when it has no event stream and no sport-owned setup. Soccer and unknown sports remain ineligible even when both fields are `null` |
 | Sport workspace availability is a soccer special case | `src/lib/sportAvailability.ts` | Extend when basketball event games become opt-in |
 
 **Recommended first move in BKE-1A:** extract `src/lib/sportGameState/` (union type, dispatching
