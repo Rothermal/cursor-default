@@ -72,7 +72,11 @@ export function isGameEventEnvelope(value: unknown): value is GameEvent {
   if (!isNonNegativeInteger(value.sequence) || !isPeriod(value.period)) return false
   if (value.elapsedMs !== null && !isNonNegativeInteger(value.elapsedMs)) return false
   if (!isIsoTimestamp(value.occurredAt)) return false
-  if (value.teamSide !== 'tracked' && value.teamSide !== 'opponent') return false
+  if (
+    value.teamSide !== 'tracked' &&
+    value.teamSide !== 'opponent' &&
+    value.teamSide !== 'neutral'
+  ) return false
   if (value.location !== null && !isLocation(value.location)) return false
   if (!Array.isArray(value.actors) || !value.actors.every(isActor)) return false
   if (!isPlainObject(value.payload)) return false

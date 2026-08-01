@@ -126,13 +126,16 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 **GameContext** is the runtime heart. Every stat tap updates the reducer, persists to the parked `localStorage` record, and drains through the debounced sync queue into `syncGameSnapshotToCloud`.
 
 `GameState.eventStream` is `null` for legacy aggregate-only games and a versioned raw stream
-for event-authoritative games. SOC-1 infrastructure lives in `src/lib/gameEvents/`: the
+for event-authoritative games. Shared infrastructure lives in `src/lib/gameEvents/`: the
 generic engine validates, migrates, quarantines, and orders events, then one projector per
-sport rebuilds aggregate state. SOC-2A registers production soccer match-state schemas and
-SOC-3A adds shots, own goals, score adjustments, and their semantic projector rules in
-`src/lib/soccer/`. `GameState.sportGameState` holds soccer's immutable
-resolved setup and rebuildable runtime projection. Semantic failures preserve raw events,
-project through the last coherent event, and expose diagnostics.
+sport rebuilds aggregate state. BKE-1A adds final-state-only atomic update/delete/restore batches
+and definition-scoped neutral sides; the current cloud constraint still rejects neutral until
+BKE-4A. `src/lib/sportGameState/` owns the multi-sport state union, normalization dispatch, setup
+fingerprint, and fail-closed legacy aggregate capability. SOC-2A registers production soccer
+match-state schemas and SOC-3A adds shots, own goals, score adjustments, and their semantic
+projector rules in `src/lib/soccer/`. Soccer's concrete state holds its immutable resolved setup
+and rebuildable runtime projection. Semantic failures preserve raw events, project through the
+last coherent event, and expose diagnostics.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;

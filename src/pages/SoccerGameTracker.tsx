@@ -304,11 +304,12 @@ export default function SoccerGameTracker() {
   const editFieldEvent = (event: GameEvent) => {
     if (cloudFinal) return
     if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
+      const attackingEvent = event as SoccerShotEvent | SoccerOwnGoalEvent
       setCaptureDraft({
         mode: 'edit',
-        teamSide: event.teamSide,
+        teamSide: attackingEvent.teamSide,
         location: event.location,
-        event: event as SoccerShotEvent | SoccerOwnGoalEvent,
+        event: attackingEvent,
       })
       return
     }

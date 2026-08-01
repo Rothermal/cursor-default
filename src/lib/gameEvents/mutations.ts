@@ -6,6 +6,7 @@ import { createGameEventStream } from './stream'
 import type {
   GameEvent,
   GameEventEditableFields,
+  GameEventMutation,
   GameEventMutationErrorCode,
   GameEventMutationResult,
 } from './types'
@@ -207,6 +208,123 @@ export function restoreGameEvent<TEvent extends GameEvent>(
       event: { ...event, revision: event.revision + 1, updatedAt: now, deletedAt: null },
     }
   })
+}
+
+export function applyGameEventMutations<TEvent extends GameEvent>(
+  state: GameState,
+  mutations: readonly GameEventMutation[],
+  now: string,
+  registry: GameEventRegistry<TEvent>,
+  projectors: GameEventProjectorRegistry<TEvent>
+): GameEventMutationResult {
+  // Atomic batches use append-strict semantics: unlike the single-event revision helpers, their
+  // final projection must be complete. A one-item batch is therefore not always interchangeable.
+  if (!state.eventStream) {
+    return failed(state, 'stream_not_initialized', 'Initialize the event stream before editing events.')
+  }
+  if (mutations.length === 0) {
+    return failed(state, 'empty_mutation_batch', 'At least one event mutation is required.')
+  }
+
+  const events = [...state.eventStream.events]
+  const targetedIds = new Set<string>()
+
+  for (const mutation of mutations) {
+    if (targetedIds.has(mutation.eventId)) {
+      return failed(
+        state,
+        'duplicate_mutation_target',
+        'An event may be revised only once in an atomic mutation.'
+      )
+    }
+    targetedIds.add(mutation.eventId)
+
+    const index = state.eventStream.events.findIndex(
+      raw => isGameEventEnvelope(raw) && raw.id === mutation.eventId
+    )
+    if (index < 0) return failed(state, 'event_not_found', 'The event was not found.')
+
+    const stored = state.eventStream.events[index]
+    const inspected = registry.inspect(stored)
+    if (!inspected.ok) {
+      return failed(
+        state,
+        'invalid_event',
+        'A quarantined event cannot be edited by the typed mutation API.'
+      )
+    }
+    if (state.sport?.id !== inspected.event.sportId) {
+      return failed(state, 'sport_mismatch', 'The event sport does not match the active game.')
+    }
+
+    const outcome = applyMutationToEvent(stored, inspected.event, mutation, now)
+    if ('error' in outcome) {
+      return failed(
+        state,
+        outcome.error,
+        outcome.error === 'already_deleted'
+          ? 'The event is already deleted.'
+          : 'The event is not deleted.'
+      )
+    }
+    if (!isGameEventEnvelope(outcome.event) || !registry.inspect(outcome.event).ok) {
+      return failed(state, 'invalid_event', 'The event update failed validation.')
+    }
+    events[index] = cloneEvent(outcome.event)
+  }
+
+  const candidate = {
+    ...state,
+    eventStream: { ...state.eventStream, events },
+  }
+  const rebuilt = rebuildGameEventProjection(candidate, registry, projectors)
+  if (!rebuilt.inspection.complete) {
+    return failed(
+      state,
+      'incomplete_projection',
+      'The event mutations would create invalid or incomplete match history.'
+    )
+  }
+  return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
+}
+
+function applyMutationToEvent(
+  stored: unknown,
+  runtime: GameEvent,
+  mutation: GameEventMutation,
+  now: string
+): RevisionOutcome {
+  if (mutation.type === 'update') {
+    if (runtime.deletedAt) return { error: 'already_deleted' }
+    return {
+      event: {
+        ...runtime,
+        ...mutation.changes,
+        id: runtime.id,
+        sportId: runtime.sportId,
+        eventType: runtime.eventType,
+        recorderUserId: runtime.recorderUserId,
+        sequence: runtime.sequence,
+        createdAt: runtime.createdAt,
+        revision: runtime.revision + 1,
+        updatedAt: now,
+        deletedAt: null,
+      },
+    }
+  }
+
+  if (!isGameEventEnvelope(stored)) return { error: 'not_deleted' }
+  if (mutation.type === 'delete') {
+    if (stored.deletedAt) return { error: 'already_deleted' }
+    return {
+      event: { ...stored, revision: stored.revision + 1, updatedAt: now, deletedAt: now },
+    }
+  }
+
+  if (!stored.deletedAt) return { error: 'not_deleted' }
+  return {
+    event: { ...stored, revision: stored.revision + 1, updatedAt: now, deletedAt: null },
+  }
 }
 
 type RevisionOutcome =

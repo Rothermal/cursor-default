@@ -4,8 +4,8 @@ Parent plan for the first Basketball event-model implementation program. BKE-1 e
 remaining sport-neutral seams, installs a deterministic Basketball event foundation, and then
 moves the existing court workflow onto that foundation behind an internal-only gate.
 
-Status: Planned. BKE-1A is ready for implementation; BKE-1B and BKE-1C require their own detailed
-plans before code begins.
+Status: In progress. BKE-1A implementation is complete; BKE-1B and BKE-1C require their own
+detailed plans before code begins.
 
 Architecture: [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md)
 
@@ -51,6 +51,8 @@ Detailed plans:
 - Basketball owns its participants, rules, payload validation, relationships, and projection.
 - `elapsedMs` remains `null` through BKE-5. BKE-6 owns the Basketball clock and lineups.
 - BKE-1 adds no Supabase migration and does not wire Basketball events into automatic cloud sync.
+- BKE-1B may register neutral Basketball definitions for local fixtures, but those events cannot
+  enter cloud transport before BKE-4A widens the database constraint and proves Soccer RPC parity.
 - Cloud authority fails closed: a missing or invalid sport-owned snapshot never grants aggregate
   sync unless the sport explicitly supports the legacy aggregate path.
 - Projection diagnostics fail closed. Incomplete streams cannot present authoritative totals or
@@ -90,6 +92,9 @@ internal even after court capture works.
 
 - Court capture parity fixtures for made/missed shots, value override, player switch, optional
   assist/rebound links, grouped undo/restore, and clear chart.
+- Atomic batches require a complete final projection, unlike the permissive single-event revision
+  helpers. BKE-1C must not replace a single helper with a one-item batch without handling that
+  stricter contract explicitly.
 - Individual, team, and All shot filters.
 - Mobile interaction regression for the popup and inline court.
 

@@ -598,7 +598,7 @@ actions are backfilled.
 
 ---
 
-## 11a. Shared event foundation (SOC-1)
+## 11a. Shared event foundation (SOC-1 / BKE-1A)
 
 **Precondition:** Existing basketball local/parked games; migration
 `042_game_events.sql` applied only when testing the isolated cloud repository. Soccer remains
@@ -614,6 +614,10 @@ disabled in production; SOC-2A later installs production soccer match-state defi
 | 11a.6 | Write a lower revision, then an equal revision with changed payload | RPC reports `stale`, then `conflict`; existing cloud row is unchanged |
 | 11a.7 | As viewer or with another recorder's row id, attempt an event write | RLS/RPC rejects the write; accepted viewers can read team event rows |
 | 11a.8 | Attempt an ordinary SQL/client delete | No client delete policy exists; revisioned tombstone update is the supported path |
+| 11a.9 | Load or import a Soccer shell whose event stream and sport state are both null or whose setup fails normalization | It remains ineligible for legacy aggregate cloud sync; no `game_stats` write path is selected |
+| 11a.10 | Check aggregate sync eligibility for configured Basketball, Baseball, Football, and Hockey games with null event/sport state, then an unknown sport id | The four configured legacy sports remain eligible; the unknown sport fails closed |
+| 11a.11 | Inspect a neutral-side fixture through a default event definition, then one explicitly allowing neutral | The default definition rejects it; the opted-in definition accepts it; Soccer definitions continue to reject neutral |
+| 11a.12 | Apply one atomic command containing event update, tombstone, and restore operations | Every target advances one revision at the same timestamp, projection rebuilds once, and any invalid member or final diagnostic returns the original state unchanged |
 
 ---
 

@@ -4,7 +4,6 @@ import type {
   GameEventActor,
   GameEventLocation,
   GameEventPeriod,
-  GameEventTeamSide,
   JsonObject,
 } from '../gameEvents/types'
 import type { GameEventDefinition } from '../gameEvents/registry'
@@ -36,6 +35,7 @@ import type {
   SoccerShootoutStartedPayload,
   SoccerSubstitutionWindowPayload,
   SoccerTeamEventPayload,
+  SoccerTeamSide,
 } from './types'
 import { createSoccerUuid } from './id'
 import { SOCCER_EVENT_SCHEMA_VERSION } from './types'
@@ -77,7 +77,7 @@ export interface CreateSoccerEventInput<TType extends keyof SoccerEventPayloadBy
   period: GameEventPeriod
   elapsedMs: number | null
   occurredAt: string
-  teamSide?: GameEventTeamSide
+  teamSide?: SoccerTeamSide
   location?: GameEventLocation | null
   actors?: GameEventActor[]
 }

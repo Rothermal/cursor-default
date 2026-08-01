@@ -7,7 +7,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialCloudSyncState } from '../gameReducer'
 import { supabase } from '../supabase'
 import { prepareSoccerKickoff } from './kickoff'
-import { createSoccerSportGameState, normalizeSportGameState } from './state'
+import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import type { SoccerMatchSetup } from './types'
 
 interface SoccerCloudGameRow {
@@ -263,7 +263,7 @@ async function loadSoccerCloudShell(gameId: string): Promise<SoccerCloudShell> {
   if (!gameData || !setupData) throw new Error('Soccer cloud game is unavailable.')
 
   const game = gameData as SoccerCloudGameRow
-  const normalized = normalizeSportGameState({
+  const normalized = normalizeSoccerSportGameState({
     sportId: 'soccer',
     version: 2,
     setup: setupData.setup_snapshot,

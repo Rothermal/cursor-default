@@ -1,10 +1,11 @@
-import type { GameEventPeriod, GameEventTeamSide } from '../gameEvents/types'
+import type { GameEventPeriod } from '../gameEvents/types'
 import type {
   SoccerMatchEvent,
   SoccerCardSanction,
   SoccerProjectedParticipant,
   SoccerRole,
   SoccerShotSituation,
+  SoccerTeamSide,
   SoccerYellowCardExitPolicy,
 } from './types'
 
@@ -57,7 +58,7 @@ export function soccerParticipantRoleAt(
 export function soccerShotSourceCandidates(
   events: SoccerMatchEvent[],
   options: {
-    teamSide: GameEventTeamSide
+    teamSide: SoccerTeamSide
     situation: SoccerShotSituation
     period: GameEventPeriod
     elapsedMs: number

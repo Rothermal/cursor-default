@@ -1,5 +1,7 @@
 import { cloneEvent, eventIdFromUnknown, isGameEventEnvelope } from './envelope'
-import type { GameEvent, GameEventDiagnostic } from './types'
+import type { GameEvent, GameEventDiagnostic, GameEventTeamSide } from './types'
+
+const DEFAULT_ALLOWED_TEAM_SIDES: readonly GameEventTeamSide[] = ['tracked', 'opponent']
 
 export type GameEventValidationResult<TEvent extends GameEvent> =
   | { ok: true; event: TEvent }
@@ -9,6 +11,8 @@ export interface GameEventDefinition<TEvent extends GameEvent = GameEvent> {
   sportId: TEvent['sportId']
   eventType: TEvent['eventType']
   currentSchemaVersion: number
+  /** Omitted definitions retain the pre-neutral tracked/opponent contract. */
+  allowedTeamSides?: readonly GameEventTeamSide[]
   /** A migration at key N converts schema N to N + 1. */
   migrations?: Record<number, (event: GameEvent) => GameEvent>
   validate: (event: GameEvent) => GameEventValidationResult<TEvent>
@@ -100,6 +104,18 @@ export class GameEventRegistry<TEvent extends GameEvent = GameEvent> {
         diagnostic: {
           code: 'migration_failed',
           message: error instanceof Error ? error.message : 'Event migration failed.',
+          eventId: raw.id,
+        },
+      }
+    }
+
+    const allowedTeamSides = definition.allowedTeamSides ?? DEFAULT_ALLOWED_TEAM_SIDES
+    if (!allowedTeamSides.includes(migrated.teamSide)) {
+      return {
+        ok: false,
+        diagnostic: {
+          code: 'validation_failed',
+          message: `Team side ${migrated.teamSide} is not allowed for ${raw.sportId}/${raw.eventType}.`,
           eventId: raw.id,
         },
       }

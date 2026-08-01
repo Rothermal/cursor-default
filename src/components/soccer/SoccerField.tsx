@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react'
-import type { GameEventLocation, GameEventTeamSide } from '../../lib/gameEvents/types'
-import type { SoccerAttackingDirection } from '../../lib/soccer'
+import type { GameEventLocation } from '../../lib/gameEvents/types'
+import type { SoccerAttackingDirection, SoccerTeamSide } from '../../lib/soccer'
 import type { SoccerFieldReviewFamily } from '../../lib/soccer/summaryField'
 import { clusterSoccerMarkerPoints, soccerFieldLocation } from '../../lib/soccer/field'
 
@@ -13,14 +13,14 @@ export interface SoccerFieldMarker {
   id: string
   x: number
   y: number
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   kind: SoccerFieldMarkerKind
   label: string
 }
 
 interface SoccerFieldProps {
   trackedDirection: SoccerAttackingDirection
-  captureSide: GameEventTeamSide
+  captureSide: SoccerTeamSide
   flipped: boolean
   disabled: boolean
   markers?: SoccerFieldMarker[]

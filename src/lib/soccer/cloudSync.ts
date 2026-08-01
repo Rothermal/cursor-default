@@ -15,7 +15,7 @@ import {
   gameEventSyncBase,
   mergeSameRecorderEventStreams,
 } from './cloudConflicts'
-import { createSoccerSportGameState, normalizeSportGameState } from './state'
+import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import type { SoccerMatchParticipant, SoccerSportGameState } from './types'
 
 interface SoccerCloudParticipant {
@@ -362,7 +362,7 @@ export async function loadSoccerCloudGameById(
   if (!setupData) throw new Error('Cloud soccer setup is unavailable.')
 
   const gameRow = gameData as SoccerCloudGameRow
-  const normalizedSportState = normalizeSportGameState({
+  const normalizedSportState = normalizeSoccerSportGameState({
     sportId: 'soccer',
     version: 2,
     setup: setupData.setup_snapshot,

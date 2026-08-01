@@ -20,7 +20,7 @@ import {
 import { gameEventProjectors, gameEventRegistry } from './gameEvents/runtime'
 import { normalizeGameEventStream } from './gameEvents/stream'
 import { rebuildGameEventProjection } from './gameEvents/projection'
-import { normalizeSportGameState } from './soccer/state'
+import { normalizeSportGameState } from './sportGameState/state'
 import { playerIdMapForRoster, shotChartForRoster } from './rosterAlignment'
 
 export function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): CloudSyncState {

@@ -8,7 +8,7 @@ export interface JsonObject {
   [key: string]: JsonValue
 }
 
-export type GameEventTeamSide = 'tracked' | 'opponent'
+export type GameEventTeamSide = 'tracked' | 'opponent' | 'neutral'
 export type GameEventActorKind = 'player' | 'staff' | 'team' | 'unknown'
 
 interface GameEventActorBase {
@@ -50,6 +50,7 @@ export interface GameEvent<
   TPayload extends JsonObject = JsonObject,
   TEventType extends string = string,
   TSportId extends string = string,
+  TTeamSide extends GameEventTeamSide = GameEventTeamSide,
 > {
   id: string
   sportId: TSportId
@@ -60,7 +61,7 @@ export interface GameEvent<
   period: GameEventPeriod
   elapsedMs: number | null
   occurredAt: string
-  teamSide: GameEventTeamSide
+  teamSide: TTeamSide
   location: GameEventLocation | null
   actors: GameEventActor[]
   payload: TPayload
@@ -132,6 +133,11 @@ export type GameEventEditableFields = Pick<
   'period' | 'elapsedMs' | 'occurredAt' | 'teamSide' | 'location' | 'actors' | 'payload'
 >
 
+export type GameEventMutation =
+  | { type: 'update'; eventId: string; changes: Partial<GameEventEditableFields> }
+  | { type: 'delete'; eventId: string }
+  | { type: 'restore'; eventId: string }
+
 export type GameEventMutationErrorCode =
   | 'legacy_activity_present'
   | 'unsupported_event_sport'
@@ -139,6 +145,8 @@ export type GameEventMutationErrorCode =
   | 'stream_not_initialized'
   | 'event_not_found'
   | 'duplicate_event_id'
+  | 'empty_mutation_batch'
+  | 'duplicate_mutation_target'
   | 'invalid_event'
   | 'sport_mismatch'
   | 'already_deleted'

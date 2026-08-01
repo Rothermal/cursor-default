@@ -16,7 +16,7 @@ import {
   soccerEventRevisionCheckpoint,
   soccerEventStreamFingerprint,
 } from './cloudSync'
-import { createSoccerSportGameState, normalizeSportGameState } from './state'
+import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import type { SoccerMatchSetup } from './types'
 
 export interface SoccerFinalizationReadiness {
@@ -408,7 +408,7 @@ function rebuildSoccerCanonicalSnapshot(
   snapshot: SoccerCanonicalSnapshot
 ): SoccerRecorderProjection {
   const stream = normalizeGameEventStream(snapshot.eventStream)
-  const normalized = normalizeSportGameState({
+  const normalized = normalizeSoccerSportGameState({
     sportId: 'soccer',
     version: snapshot.sportGameState.version,
     setup: snapshot.sportGameState.setup,

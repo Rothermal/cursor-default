@@ -305,8 +305,6 @@ export interface SoccerCapturePreferences {
   captureMode: SoccerCaptureMode
 }
 
-export type SportGameState = SoccerSportGameState
-
 export interface SoccerLineupEntry extends JsonObject {
   participantId: string
   role: SoccerRole
@@ -450,31 +448,33 @@ export interface SoccerShootoutKickPayload extends JsonObject {
   anonymousKickerSlot: number | null
 }
 
-export type SoccerOpeningLineupEvent = GameEvent<SoccerOpeningLineupPayload, 'soccer.opening_lineup', 'soccer'>
-export type SoccerPeriodStartedEvent = GameEvent<SoccerPeriodPayload, 'soccer.period_started', 'soccer'>
-export type SoccerPeriodEndedEvent = GameEvent<SoccerPeriodPayload, 'soccer.period_ended', 'soccer'>
-export type SoccerClockStartedEvent = GameEvent<SoccerClockStartedPayload, 'soccer.clock_started', 'soccer'>
-export type SoccerClockPausedEvent = GameEvent<SoccerClockPausedPayload, 'soccer.clock_paused', 'soccer'>
-export type SoccerClockAdjustedEvent = GameEvent<SoccerClockAdjustedPayload, 'soccer.clock_adjusted', 'soccer'>
-export type SoccerMatchRulesChangedEvent = GameEvent<SoccerMatchRulesChangedPayload, 'soccer.match_rules_changed', 'soccer'>
-export type SoccerSubstitutionWindowEvent = GameEvent<SoccerSubstitutionWindowPayload, 'soccer.substitution_window', 'soccer'>
-export type SoccerRoleChangedEvent = GameEvent<SoccerRoleChangedPayload, 'soccer.role_changed', 'soccer'>
-export type SoccerAttackingDirectionChangedEvent = GameEvent<SoccerAttackingDirectionChangedPayload, 'soccer.attacking_direction_changed', 'soccer'>
-export type SoccerMatchRosterAddedEvent = GameEvent<SoccerMatchRosterAddedPayload, 'soccer.match_roster_added', 'soccer'>
-export type SoccerParticipantResolvedEvent = GameEvent<SoccerParticipantResolvedPayload, 'soccer.participant_resolved', 'soccer'>
-export type SoccerMatchEndedEvent = GameEvent<SoccerMatchEndedPayload, 'soccer.match_ended', 'soccer'>
-export type SoccerMatchReopenedEvent = GameEvent<SoccerMatchReopenedPayload, 'soccer.match_reopened', 'soccer'>
-export type SoccerShotEvent = GameEvent<SoccerShotPayload, 'soccer.shot', 'soccer'>
-export type SoccerOwnGoalEvent = GameEvent<SoccerOwnGoalPayload, 'soccer.own_goal', 'soccer'>
-export type SoccerScoreAdjustmentEvent = GameEvent<SoccerScoreAdjustmentPayload, 'soccer.score_adjustment', 'soccer'>
-export type SoccerDefensiveActionEvent = GameEvent<SoccerDefensiveActionPayload, 'soccer.defensive_action', 'soccer'>
-export type SoccerFoulEvent = GameEvent<SoccerFoulPayload, 'soccer.foul', 'soccer'>
-export type SoccerCardEvent = GameEvent<SoccerCardPayload, 'soccer.card', 'soccer'>
-export type SoccerTeamEventEvent = GameEvent<SoccerTeamEventPayload, 'soccer.team_event', 'soccer'>
-export type SoccerShootoutStartedEvent = GameEvent<SoccerShootoutStartedPayload, 'soccer.shootout_started', 'soccer'>
-export type SoccerShootoutEligibilityChangedEvent = GameEvent<SoccerShootoutEligibilityChangedPayload, 'soccer.shootout_eligibility_changed', 'soccer'>
-export type SoccerShootoutGoalkeeperChangedEvent = GameEvent<SoccerShootoutGoalkeeperChangedPayload, 'soccer.shootout_goalkeeper_changed', 'soccer'>
-export type SoccerShootoutKickEvent = GameEvent<SoccerShootoutKickPayload, 'soccer.shootout_kick', 'soccer'>
+export type SoccerTeamSide = 'tracked' | 'opponent'
+
+export type SoccerOpeningLineupEvent = GameEvent<SoccerOpeningLineupPayload, 'soccer.opening_lineup', 'soccer', SoccerTeamSide>
+export type SoccerPeriodStartedEvent = GameEvent<SoccerPeriodPayload, 'soccer.period_started', 'soccer', SoccerTeamSide>
+export type SoccerPeriodEndedEvent = GameEvent<SoccerPeriodPayload, 'soccer.period_ended', 'soccer', SoccerTeamSide>
+export type SoccerClockStartedEvent = GameEvent<SoccerClockStartedPayload, 'soccer.clock_started', 'soccer', SoccerTeamSide>
+export type SoccerClockPausedEvent = GameEvent<SoccerClockPausedPayload, 'soccer.clock_paused', 'soccer', SoccerTeamSide>
+export type SoccerClockAdjustedEvent = GameEvent<SoccerClockAdjustedPayload, 'soccer.clock_adjusted', 'soccer', SoccerTeamSide>
+export type SoccerMatchRulesChangedEvent = GameEvent<SoccerMatchRulesChangedPayload, 'soccer.match_rules_changed', 'soccer', SoccerTeamSide>
+export type SoccerSubstitutionWindowEvent = GameEvent<SoccerSubstitutionWindowPayload, 'soccer.substitution_window', 'soccer', SoccerTeamSide>
+export type SoccerRoleChangedEvent = GameEvent<SoccerRoleChangedPayload, 'soccer.role_changed', 'soccer', SoccerTeamSide>
+export type SoccerAttackingDirectionChangedEvent = GameEvent<SoccerAttackingDirectionChangedPayload, 'soccer.attacking_direction_changed', 'soccer', SoccerTeamSide>
+export type SoccerMatchRosterAddedEvent = GameEvent<SoccerMatchRosterAddedPayload, 'soccer.match_roster_added', 'soccer', SoccerTeamSide>
+export type SoccerParticipantResolvedEvent = GameEvent<SoccerParticipantResolvedPayload, 'soccer.participant_resolved', 'soccer', SoccerTeamSide>
+export type SoccerMatchEndedEvent = GameEvent<SoccerMatchEndedPayload, 'soccer.match_ended', 'soccer', SoccerTeamSide>
+export type SoccerMatchReopenedEvent = GameEvent<SoccerMatchReopenedPayload, 'soccer.match_reopened', 'soccer', SoccerTeamSide>
+export type SoccerShotEvent = GameEvent<SoccerShotPayload, 'soccer.shot', 'soccer', SoccerTeamSide>
+export type SoccerOwnGoalEvent = GameEvent<SoccerOwnGoalPayload, 'soccer.own_goal', 'soccer', SoccerTeamSide>
+export type SoccerScoreAdjustmentEvent = GameEvent<SoccerScoreAdjustmentPayload, 'soccer.score_adjustment', 'soccer', SoccerTeamSide>
+export type SoccerDefensiveActionEvent = GameEvent<SoccerDefensiveActionPayload, 'soccer.defensive_action', 'soccer', SoccerTeamSide>
+export type SoccerFoulEvent = GameEvent<SoccerFoulPayload, 'soccer.foul', 'soccer', SoccerTeamSide>
+export type SoccerCardEvent = GameEvent<SoccerCardPayload, 'soccer.card', 'soccer', SoccerTeamSide>
+export type SoccerTeamEventEvent = GameEvent<SoccerTeamEventPayload, 'soccer.team_event', 'soccer', SoccerTeamSide>
+export type SoccerShootoutStartedEvent = GameEvent<SoccerShootoutStartedPayload, 'soccer.shootout_started', 'soccer', SoccerTeamSide>
+export type SoccerShootoutEligibilityChangedEvent = GameEvent<SoccerShootoutEligibilityChangedPayload, 'soccer.shootout_eligibility_changed', 'soccer', SoccerTeamSide>
+export type SoccerShootoutGoalkeeperChangedEvent = GameEvent<SoccerShootoutGoalkeeperChangedPayload, 'soccer.shootout_goalkeeper_changed', 'soccer', SoccerTeamSide>
+export type SoccerShootoutKickEvent = GameEvent<SoccerShootoutKickPayload, 'soccer.shootout_kick', 'soccer', SoccerTeamSide>
 
 export type SoccerMatchEvent =
   | SoccerOpeningLineupEvent

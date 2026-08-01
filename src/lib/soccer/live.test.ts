@@ -33,7 +33,7 @@ import {
   updateSoccerHistoryEvent,
 } from './live'
 import { resolveSoccerMatchRules } from './rules'
-import { createSoccerSportGameState, normalizeSportGameState, participantActiveMs } from './state'
+import { createSoccerSportGameState, normalizeSoccerSportGameState, participantActiveMs } from './state'
 import type { SoccerMatchSetup } from './types'
 
 const soccer: SportConfig = {
@@ -219,7 +219,7 @@ describe('soccer live match actions', () => {
       selectionInitialized: true,
       captureMode: 'shot',
     })
-    expect(normalizeSportGameState(structuredClone(state.sportGameState))?.capturePreferences).toEqual({
+    expect(normalizeSoccerSportGameState(structuredClone(state.sportGameState))?.capturePreferences).toEqual({
       teamSide: 'opponent',
       selectedParticipantId: 'match-defender',
       selectionInitialized: true,

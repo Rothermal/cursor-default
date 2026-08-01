@@ -1,6 +1,6 @@
 import { Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import type { GameEvent, GameEventInspection, GameEventTeamSide } from '../../lib/gameEvents/types'
+import type { GameEvent, GameEventInspection } from '../../lib/gameEvents/types'
 import {
   isSoccerScoringEvent,
   recordSoccerScoreAdjustment,
@@ -11,6 +11,7 @@ import {
   type SoccerOwnGoalEvent,
   type SoccerScoreAdjustmentEvent,
   type SoccerShotEvent,
+  type SoccerTeamSide,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
 
@@ -121,7 +122,7 @@ function ScoreAdjustmentForm({ state, event, recorderUserId, busy, onApply, onCa
   const initialTiming = timings.find(item => item.period.id === event?.period.id)
     ?? timings[timings.length - 1]
     ?? null
-  const [teamSide, setTeamSide] = useState<GameEventTeamSide>(event?.teamSide ?? 'tracked')
+  const [teamSide, setTeamSide] = useState<SoccerTeamSide>(event?.teamSide ?? 'tracked')
   const [delta, setDelta] = useState<1 | -1>(event?.payload.delta ?? 1)
   const [reason, setReason] = useState(event?.payload.reason ?? '')
   const [periodId, setPeriodId] = useState(initialTiming?.period.id ?? '')

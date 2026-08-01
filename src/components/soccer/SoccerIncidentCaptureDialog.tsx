@@ -4,7 +4,6 @@ import type {
   GameEventActor,
   GameEventLocation,
   GameEventPeriod,
-  GameEventTeamSide,
   JsonObject,
 } from '../../lib/gameEvents/types'
 import {
@@ -31,6 +30,7 @@ import {
   type SoccerTeamEventEvent,
   type SoccerTeamEventKind,
   type SoccerTackleOutcome,
+  type SoccerTeamSide,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
 import SoccerField from './SoccerField'
@@ -44,7 +44,7 @@ export type SoccerIncidentEvent =
 
 export interface SoccerIncidentDraft {
   kind: SoccerIncidentKind
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   location: GameEventLocation | null
   mode?: 'live' | 'historical' | 'edit'
   event?: SoccerIncidentEvent
@@ -115,7 +115,7 @@ export default function SoccerIncidentCaptureDialog({
   )
   const recentLabels = useMemo(() => recentOpponentLabels(state), [state])
   const mode = draft?.mode ?? (draft?.event ? 'edit' : 'live')
-  const [teamSide, setTeamSide] = useState<GameEventTeamSide>('tracked')
+  const [teamSide, setTeamSide] = useState<SoccerTeamSide>('tracked')
   const [location, setLocation] = useState<GameEventLocation | null>(null)
   const [attribution, setAttribution] = useState<Attribution>('participant')
   const [participantId, setParticipantId] = useState('')
@@ -548,8 +548,8 @@ function ChoiceButton({ active, label, onClick, compact = false }: { active: boo
 }
 
 function MomentEditor({ teamSide, onTeamSide, timings, selectedPeriodId, onSelectedPeriodId, periodElapsedMs, onPeriodElapsedMs, invalid }: {
-  teamSide: GameEventTeamSide
-  onTeamSide: (side: GameEventTeamSide) => void
+  teamSide: SoccerTeamSide
+  onTeamSide: (side: SoccerTeamSide) => void
   timings: Array<{ period: GameEventPeriod; label: string; startElapsedMs: number; endElapsedMs: number }>
   selectedPeriodId: string
   onSelectedPeriodId: (id: string) => void
@@ -562,7 +562,7 @@ function MomentEditor({ teamSide, onTeamSide, timings, selectedPeriodId, onSelec
 
 function ActorEditor({ label, side, allowStaff, attribution, onAttribution, participantId, onParticipantId, participants, actorLabel, onActorLabel, recentLabels }: {
   label: string
-  side: GameEventTeamSide
+  side: SoccerTeamSide
   allowStaff: boolean
   attribution: Attribution
   onAttribution: (value: Attribution) => void
@@ -581,7 +581,7 @@ function ActorEditor({ label, side, allowStaff, attribution, onAttribution, part
 }
 
 function OptionalFouledEditor({ committingSide, attribution, onAttribution, participantId, onParticipantId, participants, label, onLabel, recentLabels }: {
-  committingSide: GameEventTeamSide
+  committingSide: SoccerTeamSide
   attribution: 'none' | 'participant' | 'team' | 'unknown'
   onAttribution: (value: 'none' | 'participant' | 'team' | 'unknown') => void
   participantId: string

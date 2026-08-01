@@ -7,7 +7,6 @@ import type {
   SoccerMatchSetup,
   SoccerProjectedParticipant,
   SoccerSportGameState,
-  SportGameState,
 } from './types'
 import { SOCCER_GAME_STATE_VERSION } from './types'
 
@@ -65,7 +64,7 @@ export function createSoccerSportGameState(setup: SoccerMatchSetup): SoccerSport
   }
 }
 
-export function normalizeSportGameState(value: unknown): SportGameState | null {
+export function normalizeSoccerSportGameState(value: unknown): SoccerSportGameState | null {
   if (
     !isPlainObject(value) ||
     value.sportId !== 'soccer' ||
@@ -96,15 +95,6 @@ export function normalizeSportGameState(value: unknown): SportGameState | null {
     }
   }
   return normalized
-}
-
-export function sportGameStateForFingerprint(value: SportGameState | null): unknown {
-  if (!value) return null
-  return {
-    sportId: value.sportId,
-    version: value.version,
-    setup: value.setup,
-  }
 }
 
 export function validateSoccerMatchSetup(value: unknown): string | null {
