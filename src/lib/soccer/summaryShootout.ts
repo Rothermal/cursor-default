@@ -1,14 +1,15 @@
-import type { GameEventInspection, GameEventTeamSide } from '../gameEvents/types'
+import type { GameEventInspection } from '../gameEvents/types'
 import type {
   SoccerMatchProjection,
   SoccerShootoutKickEvent,
   SoccerShootoutKickOutcome,
+  SoccerTeamSide,
 } from './types'
 
 export interface SoccerShootoutAttemptReview {
   event: SoccerShootoutKickEvent | null
   eventId: string
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   outcome: SoccerShootoutKickOutcome
   outcomeLabel: string
   kickerKey: string
@@ -32,7 +33,7 @@ export interface SoccerShootoutRoundReview {
 
 export interface SoccerShootoutKickerSummary {
   key: string
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   label: string
   attempts: number
   scores: number
@@ -45,7 +46,7 @@ export interface SoccerShootoutKickerSummary {
 
 export interface SoccerShootoutGoalkeeperSummary {
   key: string
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   label: string
   attemptsFaced: number
   saves: number
@@ -54,7 +55,7 @@ export interface SoccerShootoutGoalkeeperSummary {
 export interface SoccerShootoutReview {
   matchStatus: SoccerMatchProjection['status']
   endReason: SoccerMatchProjection['endReason']
-  firstKickingSide: GameEventTeamSide
+  firstKickingSide: SoccerTeamSide
   initialKicksPerSide: number
   initialProgress: {
     tracked: number
@@ -68,9 +69,9 @@ export interface SoccerShootoutReview {
     tracked: number
     opponent: number
   }
-  nextSide: GameEventTeamSide
+  nextSide: SoccerTeamSide
   decided: boolean
-  winner: GameEventTeamSide | null
+  winner: SoccerTeamSide | null
   suddenDeathRound: number | null
   rounds: SoccerShootoutRoundReview[]
   kickers: SoccerShootoutKickerSummary[]
@@ -227,7 +228,7 @@ function goalkeeperSummaries(
 
 function shootoutActorLabel(
   projection: SoccerMatchProjection,
-  teamSide: GameEventTeamSide,
+  teamSide: SoccerTeamSide,
   key: string,
   eventLabel: string | undefined
 ): string {
@@ -259,7 +260,7 @@ function shootoutOutcomeLabel(outcome: SoccerShootoutKickOutcome): string {
 }
 
 function summarySort<T extends {
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   label: string
   key: string
 }>(left: T, right: T): number {
@@ -268,10 +269,10 @@ function summarySort<T extends {
     left.key.localeCompare(right.key)
 }
 
-function sideOrder(side: GameEventTeamSide): number {
+function sideOrder(side: SoccerTeamSide): number {
   return side === 'tracked' ? 0 : 1
 }
 
-function oppositeSide(side: GameEventTeamSide): GameEventTeamSide {
+function oppositeSide(side: SoccerTeamSide): SoccerTeamSide {
   return side === 'tracked' ? 'opponent' : 'tracked'
 }

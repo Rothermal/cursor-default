@@ -64,6 +64,23 @@ describe('gameSyncFingerprint', () => {
     }))).toBe(false)
   })
 
+  it.each(['basketball', 'baseball', 'football', 'hockey'])(
+    'keeps configured %s games eligible for legacy aggregate sync',
+    sportId => {
+      expect(isAggregateCloudSyncEligible(baseState({
+        sport: { ...sport, id: sportId },
+      }))).toBe(true)
+    }
+  )
+
+  it('fails aggregate sync eligibility closed for unknown sports', () => {
+    expect(isAggregateCloudSyncEligible(baseState({
+      sport: { ...sport, id: 'future-sport' },
+      eventStream: null,
+      sportGameState: null,
+    }))).toBe(false)
+  })
+
   it('includes the raw event stream and distinguishes legacy from initialized games', () => {
     const legacy = buildGameSyncFingerprint(baseState())
     const initialized = buildGameSyncFingerprint(

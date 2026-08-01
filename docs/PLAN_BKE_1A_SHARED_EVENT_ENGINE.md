@@ -2,8 +2,8 @@
 
 Behavior-preserving shared-engine work required before Basketball can register state or events.
 
-Status: Ready for implementation. The focused implementation review found no unresolved product
-decision; the contracts below apply the approved BKE-0 architecture.
+Status: Implementation complete. No Supabase migration is required; the cloud `team_side`
+constraint remains intentionally unchanged until BKE-4A.
 
 Parent: [PLAN_BKE_1_EVENT_FOUNDATION_AND_COURT.md](PLAN_BKE_1_EVENT_FOUNDATION_AND_COURT.md)
 
@@ -250,10 +250,17 @@ There is no new user-facing surface to visually approve in BKE-1A.
 
 ## 10. Delivery
 
-Implement BKE-1A in one feature PR. The three changes share one proof boundary and are small enough
-to review together, while BKE-1B remains isolated from generic refactoring.
+BKE-1A delivered the three changes in one feature PR while keeping BKE-1B isolated from generic
+refactoring:
 
-After merge:
+- `src/lib/sportGameState/` now owns the union, normalization dispatch, setup fingerprint, and
+  fail-closed legacy aggregate capability;
+- neutral event sides require explicit definition opt-in while Soccer remains narrowed to
+  `tracked | opponent`; and
+- `applyGameEventMutations` atomically updates, tombstones, and restores distinct event ids with
+  one final projection rebuild and unchanged-state rollback.
+
+Next:
 
 1. write the BKE-1B detailed plan against the final neutral state and mutation APIs;
 2. run the focused Basketball setup/catalog/projector Q&A;

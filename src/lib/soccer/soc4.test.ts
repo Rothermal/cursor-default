@@ -19,7 +19,7 @@ import {
   startSoccerShootout,
 } from './live'
 import { resolveSoccerMatchRules, type SoccerMatchRulesOverride } from './rules'
-import { createSoccerSportGameState, normalizeSportGameState } from './state'
+import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import type { SoccerMatchParticipant, SoccerMatchSetup } from './types'
 
 const soccer: SportConfig = {
@@ -210,7 +210,7 @@ describe('SOC-4A rules, state, and schemas', () => {
     legacyRules.shootoutAvailable = true
     delete (legacy.capturePreferences as Record<string, unknown>).captureMode
 
-    const normalized = normalizeSportGameState(legacy)
+    const normalized = normalizeSoccerSportGameState(legacy)
 
     expect(normalized?.version).toBe(2)
     expect(normalized?.setup.rulesSnapshot.tieResolution).toBe('extra_time_then_shootout')

@@ -4,8 +4,8 @@ Parent plan for the first Basketball event-model implementation program. BKE-1 e
 remaining sport-neutral seams, installs a deterministic Basketball event foundation, and then
 moves the existing court workflow onto that foundation behind an internal-only gate.
 
-Status: Planned. BKE-1A is ready for implementation; BKE-1B and BKE-1C require their own detailed
-plans before code begins.
+Status: In progress. BKE-1A implementation is complete; BKE-1B and BKE-1C require their own
+detailed plans before code begins.
 
 Architecture: [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md)
 

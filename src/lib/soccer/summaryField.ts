@@ -4,21 +4,22 @@ import type {
   GameEvent,
   GameEventInspection,
   GameEventLocation,
-  GameEventTeamSide,
 } from '../gameEvents/types'
 import type {
   SoccerCardEvent,
   SoccerDefensiveActionEvent,
   SoccerFoulEvent,
+  SoccerOwnGoalEvent,
   SoccerShotEvent,
   SoccerSportGameState,
   SoccerTeamEventEvent,
+  SoccerTeamSide,
 } from './types'
 import { soccerEventTimeLabel } from './timeline'
 import { soccerPeriodTimings } from './live'
 
 export type SoccerFieldReviewOrientation = 'normalized' | 'original'
-export type SoccerFieldReviewSide = 'all' | GameEventTeamSide
+export type SoccerFieldReviewSide = 'all' | SoccerTeamSide
 export type SoccerFieldReviewFamily =
   | 'attack'
   | 'defense'
@@ -60,7 +61,7 @@ export interface SoccerFieldReviewPeriodOption {
 }
 
 export interface SoccerFieldReviewEvent {
-  event: GameEvent
+  event: SoccerFieldReviewMatchEvent
   families: SoccerFieldReviewFamily[]
   participantIds: string[]
   participantLabel: string
@@ -74,6 +75,14 @@ export interface SoccerFieldReviewEvent {
     | 'tackle_won' | 'tackle_lost' | 'interception' | 'clearance' | 'recovery'
     | 'foul' | 'yellow_card' | 'red_card' | 'corner' | 'offside'
 }
+
+type SoccerFieldReviewMatchEvent =
+  | SoccerShotEvent
+  | SoccerOwnGoalEvent
+  | SoccerDefensiveActionEvent
+  | SoccerFoulEvent
+  | SoccerCardEvent
+  | SoccerTeamEventEvent
 
 export interface SoccerFieldReview {
   events: SoccerFieldReviewEvent[]
@@ -124,19 +133,20 @@ export function soccerSummaryFieldReview(
     .flatMap(event => {
       const families = soccerFieldReviewFamilies(event)
       if (families.length === 0) return []
+      const soccerEvent = event as SoccerFieldReviewMatchEvent
       return [{
-        event,
+        event: soccerEvent,
         families,
-        participantIds: eventParticipantIds(event).filter(id =>
+        participantIds: eventParticipantIds(soccerEvent).filter(id =>
           Boolean(sportState.projection.participants[id])
         ),
-        participantLabel: eventParticipantLabel(event),
-        periodLabel: periodLabels.get(event.period.id) ?? event.period.id,
-        timeLabel: soccerEventTimeLabel(event, timings),
-        title: soccerFieldReviewTitle(event),
-        detail: soccerFieldReviewDetail(event),
-        displayLocation: transformFieldLocation(event.location, filters.orientation),
-        markerKind: soccerFieldReviewMarkerKind(event),
+        participantLabel: eventParticipantLabel(soccerEvent),
+        periodLabel: periodLabels.get(soccerEvent.period.id) ?? soccerEvent.period.id,
+        timeLabel: soccerEventTimeLabel(soccerEvent, timings),
+        title: soccerFieldReviewTitle(soccerEvent),
+        detail: soccerFieldReviewDetail(soccerEvent),
+        displayLocation: transformFieldLocation(soccerEvent.location, filters.orientation),
+        markerKind: soccerFieldReviewMarkerKind(soccerEvent),
       } satisfies SoccerFieldReviewEvent]
     })
     .filter(item =>

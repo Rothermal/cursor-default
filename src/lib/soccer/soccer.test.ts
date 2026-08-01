@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameEvent, GameEventActor, GameEventTeamSide, JsonObject } from '../gameEvents/types'
+import type { GameEvent, GameEventActor, JsonObject } from '../gameEvents/types'
 import {
   addGameEvent,
   addGameEvents,
@@ -19,6 +19,7 @@ import type {
   SoccerEventPayloadByType,
   SoccerMatchParticipant,
   SoccerMatchSetup,
+  SoccerTeamSide,
 } from './index'
 
 const soccer: SportConfig = {
@@ -113,7 +114,7 @@ function attackingEvent<TType extends 'soccer.shot' | 'soccer.own_goal' | 'socce
   sequence: number,
   eventType: TType,
   payload: SoccerEventPayloadByType[TType],
-  teamSide: GameEventTeamSide,
+  teamSide: SoccerTeamSide,
   actors: GameEventActor[],
   elapsedMs: number,
   location: { x: number; y: number; attackingDirection: 'left_to_right' | 'right_to_left' } | null = {

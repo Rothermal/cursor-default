@@ -33,7 +33,7 @@ import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/l
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { normalizeGameEventStream } from '../lib/gameEvents/stream'
-import { normalizeSportGameState } from '../lib/soccer/state'
+import { normalizeSportGameState } from '../lib/sportGameState/state'
 import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../lib/gameEvents/runtime'
 import { sports } from '../config/sports'

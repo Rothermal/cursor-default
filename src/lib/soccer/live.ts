@@ -6,7 +6,6 @@ import type {
   GameEventInspection,
   GameEventLocation,
   GameEventPeriod,
-  GameEventTeamSide,
 } from '../gameEvents/types'
 import {
   addGameEvent,
@@ -25,6 +24,7 @@ import { elapsedSoccerClockMs } from './state'
 import type {
   SoccerAttackingDirection,
   SoccerMatchEndedPayload,
+  SoccerMatchEvent,
   SoccerMatchParticipant,
   SoccerMatchProjection,
   SoccerMatchRules,
@@ -37,6 +37,7 @@ import type {
   SoccerShotOutcome,
   SoccerShotSituation,
   SoccerSubstitutionChange,
+  SoccerTeamSide,
 } from './types'
 
 export interface SoccerLiveOptions {
@@ -51,7 +52,7 @@ export type SoccerCaptureActorSelection =
   | { kind: 'team'; label: string }
 
 export interface SoccerShotCaptureInput {
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   outcome: SoccerShotOutcome
   situation: SoccerShotSituation
   location: GameEventLocation | null
@@ -64,20 +65,20 @@ export interface SoccerShotCaptureInput {
 }
 
 export interface SoccerOwnGoalCaptureInput {
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   location: GameEventLocation | null
   ownGoalBy: SoccerCaptureActorSelection
   goalkeeper?: SoccerCaptureActorSelection | null
 }
 
 export interface SoccerScoreAdjustmentInput {
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   delta: 1 | -1
   reason: string
 }
 
 export interface SoccerShootoutStartInput {
-  firstKickingSide: GameEventTeamSide
+  firstKickingSide: SoccerTeamSide
   trackedEligibleParticipantIds: string[]
   trackedExcludedParticipantIds: string[]
   opponentEligibleCount: number
@@ -101,7 +102,7 @@ export interface SoccerShootoutEligibilityInput {
 }
 
 export interface SoccerShootoutGoalkeeperInput {
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   reason: SoccerShootoutGoalkeeperChangeReason
   goalkeeperOut: SoccerCaptureActorSelection
   goalkeeperIn: SoccerCaptureActorSelection
@@ -109,7 +110,7 @@ export interface SoccerShootoutGoalkeeperInput {
 }
 
 export interface SoccerShootoutCardInput {
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   sanction: SoccerCardSanction
   reason: SoccerDisciplineReason
   note: string | null
@@ -165,7 +166,7 @@ interface EventSpec<TType extends keyof SoccerEventPayloadByType = keyof SoccerE
   payload: SoccerEventPayloadByType[TType]
   period?: GameEventPeriod
   elapsedMs?: number | null
-  teamSide?: GameEventTeamSide
+  teamSide?: SoccerTeamSide
   location?: GameEventLocation | null
   actors?: GameEventActor[]
 }
@@ -185,7 +186,7 @@ export interface SoccerCheckedEventInput<TType extends SoccerSoc4EventType> {
   payload: SoccerEventPayloadByType[TType]
   period?: GameEventPeriod
   elapsedMs?: number | null
-  teamSide?: GameEventTeamSide
+  teamSide?: SoccerTeamSide
   location?: GameEventLocation | null
   actors?: GameEventActor[]
 }
@@ -268,7 +269,7 @@ export function recordSoccerShootoutKick(
 export function reviseSoccerShootoutKick(
   state: GameState,
   eventId: string,
-  teamSide: GameEventTeamSide,
+  teamSide: SoccerTeamSide,
   input: SoccerShootoutKickInput,
   now = new Date().toISOString()
 ): SoccerLiveResult {
@@ -903,8 +904,12 @@ export function restoreSoccerHistoryEvent(
   ))
 }
 
-export function inspectSoccerHistory(state: GameState): GameEventInspection {
-  return rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors).inspection
+export function inspectSoccerHistory(state: GameState): GameEventInspection<SoccerMatchEvent> {
+  return rebuildGameEventProjection(
+    state,
+    gameEventRegistry,
+    gameEventProjectors
+  ).inspection as GameEventInspection<SoccerMatchEvent>
 }
 
 export function isSoccerHalftimeBreak(projection: SoccerMatchProjection): boolean {

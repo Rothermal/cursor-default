@@ -1,6 +1,6 @@
 import { MapPin, MapPinOff, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { GameEventActor, GameEventLocation, GameEventTeamSide } from '../../lib/gameEvents/types'
+import type { GameEventActor, GameEventLocation } from '../../lib/gameEvents/types'
 import {
   inspectSoccerHistory,
   recordHistoricalSoccerOwnGoal,
@@ -23,12 +23,13 @@ import {
   type SoccerShotOutcome,
   type SoccerShotEvent,
   type SoccerShotSituation,
+  type SoccerTeamSide,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
 import SoccerField from './SoccerField'
 
 export interface SoccerCaptureDraft {
-  teamSide: GameEventTeamSide
+  teamSide: SoccerTeamSide
   location: GameEventLocation | null
   outcome?: SoccerShotOutcome
   preferTeamAttribution?: boolean
@@ -92,7 +93,7 @@ export default function SoccerShotCaptureDialog({
   const periodTimings = useMemo(() => soccerPeriodTimings(state), [state])
   const recentOpponentLabels = useMemo(() => opponentLabels(state), [state])
   const mode = draft?.mode ?? (draft?.event ? 'edit' : 'live')
-  const [teamSide, setTeamSide] = useState<GameEventTeamSide>('tracked')
+  const [teamSide, setTeamSide] = useState<SoccerTeamSide>('tracked')
   const [outcome, setOutcome] = useState<SoccerShotOutcome | null>(null)
   const [situation, setSituation] = useState<SoccerShotSituation>('open_play')
   const [sourceEventId, setSourceEventId] = useState('')

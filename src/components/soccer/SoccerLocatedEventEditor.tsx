@@ -34,14 +34,15 @@ export default function SoccerLocatedEventEditor({
 }: SoccerLocatedEventEditorProps) {
   if (!event || !isSoccerLocatedEditableEvent(event)) return null
   if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
+    const attackingEvent = event as SoccerShotEvent | SoccerOwnGoalEvent
     return (
       <SoccerShotCaptureDialog
         key={`${event.id}-${event.revision}`}
         draft={{
           mode: 'edit',
-          teamSide: event.teamSide,
+          teamSide: attackingEvent.teamSide,
           location: event.location,
-          event: event as SoccerShotEvent | SoccerOwnGoalEvent,
+          event: attackingEvent,
         }}
         state={state}
         recorderUserId={recorderUserId}

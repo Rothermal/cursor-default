@@ -31,13 +31,13 @@ import {
   type SoccerScoreAdjustmentEvent,
   type SoccerSummaryTimelineFilter,
   type SoccerSummaryTimelineSection,
+  type SoccerTeamSide,
   type SoccerTimelineFilter,
   withSoccerTieResolution,
 } from '../../lib/soccer'
 import type {
   GameEvent,
   GameEventInspection,
-  GameEventTeamSide,
 } from '../../lib/gameEvents/types'
 
 interface SoccerTimelineProps {
@@ -47,7 +47,7 @@ interface SoccerTimelineProps {
   onApply: (result: SoccerLiveResult) => boolean
   recorderUserId: string | null
   selectedParticipantId?: string | null
-  defaultTeamSide?: GameEventTeamSide
+  defaultTeamSide?: SoccerTeamSide
   onTrackedParticipantUsed?: (participantId: string) => void
   allowAddEvent?: boolean
   readOnly?: boolean

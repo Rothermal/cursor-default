@@ -12,7 +12,7 @@ import {
   PENDING_SYNC_KEY,
 } from './gameStorageKeys'
 import { normalizeGameEventStream } from './gameEvents/stream'
-import { normalizeSportGameState } from './soccer/state'
+import { normalizeSportGameState } from './sportGameState/state'
 
 const MANIFEST_VERSION = 1
 const EXPORT_VERSION = 1
