@@ -218,6 +218,18 @@ describe('gameReducer live tracking', () => {
     expect(gameReducer(base(), { type: 'SET_PERIOD', period: 2.9 }).currentPeriod).toBe(2)
   })
 
+  it('blocks aggregate mutations as soon as event creation intent is stamped', () => {
+    const marked = base({
+      gameDataAuthority: 'sport_events',
+      eventStream: null,
+      sportGameState: null,
+    })
+    expect(gameReducer(marked, { type: 'INCREMENT_STAT', playerId: 'p1', statId: 'ast' }))
+      .toBe(marked)
+    expect(gameReducer(marked, { type: 'INCREMENT_OPPONENT_SCORE' })).toBe(marked)
+    expect(gameReducer(marked, { type: 'ADD_SHOT', shot: shot() })).toBe(marked)
+  })
+
   it('RESET_GAME preserves offline status', () => {
     const next = gameReducer(base({ cloudSync: { ...base().cloudSync, status: 'offline' } }), {
       type: 'RESET_GAME',

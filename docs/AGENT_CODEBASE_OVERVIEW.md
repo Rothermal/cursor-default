@@ -144,8 +144,11 @@ and neutral timeouts, and manual minutes; projection also derives period team fo
 disqualification, team technicals, and located shots. Soccer and Basketball projection rebuilds
 share capture-order semantics while display readers retain clock ordering. Basketball is registered
 in the internal event runtime, but normal Basketball game creation remains aggregate-only until
-BKE-1C. Event initialization stamps `gameDataAuthority: 'sport_events'`; a marked game whose event
-stream or sport setup is malformed is quarantined and cannot silently fall back to aggregate sync.
+BKE-1C. BKE-1C1 adds the development-only local Basketball creation toggle and checked command
+foundation in `src/lib/basketball/commands.ts`: intent stamps `gameDataAuthority: 'sport_events'`
+before game info, Player Setup snapshots non-pseudo participants, and one atomic helper initializes
+the stream plus Period 1. A marked game whose event stream or sport setup is malformed is
+quarantined and cannot silently fall back to aggregate sync.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -377,7 +380,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md`](PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md) / [`PLAN_BKE_1C_COURT_EVENTS.md`](PLAN_BKE_1C_COURT_EVENTS.md) | Basketball migration onto the shared event model. BKE-1A and all BKE-1B slices are implemented; BKE-1C1 through BKE-1C3 are approved, with checked command/setup foundation next |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md`](PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md) / [`PLAN_BKE_1C_COURT_EVENTS.md`](PLAN_BKE_1C_COURT_EVENTS.md) | Basketball migration onto the shared event model. BKE-1A, all BKE-1B slices, and BKE-1C1 are implemented; BKE-1C2 court/popup integration is next |
 
 ### Held / waiting for feedback
 

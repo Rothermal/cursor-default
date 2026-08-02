@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   getSportAvailabilityPolicy,
+  isBasketballEventModelCreationAvailable,
   SOCCER_RELEASED_IN_PRODUCTION,
 } from './sportAvailability'
 
 describe('getSportAvailabilityPolicy', () => {
+  it('keeps Basketball event-game creation development-only', () => {
+    expect(isBasketballEventModelCreationAvailable(true)).toBe(true)
+    expect(isBasketballEventModelCreationAvailable(false)).toBe(false)
+  })
+
   it('keeps the development Soccer preview behind the user toggle', () => {
     expect(
       getSportAvailabilityPolicy('soccer', false, { development: true })

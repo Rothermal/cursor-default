@@ -20,7 +20,7 @@ function failed(
   return { ok: false, state, error: { code, message } }
 }
 
-function hasLegacyAggregateActivity(state: GameState): boolean {
+export function hasLegacyAggregateActivity(state: GameState): boolean {
   return (
     state.actionLog.length > 0 ||
     state.shotChart.length > 0 ||

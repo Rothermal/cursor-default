@@ -15,10 +15,14 @@ import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIn
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
 import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
-import { sportDashboardPath } from '../lib/sportNavigation'
+import { routeForResumedGame, sportDashboardPath } from '../lib/sportNavigation'
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
+import {
+  authoritativeGameDataDiagnostics,
+  SPORT_EVENTS_AUTHORITY,
+} from '../lib/gameEvents/authority'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -123,6 +127,7 @@ export default function GameTracker() {
   }, [notes])
 
   useEffect(() => {
+    if (state.gameDataAuthority === SPORT_EVENTS_AUTHORITY) return
     if (state.cloudSync.teamId && !canTrackGames(teamAccess.role)) return
     if (!sport?.teamCategories?.length || !gameInfo) return
 
@@ -130,7 +135,7 @@ export default function GameTracker() {
     if (!nextPlayers) return
 
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
-  }, [sport, gameInfo, players, dispatch, state.cloudSync.teamId, teamAccess.role])
+  }, [sport, gameInfo, players, dispatch, state.cloudSync.teamId, state.gameDataAuthority, teamAccess.role])
 
   const handleSelectPlayer = useCallback(
     (playerId: string) => {
@@ -139,6 +144,25 @@ export default function GameTracker() {
     },
     [dispatch]
   )
+
+  const authoritativeDiagnostics = authoritativeGameDataDiagnostics(state, true)
+  if (
+    state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
+    authoritativeDiagnostics.length > 0
+  ) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4 py-8">
+        <div className="max-w-lg mx-auto">
+          <AccessUnavailable
+            title="Event game unavailable"
+            message={authoritativeDiagnostics[0].message}
+            actionLabel="Return to setup"
+            onAction={() => navigate(routeForResumedGame(state))}
+          />
+        </div>
+      </div>
+    )
+  }
 
   if (state.cloudSync.teamId && !canTrackGames(teamAccess.role)) {
     const checkingAccess = teamAccess.loading && !teamAccess.error

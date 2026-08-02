@@ -8,8 +8,16 @@ import { supabase } from '../lib/supabase'
 import { teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import {
+  getSportAvailabilityPolicy,
+  isBasketballEventModelCreationAvailable,
+} from '../lib/sportAvailability'
 import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
+import {
+  hasStartedBasketballEventGame,
+  isBasketballEventSetupIntent,
+  setBasketballEventCreationIntent,
+} from '../lib/basketball'
 import {
   acceptedTeamRole,
   canManageTeam,
@@ -53,6 +61,11 @@ export default function GameSetup() {
   const sport = state.sport
   const sportHomePath = sport ? sportDashboardPath(sport.id) : '/'
   const isCloudFlow = Boolean(isConfigured && user && supabase)
+  const isBasketballEventIntent = isBasketballEventSetupIntent(state)
+
+  useEffect(() => {
+    if (hasStartedBasketballEventGame(state)) navigate('/game', { replace: true })
+  }, [navigate, state])
 
   const [teamName, setTeamName] = useState(state.gameInfo?.teamName || '')
   const [opponentName, setOpponentName] = useState(state.gameInfo?.opponentName || '')
@@ -238,6 +251,13 @@ export default function GameSetup() {
       })
       setTeams(loadedTeams)
 
+      if (isBasketballEventIntent) {
+        setTeamMode('new')
+        setSelectedTeamId('')
+        setLoadingTeams(false)
+        return
+      }
+
       const requestedTeam = requestedTeamId
         ? loadedTeams.find(team => team.id === requestedTeamId)
         : null
@@ -276,7 +296,7 @@ export default function GameSetup() {
     return () => {
       isCancelled = true
     }
-  }, [isCloudFlow, requestedTeamId, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
+  }, [isBasketballEventIntent, isCloudFlow, requestedTeamId, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
 
   useEffect(() => {
     if (!isCloudFlow || !userId || !sport || !supabase) return
@@ -418,6 +438,34 @@ export default function GameSetup() {
   const requestedTeamUnavailable = Boolean(
     requestedTeamId && !loadingTeams && !selectedTeam
   )
+  const showBasketballEventToggle = Boolean(
+    isBasketballEventModelCreationAvailable() &&
+      sport?.id === 'basketball' &&
+      !requestedTeamId &&
+      teamMode === 'new' &&
+      (isBasketballEventIntent || !state.gameInfo)
+  )
+
+  const updateBasketballEventIntent = (enabled: boolean): boolean => {
+    const result = setBasketballEventCreationIntent(state, enabled)
+    if (!result.ok) {
+      setSetupError(result.message)
+      return false
+    }
+    if (enabled) setSelectedNewTeamSeasonId('')
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+    setSetupError(null)
+    return true
+  }
+
+  const updateTeamMode = (nextMode: 'existing' | 'new') => {
+    if (
+      nextMode === 'existing' &&
+      isBasketballEventIntent &&
+      !updateBasketballEventIntent(false)
+    ) return
+    setTeamMode(nextMode)
+  }
 
   const startRequestedTeamLocally = () => {
     const requestedSport = sports.find(item => item.id === requestedLocalFallbackSportId)
@@ -475,6 +523,10 @@ export default function GameSetup() {
 
   const handleNext = async () => {
     if (!canProceed) return
+    if (isBasketballEventIntent && teamMode !== 'new') {
+      setSetupError('Basketball event mode is local-only during development.')
+      return
+    }
     if (isCloudFlow && teamMode === 'existing' && !canTrackGames(selectedTeam?.accessRole ?? null)) {
       setSetupError('Viewer access is read-only. Choose a team you can track.')
       return
@@ -565,7 +617,9 @@ export default function GameSetup() {
     }
 
     const resolvedSeasonIdForSync =
-      teamMode === 'existing' && selectedTeam
+      isBasketballEventIntent
+        ? null
+        : teamMode === 'existing' && selectedTeam
         ? selectedTeam.season_id
         : teamMode === 'new' && selectedNewTeamSeasonId
           ? selectedNewTeamSeasonId
@@ -647,7 +701,7 @@ export default function GameSetup() {
                 <div className="flex rounded-xl bg-slate-100 p-1">
                   <button
                     type="button"
-                    onClick={() => setTeamMode('existing')}
+                    onClick={() => updateTeamMode('existing')}
                     className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                       teamMode === 'existing' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
                     }`}
@@ -656,7 +710,7 @@ export default function GameSetup() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTeamMode('new')}
+                    onClick={() => updateTeamMode('new')}
                     className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                       teamMode === 'new' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
                     }`}
@@ -735,9 +789,9 @@ export default function GameSetup() {
                     className="input-field"
                     autoFocus
                   />
-                  {loadingSeasonsForNewTeam ? (
+                  {!isBasketballEventIntent && loadingSeasonsForNewTeam ? (
                     <p className="text-xs text-slate-400 animate-pulse">Loading seasons...</p>
-                  ) : seasonsForNewTeam.length > 0 ? (
+                  ) : !isBasketballEventIntent && seasonsForNewTeam.length > 0 ? (
                     <div>
                       <label className="block text-sm font-medium text-slate-600 mb-1">
                         Season for new team
@@ -774,6 +828,24 @@ export default function GameSetup() {
                 autoFocus
               />
             </div>
+          )}
+
+          {showBasketballEventToggle && (
+            <label className="flex items-start justify-between gap-4 border-y border-amber-200 bg-amber-50 px-3 py-3">
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-amber-950">Event Model</span>
+                <span className="block text-xs text-amber-800">
+                  Internal local-only Basketball tracking preview
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={isBasketballEventIntent}
+                disabled={loadingTeams}
+                onChange={event => updateBasketballEventIntent(event.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-600"
+              />
+            </label>
           )}
 
           <div>

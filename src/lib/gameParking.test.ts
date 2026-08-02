@@ -6,6 +6,7 @@ import {
   DEFAULT_BASKETBALL_RULES_SOURCE,
 } from './basketball/rules'
 import { createBasketballSportGameState } from './basketball/state'
+import { prepareBasketballGameStart } from './basketball/commands'
 import { gameReducer } from './gameReducer'
 import {
   isAggregateCloudSyncEligible,
@@ -177,6 +178,58 @@ beforeEach(() => {
 })
 
 describe('gameParking', () => {
+  it('round-trips marked Basketball setup intent without aggregate fallback', () => {
+    const marked = {
+      ...gameState(basketball, 'Wildcats', 'Tigers'),
+      gameDataAuthority: 'sport_events' as const,
+      players: [],
+      gameInfo: null,
+    }
+
+    saveActiveGameState(marked, 'user-1')
+    const restored = loadActiveParkedGameState('user-1')
+
+    expect(restored).toMatchObject({
+      gameDataAuthority: 'sport_events',
+      eventStream: null,
+      sportGameState: null,
+    })
+    expect(isAggregateCloudSyncEligible(restored!)).toBe(false)
+  })
+
+  it('round-trips an initialized local Basketball event game', () => {
+    const eventBasketball: SportConfig = {
+      ...basketball,
+      teamCategories: [{ id: 'team', name: 'Team', color: 'blue', actions: [] }],
+    }
+    const before = {
+      ...gameState(eventBasketball, 'Wildcats', 'Tigers'),
+      gameDataAuthority: 'sport_events' as const,
+    }
+    const started = prepareBasketballGameStart(before, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:00:00.000Z',
+      eventId: '71000000-0000-4000-8000-000000000001',
+      participantIds: ['71000000-0000-4000-8000-000000000101'],
+    })
+    if (!started.ok) throw new Error(started.message)
+
+    saveActiveGameState(started.state, 'user-1')
+    const restored = loadActiveParkedGameState('user-1')
+    const hydrated = gameReducer(restored!, { type: 'HYDRATE_STATE', state: restored! })
+
+    expect(restored?.gameDataAuthority).toBe('sport_events')
+    expect(restored?.eventStream?.events).toHaveLength(1)
+    expect(hydrated.sportGameState?.sportId).toBe('basketball')
+    if (hydrated.sportGameState?.sportId === 'basketball') {
+      expect(hydrated.sportGameState.projection).toMatchObject({
+        status: 'in_progress',
+        currentPeriodId: 'regulation-1',
+      })
+    }
+    expect(isAggregateCloudSyncEligible(restored!)).toBe(false)
+  })
+
   it('round-trips recognized Basketball event setup without trusting persisted projection', () => {
     const base = gameState(basketball, 'Wildcats', 'Tigers')
     const sportGameState = createBasketballSportGameState({
