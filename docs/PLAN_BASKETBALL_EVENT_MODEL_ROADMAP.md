@@ -5,8 +5,8 @@ record combination onto the shared `GameEvent` foundation introduced by the socc
 
 Status: BKE-0 architecture and product-model decisions are approved in
 [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md).
-BKE-1A, all BKE-1B slices, and BKE-1C1 are complete. The detailed BKE-1C plan is approved and split
-into BKE-1C1 through BKE-1C3; BKE-1C2 court/popup integration is next.
+BKE-1A, all BKE-1B slices, BKE-1C1, and BKE-1C2 are complete. The detailed BKE-1C plan is approved
+and split into BKE-1C1 through BKE-1C3; BKE-1C3 grouped corrections and parity proof are next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

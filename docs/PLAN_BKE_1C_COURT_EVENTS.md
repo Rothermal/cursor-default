@@ -3,8 +3,8 @@
 Detailed plan for moving the existing Basketball court workflow onto the authoritative event
 foundation while keeping normal Basketball games on the legacy aggregate path.
 
-Status: In progress. Product and delivery decisions were confirmed in the BKE-1C Q&A. BKE-1C1 is
-implemented; BKE-1C2 court/popup integration is next.
+Status: In progress. Product and delivery decisions were confirmed in the BKE-1C Q&A. BKE-1C1 and
+BKE-1C2 are implemented; BKE-1C3 grouped corrections and parity proof are next.
 
 Depends on:
 
@@ -27,10 +27,10 @@ period controls, cloud sync, Summary, and user-visible event-game creation remai
 | Phase | Scope | Exit condition |
 |---|---|---|
 | BKE-1C1 | Checked Basketball court command foundation, development-only local creation intent, setup/participant snapshot, atomic match start, and fixture helpers | **Implemented:** a local internal game becomes event-authoritative before aggregate sync can start, initializes one coherent Period 1 history, and rejects every partial/invalid transition |
-| BKE-1C2 | Court/popup integration, all popup event outputs, participant/team actor mapping, per-shot value override, capture preferences, projected filters, and event-mode tracker shell | Existing court capture gestures round-trip through events with inline failure handling while legacy Basketball UI remains unchanged |
+| BKE-1C2 | Court/popup integration, all popup event outputs, participant/team actor mapping, per-shot value override, capture preferences, projected filters, and event-mode tracker shell | **Implemented:** existing court capture gestures round-trip through events with inline failure handling while legacy Basketball UI remains unchanged |
 | BKE-1C3 | Capture-unit Recent Events, one-level undo/restore, court Undo, Clear Shot Chart dependency mutations, persisted inverse receipt, and complete parity/regression proof | Grouped corrections are atomic and reload-safe; chart clearing preserves every excluded event exactly and the BKE-1 program exits |
 
-Each slice uses its own feature branch and PR. BKE-1C2 is next.
+Each slice uses its own feature branch and PR. BKE-1C3 is next.
 
 ## 3. Guardrails
 
@@ -159,6 +159,24 @@ Each slice uses its own feature branch and PR. BKE-1C2 is next.
   command.
 - Persist selected participant/team-side display preferences for park/resume without including them
   in authoritative fingerprints.
+
+### 5.5 Implementation
+
+- `captureBasketballCourtEvent` is the single checked adapter for every existing court-popup output.
+  It maps projected participants and team pseudo-player ids to event actors, derives period and
+  per-recorder sequence centrally, and hydrates React only after complete projection.
+- Located shots convert shared court feet to normalized event coordinates. Geometry-preserving
+  choices use `court`; a changed 2PT/3PT choice uses `manual_override`, and the projected event id
+  is the only shot-chart record id.
+- Prompted assists and rebounds append atomically with their shot, relation, and shared command id.
+  Standalone popup facts retain null relation and command ids. Invalid combinations return the
+  original state and remain visible as an inline popup error.
+- Event capture preferences persist the selected participant or team side and temporary value
+  override while remaining fingerprint-inert. Successful capture and cancel clear the override.
+- The event tracker keeps the projected scoreboard, selector, court, filters, notes, and disabled
+  Recent Events shell. Legacy score/grid/team/period/Add Player controls and chart corrections are
+  hidden until their owning phases; unmarked Basketball continues through the unchanged reducer
+  path.
 
 ## 6. BKE-1C3: Undo, Restore, And Clear Chart
 

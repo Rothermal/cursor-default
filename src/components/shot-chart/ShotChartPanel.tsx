@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSettings } from '../../context/SettingsContext'
+import { useAuth } from '../../context/AuthContext'
 import BasketballCourt from './BasketballCourt'
 import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
@@ -16,6 +17,12 @@ import {
   type ShotChartSelection,
 } from '../../lib/shotChartViews'
 import type { ActionLogEntry, Player, ShotRecord } from '../../types'
+import {
+  basketballCaptureTargetForPlayerId,
+  basketballPlayerIdForCapturePreferences,
+  captureBasketballCourtEvent,
+  hasStartedBasketballEventGame,
+} from '../../lib/basketball/commands'
 
 function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
@@ -71,17 +78,24 @@ interface ShotChartPanelProps {
 
 export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
+  const { user } = useAuth()
   const { settings } = useSettings()
   const { sport, players, activePlayerId, shotChart, actionLog } = state
   const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)
+  const [captureError, setCaptureError] = useState<string | null>(null)
   const pendingPulseIdRef = useRef<string | null>(null)
+  const isEventBasketball = hasStartedBasketballEventGame(state)
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
+  const persistedCapturePlayerId = isEventBasketball
+    ? basketballPlayerIdForCapturePreferences(state)
+    : null
   const effectivePlayerId =
-    activePlayerId && players.some(p => p.id === activePlayerId)
-      ? activePlayerId
+    (persistedCapturePlayerId ?? activePlayerId) &&
+    players.some(p => p.id === (persistedCapturePlayerId ?? activePlayerId))
+      ? persistedCapturePlayerId ?? activePlayerId
       : selectorPlayers[0]?.id ?? null
   const pendingLoggingPlayer = pendingTap
     ? players.find(p => p.id === pendingTap.playerId)
@@ -97,24 +111,77 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         /* ignore */
       }
       setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt', playerId: effectivePlayerId })
+      setCaptureError(null)
+      if (isEventBasketball) {
+        const target = basketballCaptureTargetForPlayerId(state, effectivePlayerId)
+        if (target.ok) {
+          dispatch({
+            type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
+            preferences: {
+              teamSide: target.value.teamSide,
+              selectedParticipantId: target.value.selection.kind === 'participant'
+                ? target.value.selection.participantId
+                : null,
+              selectionInitialized: true,
+              shotValueOverride: null,
+            },
+          })
+        }
+      }
     },
-    [effectivePlayerId]
+    [dispatch, effectivePlayerId, isEventBasketball, state]
   )
 
   const handlePopupSelectPlayer = useCallback(
     (playerId: string) => {
       onSelectPlayer(playerId)
       setPendingTap(prev => (prev ? { ...prev, playerId } : null))
+      setCaptureError(null)
+      if (isEventBasketball) {
+        const target = basketballCaptureTargetForPlayerId(state, playerId)
+        if (target.ok) {
+          dispatch({
+            type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
+            preferences: {
+              teamSide: target.value.teamSide,
+              selectedParticipantId: target.value.selection.kind === 'participant'
+                ? target.value.selection.participantId
+                : null,
+              selectionInitialized: true,
+            },
+          })
+        }
+      }
     },
-    [onSelectPlayer]
+    [dispatch, isEventBasketball, onSelectPlayer, state]
   )
 
   const handlePopupPick = useCallback(
     (event: CourtEvent) => {
       const tap = pendingTap
-      setPendingTap(null)
       if (!tap) return
       const loggingPlayerId = tap.playerId
+
+      if (isEventBasketball) {
+        const result = captureBasketballCourtEvent(state, {
+          recorderUserId: user?.id ?? null,
+          playerId: loggingPlayerId,
+          point: { x: tap.x, y: tap.y },
+          event,
+        })
+        if (!result.ok) {
+          setCaptureError(result.message)
+          return
+        }
+        const shotId = event.kind === 'shot' ? result.eventIds[0] : null
+        pendingPulseIdRef.current = shotId
+        setCaptureError(null)
+        setPendingTap(null)
+        dispatch({ type: 'HYDRATE_STATE', state: result.state })
+        return
+      }
+
+      setPendingTap(null)
 
       if (event.kind === 'stat') {
         dispatch({
@@ -155,7 +222,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         })
       }
     },
-    [dispatch, pendingTap]
+    [dispatch, isEventBasketball, pendingTap, state, user?.id]
   )
 
   useEffect(() => {
@@ -212,7 +279,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
       </div>
 
-      <button
+      {!isEventBasketball && <button
         type="button"
         disabled={!canUndoShot}
         onClick={() => dispatch({ type: 'UNDO_LAST_SHOT' })}
@@ -220,11 +287,11 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
                    disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
       >
         ↩ Undo last shot
-      </button>
-      {undoShotSubtitle && (
+      </button>}
+      {!isEventBasketball && undoShotSubtitle && (
         <p className="text-center text-xs text-slate-500 -mt-1">{undoShotSubtitle}</p>
       )}
-      <button
+      {!isEventBasketball && <button
         type="button"
         disabled={!canClearShots}
         onClick={() => setShowClearConfirm(true)}
@@ -232,7 +299,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
                    disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
       >
         Clear all chart shots
-      </button>
+      </button>}
 
       {pendingTap && (
         <CourtEventPopup
@@ -247,12 +314,33 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
           onSelectPlayer={handlePopupSelectPlayer}
           reboundPromptAfterMissEnabled={settings.courtCapture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
+          errorMessage={captureError}
+          onShotTypeChange={shotType => {
+            if (!isEventBasketball) return
+            dispatch({
+              type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
+              preferences: {
+                shotValueOverride: shotType === pendingTap.shotType
+                  ? null
+                  : shotType === '3pt' ? 3 : 2,
+              },
+            })
+          }}
           onPick={handlePopupPick}
-          onCancel={() => setPendingTap(null)}
+          onCancel={() => {
+            setPendingTap(null)
+            setCaptureError(null)
+            if (isEventBasketball) {
+              dispatch({
+                type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
+                preferences: { shotValueOverride: null },
+              })
+            }
+          }}
         />
       )}
 
-      <ConfirmDialog
+      {!isEventBasketball && <ConfirmDialog
         open={showClearConfirm}
         title="Clear all chart shots?"
         message="Remove every shot from the chart and undo their scoring stats? Linked assists and rebound prompts are cleared too. Other stat taps are not changed."
@@ -261,7 +349,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         destructive
         onConfirm={handleClearChartConfirm}
         onCancel={() => setShowClearConfirm(false)}
-      />
+      />}
     </div>
   )
 }

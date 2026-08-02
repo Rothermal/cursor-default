@@ -24,6 +24,11 @@ import {
   SPORT_EVENTS_AUTHORITY,
 } from '../lib/gameEvents/authority'
 import { gameEventProjectors } from '../lib/gameEvents/runtime'
+import {
+  basketballCaptureTargetForPlayerId,
+  basketballPlayerIdForCapturePreferences,
+  hasStartedBasketballEventGame,
+} from '../lib/basketball/commands'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -138,12 +143,29 @@ export default function GameTracker() {
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
   }, [sport, gameInfo, players, dispatch, state.cloudSync.teamId, state.gameDataAuthority, teamAccess.role])
 
+  const isBasketballEventMode = hasStartedBasketballEventGame(state)
+
   const handleSelectPlayer = useCallback(
     (playerId: string) => {
       setShowAllShots(false)
       dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })
+      if (isBasketballEventMode) {
+        const target = basketballCaptureTargetForPlayerId(state, playerId)
+        if (target.ok) {
+          dispatch({
+            type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
+            preferences: {
+              teamSide: target.value.teamSide,
+              selectedParticipantId: target.value.selection.kind === 'participant'
+                ? target.value.selection.participantId
+                : null,
+              selectionInitialized: true,
+            },
+          })
+        }
+      }
     },
-    [dispatch]
+    [dispatch, isBasketballEventMode, state]
   )
 
   const activeProjector = state.sport ? gameEventProjectors.get(state.sport.id) : undefined
@@ -196,7 +218,10 @@ export default function GameTracker() {
     return null
   }
 
-  const activePlayer = players.find(p => p.id === activePlayerId) || players[0]
+  const preferredCapturePlayerId = isBasketballEventMode
+    ? basketballPlayerIdForCapturePreferences(state)
+    : null
+  const activePlayer = players.find(p => p.id === (preferredCapturePlayerId ?? activePlayerId)) || players[0]
   const isBasketball = sport.id === 'basketball'
   const shotChartSelection: ShotChartSelection = showAllShots
     ? { kind: 'all' }
@@ -258,7 +283,7 @@ export default function GameTracker() {
           </button>
         </div>
 
-        <Scoreboard />
+        <Scoreboard readOnly={isBasketballEventMode} />
         {parkingError && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             {parkingError}
@@ -271,13 +296,13 @@ export default function GameTracker() {
         activePlayerId={activePlayer.id}
         onSelectPlayer={handleSelectPlayer}
         activeBgClass={sport.theme.bg}
-        onAddPlayer={() => setShowAddPlayer(!showAddPlayer)}
+        onAddPlayer={isBasketballEventMode ? undefined : () => setShowAddPlayer(!showAddPlayer)}
         sticky
         onSelectAll={isBasketball ? () => setShowAllShots(true) : undefined}
         allActive={showAllShots}
       />
 
-      {showAddPlayer && (
+      {!isBasketballEventMode && showAddPlayer && (
         <div className="px-3 max-w-lg mx-auto w-full">
           <div className="card mb-2 flex gap-2 items-end">
             <input
@@ -311,15 +336,17 @@ export default function GameTracker() {
       {isBasketball && (
         <div className="px-3 py-2 max-w-lg mx-auto w-full">
           <ShotChartPanel selection={shotChartSelection} onSelectPlayer={handleSelectPlayer} />
-          <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
-            The court popup and the buttons below adjust the same player stats — the popup is
-            fast in-play entry (shots keep their location); the buttons are for direct entry
-            and corrections.
-          </p>
+          {!isBasketballEventMode && (
+            <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
+              The court popup and the buttons below adjust the same player stats — the popup is
+              fast in-play entry (shots keep their location); the buttons are for direct entry
+              and corrections.
+            </p>
+          )}
         </div>
       )}
 
-      {showPeriodToggle && teamRules && (
+      {!isBasketballEventMode && showPeriodToggle && teamRules && (
         <div className="px-3 max-w-lg mx-auto w-full">
           <PeriodToggle
             periods={periodButtonCount}
@@ -333,7 +360,7 @@ export default function GameTracker() {
         </div>
       )}
 
-      {showBonusBanner && teamRules && (
+      {!isBasketballEventMode && showBonusBanner && teamRules && (
         <div className="px-3 max-w-lg mx-auto w-full">
           <BasketballBonusIndicator
             foulCount={teamFoulCountThisPeriod}
@@ -346,7 +373,7 @@ export default function GameTracker() {
 
       <div className="px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
-          {gridCategories.map(category => {
+          {!isBasketballEventMode && gridCategories.map(category => {
             const missMap: Record<string, typeof category.actions[0]> = {}
             for (const a of category.actions) {
               if (a.madeStatId) missMap[a.madeStatId] = a
