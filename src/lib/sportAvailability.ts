@@ -1,4 +1,5 @@
 export const SOCCER_RELEASED_IN_PRODUCTION = true
+const DEVELOPMENT_BUILD = import.meta.env.DEV
 
 export type SportReleaseStage = 'unreleased' | 'preview' | 'released'
 
@@ -19,7 +20,7 @@ export function getSportAvailabilityPolicy(
   sportId: string,
   enabledInSettings: boolean,
   {
-    development = import.meta.env.DEV,
+    development = DEVELOPMENT_BUILD,
     soccerReleasedInProduction = SOCCER_RELEASED_IN_PRODUCTION,
   }: SportAvailabilityOptions = {}
 ): SportAvailabilityPolicy {
@@ -48,4 +49,10 @@ export function getSportAvailabilityPolicy(
     canStartNewGame: enabled,
     canAccessExisting: true,
   }
+}
+
+export function isBasketballEventModelCreationAvailable(
+  development = DEVELOPMENT_BUILD
+): boolean {
+  return development
 }

@@ -3,8 +3,8 @@
 Detailed plan for moving the existing Basketball court workflow onto the authoritative event
 foundation while keeping normal Basketball games on the legacy aggregate path.
 
-Status: Approved for implementation. Product and delivery decisions were confirmed in the BKE-1C
-Q&A. Implementation splits into BKE-1C1 through BKE-1C3.
+Status: In progress. Product and delivery decisions were confirmed in the BKE-1C Q&A. BKE-1C1 is
+implemented; BKE-1C2 court/popup integration is next.
 
 Depends on:
 
@@ -26,11 +26,11 @@ period controls, cloud sync, Summary, and user-visible event-game creation remai
 
 | Phase | Scope | Exit condition |
 |---|---|---|
-| BKE-1C1 | Checked Basketball court command foundation, development-only local creation intent, setup/participant snapshot, atomic match start, and fixture helpers | A local internal game becomes event-authoritative before aggregate sync can start, initializes one coherent Period 1 history, and rejects every partial/invalid transition |
+| BKE-1C1 | Checked Basketball court command foundation, development-only local creation intent, setup/participant snapshot, atomic match start, and fixture helpers | **Implemented:** a local internal game becomes event-authoritative before aggregate sync can start, initializes one coherent Period 1 history, and rejects every partial/invalid transition |
 | BKE-1C2 | Court/popup integration, all popup event outputs, participant/team actor mapping, per-shot value override, capture preferences, projected filters, and event-mode tracker shell | Existing court capture gestures round-trip through events with inline failure handling while legacy Basketball UI remains unchanged |
 | BKE-1C3 | Capture-unit Recent Events, one-level undo/restore, court Undo, Clear Shot Chart dependency mutations, persisted inverse receipt, and complete parity/regression proof | Grouped corrections are atomic and reload-safe; chart clearing preserves every excluded event exactly and the BKE-1 program exits |
 
-Each slice uses its own feature branch and PR. BKE-1C1 is next.
+Each slice uses its own feature branch and PR. BKE-1C2 is next.
 
 ## 3. Guardrails
 
@@ -57,7 +57,9 @@ Each slice uses its own feature branch and PR. BKE-1C1 is next.
 ### 4.1 Development-only creation intent
 
 - Add a development-only Event Model toggle to local Basketball setup. It defaults off for every
-  new game and is absent from production builds and cloud/team game flows.
+  new game and is absent from production builds, existing-team selection, and team deep-link flows.
+  A signed-in unbound `New Team` setup may select the toggle; doing so explicitly changes that
+  setup to `Local Team`, clears cloud-season intent, and prevents cloud team/game creation.
 - Selecting it marks the new game event-owned before `SET_GAME_INFO` can make the state eligible for
   aggregate sync. Deselecting is allowed only while no stream, setup snapshot, or aggregate activity
   exists.
@@ -96,6 +98,19 @@ Each slice uses its own feature branch and PR. BKE-1C1 is next.
   generation, normalized court location, and event timestamps.
 - Commands use the global registry/projector and require complete final projection. UI call sites
   hydrate only successful results.
+
+### 4.5 Implementation
+
+- `src/lib/basketball/commands.ts` owns creation intent, immutable setup construction, atomic Period
+  1 start, current command context, per-recorder sequencing, actor mapping, command ids, normalized
+  locations, and timestamps.
+- The centralized release policy exposes the setup toggle only in development. Selecting it on a
+  new unbound Basketball setup stamps event authority before game information and changes the
+  source label to `Local Team`; existing-team and cloud-bound starts remain rejected.
+- Player Setup excludes team pseudo-players from the immutable participant snapshot and dispatches
+  one hydrated result only after stream initialization and the first period event project fully.
+- Marked setup-in-progress and initialized games survive parking/reload/import without aggregate
+  fallback. Persisted projection is discarded and rebuilt from the stored event stream on hydrate.
 
 ## 5. BKE-1C2: Court And Popup Integration
 
@@ -253,4 +268,4 @@ match the legacy limitation.
 15. Default the internal toggle off and stamp authority before aggregate auto-sync is possible.
 16. Always allow existing parked event games to resume; creation and history access are separate.
 
-No product decisions remain open for BKE-1C1 implementation.
+No product decisions remain open for BKE-1C2 implementation.

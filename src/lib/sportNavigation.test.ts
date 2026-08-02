@@ -85,6 +85,40 @@ describe('sportNavigation', () => {
     })).toBe('/game')
   })
 
+  it('resumes marked Basketball setup before entering the tracker', () => {
+    const basketball = { id: 'basketball' } as never
+    const gameInfo = {
+      teamName: 'A',
+      opponentName: 'B',
+      tournamentName: '',
+      date: '2026-08-02',
+    }
+    expect(routeForResumedGame({
+      gameDataAuthority: 'sport_events',
+      sport: basketball,
+      gameInfo: null,
+      players: [],
+      sportGameState: null,
+      eventStream: null,
+    })).toBe('/setup')
+    expect(routeForResumedGame({
+      gameDataAuthority: 'sport_events',
+      sport: basketball,
+      gameInfo,
+      players: [{ id: 'p1', name: 'One', number: '1', stats: {} }],
+      sportGameState: null,
+      eventStream: null,
+    })).toBe('/players')
+    expect(routeForResumedGame({
+      gameDataAuthority: 'sport_events',
+      sport: basketball,
+      gameInfo,
+      players: [{ id: 'p1', name: 'One', number: '1', stats: {} }],
+      sportGameState: { sportId: 'basketball' } as never,
+      eventStream: { version: 1, events: [{}] },
+    })).toBe('/game')
+  })
+
   it('formats parked sync labels', () => {
     expect(parkedSyncLabel({ syncDirty: false, syncStatus: 'synced', syncLastError: null })).toBe('Sync: saved')
     expect(parkedSyncLabel({ syncDirty: true, syncStatus: 'offline', syncLastError: null })).toBe('Sync: offline changes pending')

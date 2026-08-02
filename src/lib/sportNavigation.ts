@@ -3,7 +3,7 @@ import type { ParkedGameSummary } from './gameParking'
 
 type ResumableGameState = Pick<
   GameState,
-  'sport' | 'gameInfo' | 'players' | 'sportGameState' | 'eventStream'
+  'gameDataAuthority' | 'sport' | 'gameInfo' | 'players' | 'sportGameState' | 'eventStream'
 >
 
 export function sportDashboardPath(sportId: string): string {
@@ -49,6 +49,10 @@ export function routeForResumedGame(state: ResumableGameState): string {
   if (state.sport.id === 'soccer') {
     if (state.eventStream?.events.length) return '/game'
     return state.sportGameState?.sportId === 'soccer' ? '/players' : '/setup'
+  }
+  if (state.sport.id === 'basketball' && state.gameDataAuthority === 'sport_events') {
+    if (state.eventStream?.events.length) return '/game'
+    return state.gameInfo ? '/players' : '/setup'
   }
   if (state.players.length === 0) return '/players'
   return '/game'

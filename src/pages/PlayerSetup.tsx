@@ -5,6 +5,11 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import {
+  hasStartedBasketballEventGame,
+  isBasketballEventSetupIntent,
+  prepareBasketballGameStart,
+} from '../lib/basketball'
 
 function generateLocalId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -29,6 +34,11 @@ export default function PlayerSetup() {
   const sport = state.sport
   const cloudTeamId = state.cloudSync.teamId
   const isCloudRoster = Boolean(cloudTeamId && isConfigured && user && supabase)
+  const isBasketballEventIntent = isBasketballEventSetupIntent(state)
+  const individualPlayers = state.players.filter(
+    player => player.id !== TEAM_PLAYER_HOME_ID && player.id !== TEAM_PLAYER_OPP_ID
+  )
+  const displayedPlayers = isBasketballEventIntent ? individualPlayers : state.players
 
   const [name, setName] = useState('')
   const [number, setNumber] = useState('')
@@ -42,6 +52,10 @@ export default function PlayerSetup() {
   /** Same for `gameInfo`: async roster load must not use a stale null from the effect closure. */
   const gameInfoRef = useRef(state.gameInfo)
   gameInfoRef.current = state.gameInfo
+
+  useEffect(() => {
+    if (hasStartedBasketballEventGame(state)) navigate('/game', { replace: true })
+  }, [navigate, state])
 
   useEffect(() => {
     if (!sport?.teamCategories?.length || !state.gameInfo) return
@@ -252,7 +266,9 @@ export default function PlayerSetup() {
     }
   }
 
-  const canStart = state.players.length > 0
+  const canStart = isBasketballEventIntent
+    ? individualPlayers.length > 0
+    : state.players.length > 0
 
   if (!sport || !state.gameInfo) {
     navigate(sport ? sportDashboardPath(sport.id) : '/')
@@ -261,6 +277,18 @@ export default function PlayerSetup() {
 
   const handleStart = () => {
     if (!canStart) return
+    if (isBasketballEventIntent) {
+      const result = prepareBasketballGameStart(state, {
+        recorderUserId: user?.id ?? null,
+      })
+      if (!result.ok) {
+        setRosterError(result.message)
+        return
+      }
+      dispatch({ type: 'HYDRATE_STATE', state: result.state })
+      navigate('/game')
+      return
+    }
     if (!state.activePlayerId && state.players.length > 0) {
       dispatch({ type: 'SET_ACTIVE_PLAYER', playerId: state.players[0].id })
     }
@@ -339,14 +367,14 @@ export default function PlayerSetup() {
           </div>
         </div>
 
-        {state.players.length === 0 ? (
+        {displayedPlayers.length === 0 ? (
           <div className="text-center py-12 text-slate-400">
             <p className="text-4xl mb-2">👥</p>
             <p>Add at least one player to start</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {state.players.map(player => (
+            {displayedPlayers.map(player => (
               <div key={player.id} className="card flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
                   <span className={`
@@ -375,10 +403,12 @@ export default function PlayerSetup() {
             disabled={!canStart || rosterLoading || saving}
             className="btn-primary w-full"
           >
-            Start Game ({state.players.length} player{state.players.length !== 1 ? 's' : ''}) →
+            Start Game ({displayedPlayers.length} player{displayedPlayers.length !== 1 ? 's' : ''}) →
           </button>
           <p className="text-center text-xs text-slate-400">
-            You can add more players during the game
+            {isBasketballEventIntent
+              ? 'The event-game roster is fixed after start'
+              : 'You can add more players during the game'}
           </p>
         </div>
       </div>
