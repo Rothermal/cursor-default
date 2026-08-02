@@ -168,6 +168,20 @@ export interface BasketballCapturePreferences {
   selectionInitialized: boolean
   shotValueOverride: 2 | 3 | null
   courtOrientation: 'standard' | 'flipped'
+  lastCourtUndo: BasketballCourtUndoReceipt | null
+}
+
+export interface BasketballCourtUndoReceiptEntry extends JsonObject {
+  eventId: string
+  expectedRevision: number
+  action: 'restore' | 'relink_block'
+  previousRelatedEventId: string | null
+}
+
+export interface BasketballCourtUndoReceipt extends JsonObject {
+  kind: 'capture_undo' | 'clear_chart'
+  createdAt: string
+  entries: BasketballCourtUndoReceiptEntry[]
 }
 
 export interface BasketballSportGameState {

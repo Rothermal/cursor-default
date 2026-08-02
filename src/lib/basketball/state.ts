@@ -5,6 +5,8 @@ import {
 } from './rules'
 import type {
   BasketballCapturePreferences,
+  BasketballCourtUndoReceipt,
+  BasketballCourtUndoReceiptEntry,
   BasketballMatchParticipant,
   BasketballMatchProjection,
   BasketballMatchSetup,
@@ -143,6 +145,7 @@ export function defaultBasketballCapturePreferences(): BasketballCapturePreferen
     selectionInitialized: false,
     shotValueOverride: null,
     courtOrientation: 'standard',
+    lastCourtUndo: null,
   }
 }
 
@@ -192,6 +195,60 @@ function normalizeCapturePreferences(value: unknown): BasketballCapturePreferenc
       ? value.shotValueOverride
       : null,
     courtOrientation: value.courtOrientation === 'flipped' ? 'flipped' : 'standard',
+    lastCourtUndo: normalizeBasketballCourtUndoReceipt(value.lastCourtUndo),
+  }
+}
+
+export function normalizeBasketballCourtUndoReceipt(
+  value: unknown
+): BasketballCourtUndoReceipt | null {
+  if (
+    !isPlainObject(value) ||
+    (value.kind !== 'capture_undo' && value.kind !== 'clear_chart') ||
+    typeof value.createdAt !== 'string' ||
+    !Number.isFinite(Date.parse(value.createdAt)) ||
+    !Array.isArray(value.entries) ||
+    value.entries.length === 0
+  ) return null
+
+  const entries: BasketballCourtUndoReceiptEntry[] = []
+  const eventIds = new Set<string>()
+  for (const candidate of value.entries) {
+    if (
+      !isPlainObject(candidate) ||
+      !isNonEmptyString(candidate.eventId) ||
+      eventIds.has(candidate.eventId) ||
+      !Number.isInteger(candidate.expectedRevision) ||
+      Number(candidate.expectedRevision) < 2 ||
+      (candidate.action !== 'restore' && candidate.action !== 'relink_block') ||
+      !(candidate.previousRelatedEventId === null || isNonEmptyString(candidate.previousRelatedEventId)) ||
+      (candidate.action === 'restore' && candidate.previousRelatedEventId !== null) ||
+      (candidate.action === 'relink_block' && candidate.previousRelatedEventId === null)
+    ) return null
+    eventIds.add(candidate.eventId)
+    entries.push({
+      eventId: candidate.eventId,
+      expectedRevision: Number(candidate.expectedRevision),
+      action: candidate.action,
+      previousRelatedEventId: candidate.previousRelatedEventId,
+    })
+  }
+
+  if (value.kind === 'capture_undo' && entries.some(entry => entry.action !== 'restore')) {
+    return null
+  }
+  const restoredIds = new Set(
+    entries.filter(entry => entry.action === 'restore').map(entry => entry.eventId)
+  )
+  if (entries.some(
+    entry => entry.action === 'relink_block' &&
+      (!entry.previousRelatedEventId || !restoredIds.has(entry.previousRelatedEventId))
+  )) return null
+
+  return {
+    kind: value.kind,
+    createdAt: value.createdAt,
+    entries,
   }
 }
 

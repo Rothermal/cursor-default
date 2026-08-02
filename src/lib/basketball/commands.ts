@@ -56,6 +56,9 @@ export type BasketballCommandErrorCode =
   | 'invalid_actor'
   | 'invalid_location'
   | 'invalid_timestamp'
+  | 'nothing_to_undo'
+  | 'nothing_to_clear'
+  | 'restore_unavailable'
   | 'command_failed'
 
 export type BasketballCommandResult<T> =
@@ -439,6 +442,7 @@ export function captureBasketballCourtEvent(
               : null,
             selectionInitialized: true,
             shotValueOverride: null,
+            lastCourtUndo: null,
           },
         },
       }

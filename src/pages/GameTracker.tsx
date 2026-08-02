@@ -10,6 +10,7 @@ import StatButton from '../components/StatButton'
 import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
 import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import RecentEventsPopup from '../components/RecentEventsPopup'
+import BasketballRecentEventsPopup from '../components/basketball/BasketballRecentEventsPopup'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
@@ -29,6 +30,12 @@ import {
   basketballPlayerIdForCapturePreferences,
   hasStartedBasketballEventGame,
 } from '../lib/basketball/commands'
+import {
+  basketballCourtCaptureUnits,
+  canRestoreBasketballCourtUndo,
+  restoreLastBasketballCourtUndo,
+  undoLatestBasketballCourtCapture,
+} from '../lib/basketball/courtCorrections'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -83,6 +90,7 @@ export default function GameTracker() {
   const [newNumber, setNewNumber] = useState('')
   const [localNotes, setLocalNotes] = useState(notes)
   const [showRecentEvents, setShowRecentEvents] = useState(false)
+  const [eventCorrectionError, setEventCorrectionError] = useState<string | null>(null)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
   const [showAllShots, setShowAllShots] = useState(false)
@@ -144,6 +152,11 @@ export default function GameTracker() {
   }, [sport, gameInfo, players, dispatch, state.cloudSync.teamId, state.gameDataAuthority, teamAccess.role])
 
   const isBasketballEventMode = hasStartedBasketballEventGame(state)
+  const basketballCaptureUnits = useMemo(
+    () => isBasketballEventMode ? basketballCourtCaptureUnits(state) : [],
+    [isBasketballEventMode, state]
+  )
+  const canRestoreBasketball = isBasketballEventMode && canRestoreBasketballCourtUndo(state)
 
   const handleSelectPlayer = useCallback(
     (playerId: string) => {
@@ -245,9 +258,32 @@ export default function GameTracker() {
     dispatch({ type: 'UNDO' })
   }
 
+  const handleBasketballUndo = () => {
+    const result = undoLatestBasketballCourtCapture(state)
+    if (!result.ok) {
+      setEventCorrectionError(result.message)
+      return
+    }
+    setEventCorrectionError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleBasketballRestore = () => {
+    const result = restoreLastBasketballCourtUndo(state)
+    if (!result.ok) {
+      setEventCorrectionError(result.message)
+      return
+    }
+    setEventCorrectionError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
   const lastAction = actionLog.length > 0 ? actionLog[actionLog.length - 1] : null
   const lastActionLabel = lastAction
     ? formatActionLogEntryLabel(lastAction, players, sport)
+    : null
+  const eventLastActionLabel = basketballCaptureUnits[0]
+    ? `${basketballCaptureUnits[0].who} ${basketballCaptureUnits[0].what}`
     : null
 
   const handleAddPlayer = () => {
@@ -527,13 +563,15 @@ export default function GameTracker() {
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="min-w-0 pr-3 text-xs text-slate-400">
-            {lastActionLabel && (
-              <span className="block truncate">Last: <span className="font-medium text-slate-600">{lastActionLabel}</span></span>
+            {(isBasketballEventMode ? eventLastActionLabel : lastActionLabel) && (
+              <span className="block truncate">Last: <span className="font-medium text-slate-600">{isBasketballEventMode ? eventLastActionLabel : lastActionLabel}</span></span>
             )}
           </div>
           <button
             onClick={() => setShowRecentEvents(true)}
-            disabled={actionLog.length === 0}
+            disabled={isBasketballEventMode
+              ? basketballCaptureUnits.length === 0 && !canRestoreBasketball
+              : actionLog.length === 0}
             className="btn-secondary py-2 px-4 text-sm disabled:opacity-30"
           >
             ↩ Undo
@@ -541,7 +579,21 @@ export default function GameTracker() {
         </div>
       </div>
 
-      {showRecentEvents && (
+      {showRecentEvents && isBasketballEventMode && (
+        <BasketballRecentEventsPopup
+          units={basketballCaptureUnits}
+          canRestore={canRestoreBasketball}
+          errorMessage={eventCorrectionError}
+          onUndoTop={handleBasketballUndo}
+          onRestore={handleBasketballRestore}
+          onClose={() => {
+            setEventCorrectionError(null)
+            setShowRecentEvents(false)
+          }}
+        />
+      )}
+
+      {showRecentEvents && !isBasketballEventMode && (
         <RecentEventsPopup
           entries={actionLog}
           players={players}
