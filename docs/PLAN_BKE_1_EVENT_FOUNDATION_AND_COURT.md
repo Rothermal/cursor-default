@@ -4,8 +4,8 @@ Parent plan for the first Basketball event-model implementation program. BKE-1 e
 remaining sport-neutral seams, installs a deterministic Basketball event foundation, and then
 moves the existing court workflow onto that foundation behind an internal-only gate.
 
-Status: In progress. BKE-1A and BKE-1B1 are complete. BKE-1B2 and BKE-1B3 remain; BKE-1C requires
-its detailed plan after the complete projector lands.
+Status: In progress. BKE-1A and all BKE-1B slices are complete. The detailed BKE-1C plan is
+approved and split into BKE-1C1 through BKE-1C3; BKE-1C1 is next.
 
 Architecture: [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md)
 
@@ -37,13 +37,13 @@ Detailed plans:
 
 - [PLAN_BKE_1A_SHARED_EVENT_ENGINE.md](PLAN_BKE_1A_SHARED_EVENT_ENGINE.md)
 - [PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md](PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md)
-- `PLAN_BKE_1C_COURT_EVENTS.md` (create after BKE-1B)
+- [PLAN_BKE_1C_COURT_EVENTS.md](PLAN_BKE_1C_COURT_EVENTS.md)
 
 ## 3. Program Guardrails
 
-- Existing unmarked Basketball games remain legacy aggregate games. Before BKE-1B3 runtime
-  registration, event-game creation must atomically persist a top-level
-  `gameDataAuthority: 'sport_events'` marker independently of the nested stream/setup payloads.
+- Existing unmarked Basketball games remain legacy aggregate games. Event-game creation must stamp
+  the top-level `gameDataAuthority: 'sport_events'` marker before game information can enter
+  aggregate sync, independently of the nested stream/setup payloads.
 - Existing and in-progress games never convert to events.
 - Event-backed Basketball games remain internal-only through BKE-4E. The user opt-in belongs to
   BKE-5 after capture, cloud, Summary, aggregates, capabilities, and settings are complete.
@@ -53,8 +53,8 @@ Detailed plans:
 - Basketball owns its participants, rules, payload validation, relationships, and projection.
 - `elapsedMs` remains `null` through BKE-5. BKE-6 owns the Basketball clock and lineups.
 - BKE-1 adds no Supabase migration and does not wire Basketball events into automatic cloud sync.
-- BKE-1B may register neutral Basketball definitions for local fixtures, but those events cannot
-  enter cloud transport before BKE-4A widens the database constraint and proves Soccer RPC parity.
+- BKE-1B registers neutral Basketball definitions for local fixtures, but those events cannot enter
+  cloud transport before BKE-4A widens the database constraint and proves Soccer RPC parity.
 - Cloud authority fails closed: `gameDataAuthority: 'sport_events'` always denies aggregate sync.
   If its stream or sport-owned snapshot fails normalization, hydration quarantines the game and
   exposes recovery diagnostics; it never silently reclassifies the game as legacy.
@@ -107,9 +107,9 @@ Intentional product changes receive named expectations. They are not hidden as p
 
 1. Implement and merge BKE-1A.
 2. Audit the resulting engine API and write the detailed BKE-1B plan.
-3. Implement and merge BKE-1B with no live Basketball cutover.
-4. Audit the Basketball projector and write the detailed BKE-1C plan.
-5. Implement and merge BKE-1C behind a development/internal creation gate.
+3. Implement and merge BKE-1B with no live Basketball cutover. **Complete.**
+4. Audit the Basketball projector and write the detailed BKE-1C plan. **Complete.**
+5. Implement BKE-1C1 through BKE-1C3 behind a development/internal creation gate.
 6. Keep the gate closed and proceed to BKE-2 complete live capture.
 
 Each child phase gets its own feature branch and PR. Documentation status and regression notes are
