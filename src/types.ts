@@ -4,6 +4,7 @@ import type {
   GameEventStream,
 } from './lib/gameEvents/types'
 import type { SoccerCapturePreferences } from './lib/soccer/types'
+import type { BasketballCapturePreferences } from './lib/basketball/types'
 import type { SportGameState } from './lib/sportGameState/types'
 import type { GameDataAuthority } from './lib/gameEvents/authority'
 
@@ -265,6 +266,7 @@ export type GameAction =
   | { type: 'ADD_GAME_EVENT'; event: GameEvent }
   | { type: 'ADD_GAME_EVENTS'; events: GameEvent[] }
   | { type: 'SET_SPORT_GAME_STATE'; sportGameState: SportGameState | null }
+  | { type: 'SET_BASKETBALL_CAPTURE_PREFERENCES'; preferences: Partial<BasketballCapturePreferences> }
   | { type: 'SET_SOCCER_CAPTURE_PREFERENCES'; preferences: Partial<SoccerCapturePreferences> }
   | {
       type: 'UPDATE_GAME_EVENT'

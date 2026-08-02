@@ -4,6 +4,7 @@ import { SPORT_EVENTS_AUTHORITY } from '../gameEvents/authority'
 import { isPlainObject } from '../gameEvents/envelope'
 import {
   addGameEvent,
+  addGameEvents,
   hasLegacyAggregateActivity,
   initializeGameEventStream,
 } from '../gameEvents/mutations'
@@ -13,8 +14,16 @@ import type {
   GameEventLocation,
   GameEventPeriod,
 } from '../gameEvents/types'
-import { isTeamPseudoPlayer } from '../teamPlayers'
-import { courtFeetToNormalizedLocation, type BasketballCourtPoint } from './courtGeometry'
+import {
+  isTeamPseudoPlayer,
+  TEAM_PLAYER_HOME_ID,
+  TEAM_PLAYER_OPP_ID,
+} from '../teamPlayers'
+import {
+  courtFeetToNormalizedLocation,
+  isThreePointer,
+  type BasketballCourtPoint,
+} from './courtGeometry'
 import { createBasketballLifecycleEvent } from './events'
 import { createBasketballUuid } from './id'
 import {
@@ -25,8 +34,10 @@ import {
   createBasketballSportGameState,
   validateBasketballMatchSetup,
 } from './state'
+import { createBasketballStatEvent } from './statEvents'
 import type {
   BasketballMatchParticipant,
+  BasketballMatchEvent,
   BasketballMatchSetup,
   BasketballSportGameState,
   BasketballTeamSide,
@@ -77,6 +88,42 @@ export interface BasketballCommandContext {
   period: GameEventPeriod
   nextSequence: number
   occurredAt: string
+}
+
+export type BasketballCourtStatId = 'oreb' | 'dreb' | 'stl' | 'blk' | 'ast'
+
+export type BasketballCourtEventChoice =
+  | {
+      kind: 'shot'
+      made: boolean
+      shotType: '2pt' | '3pt'
+      assistPlayerId?: string
+      rebound?: { statId: 'oreb' | 'dreb'; playerId: string }
+    }
+  | { kind: 'stat'; statId: BasketballCourtStatId }
+
+export interface BasketballCourtCaptureOptions {
+  recorderUserId: string | null
+  playerId: string
+  point: BasketballCourtPoint
+  event: BasketballCourtEventChoice
+  occurredAt?: string
+  eventIds?: string[]
+  captureCommandId?: string
+}
+
+export type BasketballCourtCaptureResult =
+  | { ok: true; state: GameState; eventIds: string[] }
+  | {
+      ok: false
+      state: GameState
+      code: BasketballCommandErrorCode
+      message: string
+    }
+
+export interface BasketballCaptureTarget {
+  teamSide: BasketballTeamSide
+  selection: BasketballCaptureActorSelection
 }
 
 export function isBasketballEventSetupIntent(state: GameState): boolean {
@@ -320,6 +367,239 @@ export function getBasketballCommandContext(
   }
 }
 
+export function basketballCaptureTargetForPlayerId(
+  state: GameState,
+  playerId: string
+): BasketballCommandResult<BasketballCaptureTarget> {
+  if (playerId === TEAM_PLAYER_HOME_ID) {
+    return { ok: true, value: { teamSide: 'tracked', selection: { kind: 'team' } } }
+  }
+  if (playerId === TEAM_PLAYER_OPP_ID) {
+    return { ok: true, value: { teamSide: 'opponent', selection: { kind: 'team' } } }
+  }
+  const participant = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.setup.participants.find(value => value.playerId === playerId)
+    : null
+  if (!participant) {
+    return commandFailure('invalid_actor', 'The selected Basketball player is unavailable.')
+  }
+  return {
+    ok: true,
+    value: {
+      teamSide: participant.teamSide,
+      selection: { kind: 'participant', participantId: participant.id },
+    },
+  }
+}
+
+export function basketballPlayerIdForCapturePreferences(state: GameState): string | null {
+  const sportState = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState
+    : null
+  if (!sportState?.capturePreferences.selectionInitialized) return null
+  const participantId = sportState.capturePreferences.selectedParticipantId
+  if (!participantId) {
+    return sportState.capturePreferences.teamSide === 'tracked'
+      ? TEAM_PLAYER_HOME_ID
+      : TEAM_PLAYER_OPP_ID
+  }
+  const participant = sportState.setup.participants.find(value => value.id === participantId)
+  return participant?.playerId ?? null
+}
+
+export function captureBasketballCourtEvent(
+  state: GameState,
+  options: BasketballCourtCaptureOptions
+): BasketballCourtCaptureResult {
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event capture is local-only during development.')
+  }
+  const contextResult = getBasketballCommandContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt
+  )
+  if (!contextResult.ok) return { ...contextResult, state }
+  const targetResult = basketballCaptureTargetForPlayerId(state, options.playerId)
+  if (!targetResult.ok) return { ...targetResult, state }
+
+  const { nextSequence, occurredAt, period } = contextResult.value
+  const target = targetResult.value
+  const eventIds = options.eventIds ?? []
+  const captureState: GameState = state.sportGameState?.sportId === 'basketball'
+    ? {
+        ...state,
+        sportGameState: {
+          ...state.sportGameState,
+          capturePreferences: {
+            ...state.sportGameState.capturePreferences,
+            teamSide: target.teamSide,
+            selectedParticipantId: target.selection.kind === 'participant'
+              ? target.selection.participantId
+              : null,
+            selectionInitialized: true,
+            shotValueOverride: null,
+          },
+        },
+      }
+    : state
+
+  if (options.event.kind === 'stat') {
+    const descriptor = standaloneStatDescriptor(options.event.statId)
+    const actor = basketballActorForSelection(
+      state,
+      descriptor.role,
+      target.teamSide,
+      target.selection
+    )
+    if (!actor.ok) return { ...actor, state }
+    const id = eventIds[0] ?? createBasketballUuid()
+    const event = createStandaloneBasketballStatEvent(options.event.statId, {
+      id,
+      recorderUserId: options.recorderUserId,
+      sequence: nextSequence,
+      period,
+      occurredAt,
+      teamSide: target.teamSide,
+      actors: [actor.value],
+    })
+    const appended = addGameEvent(captureState, event, gameEventRegistry, gameEventProjectors)
+    return appended.ok && appended.inspection.complete
+      ? { ok: true, state: appended.state, eventIds: [id] }
+      : failure(
+          state,
+          'command_failed',
+          appended.ok
+            ? 'Basketball capture did not produce a complete event projection.'
+            : appended.error.message
+        )
+  }
+
+  const location = normalizeBasketballCourtLocation(options.point)
+  if (!location.ok) return { ...location, state }
+  const shooter = basketballActorForSelection(
+    state,
+    'shooter',
+    target.teamSide,
+    target.selection
+  )
+  if (!shooter.ok) return { ...shooter, state }
+
+  const relatedPlayerId = options.event.assistPlayerId ?? options.event.rebound?.playerId
+  if (options.event.assistPlayerId && options.event.rebound) {
+    return failure(state, 'command_failed', 'A court shot cannot include both an assist and a rebound.')
+  }
+  if (options.event.assistPlayerId && !options.event.made) {
+    return failure(state, 'command_failed', 'Only a made shot can include an assist.')
+  }
+  if (options.event.assistPlayerId === options.playerId) {
+    return failure(state, 'invalid_actor', 'A shooter cannot be credited with the same shot assist.')
+  }
+  if (options.event.rebound && options.event.made) {
+    return failure(state, 'command_failed', 'Only a missed shot can include a rebound.')
+  }
+  const relatedTarget = relatedPlayerId
+    ? basketballCaptureTargetForPlayerId(state, relatedPlayerId)
+    : null
+  if (relatedTarget && !relatedTarget.ok) return { ...relatedTarget, state }
+  if (options.event.assistPlayerId && relatedTarget?.value.teamSide !== target.teamSide) {
+    return failure(state, 'invalid_actor', 'An assist must be credited to the shooting team.')
+  }
+  if (
+    options.event.rebound &&
+    relatedTarget?.ok &&
+    ((options.event.rebound.statId === 'oreb' && relatedTarget.value.teamSide !== target.teamSide) ||
+      (options.event.rebound.statId === 'dreb' && relatedTarget.value.teamSide === target.teamSide))
+  ) {
+    return failure(state, 'invalid_actor', 'The rebound side does not match the missed shot.')
+  }
+
+  const hasRelatedEvent = Boolean(options.event.assistPlayerId || options.event.rebound)
+  const captureCommandId = hasRelatedEvent
+    ? options.captureCommandId ?? createBasketballCaptureCommandId()
+    : null
+  const shotId = eventIds[0] ?? createBasketballUuid()
+  const detectedValue = isThreePointer(options.point.x, options.point.y) ? 3 : 2
+  const selectedValue = options.event.shotType === '3pt' ? 3 : 2
+  const events: BasketballMatchEvent[] = [createBasketballStatEvent({
+    id: shotId,
+    eventType: 'basketball.shot',
+    payload: {
+      value: selectedValue,
+      made: options.event.made,
+      attempt: 'field_goal',
+      valueSource: selectedValue === detectedValue ? 'court' : 'manual_override',
+      freeThrowTripId: null,
+      tripAttemptNumber: null,
+      captureCommandId,
+    },
+    recorderUserId: options.recorderUserId,
+    sequence: nextSequence,
+    period,
+    occurredAt,
+    teamSide: target.teamSide,
+    location: location.value,
+    actors: [shooter.value],
+  })]
+
+  if (options.event.assistPlayerId && relatedTarget?.ok) {
+    const assister = basketballActorForSelection(
+      state,
+      'assister',
+      relatedTarget.value.teamSide,
+      relatedTarget.value.selection
+    )
+    if (!assister.ok) return { ...assister, state }
+    events.push(createBasketballStatEvent({
+      id: eventIds[1] ?? createBasketballUuid(),
+      eventType: 'basketball.assist',
+      payload: { relatedEventId: shotId, captureCommandId },
+      recorderUserId: options.recorderUserId,
+      sequence: nextSequence + 1,
+      period,
+      occurredAt,
+      teamSide: relatedTarget.value.teamSide,
+      actors: [assister.value],
+    }))
+  } else if (options.event.rebound && relatedTarget?.ok) {
+    const rebounder = basketballActorForSelection(
+      state,
+      'rebounder',
+      relatedTarget.value.teamSide,
+      relatedTarget.value.selection
+    )
+    if (!rebounder.ok) return { ...rebounder, state }
+    events.push(createBasketballStatEvent({
+      id: eventIds[1] ?? createBasketballUuid(),
+      eventType: 'basketball.rebound',
+      payload: {
+        kind: options.event.rebound.statId === 'oreb' ? 'offensive' : 'defensive',
+        relatedEventId: shotId,
+        captureCommandId,
+      },
+      recorderUserId: options.recorderUserId,
+      sequence: nextSequence + 1,
+      period,
+      occurredAt,
+      teamSide: relatedTarget.value.teamSide,
+      actors: [rebounder.value],
+    }))
+  }
+
+  const appended = events.length === 1
+    ? addGameEvent(captureState, events[0], gameEventRegistry, gameEventProjectors)
+    : addGameEvents(captureState, events, gameEventRegistry, gameEventProjectors)
+  return appended.ok && appended.inspection.complete
+    ? { ok: true, state: appended.state, eventIds: events.map(event => event.id) }
+    : failure(
+        state,
+        'command_failed',
+        appended.ok
+          ? 'Basketball capture did not produce a complete event projection.'
+          : appended.error.message
+      )
+}
+
 export function nextBasketballEventSequence(
   events: unknown[],
   recorderUserId: string | null
@@ -417,6 +697,78 @@ function hasCloudBinding(state: GameState): boolean {
     Object.keys(state.cloudSync.playerIdMap).length > 0 ||
     state.cloudSync.lastSyncedGameFingerprint
   )
+}
+
+function standaloneStatDescriptor(statId: BasketballCourtStatId) {
+  switch (statId) {
+    case 'oreb':
+      return {
+        eventType: 'basketball.rebound' as const,
+        role: 'rebounder',
+        payload: { kind: 'offensive' as const, relatedEventId: null, captureCommandId: null },
+      }
+    case 'dreb':
+      return {
+        eventType: 'basketball.rebound' as const,
+        role: 'rebounder',
+        payload: { kind: 'defensive' as const, relatedEventId: null, captureCommandId: null },
+      }
+    case 'stl':
+      return {
+        eventType: 'basketball.steal' as const,
+        role: 'stealer',
+        payload: { relatedEventId: null, captureCommandId: null },
+      }
+    case 'blk':
+      return {
+        eventType: 'basketball.block' as const,
+        role: 'blocker',
+        payload: { relatedEventId: null, captureCommandId: null },
+      }
+    case 'ast':
+      return {
+        eventType: 'basketball.assist' as const,
+        role: 'assister',
+        payload: { relatedEventId: null, captureCommandId: null },
+      }
+  }
+}
+
+interface StandaloneBasketballStatEventInput {
+  id: string
+  recorderUserId: string | null
+  sequence: number
+  period: GameEventPeriod
+  occurredAt: string
+  teamSide: BasketballTeamSide
+  actors: GameEventActor[]
+}
+
+function createStandaloneBasketballStatEvent(
+  statId: BasketballCourtStatId,
+  input: StandaloneBasketballStatEventInput
+): BasketballMatchEvent {
+  const relatedPayload = { relatedEventId: null, captureCommandId: null }
+  switch (statId) {
+    case 'oreb':
+      return createBasketballStatEvent({
+        ...input,
+        eventType: 'basketball.rebound',
+        payload: { ...relatedPayload, kind: 'offensive' },
+      })
+    case 'dreb':
+      return createBasketballStatEvent({
+        ...input,
+        eventType: 'basketball.rebound',
+        payload: { ...relatedPayload, kind: 'defensive' },
+      })
+    case 'stl':
+      return createBasketballStatEvent({ ...input, eventType: 'basketball.steal', payload: relatedPayload })
+    case 'blk':
+      return createBasketballStatEvent({ ...input, eventType: 'basketball.block', payload: relatedPayload })
+    case 'ast':
+      return createBasketballStatEvent({ ...input, eventType: 'basketball.assist', payload: relatedPayload })
+  }
 }
 
 function mutationErrorCode(code: string): BasketballCommandErrorCode {

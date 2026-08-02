@@ -471,6 +471,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         },
       }
 
+    case 'SET_BASKETBALL_CAPTURE_PREFERENCES':
+      if (state.sportGameState?.sportId !== 'basketball') return state
+      return {
+        ...state,
+        sportGameState: {
+          ...state.sportGameState,
+          capturePreferences: {
+            ...state.sportGameState.capturePreferences,
+            ...action.preferences,
+          },
+        },
+      }
+
     case 'INITIALIZE_EVENT_STREAM':
       return initializeGameEventStream(state, gameEventRegistry, gameEventProjectors).state
 

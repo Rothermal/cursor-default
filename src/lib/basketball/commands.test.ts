@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
-import { createInitialState } from '../gameReducer'
+import { createInitialState, gameReducer } from '../gameReducer'
 import { isAggregateCloudSyncEligible } from '../gameSyncFingerprint'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
   basketballActorForSelection,
+  basketballCaptureTargetForPlayerId,
+  basketballPlayerIdForCapturePreferences,
+  captureBasketballCourtEvent,
   createBasketballCaptureCommandId,
   getBasketballCommandContext,
   hasStartedBasketballEventGame,
@@ -296,5 +299,243 @@ describe('BKE-1C1 Basketball commands', () => {
       code: 'invalid_location',
     })
     expect(createBasketballCaptureCommandId()).not.toBe('')
+  })
+})
+
+describe('BKE-1C2 court capture commands', () => {
+  it.each([
+    { x: 0, y: 8, made: true, shotType: '2pt' as const, statId: '2pt', score: 2 },
+    { x: 0, y: 8, made: false, shotType: '2pt' as const, statId: '2pt_miss', score: 0 },
+    { x: 23, y: 5, made: true, shotType: '3pt' as const, statId: '3pt', score: 3 },
+    { x: 23, y: 5, made: false, shotType: '3pt' as const, statId: '3pt_miss', score: 0 },
+  ])('projects an unlinked $statId court event from geometry', fixture => {
+    const result = captureBasketballCourtEvent(startedState(), {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: fixture.x, y: fixture.y },
+      event: { kind: 'shot', made: fixture.made, shotType: fixture.shotType },
+      occurredAt: '2026-08-02T15:31:00.000Z',
+      eventIds: ['70000000-0000-4000-8000-000000000200'],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const events = result.state.eventStream?.events ?? []
+    expect(events[events.length - 1]).toMatchObject({
+      eventType: 'basketball.shot',
+      payload: { captureCommandId: null, valueSource: 'court' },
+    })
+    expect(result.state.players.find(value => value.id === 'player-1')?.stats[fixture.statId])
+      .toBe(1)
+    expect(result.state.homeTeamScore).toBe(fixture.score)
+    expect(result.state.shotChart).toEqual([
+      expect.objectContaining({ id: '70000000-0000-4000-8000-000000000200' }),
+    ])
+  })
+
+  it('projects a manually overridden made shot and linked assist from one atomic command', () => {
+    const before = startedState()
+    const result = captureBasketballCourtEvent(before, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '3pt', assistPlayerId: 'player-2' },
+      occurredAt: '2026-08-02T15:31:00.000Z',
+      eventIds: [
+        '70000000-0000-4000-8000-000000000201',
+        '70000000-0000-4000-8000-000000000202',
+      ],
+      captureCommandId: '70000000-0000-4000-8000-000000000299',
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.eventIds).toEqual([
+      '70000000-0000-4000-8000-000000000201',
+      '70000000-0000-4000-8000-000000000202',
+    ])
+    expect(result.state.eventStream?.events.slice(-2)).toEqual([
+      expect.objectContaining({
+        eventType: 'basketball.shot',
+        sequence: 2,
+        payload: expect.objectContaining({
+          value: 3,
+          valueSource: 'manual_override',
+          captureCommandId: '70000000-0000-4000-8000-000000000299',
+        }),
+      }),
+      expect.objectContaining({
+        eventType: 'basketball.assist',
+        sequence: 3,
+        payload: {
+          relatedEventId: '70000000-0000-4000-8000-000000000201',
+          captureCommandId: '70000000-0000-4000-8000-000000000299',
+        },
+      }),
+    ])
+    expect(result.state.homeTeamScore).toBe(3)
+    expect(result.state.players.find(value => value.id === 'player-1')?.stats['3pt']).toBe(1)
+    expect(result.state.players.find(value => value.id === 'player-2')?.stats.ast).toBe(1)
+    expect(result.state.shotChart).toEqual([
+      expect.objectContaining({
+        id: '70000000-0000-4000-8000-000000000201',
+        playerId: 'player-1',
+        shotType: '3pt',
+        zone: 'three',
+      }),
+    ])
+    expect(result.state.actionLog).toEqual([])
+  })
+
+  it('links a defensive team rebound to an opponent-side miss', () => {
+    const before = startedState()
+    const result = captureBasketballCourtEvent(before, {
+      recorderUserId: 'recorder-1',
+      playerId: TEAM_PLAYER_OPP_ID,
+      point: { x: 23, y: 5 },
+      event: {
+        kind: 'shot',
+        made: false,
+        shotType: '3pt',
+        rebound: { statId: 'dreb', playerId: TEAM_PLAYER_HOME_ID },
+      },
+      occurredAt: '2026-08-02T15:31:00.000Z',
+      eventIds: [
+        '70000000-0000-4000-8000-000000000211',
+        '70000000-0000-4000-8000-000000000212',
+      ],
+      captureCommandId: '70000000-0000-4000-8000-000000000298',
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.state.players.find(value => value.id === TEAM_PLAYER_OPP_ID)?.stats['3pt_miss'])
+      .toBe(1)
+    expect(result.state.players.find(value => value.id === TEAM_PLAYER_HOME_ID)?.stats.dreb)
+      .toBe(1)
+    expect(result.state.sportGameState?.sportId === 'basketball'
+      ? result.state.sportGameState.projection.relationshipWarnings
+      : null).toEqual([])
+  })
+
+  it('records every standalone popup stat without a relationship or command group', () => {
+    let current = startedState()
+    const statIds = ['oreb', 'dreb', 'stl', 'blk', 'ast'] as const
+    for (const [index, statId] of statIds.entries()) {
+      const result = captureBasketballCourtEvent(current, {
+        recorderUserId: 'recorder-1',
+        playerId: 'player-1',
+        point: { x: 0, y: 8 },
+        event: { kind: 'stat', statId },
+        occurredAt: `2026-08-02T15:3${index + 1}:00.000Z`,
+        eventIds: [`70000000-0000-4000-8000-00000000022${index}`],
+      })
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      const events = result.state.eventStream?.events ?? []
+      expect(events[events.length - 1]).toMatchObject({
+        location: null,
+        payload: expect.objectContaining({ relatedEventId: null, captureCommandId: null }),
+      })
+      current = result.state
+    }
+    expect(current.players.find(value => value.id === 'player-1')?.stats).toMatchObject({
+      oreb: 1,
+      dreb: 1,
+      stl: 1,
+      blk: 1,
+      ast: 1,
+    })
+  })
+
+  it('maps persisted participant and team-side capture choices back to legacy player ids', () => {
+    const started = startedState()
+    const participant = basketballCaptureTargetForPlayerId(started, 'player-2')
+    expect(participant).toMatchObject({
+      ok: true,
+      value: { teamSide: 'tracked', selection: { kind: 'participant' } },
+    })
+    if (!participant.ok || participant.value.selection.kind !== 'participant') return
+    const selectedPlayer: GameState = {
+      ...started,
+      sportGameState: started.sportGameState?.sportId === 'basketball'
+        ? {
+            ...started.sportGameState,
+            capturePreferences: {
+              ...started.sportGameState.capturePreferences,
+              teamSide: 'tracked' as const,
+              selectedParticipantId: participant.value.selection.participantId,
+              selectionInitialized: true,
+            },
+          }
+        : started.sportGameState,
+    }
+    expect(basketballPlayerIdForCapturePreferences(selectedPlayer)).toBe('player-2')
+
+    if (selectedPlayer.sportGameState?.sportId !== 'basketball') return
+    selectedPlayer.sportGameState.capturePreferences.teamSide = 'opponent'
+    selectedPlayer.sportGameState.capturePreferences.selectedParticipantId = null
+    expect(basketballPlayerIdForCapturePreferences(selectedPlayer)).toBe(TEAM_PLAYER_OPP_ID)
+  })
+
+  it('persists capture preferences without changing authoritative event history', () => {
+    const before = startedState()
+    const eventStream = before.eventStream
+    const next = gameReducer(before, {
+      type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
+      preferences: {
+        teamSide: 'opponent',
+        selectedParticipantId: null,
+        selectionInitialized: true,
+        shotValueOverride: 3,
+      },
+    })
+
+    expect(next.eventStream).toBe(eventStream)
+    expect(next.sportGameState?.sportId === 'basketball'
+      ? next.sportGameState.capturePreferences
+      : null).toMatchObject({
+      teamSide: 'opponent',
+      selectedParticipantId: null,
+      selectionInitialized: true,
+      shotValueOverride: 3,
+    })
+  })
+
+  it('rejects an invalid linked rebound atomically and preserves the pending override', () => {
+    const before = startedState()
+    if (before.sportGameState?.sportId !== 'basketball') return
+    before.sportGameState.capturePreferences.shotValueOverride = 3
+    const result = captureBasketballCourtEvent(before, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: {
+        kind: 'shot',
+        made: false,
+        shotType: '2pt',
+        rebound: { statId: 'dreb', playerId: TEAM_PLAYER_HOME_ID },
+      },
+      occurredAt: '2026-08-02T15:31:00.000Z',
+    })
+
+    expect(result).toMatchObject({ ok: false, state: before, code: 'invalid_actor' })
+    expect(result.state).toBe(before)
+    expect(before.eventStream?.events).toHaveLength(1)
+    expect(before.sportGameState.capturePreferences.shotValueOverride).toBe(3)
+  })
+
+  it('rejects a self-assist without appending the shot', () => {
+    const before = startedState()
+    const result = captureBasketballCourtEvent(before, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt', assistPlayerId: 'player-1' },
+      occurredAt: '2026-08-02T15:31:00.000Z',
+    })
+
+    expect(result).toMatchObject({ ok: false, state: before, code: 'invalid_actor' })
+    expect(before.eventStream?.events).toHaveLength(1)
   })
 })

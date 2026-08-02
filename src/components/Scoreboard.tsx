@@ -2,7 +2,11 @@ import { useGame } from '../context/GameContext'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 
-export default function Scoreboard() {
+interface ScoreboardProps {
+  readOnly?: boolean
+}
+
+export default function Scoreboard({ readOnly = false }: ScoreboardProps) {
   const { state, dispatch } = useGame()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, cloudSync } =
     state
@@ -42,7 +46,7 @@ export default function Scoreboard() {
             {gameInfo.teamName}
           </p>
           <p className="text-4xl font-bold tabular-nums">{teamScore}</p>
-          <div className="flex justify-center gap-2 mt-1">
+          {!readOnly && <div className="flex justify-center gap-2 mt-1">
             <button
               onClick={() => dispatch({ type: 'DECREMENT_HOME_SCORE' })}
               className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
@@ -55,7 +59,7 @@ export default function Scoreboard() {
             >
               +
             </button>
-          </div>
+          </div>}
         </div>
 
         <div className="px-4">
@@ -70,7 +74,7 @@ export default function Scoreboard() {
             {gameInfo.opponentName}
           </p>
           <p className="text-4xl font-bold tabular-nums">{opponentScore}</p>
-          <div className="flex justify-center gap-2 mt-1">
+          {!readOnly && <div className="flex justify-center gap-2 mt-1">
             <button
               onClick={() => dispatch({ type: 'DECREMENT_OPPONENT_SCORE' })}
               className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
@@ -83,7 +87,7 @@ export default function Scoreboard() {
             >
               +
             </button>
-          </div>
+          </div>}
         </div>
       </div>
 

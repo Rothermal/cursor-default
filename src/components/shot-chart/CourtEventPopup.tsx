@@ -58,6 +58,8 @@ interface CourtEventPopupProps {
   reboundPromptAfterMissEnabled?: boolean
   /** Detected from the tap location via `isThreePointer`; user can override before logging. */
   shotType: '2pt' | '3pt'
+  onShotTypeChange?: (shotType: '2pt' | '3pt') => void
+  errorMessage?: string | null
   onPick: (event: CourtEvent) => void
   /** Cancel button, tap-outside, and Escape all dismiss with no change (D8). */
   onCancel: () => void
@@ -76,6 +78,8 @@ export default function CourtEventPopup({
   onSelectPlayer,
   reboundPromptAfterMissEnabled = false,
   shotType,
+  onShotTypeChange,
+  errorMessage,
   onPick,
   onCancel,
 }: CourtEventPopupProps) {
@@ -177,6 +181,7 @@ export default function CourtEventPopup({
     if (!armedRef.current) return
     if (isFollowUpStep) return
     setSelectedShotType(nextShotType)
+    onShotTypeChange?.(nextShotType)
   }
 
   const togglePlayerPicker = () => {
@@ -237,6 +242,11 @@ export default function CourtEventPopup({
         className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-4 space-y-3"
         onClick={e => e.stopPropagation()}
       >
+        {errorMessage && (
+          <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+            {errorMessage}
+          </p>
+        )}
         <div>
           <button
             type="button"
