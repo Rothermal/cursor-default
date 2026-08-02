@@ -17,6 +17,7 @@ import {
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createSoccerEvent, nextSoccerEventSequence, type SoccerEventPayloadByType } from './events'
+import { requireSoccerEventGameState, type SoccerEventGameState } from './gameState'
 import { createSoccerUuid } from './id'
 import { orderedSoccerSegments } from './rules'
 import { soccerLifecycleAction, soccerShootoutPeriod } from './shootout'
@@ -131,7 +132,7 @@ export interface SoccerPeriodTiming {
 }
 
 export type SoccerLiveResult =
-  | { ok: true; state: GameState; inspection: GameEventInspection }
+  | { ok: true; state: SoccerEventGameState; inspection: GameEventInspection }
   | { ok: false; state: GameState; message: string }
 
 export type SoccerCaptureSaveOperation = 'record_live' | 'record_historical' | 'revise'
@@ -972,7 +973,7 @@ export function formatSoccerDuration(durationMs: number): string {
 function liveContext(state: GameState, options: SoccerLiveOptions):
   | {
       ok: true
-      projection: NonNullable<GameState['sportGameState']>['projection']
+      projection: SoccerMatchProjection
       elapsedMs: number
       period: GameEventPeriod
     }
@@ -1147,7 +1148,11 @@ function currentPeriodStartElapsedMs(state: GameState, periodId: string | null):
 
 function mutationResult(result: ReturnType<typeof addGameEvent>): SoccerLiveResult {
   return result.ok
-    ? { ok: true, state: result.state, inspection: result.inspection }
+    ? {
+        ok: true,
+        state: requireSoccerEventGameState(result.state),
+        inspection: result.inspection,
+      }
     : { ok: false, state: result.state, message: result.error.message }
 }
 

@@ -4,8 +4,8 @@ Parent plan for the first Basketball event-model implementation program. BKE-1 e
 remaining sport-neutral seams, installs a deterministic Basketball event foundation, and then
 moves the existing court workflow onto that foundation behind an internal-only gate.
 
-Status: In progress. BKE-1A implementation is complete; BKE-1B and BKE-1C require their own
-detailed plans before code begins.
+Status: In progress. BKE-1A and BKE-1B1 are complete. BKE-1B2 and BKE-1B3 remain; BKE-1C requires
+its detailed plan after the complete projector lands.
 
 Architecture: [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md)
 
@@ -30,13 +30,13 @@ cloud lifecycle.
 | Phase | Scope | Exit condition |
 |---|---|---|
 | BKE-1A | Sport-neutral state extraction, definition-scoped neutral sides, atomic multi-event mutation | Soccer behavior is unchanged and the generic capabilities are independently tested |
-| BKE-1B | Basketball setup, participants, immutable rules snapshot, definitions, projector, parity fixtures | Internal fixture games rebuild deterministic Basketball state without a live UI cutover |
+| BKE-1B | Basketball setup, participants, immutable rules snapshot, definitions, projector, parity fixtures. **Splits into BKE-1B1-1B3** | Internal fixture games rebuild deterministic Basketball state without a live UI cutover |
 | BKE-1C | Court shots, assists, rebounds, recent-event undo/restore, clear chart, filters, and popup parity | Existing court workflows round-trip through Basketball events behind the internal gate |
 
 Detailed plans:
 
 - [PLAN_BKE_1A_SHARED_EVENT_ENGINE.md](PLAN_BKE_1A_SHARED_EVENT_ENGINE.md)
-- `PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md` (create after BKE-1A)
+- [PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md](PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md)
 - `PLAN_BKE_1C_COURT_EVENTS.md` (create after BKE-1B)
 
 ## 3. Program Guardrails

@@ -2,13 +2,14 @@ import type { GameState } from '../../types'
 import { addGameEvents, initializeGameEventStream } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createSoccerEvent, nextSoccerEventSequence } from './events'
+import { requireSoccerEventGameState, type SoccerEventGameState } from './gameState'
 import { createSoccerUuid } from './id'
 import { orderedSoccerSegments } from './rules'
 import { createSoccerSportGameState, validateSoccerMatchSetup } from './state'
 import type { SoccerMatchSetup } from './types'
 
 export type SoccerKickoffResult =
-  | { ok: true; state: GameState }
+  | { ok: true; state: SoccerEventGameState }
   | { ok: false; message: string }
 
 export interface SoccerKickoffOptions {
@@ -104,6 +105,6 @@ export function prepareSoccerKickoff(
     gameEventProjectors
   )
   return appended.ok
-    ? { ok: true, state: appended.state }
+    ? { ok: true, state: requireSoccerEventGameState(appended.state) }
     : { ok: false, message: appended.error.message }
 }

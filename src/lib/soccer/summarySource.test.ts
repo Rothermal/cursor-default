@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { sports } from '../../config/sports'
 import type { GameState } from '../../types'
 import { createInitialCloudSyncState } from '../gameReducer'
+import {
+  requireSoccerEventGameState,
+  type SoccerEventGameState,
+} from './gameState'
 import { DEFAULT_SOCCER_MATCH_RULES } from './rules'
 import { createSoccerSportGameState } from './state'
 import {
@@ -17,7 +21,7 @@ import type {
 } from './recorders'
 import type { SoccerMatchSetup } from './types'
 
-function state(status: string | null = 'in_progress'): GameState {
+function state(status: string | null = 'in_progress'): SoccerEventGameState {
   const soccer = sports.find(item => item.id === 'soccer')!
   const setup: SoccerMatchSetup = {
     version: 1,
@@ -71,7 +75,7 @@ function recorder(): SoccerRecorderSummary {
   }
 }
 
-function projection(base = state()): SoccerRecorderProjection {
+function projection(base: SoccerEventGameState = state()): SoccerRecorderProjection {
   return {
     recorder: recorder(),
     state: base,
@@ -121,7 +125,7 @@ function dependencies(cloudState = state()): SoccerSummarySourceDependencies {
     }),
     loadCanonical: vi.fn().mockResolvedValue(null),
     loadRecorders: vi.fn().mockResolvedValue([recorder()]),
-    projectCanonical: vi.fn((base: GameState) => projection(base)),
+    projectCanonical: vi.fn((base: GameState) => projection(requireSoccerEventGameState(base))),
   }
 }
 

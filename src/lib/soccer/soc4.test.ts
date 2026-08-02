@@ -7,8 +7,13 @@ import {
 } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState } from '../gameReducer'
-import type { GameState, SportConfig } from '../../types'
+import type { SportConfig } from '../../types'
 import { createSoccerEvent, soccerEventDefinitions, type SoccerEventPayloadByType } from './events'
+import {
+  requireSoccerEventGameState,
+  type SoccerEventGameState,
+  type SoccerGameState,
+} from './gameState'
 import {
   endSoccerMatch,
   recordCheckedSoccerEvent,
@@ -88,8 +93,8 @@ function initializedState(
   tieResolution: SoccerMatchSetup['rulesSnapshot']['tieResolution'] = 'draw_allowed',
   ruleOverrides: SoccerMatchRulesOverride = {}
 ):
-GameState {
-  const state: GameState = {
+SoccerEventGameState {
+  const state: SoccerGameState = {
     ...createInitialState(),
     sport: soccer,
     gameInfo: {
@@ -108,7 +113,7 @@ GameState {
   }
   const initialized = initializeGameEventStream(state, gameEventRegistry, gameEventProjectors)
   if (!initialized.ok) throw new Error(initialized.error.message)
-  return initialized.state
+  return requireSoccerEventGameState(initialized.state)
 }
 
 function event<TType extends keyof SoccerEventPayloadByType>(
@@ -171,13 +176,13 @@ function completedRegulationEvents(): GameEvent[] {
   ]
 }
 
-function append(state: GameState, events: GameEvent[]): GameState {
+function append(state: SoccerEventGameState, events: GameEvent[]): SoccerEventGameState {
   const result = addGameEvents(state, events, gameEventRegistry, gameEventProjectors)
   if (!result.ok) throw new Error(result.error.message)
-  return result.state
+  return requireSoccerEventGameState(result.state)
 }
 
-function activeShootoutState(): GameState {
+function activeShootoutState(): SoccerEventGameState {
   const regulation = append(initializedState('direct_to_shootout'), completedRegulationEvents())
   const started = startSoccerShootout(regulation, {
     firstKickingSide: 'tracked',

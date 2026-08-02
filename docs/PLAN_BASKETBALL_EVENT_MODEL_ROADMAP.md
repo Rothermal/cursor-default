@@ -5,7 +5,7 @@ record combination onto the shared `GameEvent` foundation introduced by the socc
 
 Status: BKE-0 architecture and product-model decisions are approved in
 [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md).
-BKE-1A shared-engine implementation is complete; BKE-1B foundation planning is next.
+BKE-1A and BKE-1B1 are complete; BKE-1B2 stat-event projection is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -213,7 +213,7 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 | Phase | Purpose | Dependency | Exit condition |
 |---|---|---|---|
 | BKE-0 | Architecture audit, product-model Q&A, event catalog, authority, compatibility, settings/release strategy, and F13 reconciliation | Completed SOC-6 program | Detailed migration design approved; no Basketball code migration required |
-| BKE-1 | Shared-engine extraction through court capture. **Splits into BKE-1A-1C** — see BKE-0 §9 | BKE-0 approved | Generic refactors preserve Soccer; Basketball setup/projector and court workflows pass approved parity fixtures |
+| BKE-1 | Shared-engine extraction through court capture. **Splits into BKE-1A-1C; BKE-1B further splits into BKE-1B1-1B3** — see BKE-0 §9 | BKE-0 approved | Generic refactors preserve Soccer; Basketball setup/projector and court workflows pass approved parity fixtures |
 | BKE-2 | Direct stat grid, event-derived score adjustments, team/period stats, fouls/ejections, timeouts, and remaining Basketball actions | BKE-1C | Every new Basketball live action has one event-backed source of truth |
 | BKE-3 | Editable Basketball Timeline/detail experience and F13 delivery | BKE-2 | Users can review, revise, remove, restore, and re-link supported local events |
 | BKE-4 | Generalized cloud lifecycle, authority-aware Summary, canonical aggregates, capability negotiation, and release readiness. **Splits into BKE-4A-4E** — see BKE-0 §9 | BKE-3 stable | New Basketball games sync and publish canonically behind the internal gate; Soccer remains unchanged; legacy games remain readable |

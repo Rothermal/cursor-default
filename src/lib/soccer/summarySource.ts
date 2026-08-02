@@ -1,5 +1,6 @@
 import type { GameState } from '../../types'
 import type { GameEvent, GameEventInspection } from '../gameEvents/types'
+import { requireSoccerEventGameState, type SoccerEventGameState } from './gameState'
 import { inspectSoccerHistory } from './live'
 import {
   loadSoccerCanonicalPublication,
@@ -16,7 +17,7 @@ import {
 } from './recorders'
 
 interface SoccerSummarySourceBase {
-  state: GameState
+  state: SoccerEventGameState
   recorder: SoccerRecorderSummary | null
   recorders: SoccerRecorderSummary[]
   publication: SoccerCanonicalPublication | null
@@ -120,7 +121,7 @@ export async function loadSoccerSummarySource(
   }
   return {
     kind: 'local',
-    state: localState,
+    state: requireSoccerEventGameState(localState),
     recorder: null,
     recorders: [],
     publication: null,
@@ -162,7 +163,7 @@ export async function loadSoccerSummaryRecordingSource(
     const projection = await loadRecorder(baseSource.state, available)
     return {
       kind: available.isPrimary ? 'cloud_primary' : 'cloud_recording',
-      state: projection.state,
+      state: requireSoccerEventGameState(projection.state),
       recorder: projection.recorder,
       recorders: baseSource.recorders,
       publication: null,
@@ -214,7 +215,7 @@ async function loadCloudSource(
       )
       return {
         kind: 'canonical',
-        state: projection.state,
+        state: requireSoccerEventGameState(projection.state),
         recorder,
         recorders,
         publication,
@@ -234,7 +235,7 @@ async function loadCloudSource(
     const { primary, recorders } = await dependencies.loadPrimary(gameId)
     return {
       kind: 'cloud_primary',
-      state: primary.state,
+      state: requireSoccerEventGameState(primary.state),
       recorder: primary.recorder,
       recorders,
       publication: null,
