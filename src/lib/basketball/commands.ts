@@ -89,6 +89,7 @@ export function isBasketballEventSetupIntent(state: GameState): boolean {
 export function hasStartedBasketballEventGame(state: GameState): boolean {
   return state.sport?.id === 'basketball' &&
     state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
+    state.sportGameState?.sportId === 'basketball' &&
     Boolean(state.eventStream?.events.length)
 }
 

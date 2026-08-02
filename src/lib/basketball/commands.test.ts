@@ -8,6 +8,7 @@ import {
   basketballActorForSelection,
   createBasketballCaptureCommandId,
   getBasketballCommandContext,
+  hasStartedBasketballEventGame,
   isBasketballEventSetupIntent,
   nextBasketballEventSequence,
   normalizeBasketballCourtLocation,
@@ -103,6 +104,13 @@ describe('BKE-1C1 Basketball commands', () => {
       state: initialized,
       code: 'creation_intent_unavailable',
     })
+  })
+
+  it('recognizes only a complete initialized Basketball event game as started', () => {
+    const started = startedState()
+    expect(hasStartedBasketballEventGame(started)).toBe(true)
+    expect(hasStartedBasketballEventGame({ ...started, sportGameState: null })).toBe(false)
+    expect(hasStartedBasketballEventGame({ ...started, eventStream: null })).toBe(false)
   })
 
   it('does not convert an aggregate setup or cloud-bound game', () => {

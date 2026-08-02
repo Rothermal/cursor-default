@@ -57,7 +57,9 @@ Each slice uses its own feature branch and PR. BKE-1C2 is next.
 ### 4.1 Development-only creation intent
 
 - Add a development-only Event Model toggle to local Basketball setup. It defaults off for every
-  new game and is absent from production builds and cloud/team game flows.
+  new game and is absent from production builds, existing-team selection, and team deep-link flows.
+  A signed-in unbound `New Team` setup may select the toggle; doing so explicitly changes that
+  setup to `Local Team`, clears cloud-season intent, and prevents cloud team/game creation.
 - Selecting it marks the new game event-owned before `SET_GAME_INFO` can make the state eligible for
   aggregate sync. Deselecting is allowed only while no stream, setup snapshot, or aggregate activity
   exists.
@@ -103,8 +105,8 @@ Each slice uses its own feature branch and PR. BKE-1C2 is next.
   1 start, current command context, per-recorder sequencing, actor mapping, command ids, normalized
   locations, and timestamps.
 - The centralized release policy exposes the setup toggle only in development. Selecting it on a
-  new local Basketball setup stamps event authority before game information; existing-team and
-  cloud-bound starts remain rejected.
+  new unbound Basketball setup stamps event authority before game information and changes the
+  source label to `Local Team`; existing-team and cloud-bound starts remain rejected.
 - Player Setup excludes team pseudo-players from the immutable participant snapshot and dispatches
   one hydrated result only after stream initialization and the first period event project fully.
 - Marked setup-in-progress and initialized games survive parking/reload/import without aggregate

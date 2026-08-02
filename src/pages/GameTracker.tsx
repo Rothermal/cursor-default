@@ -15,7 +15,7 @@ import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIn
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
 import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
-import { routeForResumedGame, sportDashboardPath } from '../lib/sportNavigation'
+import { sportDashboardPath } from '../lib/sportNavigation'
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
@@ -23,6 +23,7 @@ import {
   authoritativeGameDataDiagnostics,
   SPORT_EVENTS_AUTHORITY,
 } from '../lib/gameEvents/authority'
+import { gameEventProjectors } from '../lib/gameEvents/runtime'
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -145,7 +146,11 @@ export default function GameTracker() {
     [dispatch]
   )
 
-  const authoritativeDiagnostics = authoritativeGameDataDiagnostics(state, true)
+  const activeProjector = state.sport ? gameEventProjectors.get(state.sport.id) : undefined
+  const authoritativeDiagnostics = authoritativeGameDataDiagnostics(
+    state,
+    activeProjector?.requiresSportGameState === true
+  )
   if (
     state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
     authoritativeDiagnostics.length > 0
@@ -156,8 +161,8 @@ export default function GameTracker() {
           <AccessUnavailable
             title="Event game unavailable"
             message={authoritativeDiagnostics[0].message}
-            actionLabel="Return to setup"
-            onAction={() => navigate(routeForResumedGame(state))}
+            actionLabel={sport ? `Back to ${sport.name}` : 'Back to Sports'}
+            onAction={() => navigate(sport ? sportDashboardPath(sport.id) : '/')}
           />
         </div>
       </div>

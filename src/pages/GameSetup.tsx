@@ -715,7 +715,7 @@ export default function GameSetup() {
                       teamMode === 'new' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
                     }`}
                   >
-                    New Team
+                    {isBasketballEventIntent ? 'Local Team' : 'New Team'}
                   </button>
                 </div>
               )}
