@@ -10,7 +10,7 @@ import { SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
  */
 export function buildGameSyncFingerprint(state: GameState): string {
   return JSON.stringify({
-    gameDataAuthority: state.gameDataAuthority ?? null,
+    ...(state.gameDataAuthority ? { gameDataAuthority: state.gameDataAuthority } : {}),
     sportId: state.sport?.id ?? null,
     gameInfo: state.gameInfo,
     opponentScore: state.opponentScore,

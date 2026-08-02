@@ -95,10 +95,15 @@ describe('gameSyncFingerprint', () => {
   })
 
   it('fingerprints durable event authority and blocks aggregate fallback when data is missing', () => {
-    const legacy = baseState()
+    const legacy = baseState({ gameDataAuthority: null })
     const marked = baseState({ gameDataAuthority: 'sport_events' })
+    const legacyFingerprint = buildGameSyncFingerprint(legacy)
+    const markedFingerprint = buildGameSyncFingerprint(marked)
 
-    expect(buildGameSyncFingerprint(marked)).not.toBe(buildGameSyncFingerprint(legacy))
+    expect(legacyFingerprint).toMatch(/^\{"sportId":/)
+    expect(legacyFingerprint).not.toContain('"gameDataAuthority"')
+    expect(markedFingerprint).toMatch(/^\{"gameDataAuthority":"sport_events","sportId":/)
+    expect(markedFingerprint).not.toBe(legacyFingerprint)
     expect(isAggregateCloudSyncEligible(marked)).toBe(false)
   })
 
