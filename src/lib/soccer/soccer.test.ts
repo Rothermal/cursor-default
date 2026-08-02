@@ -10,9 +10,14 @@ import {
 } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState, gameReducer } from '../gameReducer'
-import type { GameState, SportConfig } from '../../types'
+import type { SportConfig } from '../../types'
 import { buildGameSyncFingerprint, isAggregateCloudSyncEligible } from '../gameSyncFingerprint'
 import { createSoccerEvent, soccerEventDefinitions } from './events'
+import {
+  requireSoccerEventGameState,
+  type SoccerEventGameState,
+  type SoccerGameState,
+} from './gameState'
 import { DEFAULT_SOCCER_MATCH_RULES, resolveSoccerMatchRules, validateSoccerMatchRules } from './rules'
 import { createSoccerSportGameState, elapsedSoccerClockMs } from './state'
 import type {
@@ -70,7 +75,7 @@ function setup(): SoccerMatchSetup {
   }
 }
 
-function state(): GameState {
+function state(): SoccerGameState {
   return {
     ...createInitialState(),
     sport: soccer,
@@ -147,10 +152,10 @@ function opponentActor(role: string, label: string): GameEventActor {
   return { role, kind: 'unknown', label }
 }
 
-function initializedState(): GameState {
+function initializedState(): SoccerEventGameState {
   const initialized = initializeGameEventStream(state(), gameEventRegistry, gameEventProjectors)
   if (!initialized.ok) throw new Error(initialized.error.message)
-  return initialized.state
+  return requireSoccerEventGameState(initialized.state)
 }
 
 function kickoffEvents(): GameEvent[] {
@@ -280,7 +285,7 @@ describe('soccer attacking event projection', () => {
     if (!result.ok) throw new Error(result.error.message)
 
     expect(result.state.homeTeamScore).toBe(2)
-    expect(result.state.sportGameState?.projection.sideTotals.tracked).toMatchObject({
+    expect(requireSoccerEventGameState(result.state).sportGameState.projection.sideTotals.tracked).toMatchObject({
       score: 2,
       goals: 2,
       shots: 2,
@@ -323,7 +328,7 @@ describe('soccer attacking event projection', () => {
     const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
     if (!result.ok) throw new Error(result.error.message)
 
-    expect(result.state.sportGameState?.projection.sideTotals.tracked).toMatchObject({
+    expect(requireSoccerEventGameState(result.state).sportGameState.projection.sideTotals.tracked).toMatchObject({
       score: 1,
       shots: 5,
       shotsOnTarget: 2,
@@ -385,7 +390,7 @@ describe('soccer attacking event projection', () => {
 
     expect(result.state.homeTeamScore).toBe(1)
     expect(result.state.opponentScore).toBe(2)
-    expect(result.state.sportGameState?.projection.sideTotals).toMatchObject({
+    expect(requireSoccerEventGameState(result.state).sportGameState.projection.sideTotals).toMatchObject({
       tracked: { score: 1, shots: 2, shotsOnTarget: 2, goals: 1, saved: 1 },
       opponent: {
         score: 2,
@@ -428,8 +433,8 @@ describe('soccer attacking event projection', () => {
     const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
     if (!result.ok) throw new Error(result.error.message)
 
-    expect(result.state.sportGameState?.projection.status).toBe('period_break')
-    expect(result.state.sportGameState?.projection.clock.elapsedMs).toBe(1_000)
+    expect(requireSoccerEventGameState(result.state).sportGameState.projection.status).toBe('period_break')
+    expect(requireSoccerEventGameState(result.state).sportGameState.projection.clock.elapsedMs).toBe(1_000)
     expect(result.state.players.find(player => player.id === 'p2')?.stats.soc_shot).toBe(1)
   })
 
@@ -446,10 +451,11 @@ describe('soccer attacking event projection', () => {
     const result = addGameEvents(initializedState(), events, gameEventRegistry, gameEventProjectors)
     if (!result.ok) throw new Error(result.error.message)
 
-    expect(result.state.sportGameState?.projection.status).toBe('suspended')
-    expect(result.state.sportGameState?.projection.startedPeriodIds).toEqual(['regulation-1'])
-    expect(result.state.sportGameState?.projection.periodEndElapsedMsById).toEqual({})
-    expect(result.state.sportGameState?.projection.suspendedContext).toEqual({
+    const suspendedState = requireSoccerEventGameState(result.state)
+    expect(suspendedState.sportGameState.projection.status).toBe('suspended')
+    expect(suspendedState.sportGameState.projection.startedPeriodIds).toEqual(['regulation-1'])
+    expect(suspendedState.sportGameState.projection.periodEndElapsedMsById).toEqual({})
+    expect(suspendedState.sportGameState.projection.suspendedContext).toEqual({
       periodId: 'regulation-1',
       elapsedMs: 1_000,
     })
@@ -665,7 +671,7 @@ describe('soccer match projection', () => {
 
     expect(result.inspection.complete).toBe(true)
     expect(result.state.eventStream?.events).toHaveLength(events.length)
-    const projection = result.state.sportGameState?.projection
+    const projection = requireSoccerEventGameState(result.state).sportGameState.projection
     expect(projection?.status).toBe('period_break')
     expect(projection?.completedPeriodIds).toEqual(['regulation-1', 'regulation-2'])
     expect(projection?.attackingDirection).toBe('right_to_left')
@@ -750,7 +756,7 @@ describe('soccer match projection', () => {
       'semantic_validation_failed',
       'unprojected_event',
     ])
-    const projection = edited.state.sportGameState?.projection
+    const projection = requireSoccerEventGameState(edited.state).sportGameState.projection
     expect(projection?.clock.running).toBe(false)
     expect(projection?.currentPeriodId).toBe('regulation-1')
     expect(projection?.participants['match-p1'].status).toBe('on_field')
@@ -796,7 +802,7 @@ describe('soccer match projection', () => {
       gameEventProjectors
     )
     if (!result.ok) throw new Error(result.error.message)
-    const projection = result.state.sportGameState?.projection
+    const projection = requireSoccerEventGameState(result.state).sportGameState.projection
     if (!projection?.clock.anchorOccurredAt) throw new Error('clock did not start')
 
     expect(elapsedSoccerClockMs(projection, Date.parse(projection.clock.anchorOccurredAt) + 12_345)).toBe(12_345)

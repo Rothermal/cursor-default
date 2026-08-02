@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { sports } from '../../config/sports'
-import type { GameState } from '../../types'
 import type { GameEvent, GameEventInspection } from '../gameEvents/types'
 import { createInitialCloudSyncState } from '../gameReducer'
+import type { SoccerEventGameState } from './gameState'
 import { DEFAULT_SOCCER_MATCH_RULES } from './rules'
 import {
   formatSoccerReviewDuration,
@@ -11,9 +11,9 @@ import {
   soccerReviewRate,
 } from './summaryPlayers'
 import { createSoccerSportGameState } from './state'
-import type { SoccerMatchSetup } from './types'
+import type { SoccerMatchSetup, SoccerProjectedParticipant } from './types'
 
-function fixtureState(): GameState {
+function fixtureState(): SoccerEventGameState {
   const setup: SoccerMatchSetup = {
     version: 1,
     trackedTeamDesignation: 'home',
@@ -137,7 +137,7 @@ function participant(
 }
 
 function play(
-  projected: NonNullable<GameState['sportGameState']>['projection']['participants'][string],
+  projected: SoccerProjectedParticipant,
   started: boolean,
   periodId: string,
   startElapsedMs: number,

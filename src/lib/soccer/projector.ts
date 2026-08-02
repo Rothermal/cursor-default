@@ -8,6 +8,7 @@ import type {
   SportGameEventProjectionResult,
   SportGameEventProjector,
 } from '../gameEvents/types'
+import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { normalizeSoccerMatchRules, orderedSoccerSegments, validateSoccerMatchRules } from './rules'
 import { createSoccerMatchProjection, emptyParticipantStats } from './state'
 import {
@@ -52,7 +53,7 @@ export function projectSoccerMatchEvents(
 
   const soccerEvents = [...events]
     .filter((event): event is SoccerMatchEvent => event.sportId === 'soccer')
-    .sort(compareSoccerCaptureOrder)
+    .sort(compareGameEventCaptureOrder)
   let projection = createSoccerMatchProjection(sportState.setup)
   const diagnostics: GameEventDiagnostic[] = []
   const seenSequences = new Set<string>()
@@ -1173,11 +1174,6 @@ function directionForSegment(
 
 function oppositeDirection(direction: SoccerAttackingDirection): SoccerAttackingDirection {
   return direction === 'left_to_right' ? 'right_to_left' : 'left_to_right'
-}
-
-function compareSoccerCaptureOrder(left: SoccerMatchEvent, right: SoccerMatchEvent): number {
-  if (left.sequence !== right.sequence) return left.sequence - right.sequence
-  return left.id.localeCompare(right.id)
 }
 
 function buildProjection(

@@ -1,4 +1,5 @@
 export * from './types'
+export * from './gameState'
 export * from './rules'
 export * from './state'
 export * from './events'

@@ -30,6 +30,12 @@ export function compareGameEvents(left: GameEvent, right: GameEvent): number {
   return left.id.localeCompare(right.id)
 }
 
+/** Projection rebuilds follow recorder capture order, independent of display clock order. */
+export function compareGameEventCaptureOrder(left: GameEvent, right: GameEvent): number {
+  if (left.sequence !== right.sequence) return left.sequence - right.sequence
+  return left.id.localeCompare(right.id)
+}
+
 /** Stable raw representation for dirty detection; does not mutate persisted event order. */
 export function canonicalGameEventStreamForFingerprint(
   stream: GameEventStream | null

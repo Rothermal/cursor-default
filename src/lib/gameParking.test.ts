@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../types'
 import { activeCloudSyncStateAction } from './cloudSyncState'
+import {
+  createBasketballMatchRules,
+  DEFAULT_BASKETBALL_RULES_SOURCE,
+} from './basketball/rules'
+import { createBasketballSportGameState } from './basketball/state'
 import { gameReducer } from './gameReducer'
 import { withLastSyncedGameFingerprint } from './gameSyncFingerprint'
 import {
@@ -169,6 +174,41 @@ beforeEach(() => {
 })
 
 describe('gameParking', () => {
+  it('round-trips recognized Basketball event setup without trusting persisted projection', () => {
+    const base = gameState(basketball, 'Wildcats', 'Tigers')
+    const sportGameState = createBasketballSportGameState({
+      version: 1,
+      trackedTeamDesignation: 'home',
+      sourceTeamId: 'team-1',
+      sourceSeasonId: 'season-1',
+      rulesSource: structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE),
+      rulesSnapshot: createBasketballMatchRules(),
+      participants: [{
+        id: 'match-p1',
+        playerId: 'p1',
+        displayName: 'One',
+        number: '1',
+        teamSide: 'tracked',
+        initialStatus: 'starter',
+        position: null,
+        captain: false,
+      }],
+    })
+    sportGameState.projection.status = 'ended'
+    sportGameState.capturePreferences.courtOrientation = 'flipped'
+
+    saveActiveGameState({ ...base, sportGameState }, 'user-1')
+    const restored = loadActiveParkedGameState('user-1')
+
+    expect(restored?.sportGameState?.sportId).toBe('basketball')
+    if (restored?.sportGameState?.sportId !== 'basketball') {
+      throw new Error('Expected parked Basketball state.')
+    }
+    expect(restored.sportGameState.projection.status).toBe('not_started')
+    expect(restored.sportGameState.capturePreferences.courtOrientation).toBe('flipped')
+    expect(restored.sportGameState.setup.participants[0]?.id).toBe('match-p1')
+  })
+
   it('migrates the legacy single-game key into an active parked record', () => {
     const legacy = gameState(basketball, 'Wildcats', 'Tigers')
     localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(legacy))

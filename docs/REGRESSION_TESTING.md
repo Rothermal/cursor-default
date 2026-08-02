@@ -621,6 +621,25 @@ disabled in production; SOC-2A later installs production soccer match-state defi
 
 ---
 
+## 11a1. Basketball state and lifecycle foundation (BKE-1B1)
+
+**Precondition:** No Basketball event game is exposed in the app. These checks are automated/library
+proofs; ordinary Basketball games must remain on the existing aggregate path.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a1.1 | Create and normalize a Basketball setup fixture | Rules, stable regulation/overtime identities, source metadata, and tracked/opponent participants survive; persisted projection is discarded and capture preferences normalize |
+| 11a1.2 | Replay period start/end, late roster addition, participant resolution, and match end events | Projection deterministically rebuilds status, period history, effective participants, and result without mutating setup |
+| 11a1.2a | Inspect each Basketball lifecycle family with neutral, tracked, and opponent event sides | Neutral is accepted; tracked/opponent variants are rejected because lifecycle facts belong to neither team |
+| 11a1.3 | Start overtime after all regulation segments complete | `overtime-1` is appended with the snapshotted template label, duration, and canonical order |
+| 11a1.4 | Replay an out-of-order period, duplicate recorder sequence, duplicate participant/player identity, or previous-period lifecycle action | The stream is preserved, projection fails closed, and a focused diagnostic identifies the invalid transition |
+| 11a1.5 | End as suspended, then append a reasoned reopen | Status returns to the latest period state; end reason/result clear and existing events remain byte-identical |
+| 11a1.6 | Change only Basketball projection/capture preferences, then change immutable setup | Runtime-only changes leave the fingerprint unchanged; setup changes alter it |
+| 11a1.7 | Park and resume recognized Basketball setup with falsified persisted projection | Setup and preferences survive; projection returns to the clean event-derived baseline |
+| 11a1.8 | Inspect the production event registries and start a normal Basketball game | No Basketball projector is registered before BKE-1B3; normal games continue using aggregate tracking/sync |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

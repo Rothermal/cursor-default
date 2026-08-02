@@ -1,0 +1,117 @@
+# Plan: BKE-1B Basketball Event Foundation
+
+Parent plan for the Basketball setup, event catalog, projector, and parity-fixture program.
+
+Status: Approved and in progress. BKE-1B1 is implemented; BKE-1B2 and BKE-1B3 remain. The split
+gives state, stat-event projection, and administrative parity an independent proof. No active user
+rollout is required while the BKE program is under construction.
+
+Depends on:
+
+- [PLAN_BKE_1A_SHARED_EVENT_ENGINE.md](PLAN_BKE_1A_SHARED_EVENT_ENGINE.md)
+- [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md)
+
+## 1. Goal
+
+BKE-1B exits when a complete, internally gated Basketball event fixture can rebuild setup,
+participants, score, player and team statistics, shot records, periods, discipline, timeouts, and
+match result deterministically. The existing aggregate Basketball path and every Soccer event path
+must remain unchanged.
+
+## 2. Phase Map
+
+| Phase | Scope | Exit condition |
+|---|---|---|
+| BKE-1B1 | Immutable rules/setup, participant identity, sport-state normalization, and lifecycle events/projection | Basketball setup and lifecycle histories normalize, rebuild, fingerprint, and park without entering the live runtime registry |
+| BKE-1B2 | Shooting, scoring, assists, rebounds, steals, blocks, turnovers, links, and stat projection | Court and box-score fixture events deterministically rebuild score, player totals, and shot records |
+| BKE-1B3 | Fouls, ejections, timeouts, minutes, durable event-authority/quarantine marker, complete parity fixtures, and runtime registration | The complete catalog passes parity/integration tests; corrupt event state cannot fall back to aggregate sync; Basketball event support is registered behind the internal creation gate |
+
+The split is an implementation boundary, not a product-model change. BKE-1C remains the first
+court-command and live capture cutover.
+
+## 3. BKE-1B1 Scope
+
+### Included
+
+- `BasketballSportGameState` version 1 with immutable setup, rebuildable projection, and normalized
+  capture preferences.
+- Complete baseline `BasketballMatchRules` snapshots derived from the current resolved team-stat
+  configuration, with stable regulation segment identities, a dynamic-overtime template,
+  `clockModel: 'none'`, and rules-source metadata reserved for BKE-5 layers.
+- Stable tracked/opponent player participants with starter, bench, or DNP opening status; optional
+  player resolution, number, position, and captain metadata; and duplicate-id rejection.
+- Lifecycle event definitions for period start/end, late roster additions, participant resolution,
+  match end, and match reopen.
+- A pure lifecycle projector that rebuilds status, periods, the effective participant registry,
+  end reason, and result without reading React, Supabase, capture preferences, or mutable legacy
+  counters.
+- Basketball membership in the neutral `SportGameState` union and normalizer registry.
+- Focused hydration, parking, and fingerprint coverage.
+
+### Excluded
+
+- Shooting, scoring, player-stat, team-stat, discipline, timeout, and minutes events (BKE-1B2/1B3).
+- Court commands, stat-grid commands, popup behavior, filters, and undo (BKE-1C/BKE-2).
+- Global Basketball event definitions/projector registration. The production runtime remains
+  Soccer-only until BKE-1B3 is complete.
+- Supabase migrations, cloud transport, finalization, Summary, aggregates, and settings UI.
+- Anchored clock, substitutions, and on-court intervals (BKE-6).
+
+## 4. State Contract
+
+- Setup is cloned at creation and never changed by projection.
+- `participantId` and `teamSide` are stable match identity. Resolution may add or replace the cloud
+  `playerId`, display name, and number without rewriting historical actors.
+- Team pseudo-players and staff are not participant rows.
+- Regulation segment ids are stable and unique. Overtime ids are derived as `overtime-N` from a
+  snapshotted template and are appended only when their period starts.
+- Capture preferences are resume-only state and remain outside fingerprints and projection.
+- Basketball can simultaneously support legacy aggregate games and recognized event-owned setup.
+  During BKE-1B1/BKE-1B2 fixtures, aggregate sync remains eligible only when both `eventStream` and
+  `sportGameState` are null. Before BKE-1B3 registers the runtime, add a durable top-level
+  `gameDataAuthority: 'sport_events'` marker that is normalized independently of those fields.
+- Existing unmarked Basketball games remain legacy. A marked event game whose stream or setup
+  fails normalization is quarantined with recovery diagnostics and remains ineligible for aggregate
+  sync; corruption never silently changes its authority model.
+
+## 5. Lifecycle Contract
+
+- The initial projection is `not_started` and contains the setup participant registry.
+- All six lifecycle families are side-less administrative facts and therefore require
+  `teamSide: 'neutral'`; tracked/opponent variants are invalid.
+- A period can start once, only after the previous started period has ended. Its payload period id
+  and envelope period must agree.
+- A started period can end once and must be the current period.
+- Late roster additions require a new participant id and may enter as bench or DNP. Team side never
+  changes after entry.
+- Participant resolution requires an existing participant and a non-empty player id. It updates
+  projected identity only.
+- Match end requires at least one started period. Completed, suspended, and abandoned are explicit
+  reasons; only completed derives a winner/draw from the projected score.
+- Reopen applies only to ended/suspended matches and returns to period break or in-progress state
+  according to the latest period history. It clears the previous end result without changing events.
+- Any invalid transition emits diagnostics, preserves the stream, and prevents authoritative
+  completion.
+
+## 6. Proof
+
+- Rules and setup validation reject malformed snapshots, duplicate segments, duplicate participant
+  ids, invalid side/status metadata, and inconsistent compatibility fields.
+- State normalization drops persisted projection truth, rebuilds a clean projection, and normalizes
+  capture preferences defensively.
+- Lifecycle fixtures cover regulation, dynamic overtime, late tracked/opponent participants,
+  identity resolution, completion, suspension/abandonment, reopen, duplicate sequences, and invalid
+  transitions.
+- Lifecycle definitions explicitly opt into neutral and reject tracked/opponent sides.
+- Fingerprints include immutable Basketball setup but exclude projection and capture preferences.
+- Park/import/hydration round trips recognize valid Basketball state and reject malformed state.
+- Existing Soccer, aggregate Basketball, full unit, lint, and production-build checks remain green.
+
+## 7. Delivery
+
+1. Merge BKE-1B1 with no global Basketball event runtime registration.
+2. Re-audit the frozen lifecycle types and write the focused BKE-1B2 implementation map.
+3. Merge BKE-1B2 using a private Basketball fixture registry/projector.
+4. Complete BKE-1B3 administrative projection and parity fixtures; add the durable event-authority
+   marker plus corrupt-state quarantine before global internal registration.
+5. Keep normal game creation on the aggregate path and proceed to BKE-1C court capture.
