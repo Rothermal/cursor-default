@@ -160,8 +160,13 @@ Each slice uses its own feature branch and PR. BKE-1C1 is next.
 
 - Store one validated, non-authoritative `lastCourtUndo` receipt in Basketball capture preferences.
   It records only the event ids to restore and the previous links required to invert updates.
-- The receipt survives park/reload, is excluded from fingerprints/publication, and is cleared by any
-  new capture, successful restore, or unrelated event mutation.
+- Add the receipt without bumping `BASKETBALL_GAME_STATE_VERSION`. Normalization treats the field as
+  optional and defaults missing/invalid values to `null`, so existing marked development games stay
+  readable instead of being quarantined by a persisted-shape change.
+- The receipt survives park/reload and is cleared by any new capture, successful restore, or
+  unrelated event mutation. It is fingerprint-inert by construction because
+  `sportGameStateForFingerprint` includes only sport id, version, and immutable setup; capture
+  preferences never enter fingerprints or publication.
 - Recent Events shows `Restore last undone` only while the receipt still matches the current stream.
   Restore applies every inverse mutation atomically; stale or invalid receipts fail visibly and
   cannot partially restore history.
@@ -175,6 +180,13 @@ Each slice uses its own feature branch and PR. BKE-1C1 is next.
 - Undo the complete newest unit, including its prompted assist or rebound. Never search past a newer
   standalone capture to find an older shot.
 - Restore remains in Recent Events rather than changing the court button's meaning.
+
+This is a named intentional improvement over legacy behavior. The legacy court button checks only
+the newest `actionLog` row's `shotId`; a prompted assist/rebound is a trailing row with only
+`linkedShotId`, so the button is disabled immediately after that grouped gesture. Event mode keeps
+the same strict newest-first boundary but correctly recognizes the whole persisted capture unit.
+Parity fixtures must expect the availability difference rather than disabling grouped event undo to
+match the legacy limitation.
 
 ### 6.4 Clear Shot Chart
 
@@ -212,6 +224,8 @@ Each slice uses its own feature branch and PR. BKE-1C1 is next.
 ### BKE-1C3
 
 - Single and grouped captures undo newest-first and restore after park/reload.
+- A prompted assist/rebound leaves legacy court Undo disabled but enables event-mode court Undo for
+  the complete newest capture unit; this is the approved intentional improvement.
 - A newer standalone event prevents court Undo from reaching an older shot.
 - Clear Chart removes all and only located shots plus approved dependents across filters.
 - Free throws and unlocated attempts remain byte-identical; `ft` totals do not move; shared 2PT/3PT
@@ -232,7 +246,8 @@ Each slice uses its own feature branch and PR. BKE-1C1 is next.
 9. Mark all initial participants bench until lineup truth exists.
 10. Initialize setup, stream, and Period 1 atomically before tracker navigation.
 11. Clear the entire chart across filters with exact dependency handling and consequence counts.
-12. Keep court Undo newest-first and never skip later captures.
+12. Keep the legacy newest-first boundary and never skip later captures, while intentionally fixing
+    the legacy limitation that disables court Undo after a prompted assist/rebound.
 13. Hide unimplemented mutation surfaces in event mode rather than rendering no-op controls.
 14. Lock the event-game roster after start until late-participant UI ships.
 15. Default the internal toggle off and stamp authority before aggregate auto-sync is possible.
