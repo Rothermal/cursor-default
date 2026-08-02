@@ -630,6 +630,7 @@ proofs; ordinary Basketball games must remain on the existing aggregate path.
 |------|--------|----------|
 | 11a1.1 | Create and normalize a Basketball setup fixture | Rules, stable regulation/overtime identities, source metadata, and tracked/opponent participants survive; persisted projection is discarded and capture preferences normalize |
 | 11a1.2 | Replay period start/end, late roster addition, participant resolution, and match end events | Projection deterministically rebuilds status, period history, effective participants, and result without mutating setup |
+| 11a1.2a | Inspect each Basketball lifecycle family with neutral, tracked, and opponent event sides | Neutral is accepted; tracked/opponent variants are rejected because lifecycle facts belong to neither team |
 | 11a1.3 | Start overtime after all regulation segments complete | `overtime-1` is appended with the snapshotted template label, duration, and canonical order |
 | 11a1.4 | Replay an out-of-order period, duplicate recorder sequence, duplicate participant/player identity, or previous-period lifecycle action | The stream is preserved, projection fails closed, and a focused diagnostic identifies the invalid transition |
 | 11a1.5 | End as suspended, then append a reasoned reopen | Status returns to the latest period state; end reason/result clear and existing events remain byte-identical |

@@ -185,10 +185,11 @@ describe('BKE-1B1 Basketball foundation', () => {
     expect(sportSupportsEventGameState('basketball')).toBe(true)
   })
 
-  it('keeps lifecycle definitions strict and neutral events unregistered', () => {
+  it('registers side-less lifecycle events as neutral only', () => {
     const started = periodEvent(0, 'basketball.period_started', 'regulation-1', 1)
     expect(registry.inspect(started).ok).toBe(true)
-    expect(registry.inspect({ ...started, teamSide: 'neutral' }).ok).toBe(false)
+    expect(registry.inspect({ ...started, teamSide: 'tracked' }).ok).toBe(false)
+    expect(registry.inspect({ ...started, teamSide: 'opponent' }).ok).toBe(false)
     expect(registry.inspect({ ...started, actors: [{ role: 'team', kind: 'team', label: 'A' }] }).ok)
       .toBe(false)
     expect(registry.inspect({ ...started, payload: { periodId: '', captureCommandId: null } }).ok)

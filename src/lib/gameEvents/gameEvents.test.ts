@@ -12,7 +12,12 @@ import {
 } from './mutations'
 import { GameEventProjectorRegistry } from './projection'
 import { GameEventRegistry, type GameEventDefinition } from './registry'
-import { compareGameEvents, inspectGameEventStream, normalizeGameEventStream } from './stream'
+import {
+  compareGameEventCaptureOrder,
+  compareGameEvents,
+  inspectGameEventStream,
+  normalizeGameEventStream,
+} from './stream'
 import type { GameEvent, JsonObject } from './types'
 
 interface FixturePayload extends JsonObject {
@@ -162,6 +167,34 @@ describe('game event registry and stream inspection', () => {
     ])
     expect(inspected.deletedEvents).toHaveLength(1)
     expect([...events].sort(compareGameEvents)).toHaveLength(4)
+  })
+
+  it('orders projection rebuilds by capture sequence and id only', () => {
+    const laterClockEarlierCapture = event('10000000-0000-4000-8000-000000000007', {
+      sequence: 1,
+      period: { id: 'regulation-2', order: 2 },
+      elapsedMs: 30_000,
+    })
+    const earlierClockLaterCapture = event('10000000-0000-4000-8000-000000000006', {
+      sequence: 2,
+      period: { id: 'regulation-1', order: 1 },
+      elapsedMs: 1_000,
+    })
+    const sameSequenceLowerId = event('10000000-0000-4000-8000-000000000005', {
+      sequence: 2,
+      period: { id: 'regulation-3', order: 3 },
+      elapsedMs: 90_000,
+    })
+
+    expect([
+      earlierClockLaterCapture,
+      laterClockEarlierCapture,
+      sameSequenceLowerId,
+    ].sort(compareGameEventCaptureOrder).map(item => item.id)).toEqual([
+      laterClockEarlierCapture.id,
+      sameSequenceLowerId.id,
+      earlierClockLaterCapture.id,
+    ])
   })
 
   it('normalizes missing legacy streams to null while preserving future containers', () => {

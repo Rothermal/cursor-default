@@ -49,7 +49,7 @@ export function createBasketballLifecycleEvent<
     period: input.period,
     elapsedMs: null,
     occurredAt: input.occurredAt,
-    teamSide: 'tracked',
+    teamSide: 'neutral',
     location: null,
     actors: [],
     payload: input.payload,
@@ -77,12 +77,13 @@ function lifecycleDefinition(
     sportId: 'basketball',
     eventType,
     currentSchemaVersion: BASKETBALL_EVENT_SCHEMA_VERSION,
+    allowedTeamSides: ['neutral'],
     validate: event => {
       if (
         event.sportId !== 'basketball' ||
         event.eventType !== eventType ||
         event.schemaVersion !== BASKETBALL_EVENT_SCHEMA_VERSION ||
-        event.teamSide !== 'tracked' ||
+        event.teamSide !== 'neutral' ||
         event.elapsedMs !== null ||
         event.location !== null ||
         event.actors.length !== 0 ||

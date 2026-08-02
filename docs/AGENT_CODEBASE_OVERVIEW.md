@@ -138,9 +138,11 @@ and rebuildable runtime projection. Semantic failures preserve raw events, proje
 last coherent event, and expose diagnostics.
 
 BKE-1B1 adds `src/lib/basketball/` with immutable Basketball rules/setup, side-bearing participants,
-defensive normalization, six lifecycle definitions, and a pure lifecycle projector. Basketball
-setup is recognized for parking and fingerprints, but its event definitions/projector remain out of
-the production runtime registry until BKE-1B3 completes the catalog and parity suite.
+defensive normalization, six neutral lifecycle definitions, and a pure lifecycle projector. Soccer
+and Basketball projection rebuilds share capture-order semantics while display readers retain clock
+ordering. Basketball setup is recognized for parking and fingerprints, but its event definitions
+and projector remain out of the production runtime registry until BKE-1B3 completes the catalog,
+adds a durable event-authority marker with corrupt-state quarantine, and passes the parity suite.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;

@@ -158,7 +158,7 @@ export interface BasketballMatchReopenedPayload extends BasketballCapturePayload
 type BasketballLifecycleGameEvent<
   TPayload extends BasketballCapturePayload,
   TEventType extends string,
-> = GameEvent<TPayload, TEventType, 'basketball', 'tracked'>
+> = GameEvent<TPayload, TEventType, 'basketball', 'neutral'>
 
 export type BasketballPeriodStartedEvent = BasketballLifecycleGameEvent<
   BasketballPeriodPayload,

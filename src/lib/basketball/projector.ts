@@ -6,6 +6,7 @@ import type {
   SportGameEventProjectionResult,
   SportGameEventProjector,
 } from '../gameEvents/types'
+import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { resolveBasketballPeriodSegment } from './rules'
 import {
   createBasketballMatchProjection,
@@ -37,7 +38,7 @@ export function projectBasketballLifecycleEvents(
 
   const basketballEvents = [...events]
     .filter((event): event is BasketballLifecycleEvent => event.sportId === 'basketball')
-    .sort(compareCaptureOrder)
+    .sort(compareGameEventCaptureOrder)
   let projection = createBasketballMatchProjection(sportState.setup)
   const seenSequences = new Set<string>()
   let failedEvent: BasketballLifecycleEvent | null = null
@@ -276,11 +277,6 @@ function resultForEnd(
   if (projection.score.tracked > projection.score.opponent) return 'tracked_win'
   if (projection.score.opponent > projection.score.tracked) return 'opponent_win'
   return 'draw'
-}
-
-function compareCaptureOrder(left: BasketballLifecycleEvent, right: BasketballLifecycleEvent): number {
-  if (left.sequence !== right.sequence) return left.sequence - right.sequence
-  return left.id.localeCompare(right.id)
 }
 
 function buildProjection(

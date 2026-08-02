@@ -41,7 +41,9 @@ Detailed plans:
 
 ## 3. Program Guardrails
 
-- `eventStream: null` remains the permanent legacy Basketball authority marker.
+- Existing unmarked Basketball games remain legacy aggregate games. Before BKE-1B3 runtime
+  registration, event-game creation must atomically persist a top-level
+  `gameDataAuthority: 'sport_events'` marker independently of the nested stream/setup payloads.
 - Existing and in-progress games never convert to events.
 - Event-backed Basketball games remain internal-only through BKE-4E. The user opt-in belongs to
   BKE-5 after capture, cloud, Summary, aggregates, capabilities, and settings are complete.
@@ -53,8 +55,9 @@ Detailed plans:
 - BKE-1 adds no Supabase migration and does not wire Basketball events into automatic cloud sync.
 - BKE-1B may register neutral Basketball definitions for local fixtures, but those events cannot
   enter cloud transport before BKE-4A widens the database constraint and proves Soccer RPC parity.
-- Cloud authority fails closed: a missing or invalid sport-owned snapshot never grants aggregate
-  sync unless the sport explicitly supports the legacy aggregate path.
+- Cloud authority fails closed: `gameDataAuthority: 'sport_events'` always denies aggregate sync.
+  If its stream or sport-owned snapshot fails normalization, hydration quarantines the game and
+  exposes recovery diagnostics; it never silently reclassifies the game as legacy.
 - Projection diagnostics fail closed. Incomplete streams cannot present authoritative totals or
   pass release gates.
 

@@ -24,7 +24,7 @@ must remain unchanged.
 |---|---|---|
 | BKE-1B1 | Immutable rules/setup, participant identity, sport-state normalization, and lifecycle events/projection | Basketball setup and lifecycle histories normalize, rebuild, fingerprint, and park without entering the live runtime registry |
 | BKE-1B2 | Shooting, scoring, assists, rebounds, steals, blocks, turnovers, links, and stat projection | Court and box-score fixture events deterministically rebuild score, player totals, and shot records |
-| BKE-1B3 | Fouls, ejections, timeouts, minutes, complete parity fixtures, and runtime registration | The complete catalog passes parity/integration tests and Basketball event support is registered behind the internal creation gate |
+| BKE-1B3 | Fouls, ejections, timeouts, minutes, durable event-authority/quarantine marker, complete parity fixtures, and runtime registration | The complete catalog passes parity/integration tests; corrupt event state cannot fall back to aggregate sync; Basketball event support is registered behind the internal creation gate |
 
 The split is an implementation boundary, not a product-model change. BKE-1C remains the first
 court-command and live capture cutover.
@@ -67,11 +67,18 @@ court-command and live capture cutover.
   snapshotted template and are appended only when their period starts.
 - Capture preferences are resume-only state and remain outside fingerprints and projection.
 - Basketball can simultaneously support legacy aggregate games and recognized event-owned setup.
-  Aggregate sync remains eligible only when both `eventStream` and `sportGameState` are null.
+  During BKE-1B1/BKE-1B2 fixtures, aggregate sync remains eligible only when both `eventStream` and
+  `sportGameState` are null. Before BKE-1B3 registers the runtime, add a durable top-level
+  `gameDataAuthority: 'sport_events'` marker that is normalized independently of those fields.
+- Existing unmarked Basketball games remain legacy. A marked event game whose stream or setup
+  fails normalization is quarantined with recovery diagnostics and remains ineligible for aggregate
+  sync; corruption never silently changes its authority model.
 
 ## 5. Lifecycle Contract
 
 - The initial projection is `not_started` and contains the setup participant registry.
+- All six lifecycle families are side-less administrative facts and therefore require
+  `teamSide: 'neutral'`; tracked/opponent variants are invalid.
 - A period can start once, only after the previous started period has ended. Its payload period id
   and envelope period must agree.
 - A started period can end once and must be the current period.
@@ -95,6 +102,7 @@ court-command and live capture cutover.
 - Lifecycle fixtures cover regulation, dynamic overtime, late tracked/opponent participants,
   identity resolution, completion, suspension/abandonment, reopen, duplicate sequences, and invalid
   transitions.
+- Lifecycle definitions explicitly opt into neutral and reject tracked/opponent sides.
 - Fingerprints include immutable Basketball setup but exclude projection and capture preferences.
 - Park/import/hydration round trips recognize valid Basketball state and reject malformed state.
 - Existing Soccer, aggregate Basketball, full unit, lint, and production-build checks remain green.
@@ -104,5 +112,6 @@ court-command and live capture cutover.
 1. Merge BKE-1B1 with no global Basketball event runtime registration.
 2. Re-audit the frozen lifecycle types and write the focused BKE-1B2 implementation map.
 3. Merge BKE-1B2 using a private Basketball fixture registry/projector.
-4. Complete BKE-1B3 administrative projection, parity fixtures, and global internal registration.
+4. Complete BKE-1B3 administrative projection and parity fixtures; add the durable event-authority
+   marker plus corrupt-state quarantine before global internal registration.
 5. Keep normal game creation on the aggregate path and proceed to BKE-1C court capture.
