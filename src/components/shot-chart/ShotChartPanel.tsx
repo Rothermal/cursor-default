@@ -23,6 +23,12 @@ import {
   captureBasketballCourtEvent,
   hasStartedBasketballEventGame,
 } from '../../lib/basketball/commands'
+import {
+  basketballCourtCaptureUnits,
+  clearBasketballShotChart,
+  previewBasketballClearShotChart,
+  undoLatestBasketballCourtCapture,
+} from '../../lib/basketball/courtCorrections'
 
 function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
@@ -85,8 +91,17 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)
   const [captureError, setCaptureError] = useState<string | null>(null)
+  const [correctionError, setCorrectionError] = useState<string | null>(null)
   const pendingPulseIdRef = useRef<string | null>(null)
   const isEventBasketball = hasStartedBasketballEventGame(state)
+  const eventCaptureUnits = useMemo(
+    () => isEventBasketball ? basketballCourtCaptureUnits(state) : [],
+    [isEventBasketball, state]
+  )
+  const clearPreview = useMemo(
+    () => isEventBasketball ? previewBasketballClearShotChart(state) : null,
+    [isEventBasketball, state]
+  )
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
   const persistedCapturePlayerId = isEventBasketball
@@ -176,6 +191,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         const shotId = event.kind === 'shot' ? result.eventIds[0] : null
         pendingPulseIdRef.current = shotId
         setCaptureError(null)
+        setCorrectionError(null)
         setPendingTap(null)
         dispatch({ type: 'HYDRATE_STATE', state: result.state })
         return
@@ -244,6 +260,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
     [lastEntry, players]
   )
   const canClearShots = shotChart.length > 0
+  const canUndoEventShot = Boolean(eventCaptureUnits[0]?.containsLocatedFieldGoal)
 
   // What the court + zone summary display (F2); recording is unaffected by the filter.
   const visibleShots = useMemo(
@@ -253,7 +270,27 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
 
   const handleClearChartConfirm = () => {
     setShowClearConfirm(false)
+    if (isEventBasketball) {
+      const result = clearBasketballShotChart(state)
+      if (!result.ok) {
+        setCorrectionError(result.message)
+        return
+      }
+      setCorrectionError(null)
+      dispatch({ type: 'HYDRATE_STATE', state: result.state })
+      return
+    }
     dispatch({ type: 'CLEAR_SHOT_CHART' })
+  }
+
+  const handleEventShotUndo = () => {
+    const result = undoLatestBasketballCourtCapture(state, new Date().toISOString(), true)
+    if (!result.ok) {
+      setCorrectionError(result.message)
+      return
+    }
+    setCorrectionError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
   return (
@@ -279,6 +316,12 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
       </div>
 
+      {correctionError && (
+        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+          {correctionError}
+        </p>
+      )}
+
       {!isEventBasketball && <button
         type="button"
         disabled={!canUndoShot}
@@ -288,12 +331,31 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       >
         ↩ Undo last shot
       </button>}
+      {isEventBasketball && <button
+        type="button"
+        disabled={!canUndoEventShot}
+        onClick={handleEventShotUndo}
+        className="w-full py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white text-slate-800
+                   disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
+        title={canUndoEventShot ? 'Undo the newest court capture' : 'A newer non-shot capture must be undone first'}
+      >
+        ↩ Undo last shot
+      </button>}
       {!isEventBasketball && undoShotSubtitle && (
         <p className="text-center text-xs text-slate-500 -mt-1">{undoShotSubtitle}</p>
       )}
       {!isEventBasketball && <button
         type="button"
         disabled={!canClearShots}
+        onClick={() => setShowClearConfirm(true)}
+        className="w-full py-2 rounded-xl text-sm font-medium border border-rose-200 bg-rose-50 text-rose-800
+                   disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
+      >
+        Clear all chart shots
+      </button>}
+      {isEventBasketball && <button
+        type="button"
+        disabled={!clearPreview || clearPreview.shotCount === 0}
         onClick={() => setShowClearConfirm(true)}
         className="w-full py-2 rounded-xl text-sm font-medium border border-rose-200 bg-rose-50 text-rose-800
                    disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
@@ -340,16 +402,18 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
         />
       )}
 
-      {!isEventBasketball && <ConfirmDialog
+      <ConfirmDialog
         open={showClearConfirm}
         title="Clear all chart shots?"
-        message="Remove every shot from the chart and undo their scoring stats? Linked assists and rebound prompts are cleared too. Other stat taps are not changed."
+        message={isEventBasketball && clearPreview
+          ? `Remove ${clearPreview.shotCount} shot${clearPreview.shotCount === 1 ? '' : 's'}, ${clearPreview.linkedAssistCount} linked assist${clearPreview.linkedAssistCount === 1 ? '' : 's'}, and ${clearPreview.linkedReboundCount} linked rebound${clearPreview.linkedReboundCount === 1 ? '' : 's'}? ${clearPreview.unlinkedBlockCount} linked block${clearPreview.unlinkedBlockCount === 1 ? '' : 's'} will keep its stat and lose only the shot link.`
+          : 'Remove every shot from the chart and undo their scoring stats? Linked assists and rebound prompts are cleared too. Other stat taps are not changed.'}
         confirmLabel="Clear shots"
         cancelLabel="Cancel"
         destructive
         onConfirm={handleClearChartConfirm}
         onCancel={() => setShowClearConfirm(false)}
-      />}
+      />
     </div>
   )
 }

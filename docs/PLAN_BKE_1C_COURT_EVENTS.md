@@ -3,8 +3,8 @@
 Detailed plan for moving the existing Basketball court workflow onto the authoritative event
 foundation while keeping normal Basketball games on the legacy aggregate path.
 
-Status: In progress. Product and delivery decisions were confirmed in the BKE-1C Q&A. BKE-1C1 and
-BKE-1C2 are implemented; BKE-1C3 grouped corrections and parity proof are next.
+Status: Complete. Product and delivery decisions were confirmed in the BKE-1C Q&A, and BKE-1C1
+through BKE-1C3 are implemented. BKE-2 direct live actions are next.
 
 Depends on:
 
@@ -28,9 +28,9 @@ period controls, cloud sync, Summary, and user-visible event-game creation remai
 |---|---|---|
 | BKE-1C1 | Checked Basketball court command foundation, development-only local creation intent, setup/participant snapshot, atomic match start, and fixture helpers | **Implemented:** a local internal game becomes event-authoritative before aggregate sync can start, initializes one coherent Period 1 history, and rejects every partial/invalid transition |
 | BKE-1C2 | Court/popup integration, all popup event outputs, participant/team actor mapping, per-shot value override, capture preferences, projected filters, and event-mode tracker shell | **Implemented:** existing court capture gestures round-trip through events with inline failure handling while legacy Basketball UI remains unchanged |
-| BKE-1C3 | Capture-unit Recent Events, one-level undo/restore, court Undo, Clear Shot Chart dependency mutations, persisted inverse receipt, and complete parity/regression proof | Grouped corrections are atomic and reload-safe; chart clearing preserves every excluded event exactly and the BKE-1 program exits |
+| BKE-1C3 | Capture-unit Recent Events, one-level undo/restore, court Undo, Clear Shot Chart dependency mutations, persisted inverse receipt, and complete parity/regression proof | **Implemented:** grouped corrections are atomic and reload-safe; chart clearing preserves every excluded event exactly and the BKE-1 program exits |
 
-Each slice uses its own feature branch and PR. BKE-1C3 is next.
+Each slice used its own feature branch and PR. All BKE-1C slices are complete.
 
 ## 3. Guardrails
 
@@ -233,6 +233,24 @@ match the legacy limitation.
   byte-identically.
 - Confirmation reports exact counts for shots, linked assists/rebounds, and unlinked blocks before
   applying. Successful clear produces one restoreable correction receipt, not a synthetic event.
+
+### 6.5 Implementation
+
+- `courtCorrections.ts` derives newest-first court capture units from validated active Basketball
+  events. Shared command ids form one row; null command ids remain independent rows; lifecycle
+  events cannot enter the correction surface.
+- Recent Events renders grouped event labels and permits only the newest active unit to undo. The
+  court Undo delegates to the same command and is enabled only when that newest unit contains a
+  located field goal, so it never skips a newer standalone fact.
+- Undo atomically tombstones every active unit member. Clear Chart atomically tombstones every
+  located field goal plus linked assists/rebounds and updates linked blocks to a null relation while
+  preserving their totals.
+- `lastCourtUndo` stores exact post-mutation revisions, restorable event ids, and prior block links.
+  Normalization treats the optional receipt as fail-soft, park/reload preserves valid receipts, and
+  restore requires every stored revision and state to still match before applying one atomic batch.
+- New capture and unrelated reducer event mutations clear the one-level receipt. Capture
+  preferences remain outside fingerprints, and legacy Basketball continues using `actionLog` and
+  the existing reducer correction behavior.
 
 ## 7. Verification
 

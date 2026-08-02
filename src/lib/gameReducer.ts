@@ -487,24 +487,28 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'INITIALIZE_EVENT_STREAM':
       return initializeGameEventStream(state, gameEventRegistry, gameEventProjectors).state
 
-    case 'ADD_GAME_EVENT':
-      return addGameEvent(
+    case 'ADD_GAME_EVENT': {
+      const next = addGameEvent(
         state,
         action.event,
         gameEventRegistry,
         gameEventProjectors
       ).state
+      return clearBasketballCourtUndoAfterEventMutation(state, next)
+    }
 
-    case 'ADD_GAME_EVENTS':
-      return addGameEvents(
+    case 'ADD_GAME_EVENTS': {
+      const next = addGameEvents(
         state,
         action.events,
         gameEventRegistry,
         gameEventProjectors
       ).state
+      return clearBasketballCourtUndoAfterEventMutation(state, next)
+    }
 
-    case 'UPDATE_GAME_EVENT':
-      return updateGameEvent(
+    case 'UPDATE_GAME_EVENT': {
+      const next = updateGameEvent(
         state,
         action.eventId,
         action.changes,
@@ -512,27 +516,54 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         gameEventRegistry,
         gameEventProjectors
       ).state
+      return clearBasketballCourtUndoAfterEventMutation(state, next)
+    }
 
-    case 'DELETE_GAME_EVENT':
-      return deleteGameEvent(
+    case 'DELETE_GAME_EVENT': {
+      const next = deleteGameEvent(
         state,
         action.eventId,
         action.now ?? new Date().toISOString(),
         gameEventRegistry,
         gameEventProjectors
       ).state
+      return clearBasketballCourtUndoAfterEventMutation(state, next)
+    }
 
-    case 'RESTORE_GAME_EVENT':
-      return restoreGameEvent(
+    case 'RESTORE_GAME_EVENT': {
+      const next = restoreGameEvent(
         state,
         action.eventId,
         action.now ?? new Date().toISOString(),
         gameEventRegistry,
         gameEventProjectors
       ).state
+      return clearBasketballCourtUndoAfterEventMutation(state, next)
+    }
 
     default:
       return state
+  }
+}
+
+function clearBasketballCourtUndoAfterEventMutation(
+  previous: GameState,
+  next: GameState
+): GameState {
+  if (
+    next === previous ||
+    next.sportGameState?.sportId !== 'basketball' ||
+    next.sportGameState.capturePreferences.lastCourtUndo === null
+  ) return next
+  return {
+    ...next,
+    sportGameState: {
+      ...next.sportGameState,
+      capturePreferences: {
+        ...next.sportGameState.capturePreferences,
+        lastCourtUndo: null,
+      },
+    },
   }
 }
 
