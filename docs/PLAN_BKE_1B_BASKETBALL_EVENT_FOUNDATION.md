@@ -2,7 +2,7 @@
 
 Parent plan for the Basketball setup, event catalog, projector, and parity-fixture program.
 
-Status: Approved and in progress. BKE-1B1 is implemented; BKE-1B2 and BKE-1B3 remain. The split
+Status: Approved and in progress. BKE-1B1 and BKE-1B2 are implemented; BKE-1B3 remains. The split
 gives state, stat-event projection, and administrative parity an independent proof. No active user
 rollout is required while the BKE program is under construction.
 
@@ -23,7 +23,7 @@ must remain unchanged.
 | Phase | Scope | Exit condition |
 |---|---|---|
 | BKE-1B1 | Immutable rules/setup, participant identity, sport-state normalization, and lifecycle events/projection | Basketball setup and lifecycle histories normalize, rebuild, fingerprint, and park without entering the live runtime registry |
-| BKE-1B2 | Shooting, scoring, assists, rebounds, steals, blocks, turnovers, links, and stat projection | Court and box-score fixture events deterministically rebuild score, player totals, and shot records |
+| BKE-1B2 | Shooting, scoring, assists, rebounds, steals, blocks, turnovers, links, and stat projection | **Implemented:** court and box-score fixture events deterministically rebuild score, player/side/team totals, and located shot records |
 | BKE-1B3 | Fouls, ejections, timeouts, minutes, durable event-authority/quarantine marker, complete parity fixtures, and runtime registration | The complete catalog passes parity/integration tests; corrupt event state cannot fall back to aggregate sync; Basketball event support is registered behind the internal creation gate |
 
 The split is an implementation boundary, not a product-model change. BKE-1C remains the first
@@ -107,11 +107,54 @@ court-command and live capture cutover.
 - Park/import/hydration round trips recognize valid Basketball state and reject malformed state.
 - Existing Soccer, aggregate Basketball, full unit, lint, and production-build checks remain green.
 
-## 7. Delivery
+## 7. BKE-1B2 Implementation
+
+### Event families
+
+- `basketball.free_throw_trip` owns optional structured award context without contributing a stat.
+- `basketball.shot` owns field-goal/free-throw makes and misses, score, optional normalized court
+  location, explicit value source, and optional trip position.
+- `basketball.assist`, `basketball.rebound`, `basketball.steal`, and `basketball.block` are independent
+  facts with optional links. Totals never depend on a link.
+- `basketball.turnover` distinguishes player/unknown attribution from explicit team turnovers.
+- `basketball.score_adjustment` is signed, team-attributed, and requires a note for official
+  corrections.
+
+All BKE-1B2 stat families are tracked/opponent events with `elapsedMs: null`. Definitions enforce
+payload shape, actor roles/kinds, shot geometry/value compatibility, grouped free-throw fields,
+score-adjustment reasons, and team-turnover attribution. Effective participant and side identity are
+rechecked during projection.
+
+### Projection
+
+- Participant totals remain keyed by stable `participantId` and map to current local player ids only
+  at the compatibility projection boundary.
+- `sideStats` counts every attributable fact for full side totals. `teamActorStats` separately maps
+  team/unknown facts into the existing home/opponent pseudo-player rows; explicit team turnovers
+  emit `team_turnover` while still contributing to side turnover totals.
+- Made shots plus signed adjustments are the only score authority. Ending a match derives its result
+  from that projected score.
+- Located field goals project to unchanged `ShotRecord` rows. Free throws and unlocated field goals
+  remain authoritative for score/stats but do not fabricate chart coordinates.
+- `src/lib/basketball/courtGeometry.ts` now owns the court constants, zone classifier, and canonical
+  normalized-event-coordinate conversion. The existing component module re-exports it, so live UI
+  and event validation cannot drift.
+- Valid links must point backward to an already projected active event. Missing, tombstoned,
+  future, or semantically stale links produce `relationshipWarnings`, degrade to unlinked facts,
+  preserve totals, and do not make the stream incomplete.
+
+### Still excluded
+
+- Fouls, ejections, timeouts, minutes, bonus/disqualification state, and the durable event-authority
+  marker remain BKE-1B3.
+- Court/stat-grid commands, grouped undo, clear-chart mutations, and UI cutover remain BKE-1C/BKE-2.
+- The production registry/projector remains Soccer-only.
+
+## 8. Delivery
 
 1. Merge BKE-1B1 with no global Basketball event runtime registration.
-2. Re-audit the frozen lifecycle types and write the focused BKE-1B2 implementation map.
-3. Merge BKE-1B2 using a private Basketball fixture registry/projector.
+2. Merge BKE-1B2 stat definitions/projection using a private Basketball fixture registry/projector.
+3. Re-audit the complete BKE-1B1/BKE-1B2 catalog against the BKE-1B3 administrative map.
 4. Complete BKE-1B3 administrative projection and parity fixtures; add the durable event-authority
    marker plus corrupt-state quarantine before global internal registration.
 5. Keep normal game creation on the aggregate path and proceed to BKE-1C court capture.

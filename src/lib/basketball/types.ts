@@ -91,6 +91,34 @@ export interface BasketballProjectedParticipant {
   position: string | null
   captain: boolean
   lateAdded: boolean
+  stats: BasketballStatTotals
+}
+
+export type BasketballStatId =
+  | 'ft'
+  | 'ft_miss'
+  | '2pt'
+  | '2pt_miss'
+  | '3pt'
+  | '3pt_miss'
+  | 'oreb'
+  | 'dreb'
+  | 'ast'
+  | 'stl'
+  | 'blk'
+  | 'to'
+  | 'pf'
+  | 'min'
+
+export type BasketballStatTotals = Record<BasketballStatId, number>
+export type BasketballTeamStatTotals = BasketballStatTotals & {
+  team_turnover: number
+}
+
+export interface BasketballRelationshipWarning {
+  eventId: string
+  relatedEventId: string
+  message: string
 }
 
 export interface BasketballScoreProjection {
@@ -105,7 +133,10 @@ export interface BasketballMatchProjection {
   startedPeriodIds: string[]
   completedPeriodIds: string[]
   participants: Record<string, BasketballProjectedParticipant>
+  sideStats: Record<BasketballTeamSide, BasketballStatTotals>
+  teamActorStats: Record<BasketballTeamSide, BasketballTeamStatTotals>
   score: BasketballScoreProjection
+  relationshipWarnings: BasketballRelationshipWarning[]
   endedAt: string | null
   endReason: BasketballMatchEndReason | null
   result: BasketballMatchResult
@@ -155,6 +186,48 @@ export interface BasketballMatchReopenedPayload extends BasketballCapturePayload
   reason: string | null
 }
 
+export type BasketballShotAttempt = 'field_goal' | 'free_throw'
+export type BasketballShotValueSource =
+  | 'court'
+  | 'manual_override'
+  | 'quick_entry'
+  | 'free_throw'
+
+export interface BasketballFreeThrowTripPayload extends BasketballCapturePayload {
+  maximumAttempts: 1 | 2 | 3
+  oneAndOne: boolean
+  sourceFoulEventId: string | null
+  technical: boolean
+  possessionRetained: boolean
+}
+
+export interface BasketballShotPayload extends BasketballCapturePayload {
+  value: 1 | 2 | 3
+  made: boolean
+  attempt: BasketballShotAttempt
+  valueSource: BasketballShotValueSource
+  freeThrowTripId: string | null
+  tripAttemptNumber: number | null
+}
+
+export interface BasketballRelatedEventPayload extends BasketballCapturePayload {
+  relatedEventId: string | null
+}
+
+export interface BasketballReboundPayload extends BasketballRelatedEventPayload {
+  kind: 'offensive' | 'defensive'
+}
+
+export interface BasketballTurnoverPayload extends BasketballCapturePayload {
+  kind: 'player' | 'team'
+}
+
+export interface BasketballScoreAdjustmentPayload extends BasketballCapturePayload {
+  delta: number
+  reason: 'scoreboard_control' | 'unattributed_score' | 'official_correction'
+  note: string | null
+}
+
 type BasketballLifecycleGameEvent<
   TPayload extends BasketballCapturePayload,
   TEventType extends string,
@@ -192,3 +265,53 @@ export type BasketballLifecycleEvent =
   | BasketballParticipantResolvedEvent
   | BasketballMatchEndedEvent
   | BasketballMatchReopenedEvent
+
+type BasketballStatGameEvent<
+  TPayload extends BasketballCapturePayload,
+  TEventType extends string,
+> = GameEvent<TPayload, TEventType, 'basketball', BasketballTeamSide>
+
+export type BasketballFreeThrowTripEvent = BasketballStatGameEvent<
+  BasketballFreeThrowTripPayload,
+  'basketball.free_throw_trip'
+>
+export type BasketballShotEvent = BasketballStatGameEvent<
+  BasketballShotPayload,
+  'basketball.shot'
+>
+export type BasketballAssistEvent = BasketballStatGameEvent<
+  BasketballRelatedEventPayload,
+  'basketball.assist'
+>
+export type BasketballReboundEvent = BasketballStatGameEvent<
+  BasketballReboundPayload,
+  'basketball.rebound'
+>
+export type BasketballStealEvent = BasketballStatGameEvent<
+  BasketballRelatedEventPayload,
+  'basketball.steal'
+>
+export type BasketballBlockEvent = BasketballStatGameEvent<
+  BasketballRelatedEventPayload,
+  'basketball.block'
+>
+export type BasketballTurnoverEvent = BasketballStatGameEvent<
+  BasketballTurnoverPayload,
+  'basketball.turnover'
+>
+export type BasketballScoreAdjustmentEvent = BasketballStatGameEvent<
+  BasketballScoreAdjustmentPayload,
+  'basketball.score_adjustment'
+>
+
+export type BasketballStatEvent =
+  | BasketballFreeThrowTripEvent
+  | BasketballShotEvent
+  | BasketballAssistEvent
+  | BasketballReboundEvent
+  | BasketballStealEvent
+  | BasketballBlockEvent
+  | BasketballTurnoverEvent
+  | BasketballScoreAdjustmentEvent
+
+export type BasketballMatchEvent = BasketballLifecycleEvent | BasketballStatEvent

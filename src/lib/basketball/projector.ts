@@ -7,24 +7,34 @@ import type {
   SportGameEventProjector,
 } from '../gameEvents/types'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
+import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import { resolveBasketballPeriodSegment } from './rules'
+import {
+  applyBasketballStatEvent,
+  createBasketballStatProjectionContext,
+  registerProjectedBasketballEvent,
+} from './statProjection'
 import {
   createBasketballMatchProjection,
   projectedBasketballParticipant,
 } from './state'
 import type {
   BasketballLifecycleEvent,
+  BasketballMatchEvent,
   BasketballMatchProjection,
+  BasketballStatEvent,
   BasketballSportGameState,
 } from './types'
 
-export const basketballLifecycleProjector: SportGameEventProjector<GameEvent> = {
+export const basketballGameEventProjector: SportGameEventProjector<GameEvent> = {
   sportId: 'basketball',
   requiresSportGameState: true,
-  project: projectBasketballLifecycleEvents,
+  project: projectBasketballEvents,
 }
 
-export function projectBasketballLifecycleEvents(
+export const basketballLifecycleProjector = basketballGameEventProjector
+
+export function projectBasketballEvents(
   state: GameState,
   events: GameEvent[]
 ): SportGameEventProjectionResult {
@@ -37,11 +47,12 @@ export function projectBasketballLifecycleEvents(
   }
 
   const basketballEvents = [...events]
-    .filter((event): event is BasketballLifecycleEvent => event.sportId === 'basketball')
+    .filter((event): event is BasketballMatchEvent => event.sportId === 'basketball')
     .sort(compareGameEventCaptureOrder)
   let projection = createBasketballMatchProjection(sportState.setup)
+  const statContext = createBasketballStatProjectionContext()
   const seenSequences = new Set<string>()
-  let failedEvent: BasketballLifecycleEvent | null = null
+  let failedEvent: BasketballMatchEvent | null = null
   let failureMessage: string | null = null
 
   for (const event of basketballEvents) {
@@ -54,13 +65,16 @@ export function projectBasketballLifecycleEvents(
     seenSequences.add(sequenceKey)
 
     const next = structuredClone(projection)
-    const error = applyLifecycleEvent(next, sportState, event)
+    const error = isBasketballStatEvent(event)
+      ? applyBasketballStatEvent(next, event, statContext)
+      : applyLifecycleEvent(next, sportState, event)
     if (error) {
       failedEvent = event
       failureMessage = error
       break
     }
     projection = next
+    registerProjectedBasketballEvent(statContext, event)
   }
 
   const diagnostics: GameEventDiagnostic[] = []
@@ -82,7 +96,23 @@ export function projectBasketballLifecycleEvents(
   }
 
   const nextSportState: BasketballSportGameState = { ...sportState, projection }
-  return { projection: buildProjection(state, nextSportState), diagnostics }
+  return {
+    projection: buildProjection(state, nextSportState, statContext.shotChart),
+    diagnostics,
+  }
+}
+
+function isBasketballStatEvent(event: BasketballMatchEvent): event is BasketballStatEvent {
+  return [
+    'basketball.free_throw_trip',
+    'basketball.shot',
+    'basketball.assist',
+    'basketball.rebound',
+    'basketball.steal',
+    'basketball.block',
+    'basketball.turnover',
+    'basketball.score_adjustment',
+  ].includes(event.eventType)
 }
 
 function applyLifecycleEvent(
@@ -281,13 +311,31 @@ function resultForEnd(
 
 function buildProjection(
   state: GameState,
-  sportGameState: BasketballSportGameState
+  sportGameState: BasketballSportGameState,
+  shotChart: GameEventProjection['shotChart']
 ): GameEventProjection {
+  const playerStatsById: Record<string, Record<string, number>> = Object.fromEntries(
+    state.players.map(player => [player.id, {}])
+  )
+  for (const participant of Object.values(sportGameState.projection.participants)) {
+    if (!participant.playerId || !playerStatsById[participant.playerId]) continue
+    playerStatsById[participant.playerId] = structuredClone(participant.stats)
+  }
+  if (playerStatsById[TEAM_PLAYER_HOME_ID]) {
+    playerStatsById[TEAM_PLAYER_HOME_ID] = structuredClone(
+      sportGameState.projection.teamActorStats.tracked
+    )
+  }
+  if (playerStatsById[TEAM_PLAYER_OPP_ID]) {
+    playerStatsById[TEAM_PLAYER_OPP_ID] = structuredClone(
+      sportGameState.projection.teamActorStats.opponent
+    )
+  }
   return {
-    playerStatsById: Object.fromEntries(state.players.map(player => [player.id, {}])),
+    playerStatsById,
     opponentScore: sportGameState.projection.score.opponent,
     homeTeamScore: sportGameState.projection.score.tracked,
-    shotChart: [],
+    shotChart,
     sportGameState,
   }
 }

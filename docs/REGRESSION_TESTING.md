@@ -640,6 +640,24 @@ proofs; ordinary Basketball games must remain on the existing aggregate path.
 
 ---
 
+## 11a2. Basketball stat-event projection (BKE-1B2)
+
+**Precondition:** Basketball event games remain private fixtures; production registration is still
+closed until BKE-1B3.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a2.1 | Replay located/unlocated 2PT/3PT and grouped/ungrouped free throws for tracked and opponent sides | Score and make/miss totals rebuild; only located field goals produce unchanged `ShotRecord` rows |
+| 11a2.2 | Record linked/unlinked assists, offensive/defensive rebounds, steals, blocks, player turnovers, and team turnovers | Participant, side, and explicit pseudo-player totals match actor/side semantics; links never control whether a stat counts |
+| 11a2.3 | Record signed scoreboard/unattributed adjustments and an official correction | Signed deltas affect only the selected side; an official correction without a non-empty note is rejected |
+| 11a2.4 | Record a located geometry-derived shot with a mismatched value, then an explicit manual override | The first event is rejected; the override is accepted, retains its chosen value, and derives zone from the actual coordinates |
+| 11a2.5 | Link to a missing/tombstoned/future/wrong-side/wrong-outcome event or duplicate a free-throw attempt position | The independent fact and total survive; a relationship warning is projected; authoritative stream completeness is unchanged |
+| 11a2.6 | Attribute a player event to a missing participant, mismatched resolved player, or wrong side | Projection stops at the offending event, preserves later rows as unprojected diagnostics, and cannot be authoritative |
+| 11a2.7 | Replay the approved reducer-equivalence fixture without score adjustments | Player/team totals, displayed score, and located shot rows match the legacy reducer |
+| 11a2.8 | Inspect `gameEvents/runtime.ts` and run an ordinary Basketball game | Production remains Soccer-only; aggregate Basketball behavior is unchanged |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production
