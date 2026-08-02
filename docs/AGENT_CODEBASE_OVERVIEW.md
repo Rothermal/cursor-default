@@ -140,9 +140,12 @@ last coherent event, and expose diagnostics.
 BKE-1B1 adds `src/lib/basketball/` with immutable Basketball rules/setup, side-bearing participants,
 defensive normalization, six neutral lifecycle definitions, and a pure lifecycle projector. Soccer
 and Basketball projection rebuilds share capture-order semantics while display readers retain clock
-ordering. Basketball setup is recognized for parking and fingerprints, but its event definitions
-and projector remain out of the production runtime registry until BKE-1B3 completes the catalog,
-adds a durable event-authority marker with corrupt-state quarantine, and passes the parity suite.
+ordering. BKE-1B2 adds the private shooting/free-throw/playmaking/defense/turnover/score-adjustment
+catalog; deterministic participant, side, explicit team-actor, score, advisory-link, and located
+shot projections; and one shared Basketball court-geometry/coordinate module. Basketball setup is
+recognized for parking and fingerprints, but its event definitions and projector remain out of the
+production runtime registry until BKE-1B3 completes administration, adds a durable event-authority
+marker with corrupt-state quarantine, and passes the full parity suite.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;

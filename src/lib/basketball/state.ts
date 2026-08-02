@@ -10,6 +10,8 @@ import type {
   BasketballMatchSetup,
   BasketballProjectedParticipant,
   BasketballSportGameState,
+  BasketballStatTotals,
+  BasketballTeamStatTotals,
 } from './types'
 import { BASKETBALL_GAME_STATE_VERSION } from './types'
 
@@ -25,7 +27,16 @@ export function createBasketballMatchProjection(
     participants: Object.fromEntries(
       setup.participants.map(participant => [participant.id, projectedParticipant(participant, false)])
     ),
+    sideStats: {
+      tracked: emptyBasketballStatTotals(),
+      opponent: emptyBasketballStatTotals(),
+    },
+    teamActorStats: {
+      tracked: emptyBasketballTeamStatTotals(),
+      opponent: emptyBasketballTeamStatTotals(),
+    },
     score: { tracked: 0, opponent: 0 },
+    relationshipWarnings: [],
     endedAt: null,
     endReason: null,
     result: 'unresolved',
@@ -130,6 +141,32 @@ export function defaultBasketballCapturePreferences(): BasketballCapturePreferen
   }
 }
 
+export function emptyBasketballStatTotals(): BasketballStatTotals {
+  return {
+    ft: 0,
+    ft_miss: 0,
+    '2pt': 0,
+    '2pt_miss': 0,
+    '3pt': 0,
+    '3pt_miss': 0,
+    oreb: 0,
+    dreb: 0,
+    ast: 0,
+    stl: 0,
+    blk: 0,
+    to: 0,
+    pf: 0,
+    min: 0,
+  }
+}
+
+export function emptyBasketballTeamStatTotals(): BasketballTeamStatTotals {
+  return {
+    ...emptyBasketballStatTotals(),
+    team_turnover: 0,
+  }
+}
+
 export function projectedBasketballParticipant(
   participant: BasketballMatchParticipant,
   lateAdded: boolean
@@ -166,6 +203,7 @@ function projectedParticipant(
     position: participant.position,
     captain: participant.captain,
     lateAdded,
+    stats: emptyBasketballStatTotals(),
   }
 }
 
