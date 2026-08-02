@@ -9,6 +9,7 @@ import type {
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import { resolveBasketballPeriodSegment } from './rules'
+import { applyBasketballAdministrativeEvent } from './administrativeProjection'
 import {
   applyBasketballStatEvent,
   createBasketballStatProjectionContext,
@@ -20,6 +21,7 @@ import {
 } from './state'
 import type {
   BasketballLifecycleEvent,
+  BasketballAdministrativeEvent,
   BasketballMatchEvent,
   BasketballMatchProjection,
   BasketballStatEvent,
@@ -65,9 +67,16 @@ export function projectBasketballEvents(
     seenSequences.add(sequenceKey)
 
     const next = structuredClone(projection)
-    const error = isBasketballStatEvent(event)
-      ? applyBasketballStatEvent(next, event, statContext)
-      : applyLifecycleEvent(next, sportState, event)
+    const error = isBasketballAdministrativeEvent(event)
+      ? applyBasketballAdministrativeEvent(
+          next,
+          event,
+          statContext,
+          sportState.setup.rulesSnapshot
+        )
+      : isBasketballStatEvent(event)
+        ? applyBasketballStatEvent(next, event, statContext)
+        : applyLifecycleEvent(next, sportState, event)
     if (error) {
       failedEvent = event
       failureMessage = error
@@ -100,6 +109,17 @@ export function projectBasketballEvents(
     projection: buildProjection(state, nextSportState, statContext.shotChart),
     diagnostics,
   }
+}
+
+function isBasketballAdministrativeEvent(
+  event: BasketballMatchEvent
+): event is BasketballAdministrativeEvent {
+  return [
+    'basketball.foul',
+    'basketball.ejection',
+    'basketball.timeout',
+    'basketball.minutes_adjustment',
+  ].includes(event.eventType)
 }
 
 function isBasketballStatEvent(event: BasketballMatchEvent): event is BasketballStatEvent {
@@ -336,8 +356,14 @@ function buildProjection(
     opponentScore: sportGameState.projection.score.opponent,
     homeTeamScore: sportGameState.projection.score.tracked,
     shotChart,
+    currentPeriod: currentBasketballPeriodOrder(sportGameState),
     sportGameState,
   }
+}
+
+function currentBasketballPeriodOrder(sportGameState: BasketballSportGameState): number {
+  const currentId = sportGameState.projection.currentPeriodId
+  return sportGameState.projection.periods.find(period => period.id === currentId)?.order ?? 1
 }
 
 function emptyProjection(

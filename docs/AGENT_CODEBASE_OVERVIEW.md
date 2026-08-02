@@ -137,15 +137,15 @@ projector rules in `src/lib/soccer/`. Soccer's concrete state holds its immutabl
 and rebuildable runtime projection. Semantic failures preserve raw events, project through the
 last coherent event, and expose diagnostics.
 
-BKE-1B1 adds `src/lib/basketball/` with immutable Basketball rules/setup, side-bearing participants,
-defensive normalization, six neutral lifecycle definitions, and a pure lifecycle projector. Soccer
-and Basketball projection rebuilds share capture-order semantics while display readers retain clock
-ordering. BKE-1B2 adds the private shooting/free-throw/playmaking/defense/turnover/score-adjustment
-catalog; deterministic participant, side, explicit team-actor, score, advisory-link, and located
-shot projections; and one shared Basketball court-geometry/coordinate module. Basketball setup is
-recognized for parking and fingerprints, but its event definitions and projector remain out of the
-production runtime registry until BKE-1B3 completes administration, adds a durable event-authority
-marker with corrupt-state quarantine, and passes the full parity suite.
+BKE-1B adds `src/lib/basketball/` with immutable Basketball rules/setup, side-bearing participants,
+strict lifecycle/stat/administrative definitions, and deterministic projection. The catalog covers
+shooting, free throws, playmaking, defense, turnovers, score adjustments, fouls, ejections, charged
+and neutral timeouts, and manual minutes; projection also derives period team fouls, bonus,
+disqualification, team technicals, and located shots. Soccer and Basketball projection rebuilds
+share capture-order semantics while display readers retain clock ordering. Basketball is registered
+in the internal event runtime, but normal Basketball game creation remains aggregate-only until
+BKE-1C. Event initialization stamps `gameDataAuthority: 'sport_events'`; a marked game whose event
+stream or sport setup is malformed is quarantined and cannot silently fall back to aggregate sync.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -377,7 +377,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md`](PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md) | Basketball migration onto the shared event model. Product decisions are approved; BKE-1A and BKE-1B1 are implemented, BKE-1B is split into 1B1-1B3, and the production Basketball runtime gate remains closed until 1B3 |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md`](PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md) | Basketball migration onto the shared event model. BKE-1A and all BKE-1B slices are implemented; definitions/projector are internally registered behind the aggregate-only creation boundary, and BKE-1C court capture is next |
 
 ### Held / waiting for feedback
 

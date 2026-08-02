@@ -12,6 +12,7 @@ import {
   PENDING_SYNC_KEY,
 } from './gameStorageKeys'
 import { normalizeGameEventStream } from './gameEvents/stream'
+import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
 
 const MANIFEST_VERSION = 1
@@ -240,6 +241,7 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
 function normalizePersistedGameState(state: GameState): GameState {
   return {
     ...state,
+    gameDataAuthority: normalizeGameDataAuthority(state.gameDataAuthority),
     eventStream: normalizeGameEventStream(state.eventStream),
     sportGameState: normalizeSportGameState(state.sportGameState),
   }
@@ -343,6 +345,7 @@ function hasPersistableGameState(state: GameState): boolean {
       state.players.length > 0 ||
       state.actionLog.length > 0 ||
       state.shotChart.length > 0 ||
+      state.gameDataAuthority === SPORT_EVENTS_AUTHORITY ||
       state.eventStream !== null ||
       state.sportGameState !== null ||
       state.cloudSync.gameId
@@ -876,6 +879,7 @@ function isImportableGameState(value: unknown): value is GameState {
   if (!isPlainObject(value)) return false
   const sport = value.sport
   const cloudSync = value.cloudSync
+  const authority = normalizeGameDataAuthority(value.gameDataAuthority)
   return (
     isPlainObject(sport) &&
     typeof sport.id === 'string' &&
@@ -883,14 +887,16 @@ function isImportableGameState(value: unknown): value is GameState {
     Array.isArray(value.players) &&
     Array.isArray(value.actionLog) &&
     Array.isArray(value.shotChart) &&
-    (value.eventStream === undefined ||
+    (authority === SPORT_EVENTS_AUTHORITY ||
+      value.eventStream === undefined ||
       value.eventStream === null ||
       (isPlainObject(value.eventStream) &&
         typeof value.eventStream.version === 'number' &&
         Number.isInteger(value.eventStream.version) &&
         value.eventStream.version >= 1 &&
         Array.isArray(value.eventStream.events))) &&
-    (value.sportGameState === undefined ||
+    (authority === SPORT_EVENTS_AUTHORITY ||
+      value.sportGameState === undefined ||
       value.sportGameState === null ||
       normalizeSportGameState(value.sportGameState) !== null) &&
     isPlainObject(cloudSync)

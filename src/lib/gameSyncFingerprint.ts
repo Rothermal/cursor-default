@@ -2,6 +2,7 @@ import type { GameState } from '../types'
 import { canonicalGameEventStreamForFingerprint } from './gameEvents/stream'
 import { sportSupportsLegacyAggregateCloudSync } from './sportGameState/capabilities'
 import { sportGameStateForFingerprint } from './sportGameState/state'
+import { SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 
 /**
  * Canonical snapshot of game fields that are uploaded on cloud sync (excludes sync metadata).
@@ -9,6 +10,7 @@ import { sportGameStateForFingerprint } from './sportGameState/state'
  */
 export function buildGameSyncFingerprint(state: GameState): string {
   return JSON.stringify({
+    gameDataAuthority: state.gameDataAuthority ?? null,
     sportId: state.sport?.id ?? null,
     gameInfo: state.gameInfo,
     opponentScore: state.opponentScore,
@@ -33,6 +35,7 @@ export function buildGameSyncFingerprint(state: GameState): string {
 export function isAggregateCloudSyncEligible(state: GameState): boolean {
   return (
     Boolean(state.sport && sportSupportsLegacyAggregateCloudSync(state.sport.id)) &&
+    state.gameDataAuthority !== SPORT_EVENTS_AUTHORITY &&
     state.eventStream === null &&
     state.sportGameState === null
   )

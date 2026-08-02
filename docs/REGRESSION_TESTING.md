@@ -636,14 +636,14 @@ proofs; ordinary Basketball games must remain on the existing aggregate path.
 | 11a1.5 | End as suspended, then append a reasoned reopen | Status returns to the latest period state; end reason/result clear and existing events remain byte-identical |
 | 11a1.6 | Change only Basketball projection/capture preferences, then change immutable setup | Runtime-only changes leave the fingerprint unchanged; setup changes alter it |
 | 11a1.7 | Park and resume recognized Basketball setup with falsified persisted projection | Setup and preferences survive; projection returns to the clean event-derived baseline |
-| 11a1.8 | Inspect the production event registries and start a normal Basketball game | No Basketball projector is registered before BKE-1B3; normal games continue using aggregate tracking/sync |
+| 11a1.8 | Inspect the production event registries and start a normal Basketball game | Basketball is registered internally after BKE-1B3, but normal games continue using aggregate tracking/sync until BKE-1C |
 
 ---
 
 ## 11a2. Basketball stat-event projection (BKE-1B2)
 
-**Precondition:** Basketball event games remain private fixtures; production registration is still
-closed until BKE-1B3.
+**Precondition:** Basketball event games remain internal fixtures; ordinary game creation stays on
+the aggregate path until BKE-1C.
 
 | Step | Action | Expected |
 |------|--------|----------|
@@ -654,7 +654,25 @@ closed until BKE-1B3.
 | 11a2.5 | Link to a missing/tombstoned/future/wrong-side/wrong-outcome event or duplicate a free-throw attempt position | The independent fact and total survive; a relationship warning is projected; authoritative stream completeness is unchanged |
 | 11a2.6 | Attribute a player event to a missing participant, mismatched resolved player, or wrong side | Projection stops at the offending event, preserves later rows as unprojected diagnostics, and cannot be authoritative |
 | 11a2.7 | Replay the approved reducer-equivalence fixture without score adjustments | Player/team totals, displayed score, and located shot rows match the legacy reducer |
-| 11a2.8 | Inspect `gameEvents/runtime.ts` and run an ordinary Basketball game | Production remains Soccer-only; aggregate Basketball behavior is unchanged |
+| 11a2.8 | Inspect `gameEvents/runtime.ts` and run an ordinary Basketball game | Basketball definitions/projector are registered internally; aggregate Basketball behavior is unchanged because creation does not initialize event state |
+
+---
+
+## 11a3. Basketball administration and authority (BKE-1B3)
+
+**Precondition:** Ordinary Basketball game creation remains aggregate-only. Use library fixtures for
+event-authoritative Basketball checks.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a3.1 | Replay player, staff, and team fouls across two periods | Personal/team/technical totals and per-period team fouls derive from events; explicit counting overrides replace default semantics |
+| 11a3.2 | Cross the snapshotted team-foul and personal-foul thresholds | Bonus state changes at the configured thresholds and the player becomes disqualified at the configured limit |
+| 11a3.3 | Record charged full/30-second and neutral media/official timeouts | Charged usage belongs to the selected side and period; neutral stoppages never fabricate side ownership |
+| 11a3.4 | Apply positive and negative manual-minute adjustments | No-clock games sum signed adjustments; a negative projected total fails closed; anchored-clock rules ignore manual adjustments |
+| 11a3.5 | Eject a player or staff member, including an advisory link to a stale foul | Player/staff ejection state derives correctly; stale links emit relationship warnings without discarding the independent fact |
+| 11a3.6 | Initialize or mutate a Basketball event fixture | `gameDataAuthority` is stamped `sport_events`, included in fingerprints, and preserved across parking/import |
+| 11a3.7 | Remove or corrupt the stream/setup of a marked fixture, then attempt aggregate writes/sync | Recovery diagnostics identify missing authoritative data; reducer writes and aggregate cloud sync fail closed |
+| 11a3.8 | Create and track an ordinary Basketball game | It remains unmarked and uses the unchanged aggregate reducer/sync path until BKE-1C |
 
 ---
 

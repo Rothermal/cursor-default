@@ -35,6 +35,7 @@ export function createBasketballMatchRules(
       label: config.overtimeLabel,
       durationMs: 4 * MINUTE_MS,
     },
+    personalFoulLimit: 5,
     clockModel: 'none',
   }
   const error = validateBasketballMatchRules(rules)
@@ -107,6 +108,9 @@ export function validateBasketballMatchRules(value: unknown): string | null {
   }
   if (!isNullableNonNegativeInteger(value.timeoutsPerOvertime)) {
     return 'Overtime timeout inventory is invalid.'
+  }
+  if (!isPositiveInteger(value.personalFoulLimit)) {
+    return 'Personal foul limit must be positive.'
   }
   if (value.clockModel !== 'none' && value.clockModel !== 'anchored') {
     return 'Basketball clock model is invalid.'

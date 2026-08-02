@@ -1,5 +1,6 @@
 import type { GameState } from '../../types'
 import type { GameEventRegistry } from './registry'
+import { authoritativeGameDataDiagnostics } from './authority'
 import { inspectGameEventStream } from './stream'
 import type {
   GameEvent,
@@ -38,6 +39,23 @@ export function rebuildGameEventProjection<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): ProjectionRebuildResult<TEvent> {
+  const sportId = state.sport?.id
+  const projector = sportId ? projectors.get(sportId) : undefined
+  const authorityDiagnostics = authoritativeGameDataDiagnostics(
+    state,
+    projector?.requiresSportGameState === true
+  )
+  if (authorityDiagnostics.length > 0) {
+    return {
+      state,
+      inspection: {
+        complete: false,
+        activeEvents: [],
+        deletedEvents: [],
+        diagnostics: authorityDiagnostics,
+      },
+    }
+  }
   if (!state.eventStream) {
     return {
       state,
@@ -46,8 +64,6 @@ export function rebuildGameEventProjection<TEvent extends GameEvent>(
   }
 
   const inspection = inspectGameEventStream(state.eventStream, registry)
-  const sportId = state.sport?.id
-  const projector = sportId ? projectors.get(sportId) : undefined
   if (!projector) {
     return {
       state,
@@ -90,6 +106,7 @@ export function rebuildGameEventProjection<TEvent extends GameEvent>(
       homeTeamScore: projection.homeTeamScore,
       homeScoreAdjustment: 0,
       shotChart: projection.shotChart,
+      currentPeriod: projection.currentPeriod ?? state.currentPeriod,
       sportGameState:
         projection.sportGameState === undefined
           ? state.sportGameState

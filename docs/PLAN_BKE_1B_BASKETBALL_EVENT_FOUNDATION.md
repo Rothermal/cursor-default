@@ -2,9 +2,9 @@
 
 Parent plan for the Basketball setup, event catalog, projector, and parity-fixture program.
 
-Status: Approved and in progress. BKE-1B1 and BKE-1B2 are implemented; BKE-1B3 remains. The split
-gives state, stat-event projection, and administrative parity an independent proof. No active user
-rollout is required while the BKE program is under construction.
+Status: Complete. BKE-1B1, BKE-1B2, and BKE-1B3 are implemented. The split gives state,
+stat-event projection, and administrative parity an independent proof. No active user rollout is
+required while the BKE program is under construction.
 
 Depends on:
 
@@ -24,7 +24,7 @@ must remain unchanged.
 |---|---|---|
 | BKE-1B1 | Immutable rules/setup, participant identity, sport-state normalization, and lifecycle events/projection | Basketball setup and lifecycle histories normalize, rebuild, fingerprint, and park without entering the live runtime registry |
 | BKE-1B2 | Shooting, scoring, assists, rebounds, steals, blocks, turnovers, links, and stat projection | **Implemented:** court and box-score fixture events deterministically rebuild score, player/side/team totals, and located shot records |
-| BKE-1B3 | Fouls, ejections, timeouts, minutes, durable event-authority/quarantine marker, complete parity fixtures, and runtime registration | The complete catalog passes parity/integration tests; corrupt event state cannot fall back to aggregate sync; Basketball event support is registered behind the internal creation gate |
+| BKE-1B3 | Fouls, ejections, timeouts, minutes, durable event-authority/quarantine marker, complete parity fixtures, and runtime registration | **Implemented:** the complete catalog passes parity/integration tests; corrupt event state cannot fall back to aggregate sync; Basketball event support is registered behind the internal creation gate |
 
 The split is an implementation boundary, not a product-model change. BKE-1C remains the first
 court-command and live capture cutover.
@@ -52,8 +52,7 @@ court-command and live capture cutover.
 
 - Shooting, scoring, player-stat, team-stat, discipline, timeout, and minutes events (BKE-1B2/1B3).
 - Court commands, stat-grid commands, popup behavior, filters, and undo (BKE-1C/BKE-2).
-- Global Basketball event definitions/projector registration. The production runtime remains
-  Soccer-only until BKE-1B3 is complete.
+- Global Basketball event definitions/projector registration (delivered in BKE-1B3).
 - Supabase migrations, cloud transport, finalization, Summary, aggregates, and settings UI.
 - Anchored clock, substitutions, and on-court intervals (BKE-6).
 
@@ -67,9 +66,9 @@ court-command and live capture cutover.
   snapshotted template and are appended only when their period starts.
 - Capture preferences are resume-only state and remain outside fingerprints and projection.
 - Basketball can simultaneously support legacy aggregate games and recognized event-owned setup.
-  During BKE-1B1/BKE-1B2 fixtures, aggregate sync remains eligible only when both `eventStream` and
-  `sportGameState` are null. Before BKE-1B3 registers the runtime, add a durable top-level
-  `gameDataAuthority: 'sport_events'` marker that is normalized independently of those fields.
+  Aggregate sync remains eligible only for unmarked legacy games with no event stream or sport
+  state. BKE-1B3 adds a durable top-level `gameDataAuthority: 'sport_events'` marker that is
+  normalized independently of those fields.
 - Existing unmarked Basketball games remain legacy. A marked event game whose stream or setup
   fails normalization is quarantined with recovery diagnostics and remains ineligible for aggregate
   sync; corruption never silently changes its authority model.
@@ -145,16 +144,43 @@ rechecked during projection.
 
 ### Still excluded
 
-- Fouls, ejections, timeouts, minutes, bonus/disqualification state, and the durable event-authority
-  marker remain BKE-1B3.
 - Court/stat-grid commands, grouped undo, clear-chart mutations, and UI cutover remain BKE-1C/BKE-2.
-- The production registry/projector remains Soccer-only.
+- Supabase event transport remains blocked by migration 042's neutral-side constraint until BKE-4A.
 
-## 8. Delivery
+## 8. BKE-1B3 Implementation
+
+### Administrative events and projection
+
+- `basketball.foul` records personal, technical, flagrant, intentional, and double fouls with
+  explicit context, actors, optional drawn-by attribution, incident grouping, and reasoned counting
+  overrides. Projection derives player/team fouls, period team fouls, team technicals, snapshotted
+  bonus state, and player disqualification.
+- `basketball.ejection` supports player and staff subjects, official rulings, automatic-threshold
+  validation, and advisory links to related fouls.
+- `basketball.timeout` separates charged full/30-second team timeouts from neutral media/official
+  stoppages. Projection counts charged usage per side and period without inventing team ownership
+  for neutral stoppages.
+- `basketball.minutes_adjustment` provides signed manual player minutes for the current no-clock
+  model. Negative projected totals fail closed; adjustments are ignored when an anchored clock owns
+  minutes in a future rules version.
+
+### Authority and registration
+
+- Event-stream initialization and every successful event mutation stamp the top-level
+  `gameDataAuthority: 'sport_events'` marker. The marker participates in fingerprints and parking
+  normalization independently from event/setup data.
+- Marked games with a missing or malformed stream/setup emit recovery diagnostics, reject aggregate
+  reducer writes, and remain ineligible for aggregate cloud sync. Unmarked historical Basketball
+  games continue on the existing aggregate path.
+- Basketball definitions and projector are registered in `gameEvents/runtime.ts`. The ordinary New
+  Game flow still does not initialize Basketball event state, so BKE-1C remains the deliberate live
+  capture cutover.
+
+## 9. Delivery
 
 1. Merge BKE-1B1 with no global Basketball event runtime registration.
 2. Merge BKE-1B2 stat definitions/projection using a private Basketball fixture registry/projector.
 3. Re-audit the complete BKE-1B1/BKE-1B2 catalog against the BKE-1B3 administrative map.
-4. Complete BKE-1B3 administrative projection and parity fixtures; add the durable event-authority
-   marker plus corrupt-state quarantine before global internal registration.
+4. Merge BKE-1B3 administrative projection, parity fixtures, durable authority/quarantine, and
+   global internal registration.
 5. Keep normal game creation on the aggregate path and proceed to BKE-1C court capture.

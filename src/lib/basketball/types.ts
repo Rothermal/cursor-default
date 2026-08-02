@@ -1,4 +1,4 @@
-import type { GameEvent, JsonObject } from '../gameEvents/types'
+import type { GameEvent, GameEventActor, JsonObject } from '../gameEvents/types'
 
 export const BASKETBALL_GAME_STATE_VERSION = 1
 export const BASKETBALL_EVENT_SCHEMA_VERSION = 1
@@ -49,6 +49,7 @@ export interface BasketballMatchRules extends JsonObject {
   overtimeFoulsReset: boolean
   timeoutsPerPeriod: number | null
   timeoutsPerOvertime: number | null
+  personalFoulLimit: number
   clockModel: BasketballClockModel
 }
 
@@ -92,6 +93,8 @@ export interface BasketballProjectedParticipant {
   captain: boolean
   lateAdded: boolean
   stats: BasketballStatTotals
+  disqualified: boolean
+  ejected: boolean
 }
 
 export type BasketballStatId =
@@ -111,8 +114,20 @@ export type BasketballStatId =
   | 'min'
 
 export type BasketballStatTotals = Record<BasketballStatId, number>
-export type BasketballTeamStatTotals = BasketballStatTotals & {
+export type BasketballTeamStatTotals = BasketballStatTotals & Record<string, number> & {
   team_turnover: number
+  team_tech: number
+}
+
+export type BasketballBonusStatus = 'none' | 'one_and_one' | 'double_bonus'
+
+export interface BasketballEjectionProjection {
+  eventId: string
+  teamSide: BasketballTeamSide
+  subject: GameEventActor
+  reason: string
+  source: BasketballEjectionSource
+  relatedFoulEventId: string | null
 }
 
 export interface BasketballRelationshipWarning {
@@ -135,6 +150,11 @@ export interface BasketballMatchProjection {
   participants: Record<string, BasketballProjectedParticipant>
   sideStats: Record<BasketballTeamSide, BasketballStatTotals>
   teamActorStats: Record<BasketballTeamSide, BasketballTeamStatTotals>
+  periodTeamFouls: Record<string, Record<BasketballTeamSide, number>>
+  periodTimeouts: Record<string, Record<BasketballTeamSide, number>>
+  bonusStatusByPeriod: Record<string, Record<BasketballTeamSide, BasketballBonusStatus>>
+  neutralTimeouts: number
+  ejections: BasketballEjectionProjection[]
   score: BasketballScoreProjection
   relationshipWarnings: BasketballRelationshipWarning[]
   endedAt: string | null
@@ -228,6 +248,55 @@ export interface BasketballScoreAdjustmentPayload extends BasketballCapturePaylo
   note: string | null
 }
 
+export type BasketballFoulClass =
+  | 'personal'
+  | 'technical'
+  | 'flagrant'
+  | 'intentional'
+  | 'double'
+export type BasketballFoulContext =
+  | 'common'
+  | 'shooting'
+  | 'offensive'
+  | 'loose_ball'
+  | 'away_from_play'
+  | 'administrative'
+
+export interface BasketballFoulCountingOverride extends JsonObject {
+  personalFoul: boolean
+  teamFoul: boolean
+  technical: boolean
+  reason: string
+}
+
+export interface BasketballFoulPayload extends BasketballCapturePayload {
+  class: BasketballFoulClass
+  context: BasketballFoulContext
+  teamControlSide: BasketballTeamSide | null
+  incidentId: string | null
+  countingOverride: BasketballFoulCountingOverride | null
+}
+
+export type BasketballEjectionSource = 'automatic_threshold' | 'official_ruling'
+
+export interface BasketballEjectionPayload extends BasketballCapturePayload {
+  reason: string
+  source: BasketballEjectionSource
+  relatedFoulEventId: string | null
+}
+
+export type BasketballTimeoutKind = 'full' | 'thirty_second' | 'media' | 'official'
+
+export interface BasketballTimeoutPayload extends BasketballCapturePayload {
+  kind: BasketballTimeoutKind
+  chargedSide: BasketballTeamSide | null
+  label: string | null
+}
+
+export interface BasketballMinutesAdjustmentPayload extends BasketballCapturePayload {
+  deltaMinutes: number
+}
+
 type BasketballLifecycleGameEvent<
   TPayload extends BasketballCapturePayload,
   TEventType extends string,
@@ -304,6 +373,25 @@ export type BasketballScoreAdjustmentEvent = BasketballStatGameEvent<
   'basketball.score_adjustment'
 >
 
+export type BasketballFoulEvent = BasketballStatGameEvent<
+  BasketballFoulPayload,
+  'basketball.foul'
+>
+export type BasketballEjectionEvent = BasketballStatGameEvent<
+  BasketballEjectionPayload,
+  'basketball.ejection'
+>
+export type BasketballTimeoutEvent = GameEvent<
+  BasketballTimeoutPayload,
+  'basketball.timeout',
+  'basketball',
+  BasketballTeamSide | 'neutral'
+>
+export type BasketballMinutesAdjustmentEvent = BasketballStatGameEvent<
+  BasketballMinutesAdjustmentPayload,
+  'basketball.minutes_adjustment'
+>
+
 export type BasketballStatEvent =
   | BasketballFreeThrowTripEvent
   | BasketballShotEvent
@@ -314,4 +402,13 @@ export type BasketballStatEvent =
   | BasketballTurnoverEvent
   | BasketballScoreAdjustmentEvent
 
-export type BasketballMatchEvent = BasketballLifecycleEvent | BasketballStatEvent
+export type BasketballAdministrativeEvent =
+  | BasketballFoulEvent
+  | BasketballEjectionEvent
+  | BasketballTimeoutEvent
+  | BasketballMinutesAdjustmentEvent
+
+export type BasketballMatchEvent =
+  | BasketballLifecycleEvent
+  | BasketballStatEvent
+  | BasketballAdministrativeEvent

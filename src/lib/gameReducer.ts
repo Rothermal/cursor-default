@@ -20,6 +20,7 @@ import {
 import { gameEventProjectors, gameEventRegistry } from './gameEvents/runtime'
 import { normalizeGameEventStream } from './gameEvents/stream'
 import { rebuildGameEventProjection } from './gameEvents/projection'
+import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
 import { playerIdMapForRoster, shotChartForRoster } from './rosterAlignment'
 
@@ -43,6 +44,7 @@ export function createInitialCloudSyncState(status: CloudSyncStatus = 'idle'): C
 
 export function createInitialState(status: CloudSyncStatus = 'idle'): GameState {
   return {
+    gameDataAuthority: null,
     sport: null,
     gameInfo: null,
     players: [],
@@ -117,7 +119,10 @@ export function applyUndoLastEntry(state: GameState): GameState | null {
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   const resetStatus: CloudSyncStatus = state.cloudSync.status === 'offline' ? 'offline' : 'idle'
-  if (state.eventStream && isLegacyAggregateMutation(action.type)) return state
+  if (
+    (state.eventStream || state.gameDataAuthority === SPORT_EVENTS_AUTHORITY) &&
+    isLegacyAggregateMutation(action.type)
+  ) return state
 
   switch (action.type) {
     case 'SET_SPORT':
@@ -174,6 +179,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const cs = s.cloudSync
       const normalizedState: GameState = {
         ...s,
+        gameDataAuthority: normalizeGameDataAuthority(s.gameDataAuthority),
         eventStream: normalizeGameEventStream(s.eventStream),
         sportGameState: normalizeSportGameState(s.sportGameState),
         shotChart: shotChartForRoster(s.shotChart, s.players),

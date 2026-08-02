@@ -35,6 +35,11 @@ export function createBasketballMatchProjection(
       tracked: emptyBasketballTeamStatTotals(),
       opponent: emptyBasketballTeamStatTotals(),
     },
+    periodTeamFouls: {},
+    periodTimeouts: {},
+    bonusStatusByPeriod: {},
+    neutralTimeouts: 0,
+    ejections: [],
     score: { tracked: 0, opponent: 0 },
     relationshipWarnings: [],
     endedAt: null,
@@ -164,6 +169,7 @@ export function emptyBasketballTeamStatTotals(): BasketballTeamStatTotals {
   return {
     ...emptyBasketballStatTotals(),
     team_turnover: 0,
+    team_tech: 0,
   }
 }
 
@@ -204,6 +210,8 @@ function projectedParticipant(
     captain: participant.captain,
     lateAdded,
     stats: emptyBasketballStatTotals(),
+    disqualified: false,
+    ejected: false,
   }
 }
 
