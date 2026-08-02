@@ -7,7 +7,10 @@ import {
 } from './basketball/rules'
 import { createBasketballSportGameState } from './basketball/state'
 import { gameReducer } from './gameReducer'
-import { withLastSyncedGameFingerprint } from './gameSyncFingerprint'
+import {
+  isAggregateCloudSyncEligible,
+  withLastSyncedGameFingerprint,
+} from './gameSyncFingerprint'
 import {
   GAME_RECORD_KEY_PREFIX,
   GAME_STORAGE_KEY,
@@ -544,6 +547,29 @@ describe('gameParking', () => {
 
     expect(result.imported).toBe(1)
     expect(getParkedGameRecord('legacy-import', 'user-1')?.gameState.eventStream).toBeNull()
+  })
+
+  it('preserves event authority while quarantining malformed imported event data', () => {
+    const marked = {
+      ...gameState(basketball, 'Marked', 'Bears'),
+      gameDataAuthority: 'sport_events',
+      eventStream: { version: 'invalid', events: 'invalid' },
+      sportGameState: { sportId: 'basketball', version: 999 },
+    } as unknown as GameState
+
+    const result = importParkedGames(
+      importPayload([importedRecord('marked-import', marked)]),
+      'user-1'
+    )
+    const restored = getParkedGameRecord('marked-import', 'user-1')?.gameState
+
+    expect(result.imported).toBe(1)
+    expect(restored).toMatchObject({
+      gameDataAuthority: 'sport_events',
+      eventStream: null,
+      sportGameState: null,
+    })
+    expect(isAggregateCloudSyncEligible(restored!)).toBe(false)
   })
 
   it('keeps existing games when imported records use the same local id', () => {

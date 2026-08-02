@@ -94,6 +94,19 @@ describe('gameSyncFingerprint', () => {
     expect(revision).not.toBe(initialized)
   })
 
+  it('fingerprints durable event authority and blocks aggregate fallback when data is missing', () => {
+    const legacy = baseState({ gameDataAuthority: null })
+    const marked = baseState({ gameDataAuthority: 'sport_events' })
+    const legacyFingerprint = buildGameSyncFingerprint(legacy)
+    const markedFingerprint = buildGameSyncFingerprint(marked)
+
+    expect(legacyFingerprint).toMatch(/^\{"sportId":/)
+    expect(legacyFingerprint).not.toContain('"gameDataAuthority"')
+    expect(markedFingerprint).toMatch(/^\{"gameDataAuthority":"sport_events","sportId":/)
+    expect(markedFingerprint).not.toBe(legacyFingerprint)
+    expect(isAggregateCloudSyncEligible(marked)).toBe(false)
+  })
+
   it('canonicalizes raw event order and object keys for dirty detection', () => {
     const first = buildGameSyncFingerprint(
       baseState({

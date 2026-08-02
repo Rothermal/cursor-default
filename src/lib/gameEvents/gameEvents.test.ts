@@ -235,7 +235,10 @@ describe('game event mutations and projections', () => {
     ).toMatchObject({ ok: false, error: { code: 'legacy_activity_present' } })
     expect(initializeGameEventStream(state(), registry, projectors)).toMatchObject({
       ok: true,
-      state: { eventStream: { version: 1, events: [] } },
+      state: {
+        gameDataAuthority: 'sport_events',
+        eventStream: { version: 1, events: [] },
+      },
     })
   })
 

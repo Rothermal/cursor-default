@@ -13,6 +13,7 @@ import type {
 } from './types'
 import { BASKETBALL_EVENT_SCHEMA_VERSION } from './types'
 import { basketballStatEventDefinitions } from './statEvents'
+import { basketballAdministrativeEventDefinitions } from './administrativeEvents'
 
 export type BasketballLifecyclePayloadByType = {
   'basketball.period_started': BasketballPeriodPayload
@@ -73,6 +74,7 @@ export const basketballLifecycleEventDefinitions: GameEventDefinition<GameEvent>
 export const basketballEventDefinitions: GameEventDefinition<GameEvent>[] = [
   ...basketballLifecycleEventDefinitions,
   ...basketballStatEventDefinitions,
+  ...basketballAdministrativeEventDefinitions,
 ]
 
 function lifecycleDefinition(

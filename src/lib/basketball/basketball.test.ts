@@ -222,6 +222,7 @@ describe('BKE-1B1 Basketball foundation', () => {
     const projection = basketballState(result.state.sportGameState).projection
 
     expect(result.inspection.complete).toBe(true)
+    expect(result.state.currentPeriod).toBe(2)
     expect(projection).toMatchObject({
       status: 'ended',
       currentPeriodId: 'regulation-2',
@@ -354,7 +355,7 @@ describe('BKE-1B1 Basketball foundation', () => {
     expect(isAggregateCloudSyncEligible(state())).toBe(false)
   })
 
-  it('leaves the production Basketball event projector unregistered until BKE-1B3', () => {
-    expect(gameEventProjectors.get('basketball')).toBeUndefined()
+  it('registers the production Basketball event projector after BKE-1B3 parity', () => {
+    expect(gameEventProjectors.get('basketball')).toBeDefined()
   })
 })

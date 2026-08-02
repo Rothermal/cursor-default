@@ -34,6 +34,7 @@ import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { normalizeGameEventStream } from '../lib/gameEvents/stream'
 import { normalizeSportGameState } from '../lib/sportGameState/state'
+import { normalizeGameDataAuthority } from '../lib/gameEvents/authority'
 import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../lib/gameEvents/runtime'
 import { sports } from '../config/sports'
@@ -179,6 +180,7 @@ function buildHydratedStateFromCloudGame(
   if (!sport) return null
 
   return withLastSyncedGameFingerprint({
+    gameDataAuthority: null,
     sport,
     gameInfo: cloudGame.gameInfo,
     players: cloudGame.players,
@@ -234,6 +236,7 @@ function loadState(userId: string | null): GameState {
       const restoredState: GameState = {
         ...createInitialState(restoredStatus),
         ...parsed,
+        gameDataAuthority: normalizeGameDataAuthority(parsed.gameDataAuthority),
         homeTeamScore: typeof parsed.homeTeamScore === 'number' ? parsed.homeTeamScore : null,
         homeScoreAdjustment: typeof parsed.homeScoreAdjustment === 'number' ? parsed.homeScoreAdjustment : 0,
         notes: typeof parsed.notes === 'string' ? parsed.notes : '',

@@ -85,6 +85,7 @@ export type GameEventDiagnosticCode =
   | 'migration_failed'
   | 'validation_failed'
   | 'missing_projector'
+  | 'missing_authoritative_data'
   | 'unmapped_player'
   | 'invalid_cloud_row'
   | 'semantic_validation_failed'
@@ -109,6 +110,8 @@ export interface GameEventProjection {
   opponentScore: number
   homeTeamScore: number | null
   shotChart: ShotRecord[]
+  /** Compatibility period index for legacy surfaces that have not moved to sport projection. */
+  currentPeriod?: number
   /** Omitted by legacy fixture projectors; sport projectors replace it when supplied. */
   sportGameState?: GameState['sportGameState']
 }

@@ -5,6 +5,7 @@ import type {
 } from './lib/gameEvents/types'
 import type { SoccerCapturePreferences } from './lib/soccer/types'
 import type { SportGameState } from './lib/sportGameState/types'
+import type { GameDataAuthority } from './lib/gameEvents/authority'
 
 export type ShotZone = 'restricted' | 'paint' | 'mid_range' | 'three'
 
@@ -139,6 +140,8 @@ export interface BasketballTeamStatsConfig {
 export type TeamStatsConfig = BasketballTeamStatsConfig
 
 export interface GameState {
+  /** Missing/null is a legacy aggregate game; sport_events is durable and fail-closed. */
+  gameDataAuthority?: GameDataAuthority | null
   sport: SportConfig | null
   gameInfo: GameInfo | null
   players: Player[]

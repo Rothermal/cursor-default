@@ -10,6 +10,7 @@ import type {
   GameEventMutationErrorCode,
   GameEventMutationResult,
 } from './types'
+import { SPORT_EVENTS_AUTHORITY } from './authority'
 
 function failed(
   state: GameState,
@@ -35,7 +36,13 @@ export function initializeGameEventStream<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
-  if (state.eventStream) return rebuildAsSuccess(state, registry, projectors)
+  if (state.eventStream) {
+    return rebuildAsSuccess(
+      { ...state, gameDataAuthority: SPORT_EVENTS_AUTHORITY },
+      registry,
+      projectors
+    )
+  }
   const projector = state.sport ? projectors.get(state.sport.id) : undefined
   if (!state.sport || !projector) {
     return failed(
@@ -61,7 +68,11 @@ export function initializeGameEventStream<TEvent extends GameEvent>(
       'An event stream cannot be initialized after aggregate tracking has begun.'
     )
   }
-  return rebuildAsSuccess({ ...state, eventStream: createGameEventStream() }, registry, projectors)
+  return rebuildAsSuccess({
+    ...state,
+    gameDataAuthority: SPORT_EVENTS_AUTHORITY,
+    eventStream: createGameEventStream(),
+  }, registry, projectors)
 }
 
 export function addGameEvent<TEvent extends GameEvent>(
@@ -379,7 +390,10 @@ function rebuildAsSuccess<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
-  const rebuilt = rebuildGameEventProjection(state, registry, projectors)
+  const authoritativeState = state.eventStream
+    ? { ...state, gameDataAuthority: SPORT_EVENTS_AUTHORITY }
+    : state
+  const rebuilt = rebuildGameEventProjection(authoritativeState, registry, projectors)
   return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
 }
 
@@ -389,7 +403,11 @@ function appendAndRequireComplete<TEvent extends GameEvent>(
   registry: GameEventRegistry<TEvent>,
   projectors: GameEventProjectorRegistry<TEvent>
 ): GameEventMutationResult {
-  const rebuilt = rebuildGameEventProjection(appendedState, registry, projectors)
+  const rebuilt = rebuildGameEventProjection(
+    { ...appendedState, gameDataAuthority: SPORT_EVENTS_AUTHORITY },
+    registry,
+    projectors
+  )
   if (!rebuilt.inspection.complete) {
     return failed(
       originalState,
