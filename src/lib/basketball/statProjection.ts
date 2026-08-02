@@ -1,7 +1,7 @@
 import type { ShotRecord } from '../../types'
 import type { GameEventActor } from '../gameEvents/types'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
-import { classifyShotZone, normalizedCourtLocationToFeet } from './courtGeometry'
+import { normalizedCourtLocationToFeet, zoneForForcedShotType } from './courtGeometry'
 import type {
   BasketballMatchEvent,
   BasketballMatchProjection,
@@ -155,13 +155,16 @@ function applyShot(
   if (event.payload.attempt !== 'field_goal' || !event.location) return
 
   const point = normalizedCourtLocationToFeet(event.location)
+  const x = roundCourtFeet(point.x)
+  const y = roundCourtFeet(point.y)
+  const shotType = event.payload.value === 3 ? '3pt' : '2pt'
   context.shotChart.push({
     id: event.id,
-    x: roundCourtFeet(point.x),
-    y: roundCourtFeet(point.y),
+    x,
+    y,
     made: event.payload.made,
-    shotType: event.payload.value === 3 ? '3pt' : '2pt',
-    zone: classifyShotZone(point.x, point.y),
+    shotType,
+    zone: zoneForForcedShotType(x, y, shotType),
     playerId: projectionPlayerId(projection, actor, event.teamSide),
     timestamp: Date.parse(event.occurredAt),
   })

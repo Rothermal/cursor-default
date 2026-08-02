@@ -384,16 +384,23 @@ describe('BKE-1B2 Basketball stat projection', () => {
     expect(registry.inspect(malformedOneAndOne).ok).toBe(false)
   })
 
-  it('keeps manual value overrides honest by deriving zone from location', () => {
-    const overridden = stat(1, 'basketball.shot', shotPayload(true, 3, 'manual_override'), {
+  it('preserves legacy shot type and zone compatibility for manual value overrides', () => {
+    const overriddenThree = stat(1, 'basketball.shot', shotPayload(true, 3, 'manual_override'), {
       actors: [playerActor('shooter', 'tracked-1', 'player-1')],
       location: location(0, 8),
     })
-    const result = project([start(), overridden])
+    const overriddenTwo = stat(2, 'basketball.shot', shotPayload(true, 2, 'manual_override'), {
+      actors: [playerActor('shooter', 'tracked-1', 'player-1')],
+      location: location(23, 5),
+    })
+    const result = project([start(), overriddenThree, overriddenTwo])
 
     expect(result.inspection.complete).toBe(true)
-    expect(result.state.shotChart[0]).toMatchObject({ shotType: '3pt', zone: 'paint' })
-    expect(result.state.homeTeamScore).toBe(3)
+    expect(result.state.shotChart).toEqual([
+      expect.objectContaining({ shotType: '3pt', zone: 'three' }),
+      expect.objectContaining({ shotType: '2pt', zone: 'mid_range' }),
+    ])
+    expect(result.state.homeTeamScore).toBe(5)
   })
 
   it('counts unlocated quick entries without fabricating chart records', () => {
