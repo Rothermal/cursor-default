@@ -37,13 +37,7 @@ describe('game data authority diagnostics', () => {
     const missingStream = authoritativeGameDataDiagnostics(baseState({
       gameDataAuthority: SPORT_EVENTS_AUTHORITY,
       eventStream: null,
-      sportGameState: {
-        sportId: 'basketball',
-        schemaVersion: 1,
-        setup: {} as never,
-        projection: {} as never,
-        capturePreferences: {} as never,
-      },
+      sportGameState: { sportId: 'basketball' } as GameState['sportGameState'],
     }), true)
     expect(missingStream).toEqual([
       expect.objectContaining({
@@ -58,13 +52,7 @@ describe('game data authority diagnostics', () => {
         version: 1,
         events: [],
       },
-      sportGameState: {
-        sportId: 'soccer',
-        schemaVersion: 1,
-        setup: {} as never,
-        projection: {} as never,
-        capturePreferences: {} as never,
-      },
+      sportGameState: { sportId: 'soccer' } as GameState['sportGameState'],
     }), true)
     expect(mismatchedSport).toEqual([
       expect.objectContaining({
