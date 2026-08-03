@@ -12,6 +12,7 @@ import {
   endBasketballPeriod,
   getBasketballCommandContext,
   prepareBasketballGameStart,
+  startNextBasketballPeriod,
 } from './commands'
 import {
   decrementBasketballDirectStat,
@@ -357,6 +358,29 @@ describe('BKE-2B Basketball direct decrements', () => {
       recorderUserId: 'recorder-1',
       playerId: 'player-1',
     })).toMatchObject({ ok: false, state: minuteDown.state })
+  })
+
+  it('does not search earlier periods for a quick grid decrement', () => {
+    const periodOne = capture(startedState(), 'stl', 'player-1', 1)
+    const ended = endBasketballPeriod(periodOne, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-03T12:02:00.000Z',
+      eventId: '72000000-0000-4000-8000-000000000702',
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    const periodTwo = startNextBasketballPeriod(ended.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-03T12:03:00.000Z',
+      eventId: '72000000-0000-4000-8000-000000000703',
+    })
+    if (!periodTwo.ok) throw new Error(periodTwo.message)
+
+    expect(periodTwo.state.players.find(candidate => candidate.id === 'player-1')?.stats.stl)
+      .toBe(1)
+    expect(previewBasketballDirectDecrement(periodTwo.state, 'player-1', 'stl'))
+      .toMatchObject({ ok: false, code: 'nothing_to_undo' })
+    expect(decrementBasketballDirectStat(periodTwo.state, 'player-1', 'stl'))
+      .toMatchObject({ ok: false, state: periodTwo.state, code: 'nothing_to_undo' })
   })
 
   it('removes a field goal with linked facts, unlinks a block, and restores the exact plan', () => {

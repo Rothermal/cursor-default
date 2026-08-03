@@ -179,7 +179,9 @@ available.
 
 ### 6.3 Decrements
 
-- Standalone assist, rebound, steal, block, and turnover decrements tombstone the newest active match.
+- Standalone assist, rebound, steal, block, and turnover decrements tombstone the newest active
+  match in the current period. Quick grid correction never crosses a lifecycle boundary;
+  earlier-period editing belongs to BKE-3.
 - Minutes `-1` appends a negative adjustment only when projected minutes are at least one.
 - Field-goal decrement atomically tombstones the shot and linked assists/rebounds while unlinking
   active blocks. Confirm exact effects.
@@ -208,9 +210,9 @@ available.
 - Scoreboard `+1/-1` creates explicit `scoreboard_control` events. Official Correction requires a
   signed whole-number delta and note, preserves its draft on rejection, and cannot make a side
   negative.
-- Standalone decrements target the newest matching event. Field goals remove linked assists and
-  rebounds while preserving and unlinking blocks; free throws remove linked rebounds. Exact
-  consequences require confirmation and use the reload-safe one-level inverse receipt.
+- Standalone decrements target the newest matching current-period event. Field goals remove linked
+  assists and rebounds while preserving and unlinking blocks; free throws remove linked rebounds.
+  Exact consequences require confirmation and use the reload-safe one-level inverse receipt.
 - The optional Steal + Turnover sheet records one atomic capture command and supports a rostered
   opposite-side player, an explicit unknown player label, or the opposite team actor.
 

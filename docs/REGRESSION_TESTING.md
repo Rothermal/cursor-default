@@ -713,7 +713,8 @@ period. Include tracked and opponent participants plus both team chips.
 | 11a5.8 | Decrement a free throw with a linked rebound | Confirmation removes the attempt and rebound while preserving any trip; immediate Restore returns both |
 | 11a5.9 | Perform a consequential decrement, park/reload, then Restore | The validated direct-decrement receipt survives normalization and restores only while revisions still match |
 | 11a5.10 | End a period or game and inspect court, grid, score, and compound controls | All ordinary capture/correction controls are disabled; no legacy reducer fallback appears |
-| 11a5.11 | Repeat representative grid/score actions in an ordinary legacy Basketball game and open Soccer | Existing aggregate Basketball and Soccer behavior remain unchanged |
+| 11a5.11 | Start a new period with a prior-period standalone stat but no current-period match | The game total remains visible, but quick grid decrement is disabled and cannot cross the lifecycle boundary |
+| 11a5.12 | Repeat representative grid/score actions in an ordinary legacy Basketball game and open Soccer | Existing aggregate Basketball and Soccer behavior remain unchanged |
 
 ---
 

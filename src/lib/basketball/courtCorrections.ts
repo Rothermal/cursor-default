@@ -413,7 +413,12 @@ function directDecrementPlan(
   playerId: string,
   statId: Exclude<BasketballDirectStatId, 'min'>
 ): BasketballDirectDecrementPlan | null {
+  const currentPeriodId = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.projection.currentPeriodId
+    : null
+  if (!currentPeriodId) return null
   const events = activeBasketballEvents(state)
+    .filter(event => event.period.id === currentPeriodId)
     .sort((left, right) => compareGameEventCaptureOrder(right, left))
   const target = events.find(event => directEventMatches(event, playerId, statId))
   if (!target) return null
