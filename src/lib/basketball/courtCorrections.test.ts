@@ -7,13 +7,16 @@ import { createInitialState, gameReducer } from '../gameReducer'
 import { sportGameStateForFingerprint } from '../sportGameState/state'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
+  addBasketballLateParticipant,
   basketballActorForSelection,
   captureBasketballCourtEvent,
+  endBasketballPeriod,
   getBasketballCommandContext,
   prepareBasketballGameStart,
 } from './commands'
 import {
   basketballCourtCaptureUnits,
+  basketballLiveCaptureUnits,
   canRestoreBasketballCourtUndo,
   clearBasketballShotChart,
   previewBasketballClearShotChart,
@@ -312,6 +315,83 @@ describe('BKE-1C3 Basketball court corrections', () => {
     expect(hydrated.sportGameState?.sportId === 'basketball'
       ? hydrated.sportGameState.capturePreferences.lastCourtUndo
       : undefined).toBeNull()
+  })
+})
+
+describe('BKE-2A Basketball live correction boundaries', () => {
+  it('renders lifecycle rows and prevents ordinary undo from crossing a period boundary', () => {
+    const captured = capture(startedState(), {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-02T18:01:00.000Z',
+      eventIds: ['71000000-0000-4000-8000-000000000401'],
+    })
+    const ended = endBasketballPeriod(captured, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T18:02:00.000Z',
+      eventId: '71000000-0000-4000-8000-000000000402',
+    })
+    expect(ended.ok).toBe(true)
+    if (!ended.ok) return
+
+    expect(basketballLiveCaptureUnits(ended.state).map(unit => ({
+      who: unit.who,
+      what: unit.what,
+      kind: unit.kind,
+      undoable: unit.undoable,
+    }))).toEqual([
+      { who: 'Game', what: 'Q1 ended', kind: 'boundary', undoable: false },
+      { who: '#4 Alex One', what: 'Made 2PT', kind: 'capture', undoable: true },
+      { who: 'Game', what: 'Q1 started', kind: 'boundary', undoable: false },
+    ])
+    expect(undoLatestBasketballCourtCapture(ended.state, '2026-08-02T18:03:00.000Z'))
+      .toMatchObject({ ok: false, state: ended.state, code: 'nothing_to_undo' })
+    expect(ended.state.homeTeamScore).toBe(2)
+  })
+
+  it('undoes and restores a late roster addition with its selector row', () => {
+    const added = addBasketballLateParticipant(startedState(), {
+      recorderUserId: 'recorder-1',
+      teamSide: 'opponent',
+      displayName: 'Opponent Nine',
+      number: '9',
+      occurredAt: '2026-08-02T18:01:00.000Z',
+      eventId: '71000000-0000-4000-8000-000000000411',
+      participantId: '71000000-0000-4000-8000-000000000412',
+      playerId: '71000000-0000-4000-8000-000000000413',
+      captureCommandId: '71000000-0000-4000-8000-000000000414',
+    })
+    expect(added.ok).toBe(true)
+    if (!added.ok) return
+    expect(basketballLiveCaptureUnits(added.state)[0]).toMatchObject({
+      who: 'Opponent Nine',
+      what: 'Added to Bears roster',
+      kind: 'capture',
+      undoable: true,
+    })
+
+    const undone = undoLatestBasketballCourtCapture(
+      added.state,
+      '2026-08-02T18:02:00.000Z'
+    )
+    expect(undone.ok).toBe(true)
+    if (!undone.ok) return
+    expect(undone.state.players.some(player =>
+      player.id === '71000000-0000-4000-8000-000000000413'
+    )).toBe(false)
+    expect(canRestoreBasketballCourtUndo(undone.state)).toBe(true)
+
+    const restored = restoreLastBasketballCourtUndo(
+      undone.state,
+      '2026-08-02T18:03:00.000Z'
+    )
+    expect(restored.ok).toBe(true)
+    if (!restored.ok) return
+    expect(restored.state.players.find(player =>
+      player.id === '71000000-0000-4000-8000-000000000413'
+    )).toMatchObject({ name: 'Opponent Nine', number: '9' })
   })
 })
 

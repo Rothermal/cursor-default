@@ -1,5 +1,5 @@
 import { resolveTeamStatsConfig } from '../../config/teamStatsDefaults'
-import type { GameState } from '../../types'
+import type { GameState, Player } from '../../types'
 import { SPORT_EVENTS_AUTHORITY } from '../gameEvents/authority'
 import { isPlainObject } from '../gameEvents/envelope'
 import {
@@ -29,6 +29,7 @@ import { createBasketballUuid } from './id'
 import {
   createBasketballMatchRules,
   DEFAULT_BASKETBALL_RULES_SOURCE,
+  resolveBasketballPeriodSegment,
 } from './rules'
 import {
   createBasketballSportGameState,
@@ -39,6 +40,7 @@ import type {
   BasketballMatchParticipant,
   BasketballMatchEvent,
   BasketballMatchSetup,
+  BasketballMatchSegment,
   BasketballSportGameState,
   BasketballTeamSide,
 } from './types'
@@ -53,6 +55,7 @@ export type BasketballCommandErrorCode =
   | 'already_initialized'
   | 'invalid_setup'
   | 'invalid_period'
+  | 'invalid_participant'
   | 'invalid_actor'
   | 'invalid_location'
   | 'invalid_timestamp'
@@ -79,6 +82,24 @@ export interface BasketballStartOptions {
   occurredAt?: string
   eventId?: string
   participantIds?: string[]
+}
+
+export interface BasketballLateParticipantOptions {
+  recorderUserId: string | null
+  teamSide: BasketballTeamSide
+  displayName: string
+  number?: string
+  occurredAt?: string
+  eventId?: string
+  participantId?: string
+  playerId?: string
+  captureCommandId?: string
+}
+
+export interface BasketballLifecycleCommandOptions {
+  recorderUserId: string | null
+  occurredAt?: string
+  eventId?: string
 }
 
 export type BasketballCaptureActorSelection =
@@ -381,7 +402,8 @@ export function basketballCaptureTargetForPlayerId(
     return { ok: true, value: { teamSide: 'opponent', selection: { kind: 'team' } } }
   }
   const participant = state.sportGameState?.sportId === 'basketball'
-    ? state.sportGameState.setup.participants.find(value => value.playerId === playerId)
+    ? Object.values(state.sportGameState.projection.participants)
+        .find(value => value.playerId === playerId)
     : null
   if (!participant) {
     return commandFailure('invalid_actor', 'The selected Basketball player is unavailable.')
@@ -390,7 +412,7 @@ export function basketballCaptureTargetForPlayerId(
     ok: true,
     value: {
       teamSide: participant.teamSide,
-      selection: { kind: 'participant', participantId: participant.id },
+      selection: { kind: 'participant', participantId: participant.participantId },
     },
   }
 }
@@ -406,8 +428,187 @@ export function basketballPlayerIdForCapturePreferences(state: GameState): strin
       ? TEAM_PLAYER_HOME_ID
       : TEAM_PLAYER_OPP_ID
   }
-  const participant = sportState.setup.participants.find(value => value.id === participantId)
+  const participant = sportState.projection.participants[participantId]
   return participant?.playerId ?? null
+}
+
+export function addBasketballLateParticipant(
+  state: GameState,
+  options: BasketballLateParticipantOptions
+): BasketballStateCommandResult {
+  if (hasCloudBinding(state)) {
+    return failure(
+      state,
+      'cloud_flow_unsupported',
+      'Basketball event roster changes are local-only during development.'
+    )
+  }
+  const context = getBasketballLifecycleContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt
+  )
+  if (!context.ok) return { ...context, state }
+
+  const displayName = options.displayName.trim()
+  if (!displayName) {
+    return failure(state, 'invalid_participant', 'Enter a name for the Basketball participant.')
+  }
+  const number = options.number?.trim() || null
+  const playerId = options.playerId ?? createBasketballUuid()
+  const participantId = options.participantId ?? createBasketballUuid()
+  if (state.players.some(player => player.id === playerId)) {
+    return failure(state, 'invalid_participant', 'That Basketball player id is already in use.')
+  }
+
+  const player: Player = { id: playerId, name: displayName, number: number ?? '', stats: {} }
+  const participant: BasketballMatchParticipant = {
+    id: participantId,
+    playerId,
+    displayName,
+    number,
+    teamSide: options.teamSide,
+    initialStatus: 'bench',
+    position: null,
+    captain: false,
+  }
+  const candidate = withBasketballCapturePreferences(
+    { ...state, players: [...state.players, player], activePlayerId: playerId },
+    options.teamSide,
+    participantId
+  )
+  const event = createBasketballLifecycleEvent({
+    id: options.eventId,
+    eventType: 'basketball.match_roster_added',
+    payload: {
+      participant,
+      destination: 'bench',
+      captureCommandId: options.captureCommandId ?? createBasketballCaptureCommandId(),
+    },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence,
+    period: context.value.period,
+    occurredAt: context.value.occurredAt,
+  })
+  return appendBasketballLifecycleEvent(
+    state,
+    candidate,
+    event,
+    'Basketball participant addition did not produce a complete event projection.'
+  )
+}
+
+export function endBasketballPeriod(
+  state: GameState,
+  options: BasketballLifecycleCommandOptions
+): BasketballStateCommandResult {
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  }
+  const context = getBasketballLifecycleContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt
+  )
+  if (!context.ok) return { ...context, state }
+  if (context.value.sportState.projection.status !== 'in_progress') {
+    return failure(state, 'invalid_period', 'Only an active Basketball period can end.')
+  }
+  const event = createBasketballLifecycleEvent({
+    id: options.eventId,
+    eventType: 'basketball.period_ended',
+    payload: { periodId: context.value.period.id, captureCommandId: null },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence,
+    period: context.value.period,
+    occurredAt: context.value.occurredAt,
+  })
+  return appendBasketballLifecycleEvent(
+    state,
+    clearBasketballUndoReceipt(state),
+    event,
+    'Basketball period end did not produce a complete event projection.'
+  )
+}
+
+export function startNextBasketballPeriod(
+  state: GameState,
+  options: BasketballLifecycleCommandOptions
+): BasketballStateCommandResult {
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  }
+  const context = getBasketballLifecycleContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt
+  )
+  if (!context.ok) return { ...context, state }
+  const sportState = context.value.sportState
+  if (sportState.projection.status !== 'period_break') {
+    return failure(state, 'invalid_period', 'End the active Basketball period before starting another.')
+  }
+  const nextSegment = nextBasketballSegment(sportState)
+  if (!nextSegment.ok) return { ...nextSegment, state }
+  const event = createBasketballLifecycleEvent({
+    id: options.eventId,
+    eventType: 'basketball.period_started',
+    payload: { periodId: nextSegment.value.id, captureCommandId: null },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence,
+    period: { id: nextSegment.value.id, order: nextSegment.value.order },
+    occurredAt: context.value.occurredAt,
+  })
+  return appendBasketballLifecycleEvent(
+    state,
+    clearBasketballUndoReceipt(state),
+    event,
+    'Basketball period start did not produce a complete event projection.'
+  )
+}
+
+export function completeBasketballMatch(
+  state: GameState,
+  options: BasketballLifecycleCommandOptions
+): BasketballStateCommandResult {
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  }
+  const context = getBasketballLifecycleContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt
+  )
+  if (!context.ok) return { ...context, state }
+  const sportState = context.value.sportState
+  const projection = sportState.projection
+  if (projection.status !== 'period_break') {
+    return failure(state, 'invalid_period', 'End the active Basketball period before ending the game.')
+  }
+  const regulationComplete = sportState.setup.rulesSnapshot.regulationSegments.every(segment =>
+    projection.completedPeriodIds.includes(segment.id)
+  )
+  if (!regulationComplete) {
+    return failure(state, 'invalid_period', 'Complete every Basketball regulation period first.')
+  }
+  if (projection.score.tracked === projection.score.opponent) {
+    return failure(state, 'invalid_period', 'A tied Basketball game requires another overtime.')
+  }
+  const event = createBasketballLifecycleEvent({
+    id: options.eventId,
+    eventType: 'basketball.match_ended',
+    payload: { reason: 'completed', captureCommandId: null },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence,
+    period: context.value.period,
+    occurredAt: context.value.occurredAt,
+  })
+  return appendBasketballLifecycleEvent(
+    state,
+    clearBasketballUndoReceipt(state),
+    event,
+    'Basketball completion did not produce a complete event projection.'
+  )
 }
 
 export function captureBasketballCourtEvent(
@@ -614,6 +815,119 @@ export function nextBasketballEventSequence(
       ? Math.max(highest, value.sequence)
       : highest
   }, 0) + 1
+}
+
+function getBasketballLifecycleContext(
+  state: GameState,
+  recorderUserId: string | null,
+  occurredAt?: string
+): BasketballCommandResult<BasketballCommandContext> {
+  if (
+    state.sport?.id !== 'basketball' ||
+    state.gameDataAuthority !== SPORT_EVENTS_AUTHORITY ||
+    !state.eventStream ||
+    state.sportGameState?.sportId !== 'basketball'
+  ) {
+    return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
+  }
+  const projection = state.sportGameState.projection
+  if (
+    projection.status === 'not_started' ||
+    projection.status === 'ended' ||
+    projection.status === 'suspended' ||
+    !projection.currentPeriodId
+  ) {
+    return commandFailure('invalid_period', 'Basketball lifecycle requires an open match period.')
+  }
+  const segment = projection.periods.find(period => period.id === projection.currentPeriodId)
+  if (!segment) return commandFailure('invalid_period', 'The current Basketball period is invalid.')
+  const timestamp = normalizeBasketballCommandTimestamp(occurredAt)
+  if (!timestamp.ok) return timestamp
+  return {
+    ok: true,
+    value: {
+      sportState: state.sportGameState,
+      period: { id: segment.id, order: segment.order },
+      nextSequence: nextBasketballEventSequence(state.eventStream.events, recorderUserId),
+      occurredAt: timestamp.value,
+    },
+  }
+}
+
+function nextBasketballSegment(
+  sportState: BasketballSportGameState
+): BasketballCommandResult<BasketballMatchSegment> {
+  const projection = sportState.projection
+  const current = projection.periods.find(period => period.id === projection.currentPeriodId)
+  if (!current) return commandFailure('invalid_period', 'The current Basketball period is invalid.')
+  const rules = sportState.setup.rulesSnapshot
+  if (current.order < rules.regulationSegments.length) {
+    const regulation = rules.regulationSegments.find(segment => segment.order === current.order + 1)
+    return regulation
+      ? { ok: true, value: structuredClone(regulation) }
+      : commandFailure('invalid_period', 'The next Basketball regulation period is unavailable.')
+  }
+  if (projection.score.tracked !== projection.score.opponent) {
+    return commandFailure('invalid_period', 'Overtime is available only while the score is tied.')
+  }
+  const overtimeNumber = current.order - rules.regulationSegments.length + 1
+  const overtimeId = `${rules.overtimeTemplate.idPrefix}-${overtimeNumber}`
+  const overtime = resolveBasketballPeriodSegment(rules, overtimeId)
+  return overtime
+    ? { ok: true, value: overtime }
+    : commandFailure('invalid_period', 'The next Basketball overtime is unavailable.')
+}
+
+function appendBasketballLifecycleEvent(
+  originalState: GameState,
+  candidateState: GameState,
+  event: BasketballMatchEvent,
+  incompleteMessage: string
+): BasketballStateCommandResult {
+  const appended = addGameEvent(candidateState, event, gameEventRegistry, gameEventProjectors)
+  if (!appended.ok || !appended.inspection.complete) {
+    return failure(
+      originalState,
+      'command_failed',
+      appended.ok ? incompleteMessage : appended.error.message
+    )
+  }
+  return { ok: true, state: appended.state }
+}
+
+function clearBasketballUndoReceipt(state: GameState): GameState {
+  if (state.sportGameState?.sportId !== 'basketball') return state
+  return {
+    ...state,
+    sportGameState: {
+      ...state.sportGameState,
+      capturePreferences: {
+        ...state.sportGameState.capturePreferences,
+        lastCourtUndo: null,
+      },
+    },
+  }
+}
+
+function withBasketballCapturePreferences(
+  state: GameState,
+  teamSide: BasketballTeamSide,
+  participantId: string
+): GameState {
+  if (state.sportGameState?.sportId !== 'basketball') return state
+  return {
+    ...state,
+    sportGameState: {
+      ...state.sportGameState,
+      capturePreferences: {
+        ...state.sportGameState.capturePreferences,
+        teamSide,
+        selectedParticipantId: participantId,
+        selectionInitialized: true,
+        lastCourtUndo: null,
+      },
+    },
+  }
 }
 
 export function createBasketballCaptureCommandId(): string {

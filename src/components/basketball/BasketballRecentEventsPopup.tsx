@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
 import type { BasketballCourtCaptureUnit } from '../../lib/basketball/courtCorrections'
 
 interface BasketballRecentEventsPopupProps {
@@ -44,7 +45,7 @@ export default function BasketballRecentEventsPopup({
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-recent-events-title"
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+        className="w-full max-w-lg overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
@@ -52,16 +53,16 @@ export default function BasketballRecentEventsPopup({
             <h2 id="basketball-recent-events-title" className="text-base font-bold text-slate-800">
               Recent events
             </h2>
-            <p className="text-xs text-slate-500">Newest capture is undone first.</p>
+            <p className="text-xs text-slate-500">Newest event first. Lifecycle boundaries cannot be undone here.</p>
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="h-9 w-9 rounded-full border border-slate-200 text-lg font-semibold text-slate-500 active:scale-95 transition-transform"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 active:scale-95 transition-transform"
             aria-label="Close recent events"
           >
-            x
+            <X size={18} aria-hidden />
           </button>
         </div>
 
@@ -88,11 +89,16 @@ export default function BasketballRecentEventsPopup({
             <ul className="space-y-2">
               {recent.map((unit, index) => {
                 const isTop = index === 0
+                const canUndo = isTop && unit.undoable
                 return (
                   <li
                     key={unit.id}
-                    className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${
-                      isTop ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+                      canUndo
+                        ? 'border-blue-200 bg-blue-50'
+                        : isTop && unit.kind === 'boundary'
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-slate-200 bg-white'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
@@ -101,17 +107,25 @@ export default function BasketballRecentEventsPopup({
                     </div>
                     <button
                       type="button"
-                      onClick={isTop ? onUndoTop : undefined}
-                      disabled={!isTop}
+                      onClick={canUndo ? onUndoTop : undefined}
+                      disabled={!canUndo}
                       className={`h-10 shrink-0 rounded-lg px-3 text-sm font-semibold transition-transform ${
-                        isTop
+                        canUndo
                           ? 'bg-blue-600 text-white active:scale-95'
                           : 'border border-slate-200 bg-slate-50 text-slate-400'
                       }`}
-                      aria-label={isTop ? `Undo ${unit.who} ${unit.what}` : 'Undo older capture unavailable'}
-                      title={isTop ? 'Undo this capture' : 'Undo newer captures first'}
+                      aria-label={canUndo
+                        ? `Undo ${unit.who} ${unit.what}`
+                        : unit.kind === 'boundary'
+                          ? `${unit.what} is a lifecycle boundary`
+                          : 'Undo older capture unavailable'}
+                      title={canUndo
+                        ? 'Undo this capture'
+                        : unit.kind === 'boundary'
+                          ? 'Use lifecycle controls to manage period transitions'
+                          : 'Undo newer captures first'}
                     >
-                      Undo
+                      {unit.kind === 'boundary' ? 'Boundary' : 'Undo'}
                     </button>
                   </li>
                 )

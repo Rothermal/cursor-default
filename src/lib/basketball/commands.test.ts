@@ -5,11 +5,14 @@ import { createInitialState, gameReducer } from '../gameReducer'
 import { isAggregateCloudSyncEligible } from '../gameSyncFingerprint'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
+  addBasketballLateParticipant,
   basketballActorForSelection,
   basketballCaptureTargetForPlayerId,
   basketballPlayerIdForCapturePreferences,
   captureBasketballCourtEvent,
+  completeBasketballMatch,
   createBasketballCaptureCommandId,
+  endBasketballPeriod,
   getBasketballCommandContext,
   hasStartedBasketballEventGame,
   isBasketballEventSetupIntent,
@@ -17,6 +20,7 @@ import {
   normalizeBasketballCourtLocation,
   prepareBasketballGameStart,
   setBasketballEventCreationIntent,
+  startNextBasketballPeriod,
 } from './commands'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
@@ -537,5 +541,205 @@ describe('BKE-1C2 court capture commands', () => {
 
     expect(result).toMatchObject({ ok: false, state: before, code: 'invalid_actor' })
     expect(before.eventStream?.events).toHaveLength(1)
+  })
+})
+
+describe('BKE-2A Basketball lifecycle commands', () => {
+  it('adds tracked and opponent participants through the existing roster event', () => {
+    const before = startedState()
+    const tracked = addBasketballLateParticipant(before, {
+      recorderUserId: 'recorder-1',
+      teamSide: 'tracked',
+      displayName: '  Casey Late  ',
+      number: ' 22 ',
+      occurredAt: '2026-08-02T15:31:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000301',
+      participantId: '70000000-0000-4000-8000-000000000302',
+      playerId: '70000000-0000-4000-8000-000000000303',
+      captureCommandId: '70000000-0000-4000-8000-000000000304',
+    })
+
+    expect(tracked.ok).toBe(true)
+    if (!tracked.ok) return
+    expect(before.players).toHaveLength(4)
+    expect(tracked.state.players[tracked.state.players.length - 1]).toMatchObject({
+      id: '70000000-0000-4000-8000-000000000303',
+      name: 'Casey Late',
+      number: '22',
+      stats: expect.objectContaining({ ast: 0, pf: 0 }),
+    })
+    expect(tracked.state.activePlayerId).toBe('70000000-0000-4000-8000-000000000303')
+    const trackedEvents = tracked.state.eventStream?.events ?? []
+    expect(trackedEvents[trackedEvents.length - 1]).toMatchObject({
+      eventType: 'basketball.match_roster_added',
+      payload: {
+        destination: 'bench',
+        captureCommandId: '70000000-0000-4000-8000-000000000304',
+        participant: {
+          id: '70000000-0000-4000-8000-000000000302',
+          playerId: '70000000-0000-4000-8000-000000000303',
+          teamSide: 'tracked',
+          displayName: 'Casey Late',
+          number: '22',
+        },
+      },
+    })
+    if (tracked.state.sportGameState?.sportId !== 'basketball') {
+      throw new Error('Expected Basketball sport state.')
+    }
+    expect(tracked.state.sportGameState.setup.participants).toHaveLength(2)
+    expect(tracked.state.sportGameState.projection.participants)
+      .toHaveProperty('70000000-0000-4000-8000-000000000302')
+    expect(basketballCaptureTargetForPlayerId(
+      tracked.state,
+      '70000000-0000-4000-8000-000000000303'
+    )).toMatchObject({
+      ok: true,
+      value: {
+        teamSide: 'tracked',
+        selection: {
+          kind: 'participant',
+          participantId: '70000000-0000-4000-8000-000000000302',
+        },
+      },
+    })
+    expect(basketballPlayerIdForCapturePreferences(tracked.state))
+      .toBe('70000000-0000-4000-8000-000000000303')
+
+    const opponent = addBasketballLateParticipant(tracked.state, {
+      recorderUserId: 'recorder-1',
+      teamSide: 'opponent',
+      displayName: 'Opponent Seven',
+      occurredAt: '2026-08-02T15:32:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000305',
+      participantId: '70000000-0000-4000-8000-000000000306',
+      playerId: '70000000-0000-4000-8000-000000000307',
+      captureCommandId: '70000000-0000-4000-8000-000000000308',
+    })
+    expect(opponent.ok).toBe(true)
+    if (!opponent.ok || opponent.state.sportGameState?.sportId !== 'basketball') return
+    expect(opponent.state.sportGameState.projection.participants[
+      '70000000-0000-4000-8000-000000000306'
+    ].teamSide).toBe('opponent')
+  })
+
+  it('rejects invalid or duplicate late participants without changing state', () => {
+    const before = startedState()
+    expect(addBasketballLateParticipant(before, {
+      recorderUserId: null,
+      teamSide: 'tracked',
+      displayName: '   ',
+    })).toMatchObject({ ok: false, state: before, code: 'invalid_participant' })
+    expect(addBasketballLateParticipant(before, {
+      recorderUserId: null,
+      teamSide: 'tracked',
+      displayName: 'Duplicate',
+      playerId: 'player-1',
+    })).toMatchObject({ ok: false, state: before, code: 'invalid_participant' })
+  })
+
+  it('advances sequential regulation, requires overtime for a tie, and completes locally', () => {
+    let state = startedState()
+    expect(startNextBasketballPeriod(state, { recorderUserId: 'recorder-1' }))
+      .toMatchObject({ ok: false, state, code: 'invalid_period' })
+
+    for (let period = 1; period <= 4; period += 1) {
+      const ended = endBasketballPeriod(state, {
+        recorderUserId: 'recorder-1',
+        occurredAt: `2026-08-02T15:${32 + period}:00.000Z`,
+        eventId: `70000000-0000-4000-8000-0000000004${period}1`,
+      })
+      expect(ended.ok).toBe(true)
+      if (!ended.ok) return
+      state = ended.state
+      expect(state.sportGameState?.sportId === 'basketball'
+        ? state.sportGameState.projection.status
+        : null).toBe('period_break')
+      if (period < 4) {
+        const started = startNextBasketballPeriod(state, {
+          recorderUserId: 'recorder-1',
+          occurredAt: `2026-08-02T15:${42 + period}:00.000Z`,
+          eventId: `70000000-0000-4000-8000-0000000004${period}2`,
+        })
+        expect(started.ok).toBe(true)
+        if (!started.ok) return
+        state = started.state
+        expect(state.currentPeriod).toBe(period + 1)
+      }
+    }
+
+    expect(completeBasketballMatch(state, { recorderUserId: 'recorder-1' }))
+      .toMatchObject({ ok: false, state, code: 'invalid_period' })
+    const overtime = startNextBasketballPeriod(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:00:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000451',
+    })
+    expect(overtime.ok).toBe(true)
+    if (!overtime.ok) return
+    state = overtime.state
+    expect(state.currentPeriod).toBe(5)
+    expect(state.sportGameState?.sportId === 'basketball'
+      ? state.sportGameState.projection.periods[
+          state.sportGameState.projection.periods.length - 1
+        ]
+      : null).toMatchObject({ id: 'overtime-1', label: 'OT', order: 5 })
+
+    const firstOvertimeEnded = endBasketballPeriod(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:01:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000452',
+    })
+    expect(firstOvertimeEnded.ok).toBe(true)
+    if (!firstOvertimeEnded.ok) return
+    const secondOvertime = startNextBasketballPeriod(firstOvertimeEnded.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:02:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000453',
+    })
+    expect(secondOvertime.ok).toBe(true)
+    if (!secondOvertime.ok) return
+    state = secondOvertime.state
+    expect(state.currentPeriod).toBe(6)
+    expect(state.sportGameState?.sportId === 'basketball'
+      ? state.sportGameState.projection.periods[
+          state.sportGameState.projection.periods.length - 1
+        ]
+      : null).toMatchObject({ id: 'overtime-2', label: 'OT 2', order: 6 })
+
+    const score = captureBasketballCourtEvent(state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-02T16:03:00.000Z',
+      eventIds: ['70000000-0000-4000-8000-000000000454'],
+    })
+    expect(score.ok).toBe(true)
+    if (!score.ok) return
+    const overtimeEnded = endBasketballPeriod(score.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:04:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000455',
+    })
+    expect(overtimeEnded.ok).toBe(true)
+    if (!overtimeEnded.ok) return
+    const completed = completeBasketballMatch(overtimeEnded.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:05:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000456',
+    })
+    expect(completed.ok).toBe(true)
+    if (!completed.ok || completed.state.sportGameState?.sportId !== 'basketball') return
+    expect(completed.state.sportGameState.projection).toMatchObject({
+      status: 'ended',
+      endReason: 'completed',
+      result: 'tracked_win',
+    })
+    expect(addBasketballLateParticipant(completed.state, {
+      recorderUserId: 'recorder-1',
+      teamSide: 'tracked',
+      displayName: 'Too Late',
+    })).toMatchObject({ ok: false, state: completed.state, code: 'invalid_period' })
   })
 })

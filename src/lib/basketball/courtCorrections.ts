@@ -23,6 +23,14 @@ const COURT_EVENT_TYPES = new Set([
   'basketball.block',
 ])
 
+const LIFECYCLE_BOUNDARY_TYPES = new Set([
+  'basketball.period_started',
+  'basketball.period_ended',
+  'basketball.match_ended',
+  'basketball.match_reopened',
+  'basketball.participant_resolved',
+])
+
 export interface BasketballCourtCaptureUnit {
   id: string
   captureCommandId: string | null
@@ -31,6 +39,8 @@ export interface BasketballCourtCaptureUnit {
   who: string
   what: string
   containsLocatedFieldGoal: boolean
+  kind: 'capture' | 'boundary'
+  undoable: boolean
 }
 
 export interface BasketballClearChartPreview {
@@ -44,6 +54,20 @@ export function basketballCourtCaptureUnits(state: GameState): BasketballCourtCa
   const events = activeBasketballEvents(state)
     .filter(event => COURT_EVENT_TYPES.has(event.eventType))
     .sort(compareGameEventCaptureOrder)
+  return captureUnitsForEvents(state, events)
+}
+
+export function basketballLiveCaptureUnits(state: GameState): BasketballCourtCaptureUnit[] {
+  return captureUnitsForEvents(
+    state,
+    activeBasketballEvents(state).sort(compareGameEventCaptureOrder)
+  )
+}
+
+function captureUnitsForEvents(
+  state: GameState,
+  events: BasketballMatchEvent[]
+): BasketballCourtCaptureUnit[] {
   const grouped = new Map<string, BasketballMatchEvent[]>()
 
   for (const event of events) {
@@ -55,7 +79,7 @@ export function basketballCourtCaptureUnits(state: GameState): BasketballCourtCa
   }
 
   return [...grouped.entries()]
-    .map(([key, unitEvents]) => buildCaptureUnit(state.players, key, unitEvents))
+    .map(([key, unitEvents]) => buildCaptureUnit(state, key, unitEvents))
     .sort((left, right) => {
       const leftLast = left.events[left.events.length - 1]
       const rightLast = right.events[right.events.length - 1]
@@ -84,8 +108,15 @@ export function undoLatestBasketballCourtCapture(
 ): BasketballStateCommandResult {
   const timestamp = validTimestamp(now)
   if (!timestamp) return failure(state, 'invalid_timestamp', 'Basketball undo timestamp is invalid.')
-  const unit = basketballCourtCaptureUnits(state)[0]
-  if (!unit) return failure(state, 'nothing_to_undo', 'There is no Basketball court event to undo.')
+  const unit = basketballLiveCaptureUnits(state)[0]
+  if (!unit) return failure(state, 'nothing_to_undo', 'There is no Basketball event to undo.')
+  if (!unit.undoable) {
+    return failure(
+      state,
+      'nothing_to_undo',
+      'The newest Basketball event is a lifecycle boundary and cannot be undone here.'
+    )
+  }
   if (requireLocatedShot && !unit.containsLocatedFieldGoal) {
     return failure(state, 'nothing_to_undo', 'The newest Basketball capture is not a court shot.')
   }
@@ -165,7 +196,7 @@ export function restoreLastBasketballCourtUndo(
         : result.error.message
     )
   }
-  return { ok: true, state: withUndoReceipt(result.state, null) }
+  return { ok: true, state: reconcileBasketballPlayerRows(withUndoReceipt(result.state, null)) }
 }
 
 function activeBasketballEvents(state: GameState): BasketballMatchEvent[] {
@@ -190,7 +221,7 @@ function captureCommandIdForEvent(event: BasketballMatchEvent): string | null {
 }
 
 function buildCaptureUnit(
-  players: Player[],
+  state: GameState,
   key: string,
   events: BasketballMatchEvent[]
 ): BasketballCourtCaptureUnit {
@@ -201,15 +232,31 @@ function buildCaptureUnit(
   )
   const primary = shot ?? events[0]
   const captureCommandId = captureCommandIdForEvent(primary)
+  const boundary = events.some(event => LIFECYCLE_BOUNDARY_TYPES.has(event.eventType))
   return {
     id: captureCommandId ?? key,
     captureCommandId,
     eventIds: events.map(event => event.id),
     events,
-    who: actorLabel(players, primary),
-    what: captureUnitLabel(events, shot),
+    who: captureUnitActorLabel(state.players, primary),
+    what: captureUnitLabel(state, events, shot),
     containsLocatedFieldGoal: Boolean(shot),
+    kind: boundary ? 'boundary' : 'capture',
+    undoable: !boundary,
   }
+}
+
+function captureUnitActorLabel(players: Player[], event: BasketballMatchEvent): string {
+  if (event.eventType === 'basketball.match_roster_added') {
+    return event.payload.participant.displayName
+  }
+  if (
+    event.eventType === 'basketball.period_started' ||
+    event.eventType === 'basketball.period_ended' ||
+    event.eventType === 'basketball.match_ended' ||
+    event.eventType === 'basketball.match_reopened'
+  ) return 'Game'
+  return actorLabel(players, event)
 }
 
 function actorLabel(players: Player[], event: BasketballMatchEvent): string {
@@ -231,6 +278,7 @@ function actorLabel(players: Player[], event: BasketballMatchEvent): string {
 }
 
 function captureUnitLabel(
+  state: GameState,
   events: BasketballMatchEvent[],
   shot: BasketballMatchEvent | undefined
 ): string {
@@ -245,14 +293,38 @@ function captureUnitLabel(
     return label
   }
   switch (events[0]?.eventType) {
+    case 'basketball.period_started':
+      return `${periodLabel(state, events[0].payload.periodId)} started`
+    case 'basketball.period_ended':
+      return `${periodLabel(state, events[0].payload.periodId)} ended`
+    case 'basketball.match_roster_added':
+      return `Added to ${events[0].payload.participant.teamSide === 'tracked'
+        ? state.gameInfo?.teamName || 'tracked team'
+        : state.gameInfo?.opponentName || 'opponent'} roster`
+    case 'basketball.participant_resolved': return 'Participant identity updated'
+    case 'basketball.match_ended':
+      return events[0].payload.reason === 'completed' ? 'Game completed' : 'Game ended'
+    case 'basketball.match_reopened': return 'Game reopened'
     case 'basketball.assist': return 'Assist'
     case 'basketball.rebound':
       return events[0].payload.kind === 'offensive' ? 'Offensive rebound' : 'Defensive rebound'
     case 'basketball.steal': return 'Steal'
     case 'basketball.block': return 'Block'
     case 'basketball.shot': return `${events[0].payload.made ? 'Made' : 'Missed'} ${events[0].payload.value}PT`
+    case 'basketball.turnover': return 'Turnover'
+    case 'basketball.foul': return 'Foul'
+    case 'basketball.ejection': return 'Ejection'
+    case 'basketball.timeout': return 'Timeout'
+    case 'basketball.minutes_adjustment': return 'Minutes adjustment'
+    case 'basketball.score_adjustment': return 'Score adjustment'
+    case 'basketball.free_throw_trip': return 'Free throw trip'
     default: return 'Basketball event'
   }
+}
+
+function periodLabel(state: GameState, periodId: string): string {
+  if (state.sportGameState?.sportId !== 'basketball') return periodId
+  return state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ?? periodId
 }
 
 function clearChartPlan(state: GameState) {
@@ -316,7 +388,10 @@ function applyCorrectionsWithReceipt(
         : result.error.message
     )
   }
-  return { ok: true, state: withUndoReceipt(result.state, receipt) }
+  return {
+    ok: true,
+    state: reconcileBasketballPlayerRows(withUndoReceipt(result.state, receipt)),
+  }
 }
 
 function buildRestoreMutations(state: GameState): GameEventMutation[] | null {
@@ -371,6 +446,68 @@ function withUndoReceipt(
         ...state.sportGameState.capturePreferences,
         lastCourtUndo: receipt,
       },
+    },
+  }
+}
+
+function reconcileBasketballPlayerRows(state: GameState): GameState {
+  if (state.sportGameState?.sportId !== 'basketball') return state
+  const sportState = state.sportGameState
+  const projected = Object.values(sportState.projection.participants)
+  const playerIds = new Set(
+    projected.map(participant => participant.playerId).filter((id): id is string => Boolean(id))
+  )
+  const players = state.players
+    .filter(player => isTeamPseudoPlayer(player) || playerIds.has(player.id))
+    .map(player => {
+      if (isTeamPseudoPlayer(player)) return player
+      const participant = projected.find(value => value.playerId === player.id)
+      return participant
+        ? {
+            ...player,
+            name: participant.displayName,
+            number: participant.number ?? '',
+            stats: structuredClone(participant.stats),
+          }
+        : player
+    })
+  const existingIds = new Set(players.map(player => player.id))
+  for (const participant of projected) {
+    if (!participant.playerId || existingIds.has(participant.playerId)) continue
+    players.push({
+      id: participant.playerId,
+      name: participant.displayName,
+      number: participant.number ?? '',
+      stats: structuredClone(participant.stats),
+    })
+    existingIds.add(participant.playerId)
+  }
+
+  let capturePreferences = sportState.capturePreferences
+  const selected = capturePreferences.selectedParticipantId
+  if (selected && !sportState.projection.participants[selected]) {
+    capturePreferences = {
+      ...capturePreferences,
+      selectedParticipantId: null,
+      selectionInitialized: true,
+    }
+  }
+  const preferredPlayerId = capturePreferences.selectedParticipantId
+    ? sportState.projection.participants[capturePreferences.selectedParticipantId]?.playerId ?? null
+    : capturePreferences.teamSide === 'tracked'
+      ? players.find(player => isTeamPseudoPlayer(player) && player.teamSide !== 'opponent')?.id ?? null
+      : players.find(player => isTeamPseudoPlayer(player) && player.teamSide === 'opponent')?.id ?? null
+  const activePlayerId = state.activePlayerId && existingIds.has(state.activePlayerId)
+    ? state.activePlayerId
+    : preferredPlayerId ?? players[0]?.id ?? null
+
+  return {
+    ...state,
+    players,
+    activePlayerId,
+    sportGameState: {
+      ...sportState,
+      capturePreferences,
     },
   }
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
+import { useAuth } from '../context/AuthContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
@@ -11,6 +12,9 @@ import PlayerSelectorStrip from '../components/PlayerSelectorStrip'
 import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import RecentEventsPopup from '../components/RecentEventsPopup'
 import BasketballRecentEventsPopup from '../components/basketball/BasketballRecentEventsPopup'
+import BasketballLifecycleControls from '../components/basketball/BasketballLifecycleControls'
+import BasketballLateParticipantDialog from '../components/basketball/BasketballLateParticipantDialog'
+import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
@@ -26,12 +30,16 @@ import {
 } from '../lib/gameEvents/authority'
 import { gameEventProjectors } from '../lib/gameEvents/runtime'
 import {
+  addBasketballLateParticipant,
   basketballCaptureTargetForPlayerId,
   basketballPlayerIdForCapturePreferences,
+  completeBasketballMatch,
+  endBasketballPeriod,
   hasStartedBasketballEventGame,
+  startNextBasketballPeriod,
 } from '../lib/basketball/commands'
 import {
-  basketballCourtCaptureUnits,
+  basketballLiveCaptureUnits,
   canRestoreBasketballCourtUndo,
   restoreLastBasketballCourtUndo,
   undoLatestBasketballCourtCapture,
@@ -73,6 +81,7 @@ function timeoutCapForPeriod(
 export default function GameTracker() {
   const navigate = useNavigate()
   const { state, dispatch, flushCloudSync, parkingError } = useGame()
+  const { user } = useAuth()
   const teamAccess = useTeamRole(state.cloudSync.teamId)
   const {
     sport,
@@ -91,6 +100,9 @@ export default function GameTracker() {
   const [localNotes, setLocalNotes] = useState(notes)
   const [showRecentEvents, setShowRecentEvents] = useState(false)
   const [eventCorrectionError, setEventCorrectionError] = useState<string | null>(null)
+  const [lateParticipantError, setLateParticipantError] = useState<string | null>(null)
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null)
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
   const [showAllShots, setShowAllShots] = useState(false)
@@ -152,8 +164,13 @@ export default function GameTracker() {
   }, [sport, gameInfo, players, dispatch, state.cloudSync.teamId, state.gameDataAuthority, teamAccess.role])
 
   const isBasketballEventMode = hasStartedBasketballEventGame(state)
+  const basketballSportState = isBasketballEventMode && state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState
+    : null
+  const basketballMatchOpen = basketballSportState?.projection.status === 'in_progress' ||
+    basketballSportState?.projection.status === 'period_break'
   const basketballCaptureUnits = useMemo(
-    () => isBasketballEventMode ? basketballCourtCaptureUnits(state) : [],
+    () => isBasketballEventMode ? basketballLiveCaptureUnits(state) : [],
     [isBasketballEventMode, state]
   )
   const canRestoreBasketball = isBasketballEventMode && canRestoreBasketballCourtUndo(state)
@@ -301,6 +318,59 @@ export default function GameTracker() {
     setShowAddPlayer(false)
   }
 
+  const handleAddBasketballParticipant = (input: {
+    teamSide: 'tracked' | 'opponent'
+    displayName: string
+    number: string
+  }) => {
+    const result = addBasketballLateParticipant(state, {
+      recorderUserId: user?.id ?? null,
+      ...input,
+    })
+    if (!result.ok) {
+      setLateParticipantError(result.message)
+      return
+    }
+    setLateParticipantError(null)
+    setLifecycleError(null)
+    setShowAddPlayer(false)
+    setShowAllShots(false)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleEndBasketballPeriod = () => {
+    const result = endBasketballPeriod(state, { recorderUserId: user?.id ?? null })
+    if (!result.ok) {
+      setLifecycleError(result.message)
+      return
+    }
+    setLifecycleError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleStartNextBasketballPeriod = () => {
+    const result = startNextBasketballPeriod(state, { recorderUserId: user?.id ?? null })
+    if (!result.ok) {
+      setLifecycleError(result.message)
+      return
+    }
+    setLifecycleError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleCompleteBasketballMatch = () => {
+    const result = completeBasketballMatch(state, { recorderUserId: user?.id ?? null })
+    if (!result.ok) {
+      setLifecycleError(result.message)
+      setShowCompleteConfirm(false)
+      return
+    }
+    setLifecycleError(null)
+    setShowCompleteConfirm(false)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+    navigate('/summary')
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <div className="px-3 pt-3 pb-2 max-w-lg mx-auto w-full">
@@ -325,6 +395,15 @@ export default function GameTracker() {
             {parkingError}
           </div>
         )}
+        {basketballSportState && (
+          <BasketballLifecycleControls
+            sportState={basketballSportState}
+            errorMessage={lifecycleError}
+            onEndPeriod={handleEndBasketballPeriod}
+            onStartNextPeriod={handleStartNextBasketballPeriod}
+            onComplete={() => setShowCompleteConfirm(true)}
+          />
+        )}
       </div>
 
       <PlayerSelectorStrip
@@ -332,7 +411,14 @@ export default function GameTracker() {
         activePlayerId={activePlayer.id}
         onSelectPlayer={handleSelectPlayer}
         activeBgClass={sport.theme.bg}
-        onAddPlayer={isBasketballEventMode ? undefined : () => setShowAddPlayer(!showAddPlayer)}
+        onAddPlayer={isBasketballEventMode
+          ? basketballMatchOpen
+            ? () => {
+                setLateParticipantError(null)
+                setShowAddPlayer(true)
+              }
+            : undefined
+          : () => setShowAddPlayer(!showAddPlayer)}
         sticky
         onSelectAll={isBasketball ? () => setShowAllShots(true) : undefined}
         allActive={showAllShots}
@@ -602,6 +688,32 @@ export default function GameTracker() {
           onClose={() => setShowRecentEvents(false)}
         />
       )}
+
+      {showAddPlayer && basketballSportState && basketballMatchOpen && (
+        <BasketballLateParticipantDialog
+          trackedTeamName={gameInfo.teamName}
+          opponentName={gameInfo.opponentName}
+          defaultSide={basketballSportState.capturePreferences.teamSide}
+          errorMessage={lateParticipantError}
+          onAdd={handleAddBasketballParticipant}
+          onClose={() => {
+            setLateParticipantError(null)
+            setShowAddPlayer(false)
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={showCompleteConfirm}
+        title="End this game?"
+        message="This records the current result and makes ordinary game capture read-only."
+        confirmLabel="End Game"
+        cancelLabel="Keep Tracking"
+        destructive={false}
+        error={lifecycleError}
+        onConfirm={handleCompleteBasketballMatch}
+        onCancel={() => setShowCompleteConfirm(false)}
+      />
     </div>
   )
 }
