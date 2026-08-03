@@ -5,7 +5,7 @@ model. BKE-2 keeps the internal, local-only creation gate established in BKE-1C 
 remaining live counter mutation with one checked event command.
 
 Status: Approved through the BKE-2 product and delivery Q&A. Implementation is split into BKE-2A
-through BKE-2D. BKE-2A is next.
+through BKE-2D. BKE-2A is implemented; BKE-2B is next.
 
 Depends on:
 
@@ -29,10 +29,10 @@ lineup intervals. Those remain BKE-3 through BKE-6.
 
 | Phase | Scope | Exit condition |
 |---|---|---|
-| BKE-2A | Lifecycle and late-participant commands/UI, sequential period and overtime transitions, local completion, generalized live capture units, and non-undoable lifecycle boundaries | Event games can add valid participants, advance and complete coherently, and never undo an ordinary capture across a lifecycle boundary |
+| BKE-2A | **Implemented.** Lifecycle and late-participant commands/UI, sequential period and overtime transitions, local completion, generalized live capture units, and non-undoable lifecycle boundaries | Event games can add valid participants, advance and complete coherently, and never undo an ordinary capture across a lifecycle boundary |
 | BKE-2B | Direct player/team stat commands, unlocated field goals/free throws, score adjustments, manual minutes, optional steal-turnover pairing, standalone decrements, and event-backed grid/score UI | Every ordinary direct stat and score action has exactly one event-backed source of truth |
 | BKE-2C | Structured fouls, linked free-throw trips and attempts, one-and-one handling, player/staff ejections, charged and neutral timeouts, and dependency-aware administrative corrections | Discipline and administration capture preserve rule-derived totals and linked-event integrity |
-| BKE-2D | Complete team/period tracker presentation, bonus and inventory state, unavailable-participant behavior, full parity fixtures, regression docs, and BKE-2 exit audit | No live Basketball control is hidden or counter-backed in a healthy event game, and legacy Basketball plus Soccer remain unchanged |
+| BKE-2D | Complete team/period tracker presentation, local suspend/abandon/reopen controls, bonus and inventory state, unavailable-participant behavior, full parity fixtures, regression docs, and BKE-2 exit audit | No live Basketball control is hidden or counter-backed in a healthy event game, every modeled local terminal state is reachable, and legacy Basketball plus Soccer remain unchanged |
 
 Each slice uses its own feature branch and PR. A later slice may use commands from an earlier slice,
 but no slice may expose a control before its complete checked transition and correction behavior are
@@ -86,8 +86,12 @@ available.
 
 - Expand Recent Events from court-only units to every live Basketball capture command. Events sharing
   one non-null `captureCommandId` render and undo as one unit; null command ids remain individual.
-- Period starts, period ends, and game completion render as lifecycle rows and non-undoable
-  boundaries. Ordinary Undo cannot search past the newest boundary into an earlier period.
+- Period starts, period ends, every match end, and match reopen render as lifecycle rows and
+  non-undoable boundaries. Ordinary Undo cannot search past the newest boundary into an earlier
+  period or terminal state.
+- Participant identity resolution is an administrative, non-undoable boundary rather than an
+  ordinary capture. The quick Undo surface must not rewrite stable identity; BKE-3 owns deliberate
+  identity-event editing and its dependent-history review.
 - Dedicated lifecycle controls own period correction. BKE-3 later supplies arbitrary event editing.
 - Immediate grouped undo/restore remains newest-first and one-level. It never partially restores a
   stale receipt.
@@ -117,11 +121,10 @@ available.
 
 ### 5.3 Overtime and completion
 
-- After regulation, offer Start Overtime when tied and the snapshot requires a winner. Ending the game
-  remains a separate action.
+- Basketball v1 is winner-required and has no configurable draw/tie rule in the immutable snapshot.
+  After tied regulation, offer Start Overtime. Ending the game remains a separate action.
 - Permit another overtime after a tied overtime. Never pre-create unused overtime segments.
-- End Game appends local completion only after the active period is ended and the result satisfies
-  the immutable tie rule.
+- End Game appends local completion only after the active period is ended with a non-tied score.
 - Completion makes ordinary capture read-only. Cloud finalization/reopen remain BKE-4C.
 
 ### 5.4 Verification
@@ -131,6 +134,19 @@ available.
 - Advance regulation and multiple overtimes sequentially; reject jumps and ended-period writes.
 - Prove Recent Events cannot undo a stat across a lifecycle boundary.
 - Confirm completed local games reject ordinary capture and remain reviewable.
+
+### 5.5 Implemented behavior
+
+- `src/lib/basketball/commands.ts` owns checked late-participant, period-end, next-period, dynamic
+  overtime, and local-completion transitions. Successful commands append and reproject once;
+  failures return the original state.
+- Game Tracker exposes the current segment and only the valid next lifecycle action. Court capture
+  and court correction controls are read-only during period breaks and after completion.
+- Add Participant supports tracked and opponent individuals without changing the immutable opening
+  setup. The projected participant registry, compatibility player rows, and persisted capture target
+  update together.
+- Recent Events now reads every active Basketball event command. Lifecycle rows are visible
+  non-undoable boundaries; a late-roster addition remains an undoable/restorable capture unit.
 
 ## 6. BKE-2B: Direct Stats, Score, and Minutes
 
@@ -243,6 +259,9 @@ available.
 ### 8.2 Live surface completion
 
 - Remove BKE-1 event-mode hides only after each replacement control is checked and event-backed.
+- Add explicit local Suspend and Abandon actions plus reasoned local Reopen so every terminal reason
+  already modeled by the Basketball projector is reachable before cloud cutover. BKE-4C still owns
+  recorder-aware finalization, canonical publication, and reopen after cloud finalization.
 - Keep court/grid additive: court shots carry location; direct shots do not.
 - Preserve compact repeated-use controls and use focused sheets for structured actions.
 - Keep capture/lifecycle/correction errors near the initiating control.
@@ -250,8 +269,8 @@ available.
 ### 8.3 Exit verification
 
 - Extend reducer-equivalence fixtures across every legacy action and approved intentional difference.
-- Test mixed court/grid games, actor variants, periods/overtime, completion, links, corrections,
-  restore invalidation, parking, import, and hydration.
+- Test mixed court/grid games, actor variants, periods/overtime, completion, suspension,
+  abandonment, local reopen, links, corrections, restore invalidation, parking, import, and hydration.
 - Verify no healthy event game dispatches legacy stat, score, period, or roster mutations.
 - Verify all unmarked Basketball behavior and Soccer behavior remain unchanged.
 - Update operational docs and regression coverage with shipped ownership and the BKE-3 boundary.
@@ -285,7 +304,8 @@ available.
 23. Derive team fouls from structured events and use team actors for unknown/bench fouls.
 24. Derive bonus state from foul history and immutable rules.
 25. Complete/cancel open UI drafts before period transition; persisted partial trips survive.
-26. End games explicitly and offer overtime when winner-required regulation is tied.
+26. Basketball v1 requires a winner: end games explicitly only with a non-tied score and offer
+    overtime after tied regulation or overtime.
 27. Confirm and atomically apply corrections with linked/derived consequences.
 28. Treat lifecycle transitions as visible non-undoable Recent Events boundaries.
 29. Prefer rostered opponents, use Unknown Opponent for unrostered individual facts, and reserve team

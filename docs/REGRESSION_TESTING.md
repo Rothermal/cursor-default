@@ -676,6 +676,26 @@ event-authoritative Basketball checks.
 
 ---
 
+## 11a4. Basketball lifecycle and participants (BKE-2A)
+
+**Precondition:** Development build with a healthy, local Basketball event game created through the
+internal event-model option. Event Basketball remains unavailable for cloud/team checkout.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a4.1 | Start a Basketball event game | Period 1 is active; the lifecycle band shows the snapshotted label and End Period; legacy free-select period tabs remain absent |
+| 11a4.2 | Select a tracked player, choose Add Participant, and add a tracked individual | The sheet defaults to Tracked; one roster-added event appends; the participant is selected immediately without changing the immutable opening setup |
+| 11a4.3 | Add an opponent participant with an optional number, then park and resume | The opponent participant retains stable identity, side, number, selector row, and capture selection |
+| 11a4.4 | Submit a blank name or a duplicate stable id through the checked command | The command returns the original state and the focused sheet keeps its entered values with an inline error |
+| 11a4.5 | End Period 1, inspect the tracker, then start the next period | Court capture and chart corrections are read-only during the break; only the sequential next-period action is offered |
+| 11a4.6 | Advance through the final regulation period with a tied score | End Game is unavailable and exactly one next overtime can be started from the immutable template |
+| 11a4.7 | End tied overtime and start another, then finish an overtime with a non-tied score | Overtime ids/orders remain sequential; End Game appears only after the completed non-tied period |
+| 11a4.8 | Confirm End Game, then return to the tracker | The local result is projected as final; ordinary capture, Add Participant, and correction controls remain read-only; Summary stays available |
+| 11a4.9 | Open Recent Events after a capture and period transition | Lifecycle rows are visible as Boundary; ordinary Undo cannot cross the newest boundary; a latest late-participant addition can still be undone and restored as one unit |
+| 11a4.10 | Create and track an ordinary legacy Basketball game and a Soccer game | Legacy reducer Basketball and Soccer tracker/lifecycle behavior remain unchanged |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

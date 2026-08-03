@@ -452,7 +452,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 ### What's Next
 
 - [ ] **Soccer post-deployment validation** - exercise the owner-only opt-in release against migration 049 and retain the broader role/device/failure matrix before access expands ([release matrix](docs/REGRESSION_SOC_6E_RELEASE.md), [SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md))
-- [ ] **Basketball lifecycle and participants (BKE-2A)** - sequential regulation/overtime transitions, local completion, late participants, generalized capture units, and non-undoable lifecycle boundaries ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))
+- [x] **Basketball lifecycle and participants (BKE-2A)** - sequential regulation/overtime transitions, local completion, late participants, generalized capture units, and non-undoable lifecycle boundaries ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))
 - [ ] **Basketball direct stats, score, and minutes (BKE-2B)** - event-backed grid/score controls, optional steal-turnover pairing, unlocated direct shots, and safe decrements ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))
 - [ ] **Basketball discipline and administration (BKE-2C)** - structured fouls, free-throw trips, ejections, timeouts, and dependency-aware corrections ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))
 - [ ] **Basketball complete tracker parity (BKE-2D)** - team/period presentation, projected bonus/inventory state, unavailable participants, and full exit regression ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))

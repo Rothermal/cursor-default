@@ -24,7 +24,7 @@ import {
   hasStartedBasketballEventGame,
 } from '../../lib/basketball/commands'
 import {
-  basketballCourtCaptureUnits,
+  basketballLiveCaptureUnits,
   clearBasketballShotChart,
   previewBasketballClearShotChart,
   undoLatestBasketballCourtCapture,
@@ -94,8 +94,12 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
   const [correctionError, setCorrectionError] = useState<string | null>(null)
   const pendingPulseIdRef = useRef<string | null>(null)
   const isEventBasketball = hasStartedBasketballEventGame(state)
+  const eventCaptureOpen = !isEventBasketball || (
+    state.sportGameState?.sportId === 'basketball' &&
+    state.sportGameState.projection.status === 'in_progress'
+  )
   const eventCaptureUnits = useMemo(
-    () => isEventBasketball ? basketballCourtCaptureUnits(state) : [],
+    () => isEventBasketball ? basketballLiveCaptureUnits(state) : [],
     [isEventBasketball, state]
   )
   const clearPreview = useMemo(
@@ -260,7 +264,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
     [lastEntry, players]
   )
   const canClearShots = shotChart.length > 0
-  const canUndoEventShot = Boolean(eventCaptureUnits[0]?.containsLocatedFieldGoal)
+  const canUndoEventShot = eventCaptureOpen && Boolean(eventCaptureUnits[0]?.containsLocatedFieldGoal)
 
   // What the court + zone summary display (F2); recording is unaffected by the filter.
   const visibleShots = useMemo(
@@ -305,10 +309,12 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
         <BasketballCourt
           shots={visibleShots}
-          onCourtTap={onCourtTap}
+          onCourtTap={eventCaptureOpen ? onCourtTap : undefined}
           className="w-full"
           newlyPlacedShotId={pulseShotId}
-          emptyHint="Tap the court to log an event."
+          emptyHint={eventCaptureOpen
+            ? 'Tap the court to log an event.'
+            : 'Court capture is unavailable between periods or after completion.'}
         />
       </div>
 
@@ -355,7 +361,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       </button>}
       {isEventBasketball && <button
         type="button"
-        disabled={!clearPreview || clearPreview.shotCount === 0}
+        disabled={!eventCaptureOpen || !clearPreview || clearPreview.shotCount === 0}
         onClick={() => setShowClearConfirm(true)}
         className="w-full py-2 rounded-xl text-sm font-medium border border-rose-200 bg-rose-50 text-rose-800
                    disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"

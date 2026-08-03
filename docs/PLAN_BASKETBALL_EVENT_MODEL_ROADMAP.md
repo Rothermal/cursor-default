@@ -7,7 +7,8 @@ Status: BKE-0 architecture and product-model decisions are approved in
 [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md).
 BKE-1A, all BKE-1B slices, and all BKE-1C slices are complete. BKE-2 product and delivery decisions
 are approved in [PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md);
-BKE-2A lifecycle, participants, and correction boundaries are next.
+BKE-2A lifecycle, participants, and correction boundaries are complete. BKE-2B direct stats, score,
+and minutes is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
