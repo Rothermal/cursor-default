@@ -4,7 +4,8 @@ Detailed plan for moving the existing Basketball court workflow onto the authori
 foundation while keeping normal Basketball games on the legacy aggregate path.
 
 Status: Complete. Product and delivery decisions were confirmed in the BKE-1C Q&A, and BKE-1C1
-through BKE-1C3 are implemented. BKE-2 direct live actions are next.
+through BKE-1C3 are implemented. BKE-2 is approved in
+[PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md); BKE-2A is next.
 
 Depends on:
 
