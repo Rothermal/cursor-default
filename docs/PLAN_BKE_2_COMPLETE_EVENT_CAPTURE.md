@@ -5,7 +5,7 @@ model. BKE-2 keeps the internal, local-only creation gate established in BKE-1C 
 remaining live counter mutation with one checked event command.
 
 Status: Approved through the BKE-2 product and delivery Q&A. Implementation is split into BKE-2A
-through BKE-2D. BKE-2A is implemented; BKE-2B is next.
+through BKE-2D. BKE-2A and BKE-2B are implemented; BKE-2C is next.
 
 Depends on:
 
@@ -30,7 +30,7 @@ lineup intervals. Those remain BKE-3 through BKE-6.
 | Phase | Scope | Exit condition |
 |---|---|---|
 | BKE-2A | **Implemented.** Lifecycle and late-participant commands/UI, sequential period and overtime transitions, local completion, generalized live capture units, and non-undoable lifecycle boundaries | Event games can add valid participants, advance and complete coherently, and never undo an ordinary capture across a lifecycle boundary |
-| BKE-2B | Direct player/team stat commands, unlocated field goals/free throws, score adjustments, manual minutes, optional steal-turnover pairing, standalone decrements, and event-backed grid/score UI | Every ordinary direct stat and score action has exactly one event-backed source of truth |
+| BKE-2B | **Implemented.** Direct player/team stat commands, unlocated field goals/free throws, score adjustments, manual minutes, optional steal-turnover pairing, standalone decrements, and event-backed grid/score UI | Every ordinary direct stat and score action has exactly one event-backed source of truth |
 | BKE-2C | Structured fouls, linked free-throw trips and attempts, one-and-one handling, player/staff ejections, charged and neutral timeouts, and dependency-aware administrative corrections | Discipline and administration capture preserve rule-derived totals and linked-event integrity |
 | BKE-2D | Complete team/period tracker presentation, local suspend/abandon/reopen controls, bonus and inventory state, unavailable-participant behavior, full parity fixtures, regression docs, and BKE-2 exit audit | No live Basketball control is hidden or counter-backed in a healthy event game, every modeled local terminal state is reachable, and legacy Basketball plus Soccer remain unchanged |
 
@@ -179,7 +179,9 @@ available.
 
 ### 6.3 Decrements
 
-- Standalone assist, rebound, steal, block, and turnover decrements tombstone the newest active match.
+- Standalone assist, rebound, steal, block, and turnover decrements tombstone the newest active
+  match in the current period. Quick grid correction never crosses a lifecycle boundary;
+  earlier-period editing belongs to BKE-3.
 - Minutes `-1` appends a negative adjustment only when projected minutes are at least one.
 - Field-goal decrement atomically tombstones the shot and linked assists/rebounds while unlinking
   active blocks. Confirm exact effects.
@@ -195,6 +197,24 @@ available.
   ordinal.
 - Cover tracked, rostered opponent, unknown opponent, and team attribution.
 - Cover every decrement at zero, with dependents, and through immediate restore.
+
+### 6.5 Implemented behavior
+
+- `src/lib/basketball/directCommands.ts` owns checked direct shots, related stats, player/team
+  turnovers, signed minutes, quick/official score adjustments, and atomic Steal + Turnover capture.
+  All commands reject cloud-bound or inactive-period event games and return the original state on
+  failure.
+- Game Tracker restores the familiar player grid for supported event actions and exposes only team
+  turnover on team chips. Made and missed shots have independent correction controls; fouls,
+  technicals, and timeouts stay hidden until BKE-2C.
+- Scoreboard `+1/-1` creates explicit `scoreboard_control` events. Official Correction requires a
+  signed whole-number delta and note, preserves its draft on rejection, and cannot make a side
+  negative.
+- Standalone decrements target the newest matching current-period event. Field goals remove linked
+  assists and rebounds while preserving and unlinking blocks; free throws remove linked rebounds.
+  Exact consequences require confirmation and use the reload-safe one-level inverse receipt.
+- The optional Steal + Turnover sheet records one atomic capture command and supports a rostered
+  opposite-side player, an explicit unknown player label, or the opposite team actor.
 
 ## 7. BKE-2C: Fouls, Free Throws, Ejections, and Timeouts
 

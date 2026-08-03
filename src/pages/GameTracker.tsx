@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Link2 } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { computeCategoryTotal } from '../config/sports'
@@ -14,10 +15,12 @@ import RecentEventsPopup from '../components/RecentEventsPopup'
 import BasketballRecentEventsPopup from '../components/basketball/BasketballRecentEventsPopup'
 import BasketballLifecycleControls from '../components/basketball/BasketballLifecycleControls'
 import BasketballLateParticipantDialog from '../components/basketball/BasketballLateParticipantDialog'
+import BasketballScoreCorrectionDialog from '../components/basketball/BasketballScoreCorrectionDialog'
+import BasketballStealTurnoverDialog from '../components/basketball/BasketballStealTurnoverDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
-import { playersWithTeamPlaceholders } from '../lib/teamPlayers'
+import { isTeamPseudoPlayer, playersWithTeamPlaceholders } from '../lib/teamPlayers'
 import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
@@ -41,9 +44,30 @@ import {
 import {
   basketballLiveCaptureUnits,
   canRestoreBasketballCourtUndo,
+  decrementBasketballDirectStat,
+  previewBasketballDirectDecrement,
   restoreLastBasketballCourtUndo,
   undoLatestBasketballCourtCapture,
+  type BasketballDirectDecrementPreview,
 } from '../lib/basketball/courtCorrections'
+import {
+  adjustBasketballScore,
+  captureBasketballDirectStat,
+  captureBasketballStealTurnover,
+  decrementBasketballMinutes,
+  type BasketballDirectStatId,
+  type BasketballTurnoverTarget,
+} from '../lib/basketball/directCommands'
+import type { BasketballTeamSide } from '../lib/basketball/types'
+
+const BASKETBALL_DIRECT_STAT_IDS = new Set<BasketballDirectStatId>([
+  'ft', 'ft_miss', '2pt', '2pt_miss', '3pt', '3pt_miss',
+  'oreb', 'dreb', 'ast', 'stl', 'blk', 'to', 'min', 'team_turnover',
+])
+
+function isBasketballDirectStatId(statId: string): statId is BasketballDirectStatId {
+  return BASKETBALL_DIRECT_STAT_IDS.has(statId as BasketballDirectStatId)
+}
 
 function hasPeriodScopedActions(categories: StatCategory[] | undefined): boolean {
   if (!categories) return false
@@ -102,6 +126,17 @@ export default function GameTracker() {
   const [eventCorrectionError, setEventCorrectionError] = useState<string | null>(null)
   const [lateParticipantError, setLateParticipantError] = useState<string | null>(null)
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
+  const [directCaptureError, setDirectCaptureError] = useState<string | null>(null)
+  const [showScoreCorrection, setShowScoreCorrection] = useState(false)
+  const [scoreCorrectionError, setScoreCorrectionError] = useState<string | null>(null)
+  const [showStealTurnover, setShowStealTurnover] = useState(false)
+  const [stealTurnoverError, setStealTurnoverError] = useState<string | null>(null)
+  const [pendingDirectDecrement, setPendingDirectDecrement] = useState<{
+    playerId: string
+    statId: Exclude<BasketballDirectStatId, 'min'>
+    preview: BasketballDirectDecrementPreview
+  } | null>(null)
+  const [directDecrementError, setDirectDecrementError] = useState<string | null>(null)
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
@@ -261,6 +296,37 @@ export default function GameTracker() {
     showTeamStatGrid && hasPeriodScopedActions(sport.teamCategories)
 
   const gridCategories = showTeamStatGrid ? sport.teamCategories! : sport.categories
+  const basketballPeriodActive = basketballSportState?.projection.status === 'in_progress'
+  const displayGridCategories = isBasketballEventMode
+    ? gridCategories
+        .map(category => ({
+          ...category,
+          actions: category.actions.filter(action =>
+            showTeamStatGrid
+              ? action.id === 'team_turnover'
+              : isBasketballDirectStatId(action.id) && action.id !== 'team_turnover'
+          ),
+        }))
+        .filter(category => category.actions.length > 0)
+    : gridCategories
+  const activeBasketballParticipant = basketballSportState
+    ? Object.values(basketballSportState.projection.participants)
+        .find(participant => participant.playerId === activePlayer.id)
+    : null
+  const stealTurnoverSide: BasketballTeamSide | null = activeBasketballParticipant
+    ? activeBasketballParticipant.teamSide === 'tracked' ? 'opponent' : 'tracked'
+    : null
+  const stealTurnoverTeamName = stealTurnoverSide === 'tracked'
+    ? gameInfo.teamName
+    : gameInfo.opponentName
+  const stealTurnoverCandidates = stealTurnoverSide && basketballSportState
+    ? Object.values(basketballSportState.projection.participants)
+        .filter(participant => participant.teamSide === stealTurnoverSide && participant.playerId)
+        .map(participant => ({
+          playerId: participant.playerId!,
+          label: `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`,
+        }))
+    : []
 
   const foulBaseForBonus = sport.teamFoulBaseStatId ?? null
   const teamFoulCountThisPeriod =
@@ -292,6 +358,116 @@ export default function GameTracker() {
       return
     }
     setEventCorrectionError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleDirectCapture = (playerId: string, statId: BasketballDirectStatId) => {
+    const result = captureBasketballDirectStat(state, {
+      recorderUserId: user?.id ?? null,
+      playerId,
+      statId,
+    })
+    if (!result.ok) {
+      setDirectCaptureError(result.message)
+      return
+    }
+    setDirectCaptureError(null)
+    setDirectDecrementError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const applyDirectDecrement = (
+    playerId: string,
+    statId: Exclude<BasketballDirectStatId, 'min'>
+  ) => {
+    const result = decrementBasketballDirectStat(state, playerId, statId)
+    if (!result.ok) {
+      setDirectDecrementError(result.message)
+      return false
+    }
+    setDirectCaptureError(null)
+    setDirectDecrementError(null)
+    setPendingDirectDecrement(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+    return true
+  }
+
+  const handleDirectDecrement = (playerId: string, statId: BasketballDirectStatId) => {
+    const preview = previewBasketballDirectDecrement(state, playerId, statId)
+    if (!preview.ok) {
+      setDirectDecrementError(preview.message)
+      return
+    }
+    if (statId === 'min') {
+      const result = decrementBasketballMinutes(state, {
+        recorderUserId: user?.id ?? null,
+        playerId,
+      })
+      if (!result.ok) {
+        setDirectDecrementError(result.message)
+        return
+      }
+      setDirectCaptureError(null)
+      setDirectDecrementError(null)
+      dispatch({ type: 'HYDRATE_STATE', state: result.state })
+      return
+    }
+    if (preview.value.requiresConfirmation) {
+      setDirectDecrementError(null)
+      setPendingDirectDecrement({ playerId, statId, preview: preview.value })
+      return
+    }
+    applyDirectDecrement(playerId, statId)
+  }
+
+  const handleQuickScoreAdjustment = (teamSide: BasketballTeamSide, delta: 1 | -1) => {
+    const result = adjustBasketballScore(state, {
+      recorderUserId: user?.id ?? null,
+      teamSide,
+      delta,
+      reason: 'scoreboard_control',
+    })
+    if (!result.ok) {
+      setDirectCaptureError(result.message)
+      return
+    }
+    setDirectCaptureError(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleOfficialScoreCorrection = (input: {
+    teamSide: BasketballTeamSide
+    delta: number
+    note: string
+  }) => {
+    const result = adjustBasketballScore(state, {
+      recorderUserId: user?.id ?? null,
+      ...input,
+      reason: 'official_correction',
+    })
+    if (!result.ok) {
+      setScoreCorrectionError(result.message)
+      return
+    }
+    setDirectCaptureError(null)
+    setScoreCorrectionError(null)
+    setShowScoreCorrection(false)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleStealTurnover = (turnoverTarget: BasketballTurnoverTarget) => {
+    const result = captureBasketballStealTurnover(state, {
+      recorderUserId: user?.id ?? null,
+      stealerPlayerId: activePlayer.id,
+      turnoverTarget,
+    })
+    if (!result.ok) {
+      setStealTurnoverError(result.message)
+      return
+    }
+    setDirectCaptureError(null)
+    setStealTurnoverError(null)
+    setShowStealTurnover(false)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
@@ -389,7 +565,17 @@ export default function GameTracker() {
           </button>
         </div>
 
-        <Scoreboard readOnly={isBasketballEventMode} />
+        <Scoreboard
+          readOnly={isBasketballEventMode}
+          eventScoreControls={basketballSportState ? {
+            disabled: !basketballPeriodActive,
+            onAdjust: handleQuickScoreAdjustment,
+            onOfficialCorrection: () => {
+              setScoreCorrectionError(null)
+              setShowScoreCorrection(true)
+            },
+          } : undefined}
+        />
         {parkingError && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             {parkingError}
@@ -495,7 +681,7 @@ export default function GameTracker() {
 
       <div className="px-3 pb-20 max-w-lg mx-auto w-full">
         <div className="space-y-4 mt-2">
-          {!isBasketballEventMode && gridCategories.map(category => {
+          {displayGridCategories.map(category => {
             const missMap: Record<string, typeof category.actions[0]> = {}
             for (const a of category.actions) {
               if (a.madeStatId) missMap[a.madeStatId] = a
@@ -550,6 +736,18 @@ export default function GameTracker() {
                 }`}>
                   {visibleActions.map(action => {
                     const missAction = missMap[action.id]
+                    const directStatId = isBasketballEventMode && isBasketballDirectStatId(action.id)
+                      ? action.id
+                      : null
+                    const directMissStatId = isBasketballEventMode && missAction && isBasketballDirectStatId(missAction.id)
+                      ? missAction.id
+                      : null
+                    const decrementPreview = directStatId
+                      ? previewBasketballDirectDecrement(state, activePlayer.id, directStatId)
+                      : null
+                    const missDecrementPreview = directMissStatId
+                      ? previewBasketballDirectDecrement(state, activePlayer.id, directMissStatId)
+                      : null
                     const scopedId = actualStatId(action, currentPeriod)
                     const periodTotal =
                       action.periodScoped
@@ -591,26 +789,36 @@ export default function GameTracker() {
                         pointValue={action.pointValue}
                         subtitle={subtitle}
                         maxValue={timeoutCap}
-                        onIncrement={() =>
-                          dispatch({
-                            type: 'INCREMENT_STAT',
-                            playerId: activePlayer.id,
-                            statId: scopedId,
-                          })
+                        disabled={isBasketballEventMode && !basketballPeriodActive}
+                        decrementDisabled={isBasketballEventMode && !decrementPreview?.ok}
+                        attemptDecrementDisabled={isBasketballEventMode && !missDecrementPreview?.ok}
+                        onIncrement={() => directStatId
+                          ? handleDirectCapture(activePlayer.id, directStatId)
+                          : dispatch({
+                              type: 'INCREMENT_STAT',
+                              playerId: activePlayer.id,
+                              statId: scopedId,
+                            })
                         }
-                        onDecrement={() =>
-                          dispatch({
-                            type: 'DECREMENT_STAT',
-                            playerId: activePlayer.id,
-                            statId: scopedId,
-                          })
+                        onDecrement={() => directStatId
+                          ? handleDirectDecrement(activePlayer.id, directStatId)
+                          : dispatch({
+                              type: 'DECREMENT_STAT',
+                              playerId: activePlayer.id,
+                              statId: scopedId,
+                            })
                         }
-                        onAttempt={missAction ? () =>
-                          dispatch({
-                            type: 'INCREMENT_STAT',
-                            playerId: activePlayer.id,
-                            statId: missAction.id,
-                          }) : undefined
+                        onAttempt={missAction ? () => directMissStatId
+                          ? handleDirectCapture(activePlayer.id, directMissStatId)
+                          : dispatch({
+                              type: 'INCREMENT_STAT',
+                              playerId: activePlayer.id,
+                              statId: missAction.id,
+                            }) : undefined
+                        }
+                        onAttemptDecrement={directMissStatId
+                          ? () => handleDirectDecrement(activePlayer.id, directMissStatId)
+                          : undefined
                         }
                         attemptCount={missAction ? (activePlayer.stats[missAction.id] || 0) : undefined}
                       />
@@ -628,6 +836,25 @@ export default function GameTracker() {
               </div>
             )
           })}
+          {isBasketballEventMode && activeBasketballParticipant && !isTeamPseudoPlayer(activePlayer) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStealTurnoverError(null)
+                setShowStealTurnover(true)
+              }}
+              disabled={!basketballPeriodActive}
+              className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2 text-sm disabled:opacity-40"
+            >
+              <Link2 size={16} aria-hidden />
+              Steal + Turnover
+            </button>
+          )}
+          {isBasketballEventMode && (directCaptureError || directDecrementError) && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+              {directCaptureError ?? directDecrementError}
+            </p>
+          )}
           <div className="mt-2">
             <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Game Notes
@@ -702,6 +929,66 @@ export default function GameTracker() {
           }}
         />
       )}
+
+      {showScoreCorrection && basketballSportState && (
+        <BasketballScoreCorrectionDialog
+          trackedTeamName={gameInfo.teamName}
+          opponentName={gameInfo.opponentName}
+          trackedScore={basketballSportState.projection.score.tracked}
+          opponentScore={basketballSportState.projection.score.opponent}
+          errorMessage={scoreCorrectionError}
+          onSubmit={handleOfficialScoreCorrection}
+          onClose={() => {
+            setScoreCorrectionError(null)
+            setShowScoreCorrection(false)
+          }}
+        />
+      )}
+
+      {showStealTurnover && activeBasketballParticipant && stealTurnoverSide && (
+        <BasketballStealTurnoverDialog
+          stealerLabel={`${activeBasketballParticipant.number ? `#${activeBasketballParticipant.number} ` : ''}${activeBasketballParticipant.displayName}`}
+          turnoverTeamName={stealTurnoverTeamName}
+          candidates={stealTurnoverCandidates}
+          errorMessage={stealTurnoverError}
+          onSubmit={handleStealTurnover}
+          onClose={() => {
+            setStealTurnoverError(null)
+            setShowStealTurnover(false)
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={pendingDirectDecrement !== null}
+        title={`Remove ${pendingDirectDecrement?.preview.label ?? 'stat'}?`}
+        message={pendingDirectDecrement
+          ? [
+              `This removes the selected ${pendingDirectDecrement.preview.label}.`,
+              pendingDirectDecrement.preview.linkedAssistCount > 0
+                ? `${pendingDirectDecrement.preview.linkedAssistCount} linked assist will also be removed.`
+                : null,
+              pendingDirectDecrement.preview.linkedReboundCount > 0
+                ? `${pendingDirectDecrement.preview.linkedReboundCount} linked rebound will also be removed.`
+                : null,
+              pendingDirectDecrement.preview.unlinkedBlockCount > 0
+                ? `${pendingDirectDecrement.preview.unlinkedBlockCount} linked block will be kept and unlinked.`
+                : null,
+            ].filter(Boolean).join(' ')
+          : ''}
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        error={directDecrementError}
+        onConfirm={() => {
+          if (pendingDirectDecrement) {
+            applyDirectDecrement(pendingDirectDecrement.playerId, pendingDirectDecrement.statId)
+          }
+        }}
+        onCancel={() => {
+          setDirectDecrementError(null)
+          setPendingDirectDecrement(null)
+        }}
+      />
 
       <ConfirmDialog
         open={showCompleteConfirm}

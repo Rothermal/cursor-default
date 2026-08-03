@@ -204,7 +204,9 @@ export function normalizeBasketballCourtUndoReceipt(
 ): BasketballCourtUndoReceipt | null {
   if (
     !isPlainObject(value) ||
-    (value.kind !== 'capture_undo' && value.kind !== 'clear_chart') ||
+    (value.kind !== 'capture_undo' &&
+      value.kind !== 'clear_chart' &&
+      value.kind !== 'direct_decrement') ||
     typeof value.createdAt !== 'string' ||
     !Number.isFinite(Date.parse(value.createdAt)) ||
     !Array.isArray(value.entries) ||
