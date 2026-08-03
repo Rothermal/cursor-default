@@ -313,6 +313,40 @@ describe('BKE-2B Basketball direct commands', () => {
       reason: 'scoreboard_control',
     })).toMatchObject({ ok: false, state: cloud, code: 'cloud_flow_unsupported' })
   })
+
+  it('rejects manual minutes when the game clock is authoritative', () => {
+    const before = startedState()
+    if (before.sportGameState?.sportId !== 'basketball') throw new Error('Expected Basketball state.')
+    const anchored: GameState = {
+      ...before,
+      sportGameState: {
+        ...before.sportGameState,
+        setup: {
+          ...before.sportGameState.setup,
+          rulesSnapshot: {
+            ...before.sportGameState.setup.rulesSnapshot,
+            clockModel: 'anchored',
+          },
+        },
+      },
+    }
+    const eventCount = anchored.eventStream?.events.length ?? 0
+
+    expect(captureBasketballDirectStat(anchored, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      statId: 'min',
+      occurredAt: '2026-08-03T12:30:00.000Z',
+      eventId: '72000000-0000-4000-8000-000000000801',
+    })).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
+    expect(decrementBasketballMinutes(anchored, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      occurredAt: '2026-08-03T12:31:00.000Z',
+      eventId: '72000000-0000-4000-8000-000000000802',
+    })).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
+    expect(anchored.eventStream?.events).toHaveLength(eventCount)
+  })
 })
 
 describe('BKE-2B Basketball direct decrements', () => {
