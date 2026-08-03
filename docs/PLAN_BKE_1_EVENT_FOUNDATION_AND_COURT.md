@@ -4,8 +4,8 @@ Parent plan for the first Basketball event-model implementation program. BKE-1 e
 remaining sport-neutral seams, installs a deterministic Basketball event foundation, and then
 moves the existing court workflow onto that foundation behind an internal-only gate.
 
-Status: In progress. BKE-1A, all BKE-1B slices, and BKE-1C1 are complete. The detailed BKE-1C plan
-is approved and split into BKE-1C1 through BKE-1C3; BKE-1C2 is next.
+Status: Complete. BKE-1A, all BKE-1B slices, and BKE-1C1 through BKE-1C3 are implemented. BKE-2 is
+approved and split into BKE-2A through BKE-2D in `PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`.
 
 Architecture: [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md)
 
@@ -109,9 +109,9 @@ Intentional product changes receive named expectations. They are not hidden as p
 2. Audit the resulting engine API and write the detailed BKE-1B plan.
 3. Implement and merge BKE-1B with no live Basketball cutover. **Complete.**
 4. Audit the Basketball projector and write the detailed BKE-1C plan. **Complete.**
-5. Implement BKE-1C1 through BKE-1C3 behind a development/internal creation gate. **BKE-1C1
-   complete; BKE-1C2 and BKE-1C3 remain.**
-6. Keep the gate closed and proceed to BKE-2 complete live capture.
+5. Implement BKE-1C1 through BKE-1C3 behind a development/internal creation gate. **Complete.**
+6. Keep the gate closed and proceed to BKE-2 complete live capture. **Planning complete; BKE-2A is
+   next.**
 
 Each child phase gets its own feature branch and PR. Documentation status and regression notes are
 updated in the same PR as the implementation they describe.
