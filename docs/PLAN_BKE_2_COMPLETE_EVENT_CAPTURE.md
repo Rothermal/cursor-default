@@ -70,8 +70,9 @@ available.
 - Use rostered opponent participants when available. Use an `unknown` actor for genuinely
   player-attributed opponent facts without a roster, and a team actor only for team-level facts.
   Never fabricate a participant.
-- Append a late individual through `basketball.participant_added` before making them selectable.
-  Pseudo-players remain compatibility rows, not match participants.
+- Append a late individual through the existing validated `basketball.match_roster_added` family
+  before making them selectable. BKE-2A wires its checked command and UI; it does not register a
+  second participant-addition event. Pseudo-players remain compatibility rows, not match participants.
 
 ### 4.2 Failure behavior
 
@@ -99,7 +100,8 @@ available.
 - Default to the selected side. Require a non-empty individual name and preserve number as optional.
 - The existing side team actor remains a separate picker target, not a participant option. Selecting
   a team chip never fabricates or appends a participant row.
-- Append an individual participant event and select the new participant in one checked transition.
+- Append `basketball.match_roster_added` and select the new individual in one checked transition.
+  Reuse its existing participant/destination validation and projector duplicate guards.
 - Permit tracked and opponent additions. Opponent rosters remain optional.
 - Reject duplicate stable participant ids and additions after local completion.
 
