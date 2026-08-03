@@ -30,10 +30,14 @@ interface StatButtonProps {
   maxValue?: number
   onIncrement: () => void
   onDecrement: () => void
+  onAttemptDecrement?: () => void
   /** If provided, renders a middle "A" (attempt/miss) button between − and +. */
   onAttempt?: () => void
   /** Number of misses logged; combined with value to display made/total in badge. */
   attemptCount?: number
+  disabled?: boolean
+  decrementDisabled?: boolean
+  attemptDecrementDisabled?: boolean
 }
 
 export default function StatButton({
@@ -46,8 +50,12 @@ export default function StatButton({
   maxValue,
   onIncrement,
   onDecrement,
+  onAttemptDecrement,
   onAttempt,
   attemptCount = 0,
+  disabled = false,
+  decrementDisabled = false,
+  attemptDecrementDisabled = false,
 }: StatButtonProps) {
   const [flash, setFlash] = useState(false)
   const [attemptFlash, setAttemptFlash] = useState(false)
@@ -93,26 +101,43 @@ export default function StatButton({
       <div className="flex gap-1.5">
         <button
           onClick={(e) => { e.stopPropagation(); onDecrement() }}
-          disabled={value === 0}
+          disabled={disabled || decrementDisabled || value === 0}
+          aria-label={`Decrease ${label}`}
           className="flex-1 h-10 rounded-lg bg-white/60 border border-slate-200 text-lg font-bold
                      active:scale-95 transition-transform disabled:opacity-30"
         >
           −
         </button>
         {hasAttempt && (
+          onAttemptDecrement ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAttemptDecrement() }}
+              disabled={disabled || attemptDecrementDisabled || attemptCount === 0}
+              aria-label={`Decrease missed ${label} attempt`}
+              className="flex-1 h-10 rounded-lg bg-white/60 border border-slate-200 text-xs font-bold
+                         active:scale-95 transition-transform disabled:opacity-30"
+            >
+              -M
+            </button>
+          ) : null
+        )}
+        {hasAttempt && (
           <button
             onClick={(e) => { e.stopPropagation(); handleAttempt() }}
+            disabled={disabled}
+            aria-label={`Record missed ${label} attempt`}
             className={`flex-1 h-10 rounded-lg text-white text-sm font-bold
-                        active:scale-95 transition-transform shadow-sm
+                        active:scale-95 transition-transform shadow-sm disabled:opacity-30
                         ${attemptFlash ? 'bg-slate-600' : 'bg-slate-500'}`}
             title="Record missed attempt"
           >
-            A
+            {onAttemptDecrement ? '+M' : 'A'}
           </button>
         )}
         <button
           onClick={handleIncrement}
-          disabled={maxValue !== undefined && value >= maxValue}
+          disabled={disabled || (maxValue !== undefined && value >= maxValue)}
+          aria-label={`Increase ${label}`}
           className={`${hasAttempt ? 'flex-1' : 'flex-[2]'} h-10 rounded-lg ${styles.badge} text-white text-lg font-bold
                       active:scale-95 transition-transform shadow-sm disabled:opacity-30 disabled:pointer-events-none`}
         >

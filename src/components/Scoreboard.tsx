@@ -1,12 +1,21 @@
+import { FilePenLine } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
+import type { BasketballTeamSide } from '../lib/basketball/types'
+
+interface EventScoreControls {
+  disabled: boolean
+  onAdjust: (teamSide: BasketballTeamSide, delta: 1 | -1) => void
+  onOfficialCorrection: () => void
+}
 
 interface ScoreboardProps {
   readOnly?: boolean
+  eventScoreControls?: EventScoreControls
 }
 
-export default function Scoreboard({ readOnly = false }: ScoreboardProps) {
+export default function Scoreboard({ readOnly = false, eventScoreControls }: ScoreboardProps) {
   const { state, dispatch } = useGame()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, cloudSync } =
     state
@@ -60,6 +69,24 @@ export default function Scoreboard({ readOnly = false }: ScoreboardProps) {
               +
             </button>
           </div>}
+          {eventScoreControls && <div className="flex justify-center gap-2 mt-1">
+            <button
+              onClick={() => eventScoreControls.onAdjust('tracked', -1)}
+              disabled={eventScoreControls.disabled || teamScore === 0}
+              aria-label={`Decrease ${gameInfo.teamName} score`}
+              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+            >
+              -
+            </button>
+            <button
+              onClick={() => eventScoreControls.onAdjust('tracked', 1)}
+              disabled={eventScoreControls.disabled}
+              aria-label={`Increase ${gameInfo.teamName} score`}
+              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+            >
+              +
+            </button>
+          </div>}
         </div>
 
         <div className="px-4">
@@ -88,8 +115,38 @@ export default function Scoreboard({ readOnly = false }: ScoreboardProps) {
               +
             </button>
           </div>}
+          {eventScoreControls && <div className="flex justify-center gap-2 mt-1">
+            <button
+              onClick={() => eventScoreControls.onAdjust('opponent', -1)}
+              disabled={eventScoreControls.disabled || opponentScore === 0}
+              aria-label={`Decrease ${gameInfo.opponentName} score`}
+              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+            >
+              -
+            </button>
+            <button
+              onClick={() => eventScoreControls.onAdjust('opponent', 1)}
+              disabled={eventScoreControls.disabled}
+              aria-label={`Increase ${gameInfo.opponentName} score`}
+              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+            >
+              +
+            </button>
+          </div>}
         </div>
       </div>
+
+      {eventScoreControls && (
+        <button
+          type="button"
+          onClick={eventScoreControls.onOfficialCorrection}
+          disabled={eventScoreControls.disabled}
+          className="mx-auto mt-3 flex min-h-9 items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/25 disabled:opacity-30"
+        >
+          <FilePenLine size={15} aria-hidden="true" />
+          Official correction
+        </button>
+      )}
 
       {gameInfo.tournamentName && (
         <p className="text-center text-xs opacity-60 mt-2">{gameInfo.tournamentName}</p>

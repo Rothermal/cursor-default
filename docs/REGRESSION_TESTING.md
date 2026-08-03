@@ -696,6 +696,27 @@ internal event-model option. Event Basketball remains unavailable for cloud/team
 
 ---
 
+## 11a5. Basketball direct stats, score, and minutes (BKE-2B)
+
+**Precondition:** Development build with a healthy, local Basketball event game and an active
+period. Include tracked and opponent participants plus both team chips.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a5.1 | Use every player-grid `+` action, including made/missed FT, 2PT, and 3PT | Each tap appends one checked event and updates projected totals; direct field goals/free throws have no court marker |
+| 11a5.2 | Select each team chip | Only Team Turnover is available; it updates the selected side's team actor and never charges a player |
+| 11a5.3 | Use quick scoreboard `+1/-1` on both sides, including `-1` at zero | Score adjustments append without a sheet; a negative result is disabled/rejected and made-shot scoring remains additive |
+| 11a5.4 | Open Official correction and submit blank, fractional, zero, valid positive, and valid negative adjustments | Invalid drafts remain open with no mutation; valid signed whole deltas require a note and update only the selected side |
+| 11a5.5 | Record Steal + Turnover against a rostered opponent, Unknown player, and Team | Each submit atomically appends one linked two-event capture with the correct opposite-side actor; ordinary stat decrement cannot split it |
+| 11a5.6 | Decrement standalone assists, rebounds, steals, blocks, turnovers, and minutes | The newest matching standalone event is corrected; minutes append `-1`; controls stop at zero |
+| 11a5.7 | Decrement a field goal linked to an assist, rebound, and block | Confirmation names exact effects; shot/assist/rebound are removed atomically, the block survives unlinked, and Restore reverses the complete batch |
+| 11a5.8 | Decrement a free throw with a linked rebound | Confirmation removes the attempt and rebound while preserving any trip; immediate Restore returns both |
+| 11a5.9 | Perform a consequential decrement, park/reload, then Restore | The validated direct-decrement receipt survives normalization and restores only while revisions still match |
+| 11a5.10 | End a period or game and inspect court, grid, score, and compound controls | All ordinary capture/correction controls are disabled; no legacy reducer fallback appears |
+| 11a5.11 | Repeat representative grid/score actions in an ordinary legacy Basketball game and open Soccer | Existing aggregate Basketball and Soccer behavior remain unchanged |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

@@ -4,7 +4,7 @@ import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventMutation } from '../gameEvents/types'
-import { isTeamPseudoPlayer } from '../teamPlayers'
+import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import type {
   BasketballCourtUndoReceipt,
   BasketballCourtUndoReceiptEntry,
@@ -12,8 +12,10 @@ import type {
 } from './types'
 import type {
   BasketballCommandErrorCode,
+  BasketballCommandResult,
   BasketballStateCommandResult,
 } from './commands'
+import type { BasketballDirectStatId } from './directCommands'
 
 const COURT_EVENT_TYPES = new Set([
   'basketball.shot',
@@ -48,6 +50,23 @@ export interface BasketballClearChartPreview {
   linkedAssistCount: number
   linkedReboundCount: number
   unlinkedBlockCount: number
+}
+
+export interface BasketballDirectDecrementPreview {
+  statId: BasketballDirectStatId
+  label: string
+  targetEventId: string | null
+  removedEventCount: number
+  linkedAssistCount: number
+  linkedReboundCount: number
+  unlinkedBlockCount: number
+  requiresConfirmation: boolean
+}
+
+interface BasketballDirectDecrementPlan {
+  preview: BasketballDirectDecrementPreview
+  mutations: GameEventMutation[]
+  receiptEntries: BasketballCourtUndoReceiptEntry[]
 }
 
 export function basketballCourtCaptureUnits(state: GameState): BasketballCourtCaptureUnit[] {
@@ -95,6 +114,68 @@ export function previewBasketballClearShotChart(state: GameState): BasketballCle
     linkedReboundCount: plan.rebounds.length,
     unlinkedBlockCount: plan.blocks.length,
   }
+}
+
+export function previewBasketballDirectDecrement(
+  state: GameState,
+  playerId: string,
+  statId: BasketballDirectStatId
+): BasketballCommandResult<BasketballDirectDecrementPreview> {
+  if (state.sportGameState?.sportId !== 'basketball') {
+    return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
+  }
+  if (state.sportGameState.projection.status !== 'in_progress') {
+    return commandFailure('invalid_period', 'Basketball corrections require an active period.')
+  }
+  if (statId === 'min') {
+    const participant = Object.values(state.sportGameState.projection.participants)
+      .find(value => value.playerId === playerId)
+    return participant && participant.stats.min > 0
+      ? {
+          ok: true,
+          value: {
+            statId,
+            label: 'Minute',
+            targetEventId: null,
+            removedEventCount: 0,
+            linkedAssistCount: 0,
+            linkedReboundCount: 0,
+            unlinkedBlockCount: 0,
+            requiresConfirmation: false,
+          },
+        }
+      : commandFailure('nothing_to_undo', 'There are no Basketball minutes to decrement.')
+  }
+  const plan = directDecrementPlan(state, playerId, statId)
+  return plan
+    ? { ok: true, value: plan.preview }
+    : commandFailure('nothing_to_undo', `There is no matching ${directStatLabel(statId)} event to decrement.`)
+}
+
+export function decrementBasketballDirectStat(
+  state: GameState,
+  playerId: string,
+  statId: Exclude<BasketballDirectStatId, 'min'>,
+  now = new Date().toISOString()
+): BasketballStateCommandResult {
+  const timestamp = validTimestamp(now)
+  if (!timestamp) return failure(state, 'invalid_timestamp', 'Basketball correction timestamp is invalid.')
+  if (state.sportGameState?.sportId !== 'basketball') {
+    return failure(state, 'setup_incomplete', 'An initialized Basketball event game is required.')
+  }
+  if (state.sportGameState.projection.status !== 'in_progress') {
+    return failure(state, 'invalid_period', 'Basketball corrections require an active period.')
+  }
+  const plan = directDecrementPlan(state, playerId, statId)
+  if (!plan) {
+    return failure(state, 'nothing_to_undo', `There is no matching ${directStatLabel(statId)} event to decrement.`)
+  }
+  const receipt: BasketballCourtUndoReceipt = {
+    kind: 'direct_decrement',
+    createdAt: timestamp,
+    entries: plan.receiptEntries,
+  }
+  return applyCorrectionsWithReceipt(state, plan.mutations, receipt, timestamp)
 }
 
 export function canRestoreBasketballCourtUndo(state: GameState): boolean {
@@ -327,6 +408,142 @@ function periodLabel(state: GameState, periodId: string): string {
   return state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ?? periodId
 }
 
+function directDecrementPlan(
+  state: GameState,
+  playerId: string,
+  statId: Exclude<BasketballDirectStatId, 'min'>
+): BasketballDirectDecrementPlan | null {
+  const events = activeBasketballEvents(state)
+    .sort((left, right) => compareGameEventCaptureOrder(right, left))
+  const target = events.find(event => directEventMatches(event, playerId, statId))
+  if (!target) return null
+
+  const linkedAssists = target.eventType === 'basketball.shot' && target.payload.attempt === 'field_goal'
+    ? events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.assist' }> =>
+        event.eventType === 'basketball.assist' && event.payload.relatedEventId === target.id
+      )
+    : []
+  const linkedRebounds = target.eventType === 'basketball.shot'
+    ? events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.rebound' }> =>
+        event.eventType === 'basketball.rebound' && event.payload.relatedEventId === target.id
+      )
+    : []
+  const linkedBlocks = target.eventType === 'basketball.shot' && target.payload.attempt === 'field_goal'
+    ? events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.block' }> =>
+        event.eventType === 'basketball.block' && event.payload.relatedEventId === target.id
+      )
+    : []
+  const removed = [target, ...linkedAssists, ...linkedRebounds]
+  const mutations: GameEventMutation[] = [
+    ...removed.map(event => ({ type: 'delete' as const, eventId: event.id })),
+    ...linkedBlocks.map(event => ({
+      type: 'update' as const,
+      eventId: event.id,
+      changes: { payload: { ...event.payload, relatedEventId: null } },
+    })),
+  ]
+  const receiptEntries = [
+    ...removed.map(event => receiptEntry(event, 'restore', null)),
+    ...linkedBlocks.map(event => receiptEntry(event, 'relink_block', target.id)),
+  ]
+  const fieldGoal = target.eventType === 'basketball.shot' && target.payload.attempt === 'field_goal'
+  return {
+    preview: {
+      statId,
+      label: directStatLabel(statId),
+      targetEventId: target.id,
+      removedEventCount: removed.length,
+      linkedAssistCount: linkedAssists.length,
+      linkedReboundCount: linkedRebounds.length,
+      unlinkedBlockCount: linkedBlocks.length,
+      requiresConfirmation: fieldGoal || linkedRebounds.length > 0,
+    },
+    mutations,
+    receiptEntries,
+  }
+}
+
+function directEventMatches(
+  event: BasketballMatchEvent,
+  playerId: string,
+  statId: Exclude<BasketballDirectStatId, 'min'>
+): boolean {
+  if (isDirectShotStat(statId)) {
+    if (event.eventType !== 'basketball.shot' || !actorMatchesPlayer(event, 'shooter', playerId)) {
+      return false
+    }
+    if (statId === 'ft' || statId === 'ft_miss') {
+      return event.payload.attempt === 'free_throw' && event.payload.made === (statId === 'ft')
+    }
+    const value = statId.startsWith('3') ? 3 : 2
+    return event.payload.attempt === 'field_goal' &&
+      event.payload.value === value &&
+      event.payload.made === !statId.endsWith('_miss')
+  }
+
+  if (statId === 'oreb' || statId === 'dreb') {
+    return event.eventType === 'basketball.rebound' &&
+      event.payload.relatedEventId === null &&
+      event.payload.captureCommandId === null &&
+      event.payload.kind === (statId === 'oreb' ? 'offensive' : 'defensive') &&
+      actorMatchesPlayer(event, 'rebounder', playerId)
+  }
+  if (statId === 'ast' || statId === 'stl' || statId === 'blk') {
+    const eventType = statId === 'ast'
+      ? 'basketball.assist'
+      : statId === 'stl'
+        ? 'basketball.steal'
+        : 'basketball.block'
+    const role = statId === 'ast' ? 'assister' : statId === 'stl' ? 'stealer' : 'blocker'
+    return event.eventType === eventType &&
+      event.payload.relatedEventId === null &&
+      event.payload.captureCommandId === null &&
+      actorMatchesPlayer(event, role, playerId)
+  }
+  if (event.eventType !== 'basketball.turnover' || event.payload.captureCommandId !== null) {
+    return false
+  }
+  return event.payload.kind === (statId === 'team_turnover' ? 'team' : 'player') &&
+    actorMatchesPlayer(event, 'committed_by', playerId)
+}
+
+function actorMatchesPlayer(event: BasketballMatchEvent, role: string, playerId: string): boolean {
+  const actor = event.actors.find(candidate => candidate.role === role)
+  if (!actor) return false
+  if (playerId === TEAM_PLAYER_HOME_ID) {
+    return actor.kind === 'team' && event.teamSide === 'tracked'
+  }
+  if (playerId === TEAM_PLAYER_OPP_ID) {
+    return actor.kind === 'team' && event.teamSide === 'opponent'
+  }
+  return actor.kind === 'player' && actor.playerId === playerId
+}
+
+function isDirectShotStat(statId: Exclude<BasketballDirectStatId, 'min'>): statId is
+  'ft' | 'ft_miss' | '2pt' | '2pt_miss' | '3pt' | '3pt_miss' {
+  return statId === 'ft' || statId === 'ft_miss' || statId === '2pt' ||
+    statId === '2pt_miss' || statId === '3pt' || statId === '3pt_miss'
+}
+
+function directStatLabel(statId: BasketballDirectStatId): string {
+  switch (statId) {
+    case 'ft': return 'made free throw'
+    case 'ft_miss': return 'missed free throw'
+    case '2pt': return 'made 2-pointer'
+    case '2pt_miss': return 'missed 2-pointer'
+    case '3pt': return 'made 3-pointer'
+    case '3pt_miss': return 'missed 3-pointer'
+    case 'oreb': return 'offensive rebound'
+    case 'dreb': return 'defensive rebound'
+    case 'ast': return 'assist'
+    case 'stl': return 'steal'
+    case 'blk': return 'block'
+    case 'to': return 'turnover'
+    case 'min': return 'minute'
+    case 'team_turnover': return 'team turnover'
+  }
+}
+
 function clearChartPlan(state: GameState) {
   const events = activeBasketballEvents(state)
   const shots = events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.shot' }> =>
@@ -522,4 +739,11 @@ function failure(
   message: string
 ): BasketballStateCommandResult & { ok: false } {
   return { ok: false, state, code, message }
+}
+
+function commandFailure<T>(
+  code: BasketballCommandErrorCode,
+  message: string
+): BasketballCommandResult<T> & { ok: false } {
+  return { ok: false, code, message }
 }

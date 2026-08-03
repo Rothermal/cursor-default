@@ -179,7 +179,7 @@ export interface BasketballCourtUndoReceiptEntry extends JsonObject {
 }
 
 export interface BasketballCourtUndoReceipt extends JsonObject {
-  kind: 'capture_undo' | 'clear_chart'
+  kind: 'capture_undo' | 'clear_chart' | 'direct_decrement'
   createdAt: string
   entries: BasketballCourtUndoReceiptEntry[]
 }
