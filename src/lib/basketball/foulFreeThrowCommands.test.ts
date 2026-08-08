@@ -122,6 +122,16 @@ function captureFoul(
   })
 }
 
+function oneAndOneState(teamFoulCount = 4): GameState {
+  let state = startedState({ hasOneAndOne: true, doubleBonusThreshold: 10 })
+  for (let index = 0; index < teamFoulCount; index += 1) {
+    const foul = captureFoul(state, 2 + index, { offender: { kind: 'team' } })
+    if (!foul.ok) throw new Error(foul.message)
+    state = foul.state
+  }
+  return state
+}
+
 describe('BKE-2C1 Basketball foul and free-throw commands', () => {
   it('atomically records a structured foul and awarded trip, then projects stable attempts', () => {
     const captured = captureFoul(startedState(), 1, {
@@ -183,13 +193,7 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
   })
 
   it('closes a one-and-one after a first miss and preserves the rejected state', () => {
-    let state = startedState({ hasOneAndOne: true, doubleBonusThreshold: 10 })
-    for (let index = 2; index <= 5; index += 1) {
-      const foul = captureFoul(state, index, { offender: { kind: 'team' } })
-      if (!foul.ok) throw new Error(foul.message)
-      state = foul.state
-    }
-    const captured = captureFoul(state, 6, {
+    const captured = captureFoul(oneAndOneState(), 6, {
       freeThrows: {
         maximumAttempts: 2,
         oneAndOne: true,
@@ -218,6 +222,34 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
       code: 'command_failed',
     })
     const removed = decrementBasketballDirectStat(first.state, 'opponent-9', 'ft_miss')
+    if (!removed.ok) throw new Error(removed.message)
+    expect(captureBasketballFreeThrowAttempt(removed.state, {
+      recorderUserId: 'recorder-1',
+      tripEventId: captured.tripEventId,
+      shooterPlayerId: 'opponent-9',
+      made: true,
+    })).toMatchObject({ ok: false, state: removed.state, code: 'command_failed' })
+  })
+
+  it('does not allow a bonus attempt after deleting a made one-and-one first attempt', () => {
+    const captured = captureFoul(oneAndOneState(), 6, {
+      freeThrows: {
+        maximumAttempts: 2,
+        oneAndOne: true,
+        technical: false,
+        possessionRetained: false,
+      },
+    })
+    if (!captured.ok || !captured.tripEventId) throw new Error('Trip fixture failed.')
+    const first = captureBasketballFreeThrowAttempt(captured.state, {
+      recorderUserId: 'recorder-1',
+      tripEventId: captured.tripEventId,
+      shooterPlayerId: 'opponent-9',
+      made: true,
+      eventId: id(611),
+    })
+    if (!first.ok) throw new Error(first.message)
+    const removed = decrementBasketballDirectStat(first.state, 'opponent-9', 'ft')
     if (!removed.ok) throw new Error(removed.message)
     expect(captureBasketballFreeThrowAttempt(removed.state, {
       recorderUserId: 'recorder-1',
@@ -374,15 +406,31 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
         possessionRetained: true,
       },
     })).toMatchObject({ ok: false, state, code: 'command_failed' })
-    const oneAndOneState = startedState({ hasOneAndOne: true, doubleBonusThreshold: 10 })
-    expect(captureFoul(oneAndOneState, 12, {
+    const supportedOneAndOneState = startedState({ hasOneAndOne: true, doubleBonusThreshold: 10 })
+    expect(captureFoul(supportedOneAndOneState, 12, {
       freeThrows: {
         maximumAttempts: 2,
         oneAndOne: true,
         technical: false,
         possessionRetained: false,
       },
-    })).toMatchObject({ ok: false, state: oneAndOneState, code: 'command_failed' })
+    })).toMatchObject({ ok: false, state: supportedOneAndOneState, code: 'command_failed' })
+    const bonusState = oneAndOneState(5)
+    expect(captureFoul(bonusState, 13, {
+      offender: { kind: 'team' },
+      countingOverride: {
+        personalFoul: false,
+        teamFoul: false,
+        technical: false,
+        reason: 'Does not count toward the bonus',
+      },
+      freeThrows: {
+        maximumAttempts: 2,
+        oneAndOne: true,
+        technical: false,
+        possessionRetained: false,
+      },
+    })).toMatchObject({ ok: false, state: bonusState, code: 'command_failed' })
 
     const ended = endBasketballPeriod(state, {
       recorderUserId: 'recorder-1',
@@ -411,6 +459,19 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
       if (!result.ok) throw new Error(result.message)
       state = result.state
     }
+    for (let index = 0; index < 5; index += 1) {
+      const result = captureFoul(state, 50 + index, {
+        offender: { kind: 'player', playerId: 'player-2' },
+        countingOverride: {
+          personalFoul: true,
+          teamFoul: false,
+          technical: false,
+          reason: 'Personal-only fixture',
+        },
+      })
+      if (!result.ok) throw new Error(result.message)
+      state = result.state
+    }
     const fifth = captureFoul(state, 15, {
       freeThrows: {
         maximumAttempts: 1,
@@ -434,6 +495,16 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
       { kind: 'participant', participantId: participant.participantId }
     )
     if (!subject.ok) throw new Error(subject.message)
+    const otherParticipant = Object.values(context.value.sportState.projection.participants)
+      .find(candidate => candidate.playerId === 'player-2')
+    if (!otherParticipant) throw new Error('Other participant fixture missing.')
+    const otherSubject = basketballActorForSelection(
+      state,
+      'subject',
+      'tracked',
+      { kind: 'participant', participantId: otherParticipant.participantId }
+    )
+    if (!otherSubject.ok) throw new Error(otherSubject.message)
     const ejection = createBasketballAdministrativeEvent({
       id: id(700),
       eventType: 'basketball.ejection',
@@ -466,9 +537,25 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
       teamSide: 'tracked',
       actors: [subject.value],
     })
+    const staleAutomaticEjection = createBasketballAdministrativeEvent({
+      id: id(702),
+      eventType: 'basketball.ejection',
+      payload: {
+        reason: 'Threshold on another participant',
+        source: 'automatic_threshold',
+        relatedFoulEventId: fifth.foulEventId,
+        captureCommandId: null,
+      },
+      recorderUserId: 'recorder-1',
+      sequence: context.value.nextSequence + 2,
+      period: context.value.period,
+      occurredAt: context.value.occurredAt,
+      teamSide: 'tracked',
+      actors: [otherSubject.value],
+    })
     const appended = addGameEvents(
       state,
-      [ejection, automaticEjection],
+      [ejection, automaticEjection, staleAutomaticEjection],
       gameEventRegistry,
       gameEventProjectors
     )
@@ -483,7 +570,7 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
           removesPersonalFoul: true,
           removesTeamFoul: true,
           unlinkedTripCount: 1,
-          unlinkedEjectionCount: 1,
+          unlinkedEjectionCount: 2,
           removedAutomaticEjectionCount: 1,
           clearsDisqualification: true,
           bonusStatusBefore: 'double_bonus',
@@ -510,6 +597,9 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
     expect(removed.state.eventStream?.events.find(event =>
       typeof event === 'object' && event && 'id' in event && event.id === automaticEjection.id
     )).toMatchObject({ deletedAt: '2026-08-08T12:21:00.000Z' })
+    expect(removed.state.eventStream?.events.find(event =>
+      typeof event === 'object' && event && 'id' in event && event.id === staleAutomaticEjection.id
+    )).toMatchObject({ deletedAt: null, payload: { relatedFoulEventId: null } })
 
     const restored = restoreLastBasketballCourtUndo(removed.state, '2026-08-08T12:22:00.000Z')
     expect(restored.ok).toBe(true)
@@ -523,6 +613,12 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
     )).toMatchObject({ payload: { relatedFoulEventId: fifth.foulEventId } })
     expect(restored.state.eventStream?.events.find(event =>
       typeof event === 'object' && event && 'id' in event && event.id === automaticEjection.id
+    )).toMatchObject({
+      deletedAt: null,
+      payload: { source: 'automatic_threshold', relatedFoulEventId: fifth.foulEventId },
+    })
+    expect(restored.state.eventStream?.events.find(event =>
+      typeof event === 'object' && event && 'id' in event && event.id === staleAutomaticEjection.id
     )).toMatchObject({
       deletedAt: null,
       payload: { source: 'automatic_threshold', relatedFoulEventId: fifth.foulEventId },

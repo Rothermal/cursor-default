@@ -245,9 +245,12 @@ React.
 - The foul sheet may start a linked trip. Append foul and trip atomically, then record each attempt as
   it occurs.
 - Support one, two, or three maximum attempts; one-and-one is a maximum two-attempt trip.
-- Validate one-and-one against the immutable rules and the post-foul one-and-one bonus window;
-  technical-trip context must match the foul's derived or overridden technical count.
+- Validate one-and-one against the immutable rules and the post-foul one-and-one bonus window; the
+  awarding foul must count as a nontechnical team foul, and technical-trip context must match the
+  foul's derived or overridden technical count.
 - A first-attempt one-and-one miss closes live capture without fabricating a second attempt.
+- A removed first one-and-one attempt remains a consumed historical position; attempt 2 requires
+  attempt 1 to remain active and made.
 - Technical and possession-retained flags belong to the trip. Attempts remain linked shot events.
 - Empty/partial trips remain reviewable and do not invent points or attempts.
 

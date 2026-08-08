@@ -215,8 +215,12 @@ export function captureBasketballFreeThrowAttempt(
       event.payload.tripAttemptNumber !== null
     )
   const firstAttempt = historicalAttempts.find(event => event.payload.tripAttemptNumber === 1)
-  if (trip.payload.oneAndOne && firstAttempt && !firstAttempt.payload.made) {
-    return failure(state, 'command_failed', 'The one-and-one trip ended after the missed first attempt.')
+  if (
+    trip.payload.oneAndOne &&
+    firstAttempt &&
+    (firstAttempt.deletedAt !== null || !firstAttempt.payload.made)
+  ) {
+    return failure(state, 'command_failed', 'The one-and-one trip ended after its first attempt.')
   }
   const usedPositions = new Set(historicalAttempts.map(event => event.payload.tripAttemptNumber!))
   let attemptNumber: number | null = null
@@ -371,6 +375,10 @@ function validateFreeThrowAward(
     return 'The free-throw technical flag must match the foul counting context.'
   }
   if (!award.oneAndOne) return null
+  const countsAsTeamFoul = foul.payload.countingOverride?.teamFoul ?? true
+  if (!countsAsTeamFoul || technicalFoul) {
+    return 'A one-and-one trip requires a nontechnical foul that counts toward the team bonus.'
+  }
   const sportState = state.sportGameState?.sportId === 'basketball'
     ? state.sportGameState
     : null

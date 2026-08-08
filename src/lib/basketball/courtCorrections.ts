@@ -574,7 +574,11 @@ function foulDecrementPlan(
     participant.stats.pf - 1 < sportState.setup.rulesSnapshot.personalFoulLimit
   )
   const removedAutomaticEjections = clearsDisqualification
-    ? ejections.filter(event => event.payload.source === 'automatic_threshold')
+    ? ejections.filter(event => {
+        const subject = event.actors.find(actor => actor.role === 'subject')
+        return event.payload.source === 'automatic_threshold' &&
+          subject?.participantId === committedBy?.participantId
+      })
     : []
   const removedAutomaticEjectionIds = new Set(removedAutomaticEjections.map(event => event.id))
   const survivingEjections = ejections.filter(event => !removedAutomaticEjectionIds.has(event.id))
