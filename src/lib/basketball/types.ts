@@ -174,12 +174,18 @@ export interface BasketballCapturePreferences {
 export interface BasketballCourtUndoReceiptEntry extends JsonObject {
   eventId: string
   expectedRevision: number
-  action: 'restore' | 'relink_block'
+  action:
+    | 'restore'
+    | 'relink_block'
+    | 'relink_trip_foul'
+    | 'relink_ejection_foul'
+    | 'relink_attempt_trip'
   previousRelatedEventId: string | null
+  previousAttemptNumber: number | null
 }
 
 export interface BasketballCourtUndoReceipt extends JsonObject {
-  kind: 'capture_undo' | 'clear_chart' | 'direct_decrement'
+  kind: 'capture_undo' | 'clear_chart' | 'direct_decrement' | 'administrative_decrement'
   createdAt: string
   entries: BasketballCourtUndoReceiptEntry[]
 }

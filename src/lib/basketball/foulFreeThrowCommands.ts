@@ -1,0 +1,462 @@
+import type { GameState } from '../../types'
+import { addGameEvent, addGameEvents } from '../gameEvents/mutations'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
+import { inspectGameEventStream } from '../gameEvents/stream'
+import type { GameEventActor } from '../gameEvents/types'
+import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import {
+  basketballActorForSelection,
+  basketballCaptureTargetForPlayerId,
+  createBasketballCaptureCommandId,
+  getBasketballCommandContext,
+  type BasketballCaptureActorSelection,
+  type BasketballCommandErrorCode,
+} from './commands'
+import { createBasketballUuid } from './id'
+import { createBasketballStatEvent } from './statEvents'
+import type {
+  BasketballFoulClass,
+  BasketballFoulContext,
+  BasketballFoulCountingOverride,
+  BasketballMatchEvent,
+  BasketballTeamSide,
+} from './types'
+
+export type BasketballFoulOffender =
+  | { kind: 'player'; playerId: string }
+  | { kind: 'team' }
+  | { kind: 'staff'; label: string }
+
+export type BasketballFoulDrawnBy =
+  | { kind: 'player'; playerId: string }
+  | { kind: 'unknown'; label: string }
+
+export interface BasketballFreeThrowAward {
+  maximumAttempts: 1 | 2 | 3
+  oneAndOne: boolean
+  technical: boolean
+  possessionRetained: boolean
+}
+
+export interface BasketballFoulCaptureOptions {
+  recorderUserId: string | null
+  teamSide: BasketballTeamSide
+  offender: BasketballFoulOffender
+  class: BasketballFoulClass
+  context: BasketballFoulContext
+  teamControlSide?: BasketballTeamSide | null
+  incidentId?: string | null
+  drawnBy?: BasketballFoulDrawnBy | null
+  countingOverride?: BasketballFoulCountingOverride | null
+  freeThrows?: BasketballFreeThrowAward | null
+  occurredAt?: string
+  eventIds?: string[]
+  captureCommandId?: string
+}
+
+export interface BasketballFreeThrowAttemptOptions {
+  recorderUserId: string | null
+  tripEventId: string
+  shooterPlayerId: string
+  made: boolean
+  occurredAt?: string
+  eventId?: string
+}
+
+export type BasketballFoulFreeThrowCommandResult =
+  | {
+      ok: true
+      state: GameState
+      eventIds: string[]
+      foulEventId?: string
+      tripEventId?: string
+      attemptNumber?: number
+      tripComplete?: boolean
+    }
+  | {
+      ok: false
+      state: GameState
+      code: BasketballCommandErrorCode
+      message: string
+    }
+
+export function captureBasketballFoul(
+  state: GameState,
+  options: BasketballFoulCaptureOptions
+): BasketballFoulFreeThrowCommandResult {
+  const guarded = commandContext(state, options.recorderUserId, options.occurredAt)
+  if (!guarded.ok) return guarded
+  const offender = foulOffenderActor(state, options.teamSide, options.offender)
+  if (!offender.ok) return offender
+  const drawnBy = foulDrawnByActor(state, options.teamSide, options.drawnBy ?? null)
+  if (!drawnBy.ok) return drawnBy
+  const override = normalizeCountingOverride(state, options.countingOverride ?? null)
+  if (!override.ok) return override
+  const awardError = validateFreeThrowAward(options.freeThrows ?? null)
+  if (awardError) return failure(state, 'command_failed', awardError)
+  if (
+    options.context === 'offensive' &&
+    options.teamControlSide !== undefined &&
+    options.teamControlSide !== options.teamSide
+  ) {
+    return failure(state, 'command_failed', 'An offensive foul must use the committing side as team control.')
+  }
+
+  const incidentId = options.incidentId?.trim() || null
+  const commandId = options.freeThrows
+    ? options.captureCommandId ?? createBasketballCaptureCommandId()
+    : options.captureCommandId ?? null
+  const foulId = options.eventIds?.[0] ?? createBasketballUuid()
+  const foul = createBasketballAdministrativeEvent({
+    id: foulId,
+    eventType: 'basketball.foul',
+    payload: {
+      class: options.class,
+      context: options.context,
+      teamControlSide: options.context === 'offensive'
+        ? options.teamSide
+        : options.teamControlSide ?? null,
+      incidentId,
+      countingOverride: override.value,
+      captureCommandId: commandId,
+    },
+    recorderUserId: options.recorderUserId,
+    sequence: guarded.context.nextSequence,
+    period: guarded.context.period,
+    occurredAt: guarded.context.occurredAt,
+    teamSide: options.teamSide,
+    actors: drawnBy.actor ? [offender.actor, drawnBy.actor] : [offender.actor],
+  })
+
+  const events: BasketballMatchEvent[] = [foul]
+  let tripId: string | undefined
+  if (options.freeThrows) {
+    tripId = options.eventIds?.[1] ?? createBasketballUuid()
+    events.push(createBasketballStatEvent({
+      id: tripId,
+      eventType: 'basketball.free_throw_trip',
+      payload: {
+        ...options.freeThrows,
+        sourceFoulEventId: foulId,
+        captureCommandId: commandId,
+      },
+      recorderUserId: options.recorderUserId,
+      sequence: guarded.context.nextSequence + 1,
+      period: guarded.context.period,
+      occurredAt: guarded.context.occurredAt,
+      teamSide: oppositeSide(options.teamSide),
+      actors: [],
+    }))
+  }
+
+  const candidate = withCaptureTarget(
+    state,
+    options.teamSide,
+    offender.selection
+  )
+  const appended = appendEvents(state, candidate, events)
+  return appended.ok
+    ? { ...appended, foulEventId: foulId, tripEventId: tripId }
+    : appended
+}
+
+export function captureBasketballFreeThrowAttempt(
+  state: GameState,
+  options: BasketballFreeThrowAttemptOptions
+): BasketballFoulFreeThrowCommandResult {
+  const guarded = commandContext(state, options.recorderUserId, options.occurredAt)
+  if (!guarded.ok) return guarded
+  const inspected = basketballEvents(state)
+  if (!inspected.ok) return failure(state, 'command_failed', inspected.message)
+  const trip = inspected.active.find(event =>
+    event.id === options.tripEventId && event.eventType === 'basketball.free_throw_trip'
+  )
+  if (!trip || trip.eventType !== 'basketball.free_throw_trip') {
+    return failure(state, 'command_failed', 'The Basketball free-throw trip is unavailable.')
+  }
+  if (trip.period.id !== guarded.context.period.id) {
+    return failure(state, 'invalid_period', 'Free throws must be recorded in their awarded period.')
+  }
+
+  const shooterTarget = basketballCaptureTargetForPlayerId(state, options.shooterPlayerId)
+  if (!shooterTarget.ok) return failure(state, shooterTarget.code, shooterTarget.message)
+  if (
+    shooterTarget.value.teamSide !== trip.teamSide ||
+    shooterTarget.value.selection.kind !== 'participant'
+  ) {
+    return failure(state, 'invalid_actor', 'The free-throw shooter must belong to the awarded side.')
+  }
+  const participant = guarded.context.sportState.projection.participants[
+    shooterTarget.value.selection.participantId
+  ]
+  if (!participant || participant.disqualified || participant.ejected) {
+    return failure(state, 'invalid_actor', 'The selected Basketball shooter is unavailable.')
+  }
+  const shooter = basketballActorForSelection(
+    state,
+    'shooter',
+    trip.teamSide,
+    shooterTarget.value.selection
+  )
+  if (!shooter.ok || shooter.value.kind !== 'player') {
+    return failure(
+      state,
+      shooter.ok ? 'invalid_actor' : shooter.code,
+      shooter.ok ? 'Free throws require a resolved Basketball player.' : shooter.message
+    )
+  }
+
+  const historicalAttempts = [...inspected.active, ...inspected.deleted]
+    .filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.shot' }> =>
+      event.eventType === 'basketball.shot' &&
+      event.payload.attempt === 'free_throw' &&
+      event.payload.freeThrowTripId === trip.id &&
+      event.payload.tripAttemptNumber !== null
+    )
+  const activeAttempts = historicalAttempts.filter(event => event.deletedAt === null)
+  const firstAttempt = activeAttempts.find(event => event.payload.tripAttemptNumber === 1)
+  if (trip.payload.oneAndOne && firstAttempt && !firstAttempt.payload.made) {
+    return failure(state, 'command_failed', 'The one-and-one trip ended after the missed first attempt.')
+  }
+  const usedPositions = new Set(historicalAttempts.map(event => event.payload.tripAttemptNumber!))
+  let attemptNumber: number | null = null
+  for (let position = 1; position <= trip.payload.maximumAttempts; position += 1) {
+    if (!usedPositions.has(position)) {
+      attemptNumber = position
+      break
+    }
+  }
+  if (attemptNumber === null) {
+    return failure(state, 'command_failed', 'Every awarded free-throw position has already been recorded.')
+  }
+
+  const event = createBasketballStatEvent({
+    id: options.eventId,
+    eventType: 'basketball.shot',
+    payload: {
+      value: 1,
+      made: options.made,
+      attempt: 'free_throw',
+      valueSource: 'free_throw',
+      freeThrowTripId: trip.id,
+      tripAttemptNumber: attemptNumber,
+      captureCommandId: null,
+    },
+    recorderUserId: options.recorderUserId,
+    sequence: guarded.context.nextSequence,
+    period: guarded.context.period,
+    occurredAt: guarded.context.occurredAt,
+    teamSide: trip.teamSide,
+    actors: [shooter.value],
+  })
+  const appended = appendEvents(
+    state,
+    withCaptureTarget(state, trip.teamSide, shooterTarget.value.selection),
+    [event]
+  )
+  if (!appended.ok) return appended
+  const tripComplete = !options.made && trip.payload.oneAndOne && attemptNumber === 1
+    ? true
+    : attemptNumber === trip.payload.maximumAttempts
+  return { ...appended, attemptNumber, tripComplete }
+}
+
+function foulOffenderActor(
+  state: GameState,
+  teamSide: BasketballTeamSide,
+  offender: BasketballFoulOffender
+):
+  | { ok: true; actor: GameEventActor; selection: BasketballCaptureActorSelection }
+  | { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string } {
+  if (offender.kind === 'staff') {
+    const label = offender.label.trim()
+    return label
+      ? {
+          ok: true,
+          actor: { role: 'committed_by', kind: 'staff', label },
+          selection: { kind: 'team' },
+        }
+      : failure(state, 'invalid_actor', 'Enter a Basketball staff label.')
+  }
+  if (offender.kind === 'team') {
+    const actor = basketballActorForSelection(state, 'committed_by', teamSide, { kind: 'team' })
+    return actor.ok
+      ? { ok: true, actor: actor.value, selection: { kind: 'team' } }
+      : failure(state, actor.code, actor.message)
+  }
+  const target = basketballCaptureTargetForPlayerId(state, offender.playerId)
+  if (!target.ok) return failure(state, target.code, target.message)
+  if (target.value.teamSide !== teamSide || target.value.selection.kind !== 'participant') {
+    return failure(state, 'invalid_actor', 'The foul offender must belong to the selected side.')
+  }
+  const participant = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.projection.participants[target.value.selection.participantId]
+    : null
+  if (!participant || participant.disqualified || participant.ejected) {
+    return failure(state, 'invalid_actor', 'The selected Basketball foul offender is unavailable.')
+  }
+  const actor = basketballActorForSelection(
+    state,
+    'committed_by',
+    teamSide,
+    target.value.selection
+  )
+  if (!actor.ok || actor.value.kind !== 'player') {
+    return failure(
+      state,
+      actor.ok ? 'invalid_actor' : actor.code,
+      actor.ok ? 'Player fouls require a resolved Basketball player.' : actor.message
+    )
+  }
+  return { ok: true, actor: actor.value, selection: target.value.selection }
+}
+
+function foulDrawnByActor(
+  state: GameState,
+  foulSide: BasketballTeamSide,
+  drawnBy: BasketballFoulDrawnBy | null
+):
+  | { ok: true; actor: GameEventActor | null }
+  | { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string } {
+  if (!drawnBy) return { ok: true, actor: null }
+  const side = oppositeSide(foulSide)
+  if (drawnBy.kind === 'unknown') {
+    const actor = basketballActorForSelection(
+      state,
+      'drawn_by',
+      side,
+      { kind: 'unknown', label: drawnBy.label }
+    )
+    return actor.ok ? { ok: true, actor: actor.value } : failure(state, actor.code, actor.message)
+  }
+  const target = basketballCaptureTargetForPlayerId(state, drawnBy.playerId)
+  if (!target.ok) return failure(state, target.code, target.message)
+  if (target.value.teamSide !== side || target.value.selection.kind !== 'participant') {
+    return failure(state, 'invalid_actor', 'The player drawing the foul must belong to the opposite side.')
+  }
+  const participant = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.projection.participants[target.value.selection.participantId]
+    : null
+  if (!participant || participant.disqualified || participant.ejected) {
+    return failure(state, 'invalid_actor', 'The selected Basketball player drawing the foul is unavailable.')
+  }
+  const actor = basketballActorForSelection(state, 'drawn_by', side, target.value.selection)
+  return actor.ok ? { ok: true, actor: actor.value } : failure(state, actor.code, actor.message)
+}
+
+function normalizeCountingOverride(
+  state: GameState,
+  override: BasketballFoulCountingOverride | null
+):
+  | { ok: true; value: BasketballFoulCountingOverride | null }
+  | { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string } {
+  if (!override) return { ok: true, value: null }
+  const reason = override.reason.trim()
+  return reason
+    ? { ok: true, value: { ...override, reason } }
+    : failure(state, 'command_failed', 'Exceptional foul counting requires a reason.')
+}
+
+function validateFreeThrowAward(award: BasketballFreeThrowAward | null): string | null {
+  if (!award) return null
+  if (award.oneAndOne && award.maximumAttempts !== 2) {
+    return 'A one-and-one Basketball trip must award at most two attempts.'
+  }
+  return null
+}
+
+function commandContext(
+  state: GameState,
+  recorderUserId: string | null,
+  occurredAt?: string
+):
+  | { ok: true; context: Exclude<ReturnType<typeof getBasketballCommandContext>, { ok: false }>['value'] }
+  | { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string } {
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event capture is local-only during development.')
+  }
+  const context = getBasketballCommandContext(state, recorderUserId, occurredAt)
+  return context.ok ? { ok: true, context: context.value } : failure(state, context.code, context.message)
+}
+
+function appendEvents(
+  originalState: GameState,
+  candidateState: GameState,
+  events: BasketballMatchEvent[]
+): BasketballFoulFreeThrowCommandResult {
+  const appended = events.length === 1
+    ? addGameEvent(candidateState, events[0], gameEventRegistry, gameEventProjectors)
+    : addGameEvents(candidateState, events, gameEventRegistry, gameEventProjectors)
+  if (!appended.ok || !appended.inspection.complete) {
+    return failure(
+      originalState,
+      'command_failed',
+      appended.ok
+        ? 'Basketball foul/free-throw capture did not produce a complete event projection.'
+        : appended.error.message
+    )
+  }
+  return { ok: true, state: appended.state, eventIds: events.map(event => event.id) }
+}
+
+function basketballEvents(state: GameState):
+  | { ok: true; active: BasketballMatchEvent[]; deleted: BasketballMatchEvent[] }
+  | { ok: false; message: string } {
+  if (!state.eventStream) return { ok: false, message: 'Basketball event history is unavailable.' }
+  const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
+  if (!inspection.complete) {
+    return { ok: false, message: 'Basketball event history is incomplete.' }
+  }
+  return {
+    ok: true,
+    active: inspection.activeEvents.filter(isBasketballMatchEvent),
+    deleted: inspection.deletedEvents.filter(isBasketballMatchEvent),
+  }
+}
+
+function isBasketballMatchEvent(event: { sportId: string }): event is BasketballMatchEvent {
+  return event.sportId === 'basketball'
+}
+
+function withCaptureTarget(
+  state: GameState,
+  teamSide: BasketballTeamSide,
+  selection: BasketballCaptureActorSelection
+): GameState {
+  if (state.sportGameState?.sportId !== 'basketball') return state
+  return {
+    ...state,
+    sportGameState: {
+      ...state.sportGameState,
+      capturePreferences: {
+        ...state.sportGameState.capturePreferences,
+        teamSide,
+        selectedParticipantId: selection.kind === 'participant' ? selection.participantId : null,
+        selectionInitialized: true,
+        lastCourtUndo: null,
+      },
+    },
+  }
+}
+
+function oppositeSide(side: BasketballTeamSide): BasketballTeamSide {
+  return side === 'tracked' ? 'opponent' : 'tracked'
+}
+
+function hasCloudBinding(state: GameState): boolean {
+  return Boolean(
+    state.cloudSync.teamId ||
+    state.cloudSync.gameId ||
+    state.cloudSync.seasonId ||
+    Object.keys(state.cloudSync.playerIdMap).length > 0 ||
+    state.cloudSync.lastSyncedGameFingerprint
+  )
+}
+
+function failure(
+  state: GameState,
+  code: BasketballCommandErrorCode,
+  message: string
+): BasketballFoulFreeThrowCommandResult & { ok: false } {
+  return { ok: false, state, code, message }
+}

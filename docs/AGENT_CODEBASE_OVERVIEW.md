@@ -159,7 +159,10 @@ and generalized Recent Events with non-undoable lifecycle boundaries. BKE-2B res
 direct player/team stats, unlocated shots and free throws, manual minutes, quick and official score
 adjustments, optional atomic Steal + Turnover attribution, and dependency-aware decrements with a
 reload-safe inverse receipt. Court/grid/score capture is read-only outside active periods. BKE-2C
-discipline and administration is next; event games remain internal and local-only.
+is delivered in four slices. BKE-2C1 adds checked structured-foul, linked free-throw-trip, and
+stable-position attempt commands; one-and-one enforcement; consequential foul/trip corrections;
+and exact reload-safe relationship restore. It intentionally exposes no controls. BKE-2C2 foul
+and awarded-free-throw tracker UI is next; event games remain internal and local-only.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -391,7 +394,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) | Basketball migration onto the shared event model. BKE-1, BKE-2A, and BKE-2B are complete; BKE-2C discipline and administration is next |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) | Basketball migration onto the shared event model. BKE-1, BKE-2A, BKE-2B, and BKE-2C1 are complete; BKE-2C2 foul/free-throw UI is next |
 
 ### Held / waiting for feedback
 

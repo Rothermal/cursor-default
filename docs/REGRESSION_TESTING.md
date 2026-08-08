@@ -718,6 +718,23 @@ period. Include tracked and opponent participants plus both team chips.
 
 ---
 
+## 11a6. Basketball foul and free-throw domain (BKE-2C1)
+
+**Precondition:** Library tests use a healthy local Basketball event game with an active period.
+BKE-2C1 intentionally exposes no tracker controls; manual UI checks begin in BKE-2C2.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a6.1 | Capture player, team, and staff fouls with ordinary and exceptional counting | Actors and counting overrides validate; blank override reasons, wrong-side players, unavailable players, and invalid offensive-control sides leave state unchanged |
+| 11a6.2 | Capture a foul with an awarded trip | Foul and trip append atomically under one command id; the trip belongs to the opposite side and links to its source foul |
+| 11a6.3 | Record a two-attempt trip and a one-and-one first miss | Attempt positions are stable; the first-miss one-and-one closes immediately and rejects a second attempt without mutation |
+| 11a6.4 | Remove and restore an attempted free-throw trip | The trip is removed, attempts remain authoritative but ungrouped, and exact trip ids/positions restore after receipt serialization |
+| 11a6.5 | Decrement a foul linked to a trip and ejection | Preview reports personal/team/technical, bonus, disqualification, and unlink effects; correction removes the foul and unlinks dependents atomically; Restore reverses the full batch |
+| 11a6.6 | Delete an attempt, then request another for the same trip | A tombstoned attempt position is never reused; exhausted trips reject further attempts |
+| 11a6.7 | Attempt capture/correction during a period break, after completion, or with a cloud binding | Commands return the original state; no aggregate fallback or partial append occurs |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production
