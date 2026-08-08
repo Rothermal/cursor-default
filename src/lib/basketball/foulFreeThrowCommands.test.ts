@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { sports } from '../../config/sports'
-import type { GameState, Player } from '../../types'
+import type { BasketballTeamStatsConfig, GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
-import { addGameEvent } from '../gameEvents/mutations'
+import { addGameEvents } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
@@ -35,7 +35,21 @@ function player(id: string, name = id, number = ''): Player {
   return { id, name, number, stats: {} }
 }
 
-function setupState(): GameState {
+function setupState(
+  teamStatsOverrides: Partial<BasketballTeamStatsConfig> = {}
+): GameState {
+  const teamStatsConfig = {
+    periodsPerGame: 4,
+    periodLabels: ['Q1', 'Q2', 'Q3', 'Q4'],
+    bonusThreshold: 5,
+    doubleBonusThreshold: 5,
+    hasOneAndOne: false,
+    overtimeLabel: 'OT',
+    overtimeFoulsReset: true,
+    timeoutsPerPeriod: null,
+    timeoutsPerOvertime: null,
+    ...teamStatsOverrides,
+  }
   return {
     ...createInitialState(),
     sport: basketball,
@@ -53,22 +67,14 @@ function setupState(): GameState {
       player('player-1', 'Alex One', '4'),
       player('player-2', 'Blake Two', '12'),
     ],
-    teamStatsConfig: {
-      periodsPerGame: 4,
-      periodLabels: ['Q1', 'Q2', 'Q3', 'Q4'],
-      bonusThreshold: 5,
-      doubleBonusThreshold: 5,
-      hasOneAndOne: false,
-      overtimeLabel: 'OT',
-      overtimeFoulsReset: true,
-      timeoutsPerPeriod: null,
-      timeoutsPerOvertime: null,
-    },
+    teamStatsConfig,
   }
 }
 
-function startedState(): GameState {
-  const result = prepareBasketballGameStart(setupState(), {
+function startedState(
+  teamStatsOverrides: Partial<BasketballTeamStatsConfig> = {}
+): GameState {
+  const result = prepareBasketballGameStart(setupState(teamStatsOverrides), {
     recorderUserId: 'recorder-1',
     occurredAt: '2026-08-08T12:00:00.000Z',
     eventId: id(1),
@@ -177,7 +183,13 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
   })
 
   it('closes a one-and-one after a first miss and preserves the rejected state', () => {
-    const captured = captureFoul(startedState(), 2, {
+    let state = startedState({ hasOneAndOne: true, doubleBonusThreshold: 10 })
+    for (let index = 2; index <= 5; index += 1) {
+      const foul = captureFoul(state, index, { offender: { kind: 'team' } })
+      if (!foul.ok) throw new Error(foul.message)
+      state = foul.state
+    }
+    const captured = captureFoul(state, 6, {
       freeThrows: {
         maximumAttempts: 2,
         oneAndOne: true,
@@ -205,11 +217,21 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
       state: first.state,
       code: 'command_failed',
     })
+    const removed = decrementBasketballDirectStat(first.state, 'opponent-9', 'ft_miss')
+    if (!removed.ok) throw new Error(removed.message)
+    expect(captureBasketballFreeThrowAttempt(removed.state, {
+      recorderUserId: 'recorder-1',
+      tripEventId: captured.tripEventId,
+      shooterPlayerId: 'opponent-9',
+      made: true,
+    })).toMatchObject({ ok: false, state: removed.state, code: 'command_failed' })
   })
 
   it('supports one- and three-attempt trips and rejects exhausted awards', () => {
     for (const [caseIndex, maximumAttempts] of ([1, 3] as const).entries()) {
       const captured = captureFoul(startedState(), 31 + caseIndex, {
+        class: maximumAttempts === 1 ? 'technical' : 'personal',
+        context: maximumAttempts === 1 ? 'administrative' : 'shooting',
         freeThrows: {
           maximumAttempts,
           oneAndOne: false,
@@ -332,6 +354,35 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
       context: 'offensive',
       teamControlSide: 'opponent',
     })).toMatchObject({ ok: false, state, code: 'command_failed' })
+    expect(captureFoul(state, 9, {
+      context: 'offensive',
+      teamControlSide: null,
+    })).toMatchObject({ ok: true })
+    expect(captureFoul(state, 10, {
+      freeThrows: {
+        maximumAttempts: 2,
+        oneAndOne: true,
+        technical: false,
+        possessionRetained: false,
+      },
+    })).toMatchObject({ ok: false, state, code: 'command_failed' })
+    expect(captureFoul(state, 11, {
+      freeThrows: {
+        maximumAttempts: 1,
+        oneAndOne: false,
+        technical: true,
+        possessionRetained: true,
+      },
+    })).toMatchObject({ ok: false, state, code: 'command_failed' })
+    const oneAndOneState = startedState({ hasOneAndOne: true, doubleBonusThreshold: 10 })
+    expect(captureFoul(oneAndOneState, 12, {
+      freeThrows: {
+        maximumAttempts: 2,
+        oneAndOne: true,
+        technical: false,
+        possessionRetained: false,
+      },
+    })).toMatchObject({ ok: false, state: oneAndOneState, code: 'command_failed' })
 
     const ended = endBasketballPeriod(state, {
       recorderUserId: 'recorder-1',
@@ -399,8 +450,29 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
       teamSide: 'tracked',
       actors: [subject.value],
     })
-    const appended = addGameEvent(state, ejection, gameEventRegistry, gameEventProjectors)
-    if (!appended.ok || !appended.inspection.complete) throw new Error('Ejection fixture failed.')
+    const automaticEjection = createBasketballAdministrativeEvent({
+      id: id(701),
+      eventType: 'basketball.ejection',
+      payload: {
+        reason: 'Automatic threshold',
+        source: 'automatic_threshold',
+        relatedFoulEventId: fifth.foulEventId,
+        captureCommandId: null,
+      },
+      recorderUserId: 'recorder-1',
+      sequence: context.value.nextSequence + 1,
+      period: context.value.period,
+      occurredAt: context.value.occurredAt,
+      teamSide: 'tracked',
+      actors: [subject.value],
+    })
+    const appended = addGameEvents(
+      state,
+      [ejection, automaticEjection],
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    if (!appended.ok || !appended.inspection.complete) throw new Error('Ejection fixtures failed.')
     state = appended.state
 
     expect(previewBasketballFoulDecrement(state, { kind: 'player', playerId: 'player-1' }))
@@ -412,6 +484,7 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
           removesTeamFoul: true,
           unlinkedTripCount: 1,
           unlinkedEjectionCount: 1,
+          removedAutomaticEjectionCount: 1,
           clearsDisqualification: true,
           bonusStatusBefore: 'double_bonus',
           bonusStatusAfter: 'none',
@@ -434,6 +507,9 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
     expect(removed.state.eventStream?.events.find(event =>
       typeof event === 'object' && event && 'id' in event && event.id === ejection.id
     )).toMatchObject({ payload: { relatedFoulEventId: null } })
+    expect(removed.state.eventStream?.events.find(event =>
+      typeof event === 'object' && event && 'id' in event && event.id === automaticEjection.id
+    )).toMatchObject({ deletedAt: '2026-08-08T12:21:00.000Z' })
 
     const restored = restoreLastBasketballCourtUndo(removed.state, '2026-08-08T12:22:00.000Z')
     expect(restored.ok).toBe(true)
@@ -445,6 +521,12 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
     expect(restored.state.eventStream?.events.find(event =>
       typeof event === 'object' && event && 'id' in event && event.id === ejection.id
     )).toMatchObject({ payload: { relatedFoulEventId: fifth.foulEventId } })
+    expect(restored.state.eventStream?.events.find(event =>
+      typeof event === 'object' && event && 'id' in event && event.id === automaticEjection.id
+    )).toMatchObject({
+      deletedAt: null,
+      payload: { source: 'automatic_threshold', relatedFoulEventId: fifth.foulEventId },
+    })
   })
 
   it('removes a trip without changing free-throw totals and restores stable positions', () => {
@@ -554,6 +636,55 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
       .toMatchObject({ ok: false, code: 'nothing_to_undo' })
     expect(previewBasketballFreeThrowTripRemoval(next.state, captured.tripEventId))
       .toMatchObject({ ok: false, code: 'nothing_to_undo' })
+  })
+
+  it('preserves carried overtime bonus status after removing the current overtime foul', () => {
+    let state = startedState({
+      periodsPerGame: 1,
+      periodLabels: ['H1'],
+      bonusThreshold: 1,
+      doubleBonusThreshold: 2,
+      hasOneAndOne: true,
+      overtimeFoulsReset: false,
+    })
+    const regulationEnded = endBasketballPeriod(state, {
+      recorderUserId: 'recorder-1',
+      eventId: id(950),
+    })
+    if (!regulationEnded.ok) throw new Error(regulationEnded.message)
+    const overtimeOne = startNextBasketballPeriod(regulationEnded.state, {
+      recorderUserId: 'recorder-1',
+      eventId: id(951),
+    })
+    if (!overtimeOne.ok) throw new Error(overtimeOne.message)
+    const firstFoul = captureFoul(overtimeOne.state, 20, { offender: { kind: 'team' } })
+    if (!firstFoul.ok) throw new Error(firstFoul.message)
+    const overtimeOneEnded = endBasketballPeriod(firstFoul.state, {
+      recorderUserId: 'recorder-1',
+      eventId: id(952),
+    })
+    if (!overtimeOneEnded.ok) throw new Error(overtimeOneEnded.message)
+    const overtimeTwo = startNextBasketballPeriod(overtimeOneEnded.state, {
+      recorderUserId: 'recorder-1',
+      eventId: id(953),
+    })
+    if (!overtimeTwo.ok) throw new Error(overtimeTwo.message)
+    expect(overtimeTwo.state.sportGameState?.sportId === 'basketball'
+      ? overtimeTwo.state.sportGameState.projection.bonusStatusByPeriod['overtime-2']?.tracked
+      : null).toBe('one_and_one')
+    state = overtimeTwo.state
+    const secondFoul = captureFoul(state, 21, { offender: { kind: 'team' } })
+    if (!secondFoul.ok) throw new Error(secondFoul.message)
+    expect(previewBasketballFoulDecrement(secondFoul.state, {
+      kind: 'team_foul',
+      teamSide: 'tracked',
+    })).toMatchObject({
+      ok: true,
+      value: {
+        bonusStatusBefore: 'double_bonus',
+        bonusStatusAfter: 'one_and_one',
+      },
+    })
   })
 
   it('rejects foul and trip corrections on a cloud-bound event game', () => {

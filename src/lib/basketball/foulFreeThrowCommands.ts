@@ -18,6 +18,7 @@ import type {
   BasketballFoulClass,
   BasketballFoulContext,
   BasketballFoulCountingOverride,
+  BasketballFoulEvent,
   BasketballMatchEvent,
   BasketballTeamSide,
 } from './types'
@@ -92,11 +93,9 @@ export function captureBasketballFoul(
   if (!drawnBy.ok) return drawnBy
   const override = normalizeCountingOverride(state, options.countingOverride ?? null)
   if (!override.ok) return override
-  const awardError = validateFreeThrowAward(options.freeThrows ?? null)
-  if (awardError) return failure(state, 'command_failed', awardError)
   if (
     options.context === 'offensive' &&
-    options.teamControlSide !== undefined &&
+    options.teamControlSide != null &&
     options.teamControlSide !== options.teamSide
   ) {
     return failure(state, 'command_failed', 'An offensive foul must use the committing side as team control.')
@@ -127,6 +126,8 @@ export function captureBasketballFoul(
     teamSide: options.teamSide,
     actors: drawnBy.actor ? [offender.actor, drawnBy.actor] : [offender.actor],
   })
+  const awardError = validateFreeThrowAward(state, foul, options.freeThrows ?? null)
+  if (awardError) return failure(state, 'command_failed', awardError)
 
   const events: BasketballMatchEvent[] = [foul]
   let tripId: string | undefined
@@ -213,8 +214,7 @@ export function captureBasketballFreeThrowAttempt(
       event.payload.freeThrowTripId === trip.id &&
       event.payload.tripAttemptNumber !== null
     )
-  const activeAttempts = historicalAttempts.filter(event => event.deletedAt === null)
-  const firstAttempt = activeAttempts.find(event => event.payload.tripAttemptNumber === 1)
+  const firstAttempt = historicalAttempts.find(event => event.payload.tripAttemptNumber === 1)
   if (trip.payload.oneAndOne && firstAttempt && !firstAttempt.payload.made) {
     return failure(state, 'command_failed', 'The one-and-one trip ended after the missed first attempt.')
   }
@@ -357,10 +357,38 @@ function normalizeCountingOverride(
     : failure(state, 'command_failed', 'Exceptional foul counting requires a reason.')
 }
 
-function validateFreeThrowAward(award: BasketballFreeThrowAward | null): string | null {
+function validateFreeThrowAward(
+  state: GameState,
+  foul: BasketballFoulEvent,
+  award: BasketballFreeThrowAward | null
+): string | null {
   if (!award) return null
   if (award.oneAndOne && award.maximumAttempts !== 2) {
     return 'A one-and-one Basketball trip must award at most two attempts.'
+  }
+  const technicalFoul = foul.payload.countingOverride?.technical ?? foul.payload.class === 'technical'
+  if (award.technical !== technicalFoul) {
+    return 'The free-throw technical flag must match the foul counting context.'
+  }
+  if (!award.oneAndOne) return null
+  const sportState = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState
+    : null
+  if (!sportState?.setup.rulesSnapshot.hasOneAndOne) {
+    return 'The Basketball rules snapshot does not allow one-and-one free throws.'
+  }
+  const projected = addGameEvent(state, foul, gameEventRegistry, gameEventProjectors)
+  const projectedState = projected.ok && projected.inspection.complete &&
+    projected.state.sportGameState?.sportId === 'basketball'
+    ? projected.state.sportGameState
+    : null
+  if (!projectedState) {
+    return 'The Basketball foul could not be projected before awarding free throws.'
+  }
+  const bonus = projectedState.projection.bonusStatusByPeriod[foul.period.id]?.[foul.teamSide]
+    ?? 'none'
+  if (bonus !== 'one_and_one') {
+    return 'A one-and-one trip requires the committing side to be in the one-and-one bonus window.'
   }
   return null
 }

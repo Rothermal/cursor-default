@@ -86,6 +86,7 @@ export interface BasketballFoulDecrementPreview {
   removesTechnical: boolean
   unlinkedTripCount: number
   unlinkedEjectionCount: number
+  removedAutomaticEjectionCount: number
   clearsDisqualification: boolean
   bonusStatusBefore: BasketballBonusStatus
   bonusStatusAfter: BasketballBonusStatus
@@ -567,6 +568,16 @@ function foulDecrementPlan(
   const participant = committedBy?.kind === 'player' && committedBy.participantId
     ? sportState.projection.participants[committedBy.participantId]
     : null
+  const clearsDisqualification = Boolean(
+    counts.personalFoul &&
+    participant?.disqualified &&
+    participant.stats.pf - 1 < sportState.setup.rulesSnapshot.personalFoulLimit
+  )
+  const removedAutomaticEjections = clearsDisqualification
+    ? ejections.filter(event => event.payload.source === 'automatic_threshold')
+    : []
+  const removedAutomaticEjectionIds = new Set(removedAutomaticEjections.map(event => event.id))
+  const survivingEjections = ejections.filter(event => !removedAutomaticEjectionIds.has(event.id))
   const mutations: GameEventMutation[] = [
     { type: 'delete', eventId: foul.id },
     ...trips.map(event => ({
@@ -574,10 +585,14 @@ function foulDecrementPlan(
       eventId: event.id,
       changes: { payload: { ...event.payload, sourceFoulEventId: null } },
     })),
-    ...ejections.map(event => ({
+    ...survivingEjections.map(event => ({
       type: 'update' as const,
       eventId: event.id,
       changes: { payload: { ...event.payload, relatedFoulEventId: null } },
+    })),
+    ...removedAutomaticEjections.map(event => ({
+      type: 'delete' as const,
+      eventId: event.id,
     })),
   ]
   return {
@@ -586,7 +601,8 @@ function foulDecrementPlan(
     receiptEntries: [
       receiptEntry(foul, 'restore', null),
       ...trips.map(event => receiptEntry(event, 'relink_trip_foul', foul.id)),
-      ...ejections.map(event => receiptEntry(event, 'relink_ejection_foul', foul.id)),
+      ...survivingEjections.map(event => receiptEntry(event, 'relink_ejection_foul', foul.id)),
+      ...removedAutomaticEjections.map(event => receiptEntry(event, 'restore', null)),
     ],
     basePreview: {
       targetEventId: foul.id,
@@ -596,12 +612,9 @@ function foulDecrementPlan(
       removesTeamFoul: counts.teamFoul,
       removesTechnical: counts.technical,
       unlinkedTripCount: trips.length,
-      unlinkedEjectionCount: ejections.length,
-      clearsDisqualification: Boolean(
-        counts.personalFoul &&
-        participant?.disqualified &&
-        participant.stats.pf - 1 < sportState.setup.rulesSnapshot.personalFoulLimit
-      ),
+      unlinkedEjectionCount: survivingEjections.length,
+      removedAutomaticEjectionCount: removedAutomaticEjections.length,
+      clearsDisqualification,
       bonusStatusBefore: sportState.projection.bonusStatusByPeriod[foul.period.id]
         ?.[foul.teamSide] ?? 'none',
       requiresConfirmation: true,

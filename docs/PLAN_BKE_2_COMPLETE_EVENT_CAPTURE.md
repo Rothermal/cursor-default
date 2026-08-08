@@ -245,6 +245,8 @@ React.
 - The foul sheet may start a linked trip. Append foul and trip atomically, then record each attempt as
   it occurs.
 - Support one, two, or three maximum attempts; one-and-one is a maximum two-attempt trip.
+- Validate one-and-one against the immutable rules and the post-foul one-and-one bonus window;
+  technical-trip context must match the foul's derived or overridden technical count.
 - A first-attempt one-and-one miss closes live capture without fabricating a second attempt.
 - Technical and possession-retained flags belong to the trip. Attempts remain linked shot events.
 - Empty/partial trips remain reviewable and do not invent points or attempts.
@@ -266,6 +268,8 @@ React.
 
 - Foul decrement removes the newest match and atomically clears source links from surviving trips and
   ejections. Confirmation names personal, team, bonus/disqualification, and unlink effects.
+- If removing the foul clears disqualification, a related automatic-threshold ejection is removed
+  with it; explicit official ejections remain authoritative and survive with their stale link cleared.
 - Team foul/technical decrement resolves the newest qualifying current-period foul.
 - Charged timeout decrement resolves the newest matching current-period timeout.
 - Removing a trip clears surviving attempt links; removing an attempt leaves trip positions intact.
