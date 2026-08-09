@@ -47,6 +47,7 @@ import {
 } from '../lib/basketball/commands'
 import {
   basketballLiveCaptureUnits,
+  canDecrementBasketballFoul,
   canRestoreBasketballCourtUndo,
   decrementBasketballDirectStat,
   decrementBasketballFoul,
@@ -120,6 +121,10 @@ function timeoutCapForPeriod(
   const cap = isOt ? capOt : capReg
   if (cap == null) return undefined
   return cap
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`
 }
 
 export default function GameTracker() {
@@ -382,9 +387,12 @@ export default function GameTracker() {
         }))
     : []
   const currentPeriodId = basketballSportState?.projection.currentPeriodId ?? null
-  const openFreeThrowTrips = basketballTripStatuses.filter(trip =>
-    trip.open && trip.periodId === currentPeriodId
+  const reviewableFreeThrowTrips = basketballTripStatuses.filter(trip =>
+    trip.periodId === currentPeriodId && (
+      trip.open || trip.attempts.some(attempt => attempt.deleted)
+    )
   )
+  const openFreeThrowTripCount = reviewableFreeThrowTrips.filter(trip => trip.open).length
   const selectedFreeThrowTrip = activeFreeThrowTrip
     ? basketballTripStatuses.find(trip => trip.eventId === activeFreeThrowTrip.eventId) ?? null
     : null
@@ -397,6 +405,11 @@ export default function GameTracker() {
   const activeCaptureSide = activeCaptureTarget?.ok
     ? activeCaptureTarget.value.teamSide
     : basketballSportState?.capturePreferences.teamSide ?? 'tracked'
+  const activeFoulOffenderAvailable = Boolean(
+    activeBasketballParticipant &&
+    !activeBasketballParticipant.disqualified &&
+    !activeBasketballParticipant.ejected
+  )
 
   const foulBaseForBonus = sport.teamFoulBaseStatId ?? null
   const teamFoulCountThisPeriod =
@@ -406,6 +419,12 @@ export default function GameTracker() {
 
   const showBonusBanner =
     showTeamStatGrid && Boolean(foulBaseForBonus) && teamRules !== null
+
+  const clearTrackerActionErrors = () => {
+    setDirectCaptureError(null)
+    setDirectDecrementError(null)
+    setAdministrativeCorrectionError(null)
+  }
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })
@@ -432,6 +451,7 @@ export default function GameTracker() {
   }
 
   const handleDirectCapture = (playerId: string, statId: BasketballDirectStatId) => {
+    clearTrackerActionErrors()
     const result = captureBasketballDirectStat(state, {
       recorderUserId: user?.id ?? null,
       playerId,
@@ -441,8 +461,6 @@ export default function GameTracker() {
       setDirectCaptureError(result.message)
       return
     }
-    setDirectCaptureError(null)
-    setDirectDecrementError(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
@@ -450,19 +468,19 @@ export default function GameTracker() {
     playerId: string,
     statId: Exclude<BasketballDirectStatId, 'min'>
   ) => {
+    clearTrackerActionErrors()
     const result = decrementBasketballDirectStat(state, playerId, statId)
     if (!result.ok) {
       setDirectDecrementError(result.message)
       return false
     }
-    setDirectCaptureError(null)
-    setDirectDecrementError(null)
     setPendingDirectDecrement(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
     return true
   }
 
   const handleDirectDecrement = (playerId: string, statId: BasketballDirectStatId) => {
+    clearTrackerActionErrors()
     const preview = previewBasketballDirectDecrement(state, playerId, statId)
     if (!preview.ok) {
       setDirectDecrementError(preview.message)
@@ -477,8 +495,6 @@ export default function GameTracker() {
         setDirectDecrementError(result.message)
         return
       }
-      setDirectCaptureError(null)
-      setDirectDecrementError(null)
       dispatch({ type: 'HYDRATE_STATE', state: result.state })
       return
     }
@@ -491,6 +507,7 @@ export default function GameTracker() {
   }
 
   const handleQuickScoreAdjustment = (teamSide: BasketballTeamSide, delta: 1 | -1) => {
+    clearTrackerActionErrors()
     const result = adjustBasketballScore(state, {
       recorderUserId: user?.id ?? null,
       teamSide,
@@ -501,7 +518,6 @@ export default function GameTracker() {
       setDirectCaptureError(result.message)
       return
     }
-    setDirectCaptureError(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
@@ -510,6 +526,7 @@ export default function GameTracker() {
     delta: number
     note: string
   }) => {
+    clearTrackerActionErrors()
     const result = adjustBasketballScore(state, {
       recorderUserId: user?.id ?? null,
       ...input,
@@ -519,13 +536,13 @@ export default function GameTracker() {
       setScoreCorrectionError(result.message)
       return
     }
-    setDirectCaptureError(null)
     setScoreCorrectionError(null)
     setShowScoreCorrection(false)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
   const handleStealTurnover = (turnoverTarget: BasketballTurnoverTarget) => {
+    clearTrackerActionErrors()
     const result = captureBasketballStealTurnover(state, {
       recorderUserId: user?.id ?? null,
       stealerPlayerId: activePlayer.id,
@@ -535,13 +552,13 @@ export default function GameTracker() {
       setStealTurnoverError(result.message)
       return
     }
-    setDirectCaptureError(null)
     setStealTurnoverError(null)
     setShowStealTurnover(false)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
   const handleFoulCapture = (input: BasketballFoulDialogInput) => {
+    clearTrackerActionErrors()
     const result = captureBasketballFoul(state, {
       recorderUserId: user?.id ?? null,
       ...input,
@@ -550,7 +567,6 @@ export default function GameTracker() {
       setFoulError(result.message)
       return
     }
-    setDirectCaptureError(null)
     setFoulError(null)
     setFoulDialog(null)
     if (result.tripEventId) {
@@ -570,12 +586,13 @@ export default function GameTracker() {
     context: BasketballFoulContext
   ) => {
     setFoulError(null)
-    setAdministrativeCorrectionError(null)
+    clearTrackerActionErrors()
     setFoulDialog({ teamSide, playerId, foulClass, context })
   }
 
   const handleFreeThrowAttempt = (playerId: string, made: boolean) => {
     if (!selectedFreeThrowTrip) return
+    clearTrackerActionErrors()
     const result = captureBasketballFreeThrowAttempt(state, {
       recorderUserId: user?.id ?? null,
       tripEventId: selectedFreeThrowTrip.eventId,
@@ -586,53 +603,52 @@ export default function GameTracker() {
       setFreeThrowError(result.message)
       return
     }
-    setDirectCaptureError(null)
     setFreeThrowError(null)
     if (result.tripComplete) setActiveFreeThrowTrip(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
   const handleFoulDecrement = (target: BasketballFoulDecrementTarget) => {
+    clearTrackerActionErrors()
     const preview = previewBasketballFoulDecrement(state, target)
     if (!preview.ok) {
       setAdministrativeCorrectionError(preview.message)
       return
     }
-    setAdministrativeCorrectionError(null)
     setPendingFoulDecrement({ target, preview: preview.value })
   }
 
   const applyFoulDecrement = () => {
     if (!pendingFoulDecrement) return
+    clearTrackerActionErrors()
     const result = decrementBasketballFoul(state, pendingFoulDecrement.target)
     if (!result.ok) {
       setAdministrativeCorrectionError(result.message)
       return
     }
-    setAdministrativeCorrectionError(null)
     setPendingFoulDecrement(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
   const handleFreeThrowTripRemoval = (eventId: string) => {
+    clearTrackerActionErrors()
     const preview = previewBasketballFreeThrowTripRemoval(state, eventId)
     if (!preview.ok) {
       setFreeThrowError(preview.message)
       return
     }
     setFreeThrowError(null)
-    setAdministrativeCorrectionError(null)
     setPendingTripRemoval({ eventId, preview: preview.value })
   }
 
   const applyFreeThrowTripRemoval = () => {
     if (!pendingTripRemoval) return
+    clearTrackerActionErrors()
     const result = removeBasketballFreeThrowTrip(state, pendingTripRemoval.eventId)
     if (!result.ok) {
       setAdministrativeCorrectionError(result.message)
       return
     }
-    setAdministrativeCorrectionError(null)
     setPendingTripRemoval(null)
     setActiveFreeThrowTrip(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
@@ -924,9 +940,9 @@ export default function GameTracker() {
                             ? { kind: 'team_technical', teamSide: activeCaptureSide }
                             : null
                       : null
-                    const foulDecrementPreview = foulTarget
-                      ? previewBasketballFoulDecrement(state, foulTarget)
-                      : null
+                    const foulDecrementAvailable = foulTarget
+                      ? canDecrementBasketballFoul(state, foulTarget)
+                      : false
                     const scopedId = actualStatId(action, currentPeriod)
                     const periodTotal =
                       action.periodScoped
@@ -969,8 +985,9 @@ export default function GameTracker() {
                         subtitle={subtitle}
                         maxValue={timeoutCap}
                         disabled={isBasketballEventMode && !basketballPeriodActive}
+                        incrementDisabled={isBasketballEventMode && action.id === 'pf' && !activeFoulOffenderAvailable}
                         decrementDisabled={isBasketballEventMode && (
-                          foulTarget ? !foulDecrementPreview?.ok : !decrementPreview?.ok
+                          foulTarget ? !foulDecrementAvailable : !decrementPreview?.ok
                         )}
                         attemptDecrementDisabled={isBasketballEventMode && !missDecrementPreview?.ok}
                         onIncrement={() => {
@@ -1045,18 +1062,20 @@ export default function GameTracker() {
               Steal + Turnover
             </button>
           )}
-          {isBasketballEventMode && openFreeThrowTrips.length > 0 && (
+          {isBasketballEventMode && reviewableFreeThrowTrips.length > 0 && (
             <section className="border-y border-amber-200 bg-amber-50 px-3 py-3" aria-labelledby="basketball-open-trips-title">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <h3 id="basketball-open-trips-title" className="text-sm font-bold text-amber-950">
                   Awarded free throws
                 </h3>
                 <span className="text-xs font-semibold text-amber-800">
-                  {openFreeThrowTrips.length} open
+                  {openFreeThrowTripCount > 0
+                    ? `${openFreeThrowTripCount} open`
+                    : 'Review corrections'}
                 </span>
               </div>
               <div className="space-y-2">
-                {openFreeThrowTrips.map(trip => {
+                {reviewableFreeThrowTrips.map(trip => {
                   const teamName = trip.teamSide === 'tracked' ? gameInfo.teamName : gameInfo.opponentName
                   const lastShooter = [...trip.attempts]
                     .reverse()
@@ -1066,7 +1085,9 @@ export default function GameTracker() {
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-800">{teamName}</p>
                         <p className="text-xs text-slate-600">
-                          Attempt {trip.nextAttemptNumber} of {trip.maximumAttempts}
+                          {trip.open
+                            ? `Attempt ${trip.nextAttemptNumber} of ${trip.maximumAttempts}`
+                            : 'Closed · removed position retained'}
                           {trip.oneAndOne ? ' · one-and-one' : ''}
                           {trip.technical ? ' · technical' : ''}
                         </p>
@@ -1081,7 +1102,7 @@ export default function GameTracker() {
                         className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:opacity-40"
                       >
                         <ReceiptText size={16} aria-hidden />
-                        Record
+                        {trip.open ? 'Record' : 'Review'}
                       </button>
                     </div>
                   )
@@ -1226,6 +1247,20 @@ export default function GameTracker() {
           suggestedPlayerId={activeFreeThrowTrip?.suggestedPlayerId}
           errorMessage={freeThrowError}
           onRecord={handleFreeThrowAttempt}
+          onAddParticipant={() => {
+            dispatch({
+              type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
+              preferences: {
+                teamSide: selectedFreeThrowTrip.teamSide,
+                selectedParticipantId: null,
+                selectionInitialized: true,
+              },
+            })
+            setFreeThrowError(null)
+            setActiveFreeThrowTrip(null)
+            setLateParticipantError(null)
+            setShowAddPlayer(true)
+          }}
           onRemove={() => handleFreeThrowTripRemoval(selectedFreeThrowTrip.eventId)}
           onClose={() => {
             setFreeThrowError(null)
@@ -1249,13 +1284,13 @@ export default function GameTracker() {
                 ? 'The player will no longer be disqualified.'
                 : null,
               pendingFoulDecrement.preview.unlinkedTripCount > 0
-                ? `${pendingFoulDecrement.preview.unlinkedTripCount} free-throw award will be kept and unlinked.`
+                ? `${countLabel(pendingFoulDecrement.preview.unlinkedTripCount, 'free-throw award')} will be kept and unlinked.`
                 : null,
               pendingFoulDecrement.preview.unlinkedEjectionCount > 0
-                ? `${pendingFoulDecrement.preview.unlinkedEjectionCount} ejection will be kept and unlinked.`
+                ? `${countLabel(pendingFoulDecrement.preview.unlinkedEjectionCount, 'ejection')} will be kept and unlinked.`
                 : null,
               pendingFoulDecrement.preview.removedAutomaticEjectionCount > 0
-                ? `${pendingFoulDecrement.preview.removedAutomaticEjectionCount} automatic ejection will also be removed.`
+                ? `${countLabel(pendingFoulDecrement.preview.removedAutomaticEjectionCount, 'automatic ejection')} will also be removed.`
                 : null,
             ].filter(Boolean).join(' ')
           : ''}
@@ -1274,7 +1309,7 @@ export default function GameTracker() {
         title="Remove free-throw award?"
         message={pendingTripRemoval
           ? `The award will be removed.${pendingTripRemoval.preview.unlinkedAttemptCount > 0
-              ? ` ${pendingTripRemoval.preview.unlinkedAttemptCount} recorded attempt will be kept and unlinked.`
+              ? ` ${countLabel(pendingTripRemoval.preview.unlinkedAttemptCount, 'recorded attempt')} will be kept and unlinked.`
               : ''}`
           : ''}
         confirmLabel="Remove"
@@ -1294,13 +1329,16 @@ export default function GameTracker() {
           ? [
               `This removes the selected ${pendingDirectDecrement.preview.label}.`,
               pendingDirectDecrement.preview.linkedAssistCount > 0
-                ? `${pendingDirectDecrement.preview.linkedAssistCount} linked assist will also be removed.`
+                ? `${countLabel(pendingDirectDecrement.preview.linkedAssistCount, 'linked assist')} will also be removed.`
                 : null,
               pendingDirectDecrement.preview.linkedReboundCount > 0
-                ? `${pendingDirectDecrement.preview.linkedReboundCount} linked rebound will also be removed.`
+                ? `${countLabel(pendingDirectDecrement.preview.linkedReboundCount, 'linked rebound')} will also be removed.`
                 : null,
               pendingDirectDecrement.preview.unlinkedBlockCount > 0
-                ? `${pendingDirectDecrement.preview.unlinkedBlockCount} linked block will be kept and unlinked.`
+                ? `${countLabel(pendingDirectDecrement.preview.unlinkedBlockCount, 'linked block')} will be kept and unlinked.`
+                : null,
+              pendingDirectDecrement.preview.consumesFreeThrowTripPosition
+                ? 'Its awarded-trip position stays consumed; reopen the trip workspace to review or remove the award.'
                 : null,
             ].filter(Boolean).join(' ')
           : ''}

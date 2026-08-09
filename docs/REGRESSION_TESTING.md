@@ -739,18 +739,22 @@ BKE-2C1 intentionally exposes no tracker controls; manual UI checks begin in BKE
 ## 11a7. Basketball foul and awarded-free-throw UI (BKE-2C2)
 
 **Precondition:** Development build with a healthy, local Basketball event game and an active
-period. Include tracked and opponent participants plus both team chips.
+period. Begin with tracked participants and both team chips; add an opponent participant when the
+matrix requests one.
 
 | Step | Action | Expected |
 |------|--------|----------|
 | 11a7.1 | Select a player and tap PF `+` | The foul sheet opens with that player's side/player selected and Personal + Common defaults; cancelling changes nothing |
-| 11a7.2 | Select each team chip and tap Foul or Technical `+` | The sheet uses that side and a team offender; Technical defaults to Technical + Administrative; no duplicate team counter is written |
+| 11a7.1a | Reach the personal-foul limit, then inspect that player's PF controls | PF `+` is disabled so it cannot silently fall back to a team offender; PF `-` remains available for correction |
+| 11a7.2 | Select each team chip and tap Foul or Technical `+` | The sheet uses that side and a team offender; Technical defaults to Technical + Administrative and, under the version-1 NFHS baseline, derives both technical and team-foul/bonus counts from the one foul event |
 | 11a7.3 | Switch side/offender, use a staff label, select a drawn-by player or unknown label, and exercise offensive/non-offensive team control | Candidate lists remain side-correct, required labels are enforced, and successful captures project the chosen actors/context |
 | 11a7.4 | Enable Advanced counting override with and without a reason | Submit remains disabled without a reason; valid personal/team/technical choices become the authoritative projected counts |
 | 11a7.5 | Award 1, 2, 3, technical, possession-retained, and valid one-and-one trips | Foul plus award append atomically; failures remain in the foul sheet; success opens the awarded-trip workspace for the opposite side |
-| 11a7.6 | Select an eligible shooter and record Made/Miss attempts | Each attempt updates projected player/side score and attempt totals; fixed trips close after their final position and do not create court markers |
+| 11a7.6 | With no opponent participant, award the opponent a trip; use Add player, then reopen the trip and record Made/Miss attempts | The workspace explains why capture is blocked and opens the late-participant flow on the awarded side; the resumed trip accepts the new shooter, updates projected totals, closes after its final position, and creates no court marker |
 | 11a7.7 | Miss the first one-and-one attempt; separately leave a fixed trip partial, close the sheet, park/reload, and resume it | The one-and-one closes without a second attempt; the partial trip remains visible as open work with its stable next position and prior shooter suggestion |
+| 11a7.7a | Decrement a trip-linked made or missed FT from the player grid | Confirmation warns that the awarded position stays consumed; after removal the corrected trip remains in the workspace for review or whole-award removal |
 | 11a7.8 | Decrement player PF, team Foul, and team Technical values | Each confirmation names personal/team/technical, bonus, disqualification, unlink, and automatic-ejection effects before applying the newest current-period match |
+| 11a7.8a | Trigger failures in two different capture/correction families, then complete valid work | Only the newest error is visible, and a later successful action clears stale tracker feedback |
 | 11a7.9 | Remove an empty and attempted free-throw award, then use immediate Restore | The confirmation names surviving unlinked attempts; removal preserves their totals and Restore re-links the exact trip/positions |
 | 11a7.10 | End the period/game, then repeat representative actions in a legacy Basketball game and open Soccer | Event foul/trip controls are disabled outside active periods; legacy Basketball and Soccer behavior remain unchanged |
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Trash2, X } from 'lucide-react'
+import { Check, Trash2, UserPlus, X } from 'lucide-react'
 import type { BasketballFreeThrowTripStatus } from '../../lib/basketball/foulFreeThrowCommands'
 
 export interface BasketballFreeThrowShooterCandidate {
@@ -14,6 +14,7 @@ interface BasketballFreeThrowTripDialogProps {
   suggestedPlayerId?: string | null
   errorMessage?: string | null
   onRecord: (playerId: string, made: boolean) => void
+  onAddParticipant: () => void
   onRemove: () => void
   onClose: () => void
 }
@@ -25,6 +26,7 @@ export default function BasketballFreeThrowTripDialog({
   suggestedPlayerId = null,
   errorMessage,
   onRecord,
+  onAddParticipant,
   onRemove,
   onClose,
 }: BasketballFreeThrowTripDialogProps) {
@@ -75,7 +77,9 @@ export default function BasketballFreeThrowTripDialog({
         <div className="space-y-4 px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-semibold text-slate-700">
-              Attempt {trip.nextAttemptNumber ?? trip.maximumAttempts} of {trip.maximumAttempts}
+              {trip.open
+                ? `Attempt ${trip.nextAttemptNumber} of ${trip.maximumAttempts}`
+                : 'Trip closed'}
             </span>
             <div className="flex gap-1" aria-label="Recorded attempts">
               {Array.from({ length: trip.maximumAttempts }, (_, index) => {
@@ -102,6 +106,14 @@ export default function BasketballFreeThrowTripDialog({
             </div>
           </div>
 
+          {!trip.open && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {trip.closedReason === 'first_attempt_ended'
+                ? 'The one-and-one ended after attempt 1. Removed positions stay consumed.'
+                : 'All awarded positions have been recorded. Removed positions stay consumed.'}
+            </p>
+          )}
+
           <label className="block text-sm font-semibold text-slate-700">
             Shooter
             <select value={playerId} onChange={event => setPlayerId(event.target.value)} className="input-field mt-1" disabled={candidates.length === 0}>
@@ -109,6 +121,22 @@ export default function BasketballFreeThrowTripDialog({
               {candidates.map(candidate => <option key={candidate.playerId} value={candidate.playerId}>{candidate.label}</option>)}
             </select>
           </label>
+
+          {candidates.length === 0 && trip.open && (
+            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+              <p className="text-sm text-amber-950">
+                Add an eligible {teamName} player before recording this trip.
+              </p>
+              <button
+                type="button"
+                onClick={onAddParticipant}
+                className="btn-secondary inline-flex min-h-10 items-center gap-2 px-3 py-2 text-sm"
+              >
+                <UserPlus size={16} aria-hidden />
+                Add player
+              </button>
+            </div>
+          )}
 
           {activeAttempts.length > 0 && (
             <p className="text-xs font-medium text-slate-500">

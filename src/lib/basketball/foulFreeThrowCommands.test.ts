@@ -15,9 +15,11 @@ import {
   startNextBasketballPeriod,
 } from './commands'
 import {
+  canDecrementBasketballFoul,
   decrementBasketballDirectStat,
   decrementBasketballFoul,
   previewBasketballFoulDecrement,
+  previewBasketballDirectDecrement,
   previewBasketballFreeThrowTripRemoval,
   removeBasketballFreeThrowTrip,
   restoreLastBasketballCourtUndo,
@@ -230,6 +232,14 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
     })
     expect(first).toMatchObject({ ok: true, attemptNumber: 1, tripComplete: true })
     if (!first.ok) return
+    expect(previewBasketballDirectDecrement(first.state, 'opponent-9', 'ft_miss'))
+      .toMatchObject({
+        ok: true,
+        value: {
+          consumesFreeThrowTripPosition: true,
+          requiresConfirmation: true,
+        },
+      })
     expect(captureBasketballFreeThrowAttempt(first.state, {
       recorderUserId: 'recorder-1',
       tripEventId: captured.tripEventId,
@@ -602,6 +612,7 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
           bonusStatusAfter: 'none',
         },
       })
+    expect(canDecrementBasketballFoul(state, { kind: 'player', playerId: 'player-1' })).toBe(true)
     const removed = decrementBasketballFoul(
       state,
       { kind: 'player', playerId: 'player-1' },
@@ -755,6 +766,7 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
     if (!next.ok) throw new Error(next.message)
     expect(previewBasketballFoulDecrement(next.state, { kind: 'player', playerId: 'player-1' }))
       .toMatchObject({ ok: false, code: 'nothing_to_undo' })
+    expect(canDecrementBasketballFoul(next.state, { kind: 'player', playerId: 'player-1' })).toBe(false)
     expect(previewBasketballFreeThrowTripRemoval(next.state, captured.tripEventId))
       .toMatchObject({ ok: false, code: 'nothing_to_undo' })
   })

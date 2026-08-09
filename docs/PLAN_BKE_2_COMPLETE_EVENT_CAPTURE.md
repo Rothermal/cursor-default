@@ -237,6 +237,9 @@ React.
 - Allow class, context, offender, optional drawn-by, and context-appropriate team-control side.
 - Use rule-derived personal/team/technical counts by default. Put reason-required counting overrides
   under Advanced.
+- Version 1 uses the NFHS baseline: technical fouls count toward both the technical total and team
+  foul/bonus count. Use a reason-required Advanced override for a competition that counts them
+  differently; layered rules-profile policy remains a later Basketball settings concern.
 - A team-level Foul action uses a team actor for unknown/bench attribution. Player/staff fouls derive
   team totals; there is no second editable team-foul counter.
 
