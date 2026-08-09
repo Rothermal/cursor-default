@@ -160,10 +160,15 @@ consequence preview, atomic mutation, and focused tests exist.
 - Dedicated historical-add commands may target a started period and use the same actor, relationship,
   inventory, non-negative score, and rule validation as live capture.
 - BKE-3D changes Basketball stat and administrative replay validation to accept any period that had
-  started at that event's append position. Current-period enforcement moves to the checked live
-  command boundary; lifecycle events keep their existing current-period projector rules. This is an
-  explicit replay contract change, not only a new command option, so an event appended in Q3 for Q1
-  remains projectable after reload.
+  started at that event's append position. Administrative replay also accepts `period_break`, aligning
+  its allowed status set with stat replay: `not_started`, `ended`, and `suspended` remain rejected.
+  Current-period and active-period enforcement moves to the checked live command boundary; lifecycle
+  events keep their existing current-period projector rules. These are explicit replay contract
+  changes, not only new command options, so an administrative event added during a break and an event
+  appended in Q3 for Q1 both remain projectable after reload.
+- Stat replay already accepts an event for the just-ended period during its break because
+  `currentPeriodId` retains that period. BKE-3D generalizes that narrow precedent across any previously
+  started period and across administrative event families.
 - Historical attribution changes period-scoped totals for the selected period, including team fouls
   and timeout inventory. Non-resetting overtime bonus recomputes from the same cumulative helper used
   by the tracker.
@@ -228,9 +233,10 @@ consequence preview, atomic mutation, and focused tests exist.
   completeness is necessary but not sufficient: Basketball-owned commands also validate final
   family invariants that the projector reports only as advisory relationship warnings.
 - Command validation owns duplicate free-throw attempt positions, relationship-target compatibility,
-  duplicate official facts, and any other warning-level invariant touched by the candidate. Existing
-  unrelated advisory warnings may remain, but a command cannot introduce a new warning for an
-  appended, revised, deleted, or restored event.
+  duplicate official facts, and any other warning-level invariant affected by the candidate. It
+  compares baseline and final relationship warnings across the complete stream and rejects every new
+  warning attributable to the command, including a dangling link on an untouched surviving event.
+  Existing unrelated advisory warnings may remain.
 - Rejected commands return the original `GameState` by identity with a typed product-facing error.
 
 ### 7.2 Individual and group removal
@@ -444,8 +450,9 @@ Each slice adds focused pure tests before UI exposure. The final BKE-3 gate incl
 30. Give legacy markers read-only core detail without links or editing.
 31. Leave legacy Recent Events unchanged.
 32. Keep BKE-3 on the local Game Tracker; BKE-4D owns Summary and remote authority.
-33. Let stat/administrative replay accept an already-started target period while checked live
-    commands retain current-period enforcement; lifecycle replay remains unchanged.
+33. Let stat/administrative replay accept an already-started target period, and let administrative
+    replay accept `period_break`, while checked live commands retain active/current-period
+    enforcement; lifecycle replay remains unchanged.
 34. Derive shot `valueSource` deterministically when location or value changes and label manual
     values in detail.
 35. Treat complete projection as necessary but use Basketball command validation for warning-level
