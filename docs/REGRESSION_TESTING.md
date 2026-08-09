@@ -799,6 +799,27 @@ period. Use one finite timeout profile and one profile with unlimited regulation
 
 ---
 
+## 11a10. Basketball complete tracker parity and BKE-2 exit (BKE-2D)
+
+**Precondition:** Development build with a healthy, local Basketball event game. Exercise both an
+active period and a period break, plus completed, suspended, and abandoned states.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a10.1 | Select tracked/opponent team chips and individual chips | Team targets show only valid team actions/totals; individuals retain player actions; selected identity remains visible in focused sheets |
+| 11a10.2 | Add fouls for both sides through a bonus threshold | Both period-foul totals and the opponent's resulting 1-and-1/bonus state update from projection; a new period displays zero fouls and no bonus |
+| 11a10.3 | End a period and inspect court, grid, score, foul, ejection, and timeout controls | Every capture path is read-only until the next period starts; review and correction context remains visible |
+| 11a10.4 | Eject or disqualify a player, then select their chip | The player remains visible with status/history but court and direct player capture are unavailable |
+| 11a10.5 | Suspend during active play, then reopen with a reason | Capture stops while suspended; reopen preserves every event and resumes the active period |
+| 11a10.6 | Suspend or abandon during a period break, then reopen | The stream remains intact and returns to the same period break rather than inventing an active segment |
+| 11a10.7 | Complete a non-tied local game, reopen with a reason, and continue | Completion is reviewable and reasoned reopen restores the projected pre-terminal lifecycle state |
+| 11a10.8 | Try blank/oversized reopen reasons and any terminal command on a cloud-bound event game | The command returns the original state with an inline error and no fallback mutation or cloud write |
+| 11a10.9 | Mix court/grid capture, team actions, fouls, timeouts, staff discipline, lifecycle changes, and a period transition | Score, stats, shots, administration, lifecycle, and current-period presentation remain one coherent event projection |
+| 11a10.10 | Park, JSON export/import or reload, hydrate, and rebuild the mixed game | The event stream, sport state, compatibility players, and shot chart reproduce exactly; direct legacy reducer actions remain rejected |
+| 11a10.11 | Run `pnpm test`, `pnpm lint`, and `pnpm build` | Basketball event, legacy Basketball, and Soccer suites pass; lint has no new warnings and production build succeeds |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

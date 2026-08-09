@@ -102,6 +102,10 @@ export interface BasketballLifecycleCommandOptions {
   eventId?: string
 }
 
+export interface BasketballReopenCommandOptions extends BasketballLifecycleCommandOptions {
+  reason: string
+}
+
 export type BasketballCaptureActorSelection =
   | { kind: 'participant'; participantId: string }
   | { kind: 'team' }
@@ -611,6 +615,57 @@ export function completeBasketballMatch(
   )
 }
 
+export function suspendBasketballMatch(
+  state: GameState,
+  options: BasketballLifecycleCommandOptions
+): BasketballStateCommandResult {
+  return endBasketballMatchLocally(state, options, 'suspended')
+}
+
+export function abandonBasketballMatch(
+  state: GameState,
+  options: BasketballLifecycleCommandOptions
+): BasketballStateCommandResult {
+  return endBasketballMatchLocally(state, options, 'abandoned')
+}
+
+export function reopenBasketballMatch(
+  state: GameState,
+  options: BasketballReopenCommandOptions
+): BasketballStateCommandResult {
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  }
+  const reason = options.reason.trim()
+  if (!reason) {
+    return failure(state, 'command_failed', 'Enter a reason for reopening the Basketball game.')
+  }
+  if (reason.length > 240) {
+    return failure(state, 'command_failed', 'Basketball reopen reasons cannot exceed 240 characters.')
+  }
+  const context = getBasketballTerminalLifecycleContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt
+  )
+  if (!context.ok) return { ...context, state }
+  const event = createBasketballLifecycleEvent({
+    id: options.eventId,
+    eventType: 'basketball.match_reopened',
+    payload: { reason, captureCommandId: null },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence,
+    period: context.value.period,
+    occurredAt: context.value.occurredAt,
+  })
+  return appendBasketballLifecycleEvent(
+    state,
+    clearBasketballUndoReceipt(state),
+    event,
+    'Basketball reopen did not produce a complete event projection.'
+  )
+}
+
 export function captureBasketballCourtEvent(
   state: GameState,
   options: BasketballCourtCaptureOptions
@@ -852,6 +907,74 @@ function getBasketballLifecycleContext(
       occurredAt: timestamp.value,
     },
   }
+}
+
+function getBasketballTerminalLifecycleContext(
+  state: GameState,
+  recorderUserId: string | null,
+  occurredAt?: string
+): BasketballCommandResult<BasketballCommandContext> {
+  if (
+    state.sport?.id !== 'basketball' ||
+    state.gameDataAuthority !== SPORT_EVENTS_AUTHORITY ||
+    !state.eventStream ||
+    state.sportGameState?.sportId !== 'basketball'
+  ) {
+    return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
+  }
+  const projection = state.sportGameState.projection
+  if (
+    (projection.status !== 'ended' && projection.status !== 'suspended') ||
+    !projection.currentPeriodId
+  ) {
+    return commandFailure('invalid_period', 'Only a suspended or ended Basketball game can reopen.')
+  }
+  const segment = projection.periods.find(period => period.id === projection.currentPeriodId)
+  if (!segment) return commandFailure('invalid_period', 'The current Basketball period is invalid.')
+  const timestamp = normalizeBasketballCommandTimestamp(occurredAt)
+  if (!timestamp.ok) return timestamp
+  return {
+    ok: true,
+    value: {
+      sportState: state.sportGameState,
+      period: { id: segment.id, order: segment.order },
+      nextSequence: nextBasketballEventSequence(state.eventStream.events, recorderUserId),
+      occurredAt: timestamp.value,
+    },
+  }
+}
+
+function endBasketballMatchLocally(
+  state: GameState,
+  options: BasketballLifecycleCommandOptions,
+  reason: 'suspended' | 'abandoned'
+): BasketballStateCommandResult {
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  }
+  const context = getBasketballLifecycleContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt
+  )
+  if (!context.ok) return { ...context, state }
+  const event = createBasketballLifecycleEvent({
+    id: options.eventId,
+    eventType: 'basketball.match_ended',
+    payload: { reason, captureCommandId: null },
+    recorderUserId: options.recorderUserId,
+    sequence: context.value.nextSequence,
+    period: context.value.period,
+    occurredAt: context.value.occurredAt,
+  })
+  return appendBasketballLifecycleEvent(
+    state,
+    clearBasketballUndoReceipt(state),
+    event,
+    reason === 'suspended'
+      ? 'Basketball suspension did not produce a complete event projection.'
+      : 'Basketball abandonment did not produce a complete event projection.'
+  )
 }
 
 function nextBasketballSegment(
