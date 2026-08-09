@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Link2, ReceiptText, Trash2, UserX } from 'lucide-react'
+import { Clock3, Link2, Minus, ReceiptText, Trash2, UserX } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
+import { basketballTimeoutCap } from '../lib/basketball/rules'
 import type { BasketballTeamStatsConfig, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
@@ -24,6 +25,7 @@ import BasketballFreeThrowTripDialog from '../components/basketball/BasketballFr
 import BasketballEjectionDialog, {
   type BasketballEjectionDialogInput,
 } from '../components/basketball/BasketballEjectionDialog'
+import BasketballTimeoutDialog from '../components/basketball/BasketballTimeoutDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
@@ -86,6 +88,16 @@ import {
   removeBasketballOfficialEjection,
   type BasketballEjectionRemovalPreview,
 } from '../lib/basketball/ejectionCommands'
+import {
+  basketballTimeoutInventory,
+  captureBasketballTimeout,
+  formatBasketballTimeoutInventory,
+  previewBasketballTimeoutDecrement,
+  removeBasketballTimeout,
+  type BasketballTimeoutCapture,
+  type BasketballTimeoutDecrementTarget,
+  type BasketballTimeoutRemovalPreview,
+} from '../lib/basketball/timeoutCommands'
 import type {
   BasketballFoulClass,
   BasketballFoulContext,
@@ -126,10 +138,8 @@ function timeoutCapForPeriod(
   periodIndex: number
 ): number | undefined {
   if (!rules) return undefined
-  const capReg = rules.timeoutsPerPeriod
-  const capOt = rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
   const isOt = periodIndex > rules.periodsPerGame
-  const cap = isOt ? capOt : capReg
+  const cap = basketballTimeoutCap(rules, isOt ? 'overtime' : 'regulation')
   if (cap == null) return undefined
   return cap
 }
@@ -198,6 +208,12 @@ export default function GameTracker() {
   const [pendingEjectionRemoval, setPendingEjectionRemoval] = useState<{
     eventId: string
     preview: BasketballEjectionRemovalPreview
+  } | null>(null)
+  const [showTimeoutDialog, setShowTimeoutDialog] = useState(false)
+  const [timeoutError, setTimeoutError] = useState<string | null>(null)
+  const [pendingTimeoutRemoval, setPendingTimeoutRemoval] = useState<{
+    target: BasketballTimeoutDecrementTarget
+    preview: BasketballTimeoutRemovalPreview
   } | null>(null)
   const [administrativeCorrectionError, setAdministrativeCorrectionError] = useState<string | null>(null)
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
@@ -281,6 +297,10 @@ export default function GameTracker() {
   )
   const ejectionFoulCandidates = useMemo(
     () => isBasketballEventMode ? basketballEjectionFoulCandidates(state) : [],
+    [isBasketballEventMode, state]
+  )
+  const timeoutInventory = useMemo(
+    () => isBasketballEventMode ? basketballTimeoutInventory(state) : null,
     [isBasketballEventMode, state]
   )
   const canRestoreBasketball = isBasketballEventMode && canRestoreBasketballCourtUndo(state)
@@ -465,7 +485,6 @@ export default function GameTracker() {
           label: `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}${participant.disqualified ? ' (DQ)' : ''}`,
         }))
     : []
-
   const foulBaseForBonus = sport.teamFoulBaseStatId ?? null
   const teamFoulCountThisPeriod =
     showTeamStatGrid && foulBaseForBonus && teamRules
@@ -480,6 +499,7 @@ export default function GameTracker() {
     setDirectDecrementError(null)
     setAdministrativeCorrectionError(null)
     setEjectionError(null)
+    setTimeoutError(null)
   }
 
   const handleUndo = () => {
@@ -744,6 +764,43 @@ export default function GameTracker() {
       return
     }
     setPendingEjectionRemoval(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleTimeoutCapture = (timeout: BasketballTimeoutCapture) => {
+    clearTrackerActionErrors()
+    const result = captureBasketballTimeout(state, {
+      recorderUserId: user?.id ?? null,
+      timeout,
+    })
+    if (!result.ok) {
+      setTimeoutError(result.message)
+      return
+    }
+    setTimeoutError(null)
+    setShowTimeoutDialog(false)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleTimeoutRemoval = (target: BasketballTimeoutDecrementTarget) => {
+    clearTrackerActionErrors()
+    const preview = previewBasketballTimeoutDecrement(state, target)
+    if (!preview.ok) {
+      setAdministrativeCorrectionError(preview.message)
+      return
+    }
+    setPendingTimeoutRemoval({ target, preview: preview.value })
+  }
+
+  const applyTimeoutRemoval = () => {
+    if (!pendingTimeoutRemoval) return
+    clearTrackerActionErrors()
+    const result = removeBasketballTimeout(state, pendingTimeoutRemoval.target)
+    if (!result.ok) {
+      setAdministrativeCorrectionError(result.message)
+      return
+    }
+    setPendingTimeoutRemoval(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
@@ -1165,6 +1222,54 @@ export default function GameTracker() {
               Steal + Turnover
             </button>
           )}
+          {isBasketballEventMode && timeoutInventory && (
+            <section className="border-y border-sky-200 bg-sky-50 px-3 py-3" aria-labelledby="basketball-timeouts-title">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 id="basketball-timeouts-title" className="text-sm font-bold text-sky-950">Timeouts</h3>
+                  <p className="text-xs text-sky-800">{timeoutInventory.periodLabel}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearTrackerActionErrors()
+                    setShowTimeoutDialog(true)
+                  }}
+                  disabled={!basketballPeriodActive}
+                  className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:opacity-40"
+                >
+                  <Clock3 size={16} aria-hidden />
+                  Record
+                </button>
+              </div>
+              <div className="mt-3 divide-y divide-sky-200 border-t border-sky-200">
+                <TimeoutInventoryRow
+                  label={gameInfo.teamName}
+                  detail={formatBasketballTimeoutInventory(timeoutInventory.tracked)}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.tracked.used === 0}
+                  onRemove={() => handleTimeoutRemoval({ mode: 'charged', teamSide: 'tracked' })}
+                />
+                <TimeoutInventoryRow
+                  label={gameInfo.opponentName}
+                  detail={formatBasketballTimeoutInventory(timeoutInventory.opponent)}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.opponent.used === 0}
+                  onRemove={() => handleTimeoutRemoval({ mode: 'charged', teamSide: 'opponent' })}
+                />
+                <TimeoutInventoryRow
+                  label="Media"
+                  detail={countLabel(timeoutInventory.neutralMedia, 'recorded timeout')}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.neutralMedia === 0}
+                  onRemove={() => handleTimeoutRemoval({ mode: 'neutral', kind: 'media' })}
+                />
+                <TimeoutInventoryRow
+                  label="Official"
+                  detail={countLabel(timeoutInventory.neutralOfficial, 'recorded timeout')}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.neutralOfficial === 0}
+                  onRemove={() => handleTimeoutRemoval({ mode: 'neutral', kind: 'official' })}
+                />
+              </div>
+            </section>
+          )}
           {isBasketballEventMode && (
             <section className="border-y border-rose-200 bg-rose-50 px-3 py-3" aria-labelledby="basketball-ejections-title">
               <div className="flex items-center justify-between gap-3">
@@ -1385,6 +1490,21 @@ export default function GameTracker() {
         />
       )}
 
+      {showTimeoutDialog && basketballSportState && timeoutInventory && (
+        <BasketballTimeoutDialog
+          trackedTeamName={gameInfo.teamName}
+          opponentName={gameInfo.opponentName}
+          inventory={timeoutInventory}
+          defaultSide={activeBasketballParticipant?.teamSide ?? basketballSportState.capturePreferences.teamSide}
+          errorMessage={timeoutError}
+          onSubmit={handleTimeoutCapture}
+          onClose={() => {
+            setTimeoutError(null)
+            setShowTimeoutDialog(false)
+          }}
+        />
+      )}
+
       {foulDialog && basketballSportState && (
         <BasketballFoulDialog
           key={`${foulDialog.teamSide}:${foulDialog.playerId ?? 'team'}:${foulDialog.foulClass}:${foulDialog.context}`}
@@ -1434,6 +1554,29 @@ export default function GameTracker() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={pendingTimeoutRemoval !== null}
+        title="Remove timeout?"
+        message={pendingTimeoutRemoval
+          ? [
+              `${pendingTimeoutRemoval.preview.label} for ${pendingTimeoutRemoval.preview.ownerLabel} in ${pendingTimeoutRemoval.preview.periodLabel} will be removed.`,
+              pendingTimeoutRemoval.preview.target.mode === 'charged'
+                ? pendingTimeoutRemoval.preview.chargedRemainingAfter === null
+                  ? 'Charged timeout inventory remains unlimited.'
+                  : `${pendingTimeoutRemoval.preview.chargedRemainingAfter} charged timeout${pendingTimeoutRemoval.preview.chargedRemainingAfter === 1 ? '' : 's'} will remain.`
+                : 'Team charged timeout inventory is unchanged.',
+            ].join(' ')
+          : ''}
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        error={administrativeCorrectionError}
+        onConfirm={applyTimeoutRemoval}
+        onCancel={() => {
+          setAdministrativeCorrectionError(null)
+          setPendingTimeoutRemoval(null)
+        }}
+      />
 
       <ConfirmDialog
         open={pendingEjectionRemoval !== null}
@@ -1559,6 +1702,37 @@ export default function GameTracker() {
         onConfirm={handleCompleteBasketballMatch}
         onCancel={() => setShowCompleteConfirm(false)}
       />
+    </div>
+  )
+}
+
+function TimeoutInventoryRow({
+  label,
+  detail,
+  removeDisabled,
+  onRemove,
+}: {
+  label: string
+  detail: string
+  removeDisabled: boolean
+  onRemove: () => void
+}) {
+  return (
+    <div className="flex min-h-12 items-center justify-between gap-3 py-2">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-800">{label}</p>
+        <p className="text-xs text-slate-600">{detail}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={removeDisabled}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sky-200 bg-white text-sky-800 disabled:opacity-30"
+        aria-label={`Remove latest ${label} timeout`}
+        title={removeDisabled ? 'No matching current-period timeout to remove' : 'Remove latest timeout'}
+      >
+        <Minus size={16} aria-hidden />
+      </button>
     </div>
   )
 }

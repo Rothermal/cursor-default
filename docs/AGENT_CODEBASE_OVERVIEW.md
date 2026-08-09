@@ -165,8 +165,10 @@ and exact reload-safe relationship restore. BKE-2C2 exposes those checked transi
 structured foul sheet, resumable awarded-free-throw workspace, player/team grid actions, and
 consequence-aware correction confirmations. BKE-2C3 adds checked official player/staff ejections,
 optional same-subject foul links, exact removal/restore, and projected unavailable-player enforcement
-across court and direct capture. BKE-2C4 timeout capture is next; event games remain internal and
-local-only.
+across court and direct capture. BKE-2C4 completes the phase with checked charged/neutral timeout
+capture, immutable finite/unlimited inventory enforcement, simultaneous tracker inventory display,
+newest matching current-period correction, and exact restore. BKE-2D whole-tracker parity is next;
+event games remain internal and local-only.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -398,7 +400,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) | Basketball migration onto the shared event model. BKE-1, BKE-2A, BKE-2B, and BKE-2C1 through BKE-2C3 are complete; BKE-2C4 timeout capture is next |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) | Basketball migration onto the shared event model. BKE-1, BKE-2A, BKE-2B, and BKE-2C are complete; BKE-2D whole-tracker parity is next |
 
 ### Held / waiting for feedback
 

@@ -9,6 +9,7 @@ import type {
   BasketballMatchProjection,
   BasketballTeamSide,
 } from './types'
+import { basketballTimeoutCap } from './rules'
 
 export function applyBasketballAdministrativeEvent(
   projection: BasketballMatchProjection,
@@ -29,8 +30,7 @@ export function applyBasketballAdministrativeEvent(
     case 'basketball.ejection':
       return applyEjection(projection, event, context)
     case 'basketball.timeout':
-      applyTimeout(projection, event)
-      return null
+      return applyTimeout(projection, event, rules)
     case 'basketball.minutes_adjustment':
       return applyMinutesAdjustment(projection, event, rules)
   }
@@ -191,15 +191,22 @@ function applyEjection(
 
 function applyTimeout(
   projection: BasketballMatchProjection,
-  event: Extract<BasketballAdministrativeEvent, { eventType: 'basketball.timeout' }>
-): void {
+  event: Extract<BasketballAdministrativeEvent, { eventType: 'basketball.timeout' }>,
+  rules: BasketballMatchRules
+): string | null {
   if (event.teamSide === 'neutral') {
     projection.neutralTimeouts += 1
-    return
+    return null
   }
   const periodTimeouts = ensurePeriodSideCounts(projection.periodTimeouts, event.period.id)
+  const segment = projection.periods.find(candidate => candidate.id === event.period.id)
+  const cap = basketballTimeoutCap(rules, segment?.kind ?? 'regulation')
+  if (cap !== null && periodTimeouts[event.teamSide] >= cap) {
+    return 'Basketball charged-timeout inventory is exhausted for this period.'
+  }
   periodTimeouts[event.teamSide] += 1
   incrementTeamStat(projection, event.teamSide, `team_to_used_p${event.period.order}`)
+  return null
 }
 
 function applyMinutesAdjustment(

@@ -488,6 +488,7 @@ function captureUnitActorLabel(players: Player[], event: BasketballMatchEvent): 
 }
 
 function actorLabel(players: Player[], event: BasketballMatchEvent): string {
+  if (event.teamSide === 'neutral') return 'Game administration'
   const actor = event.actors[0]
   if (!actor) return event.teamSide === 'tracked' ? 'Tracked team' : 'Opponent'
   if (actor.kind === 'player') {
@@ -542,7 +543,8 @@ function captureUnitLabel(
     case 'basketball.turnover': return 'Turnover'
     case 'basketball.foul': return 'Foul'
     case 'basketball.ejection': return 'Ejection'
-    case 'basketball.timeout': return 'Timeout'
+    case 'basketball.timeout':
+      return events[0].payload.label?.trim() || 'Timeout'
     case 'basketball.minutes_adjustment': return 'Minutes adjustment'
     case 'basketball.score_adjustment': return 'Score adjustment'
     case 'basketball.free_throw_trip': return 'Free throw trip'
