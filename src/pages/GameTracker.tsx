@@ -7,6 +7,7 @@ import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
 import { basketballTimeoutCap } from '../lib/basketball/rules'
+import { basketballBonusFoulCountsForPeriod } from '../lib/basketball/administrativeProjection'
 import type { BasketballTeamStatsConfig, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
@@ -450,8 +451,12 @@ export default function GameTracker() {
   const currentBasketballSegment = basketballSportState?.projection.periods.find(
     period => period.id === currentPeriodId
   ) ?? null
-  const currentBasketballFouls = currentPeriodId
-    ? basketballSportState?.projection.periodTeamFouls[currentPeriodId] ?? { tracked: 0, opponent: 0 }
+  const currentBasketballFouls = currentPeriodId && basketballSportState
+    ? basketballBonusFoulCountsForPeriod(
+        basketballSportState.projection,
+        currentPeriodId,
+        basketballSportState.setup.rulesSnapshot
+      ) ?? { tracked: 0, opponent: 0 }
     : { tracked: 0, opponent: 0 }
   const currentBasketballBonus: Record<BasketballTeamSide, BasketballBonusStatus> = currentPeriodId
     ? basketballSportState?.projection.bonusStatusByPeriod[currentPeriodId] ?? { tracked: 'none', opponent: 'none' }

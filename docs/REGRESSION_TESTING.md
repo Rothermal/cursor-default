@@ -807,7 +807,7 @@ active period and a period break, plus completed, suspended, and abandoned state
 | Step | Action | Expected |
 |------|--------|----------|
 | 11a10.1 | Select tracked/opponent team chips and individual chips | Team targets show only valid team actions/totals; individuals retain player actions; selected identity remains visible in focused sheets |
-| 11a10.2 | Add fouls for both sides through a bonus threshold | Both period-foul totals and the opponent's resulting 1-and-1/bonus state update from projection; a new period displays zero fouls and no bonus |
+| 11a10.2 | Add fouls for both sides through a bonus threshold, then start overtime with reset on and off | Both foul totals and the opponent's resulting 1-and-1/bonus state update from one projection contract; regulation/resetting overtime starts at zero while non-resetting overtime carries the cumulative overtime foul count and matching bonus state |
 | 11a10.3 | End a period and inspect court, grid, score, foul, ejection, and timeout controls | Every capture path is read-only until the next period starts; review and correction context remains visible |
 | 11a10.4 | Eject or disqualify a player, then select their chip | The player remains visible with status/history but court and direct player capture are unavailable |
 | 11a10.5 | Suspend during active play, then reopen with a reason | Capture stops while suspended; reopen preserves every event and resumes the active period |

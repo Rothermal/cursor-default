@@ -15,6 +15,10 @@ import {
   createBasketballAdministrativeEvent,
   type BasketballAdministrativePayloadByType,
 } from './administrativeEvents'
+import {
+  basketballBonusFoulCountsForPeriod,
+  updateBasketballBonusStatus,
+} from './administrativeProjection'
 import { basketballEventDefinitions, createBasketballLifecycleEvent } from './events'
 import { basketballGameEventProjector } from './projector'
 import { createBasketballMatchRules, DEFAULT_BASKETBALL_RULES_SOURCE } from './rules'
@@ -255,6 +259,44 @@ describe('BKE-1B3 Basketball administration', () => {
     expect(projection.bonusStatusByPeriod[period.id].tracked).toBe('double_bonus')
     expect(result.state.players.find(player => player.id === TEAM_PLAYER_HOME_ID)?.stats)
       .toMatchObject({ team_foul_p1: 3, team_tech: 1 })
+  })
+
+  it('uses the same cumulative overtime foul count for display and bonus projection', () => {
+    const matchSetup = setup()
+    matchSetup.rulesSnapshot.overtimeFoulsReset = false
+    const sportState = createBasketballSportGameState(matchSetup)
+    sportState.projection.periods = [
+      { id: 'regulation-1', label: 'Q1', kind: 'regulation', order: 1, durationMs: 480_000 },
+      { id: 'overtime-1', label: 'OT', kind: 'overtime', order: 2, durationMs: 240_000 },
+      { id: 'overtime-2', label: 'OT 2', kind: 'overtime', order: 3, durationMs: 240_000 },
+    ]
+    sportState.projection.periodTeamFouls = {
+      'regulation-1': { tracked: 4, opponent: 0 },
+      'overtime-1': { tracked: 2, opponent: 1 },
+      'overtime-2': { tracked: 0, opponent: 1 },
+    }
+
+    expect(basketballBonusFoulCountsForPeriod(
+      sportState.projection,
+      'overtime-2',
+      matchSetup.rulesSnapshot
+    )).toEqual({ tracked: 2, opponent: 2 })
+    updateBasketballBonusStatus(
+      sportState.projection,
+      'overtime-2',
+      matchSetup.rulesSnapshot
+    )
+    expect(sportState.projection.bonusStatusByPeriod['overtime-2']).toEqual({
+      tracked: 'one_and_one',
+      opponent: 'one_and_one',
+    })
+
+    matchSetup.rulesSnapshot.overtimeFoulsReset = true
+    expect(basketballBonusFoulCountsForPeriod(
+      sportState.projection,
+      'overtime-2',
+      matchSetup.rulesSnapshot
+    )).toEqual({ tracked: 0, opponent: 1 })
   })
 
   it('honors reasoned counting overrides without creating a second counter authority', () => {

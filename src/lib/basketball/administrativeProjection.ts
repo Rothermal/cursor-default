@@ -255,21 +255,8 @@ export function updateBasketballBonusStatus(
   periodId: string,
   rules: BasketballMatchRules
 ): void {
-  const segment = projection.periods.find(period => period.id === periodId)
-  if (!segment) return
-  const counts = segment.kind === 'overtime' && !rules.overtimeFoulsReset
-    ? projection.periods
-        .filter(period => period.kind === 'overtime' && period.order <= segment.order)
-        .reduce(
-          (total, period) => {
-            const periodCounts = projection.periodTeamFouls[period.id]
-            total.tracked += periodCounts?.tracked ?? 0
-            total.opponent += periodCounts?.opponent ?? 0
-            return total
-          },
-          { tracked: 0, opponent: 0 }
-        )
-    : projection.periodTeamFouls[periodId] ?? { tracked: 0, opponent: 0 }
+  const counts = basketballBonusFoulCountsForPeriod(projection, periodId, rules)
+  if (!counts) return
   projection.bonusStatusByPeriod[periodId] = {
     tracked: getBonusStatus(
       counts.tracked,
@@ -284,6 +271,28 @@ export function updateBasketballBonusStatus(
       rules.hasOneAndOne
     ),
   }
+}
+
+export function basketballBonusFoulCountsForPeriod(
+  projection: BasketballMatchProjection,
+  periodId: string,
+  rules: Pick<BasketballMatchRules, 'overtimeFoulsReset'>
+): Record<BasketballTeamSide, number> | null {
+  const segment = projection.periods.find(period => period.id === periodId)
+  if (!segment) return null
+  return segment.kind === 'overtime' && !rules.overtimeFoulsReset
+    ? projection.periods
+        .filter(period => period.kind === 'overtime' && period.order <= segment.order)
+        .reduce(
+          (total, period) => {
+            const periodCounts = projection.periodTeamFouls[period.id]
+            total.tracked += periodCounts?.tracked ?? 0
+            total.opponent += periodCounts?.opponent ?? 0
+            return total
+          },
+          { tracked: 0, opponent: 0 }
+        )
+    : projection.periodTeamFouls[periodId] ?? { tracked: 0, opponent: 0 }
 }
 
 function ensurePeriodSideCounts(

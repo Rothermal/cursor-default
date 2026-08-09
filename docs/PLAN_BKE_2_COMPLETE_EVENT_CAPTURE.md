@@ -349,8 +349,9 @@ Implemented behavior:
 ### 8.4 Implemented behavior and BKE-2 exit audit
 
 - Game Tracker presents the current period, both teams' period-foul totals, and the bonus consequence
-  for the opposing side directly from the Basketball projection. A period with no fouls uses the
-  projector's sparse zero-count contract; the UI renders that absence as zero.
+  for the opposing side directly from one Basketball projection helper. Regulation and resetting
+  overtime periods use their own foul counts; non-resetting overtimes display the same cumulative
+  overtime count that drives bonus. A zero-count period may remain sparse and renders as zero.
 - Explicit Suspend and Abandon actions are available during active play and period breaks. Reopen is
   available for completed, suspended, and abandoned local games, requires a reason, preserves the
   complete stream, and returns to active play or the prior period break as projected.
