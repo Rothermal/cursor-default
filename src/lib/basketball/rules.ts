@@ -5,6 +5,7 @@ import type {
   BasketballMatchRules,
   BasketballMatchSegment,
   BasketballRulesSource,
+  BasketballSegmentKind,
 } from './types'
 
 const MINUTE_MS = 60_000
@@ -138,6 +139,15 @@ export function resolveBasketballPeriodSegment(
     order: rules.regulationSegments.length + overtimeNumber,
     durationMs: rules.overtimeTemplate.durationMs,
   }
+}
+
+export function basketballTimeoutCap(
+  rules: Pick<BasketballMatchRules, 'timeoutsPerPeriod' | 'timeoutsPerOvertime'>,
+  segmentKind: BasketballSegmentKind
+): number | null {
+  return segmentKind === 'overtime'
+    ? rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
+    : rules.timeoutsPerPeriod
 }
 
 function isBasketballSegment(value: unknown): value is BasketballMatchSegment {

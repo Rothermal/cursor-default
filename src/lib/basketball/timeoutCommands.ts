@@ -4,6 +4,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { basketballTimeoutCap } from './rules'
 import {
   basketballActorForSelection,
   getBasketballCommandContext,
@@ -14,8 +15,6 @@ import {
 import type {
   BasketballCourtUndoReceipt,
   BasketballMatchEvent,
-  BasketballMatchRules,
-  BasketballMatchSegment,
   BasketballTeamSide,
   BasketballTimeoutEvent,
   BasketballTimeoutKind,
@@ -151,12 +150,13 @@ export function basketballTimeoutInventory(state: GameState): BasketballTimeoutI
   const sportState = state.sportGameState?.sportId === 'basketball'
     ? state.sportGameState
     : null
-  const periodId = sportState?.projection.currentPeriodId
+  if (!sportState || sportState.projection.status !== 'in_progress') return null
+  const periodId = sportState.projection.currentPeriodId
   const segment = periodId
     ? sportState.projection.periods.find(candidate => candidate.id === periodId)
     : null
-  if (!sportState || !periodId || !segment) return null
-  const cap = timeoutCap(sportState.setup.rulesSnapshot, segment)
+  if (!periodId || !segment) return null
+  const cap = basketballTimeoutCap(sportState.setup.rulesSnapshot, segment.kind)
   const counts = sportState.projection.periodTimeouts[periodId] ?? { tracked: 0, opponent: 0 }
   const activePeriodTimeouts = activeBasketballEvents(state).filter(
     (event): event is BasketballTimeoutEvent =>
@@ -280,18 +280,19 @@ function newestMatchingTimeout(
     ) ?? null
 }
 
-function timeoutCap(
-  rules: BasketballMatchRules,
-  segment: BasketballMatchSegment
-): number | null {
-  return segment.kind === 'overtime'
-    ? rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
-    : rules.timeoutsPerPeriod
-}
-
 function sideInventory(used: number, cap: number | null): BasketballTimeoutSideInventory {
   const remaining = cap === null ? null : Math.max(0, cap - used)
   return { used, cap, remaining, exhausted: remaining === 0 }
+}
+
+export function formatBasketballTimeoutInventory(
+  inventory: BasketballTimeoutSideInventory
+): string {
+  if (inventory.cap === null) return `${inventory.used} used - unlimited`
+  if (inventory.remaining === 0) {
+    return `${inventory.used} of ${inventory.cap} used - exhausted`
+  }
+  return `${inventory.used} of ${inventory.cap} used - ${inventory.remaining} remaining`
 }
 
 function activeBasketballEvents(state: GameState): BasketballMatchEvent[] {

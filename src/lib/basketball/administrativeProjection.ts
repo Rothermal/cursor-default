@@ -9,6 +9,7 @@ import type {
   BasketballMatchProjection,
   BasketballTeamSide,
 } from './types'
+import { basketballTimeoutCap } from './rules'
 
 export function applyBasketballAdministrativeEvent(
   projection: BasketballMatchProjection,
@@ -199,9 +200,7 @@ function applyTimeout(
   }
   const periodTimeouts = ensurePeriodSideCounts(projection.periodTimeouts, event.period.id)
   const segment = projection.periods.find(candidate => candidate.id === event.period.id)
-  const cap = segment?.kind === 'overtime'
-    ? rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
-    : rules.timeoutsPerPeriod
+  const cap = basketballTimeoutCap(rules, segment?.kind ?? 'regulation')
   if (cap !== null && periodTimeouts[event.teamSide] >= cap) {
     return 'Basketball charged-timeout inventory is exhausted for this period.'
   }

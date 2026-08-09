@@ -10,7 +10,11 @@ import {
   prepareBasketballGameStart,
   startNextBasketballPeriod,
 } from './commands'
-import { restoreLastBasketballCourtUndo } from './courtCorrections'
+import {
+  basketballLiveCaptureUnits,
+  restoreLastBasketballCourtUndo,
+} from './courtCorrections'
+import { basketballTimeoutCap } from './rules'
 import {
   basketballTimeoutInventory,
   captureBasketballTimeout,
@@ -124,6 +128,13 @@ describe('BKE-2C4 Basketball timeouts', () => {
       { kind: 'media', label: 'Media timeout', side: 'neutral' },
       { kind: 'official', label: 'Official timeout', side: 'neutral' },
     ])
+    expect(basketballLiveCaptureUnits(state).slice(0, 2).map(unit => ({
+      who: unit.who,
+      what: unit.what,
+    }))).toEqual([
+      { who: 'Game administration', what: 'Official timeout' },
+      { who: 'Game administration', what: 'Media timeout' },
+    ])
   })
 
   it('keeps unlimited inventory distinct from an exhausted zero cap', () => {
@@ -149,6 +160,20 @@ describe('BKE-2C4 Basketball timeouts', () => {
       recorderUserId: 'recorder-1',
       timeout: { mode: 'charged', teamSide: 'tracked', kind: 'full' },
     })).toMatchObject({ ok: false, state: none })
+  })
+
+  it('uses explicit overtime inventory or falls back to the regulation snapshot', () => {
+    const state = startedState(3)
+    if (state.sportGameState?.sportId !== 'basketball') {
+      throw new Error('Basketball state missing.')
+    }
+    const rules = state.sportGameState.setup.rulesSnapshot
+    expect(basketballTimeoutCap(rules, 'regulation')).toBe(3)
+    expect(basketballTimeoutCap(rules, 'overtime')).toBe(3)
+    expect(basketballTimeoutCap({
+      ...rules,
+      timeoutsPerOvertime: 1,
+    }, 'overtime')).toBe(1)
   })
 
   it('removes the newest matching current-period timeout and restores the exact event', () => {
@@ -218,6 +243,7 @@ describe('BKE-2C4 Basketball timeouts', () => {
       eventId: id(10),
     })
     if (!ended.ok) throw new Error(ended.message)
+    expect(basketballTimeoutInventory(ended.state)).toBeNull()
     expect(captureBasketballTimeout(ended.state, {
       recorderUserId: 'recorder-1',
       timeout: { mode: 'neutral', kind: 'official' },

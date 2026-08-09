@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Clock3, X } from 'lucide-react'
-import type {
-  BasketballChargedTimeoutKind,
-  BasketballNeutralTimeoutKind,
-  BasketballTimeoutCapture,
-  BasketballTimeoutInventory,
+import {
+  formatBasketballTimeoutInventory,
+  type BasketballChargedTimeoutKind,
+  type BasketballNeutralTimeoutKind,
+  type BasketballTimeoutCapture,
+  type BasketballTimeoutInventory,
 } from '../../lib/basketball/timeoutCommands'
 import type { BasketballTeamSide } from '../../lib/basketball/types'
 
@@ -93,7 +94,7 @@ export default function BasketballTimeoutDialog({
                     >
                       <span className="block break-words text-sm font-semibold text-slate-800">{name}</span>
                       <span className={`block text-xs ${sideInventory.exhausted ? 'font-semibold text-rose-700' : 'text-slate-500'}`}>
-                        {inventoryLabel(sideInventory.used, sideInventory.cap, sideInventory.remaining)}
+                        {formatBasketballTimeoutInventory(sideInventory)}
                       </span>
                     </button>
                   )
@@ -141,10 +142,4 @@ export default function BasketballTimeoutDialog({
       </section>
     </div>
   )
-}
-
-function inventoryLabel(used: number, cap: number | null, remaining: number | null): string {
-  if (cap === null) return `${used} used - unlimited`
-  if (remaining === 0) return `${used} of ${cap} used - exhausted`
-  return `${used} of ${cap} used - ${remaining} remaining`
 }

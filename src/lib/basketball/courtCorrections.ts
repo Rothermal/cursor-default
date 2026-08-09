@@ -488,6 +488,7 @@ function captureUnitActorLabel(players: Player[], event: BasketballMatchEvent): 
 }
 
 function actorLabel(players: Player[], event: BasketballMatchEvent): string {
+  if (event.teamSide === 'neutral') return 'Game administration'
   const actor = event.actors[0]
   if (!actor) return event.teamSide === 'tracked' ? 'Tracked team' : 'Opponent'
   if (actor.kind === 'player') {

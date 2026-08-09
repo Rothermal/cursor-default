@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
+import { basketballTimeoutCap } from '../lib/basketball/rules'
 import type { BasketballTeamStatsConfig, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
@@ -90,6 +91,7 @@ import {
 import {
   basketballTimeoutInventory,
   captureBasketballTimeout,
+  formatBasketballTimeoutInventory,
   previewBasketballTimeoutDecrement,
   removeBasketballTimeout,
   type BasketballTimeoutCapture,
@@ -136,10 +138,8 @@ function timeoutCapForPeriod(
   periodIndex: number
 ): number | undefined {
   if (!rules) return undefined
-  const capReg = rules.timeoutsPerPeriod
-  const capOt = rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
   const isOt = periodIndex > rules.periodsPerGame
-  const cap = isOt ? capOt : capReg
+  const cap = basketballTimeoutCap(rules, isOt ? 'overtime' : 'regulation')
   if (cap == null) return undefined
   return cap
 }
@@ -485,23 +485,6 @@ export default function GameTracker() {
           label: `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}${participant.disqualified ? ' (DQ)' : ''}`,
         }))
     : []
-  const trackedTimeoutPreview = previewBasketballTimeoutDecrement(
-    state,
-    { mode: 'charged', teamSide: 'tracked' }
-  )
-  const opponentTimeoutPreview = previewBasketballTimeoutDecrement(
-    state,
-    { mode: 'charged', teamSide: 'opponent' }
-  )
-  const mediaTimeoutPreview = previewBasketballTimeoutDecrement(
-    state,
-    { mode: 'neutral', kind: 'media' }
-  )
-  const officialTimeoutPreview = previewBasketballTimeoutDecrement(
-    state,
-    { mode: 'neutral', kind: 'official' }
-  )
-
   const foulBaseForBonus = sport.teamFoulBaseStatId ?? null
   const teamFoulCountThisPeriod =
     showTeamStatGrid && foulBaseForBonus && teamRules
@@ -1262,26 +1245,26 @@ export default function GameTracker() {
               <div className="mt-3 divide-y divide-sky-200 border-t border-sky-200">
                 <TimeoutInventoryRow
                   label={gameInfo.teamName}
-                  detail={formatTimeoutInventory(timeoutInventory.tracked.used, timeoutInventory.tracked.cap, timeoutInventory.tracked.remaining)}
-                  removeDisabled={!trackedTimeoutPreview.ok}
+                  detail={formatBasketballTimeoutInventory(timeoutInventory.tracked)}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.tracked.used === 0}
                   onRemove={() => handleTimeoutRemoval({ mode: 'charged', teamSide: 'tracked' })}
                 />
                 <TimeoutInventoryRow
                   label={gameInfo.opponentName}
-                  detail={formatTimeoutInventory(timeoutInventory.opponent.used, timeoutInventory.opponent.cap, timeoutInventory.opponent.remaining)}
-                  removeDisabled={!opponentTimeoutPreview.ok}
+                  detail={formatBasketballTimeoutInventory(timeoutInventory.opponent)}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.opponent.used === 0}
                   onRemove={() => handleTimeoutRemoval({ mode: 'charged', teamSide: 'opponent' })}
                 />
                 <TimeoutInventoryRow
                   label="Media"
                   detail={countLabel(timeoutInventory.neutralMedia, 'recorded timeout')}
-                  removeDisabled={!mediaTimeoutPreview.ok}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.neutralMedia === 0}
                   onRemove={() => handleTimeoutRemoval({ mode: 'neutral', kind: 'media' })}
                 />
                 <TimeoutInventoryRow
                   label="Official"
                   detail={countLabel(timeoutInventory.neutralOfficial, 'recorded timeout')}
-                  removeDisabled={!officialTimeoutPreview.ok}
+                  removeDisabled={!basketballPeriodActive || timeoutInventory.neutralOfficial === 0}
                   onRemove={() => handleTimeoutRemoval({ mode: 'neutral', kind: 'official' })}
                 />
               </div>
@@ -1752,10 +1735,4 @@ function TimeoutInventoryRow({
       </button>
     </div>
   )
-}
-
-function formatTimeoutInventory(used: number, cap: number | null, remaining: number | null): string {
-  if (cap === null) return `${used} used - unlimited`
-  if (remaining === 0) return `${used} of ${cap} used - exhausted`
-  return `${used} of ${cap} used - ${remaining} remaining`
 }
