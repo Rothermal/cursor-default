@@ -36,6 +36,7 @@ interface StatButtonProps {
   /** Number of misses logged; combined with value to display made/total in badge. */
   attemptCount?: number
   disabled?: boolean
+  incrementDisabled?: boolean
   decrementDisabled?: boolean
   attemptDecrementDisabled?: boolean
 }
@@ -54,6 +55,7 @@ export default function StatButton({
   onAttempt,
   attemptCount = 0,
   disabled = false,
+  incrementDisabled = false,
   decrementDisabled = false,
   attemptDecrementDisabled = false,
 }: StatButtonProps) {
@@ -136,7 +138,7 @@ export default function StatButton({
         )}
         <button
           onClick={handleIncrement}
-          disabled={disabled || (maxValue !== undefined && value >= maxValue)}
+          disabled={disabled || incrementDisabled || (maxValue !== undefined && value >= maxValue)}
           aria-label={`Increase ${label}`}
           className={`${hasAttempt ? 'flex-1' : 'flex-[2]'} h-10 rounded-lg ${styles.badge} text-white text-lg font-bold
                       active:scale-95 transition-transform shadow-sm disabled:opacity-30 disabled:pointer-events-none`}

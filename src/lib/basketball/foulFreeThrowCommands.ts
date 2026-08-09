@@ -1,7 +1,7 @@
 import type { GameState } from '../../types'
 import { addGameEvent, addGameEvents } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
-import { inspectGameEventStream } from '../gameEvents/stream'
+import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
 import {
@@ -80,6 +80,79 @@ export type BasketballFoulFreeThrowCommandResult =
       code: BasketballCommandErrorCode
       message: string
     }
+
+export interface BasketballFreeThrowAttemptStatus {
+  eventId: string
+  attemptNumber: number
+  made: boolean
+  deleted: boolean
+  shooterPlayerId: string | null
+}
+
+export interface BasketballFreeThrowTripStatus {
+  eventId: string
+  teamSide: BasketballTeamSide
+  periodId: string
+  periodOrder: number
+  maximumAttempts: 1 | 2 | 3
+  oneAndOne: boolean
+  technical: boolean
+  possessionRetained: boolean
+  sourceFoulEventId: string | null
+  attempts: BasketballFreeThrowAttemptStatus[]
+  nextAttemptNumber: number | null
+  open: boolean
+  closedReason: 'positions_complete' | 'first_attempt_ended' | null
+}
+
+export function basketballFreeThrowTripStatuses(
+  state: GameState
+): BasketballFreeThrowTripStatus[] {
+  const inspected = basketballEvents(state)
+  if (!inspected.ok) return []
+  const allAttempts = [...inspected.active, ...inspected.deleted]
+    .filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.shot' }> =>
+      event.eventType === 'basketball.shot' &&
+      event.payload.attempt === 'free_throw' &&
+      event.payload.freeThrowTripId !== null &&
+      event.payload.tripAttemptNumber !== null
+    )
+  return inspected.active
+    .filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.free_throw_trip' }> =>
+      event.eventType === 'basketball.free_throw_trip'
+    )
+    .sort((left, right) => compareGameEventCaptureOrder(right, left))
+    .map(trip => {
+      const historicalAttempts = allAttempts.filter(event =>
+        event.payload.freeThrowTripId === trip.id
+      )
+      const progress = freeThrowTripProgress(trip, historicalAttempts)
+      return {
+        eventId: trip.id,
+        teamSide: trip.teamSide,
+        periodId: trip.period.id,
+        periodOrder: trip.period.order,
+        maximumAttempts: trip.payload.maximumAttempts,
+        oneAndOne: trip.payload.oneAndOne,
+        technical: trip.payload.technical,
+        possessionRetained: trip.payload.possessionRetained,
+        sourceFoulEventId: trip.payload.sourceFoulEventId,
+        attempts: historicalAttempts
+          .sort((left, right) => left.payload.tripAttemptNumber! - right.payload.tripAttemptNumber!)
+          .map(event => {
+            const shooter = event.actors.find(actor => actor.role === 'shooter')
+            return {
+              eventId: event.id,
+              attemptNumber: event.payload.tripAttemptNumber!,
+              made: event.payload.made,
+              deleted: event.deletedAt !== null,
+              shooterPlayerId: shooter?.kind === 'player' ? shooter.playerId : null,
+            }
+          }),
+        ...progress,
+      }
+    })
+}
 
 export function captureBasketballFoul(
   state: GameState,
@@ -214,22 +287,11 @@ export function captureBasketballFreeThrowAttempt(
       event.payload.freeThrowTripId === trip.id &&
       event.payload.tripAttemptNumber !== null
     )
-  const firstAttempt = historicalAttempts.find(event => event.payload.tripAttemptNumber === 1)
-  if (
-    trip.payload.oneAndOne &&
-    firstAttempt &&
-    (firstAttempt.deletedAt !== null || !firstAttempt.payload.made)
-  ) {
+  const progress = freeThrowTripProgress(trip, historicalAttempts)
+  if (progress.closedReason === 'first_attempt_ended') {
     return failure(state, 'command_failed', 'The one-and-one trip ended after its first attempt.')
   }
-  const usedPositions = new Set(historicalAttempts.map(event => event.payload.tripAttemptNumber!))
-  let attemptNumber: number | null = null
-  for (let position = 1; position <= trip.payload.maximumAttempts; position += 1) {
-    if (!usedPositions.has(position)) {
-      attemptNumber = position
-      break
-    }
-  }
+  const attemptNumber = progress.nextAttemptNumber
   if (attemptNumber === null) {
     return failure(state, 'command_failed', 'Every awarded free-throw position has already been recorded.')
   }
@@ -399,6 +461,27 @@ function validateFreeThrowAward(
     return 'A one-and-one trip requires the committing side to be in the one-and-one bonus window.'
   }
   return null
+}
+
+function freeThrowTripProgress(
+  trip: Extract<BasketballMatchEvent, { eventType: 'basketball.free_throw_trip' }>,
+  historicalAttempts: Extract<BasketballMatchEvent, { eventType: 'basketball.shot' }>[]
+): Pick<BasketballFreeThrowTripStatus, 'nextAttemptNumber' | 'open' | 'closedReason'> {
+  const firstAttempt = historicalAttempts.find(event => event.payload.tripAttemptNumber === 1)
+  if (
+    trip.payload.oneAndOne &&
+    firstAttempt &&
+    (firstAttempt.deletedAt !== null || !firstAttempt.payload.made)
+  ) {
+    return { nextAttemptNumber: null, open: false, closedReason: 'first_attempt_ended' }
+  }
+  const usedPositions = new Set(historicalAttempts.map(event => event.payload.tripAttemptNumber!))
+  for (let position = 1; position <= trip.payload.maximumAttempts; position += 1) {
+    if (!usedPositions.has(position)) {
+      return { nextAttemptNumber: position, open: true, closedReason: null }
+    }
+  }
+  return { nextAttemptNumber: null, open: false, closedReason: 'positions_complete' }
 }
 
 function commandContext(

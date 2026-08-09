@@ -63,6 +63,7 @@ export interface BasketballDirectDecrementPreview {
   linkedAssistCount: number
   linkedReboundCount: number
   unlinkedBlockCount: number
+  consumesFreeThrowTripPosition: boolean
   requiresConfirmation: boolean
 }
 
@@ -186,6 +187,7 @@ export function previewBasketballDirectDecrement(
             linkedAssistCount: 0,
             linkedReboundCount: 0,
             unlinkedBlockCount: 0,
+            consumesFreeThrowTripPosition: false,
             requiresConfirmation: false,
           },
         }
@@ -248,6 +250,22 @@ export function previewBasketballFoulDecrement(
     plan.event.period.id
   ]?.[plan.event.teamSide] ?? 'none'
   return { ok: true, value: { ...plan.basePreview, bonusStatusAfter: after } }
+}
+
+export function canDecrementBasketballFoul(
+  state: GameState,
+  target: BasketballFoulDecrementTarget
+): boolean {
+  if (hasCloudBinding(state) || state.sportGameState?.sportId !== 'basketball') return false
+  const currentPeriodId = state.sportGameState.projection.status === 'in_progress'
+    ? state.sportGameState.projection.currentPeriodId
+    : null
+  if (!currentPeriodId) return false
+  return activeBasketballEvents(state).some(event =>
+    event.eventType === 'basketball.foul' &&
+    event.period.id === currentPeriodId &&
+    foulMatchesTarget(event, target)
+  )
 }
 
 export function decrementBasketballFoul(
@@ -756,6 +774,9 @@ function directDecrementPlan(
     ...linkedBlocks.map(event => receiptEntry(event, 'relink_block', target.id)),
   ]
   const fieldGoal = target.eventType === 'basketball.shot' && target.payload.attempt === 'field_goal'
+  const consumesFreeThrowTripPosition = target.eventType === 'basketball.shot' &&
+    target.payload.attempt === 'free_throw' &&
+    target.payload.freeThrowTripId !== null
   return {
     preview: {
       statId,
@@ -765,7 +786,8 @@ function directDecrementPlan(
       linkedAssistCount: linkedAssists.length,
       linkedReboundCount: linkedRebounds.length,
       unlinkedBlockCount: linkedBlocks.length,
-      requiresConfirmation: fieldGoal || linkedRebounds.length > 0,
+      consumesFreeThrowTripPosition,
+      requiresConfirmation: fieldGoal || linkedRebounds.length > 0 || consumesFreeThrowTripPosition,
     },
     mutations,
     receiptEntries,

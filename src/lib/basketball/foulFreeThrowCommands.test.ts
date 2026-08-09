@@ -15,14 +15,17 @@ import {
   startNextBasketballPeriod,
 } from './commands'
 import {
+  canDecrementBasketballFoul,
   decrementBasketballDirectStat,
   decrementBasketballFoul,
   previewBasketballFoulDecrement,
+  previewBasketballDirectDecrement,
   previewBasketballFreeThrowTripRemoval,
   removeBasketballFreeThrowTrip,
   restoreLastBasketballCourtUndo,
 } from './courtCorrections'
 import {
+  basketballFreeThrowTripStatuses,
   captureBasketballFoul,
   captureBasketballFreeThrowAttempt,
   type BasketballFoulCaptureOptions,
@@ -165,6 +168,13 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
         payload: { sourceFoulEventId: id(301), captureCommandId: id(501) },
       },
     ])
+    expect(basketballFreeThrowTripStatuses(captured.state)).toMatchObject([{
+      eventId: captured.tripEventId,
+      attempts: [],
+      nextAttemptNumber: 1,
+      open: true,
+      closedReason: null,
+    }])
 
     const first = captureBasketballFreeThrowAttempt(captured.state, {
       recorderUserId: 'recorder-1',
@@ -176,6 +186,12 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
     })
     expect(first).toMatchObject({ ok: true, attemptNumber: 1, tripComplete: false })
     if (!first.ok) return
+    expect(basketballFreeThrowTripStatuses(first.state)).toMatchObject([{
+      eventId: captured.tripEventId,
+      attempts: [{ attemptNumber: 1, made: true, deleted: false, shooterPlayerId: 'opponent-9' }],
+      nextAttemptNumber: 2,
+      open: true,
+    }])
     const second = captureBasketballFreeThrowAttempt(first.state, {
       recorderUserId: 'recorder-1',
       tripEventId: captured.tripEventId,
@@ -190,6 +206,11 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
       .toMatchObject({ ft: 1, ft_miss: 1 })
     expect(second.state.opponentScore).toBe(1)
     expect(second.state.shotChart).toHaveLength(0)
+    expect(basketballFreeThrowTripStatuses(second.state)[0]).toMatchObject({
+      nextAttemptNumber: null,
+      open: false,
+      closedReason: 'positions_complete',
+    })
   })
 
   it('closes a one-and-one after a first miss and preserves the rejected state', () => {
@@ -211,6 +232,14 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
     })
     expect(first).toMatchObject({ ok: true, attemptNumber: 1, tripComplete: true })
     if (!first.ok) return
+    expect(previewBasketballDirectDecrement(first.state, 'opponent-9', 'ft_miss'))
+      .toMatchObject({
+        ok: true,
+        value: {
+          consumesFreeThrowTripPosition: true,
+          requiresConfirmation: true,
+        },
+      })
     expect(captureBasketballFreeThrowAttempt(first.state, {
       recorderUserId: 'recorder-1',
       tripEventId: captured.tripEventId,
@@ -223,6 +252,12 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
     })
     const removed = decrementBasketballDirectStat(first.state, 'opponent-9', 'ft_miss')
     if (!removed.ok) throw new Error(removed.message)
+    expect(basketballFreeThrowTripStatuses(removed.state)[0]).toMatchObject({
+      attempts: [{ attemptNumber: 1, made: false, deleted: true }],
+      nextAttemptNumber: null,
+      open: false,
+      closedReason: 'first_attempt_ended',
+    })
     expect(captureBasketballFreeThrowAttempt(removed.state, {
       recorderUserId: 'recorder-1',
       tripEventId: captured.tripEventId,
@@ -577,6 +612,7 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
           bonusStatusAfter: 'none',
         },
       })
+    expect(canDecrementBasketballFoul(state, { kind: 'player', playerId: 'player-1' })).toBe(true)
     const removed = decrementBasketballFoul(
       state,
       { kind: 'player', playerId: 'player-1' },
@@ -730,6 +766,7 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
     if (!next.ok) throw new Error(next.message)
     expect(previewBasketballFoulDecrement(next.state, { kind: 'player', playerId: 'player-1' }))
       .toMatchObject({ ok: false, code: 'nothing_to_undo' })
+    expect(canDecrementBasketballFoul(next.state, { kind: 'player', playerId: 'player-1' })).toBe(false)
     expect(previewBasketballFreeThrowTripRemoval(next.state, captured.tripEventId))
       .toMatchObject({ ok: false, code: 'nothing_to_undo' })
   })
