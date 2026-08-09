@@ -230,7 +230,8 @@ export function decrementBasketballMinutes(
     state,
     'player',
     target.value.teamSide,
-    target.value.selection
+    target.value.selection,
+    { allowUnavailable: true }
   )
   if (!actor.ok || actor.value.kind !== 'player') {
     return failure(

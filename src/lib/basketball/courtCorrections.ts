@@ -6,9 +6,12 @@ import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEve
 import type { GameEventMutation } from '../gameEvents/types'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import type {
+  BasketballBonusStatus,
   BasketballCourtUndoReceipt,
   BasketballCourtUndoReceiptEntry,
+  BasketballFoulEvent,
   BasketballMatchEvent,
+  BasketballTeamSide,
 } from './types'
 import type {
   BasketballCommandErrorCode,
@@ -60,11 +63,54 @@ export interface BasketballDirectDecrementPreview {
   linkedAssistCount: number
   linkedReboundCount: number
   unlinkedBlockCount: number
+  consumesFreeThrowTripPosition: boolean
   requiresConfirmation: boolean
 }
 
 interface BasketballDirectDecrementPlan {
   preview: BasketballDirectDecrementPreview
+  mutations: GameEventMutation[]
+  receiptEntries: BasketballCourtUndoReceiptEntry[]
+}
+
+export type BasketballFoulDecrementTarget =
+  | { kind: 'player'; playerId: string }
+  | { kind: 'team_foul'; teamSide: BasketballTeamSide }
+  | { kind: 'team_technical'; teamSide: BasketballTeamSide }
+
+export interface BasketballFoulDecrementPreview {
+  targetEventId: string
+  periodId: string
+  periodLabel: string
+  removesPersonalFoul: boolean
+  removesTeamFoul: boolean
+  removesTechnical: boolean
+  unlinkedTripCount: number
+  unlinkedEjectionCount: number
+  removedAutomaticEjectionCount: number
+  clearsDisqualification: boolean
+  bonusStatusBefore: BasketballBonusStatus
+  bonusStatusAfter: BasketballBonusStatus
+  requiresConfirmation: true
+}
+
+export interface BasketballFreeThrowTripRemovalPreview {
+  targetEventId: string
+  periodId: string
+  periodLabel: string
+  unlinkedAttemptCount: number
+  requiresConfirmation: true
+}
+
+interface BasketballFoulDecrementPlan {
+  event: BasketballFoulEvent
+  mutations: GameEventMutation[]
+  receiptEntries: BasketballCourtUndoReceiptEntry[]
+  basePreview: Omit<BasketballFoulDecrementPreview, 'bonusStatusAfter'>
+}
+
+interface BasketballFreeThrowTripRemovalPlan {
+  preview: BasketballFreeThrowTripRemovalPreview
   mutations: GameEventMutation[]
   receiptEntries: BasketballCourtUndoReceiptEntry[]
 }
@@ -141,6 +187,7 @@ export function previewBasketballDirectDecrement(
             linkedAssistCount: 0,
             linkedReboundCount: 0,
             unlinkedBlockCount: 0,
+            consumesFreeThrowTripPosition: false,
             requiresConfirmation: false,
           },
         }
@@ -172,6 +219,106 @@ export function decrementBasketballDirectStat(
   }
   const receipt: BasketballCourtUndoReceipt = {
     kind: 'direct_decrement',
+    createdAt: timestamp,
+    entries: plan.receiptEntries,
+  }
+  return applyCorrectionsWithReceipt(state, plan.mutations, receipt, timestamp)
+}
+
+export function previewBasketballFoulDecrement(
+  state: GameState,
+  target: BasketballFoulDecrementTarget
+): BasketballCommandResult<BasketballFoulDecrementPreview> {
+  if (hasCloudBinding(state)) {
+    return commandFailure('cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  }
+  const plan = foulDecrementPlan(state, target)
+  if (!plan) {
+    return commandFailure('nothing_to_undo', 'There is no matching current-period Basketball foul to decrement.')
+  }
+  const projected = applyGameEventMutations(
+    state,
+    plan.mutations,
+    new Date().toISOString(),
+    gameEventRegistry,
+    gameEventProjectors
+  )
+  if (!projected.ok || !projected.inspection.complete || projected.state.sportGameState?.sportId !== 'basketball') {
+    return commandFailure('command_failed', 'Basketball foul correction could not be previewed safely.')
+  }
+  const after = projected.state.sportGameState.projection.bonusStatusByPeriod[
+    plan.event.period.id
+  ]?.[plan.event.teamSide] ?? 'none'
+  return { ok: true, value: { ...plan.basePreview, bonusStatusAfter: after } }
+}
+
+export function canDecrementBasketballFoul(
+  state: GameState,
+  target: BasketballFoulDecrementTarget
+): boolean {
+  if (hasCloudBinding(state) || state.sportGameState?.sportId !== 'basketball') return false
+  const currentPeriodId = state.sportGameState.projection.status === 'in_progress'
+    ? state.sportGameState.projection.currentPeriodId
+    : null
+  if (!currentPeriodId) return false
+  return activeBasketballEvents(state).some(event =>
+    event.eventType === 'basketball.foul' &&
+    event.period.id === currentPeriodId &&
+    foulMatchesTarget(event, target)
+  )
+}
+
+export function decrementBasketballFoul(
+  state: GameState,
+  target: BasketballFoulDecrementTarget,
+  now = new Date().toISOString()
+): BasketballStateCommandResult {
+  const timestamp = validTimestamp(now)
+  if (!timestamp) return failure(state, 'invalid_timestamp', 'Basketball correction timestamp is invalid.')
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  }
+  const plan = foulDecrementPlan(state, target)
+  if (!plan) {
+    return failure(state, 'nothing_to_undo', 'There is no matching current-period Basketball foul to decrement.')
+  }
+  const receipt: BasketballCourtUndoReceipt = {
+    kind: 'administrative_decrement',
+    createdAt: timestamp,
+    entries: plan.receiptEntries,
+  }
+  return applyCorrectionsWithReceipt(state, plan.mutations, receipt, timestamp)
+}
+
+export function previewBasketballFreeThrowTripRemoval(
+  state: GameState,
+  tripEventId: string
+): BasketballCommandResult<BasketballFreeThrowTripRemovalPreview> {
+  if (hasCloudBinding(state)) {
+    return commandFailure('cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  }
+  const plan = freeThrowTripRemovalPlan(state, tripEventId)
+  return plan
+    ? { ok: true, value: plan.preview }
+    : commandFailure('nothing_to_undo', 'The current-period Basketball free-throw trip is unavailable.')
+}
+
+export function removeBasketballFreeThrowTrip(
+  state: GameState,
+  tripEventId: string,
+  now = new Date().toISOString()
+): BasketballStateCommandResult {
+  const timestamp = validTimestamp(now)
+  if (!timestamp) return failure(state, 'invalid_timestamp', 'Basketball correction timestamp is invalid.')
+  if (hasCloudBinding(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  }
+  const plan = freeThrowTripRemovalPlan(state, tripEventId)
+  if (!plan) {
+    return failure(state, 'nothing_to_undo', 'The current-period Basketball free-throw trip is unavailable.')
+  }
+  const receipt: BasketballCourtUndoReceipt = {
+    kind: 'administrative_decrement',
     createdAt: timestamp,
     entries: plan.receiptEntries,
   }
@@ -341,6 +488,7 @@ function captureUnitActorLabel(players: Player[], event: BasketballMatchEvent): 
 }
 
 function actorLabel(players: Player[], event: BasketballMatchEvent): string {
+  if (event.teamSide === 'neutral') return 'Game administration'
   const actor = event.actors[0]
   if (!actor) return event.teamSide === 'tracked' ? 'Tracked team' : 'Opponent'
   if (actor.kind === 'player') {
@@ -395,7 +543,8 @@ function captureUnitLabel(
     case 'basketball.turnover': return 'Turnover'
     case 'basketball.foul': return 'Foul'
     case 'basketball.ejection': return 'Ejection'
-    case 'basketball.timeout': return 'Timeout'
+    case 'basketball.timeout':
+      return events[0].payload.label?.trim() || 'Timeout'
     case 'basketball.minutes_adjustment': return 'Minutes adjustment'
     case 'basketball.score_adjustment': return 'Score adjustment'
     case 'basketball.free_throw_trip': return 'Free throw trip'
@@ -408,6 +557,180 @@ function periodLabel(state: GameState, periodId: string): string {
   return state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ?? periodId
 }
 
+function foulDecrementPlan(
+  state: GameState,
+  target: BasketballFoulDecrementTarget
+): BasketballFoulDecrementPlan | null {
+  const sportState = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState
+    : null
+  const currentPeriodId = sportState?.projection.status === 'in_progress'
+    ? sportState.projection.currentPeriodId
+    : null
+  if (!sportState || !currentPeriodId) return null
+  const events = activeBasketballEvents(state)
+  const foul = events
+    .filter((event): event is BasketballFoulEvent =>
+      event.eventType === 'basketball.foul' && event.period.id === currentPeriodId
+    )
+    .sort((left, right) => compareGameEventCaptureOrder(right, left))
+    .find(event => foulMatchesTarget(event, target))
+  if (!foul) return null
+
+  const trips = events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.free_throw_trip' }> =>
+    event.eventType === 'basketball.free_throw_trip' && event.payload.sourceFoulEventId === foul.id
+  )
+  const ejections = events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.ejection' }> =>
+    event.eventType === 'basketball.ejection' && event.payload.relatedFoulEventId === foul.id
+  )
+  const counts = foulCounts(foul)
+  const committedBy = foul.actors.find(actor => actor.role === 'committed_by')
+  const participant = committedBy?.kind === 'player' && committedBy.participantId
+    ? sportState.projection.participants[committedBy.participantId]
+    : null
+  const clearsDisqualification = Boolean(
+    counts.personalFoul &&
+    participant?.disqualified &&
+    participant.stats.pf - 1 < sportState.setup.rulesSnapshot.personalFoulLimit
+  )
+  const removedAutomaticEjections = clearsDisqualification
+    ? ejections.filter(event => {
+        const subject = event.actors.find(actor => actor.role === 'subject')
+        return event.payload.source === 'automatic_threshold' &&
+          subject?.participantId === committedBy?.participantId
+      })
+    : []
+  const removedAutomaticEjectionIds = new Set(removedAutomaticEjections.map(event => event.id))
+  const survivingEjections = ejections.filter(event => !removedAutomaticEjectionIds.has(event.id))
+  const mutations: GameEventMutation[] = [
+    { type: 'delete', eventId: foul.id },
+    ...trips.map(event => ({
+      type: 'update' as const,
+      eventId: event.id,
+      changes: { payload: { ...event.payload, sourceFoulEventId: null } },
+    })),
+    ...survivingEjections.map(event => ({
+      type: 'update' as const,
+      eventId: event.id,
+      changes: { payload: { ...event.payload, relatedFoulEventId: null } },
+    })),
+    ...removedAutomaticEjections.map(event => ({
+      type: 'delete' as const,
+      eventId: event.id,
+    })),
+  ]
+  return {
+    event: foul,
+    mutations,
+    receiptEntries: [
+      receiptEntry(foul, 'restore', null),
+      ...trips.map(event => receiptEntry(event, 'relink_trip_foul', foul.id)),
+      ...survivingEjections.map(event => receiptEntry(event, 'relink_ejection_foul', foul.id)),
+      ...removedAutomaticEjections.map(event => receiptEntry(event, 'restore', null)),
+    ],
+    basePreview: {
+      targetEventId: foul.id,
+      periodId: foul.period.id,
+      periodLabel: periodLabel(state, foul.period.id),
+      removesPersonalFoul: counts.personalFoul,
+      removesTeamFoul: counts.teamFoul,
+      removesTechnical: counts.technical,
+      unlinkedTripCount: trips.length,
+      unlinkedEjectionCount: survivingEjections.length,
+      removedAutomaticEjectionCount: removedAutomaticEjections.length,
+      clearsDisqualification,
+      bonusStatusBefore: sportState.projection.bonusStatusByPeriod[foul.period.id]
+        ?.[foul.teamSide] ?? 'none',
+      requiresConfirmation: true,
+    },
+  }
+}
+
+function freeThrowTripRemovalPlan(
+  state: GameState,
+  tripEventId: string
+): BasketballFreeThrowTripRemovalPlan | null {
+  const sportState = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState
+    : null
+  const currentPeriodId = sportState?.projection.status === 'in_progress'
+    ? sportState.projection.currentPeriodId
+    : null
+  if (!currentPeriodId) return null
+  const events = activeBasketballEvents(state)
+  const trip = events.find((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.free_throw_trip' }> =>
+    event.id === tripEventId &&
+    event.eventType === 'basketball.free_throw_trip' &&
+    event.period.id === currentPeriodId
+  )
+  if (!trip) return null
+  const attempts = events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.shot' }> =>
+    event.eventType === 'basketball.shot' &&
+    event.payload.attempt === 'free_throw' &&
+    event.payload.freeThrowTripId === trip.id &&
+    event.payload.tripAttemptNumber !== null
+  )
+  return {
+    preview: {
+      targetEventId: trip.id,
+      periodId: trip.period.id,
+      periodLabel: periodLabel(state, trip.period.id),
+      unlinkedAttemptCount: attempts.length,
+      requiresConfirmation: true,
+    },
+    mutations: [
+      { type: 'delete', eventId: trip.id },
+      ...attempts.map(event => ({
+        type: 'update' as const,
+        eventId: event.id,
+        changes: {
+          payload: {
+            ...event.payload,
+            freeThrowTripId: null,
+            tripAttemptNumber: null,
+          },
+        },
+      })),
+    ],
+    receiptEntries: [
+      receiptEntry(trip, 'restore', null),
+      ...attempts.map(event => receiptEntry(
+        event,
+        'relink_attempt_trip',
+        trip.id,
+        event.payload.tripAttemptNumber
+      )),
+    ],
+  }
+}
+
+function foulMatchesTarget(
+  event: BasketballFoulEvent,
+  target: BasketballFoulDecrementTarget
+): boolean {
+  const counts = foulCounts(event)
+  if (target.kind === 'team_foul') {
+    return event.teamSide === target.teamSide && counts.teamFoul
+  }
+  if (target.kind === 'team_technical') {
+    return event.teamSide === target.teamSide && counts.technical
+  }
+  return counts.personalFoul && actorMatchesPlayer(event, 'committed_by', target.playerId)
+}
+
+function foulCounts(event: BasketballFoulEvent): {
+  personalFoul: boolean
+  teamFoul: boolean
+  technical: boolean
+} {
+  const committedBy = event.actors.find(actor => actor.role === 'committed_by')
+  return event.payload.countingOverride ?? {
+    personalFoul: committedBy?.kind === 'player',
+    teamFoul: true,
+    technical: event.payload.class === 'technical',
+  }
+}
+
 function directDecrementPlan(
   state: GameState,
   playerId: string,
@@ -417,24 +740,25 @@ function directDecrementPlan(
     ? state.sportGameState.projection.currentPeriodId
     : null
   if (!currentPeriodId) return null
-  const events = activeBasketballEvents(state)
+  const allEvents = activeBasketballEvents(state)
+  const events = allEvents
     .filter(event => event.period.id === currentPeriodId)
     .sort((left, right) => compareGameEventCaptureOrder(right, left))
   const target = events.find(event => directEventMatches(event, playerId, statId))
   if (!target) return null
 
   const linkedAssists = target.eventType === 'basketball.shot' && target.payload.attempt === 'field_goal'
-    ? events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.assist' }> =>
+    ? allEvents.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.assist' }> =>
         event.eventType === 'basketball.assist' && event.payload.relatedEventId === target.id
       )
     : []
   const linkedRebounds = target.eventType === 'basketball.shot'
-    ? events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.rebound' }> =>
+    ? allEvents.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.rebound' }> =>
         event.eventType === 'basketball.rebound' && event.payload.relatedEventId === target.id
       )
     : []
   const linkedBlocks = target.eventType === 'basketball.shot' && target.payload.attempt === 'field_goal'
-    ? events.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.block' }> =>
+    ? allEvents.filter((event): event is Extract<BasketballMatchEvent, { eventType: 'basketball.block' }> =>
         event.eventType === 'basketball.block' && event.payload.relatedEventId === target.id
       )
     : []
@@ -452,6 +776,9 @@ function directDecrementPlan(
     ...linkedBlocks.map(event => receiptEntry(event, 'relink_block', target.id)),
   ]
   const fieldGoal = target.eventType === 'basketball.shot' && target.payload.attempt === 'field_goal'
+  const consumesFreeThrowTripPosition = target.eventType === 'basketball.shot' &&
+    target.payload.attempt === 'free_throw' &&
+    target.payload.freeThrowTripId !== null
   return {
     preview: {
       statId,
@@ -461,7 +788,8 @@ function directDecrementPlan(
       linkedAssistCount: linkedAssists.length,
       linkedReboundCount: linkedRebounds.length,
       unlinkedBlockCount: linkedBlocks.length,
-      requiresConfirmation: fieldGoal || linkedRebounds.length > 0,
+      consumesFreeThrowTripPosition,
+      requiresConfirmation: fieldGoal || linkedRebounds.length > 0 || consumesFreeThrowTripPosition,
     },
     mutations,
     receiptEntries,
@@ -578,13 +906,15 @@ function clearChartPlan(state: GameState) {
 function receiptEntry(
   event: BasketballMatchEvent,
   action: BasketballCourtUndoReceiptEntry['action'],
-  previousRelatedEventId: string | null
+  previousRelatedEventId: string | null,
+  previousAttemptNumber: number | null = null
 ): BasketballCourtUndoReceiptEntry {
   return {
     eventId: event.id,
     expectedRevision: event.revision + 1,
     action,
     previousRelatedEventId,
+    previousAttemptNumber,
   }
 }
 
@@ -638,17 +968,63 @@ function buildRestoreMutations(state: GameState): GameEventMutation[] | null {
       mutations.push({ type: 'restore', eventId: event.id })
       continue
     }
+    if (event.deletedAt || !entry.previousRelatedEventId) return null
+    if (entry.action === 'relink_block') {
+      if (event.eventType !== 'basketball.block' || event.payload.relatedEventId !== null) return null
+      mutations.push({
+        type: 'update',
+        eventId: event.id,
+        changes: {
+          payload: { ...event.payload, relatedEventId: entry.previousRelatedEventId },
+        },
+      })
+      continue
+    }
+    if (entry.action === 'relink_trip_foul') {
+      if (
+        event.eventType !== 'basketball.free_throw_trip' ||
+        event.payload.sourceFoulEventId !== null
+      ) return null
+      mutations.push({
+        type: 'update',
+        eventId: event.id,
+        changes: {
+          payload: { ...event.payload, sourceFoulEventId: entry.previousRelatedEventId },
+        },
+      })
+      continue
+    }
+    if (entry.action === 'relink_ejection_foul') {
+      if (
+        event.eventType !== 'basketball.ejection' ||
+        event.payload.relatedFoulEventId !== null
+      ) return null
+      mutations.push({
+        type: 'update',
+        eventId: event.id,
+        changes: {
+          payload: { ...event.payload, relatedFoulEventId: entry.previousRelatedEventId },
+        },
+      })
+      continue
+    }
     if (
-      event.deletedAt ||
-      event.eventType !== 'basketball.block' ||
-      event.payload.relatedEventId !== null ||
-      !entry.previousRelatedEventId
+      entry.action !== 'relink_attempt_trip' ||
+      event.eventType !== 'basketball.shot' ||
+      event.payload.attempt !== 'free_throw' ||
+      event.payload.freeThrowTripId !== null ||
+      event.payload.tripAttemptNumber !== null ||
+      entry.previousAttemptNumber === null
     ) return null
     mutations.push({
       type: 'update',
       eventId: event.id,
       changes: {
-        payload: { ...event.payload, relatedEventId: entry.previousRelatedEventId },
+        payload: {
+          ...event.payload,
+          freeThrowTripId: entry.previousRelatedEventId,
+          tripAttemptNumber: entry.previousAttemptNumber,
+        },
       },
     })
   }
@@ -736,6 +1112,16 @@ function reconcileBasketballPlayerRows(state: GameState): GameState {
 
 function validTimestamp(value: string): string | null {
   return value && Number.isFinite(Date.parse(value)) ? value : null
+}
+
+function hasCloudBinding(state: GameState): boolean {
+  return Boolean(
+    state.cloudSync.teamId ||
+    state.cloudSync.gameId ||
+    state.cloudSync.seasonId ||
+    Object.keys(state.cloudSync.playerIdMap).length > 0 ||
+    state.cloudSync.lastSyncedGameFingerprint
+  )
 }
 
 function failure(

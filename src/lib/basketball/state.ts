@@ -206,7 +206,8 @@ export function normalizeBasketballCourtUndoReceipt(
     !isPlainObject(value) ||
     (value.kind !== 'capture_undo' &&
       value.kind !== 'clear_chart' &&
-      value.kind !== 'direct_decrement') ||
+      value.kind !== 'direct_decrement' &&
+      value.kind !== 'administrative_decrement') ||
     typeof value.createdAt !== 'string' ||
     !Number.isFinite(Date.parse(value.createdAt)) ||
     !Array.isArray(value.entries) ||
@@ -222,17 +223,33 @@ export function normalizeBasketballCourtUndoReceipt(
       eventIds.has(candidate.eventId) ||
       !Number.isInteger(candidate.expectedRevision) ||
       Number(candidate.expectedRevision) < 2 ||
-      (candidate.action !== 'restore' && candidate.action !== 'relink_block') ||
+      ![
+        'restore',
+        'relink_block',
+        'relink_trip_foul',
+        'relink_ejection_foul',
+        'relink_attempt_trip',
+      ].includes(String(candidate.action)) ||
       !(candidate.previousRelatedEventId === null || isNonEmptyString(candidate.previousRelatedEventId)) ||
       (candidate.action === 'restore' && candidate.previousRelatedEventId !== null) ||
-      (candidate.action === 'relink_block' && candidate.previousRelatedEventId === null)
+      (candidate.action !== 'restore' && candidate.previousRelatedEventId === null) ||
+      !(
+        candidate.previousAttemptNumber === undefined ||
+        candidate.previousAttemptNumber === null ||
+        (Number.isInteger(candidate.previousAttemptNumber) && Number(candidate.previousAttemptNumber) > 0)
+      ) ||
+      (candidate.action === 'relink_attempt_trip' && !Number.isInteger(candidate.previousAttemptNumber)) ||
+      (candidate.action !== 'relink_attempt_trip' && candidate.previousAttemptNumber != null)
     ) return null
     eventIds.add(candidate.eventId)
     entries.push({
       eventId: candidate.eventId,
       expectedRevision: Number(candidate.expectedRevision),
-      action: candidate.action,
+      action: candidate.action as BasketballCourtUndoReceiptEntry['action'],
       previousRelatedEventId: candidate.previousRelatedEventId,
+      previousAttemptNumber: candidate.previousAttemptNumber == null
+        ? null
+        : Number(candidate.previousAttemptNumber),
     })
   }
 
@@ -243,7 +260,7 @@ export function normalizeBasketballCourtUndoReceipt(
     entries.filter(entry => entry.action === 'restore').map(entry => entry.eventId)
   )
   if (entries.some(
-    entry => entry.action === 'relink_block' &&
+    entry => entry.action !== 'restore' &&
       (!entry.previousRelatedEventId || !restoredIds.has(entry.previousRelatedEventId))
   )) return null
 
