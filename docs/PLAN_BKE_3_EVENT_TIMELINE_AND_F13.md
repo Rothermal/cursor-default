@@ -98,8 +98,11 @@ consequence preview, atomic mutation, and focused tests exist.
   the complete original capture is an explicit separate action with one combined consequence
   preview.
 - Lifecycle and participant-identity events render as read-only boundaries. Period and terminal
-  correction remains in dedicated lifecycle controls; roster addition and identity resolution stay
-  in their established administration flows.
+  correction remains in dedicated lifecycle controls, and identity resolution stays in its
+  established administration flow. `basketball.match_roster_added` is the deliberate exception: it
+  remains a correction capture so the shipped quick Undo affordance is preserved. Timeline may
+  remove or restore it only when checked final-state validation proves that no surviving event or
+  identity fact depends on the participant; BKE-3 does not add a roster-addition payload editor.
 - Overlapping family filters are: All, Scoring, Shooting, Related Stats, Fouls/FT,
   Administration, and Match Control. One event may qualify for more than one family.
 - During active play the default period filter is the current period. After completion the default
@@ -111,8 +114,10 @@ consequence preview, atomic mutation, and focused tests exist.
 
 ### 4.3 Revision and deletion presentation
 
-- Active events with `revision > 1` display a Corrected badge plus revision and updated-time
-  metadata. The detail surface shows current authoritative values only.
+- Active events with `revision > 1` display a Revised badge plus revision and updated-time metadata.
+  Revision means that one or more update, delete, or restore transitions occurred; it does not claim
+  that the current payload differs from its original value. The detail surface shows current
+  authoritative values only.
 - BKE-3 does not add prior-value snapshots. The current shared engine replaces the stored event when
   revising it, and adding a second local audit authority before BKE-4 transport is out of scope.
 - Deleted events preserve their latest stored payload and actors, display Removed plus deletion
@@ -154,6 +159,11 @@ consequence preview, atomic mutation, and focused tests exist.
 - Existing live commands continue to require the active current period.
 - Dedicated historical-add commands may target a started period and use the same actor, relationship,
   inventory, non-negative score, and rule validation as live capture.
+- BKE-3D changes Basketball stat and administrative replay validation to accept any period that had
+  started at that event's append position. Current-period enforcement moves to the checked live
+  command boundary; lifecycle events keep their existing current-period projector rules. This is an
+  explicit replay contract change, not only a new command option, so an event appended in Q3 for Q1
+  remains projectable after reload.
 - Historical attribution changes period-scoped totals for the selected period, including team fouls
   and timeout inventory. Non-resetting overtime bonus recomputes from the same cumulative helper used
   by the tracker.
@@ -214,7 +224,13 @@ consequence preview, atomic mutation, and focused tests exist.
   and selected restore. React never constructs generic mutation arrays directly.
 - Every preview names direct stat/score effects, linked-event tombstones, surviving events whose links
   clear, bonus/disqualification/inventory changes, and whether the target is a lifecycle boundary.
-- Apply uses one `applyGameEventMutations` call and requires a complete final projection.
+- Apply uses one `applyGameEventMutations` call and requires a complete final projection. Projection
+  completeness is necessary but not sufficient: Basketball-owned commands also validate final
+  family invariants that the projector reports only as advisory relationship warnings.
+- Command validation owns duplicate free-throw attempt positions, relationship-target compatibility,
+  duplicate official facts, and any other warning-level invariant touched by the candidate. Existing
+  unrelated advisory warnings may remain, but a command cannot introduce a new warning for an
+  appended, revised, deleted, or restored event.
 - Rejected commands return the original `GameState` by identity with a typed product-facing error.
 
 ### 7.2 Individual and group removal
@@ -228,7 +244,9 @@ consequence preview, atomic mutation, and focused tests exist.
 - Complete capture-group removal targets every active member sharing that persisted command id, then
   adds any required dependency mutations. It never sweeps later-linked independent events merely
   because they reference a group member.
-- Lifecycle, roster-addition, and participant-resolution boundaries are not removable from Timeline.
+- Lifecycle and participant-resolution boundaries are not removable from Timeline. Roster additions
+  preserve their shipped correction behavior: removal is available only when no surviving event or
+  identity resolution depends on the participant, and it never cascades away that later history.
 
 ### 7.3 Conservative restoration
 
@@ -237,8 +255,10 @@ consequence preview, atomic mutation, and focused tests exist.
   dependents that retain a source id. Nothing extra is preselected.
 - Surviving events whose links were cleared are never re-linked automatically. Re-linking is an
   explicit BKE-3C/BKE-3D edit.
-- Restore rejects duplicate facts, invalid actor/side combinations, exhausted inventory, negative
-  score, stale revisions, or any final projection failure.
+- Restore rejects stale revisions or any final projection failure. Basketball command preflight also
+  rejects duplicate free-throw positions or official facts, invalid actor/side or relationship
+  combinations, and exhausted inventory, including cases that would otherwise produce only a
+  `relationshipWarnings` entry.
 
 ### 7.4 Verification
 
@@ -257,9 +277,17 @@ consequence preview, atomic mutation, and focused tests exist.
 - Locate/Move enters a dedicated court-placement mode. Marker selection is suspended during placement
   and the background tap updates only the draft.
 - Moving a shot recalculates normalized location and zone from snapshotted geometry but does not
-  silently change its value. Value remains an explicit separately reviewed field.
+  silently change its value. Value remains an explicit separately reviewed field. If the retained
+  value matches the new geometry, `valueSource` is `court`; otherwise Save promotes it to
+  `manual_override` and detail identifies the value as manual.
 - An unlocated field goal may gain a location; a wrongly located field goal may be returned to
-  unlocated after confirmation.
+  unlocated after confirmation. Locating uses `court` when value and geometry agree and
+  `manual_override` when they do not. Removing a location changes `court` to `quick_entry`, preserves
+  an existing `manual_override`, and never changes the value. An explicit value change follows the
+  same deterministic rule for the shot's current location.
+- Attempt kind is immutable in BKE-3. A field goal cannot be converted to a free throw or vice versa;
+  that transition would also need coordinated location, value-source, trip, and attempt-position
+  semantics. Each kind still exposes its valid result, value, actor, and relationship fields.
 - Save updates the stable event id, increments revision, rebuilds once, returns to the source view,
   and highlights the corrected row/marker.
 
@@ -272,7 +300,7 @@ consequence preview, atomic mutation, and focused tests exist.
   append-plus-mutate final-candidate helper. React never sequences two commands or performs rollback.
 - Made shots may link same-side assists. Missed shots may link offensive/defensive rebounds with the
   correct side relationship and opposite-side blocks. Totals never require a link.
-- Changing made/missed, shooter side, shooter, or attempt kind clears every now-invalid surviving
+- Changing made/missed, shooter side, or shooter clears every now-invalid surviving
   relationship in the same mutation. The preview names each event that will remain as a standalone
   stat.
 - Tombstoned dependents are restored only when explicitly selected and still valid.
@@ -388,7 +416,8 @@ Each slice adds focused pure tests before UI exposure. The final BKE-3 gate incl
 3. Render expandable persisted capture groups rather than inferred adjacency groups.
 4. Retain quick newest-action Undo alongside Timeline.
 5. Eventually edit every user-recorded Basketball family, not shots alone.
-6. Keep lifecycle events visible and read-only.
+6. Keep period, terminal, and identity lifecycle events visible and read-only; roster addition keeps
+   its established checked correction behavior.
 7. Default to individual-event removal and make whole-group removal explicit.
 8. Allow recorded-later additions to any started period without fabricated time.
 9. Use one shared responsive detail sheet from markers and Timeline.
@@ -415,6 +444,16 @@ Each slice adds focused pure tests before UI exposure. The final BKE-3 gate incl
 30. Give legacy markers read-only core detail without links or editing.
 31. Leave legacy Recent Events unchanged.
 32. Keep BKE-3 on the local Game Tracker; BKE-4D owns Summary and remote authority.
+33. Let stat/administrative replay accept an already-started target period while checked live
+    commands retain current-period enforcement; lifecycle replay remains unchanged.
+34. Derive shot `valueSource` deterministically when location or value changes and label manual
+    values in detail.
+35. Treat complete projection as necessary but use Basketball command validation for warning-level
+    relationship and duplicate-fact invariants.
+36. Preserve checked remove/restore for roster additions without adding a payload editor or cascading
+    away dependent history.
+37. Describe `revision > 1` as Revised rather than claiming the payload was corrected.
+38. Keep field-goal/free-throw attempt kind immutable in BKE-3.
 
 No product decisions remain open for BKE-3 implementation.
 
@@ -422,7 +461,8 @@ No product decisions remain open for BKE-3 implementation.
 
 - Persisting prior field-value snapshots or adding a second correction audit store.
 - Guessing links for legacy shots or promoting aggregate games into event authority.
-- Editing lifecycle, roster-addition, or participant-resolution events directly.
+- Editing lifecycle payloads or participant-resolution events directly. Roster additions retain
+  checked remove/restore but receive no payload editor.
 - Fabricating historical game times or rewriting immutable capture sequence.
 - Adding Basketball event cloud rows, migrations, recorder streams, finalization, canonical
   publication, or Summary authority.
