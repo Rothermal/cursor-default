@@ -8,7 +8,9 @@ Status: BKE-0 architecture and product-model decisions are approved in
 BKE-1A, all BKE-1B slices, and all BKE-1C slices are complete. BKE-2 product and delivery decisions
 are approved in [PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md);
 BKE-2A through BKE-2D are complete, including the full local tracker parity and exit audit. BKE-3
-editable Basketball Timeline/detail work and F13 delivery are next.
+product and delivery decisions are approved in
+[PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md); implementation is
+split into BKE-3A through BKE-3D, with BKE-3A next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -218,7 +220,7 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 | BKE-0 | Architecture audit, product-model Q&A, event catalog, authority, compatibility, settings/release strategy, and F13 reconciliation | Completed SOC-6 program | Detailed migration design approved; no Basketball code migration required |
 | BKE-1 | Shared-engine extraction through court capture. **Splits into BKE-1A-1C; BKE-1B further splits into BKE-1B1-1B3** — see BKE-0 §9 | BKE-0 approved | Generic refactors preserve Soccer; Basketball setup/projector and court workflows pass approved parity fixtures |
 | BKE-2 | Direct stat grid, event-derived score adjustments, team/period stats, fouls/ejections, timeouts, and remaining Basketball actions. **Splits into BKE-2A-2D** | BKE-1C | Every new Basketball live action has one event-backed source of truth |
-| BKE-3 | Editable Basketball Timeline/detail experience and F13 delivery | BKE-2 | Users can review, revise, remove, restore, and re-link supported local events |
+| BKE-3 | Editable Basketball Timeline/detail experience and F13 delivery. **Splits into BKE-3A-3D** | BKE-2 | Users can review, revise, remove, restore, and re-link supported local events |
 | BKE-4 | Generalized cloud lifecycle, authority-aware Summary, canonical aggregates, capability negotiation, and release readiness. **Splits into BKE-4A-4E** — see BKE-0 §9 | BKE-3 stable | New Basketball games sync and publish canonically behind the internal gate; Soccer remains unchanged; legacy games remain readable |
 | BKE-5 | Built-in/personal/team/match Basketball settings, rule profiles, and event-model rollout | BKE-4E | Defaults resolve with source metadata, setup fixes a complete immutable rules snapshot, and the user opt-in ships |
 | BKE-6 | Basketball clock, stoppage profiles, substitutions, and on-court intervals | BKE-5 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |

@@ -12,6 +12,7 @@ dist
 .env.staging
 .env*.local
 .creds/
+.claude/
 
 # Embedded / local clone (do not commit)
 cursor-default/
