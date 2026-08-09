@@ -153,7 +153,7 @@ function applyFoul(
     const periodFouls = ensurePeriodSideCounts(projection.periodTeamFouls, event.period.id)
     periodFouls[event.teamSide] += 1
     incrementTeamStat(projection, event.teamSide, `team_foul_p${event.period.order}`)
-    updateBonusStatus(projection, event.period.id, rules)
+    updateBasketballBonusStatus(projection, event.period.id, rules)
   }
 
   if (counts.technical) {
@@ -243,7 +243,7 @@ function validateEjectionRelationship(
   }
 }
 
-function updateBonusStatus(
+export function updateBasketballBonusStatus(
   projection: BasketballMatchProjection,
   periodId: string,
   rules: BasketballMatchRules
@@ -262,7 +262,7 @@ function updateBonusStatus(
           },
           { tracked: 0, opponent: 0 }
         )
-    : ensurePeriodSideCounts(projection.periodTeamFouls, periodId)
+    : projection.periodTeamFouls[periodId] ?? { tracked: 0, opponent: 0 }
   projection.bonusStatusByPeriod[periodId] = {
     tracked: getBonusStatus(
       counts.tracked,

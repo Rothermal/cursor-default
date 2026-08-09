@@ -5,7 +5,7 @@ model. BKE-2 keeps the internal, local-only creation gate established in BKE-1C 
 remaining live counter mutation with one checked event command.
 
 Status: Approved through the BKE-2 product and delivery Q&A. Implementation is split into BKE-2A
-through BKE-2D. BKE-2A and BKE-2B are implemented; BKE-2C is next.
+through BKE-2D. BKE-2A, BKE-2B, and BKE-2C1 are implemented; BKE-2C2 is next.
 
 Depends on:
 
@@ -31,7 +31,7 @@ lineup intervals. Those remain BKE-3 through BKE-6.
 |---|---|---|
 | BKE-2A | **Implemented.** Lifecycle and late-participant commands/UI, sequential period and overtime transitions, local completion, generalized live capture units, and non-undoable lifecycle boundaries | Event games can add valid participants, advance and complete coherently, and never undo an ordinary capture across a lifecycle boundary |
 | BKE-2B | **Implemented.** Direct player/team stat commands, unlocated field goals/free throws, score adjustments, manual minutes, optional steal-turnover pairing, standalone decrements, and event-backed grid/score UI | Every ordinary direct stat and score action has exactly one event-backed source of truth |
-| BKE-2C | Structured fouls, linked free-throw trips and attempts, one-and-one handling, player/staff ejections, charged and neutral timeouts, and dependency-aware administrative corrections | Discipline and administration capture preserve rule-derived totals and linked-event integrity |
+| BKE-2C | Structured fouls, linked free-throw trips and attempts, one-and-one handling, player/staff ejections, charged and neutral timeouts, and dependency-aware administrative corrections. Delivered as BKE-2C1 through BKE-2C4 below. | Discipline and administration capture preserve rule-derived totals and linked-event integrity |
 | BKE-2D | Complete team/period tracker presentation, local suspend/abandon/reopen controls, bonus and inventory state, unavailable-participant behavior, full parity fixtures, regression docs, and BKE-2 exit audit | No live Basketball control is hidden or counter-backed in a healthy event game, every modeled local terminal state is reachable, and legacy Basketball plus Soccer remain unchanged |
 
 Each slice uses its own feature branch and PR. A later slice may use commands from an earlier slice,
@@ -218,6 +218,19 @@ available.
 
 ## 7. BKE-2C: Fouls, Free Throws, Ejections, and Timeouts
 
+### 7.0 Delivery slices
+
+| Slice | Scope | UI exposure |
+|---|---|---|
+| BKE-2C1 | **Implemented.** Checked foul/free-throw-trip/attempt commands, one-and-one enforcement, dependency-aware foul/trip corrections, inverse receipts, and domain tests | None; establishes the complete foul/free-throw transition and correction contract |
+| BKE-2C2 | Foul sheet, progressive counting overrides, awarded-trip/attempt workspace, player/team grid actions, and correction confirmations | Exposes fouls and structured free throws only after C1 is complete |
+| BKE-2C3 | Checked player/staff ejection capture/correction plus focused tracker UI and unavailable-participant enforcement | Exposes official ejections without coupling them to threshold disqualification |
+| BKE-2C4 | Checked charged/neutral timeout capture/correction, inventory UI, integration fixtures, and BKE-2C exit audit | Completes administration capture and hands the tracker to BKE-2D |
+
+Each slice uses its own branch and PR. C1 may extend the shared reload-safe inverse receipt, but no
+C1 control is exposed. Later slices must reuse these commands rather than constructing events in
+React.
+
 ### 7.1 Foul sheet
 
 - Prefill the selected side/player and default to Personal + Common.
@@ -232,7 +245,12 @@ available.
 - The foul sheet may start a linked trip. Append foul and trip atomically, then record each attempt as
   it occurs.
 - Support one, two, or three maximum attempts; one-and-one is a maximum two-attempt trip.
+- Validate one-and-one against the immutable rules and the post-foul one-and-one bonus window; the
+  awarding foul must count as a nontechnical team foul, and technical-trip context must match the
+  foul's derived or overridden technical count.
 - A first-attempt one-and-one miss closes live capture without fabricating a second attempt.
+- A removed first one-and-one attempt remains a consumed historical position; attempt 2 requires
+  attempt 1 to remain active and made.
 - Technical and possession-retained flags belong to the trip. Attempts remain linked shot events.
 - Empty/partial trips remain reviewable and do not invent points or attempts.
 
@@ -253,6 +271,8 @@ available.
 
 - Foul decrement removes the newest match and atomically clears source links from surviving trips and
   ejections. Confirmation names personal, team, bonus/disqualification, and unlink effects.
+- If removing the foul clears disqualification, a related automatic-threshold ejection is removed
+  with it; explicit official ejections remain authoritative and survive with their stale link cleared.
 - Team foul/technical decrement resolves the newest qualifying current-period foul.
 - Charged timeout decrement resolves the newest matching current-period timeout.
 - Removing a trip clears surviving attempt links; removing an attempt leaves trip positions intact.
