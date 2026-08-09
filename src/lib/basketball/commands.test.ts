@@ -5,6 +5,7 @@ import { createInitialState, gameReducer } from '../gameReducer'
 import { isAggregateCloudSyncEligible } from '../gameSyncFingerprint'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
+  abandonBasketballMatch,
   addBasketballLateParticipant,
   basketballActorForSelection,
   basketballCaptureTargetForPlayerId,
@@ -19,8 +20,10 @@ import {
   nextBasketballEventSequence,
   normalizeBasketballCourtLocation,
   prepareBasketballGameStart,
+  reopenBasketballMatch,
   setBasketballEventCreationIntent,
   startNextBasketballPeriod,
+  suspendBasketballMatch,
 } from './commands'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
@@ -741,6 +744,108 @@ describe('BKE-2A Basketball lifecycle commands', () => {
       teamSide: 'tracked',
       displayName: 'Too Late',
     })).toMatchObject({ ok: false, state: completed.state, code: 'invalid_period' })
+    const reopened = reopenBasketballMatch(completed.state, {
+      recorderUserId: 'recorder-1',
+      reason: 'Correct the completed game',
+      occurredAt: '2026-08-02T16:06:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000457',
+    })
+    expect(reopened.ok).toBe(true)
+    if (!reopened.ok || reopened.state.sportGameState?.sportId !== 'basketball') return
+    expect(reopened.state.sportGameState.projection).toMatchObject({
+      status: 'period_break',
+      endReason: null,
+      result: 'unresolved',
+    })
+  })
+
+  it('suspends active play and requires a reason to reopen it exactly', () => {
+    const state = startedState()
+    const suspended = suspendBasketballMatch(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:10:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000501',
+    })
+    expect(suspended.ok).toBe(true)
+    if (!suspended.ok || suspended.state.sportGameState?.sportId !== 'basketball') return
+    expect(suspended.state.sportGameState.projection).toMatchObject({
+      status: 'suspended',
+      endReason: 'suspended',
+      result: 'suspended',
+    })
+    expect(captureBasketballCourtEvent(suspended.state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+    })).toMatchObject({ ok: false, state: suspended.state, code: 'invalid_period' })
+    expect(reopenBasketballMatch(suspended.state, {
+      recorderUserId: 'recorder-1',
+      reason: '   ',
+    })).toMatchObject({ ok: false, state: suspended.state, code: 'command_failed' })
+
+    const reopened = reopenBasketballMatch(suspended.state, {
+      recorderUserId: 'recorder-1',
+      reason: ' Officials resumed play ',
+      occurredAt: '2026-08-02T16:11:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000502',
+    })
+    expect(reopened.ok).toBe(true)
+    if (!reopened.ok || reopened.state.sportGameState?.sportId !== 'basketball') return
+    expect(reopened.state.sportGameState.projection).toMatchObject({
+      status: 'in_progress',
+      endedAt: null,
+      endReason: null,
+      result: 'unresolved',
+    })
+    expect(reopened.state.eventStream?.events.slice(-1)[0]).toMatchObject({
+      eventType: 'basketball.match_reopened',
+      payload: { reason: 'Officials resumed play' },
+    })
+  })
+
+  it('abandons a period break, reopens to that break, and rejects cloud lifecycle changes', () => {
+    const state = startedState()
+    const ended = endBasketballPeriod(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:12:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000503',
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    const abandoned = abandonBasketballMatch(ended.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T16:13:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000504',
+    })
+    expect(abandoned.ok).toBe(true)
+    if (!abandoned.ok || abandoned.state.sportGameState?.sportId !== 'basketball') return
+    expect(abandoned.state.sportGameState.projection).toMatchObject({
+      status: 'ended',
+      endReason: 'abandoned',
+      result: 'abandoned',
+    })
+    const reopened = reopenBasketballMatch(abandoned.state, {
+      recorderUserId: 'recorder-1',
+      reason: 'Administrative correction',
+      occurredAt: '2026-08-02T16:14:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000505',
+    })
+    expect(reopened.ok).toBe(true)
+    if (!reopened.ok || reopened.state.sportGameState?.sportId !== 'basketball') return
+    expect(reopened.state.sportGameState.projection.status).toBe('period_break')
+
+    const cloud = {
+      ...state,
+      cloudSync: { ...state.cloudSync, gameId: 'cloud-game' },
+    }
+    expect(suspendBasketballMatch(cloud, { recorderUserId: 'recorder-1' }))
+      .toMatchObject({ ok: false, state: cloud, code: 'cloud_flow_unsupported' })
+    expect(abandonBasketballMatch(cloud, { recorderUserId: 'recorder-1' }))
+      .toMatchObject({ ok: false, state: cloud, code: 'cloud_flow_unsupported' })
+    expect(reopenBasketballMatch(cloud, {
+      recorderUserId: 'recorder-1',
+      reason: 'Not terminal',
+    })).toMatchObject({ ok: false, state: cloud, code: 'cloud_flow_unsupported' })
   })
 
   it('completes regulation with a tracked lead and blocks overtime', () => {
