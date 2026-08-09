@@ -9,7 +9,10 @@ import type {
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import { resolveBasketballPeriodSegment } from './rules'
-import { applyBasketballAdministrativeEvent } from './administrativeProjection'
+import {
+  applyBasketballAdministrativeEvent,
+  updateBasketballBonusStatus,
+} from './administrativeProjection'
 import {
   applyBasketballStatEvent,
   createBasketballStatProjectionContext,
@@ -181,6 +184,7 @@ function applyPeriodStarted(
   projection.startedPeriodIds.push(segment.id)
   projection.currentPeriodId = segment.id
   projection.status = 'in_progress'
+  updateBasketballBonusStatus(projection, segment.id, sportState.setup.rulesSnapshot)
   return null
 }
 

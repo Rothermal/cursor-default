@@ -704,7 +704,7 @@ period. Include tracked and opponent participants plus both team chips.
 | Step | Action | Expected |
 |------|--------|----------|
 | 11a5.1 | Use every player-grid `+` action, including made/missed FT, 2PT, and 3PT | Each tap appends one checked event and updates projected totals; direct field goals/free throws have no court marker |
-| 11a5.2 | Select each team chip | Only Team Turnover is available; it updates the selected side's team actor and never charges a player |
+| 11a5.2 | Select each team chip and use Team Turnover | Team-only controls never charge a player; BKE-2C2 additionally exposes the selected side's Foul and Technical actions through its structured sheet |
 | 11a5.3 | Use quick scoreboard `+1/-1` on both sides, including `-1` at zero | Score adjustments append without a sheet; a negative result is disabled/rejected and made-shot scoring remains additive |
 | 11a5.4 | Open Official correction and submit blank, fractional, zero, valid positive, and valid negative adjustments | Invalid drafts remain open with no mutation; valid signed whole deltas require a note and update only the selected side |
 | 11a5.5 | Record Steal + Turnover against a rostered opponent, Unknown player, and Team | Each submit atomically appends one linked two-event capture with the correct opposite-side actor; ordinary stat decrement cannot split it |
@@ -715,6 +715,87 @@ period. Include tracked and opponent participants plus both team chips.
 | 11a5.10 | End a period or game and inspect court, grid, score, and compound controls | All ordinary capture/correction controls are disabled; no legacy reducer fallback appears |
 | 11a5.11 | Start a new period with a prior-period standalone stat but no current-period match | The game total remains visible, but quick grid decrement is disabled and cannot cross the lifecycle boundary |
 | 11a5.12 | Repeat representative grid/score actions in an ordinary legacy Basketball game and open Soccer | Existing aggregate Basketball and Soccer behavior remain unchanged |
+
+---
+
+## 11a6. Basketball foul and free-throw domain (BKE-2C1)
+
+**Precondition:** Library tests use a healthy local Basketball event game with an active period.
+BKE-2C1 intentionally exposes no tracker controls; manual UI checks begin in BKE-2C2.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a6.1 | Capture player, team, and staff fouls with ordinary and exceptional counting | Actors and counting overrides validate; blank override reasons, wrong-side players, unavailable players, and invalid offensive-control sides leave state unchanged |
+| 11a6.2 | Capture a foul with an awarded trip | Foul and trip append atomically under one command id; the trip belongs to the opposite side and links to its source foul |
+| 11a6.3 | Record one-, two-, and three-attempt trips; try one-and-one outside its configured post-foul bonus window or on a non-counting/technical foul; then separately delete made and missed valid first attempts | Award/rules and technical/foul context mismatches are rejected; attempt positions are stable; attempt 2 requires an active made attempt 1, so neither deleted outcome creates an unearned second attempt |
+| 11a6.4 | Remove and restore an attempted free-throw trip | The trip is removed, attempts remain authoritative but ungrouped, and exact trip ids/positions restore after receipt serialization |
+| 11a6.5 | Decrement a foul linked to a trip plus official, matching automatic-threshold, and stale other-subject ejections | Preview reports personal/team/technical, bonus, disqualification, unlink, and automatic-removal effects; correction removes only the matching invalidated automatic ejection and unlinks the surviving official/stale ejections; Restore reverses the full batch |
+| 11a6.6 | Delete an attempt, then request another for the same trip | A tombstoned attempt position is never reused; exhausted trips reject further attempts |
+| 11a6.7 | Attempt capture/correction during a period break, after completion, or with a cloud binding | Commands return the original state; no aggregate fallback or partial append occurs |
+| 11a6.8 | Carry team fouls from one overtime into the next, add the new overtime's only foul, then preview its removal | The new overtime starts with the carried bonus state and `bonusStatusAfter` returns to that state instead of `none` |
+
+---
+
+## 11a7. Basketball foul and awarded-free-throw UI (BKE-2C2)
+
+**Precondition:** Development build with a healthy, local Basketball event game and an active
+period. Begin with tracked participants and both team chips; add an opponent participant when the
+matrix requests one.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a7.1 | Select a player and tap PF `+` | The foul sheet opens with that player's side/player selected and Personal + Common defaults; cancelling changes nothing |
+| 11a7.1a | Reach the personal-foul limit, then inspect that player's PF controls | PF `+` is disabled so it cannot silently fall back to a team offender; PF `-` remains available for correction |
+| 11a7.2 | Select each team chip and tap Foul or Technical `+` | The sheet uses that side and a team offender; Technical defaults to Technical + Administrative and, under the version-1 NFHS baseline, derives both technical and team-foul/bonus counts from the one foul event |
+| 11a7.3 | Switch side/offender, use a staff label, select a drawn-by player or unknown label, and exercise offensive/non-offensive team control | Candidate lists remain side-correct, required labels are enforced, and successful captures project the chosen actors/context |
+| 11a7.4 | Enable Advanced counting override with and without a reason | Submit remains disabled without a reason; valid personal/team/technical choices become the authoritative projected counts |
+| 11a7.5 | Award 1, 2, 3, technical, possession-retained, and valid one-and-one trips | Foul plus award append atomically; failures remain in the foul sheet; success opens the awarded-trip workspace for the opposite side |
+| 11a7.6 | With no opponent participant, award the opponent a trip; use Add player, then reopen the trip and record Made/Miss attempts | The workspace explains why capture is blocked and opens the late-participant flow on the awarded side; the resumed trip accepts the new shooter, updates projected totals, closes after its final position, and creates no court marker |
+| 11a7.7 | Miss the first one-and-one attempt; separately leave a fixed trip partial, close the sheet, park/reload, and resume it | The one-and-one closes without a second attempt; the partial trip remains visible as open work with its stable next position and prior shooter suggestion |
+| 11a7.7a | Decrement a trip-linked made or missed FT from the player grid | Confirmation warns that the awarded position stays consumed; after removal the corrected trip remains in the workspace for review or whole-award removal |
+| 11a7.8 | Decrement player PF, team Foul, and team Technical values | Each confirmation names personal/team/technical, bonus, disqualification, unlink, and automatic-ejection effects before applying the newest current-period match |
+| 11a7.8a | Trigger failures in two different capture/correction families, then complete valid work | Only the newest error is visible, and a later successful action clears stale tracker feedback |
+| 11a7.9 | Remove an empty and attempted free-throw award, then use immediate Restore | The confirmation names surviving unlinked attempts; removal preserves their totals and Restore re-links the exact trip/positions |
+| 11a7.10 | End the period/game, then repeat representative actions in a legacy Basketball game and open Soccer | Event foul/trip controls are disabled outside active periods; legacy Basketball and Soccer behavior remain unchanged |
+
+---
+
+## 11a8. Basketball official ejections (BKE-2C3)
+
+**Precondition:** Development build with a healthy, local Basketball event game and an active
+period. Include at least two tracked players; record a staff foul when testing the staff-link path.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a8.1 | Open Official ejections, select a player, enter a reason, and record | One official-ruling event is appended; the player chip shows Ejected and the ruling appears in the focused list and Recent Events |
+| 11a8.2 | Select the ejected player and try the court, made/missed grid actions, related stats, PF, minutes, and Steal + Turnover | History and decrements remain available, but every new player-stat path is disabled in the UI and rejected by checked commands |
+| 11a8.3 | Reach the foul limit without an official ruling | The player chip shows DQ; no automatic ejection event is fabricated and the player is unavailable for new stats |
+| 11a8.4 | Officially eject that disqualified player, then remove the official ruling | Ejected overlays the DQ label; removal clears only ejected state and confirmation warns that foul-limit disqualification remains |
+| 11a8.5 | Restore the removed official ruling after parking/reload | The exact ejection id/revision returns and the player is marked ejected again |
+| 11a8.6 | Record a player or staff foul, then eject the same subject with the optional foul link | Only current-period, same-side, same-subject fouls are offered and accepted; wrong-subject/stale ids are rejected without mutation |
+| 11a8.7 | Record a staff ejection with a required label/reason, then remove it | The staff actor remains labeled and separate from player participants; removal keeps any linked foul and Restore reinstates the ruling |
+| 11a8.8 | Try blank reasons, duplicate subjects, a period break, a completed game, and a cloud-bound event game | Capture remains in the sheet on validation failure; no partial event, aggregate fallback, or cloud write occurs |
+
+---
+
+## 11a9. Basketball timeouts and BKE-2C exit (BKE-2C4)
+
+**Precondition:** Development build with a healthy, local Basketball event game and an active
+period. Use one finite timeout profile and one profile with unlimited regulation inventory.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a9.1 | Open Timeouts and record tracked/opponent Full and 30-second charged timeouts | The selected side's team actor owns each event; the inventory band and team period stat increment from projection and Recent Events shows the captured snapshot label |
+| 11a9.2 | Exhaust a finite side inventory, then try one additional charged timeout | The side reads exhausted, capture is disabled/rejected, and the event stream plus projected count remain unchanged |
+| 11a9.3 | Use a zero-cap profile, then an unlimited profile | Zero is exhausted before capture; unlimited remains visibly distinct, accepts repeated captures, and never displays a fabricated remaining count |
+| 11a9.4 | Record Media and Official game timeouts for both team-inventory states | Neutral counts update by kind with no actor and neither side's charged inventory changes |
+| 11a9.5 | Record Full then 30-second for one side and remove that side's latest timeout | Confirmation names the 30-second snapshot and restored remaining count; only the newest matching current-period charged event is removed |
+| 11a9.6 | Record Media, Official, then Media and remove the latest Media timeout | The newest Media event is removed; Official and both charged inventories remain unchanged |
+| 11a9.7 | Park/reload after a removal, then use Restore | The exact timeout id, kind, label, side, and active revision return; inventory reprojects exactly |
+| 11a9.8 | End the period and start the next regulation period or overtime | Prior-period timeouts remain in history but cannot be removed from the quick panel; the new segment uses its immutable regulation or overtime/fallback cap |
+| 11a9.9 | Try capture/correction during a period break, after completion, and with a cloud binding | Commands return the original state with no aggregate fallback or partial mutation |
+| 11a9.10 | Replay a raw stream containing one more charged timeout than the snapshot permits | Projection stops at the offending event with a semantic diagnostic instead of deriving impossible inventory |
+| 11a9.11 | Run representative foul/trip, ejection, and timeout capture/correction in one match | Every BKE-2C family stays event-derived, dependency-aware corrections restore exactly, and the tracker exposes no parallel aggregate authority |
 
 ---
 
