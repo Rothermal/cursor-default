@@ -4,15 +4,14 @@
 > visible numbering is no longer needed as a standalone feature; the useful version is a
 > tappable shot detail surface with durable shot number and linked F7/F9 metadata.
 >
-> Status: held as a standalone feature. Product intent is assigned to the future basketball
-> event-model program; see
-> [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md).
+> Status: superseded as an implementation plan. Product intent is assigned to the approved
+> [BKE-3 Timeline and F13 plan](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md).
 >
 > **Hold note:** Do not start this plan independently. BKE-0 has reconciled its shot detail,
 > linked metadata, and correction requirements — see
 > [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md) §8.
 > The `ShotRecord` extension and `shot_chart` columns proposed below are **superseded** by the
-> event model; the product intent is preserved and delivered in BKE-3.
+> event model; the product intent is preserved and delivered in BKE-3A through BKE-3D.
 
 ## Goal
 

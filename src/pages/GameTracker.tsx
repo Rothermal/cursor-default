@@ -7,6 +7,7 @@ import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
 import { basketballTimeoutCap } from '../lib/basketball/rules'
+import { basketballBonusFoulCountsForPeriod } from '../lib/basketball/administrativeProjection'
 import type { BasketballTeamStatsConfig, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
 import StatButton from '../components/StatButton'
@@ -15,6 +16,8 @@ import ShotChartPanel from '../components/shot-chart/ShotChartPanel'
 import RecentEventsPopup from '../components/RecentEventsPopup'
 import BasketballRecentEventsPopup from '../components/basketball/BasketballRecentEventsPopup'
 import BasketballLifecycleControls from '../components/basketball/BasketballLifecycleControls'
+import BasketballEventBonusPanel from '../components/basketball/BasketballEventBonusPanel'
+import BasketballReopenDialog from '../components/basketball/BasketballReopenDialog'
 import BasketballLateParticipantDialog from '../components/basketball/BasketballLateParticipantDialog'
 import BasketballScoreCorrectionDialog from '../components/basketball/BasketballScoreCorrectionDialog'
 import BasketballStealTurnoverDialog from '../components/basketball/BasketballStealTurnoverDialog'
@@ -42,13 +45,16 @@ import {
 } from '../lib/gameEvents/authority'
 import { gameEventProjectors } from '../lib/gameEvents/runtime'
 import {
+  abandonBasketballMatch,
   addBasketballLateParticipant,
   basketballCaptureTargetForPlayerId,
   basketballPlayerIdForCapturePreferences,
   completeBasketballMatch,
   endBasketballPeriod,
   hasStartedBasketballEventGame,
+  reopenBasketballMatch,
   startNextBasketballPeriod,
+  suspendBasketballMatch,
 } from '../lib/basketball/commands'
 import {
   basketballLiveCaptureUnits,
@@ -99,8 +105,10 @@ import {
   type BasketballTimeoutRemovalPreview,
 } from '../lib/basketball/timeoutCommands'
 import type {
+  BasketballBonusStatus,
   BasketballFoulClass,
   BasketballFoulContext,
+  BasketballSportGameState,
   BasketballTeamSide,
 } from '../lib/basketball/types'
 
@@ -217,6 +225,9 @@ export default function GameTracker() {
   } | null>(null)
   const [administrativeCorrectionError, setAdministrativeCorrectionError] = useState<string | null>(null)
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+  const [pendingLocalEnd, setPendingLocalEnd] = useState<'suspend' | 'abandon' | null>(null)
+  const [showReopenDialog, setShowReopenDialog] = useState(false)
+  const [reopenError, setReopenError] = useState<string | null>(null)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
   const [showAllShots, setShowAllShots] = useState(false)
@@ -437,6 +448,19 @@ export default function GameTracker() {
         }))
     : []
   const currentPeriodId = basketballSportState?.projection.currentPeriodId ?? null
+  const currentBasketballSegment = basketballSportState?.projection.periods.find(
+    period => period.id === currentPeriodId
+  ) ?? null
+  const currentBasketballFouls = currentPeriodId && basketballSportState
+    ? basketballBonusFoulCountsForPeriod(
+        basketballSportState.projection,
+        currentPeriodId,
+        basketballSportState.setup.rulesSnapshot
+      ) ?? { tracked: 0, opponent: 0 }
+    : { tracked: 0, opponent: 0 }
+  const currentBasketballBonus: Record<BasketballTeamSide, BasketballBonusStatus> = currentPeriodId
+    ? basketballSportState?.projection.bonusStatusByPeriod[currentPeriodId] ?? { tracked: 'none', opponent: 'none' }
+    : { tracked: 'none', opponent: 'none' }
   const reviewableFreeThrowTrips = basketballTripStatuses.filter(trip =>
     trip.periodId === currentPeriodId && (
       trip.open || trip.attempts.some(attempt => attempt.deleted)
@@ -469,6 +493,9 @@ export default function GameTracker() {
     : activeBasketballParticipant?.disqualified
       ? `${activeBasketballParticipant.displayName} is disqualified and unavailable for new stats.`
       : undefined
+  const basketballCaptureDisabledMessage = !basketballPeriodActive
+    ? basketballLifecycleCaptureMessage(basketballSportState)
+    : unavailableMessage
   const playerStatusLabels = basketballSportState
     ? Object.fromEntries(Object.values(basketballSportState.projection.participants).flatMap(participant =>
         participant.playerId && (participant.ejected || participant.disqualified)
@@ -880,6 +907,36 @@ export default function GameTracker() {
     navigate('/summary')
   }
 
+  const applyLocalBasketballEnd = () => {
+    if (!pendingLocalEnd) return
+    const command = pendingLocalEnd === 'suspend'
+      ? suspendBasketballMatch
+      : abandonBasketballMatch
+    const result = command(state, { recorderUserId: user?.id ?? null })
+    if (!result.ok) {
+      setLifecycleError(result.message)
+      return
+    }
+    setLifecycleError(null)
+    setPendingLocalEnd(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleReopenBasketballMatch = (reason: string) => {
+    const result = reopenBasketballMatch(state, {
+      recorderUserId: user?.id ?? null,
+      reason,
+    })
+    if (!result.ok) {
+      setReopenError(result.message)
+      return
+    }
+    setLifecycleError(null)
+    setReopenError(null)
+    setShowReopenDialog(false)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <div className="px-3 pt-3 pb-2 max-w-lg mx-auto w-full">
@@ -921,6 +978,30 @@ export default function GameTracker() {
             onEndPeriod={handleEndBasketballPeriod}
             onStartNextPeriod={handleStartNextBasketballPeriod}
             onComplete={() => setShowCompleteConfirm(true)}
+            onSuspend={() => {
+              setLifecycleError(null)
+              setPendingLocalEnd('suspend')
+            }}
+            onAbandon={() => {
+              setLifecycleError(null)
+              setPendingLocalEnd('abandon')
+            }}
+            onReopen={() => {
+              setReopenError(null)
+              setShowReopenDialog(true)
+            }}
+          />
+        )}
+        {basketballSportState && currentBasketballSegment && (
+          <BasketballEventBonusPanel
+            periodLabel={currentBasketballSegment.label}
+            trackedTeamName={gameInfo.teamName}
+            opponentName={gameInfo.opponentName}
+            trackedFouls={currentBasketballFouls.tracked}
+            opponentFouls={currentBasketballFouls.opponent}
+            trackedStatus={currentBasketballBonus.tracked}
+            opponentStatus={currentBasketballBonus.opponent}
+            hasOneAndOne={basketballSportState.setup.rulesSnapshot.hasOneAndOne}
           />
         )}
       </div>
@@ -980,8 +1061,8 @@ export default function GameTracker() {
           <ShotChartPanel
             selection={shotChartSelection}
             onSelectPlayer={handleSelectPlayer}
-            captureDisabled={isBasketballEventMode && activePlayerUnavailable}
-            captureDisabledMessage={unavailableMessage}
+            captureDisabled={isBasketballEventMode && (!basketballPeriodActive || activePlayerUnavailable)}
+            captureDisabledMessage={basketballCaptureDisabledMessage}
           />
           {!isBasketballEventMode && (
             <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
@@ -1505,6 +1586,18 @@ export default function GameTracker() {
         />
       )}
 
+      {showReopenDialog && basketballSportState && (
+        <BasketballReopenDialog
+          statusLabel={basketballTerminalStatusLabel(basketballSportState)}
+          errorMessage={reopenError}
+          onSubmit={handleReopenBasketballMatch}
+          onClose={() => {
+            setReopenError(null)
+            setShowReopenDialog(false)
+          }}
+        />
+      )}
+
       {foulDialog && basketballSportState && (
         <BasketballFoulDialog
           key={`${foulDialog.teamSide}:${foulDialog.playerId ?? 'team'}:${foulDialog.foulClass}:${foulDialog.context}`}
@@ -1554,6 +1647,22 @@ export default function GameTracker() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={pendingLocalEnd !== null}
+        title={pendingLocalEnd === 'suspend' ? 'Suspend game?' : 'Abandon game?'}
+        message={pendingLocalEnd === 'suspend'
+          ? 'Recording will pause at the current period state. Reopen the game with a reason to continue.'
+          : 'The game will end as abandoned. Its recorded events remain available for review and reasoned reopening.'}
+        confirmLabel={pendingLocalEnd === 'suspend' ? 'Suspend' : 'Abandon'}
+        cancelLabel="Keep tracking"
+        error={lifecycleError}
+        onConfirm={applyLocalBasketballEnd}
+        onCancel={() => {
+          setLifecycleError(null)
+          setPendingLocalEnd(null)
+        }}
+      />
 
       <ConfirmDialog
         open={pendingTimeoutRemoval !== null}
@@ -1735,4 +1844,21 @@ function TimeoutInventoryRow({
       </button>
     </div>
   )
+}
+
+function basketballLifecycleCaptureMessage(
+  sportState: BasketballSportGameState | null
+): string | undefined {
+  switch (sportState?.projection.status) {
+    case 'period_break': return 'Start the next period to record Basketball events.'
+    case 'suspended': return 'Reopen the suspended game to resume Basketball event capture.'
+    case 'ended': return 'Reopen the ended game before recording more Basketball events.'
+    default: return undefined
+  }
+}
+
+function basketballTerminalStatusLabel(sportState: BasketballSportGameState): string {
+  if (sportState.projection.status === 'suspended') return 'Suspended game'
+  if (sportState.projection.endReason === 'abandoned') return 'Abandoned game'
+  return 'Completed game'
 }

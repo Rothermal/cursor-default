@@ -531,8 +531,14 @@ function captureUnitLabel(
         ? state.gameInfo?.teamName || 'tracked team'
         : state.gameInfo?.opponentName || 'opponent'} roster`
     case 'basketball.participant_resolved': return 'Participant identity updated'
-    case 'basketball.match_ended':
-      return events[0].payload.reason === 'completed' ? 'Game completed' : 'Game ended'
+    case 'basketball.match_ended': {
+      const reason = events[0].payload.reason
+      return reason === 'completed'
+        ? 'Game completed'
+        : reason === 'suspended'
+          ? 'Game suspended'
+          : 'Game abandoned'
+    }
     case 'basketball.match_reopened': return 'Game reopened'
     case 'basketball.assist': return 'Assist'
     case 'basketball.rebound':
