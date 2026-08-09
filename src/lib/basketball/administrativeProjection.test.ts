@@ -52,12 +52,19 @@ function participant(
   }
 }
 
-function setup(options: { foulLimit?: number; clockModel?: 'none' | 'anchored' } = {}): BasketballMatchSetup {
+function setup(options: {
+  foulLimit?: number
+  clockModel?: 'none' | 'anchored'
+  timeoutsPerPeriod?: number | null
+} = {}): BasketballMatchSetup {
   const rules = createBasketballMatchRules()
   rules.personalFoulLimit = options.foulLimit ?? 5
   rules.clockModel = options.clockModel ?? 'none'
   rules.bonusThreshold = 2
   rules.doubleBonusThreshold = 3
+  if ('timeoutsPerPeriod' in options) {
+    rules.timeoutsPerPeriod = options.timeoutsPerPeriod ?? null
+  }
   return {
     version: 1,
     trackedTeamDesignation: 'home',
@@ -294,6 +301,34 @@ describe('BKE-1B3 Basketball administration', () => {
     expect(projection.periodTimeouts[period.id]).toEqual({ tracked: 1, opponent: 0 })
     expect(projection.neutralTimeouts).toBe(1)
     expect(projection.teamActorStats.tracked.team_to_used_p1).toBe(1)
+  })
+
+  it('fails closed when a stream exceeds immutable charged-timeout inventory', () => {
+    const matchSetup = setup({ timeoutsPerPeriod: 1 })
+    const result = project([
+      start(),
+      admin(1, 'basketball.timeout', {
+        kind: 'full',
+        chargedSide: 'tracked',
+        label: 'First timeout',
+        captureCommandId: null,
+      }, { actors: [teamActor('team')] }),
+      admin(2, 'basketball.timeout', {
+        kind: 'thirty_second',
+        chargedSide: 'tracked',
+        label: 'Over cap',
+        captureCommandId: null,
+      }, { actors: [teamActor('team')] }),
+    ], matchSetup)
+
+    expect(result.inspection.complete).toBe(false)
+    expect(result.inspection.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'semantic_validation_failed',
+        eventId: id(2),
+        message: expect.stringContaining('inventory is exhausted'),
+      }),
+    ]))
   })
 
   it('sums signed manual minutes, rejects negative totals, and ignores them for anchored clocks', () => {

@@ -778,6 +778,27 @@ period. Include at least two tracked players; record a staff foul when testing t
 
 ---
 
+## 11a9. Basketball timeouts and BKE-2C exit (BKE-2C4)
+
+**Precondition:** Development build with a healthy, local Basketball event game and an active
+period. Use one finite timeout profile and one profile with unlimited regulation inventory.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a9.1 | Open Timeouts and record tracked/opponent Full and 30-second charged timeouts | The selected side's team actor owns each event; the inventory band and team period stat increment from projection and Recent Events shows the captured snapshot label |
+| 11a9.2 | Exhaust a finite side inventory, then try one additional charged timeout | The side reads exhausted, capture is disabled/rejected, and the event stream plus projected count remain unchanged |
+| 11a9.3 | Use a zero-cap profile, then an unlimited profile | Zero is exhausted before capture; unlimited remains visibly distinct, accepts repeated captures, and never displays a fabricated remaining count |
+| 11a9.4 | Record Media and Official game timeouts for both team-inventory states | Neutral counts update by kind with no actor and neither side's charged inventory changes |
+| 11a9.5 | Record Full then 30-second for one side and remove that side's latest timeout | Confirmation names the 30-second snapshot and restored remaining count; only the newest matching current-period charged event is removed |
+| 11a9.6 | Record Media, Official, then Media and remove the latest Media timeout | The newest Media event is removed; Official and both charged inventories remain unchanged |
+| 11a9.7 | Park/reload after a removal, then use Restore | The exact timeout id, kind, label, side, and active revision return; inventory reprojects exactly |
+| 11a9.8 | End the period and start the next regulation period or overtime | Prior-period timeouts remain in history but cannot be removed from the quick panel; the new segment uses its immutable regulation or overtime/fallback cap |
+| 11a9.9 | Try capture/correction during a period break, after completion, and with a cloud binding | Commands return the original state with no aggregate fallback or partial mutation |
+| 11a9.10 | Replay a raw stream containing one more charged timeout than the snapshot permits | Projection stops at the offending event with a semantic diagnostic instead of deriving impossible inventory |
+| 11a9.11 | Run representative foul/trip, ejection, and timeout capture/correction in one match | Every BKE-2C family stays event-derived, dependency-aware corrections restore exactly, and the tracker exposes no parallel aggregate authority |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

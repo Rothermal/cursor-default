@@ -542,7 +542,8 @@ function captureUnitLabel(
     case 'basketball.turnover': return 'Turnover'
     case 'basketball.foul': return 'Foul'
     case 'basketball.ejection': return 'Ejection'
-    case 'basketball.timeout': return 'Timeout'
+    case 'basketball.timeout':
+      return events[0].payload.label?.trim() || 'Timeout'
     case 'basketball.minutes_adjustment': return 'Minutes adjustment'
     case 'basketball.score_adjustment': return 'Score adjustment'
     case 'basketball.free_throw_trip': return 'Free throw trip'

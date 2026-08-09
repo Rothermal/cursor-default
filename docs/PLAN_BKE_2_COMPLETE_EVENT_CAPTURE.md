@@ -5,7 +5,7 @@ model. BKE-2 keeps the internal, local-only creation gate established in BKE-1C 
 remaining live counter mutation with one checked event command.
 
 Status: Approved through the BKE-2 product and delivery Q&A. Implementation is split into BKE-2A
-through BKE-2D. BKE-2A, BKE-2B, and BKE-2C1 through BKE-2C3 are implemented; BKE-2C4 is next.
+through BKE-2D. BKE-2A, BKE-2B, and all BKE-2C slices are implemented; BKE-2D is next.
 
 Depends on:
 
@@ -31,7 +31,7 @@ lineup intervals. Those remain BKE-3 through BKE-6.
 |---|---|---|
 | BKE-2A | **Implemented.** Lifecycle and late-participant commands/UI, sequential period and overtime transitions, local completion, generalized live capture units, and non-undoable lifecycle boundaries | Event games can add valid participants, advance and complete coherently, and never undo an ordinary capture across a lifecycle boundary |
 | BKE-2B | **Implemented.** Direct player/team stat commands, unlocated field goals/free throws, score adjustments, manual minutes, optional steal-turnover pairing, standalone decrements, and event-backed grid/score UI | Every ordinary direct stat and score action has exactly one event-backed source of truth |
-| BKE-2C | Structured fouls, linked free-throw trips and attempts, one-and-one handling, player/staff ejections, charged and neutral timeouts, and dependency-aware administrative corrections. Delivered as BKE-2C1 through BKE-2C4 below. | Discipline and administration capture preserve rule-derived totals and linked-event integrity |
+| BKE-2C | **Implemented.** Structured fouls, linked free-throw trips and attempts, one-and-one handling, player/staff ejections, charged and neutral timeouts, and dependency-aware administrative corrections. Delivered as BKE-2C1 through BKE-2C4 below. | Discipline and administration capture preserve rule-derived totals and linked-event integrity |
 | BKE-2D | Complete team/period tracker presentation, local suspend/abandon/reopen controls, bonus and inventory state, unavailable-participant behavior, full parity fixtures, regression docs, and BKE-2 exit audit | No live Basketball control is hidden or counter-backed in a healthy event game, every modeled local terminal state is reachable, and legacy Basketball plus Soccer remain unchanged |
 
 Each slice uses its own feature branch and PR. A later slice may use commands from an earlier slice,
@@ -225,7 +225,7 @@ available.
 | BKE-2C1 | **Implemented.** Checked foul/free-throw-trip/attempt commands, one-and-one enforcement, dependency-aware foul/trip corrections, inverse receipts, and domain tests | None; establishes the complete foul/free-throw transition and correction contract |
 | BKE-2C2 | **Implemented.** Foul sheet, progressive counting overrides, awarded-trip/attempt workspace, player/team grid actions, and correction confirmations | Exposes fouls and structured free throws only after C1 is complete |
 | BKE-2C3 | **Implemented.** Checked player/staff ejection capture/correction, focused tracker UI, projected DQ/Ejected labels, and domain-level unavailable-participant enforcement | Exposes official ejections without coupling them to threshold disqualification |
-| BKE-2C4 | Checked charged/neutral timeout capture/correction, inventory UI, integration fixtures, and BKE-2C exit audit | Completes administration capture and hands the tracker to BKE-2D |
+| BKE-2C4 | **Implemented.** Checked charged/neutral timeout capture/correction, inventory UI, integration fixtures, and BKE-2C exit audit | Completes administration capture and hands the tracker to BKE-2D |
 
 Each slice uses its own branch and PR. C1 may extend the shared reload-safe inverse receipt, but no
 C1 control is exposed. Later slices must reuse these commands rather than constructing events in
@@ -270,6 +270,18 @@ React.
 - Offer neutral Official/Media timeouts without a team actor or inventory consumption.
 - Display snapshot labels while preserving stable catalog kinds.
 
+Implemented behavior:
+
+- `timeoutCommands.ts` owns checked charged Full/30-second and neutral Media/Official capture.
+  Charged events use the selected side's team actor; neutral events use `neutral` with no actor.
+- The projector enforces the immutable per-period cap during replay as well as command capture.
+  Overtime inherits the regulation cap when `timeoutsPerOvertime` is `null`; a regulation `null`
+  remains truly unlimited, while zero remains exhausted.
+- Game Tracker displays both team inventories plus current-period Media/Official counts at once.
+  The focused sheet chooses owner and kind without hiding the live inventory context.
+- Correction removes the newest matching current-period charged side or neutral kind, confirms the
+  snapshot label and inventory effect, and stores an exact reload-safe restore receipt.
+
 ### 7.5 Administrative corrections
 
 - Foul decrement removes the newest match and atomically clears source links from surviving trips and
@@ -289,6 +301,21 @@ React.
 - Prove threshold disqualification and explicit player/staff ejection remain distinct.
 - Exhaust charged timeout inventories and confirm neutral timeouts do not consume them.
 - Exercise every dependency-aware administrative decrement and restore.
+
+### 7.7 BKE-2C exit audit
+
+- Fouls, team fouls, technicals, bonus, structured free-throw trips/attempts, threshold
+  disqualification, official player/staff ejections, and charged/neutral timeouts now have checked
+  local event capture and correction paths. Healthy event games do not use aggregate mutations for
+  these families.
+- Every consequential correction is final-state validated and either immediate with no dependency
+  risk or confirmation-backed with one exact inverse receipt. Period breaks, completed games,
+  cloud-bound event games, and incomplete projections fail closed.
+- Charged timeout inventory, labels, and neutral counts are projection-derived. An over-cap raw
+  stream stops semantically at the offending event instead of producing an impossible total.
+- BKE-2D owns whole-tracker parity presentation, explicit local suspend/abandon/reopen controls,
+  broad mixed-flow fixtures, and the final BKE-2 audit. It does not need to redesign BKE-2C event
+  contracts.
 
 ## 8. BKE-2D: Complete Tracker and Exit Audit
 
