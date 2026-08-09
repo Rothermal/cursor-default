@@ -16,6 +16,8 @@ interface PlayerSelectorStripProps {
   onSelectAll?: () => void
   /** Active styling for the "All" chip; player chips render inactive while set. */
   allActive?: boolean
+  /** Optional projected availability status; chips stay selectable for history/corrections. */
+  playerStatusLabels?: Record<string, string>
 }
 
 /**
@@ -31,6 +33,7 @@ export default function PlayerSelectorStrip({
   sticky = false,
   onSelectAll,
   allActive = false,
+  playerStatusLabels = {},
 }: PlayerSelectorStripProps) {
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
   const teamSelectorCount = selectorPlayers.filter(isTeamPseudoPlayer).length
@@ -65,6 +68,7 @@ export default function PlayerSelectorStrip({
           const isTeam = isTeamPseudoPlayer(player)
           const showDivider = isTeam && index === teamSelectorCount - 1 && teamSelectorCount > 0
           const isActive = !allActive && player.id === activePlayerId
+          const statusLabel = playerStatusLabels[player.id]
 
           return (
             <div key={player.id} className="flex flex-shrink-0 items-stretch gap-2">
@@ -91,6 +95,11 @@ export default function PlayerSelectorStrip({
                 <span className="line-clamp-2 break-words">
                   {isTeam ? player.name : player.name.split(' ')[0]}
                 </span>
+                {statusLabel && (
+                  <span className={`block text-[10px] font-bold uppercase ${isActive ? 'text-white/85' : 'text-rose-700'}`}>
+                    {statusLabel}
+                  </span>
+                )}
               </button>
               {showDivider && (
                 <div

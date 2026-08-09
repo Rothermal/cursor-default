@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Link2, ReceiptText } from 'lucide-react'
+import { Link2, ReceiptText, Trash2, UserX } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { computeCategoryTotal } from '../config/sports'
@@ -21,6 +21,9 @@ import BasketballFoulDialog, {
   type BasketballFoulDialogInput,
 } from '../components/basketball/BasketballFoulDialog'
 import BasketballFreeThrowTripDialog from '../components/basketball/BasketballFreeThrowTripDialog'
+import BasketballEjectionDialog, {
+  type BasketballEjectionDialogInput,
+} from '../components/basketball/BasketballEjectionDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
@@ -75,6 +78,14 @@ import {
   captureBasketballFoul,
   captureBasketballFreeThrowAttempt,
 } from '../lib/basketball/foulFreeThrowCommands'
+import {
+  basketballEjectionFoulCandidates,
+  basketballOfficialEjectionStatuses,
+  captureBasketballOfficialEjection,
+  previewBasketballEjectionRemoval,
+  removeBasketballOfficialEjection,
+  type BasketballEjectionRemovalPreview,
+} from '../lib/basketball/ejectionCommands'
 import type {
   BasketballFoulClass,
   BasketballFoulContext,
@@ -182,6 +193,12 @@ export default function GameTracker() {
     eventId: string
     preview: BasketballFreeThrowTripRemovalPreview
   } | null>(null)
+  const [showEjectionDialog, setShowEjectionDialog] = useState(false)
+  const [ejectionError, setEjectionError] = useState<string | null>(null)
+  const [pendingEjectionRemoval, setPendingEjectionRemoval] = useState<{
+    eventId: string
+    preview: BasketballEjectionRemovalPreview
+  } | null>(null)
   const [administrativeCorrectionError, setAdministrativeCorrectionError] = useState<string | null>(null)
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
@@ -256,6 +273,14 @@ export default function GameTracker() {
   )
   const basketballTripStatuses = useMemo(
     () => isBasketballEventMode ? basketballFreeThrowTripStatuses(state) : [],
+    [isBasketballEventMode, state]
+  )
+  const basketballEjectionStatuses = useMemo(
+    () => isBasketballEventMode ? basketballOfficialEjectionStatuses(state) : [],
+    [isBasketballEventMode, state]
+  )
+  const ejectionFoulCandidates = useMemo(
+    () => isBasketballEventMode ? basketballEjectionFoulCandidates(state) : [],
     [isBasketballEventMode, state]
   )
   const canRestoreBasketball = isBasketballEventMode && canRestoreBasketballCourtUndo(state)
@@ -371,7 +396,12 @@ export default function GameTracker() {
     : gameInfo.opponentName
   const stealTurnoverCandidates = stealTurnoverSide && basketballSportState
     ? Object.values(basketballSportState.projection.participants)
-        .filter(participant => participant.teamSide === stealTurnoverSide && participant.playerId)
+        .filter(participant =>
+          participant.teamSide === stealTurnoverSide &&
+          participant.playerId &&
+          !participant.disqualified &&
+          !participant.ejected
+        )
         .map(participant => ({
           playerId: participant.playerId!,
           label: `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`,
@@ -410,6 +440,31 @@ export default function GameTracker() {
     !activeBasketballParticipant.disqualified &&
     !activeBasketballParticipant.ejected
   )
+  const activePlayerUnavailable = Boolean(
+    activeBasketballParticipant &&
+    (activeBasketballParticipant.disqualified || activeBasketballParticipant.ejected)
+  )
+  const unavailableMessage = activeBasketballParticipant?.ejected
+    ? `${activeBasketballParticipant.displayName} is ejected and unavailable for new stats.`
+    : activeBasketballParticipant?.disqualified
+      ? `${activeBasketballParticipant.displayName} is disqualified and unavailable for new stats.`
+      : undefined
+  const playerStatusLabels = basketballSportState
+    ? Object.fromEntries(Object.values(basketballSportState.projection.participants).flatMap(participant =>
+        participant.playerId && (participant.ejected || participant.disqualified)
+          ? [[participant.playerId, participant.ejected ? 'Ejected' : 'DQ']]
+          : []
+      ))
+    : {}
+  const ejectionCandidates = basketballSportState
+    ? Object.values(basketballSportState.projection.participants)
+        .filter(participant => participant.playerId && !participant.ejected)
+        .map(participant => ({
+          playerId: participant.playerId!,
+          teamSide: participant.teamSide,
+          label: `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}${participant.disqualified ? ' (DQ)' : ''}`,
+        }))
+    : []
 
   const foulBaseForBonus = sport.teamFoulBaseStatId ?? null
   const teamFoulCountThisPeriod =
@@ -424,6 +479,7 @@ export default function GameTracker() {
     setDirectCaptureError(null)
     setDirectDecrementError(null)
     setAdministrativeCorrectionError(null)
+    setEjectionError(null)
   }
 
   const handleUndo = () => {
@@ -654,6 +710,43 @@ export default function GameTracker() {
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
+  const handleEjectionCapture = (input: BasketballEjectionDialogInput) => {
+    clearTrackerActionErrors()
+    const result = captureBasketballOfficialEjection(state, {
+      recorderUserId: user?.id ?? null,
+      ...input,
+    })
+    if (!result.ok) {
+      setEjectionError(result.message)
+      return
+    }
+    setEjectionError(null)
+    setShowEjectionDialog(false)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const handleEjectionRemoval = (eventId: string) => {
+    clearTrackerActionErrors()
+    const preview = previewBasketballEjectionRemoval(state, eventId)
+    if (!preview.ok) {
+      setEjectionError(preview.message)
+      return
+    }
+    setPendingEjectionRemoval({ eventId, preview: preview.value })
+  }
+
+  const applyEjectionRemoval = () => {
+    if (!pendingEjectionRemoval) return
+    clearTrackerActionErrors()
+    const result = removeBasketballOfficialEjection(state, pendingEjectionRemoval.eventId)
+    if (!result.ok) {
+      setAdministrativeCorrectionError(result.message)
+      return
+    }
+    setPendingEjectionRemoval(null)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
   const lastAction = actionLog.length > 0 ? actionLog[actionLog.length - 1] : null
   const lastActionLabel = lastAction
     ? formatActionLogEntryLabel(lastAction, players, sport)
@@ -791,6 +884,7 @@ export default function GameTracker() {
         sticky
         onSelectAll={isBasketball ? () => setShowAllShots(true) : undefined}
         allActive={showAllShots}
+        playerStatusLabels={playerStatusLabels}
       />
 
       {!isBasketballEventMode && showAddPlayer && (
@@ -826,7 +920,12 @@ export default function GameTracker() {
 
       {isBasketball && (
         <div className="px-3 py-2 max-w-lg mx-auto w-full">
-          <ShotChartPanel selection={shotChartSelection} onSelectPlayer={handleSelectPlayer} />
+          <ShotChartPanel
+            selection={shotChartSelection}
+            onSelectPlayer={handleSelectPlayer}
+            captureDisabled={isBasketballEventMode && activePlayerUnavailable}
+            captureDisabledMessage={unavailableMessage}
+          />
           {!isBasketballEventMode && (
             <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
               The court popup and the buttons below adjust the same player stats — the popup is
@@ -985,7 +1084,11 @@ export default function GameTracker() {
                         subtitle={subtitle}
                         maxValue={timeoutCap}
                         disabled={isBasketballEventMode && !basketballPeriodActive}
-                        incrementDisabled={isBasketballEventMode && action.id === 'pf' && !activeFoulOffenderAvailable}
+                        incrementDisabled={isBasketballEventMode && (
+                          activePlayerUnavailable ||
+                          (action.id === 'pf' && !activeFoulOffenderAvailable)
+                        )}
+                        attemptIncrementDisabled={isBasketballEventMode && activePlayerUnavailable}
                         decrementDisabled={isBasketballEventMode && (
                           foulTarget ? !foulDecrementAvailable : !decrementPreview?.ok
                         )}
@@ -1055,12 +1158,58 @@ export default function GameTracker() {
                 setStealTurnoverError(null)
                 setShowStealTurnover(true)
               }}
-              disabled={!basketballPeriodActive}
+              disabled={!basketballPeriodActive || activePlayerUnavailable}
               className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2 text-sm disabled:opacity-40"
             >
               <Link2 size={16} aria-hidden />
               Steal + Turnover
             </button>
+          )}
+          {isBasketballEventMode && (
+            <section className="border-y border-rose-200 bg-rose-50 px-3 py-3" aria-labelledby="basketball-ejections-title">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 id="basketball-ejections-title" className="text-sm font-bold text-rose-950">Official ejections</h3>
+                  <p className="text-xs text-rose-800">{basketballEjectionStatuses.length > 0 ? countLabel(basketballEjectionStatuses.length, 'recorded ruling') : 'No recorded rulings'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearTrackerActionErrors()
+                    setShowEjectionDialog(true)
+                  }}
+                  disabled={!basketballPeriodActive}
+                  className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:opacity-40"
+                >
+                  <UserX size={16} aria-hidden />
+                  Record
+                </button>
+              </div>
+              {basketballEjectionStatuses.length > 0 && (
+                <div className="mt-3 divide-y divide-rose-200 border-t border-rose-200">
+                  {basketballEjectionStatuses.map(ejection => (
+                    <div key={ejection.eventId} className="flex items-center justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-800">{ejection.subjectLabel}</p>
+                        <p className="line-clamp-2 text-xs text-slate-600">
+                          {ejection.teamSide === 'tracked' ? gameInfo.teamName : gameInfo.opponentName} - {ejection.reason}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleEjectionRemoval(ejection.eventId)}
+                        disabled={!ejection.removable}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-700 disabled:opacity-30"
+                        aria-label={`Remove ejection for ${ejection.subjectLabel}`}
+                        title={ejection.removable ? 'Remove official ejection' : 'Only current-period ejections can be corrected'}
+                      >
+                        <Trash2 size={16} aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           )}
           {isBasketballEventMode && reviewableFreeThrowTrips.length > 0 && (
             <section className="border-y border-amber-200 bg-amber-50 px-3 py-3" aria-labelledby="basketball-open-trips-title">
@@ -1219,6 +1368,23 @@ export default function GameTracker() {
         />
       )}
 
+      {showEjectionDialog && basketballSportState && (
+        <BasketballEjectionDialog
+          trackedTeamName={gameInfo.teamName}
+          opponentName={gameInfo.opponentName}
+          candidates={ejectionCandidates}
+          foulCandidates={ejectionFoulCandidates}
+          defaultSide={activeBasketballParticipant?.teamSide ?? basketballSportState.capturePreferences.teamSide}
+          defaultPlayerId={activeBasketballParticipant?.playerId ?? null}
+          errorMessage={ejectionError}
+          onSubmit={handleEjectionCapture}
+          onClose={() => {
+            setEjectionError(null)
+            setShowEjectionDialog(false)
+          }}
+        />
+      )}
+
       {foulDialog && basketballSportState && (
         <BasketballFoulDialog
           key={`${foulDialog.teamSide}:${foulDialog.playerId ?? 'team'}:${foulDialog.foulClass}:${foulDialog.context}`}
@@ -1268,6 +1434,32 @@ export default function GameTracker() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={pendingEjectionRemoval !== null}
+        title="Remove official ejection?"
+        message={pendingEjectionRemoval
+          ? [
+              `${pendingEjectionRemoval.preview.subjectLabel} will no longer be marked ejected.`,
+              pendingEjectionRemoval.preview.subjectIsPlayer
+                ? pendingEjectionRemoval.preview.playerRemainsDisqualified
+                  ? 'The player remains disqualified by the foul limit.'
+                  : 'The player will be available for new stats.'
+                : null,
+              pendingEjectionRemoval.preview.linkedFoulKept
+                ? 'The related foul remains recorded.'
+                : null,
+            ].filter(Boolean).join(' ')
+          : ''}
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        error={administrativeCorrectionError}
+        onConfirm={applyEjectionRemoval}
+        onCancel={() => {
+          setAdministrativeCorrectionError(null)
+          setPendingEjectionRemoval(null)
+        }}
+      />
 
       <ConfirmDialog
         open={pendingFoulDecrement !== null}

@@ -938,7 +938,8 @@ export function basketballActorForSelection(
   state: GameState,
   role: string,
   teamSide: BasketballTeamSide,
-  selection: BasketballCaptureActorSelection
+  selection: BasketballCaptureActorSelection,
+  options: { allowUnavailable?: boolean } = {}
 ): BasketballCommandResult<GameEventActor> {
   if (!role.trim()) return commandFailure('invalid_actor', 'Basketball actor role is required.')
   if (selection.kind === 'participant') {
@@ -947,6 +948,14 @@ export function basketballActorForSelection(
       : null
     if (!participant || participant.teamSide !== teamSide) {
       return commandFailure('invalid_actor', 'The selected Basketball participant is unavailable.')
+    }
+    if (!options.allowUnavailable && (participant.disqualified || participant.ejected)) {
+      return commandFailure(
+        'invalid_actor',
+        participant.ejected
+          ? 'The selected Basketball participant has been ejected.'
+          : 'The selected Basketball participant is disqualified.'
+      )
     }
     return participant.playerId
       ? {

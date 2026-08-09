@@ -5,7 +5,7 @@ model. BKE-2 keeps the internal, local-only creation gate established in BKE-1C 
 remaining live counter mutation with one checked event command.
 
 Status: Approved through the BKE-2 product and delivery Q&A. Implementation is split into BKE-2A
-through BKE-2D. BKE-2A, BKE-2B, BKE-2C1, and BKE-2C2 are implemented; BKE-2C3 is next.
+through BKE-2D. BKE-2A, BKE-2B, and BKE-2C1 through BKE-2C3 are implemented; BKE-2C4 is next.
 
 Depends on:
 
@@ -224,7 +224,7 @@ available.
 |---|---|---|
 | BKE-2C1 | **Implemented.** Checked foul/free-throw-trip/attempt commands, one-and-one enforcement, dependency-aware foul/trip corrections, inverse receipts, and domain tests | None; establishes the complete foul/free-throw transition and correction contract |
 | BKE-2C2 | **Implemented.** Foul sheet, progressive counting overrides, awarded-trip/attempt workspace, player/team grid actions, and correction confirmations | Exposes fouls and structured free throws only after C1 is complete |
-| BKE-2C3 | Checked player/staff ejection capture/correction plus focused tracker UI and unavailable-participant enforcement | Exposes official ejections without coupling them to threshold disqualification |
+| BKE-2C3 | **Implemented.** Checked player/staff ejection capture/correction, focused tracker UI, projected DQ/Ejected labels, and domain-level unavailable-participant enforcement | Exposes official ejections without coupling them to threshold disqualification |
 | BKE-2C4 | Checked charged/neutral timeout capture/correction, inventory UI, integration fixtures, and BKE-2C exit audit | Completes administration capture and hands the tracker to BKE-2D |
 
 Each slice uses its own branch and PR. C1 may extend the shared reload-safe inverse receipt, but no
