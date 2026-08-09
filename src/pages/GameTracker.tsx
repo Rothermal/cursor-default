@@ -729,7 +729,7 @@ export default function GameTracker() {
     clearTrackerActionErrors()
     const preview = previewBasketballEjectionRemoval(state, eventId)
     if (!preview.ok) {
-      setEjectionError(preview.message)
+      setAdministrativeCorrectionError(preview.message)
       return
     }
     setPendingEjectionRemoval({ eventId, preview: preview.value })

@@ -140,22 +140,28 @@ export function basketballEjectionFoulCandidates(
     ? state.sportGameState.projection.currentPeriodId
     : null
   if (!currentPeriodId) return []
-  return activeBasketballEvents(state)
+  const fouls = activeBasketballEvents(state)
     .filter((event): event is BasketballFoulEvent =>
       event.eventType === 'basketball.foul' && event.period.id === currentPeriodId
     )
     .sort((left, right) => compareGameEventCaptureOrder(right, left))
-    .flatMap(event => {
-      const actor = event.actors.find(candidate => candidate.role === 'committed_by')
-      const subject = actorToSubject(actor)
-      if (!subject) return []
-      return [{
-        eventId: event.id,
-        teamSide: event.teamSide,
-        subject,
-        label: `${foulClassLabel(event.payload.class)} foul`,
-      }]
+  const subjectPositions = new Map<string, number>()
+  const candidates: BasketballEjectionFoulCandidate[] = []
+  for (const event of fouls) {
+    const actor = event.actors.find(candidate => candidate.role === 'committed_by')
+    const subject = actorToSubject(actor)
+    if (!subject) continue
+    const key = ejectionSubjectKey(event.teamSide, subject)
+    const position = (subjectPositions.get(key) ?? 0) + 1
+    subjectPositions.set(key, position)
+    candidates.push({
+      eventId: event.id,
+      teamSide: event.teamSide,
+      subject,
+      label: `${foulClassLabel(event.payload.class)} foul - ${foulContextLabel(event.payload.context)} - ${recencyLabel(position)}`,
     })
+  }
+  return candidates
 }
 
 export function basketballOfficialEjectionStatuses(
@@ -362,6 +368,34 @@ function actorDisplayLabel(players: Player[], actor: GameEventActor): string {
 
 function foulClassLabel(value: BasketballFoulEvent['payload']['class']): string {
   return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ')
+}
+
+function foulContextLabel(value: BasketballFoulEvent['payload']['context']): string {
+  return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ')
+}
+
+function ejectionSubjectKey(
+  teamSide: BasketballTeamSide,
+  subject: BasketballEjectionSubject
+): string {
+  return subject.kind === 'player'
+    ? `${teamSide}:player:${subject.playerId}`
+    : `${teamSide}:staff:${normalizeLabel(subject.label)}`
+}
+
+function recencyLabel(position: number): string {
+  if (position === 1) return 'most recent'
+  const remainder = position % 100
+  const suffix = remainder >= 11 && remainder <= 13
+    ? 'th'
+    : position % 10 === 1
+      ? 'st'
+      : position % 10 === 2
+        ? 'nd'
+        : position % 10 === 3
+          ? 'rd'
+          : 'th'
+  return `${position}${suffix} most recent`
 }
 
 function clearUndoReceipt(state: GameState): GameState {

@@ -141,10 +141,15 @@ describe('BKE-2C3 Basketball official ejections', () => {
   })
 
   it('links only a current-period foul for the same player or staff subject', () => {
-    let state = playerFoul(startedState(), 1)
-    const playerCandidate = basketballEjectionFoulCandidates(state).find(candidate =>
+    let state = playerFoul(playerFoul(startedState(), 1), 2)
+    const playerCandidates = basketballEjectionFoulCandidates(state).filter(candidate =>
       candidate.subject.kind === 'player' && candidate.subject.playerId === 'player-1'
-    )!
+    )
+    expect(playerCandidates.map(candidate => candidate.label)).toEqual([
+      'Personal foul - Common - most recent',
+      'Personal foul - Common - 2nd most recent',
+    ])
+    const playerCandidate = playerCandidates[0]
     const wrongPlayer = captureBasketballOfficialEjection(state, {
       recorderUserId: 'recorder-1',
       teamSide: 'tracked',
