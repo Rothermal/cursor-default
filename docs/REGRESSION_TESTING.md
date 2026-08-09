@@ -760,6 +760,24 @@ matrix requests one.
 
 ---
 
+## 11a8. Basketball official ejections (BKE-2C3)
+
+**Precondition:** Development build with a healthy, local Basketball event game and an active
+period. Include at least two tracked players; record a staff foul when testing the staff-link path.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a8.1 | Open Official ejections, select a player, enter a reason, and record | One official-ruling event is appended; the player chip shows Ejected and the ruling appears in the focused list and Recent Events |
+| 11a8.2 | Select the ejected player and try the court, made/missed grid actions, related stats, PF, minutes, and Steal + Turnover | History and decrements remain available, but every new player-stat path is disabled in the UI and rejected by checked commands |
+| 11a8.3 | Reach the foul limit without an official ruling | The player chip shows DQ; no automatic ejection event is fabricated and the player is unavailable for new stats |
+| 11a8.4 | Officially eject that disqualified player, then remove the official ruling | Ejected overlays the DQ label; removal clears only ejected state and confirmation warns that foul-limit disqualification remains |
+| 11a8.5 | Restore the removed official ruling after parking/reload | The exact ejection id/revision returns and the player is marked ejected again |
+| 11a8.6 | Record a player or staff foul, then eject the same subject with the optional foul link | Only current-period, same-side, same-subject fouls are offered and accepted; wrong-subject/stale ids are rejected without mutation |
+| 11a8.7 | Record a staff ejection with a required label/reason, then remove it | The staff actor remains labeled and separate from player participants; removal keeps any linked foul and Restore reinstates the ruling |
+| 11a8.8 | Try blank reasons, duplicate subjects, a period break, a completed game, and a cloud-bound event game | Capture remains in the sheet on validation failure; no partial event, aggregate fallback, or cloud write occurs |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

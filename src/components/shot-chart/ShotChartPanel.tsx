@@ -80,9 +80,17 @@ interface ShotChartPanelProps {
   selection: ShotChartSelection
   /** Same action as the sticky player strip; used by F6's in-popup player switch. */
   onSelectPlayer: (playerId: string) => void
+  /** Keeps chart review available while blocking new events for an unavailable player. */
+  captureDisabled?: boolean
+  captureDisabledMessage?: string
 }
 
-export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartPanelProps) {
+export default function ShotChartPanel({
+  selection,
+  onSelectPlayer,
+  captureDisabled = false,
+  captureDisabledMessage,
+}: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
   const { user } = useAuth()
   const { settings } = useSettings()
@@ -108,6 +116,15 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
   )
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
+  const popupPlayers = useMemo(() => {
+    if (!isEventBasketball || state.sportGameState?.sportId !== 'basketball') return players
+    return players.filter(player => {
+      if (isTeamPseudoPlayer(player)) return true
+      const participant = Object.values(state.sportGameState!.projection.participants)
+        .find(candidate => candidate.playerId === player.id)
+      return participant && !participant.disqualified && !participant.ejected
+    })
+  }, [isEventBasketball, players, state.sportGameState])
   const persistedCapturePlayerId = isEventBasketball
     ? basketballPlayerIdForCapturePreferences(state)
     : null
@@ -309,14 +326,20 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
       <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
         <BasketballCourt
           shots={visibleShots}
-          onCourtTap={eventCaptureOpen ? onCourtTap : undefined}
+          onCourtTap={eventCaptureOpen && !captureDisabled ? onCourtTap : undefined}
           className="w-full"
           newlyPlacedShotId={pulseShotId}
-          emptyHint={eventCaptureOpen
+          emptyHint={eventCaptureOpen && !captureDisabled
             ? 'Tap the court to log an event.'
-            : 'Court capture is unavailable between periods or after completion.'}
+            : captureDisabledMessage ?? 'Court capture is unavailable between periods or after completion.'}
         />
       </div>
+
+      {eventCaptureOpen && captureDisabled && captureDisabledMessage && (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+          {captureDisabledMessage}
+        </p>
+      )}
 
       <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
         <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
@@ -377,7 +400,7 @@ export default function ShotChartPanel({ selection, onSelectPlayer }: ShotChartP
               ? formatCompactGameStatLine(sport, pendingLoggingPlayer.stats)
               : undefined
           }
-          players={players}
+          players={popupPlayers}
           activePlayerId={pendingTap.playerId}
           onSelectPlayer={handlePopupSelectPlayer}
           reboundPromptAfterMissEnabled={settings.courtCapture.reboundPromptAfterMiss}

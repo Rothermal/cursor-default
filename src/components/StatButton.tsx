@@ -37,6 +37,7 @@ interface StatButtonProps {
   attemptCount?: number
   disabled?: boolean
   incrementDisabled?: boolean
+  attemptIncrementDisabled?: boolean
   decrementDisabled?: boolean
   attemptDecrementDisabled?: boolean
 }
@@ -56,6 +57,7 @@ export default function StatButton({
   attemptCount = 0,
   disabled = false,
   incrementDisabled = false,
+  attemptIncrementDisabled = false,
   decrementDisabled = false,
   attemptDecrementDisabled = false,
 }: StatButtonProps) {
@@ -126,7 +128,7 @@ export default function StatButton({
         {hasAttempt && (
           <button
             onClick={(e) => { e.stopPropagation(); handleAttempt() }}
-            disabled={disabled}
+            disabled={disabled || attemptIncrementDisabled}
             aria-label={`Record missed ${label} attempt`}
             className={`flex-1 h-10 rounded-lg text-white text-sm font-bold
                         active:scale-95 transition-transform shadow-sm disabled:opacity-30

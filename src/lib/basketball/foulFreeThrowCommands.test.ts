@@ -527,7 +527,8 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
       state,
       'subject',
       'tracked',
-      { kind: 'participant', participantId: participant.participantId }
+      { kind: 'participant', participantId: participant.participantId },
+      { allowUnavailable: true }
     )
     if (!subject.ok) throw new Error(subject.message)
     const otherParticipant = Object.values(context.value.sportState.projection.participants)
@@ -537,7 +538,8 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
       state,
       'subject',
       'tracked',
-      { kind: 'participant', participantId: otherParticipant.participantId }
+      { kind: 'participant', participantId: otherParticipant.participantId },
+      { allowUnavailable: true }
     )
     if (!otherSubject.ok) throw new Error(otherSubject.message)
     const ejection = createBasketballAdministrativeEvent({
