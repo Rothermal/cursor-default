@@ -1,4 +1,4 @@
-import { Flag, Play, Square } from 'lucide-react'
+import { Ban, Flag, Pause, Play, RotateCcw, Square } from 'lucide-react'
 import type { BasketballSportGameState } from '../../lib/basketball/types'
 
 interface BasketballLifecycleControlsProps {
@@ -7,6 +7,9 @@ interface BasketballLifecycleControlsProps {
   onEndPeriod: () => void
   onStartNextPeriod: () => void
   onComplete: () => void
+  onSuspend: () => void
+  onAbandon: () => void
+  onReopen: () => void
 }
 
 export default function BasketballLifecycleControls({
@@ -15,6 +18,9 @@ export default function BasketballLifecycleControls({
   onEndPeriod,
   onStartNextPeriod,
   onComplete,
+  onSuspend,
+  onAbandon,
+  onReopen,
 }: BasketballLifecycleControlsProps) {
   const { projection, setup } = sportState
   const current = projection.periods.find(period => period.id === projection.currentPeriodId)
@@ -29,11 +35,7 @@ export default function BasketballLifecycleControls({
       <div className="flex min-h-10 items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase text-slate-500">Period</p>
-          <p className="truncate text-sm font-bold text-slate-800">
-            {projection.status === 'ended'
-              ? 'Final'
-              : current?.label ?? 'Unavailable'}
-          </p>
+          <p className="truncate text-sm font-bold text-slate-800">{lifecycleStatusLabel(sportState)}</p>
         </div>
 
         {projection.status === 'in_progress' && current && (
@@ -69,12 +71,30 @@ export default function BasketballLifecycleControls({
           </button>
         )}
 
-        {projection.status === 'ended' && (
-          <span className="text-sm font-semibold text-slate-600">
-            {resultLabel(projection.result)}
-          </span>
+        {(projection.status === 'ended' || projection.status === 'suspended') && (
+          <button
+            type="button"
+            onClick={onReopen}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 active:scale-95"
+          >
+            <RotateCcw size={16} aria-hidden />
+            Reopen
+          </button>
         )}
       </div>
+
+      {(projection.status === 'in_progress' || projection.status === 'period_break') && (
+        <div className="mt-2 flex justify-end gap-2 border-t border-slate-100 pt-2">
+          <button type="button" onClick={onSuspend} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700">
+            <Pause size={15} aria-hidden />
+            Suspend
+          </button>
+          <button type="button" onClick={onAbandon} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700">
+            <Ban size={15} aria-hidden />
+            Abandon
+          </button>
+        </div>
+      )}
 
       {projection.status === 'period_break' && (
         <p className="mt-1 text-xs text-slate-500" role="status">
@@ -85,6 +105,9 @@ export default function BasketballLifecycleControls({
               : 'Period complete. Start the next period when ready.'}
         </p>
       )}
+      {(projection.status === 'ended' || projection.status === 'suspended') && (
+        <p className="mt-1 text-xs text-slate-500" role="status">{resultLabel(projection.result)}</p>
+      )}
       {errorMessage && (
         <p role="alert" className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
           {errorMessage}
@@ -92,6 +115,17 @@ export default function BasketballLifecycleControls({
       )}
     </section>
   )
+}
+
+function lifecycleStatusLabel(sportState: BasketballSportGameState): string {
+  const { projection } = sportState
+  const current = projection.periods.find(period => period.id === projection.currentPeriodId)
+  if (projection.status === 'suspended') return `Suspended - ${current?.label ?? 'period unavailable'}`
+  if (projection.status === 'ended') {
+    return projection.endReason === 'abandoned' ? 'Abandoned' : 'Final'
+  }
+  if (projection.status === 'period_break') return `${current?.label ?? 'Period'} complete`
+  return current?.label ?? 'Unavailable'
 }
 
 function nextPeriodLabel(sportState: BasketballSportGameState): string | null {

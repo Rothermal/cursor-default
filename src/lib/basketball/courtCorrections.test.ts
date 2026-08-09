@@ -7,12 +7,14 @@ import { createInitialState, gameReducer } from '../gameReducer'
 import { sportGameStateForFingerprint } from '../sportGameState/state'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
+  abandonBasketballMatch,
   addBasketballLateParticipant,
   basketballActorForSelection,
   captureBasketballCourtEvent,
   endBasketballPeriod,
   getBasketballCommandContext,
   prepareBasketballGameStart,
+  suspendBasketballMatch,
 } from './commands'
 import {
   basketballCourtCaptureUnits,
@@ -392,6 +394,36 @@ describe('BKE-2A Basketball live correction boundaries', () => {
     expect(restored.state.players.find(player =>
       player.id === '71000000-0000-4000-8000-000000000413'
     )).toMatchObject({ name: 'Opponent Nine', number: '9' })
+  })
+
+  it('labels suspended and abandoned lifecycle boundaries distinctly', () => {
+    const suspended = suspendBasketballMatch(startedState(), {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T18:01:00.000Z',
+      eventId: '71000000-0000-4000-8000-000000000421',
+    })
+    expect(suspended.ok).toBe(true)
+    if (!suspended.ok) return
+    expect(basketballLiveCaptureUnits(suspended.state)[0]).toMatchObject({
+      who: 'Game',
+      what: 'Game suspended',
+      kind: 'boundary',
+      undoable: false,
+    })
+
+    const abandoned = abandonBasketballMatch(startedState(), {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T18:02:00.000Z',
+      eventId: '71000000-0000-4000-8000-000000000422',
+    })
+    expect(abandoned.ok).toBe(true)
+    if (!abandoned.ok) return
+    expect(basketballLiveCaptureUnits(abandoned.state)[0]).toMatchObject({
+      who: 'Game',
+      what: 'Game abandoned',
+      kind: 'boundary',
+      undoable: false,
+    })
   })
 })
 
