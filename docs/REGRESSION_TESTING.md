@@ -704,7 +704,7 @@ period. Include tracked and opponent participants plus both team chips.
 | Step | Action | Expected |
 |------|--------|----------|
 | 11a5.1 | Use every player-grid `+` action, including made/missed FT, 2PT, and 3PT | Each tap appends one checked event and updates projected totals; direct field goals/free throws have no court marker |
-| 11a5.2 | Select each team chip | Only Team Turnover is available; it updates the selected side's team actor and never charges a player |
+| 11a5.2 | Select each team chip and use Team Turnover | Team-only controls never charge a player; BKE-2C2 additionally exposes the selected side's Foul and Technical actions through its structured sheet |
 | 11a5.3 | Use quick scoreboard `+1/-1` on both sides, including `-1` at zero | Score adjustments append without a sheet; a negative result is disabled/rejected and made-shot scoring remains additive |
 | 11a5.4 | Open Official correction and submit blank, fractional, zero, valid positive, and valid negative adjustments | Invalid drafts remain open with no mutation; valid signed whole deltas require a note and update only the selected side |
 | 11a5.5 | Record Steal + Turnover against a rostered opponent, Unknown player, and Team | Each submit atomically appends one linked two-event capture with the correct opposite-side actor; ordinary stat decrement cannot split it |
@@ -733,6 +733,26 @@ BKE-2C1 intentionally exposes no tracker controls; manual UI checks begin in BKE
 | 11a6.6 | Delete an attempt, then request another for the same trip | A tombstoned attempt position is never reused; exhausted trips reject further attempts |
 | 11a6.7 | Attempt capture/correction during a period break, after completion, or with a cloud binding | Commands return the original state; no aggregate fallback or partial append occurs |
 | 11a6.8 | Carry team fouls from one overtime into the next, add the new overtime's only foul, then preview its removal | The new overtime starts with the carried bonus state and `bonusStatusAfter` returns to that state instead of `none` |
+
+---
+
+## 11a7. Basketball foul and awarded-free-throw UI (BKE-2C2)
+
+**Precondition:** Development build with a healthy, local Basketball event game and an active
+period. Include tracked and opponent participants plus both team chips.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a7.1 | Select a player and tap PF `+` | The foul sheet opens with that player's side/player selected and Personal + Common defaults; cancelling changes nothing |
+| 11a7.2 | Select each team chip and tap Foul or Technical `+` | The sheet uses that side and a team offender; Technical defaults to Technical + Administrative; no duplicate team counter is written |
+| 11a7.3 | Switch side/offender, use a staff label, select a drawn-by player or unknown label, and exercise offensive/non-offensive team control | Candidate lists remain side-correct, required labels are enforced, and successful captures project the chosen actors/context |
+| 11a7.4 | Enable Advanced counting override with and without a reason | Submit remains disabled without a reason; valid personal/team/technical choices become the authoritative projected counts |
+| 11a7.5 | Award 1, 2, 3, technical, possession-retained, and valid one-and-one trips | Foul plus award append atomically; failures remain in the foul sheet; success opens the awarded-trip workspace for the opposite side |
+| 11a7.6 | Select an eligible shooter and record Made/Miss attempts | Each attempt updates projected player/side score and attempt totals; fixed trips close after their final position and do not create court markers |
+| 11a7.7 | Miss the first one-and-one attempt; separately leave a fixed trip partial, close the sheet, park/reload, and resume it | The one-and-one closes without a second attempt; the partial trip remains visible as open work with its stable next position and prior shooter suggestion |
+| 11a7.8 | Decrement player PF, team Foul, and team Technical values | Each confirmation names personal/team/technical, bonus, disqualification, unlink, and automatic-ejection effects before applying the newest current-period match |
+| 11a7.9 | Remove an empty and attempted free-throw award, then use immediate Restore | The confirmation names surviving unlinked attempts; removal preserves their totals and Restore re-links the exact trip/positions |
+| 11a7.10 | End the period/game, then repeat representative actions in a legacy Basketball game and open Soccer | Event foul/trip controls are disabled outside active periods; legacy Basketball and Soccer behavior remain unchanged |
 
 ---
 

@@ -7,8 +7,9 @@ Status: BKE-0 architecture and product-model decisions are approved in
 [PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md](PLAN_BKE_0_BASKETBALL_EVENT_ARCHITECTURE.md).
 BKE-1A, all BKE-1B slices, and all BKE-1C slices are complete. BKE-2 product and delivery decisions
 are approved in [PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md);
-BKE-2A lifecycle and participants, BKE-2B direct stats, and BKE-2C1 foul/free-throw domain
-commands are complete. BKE-2C2 foul and awarded-free-throw tracker UI is next.
+BKE-2A lifecycle and participants, BKE-2B direct stats, BKE-2C1 foul/free-throw domain
+commands, and BKE-2C2 foul/awarded-free-throw tracker UI are complete. BKE-2C3 ejection
+capture and correction is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

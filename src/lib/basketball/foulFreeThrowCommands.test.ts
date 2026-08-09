@@ -23,6 +23,7 @@ import {
   restoreLastBasketballCourtUndo,
 } from './courtCorrections'
 import {
+  basketballFreeThrowTripStatuses,
   captureBasketballFoul,
   captureBasketballFreeThrowAttempt,
   type BasketballFoulCaptureOptions,
@@ -165,6 +166,13 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
         payload: { sourceFoulEventId: id(301), captureCommandId: id(501) },
       },
     ])
+    expect(basketballFreeThrowTripStatuses(captured.state)).toMatchObject([{
+      eventId: captured.tripEventId,
+      attempts: [],
+      nextAttemptNumber: 1,
+      open: true,
+      closedReason: null,
+    }])
 
     const first = captureBasketballFreeThrowAttempt(captured.state, {
       recorderUserId: 'recorder-1',
@@ -176,6 +184,12 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
     })
     expect(first).toMatchObject({ ok: true, attemptNumber: 1, tripComplete: false })
     if (!first.ok) return
+    expect(basketballFreeThrowTripStatuses(first.state)).toMatchObject([{
+      eventId: captured.tripEventId,
+      attempts: [{ attemptNumber: 1, made: true, deleted: false, shooterPlayerId: 'opponent-9' }],
+      nextAttemptNumber: 2,
+      open: true,
+    }])
     const second = captureBasketballFreeThrowAttempt(first.state, {
       recorderUserId: 'recorder-1',
       tripEventId: captured.tripEventId,
@@ -190,6 +204,11 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
       .toMatchObject({ ft: 1, ft_miss: 1 })
     expect(second.state.opponentScore).toBe(1)
     expect(second.state.shotChart).toHaveLength(0)
+    expect(basketballFreeThrowTripStatuses(second.state)[0]).toMatchObject({
+      nextAttemptNumber: null,
+      open: false,
+      closedReason: 'positions_complete',
+    })
   })
 
   it('closes a one-and-one after a first miss and preserves the rejected state', () => {
@@ -223,6 +242,12 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
     })
     const removed = decrementBasketballDirectStat(first.state, 'opponent-9', 'ft_miss')
     if (!removed.ok) throw new Error(removed.message)
+    expect(basketballFreeThrowTripStatuses(removed.state)[0]).toMatchObject({
+      attempts: [{ attemptNumber: 1, made: false, deleted: true }],
+      nextAttemptNumber: null,
+      open: false,
+      closedReason: 'first_attempt_ended',
+    })
     expect(captureBasketballFreeThrowAttempt(removed.state, {
       recorderUserId: 'recorder-1',
       tripEventId: captured.tripEventId,
