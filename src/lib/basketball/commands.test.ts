@@ -847,4 +847,142 @@ describe('BKE-2A Basketball lifecycle commands', () => {
       reason: 'Not terminal',
     })).toMatchObject({ ok: false, state: cloud, code: 'cloud_flow_unsupported' })
   })
+
+  it('completes regulation with a tracked lead and blocks overtime', () => {
+    const scored = captureBasketballCourtEvent(startedState(), {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-02T17:00:00.000Z',
+      eventIds: ['70000000-0000-4000-8000-000000000501'],
+    })
+    expect(scored.ok).toBe(true)
+    if (!scored.ok) return
+
+    let state = scored.state
+    for (let period = 1; period <= 4; period += 1) {
+      const ended = endBasketballPeriod(state, {
+        recorderUserId: 'recorder-1',
+        occurredAt: `2026-08-02T17:${String(period).padStart(2, '0')}:00.000Z`,
+        eventId: `70000000-0000-4000-8000-0000000005${period}1`,
+      })
+      expect(ended.ok).toBe(true)
+      if (!ended.ok) return
+      state = ended.state
+      if (period < 4) {
+        const started = startNextBasketballPeriod(state, {
+          recorderUserId: 'recorder-1',
+          occurredAt: `2026-08-02T17:${String(10 + period).padStart(2, '0')}:00.000Z`,
+          eventId: `70000000-0000-4000-8000-0000000005${period}2`,
+        })
+        expect(started.ok).toBe(true)
+        if (!started.ok) return
+        state = started.state
+      }
+    }
+
+    expect(startNextBasketballPeriod(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T17:20:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000550',
+    })).toMatchObject({ ok: false, state, code: 'invalid_period' })
+
+    const completed = completeBasketballMatch(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T17:21:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000551',
+    })
+    expect(completed.ok).toBe(true)
+    if (!completed.ok || completed.state.sportGameState?.sportId !== 'basketball') return
+    expect(completed.state.sportGameState.projection).toMatchObject({
+      status: 'ended',
+      endReason: 'completed',
+      result: 'tracked_win',
+      score: { tracked: 2, opponent: 0 },
+    })
+  })
+
+  it('completes regulation with an opponent lead and rejects early finish', () => {
+    const withOpponent = addBasketballLateParticipant(startedState(), {
+      recorderUserId: 'recorder-1',
+      teamSide: 'opponent',
+      displayName: 'Opponent Nine',
+      number: '9',
+      occurredAt: '2026-08-02T18:00:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000601',
+      participantId: '70000000-0000-4000-8000-000000000602',
+      playerId: 'opponent-9',
+      captureCommandId: '70000000-0000-4000-8000-000000000603',
+    })
+    expect(withOpponent.ok).toBe(true)
+    if (!withOpponent.ok) return
+
+    const afterQ1 = endBasketballPeriod(withOpponent.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T18:01:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000604',
+    })
+    expect(afterQ1.ok).toBe(true)
+    if (!afterQ1.ok) return
+    expect(completeBasketballMatch(afterQ1.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T18:02:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000605',
+    })).toMatchObject({ ok: false, state: afterQ1.state, code: 'invalid_period' })
+
+    const q2 = startNextBasketballPeriod(afterQ1.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T18:03:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000606',
+    })
+    expect(q2.ok).toBe(true)
+    if (!q2.ok) return
+    const scored = captureBasketballCourtEvent(q2.state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'opponent-9',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-02T18:04:00.000Z',
+      eventIds: ['70000000-0000-4000-8000-000000000607'],
+    })
+    expect(scored.ok).toBe(true)
+    if (!scored.ok) return
+
+    let state = scored.state
+    for (let period = 2; period <= 4; period += 1) {
+      const ended = endBasketballPeriod(state, {
+        recorderUserId: 'recorder-1',
+        occurredAt: `2026-08-02T18:${String(10 + period).padStart(2, '0')}:00.000Z`,
+        eventId: `70000000-0000-4000-8000-0000000006${period}1`,
+      })
+      expect(ended.ok).toBe(true)
+      if (!ended.ok) return
+      state = ended.state
+      if (period < 4) {
+        const started = startNextBasketballPeriod(state, {
+          recorderUserId: 'recorder-1',
+          occurredAt: `2026-08-02T18:${String(20 + period).padStart(2, '0')}:00.000Z`,
+          eventId: `70000000-0000-4000-8000-0000000006${period}2`,
+        })
+        expect(started.ok).toBe(true)
+        if (!started.ok) return
+        state = started.state
+      }
+    }
+
+    const completed = completeBasketballMatch(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-02T18:40:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000650',
+    })
+    expect(completed.ok).toBe(true)
+    if (!completed.ok || completed.state.sportGameState?.sportId !== 'basketball') return
+    expect(completed.state.sportGameState.projection).toMatchObject({
+      status: 'ended',
+      endReason: 'completed',
+      result: 'opponent_win',
+      score: { tracked: 0, opponent: 2 },
+    })
+  })
 })

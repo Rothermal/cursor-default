@@ -22,6 +22,7 @@ import {
 } from './rules'
 import {
   createBasketballSportGameState,
+  normalizeBasketballCourtUndoReceipt,
   normalizeBasketballSportGameState,
   validateBasketballMatchSetup,
 } from './state'
@@ -357,5 +358,114 @@ describe('BKE-1B1 Basketball foundation', () => {
 
   it('registers the production Basketball event projector after BKE-1B3 parity', () => {
     expect(gameEventProjectors.get('basketball')).toBeDefined()
+  })
+
+  it('accepts valid court undo receipts and rejects corrupt restore plans', () => {
+    const createdAt = '2026-08-03T12:00:00.000Z'
+    const restore = {
+      eventId: 'event-restore',
+      expectedRevision: 2,
+      action: 'restore' as const,
+      previousRelatedEventId: null,
+      previousAttemptNumber: null,
+    }
+    const relink = {
+      eventId: 'event-block',
+      expectedRevision: 3,
+      action: 'relink_block' as const,
+      previousRelatedEventId: 'event-restore',
+      previousAttemptNumber: null,
+    }
+    const tripRelink = {
+      eventId: 'event-attempt',
+      expectedRevision: 4,
+      action: 'relink_attempt_trip' as const,
+      previousRelatedEventId: 'event-restore',
+      previousAttemptNumber: 2,
+    }
+
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'capture_undo',
+      createdAt,
+      entries: [restore],
+    })).toEqual({
+      kind: 'capture_undo',
+      createdAt,
+      entries: [restore],
+    })
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'direct_decrement',
+      createdAt,
+      entries: [restore, relink],
+    })).toEqual({
+      kind: 'direct_decrement',
+      createdAt,
+      entries: [restore, relink],
+    })
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'administrative_decrement',
+      createdAt,
+      entries: [restore, tripRelink],
+    })).toEqual({
+      kind: 'administrative_decrement',
+      createdAt,
+      entries: [restore, tripRelink],
+    })
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'clear_chart',
+      createdAt,
+      entries: [restore],
+    })).toMatchObject({ kind: 'clear_chart' })
+
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'capture_undo',
+      createdAt,
+      entries: [{ ...restore, expectedRevision: 1 }],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'capture_undo',
+      createdAt,
+      entries: [restore, { ...restore, eventId: 'event-restore' }],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'capture_undo',
+      createdAt,
+      entries: [],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'capture_undo',
+      createdAt: 'not-a-date',
+      entries: [restore],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'capture_undo',
+      createdAt,
+      entries: [relink],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'direct_decrement',
+      createdAt,
+      entries: [{ ...relink, previousRelatedEventId: null }],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'direct_decrement',
+      createdAt,
+      entries: [{ ...restore, previousRelatedEventId: 'event-assist' }],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'direct_decrement',
+      createdAt,
+      entries: [{ ...relink, previousRelatedEventId: 'missing-parent' }],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'administrative_decrement',
+      createdAt,
+      entries: [restore, { ...tripRelink, previousAttemptNumber: null }],
+    })).toBeNull()
+    expect(normalizeBasketballCourtUndoReceipt({
+      kind: 'direct_decrement',
+      createdAt,
+      entries: [restore, { ...relink, previousAttemptNumber: 1 }],
+    })).toBeNull()
   })
 })
