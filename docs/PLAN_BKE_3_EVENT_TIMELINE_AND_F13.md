@@ -5,7 +5,7 @@ review with an editable Timeline and delivering the held F13 shot-detail experie
 event model.
 
 Status: Approved through the BKE-3 product and delivery Q&A. Implementation is split into BKE-3A
-through BKE-3D. BKE-3A is next.
+through BKE-3D. BKE-3A is complete; BKE-3B is next.
 
 Depends on:
 
@@ -179,6 +179,10 @@ consequence preview, atomic mutation, and focused tests exist.
   actor at append time, or create an invalid relationship reject the complete command.
 
 ## 6. BKE-3A: Timeline and Read-Only Detail
+
+Status: Complete. `src/lib/basketball/timeline.ts` owns pure review/detail derivation;
+`BasketballTimeline`, `BasketballShotDetailDialog`, `ShotChartPanel`, and `BasketballCourt` expose the
+read-only tracker experience without adding correction authority.
 
 ### 6.1 Timeline review model
 

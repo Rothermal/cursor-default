@@ -820,6 +820,29 @@ active period and a period break, plus completed, suspended, and abandoned state
 
 ---
 
+## 11a11. Basketball Timeline and read-only shot detail (BKE-3A)
+
+**Precondition:** Development build with a healthy, local Basketball event game containing grouped
+and independent events for both sides, at least two periods, one removed/restored event, and two
+located shots within the marker overlap tolerance. Keep one ordinary legacy Basketball game for the
+legacy-detail checks.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a11.1 | Open the event game and switch between Track and Timeline | Track preserves the complete court/grid workspace; Timeline replaces capture controls while the scoreboard and fixed quick Undo remain available |
+| 11a11.2 | Review independent events and a multi-event shot/assist or shot/rebound capture | Timeline is newest first; persisted command members share one expandable group; independent or later-linked events remain separate |
+| 11a11.3 | Exercise event-family, period, side, and participant filters | Filters overlap without changing authority; active play defaults to the current period, a completed game defaults to Full match, and grouped context stays intact |
+| 11a11.4 | Undo and restore an event, then inspect Timeline | Removed events stay collapsed by default with their current payload; revision metadata says Revised without claiming that values changed; companion removal counts stay visible |
+| 11a11.5 | Tap a single court marker, then one marker in an overlapping cluster | A single marker opens detail directly; a cluster opens a deterministic newest-first chooser; neither gesture opens capture or adds a shot |
+| 11a11.6 | Open an event shot from both court and Timeline | Both paths use the same detail surface and show full-game field-goal or FT ordinal, period, shooter/side, result/value, location, relationships, revision metadata, ids, recorder, and timestamps |
+| 11a11.7 | Open a legacy shot marker | Detail shows full-chart ordinal, shooter, result/value, zone/location, and timestamp only; it never guesses assist/rebound/block links or exposes editing |
+| 11a11.8 | Load a malformed or semantically incomplete event stream | Timeline keeps coherent review context read-only, surfaces global or event-anchored diagnostics, and never reveals a legacy mutation fallback |
+| 11a11.9 | Park/reload the event game and repeat filters/detail navigation | Timeline and detail derive again from the authoritative stream; capture groups, ordinals, relationships, revisions, and removed events remain stable |
+| 11a11.10 | Repeat Timeline, overlap chooser, and detail checks on a narrow touch viewport and with keyboard navigation | Labels fit without overlap, selectors remain usable, marker Enter/Space activation works, Escape closes detail, and closing returns to the same court/filter/scroll context |
+| 11a11.11 | Run `pnpm test`, `pnpm lint`, and `pnpm build` | Timeline pure tests and all Basketball, legacy Basketball, Soccer, lint, and production-build checks pass with no new warning |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

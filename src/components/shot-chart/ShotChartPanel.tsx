@@ -29,6 +29,13 @@ import {
   previewBasketballClearShotChart,
   undoLatestBasketballCourtCapture,
 } from '../../lib/basketball/courtCorrections'
+import {
+  basketballShotDetailForEvent,
+  legacyBasketballShotDetail,
+  overlappingBasketballShots,
+  type BasketballShotDetailModel,
+} from '../../lib/basketball/timeline'
+import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
 
 function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
@@ -100,6 +107,8 @@ export default function ShotChartPanel({
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [correctionError, setCorrectionError] = useState<string | null>(null)
+  const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
+  const [overlapChoices, setOverlapChoices] = useState<ShotRecord[]>([])
   const pendingPulseIdRef = useRef<string | null>(null)
   const isEventBasketball = hasStartedBasketballEventGame(state)
   const eventCaptureOpen = !isEventBasketball || (
@@ -289,6 +298,22 @@ export default function ShotChartPanel({
     [shotChart, players, selection]
   )
 
+  const openShotDetail = useCallback((shot: ShotRecord) => {
+    const detail = isEventBasketball
+      ? basketballShotDetailForEvent(state, shot.id)
+      : legacyBasketballShotDetail(state, shot.id)
+    if (detail) setShotDetail(detail)
+  }, [isEventBasketball, state])
+
+  const handleMarkerActivate = useCallback((shot: ShotRecord) => {
+    const choices = overlappingBasketballShots(visibleShots, shot.id)
+    if (choices.length > 1) {
+      setOverlapChoices(choices)
+      return
+    }
+    openShotDetail(shot)
+  }, [openShotDetail, visibleShots])
+
   const handleClearChartConfirm = () => {
     setShowClearConfirm(false)
     if (isEventBasketball) {
@@ -327,6 +352,7 @@ export default function ShotChartPanel({
         <BasketballCourt
           shots={visibleShots}
           onCourtTap={eventCaptureOpen && !captureDisabled ? onCourtTap : undefined}
+          onMarkerActivate={handleMarkerActivate}
           className="w-full"
           newlyPlacedShotId={pulseShotId}
           emptyHint={eventCaptureOpen && !captureDisabled
@@ -429,6 +455,62 @@ export default function ShotChartPanel({
             }
           }}
         />
+      )}
+
+      {overlapChoices.length > 1 && (
+        <div
+          className="fixed inset-0 z-[55] flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-4"
+          onClick={() => setOverlapChoices([])}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="overlapping-shots-title"
+            className="w-full max-w-md overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+            onClick={event => event.stopPropagation()}
+          >
+            <header className="border-b border-slate-200 px-4 py-3">
+              <h2 id="overlapping-shots-title" className="text-base font-bold text-slate-900">Select shot</h2>
+            </header>
+            <div className="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto">
+              {overlapChoices.map(shot => {
+                const detail = isEventBasketball
+                  ? basketballShotDetailForEvent(state, shot.id)
+                  : legacyBasketballShotDetail(state, shot.id)
+                return (
+                  <button
+                    key={shot.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-blue-50"
+                    onClick={() => {
+                      setOverlapChoices([])
+                      openShotDetail(shot)
+                    }}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-slate-900">
+                        {detail?.ordinalLabel ?? 'Shot'} | {detail?.shooterLabel ?? 'Unknown shooter'}
+                      </span>
+                      <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                        {detail ? `${detail.resultLabel} ${detail.valueLabel}` : shot.made ? 'Made' : 'Missed'}
+                      </span>
+                    </span>
+                    <span className={`h-3 w-3 shrink-0 rounded-full ${shot.made ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                  </button>
+                )
+              })}
+            </div>
+            <footer className="border-t border-slate-200 px-4 py-3">
+              <button type="button" className="btn-secondary w-full py-2.5" onClick={() => setOverlapChoices([])}>
+                Cancel
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {shotDetail && (
+        <BasketballShotDetailDialog detail={shotDetail} onClose={() => setShotDetail(null)} />
       )}
 
       <ConfirmDialog

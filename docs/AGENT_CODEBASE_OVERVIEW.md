@@ -170,9 +170,11 @@ capture, immutable finite/unlimited inventory enforcement, simultaneous tracker 
 newest matching current-period correction, and exact restore. BKE-2D completes local tracker parity
 with projection-derived period foul/bonus presentation, consistent inactive-period capture guards,
 local suspend/abandon/reasoned-reopen controls, and mixed-flow hydration/reprojection coverage. BKE-2
-is complete. BKE-3 is approved in four slices: 3A Timeline/read-only detail, 3B arbitrary
-remove/restore, 3C F13 shot/location/relationship editing, and 3D remaining event editors plus
-recorded-later additions. BKE-3A is next, and event games remain internal and local-only.
+is complete. BKE-3 is approved in four slices. BKE-3A is complete with a pure Basketball review
+reader, Track/Timeline workspace, filtered capture groups, shared event/legacy shot detail, marker
+activation, and deterministic overlap selection. BKE-3B arbitrary remove/restore is next, followed
+by 3C F13 shot/location/relationship editing and 3D remaining editors plus recorded-later additions.
+Event games remain internal and local-only.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -404,7 +406,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) | Basketball migration onto the shared event model. BKE-1 and BKE-2 are complete; BKE-3A-3D Timeline/F13 plan is approved and BKE-3A is next |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) | Basketball migration onto the shared event model. BKE-1, BKE-2, and BKE-3A are complete; BKE-3B arbitrary remove/restore is next |
 
 ### Held / waiting for feedback
 
