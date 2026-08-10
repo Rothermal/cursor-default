@@ -4,6 +4,7 @@
  */
 import { useRef } from 'react'
 import type { ShotRecord } from '../../types'
+import { BASKETBALL_MARKER_HIT_RADIUS_FEET } from '../../lib/basketball/timeline'
 import {
   COURT_WIDTH,
   BASELINE_Y,
@@ -32,7 +33,7 @@ const TAP_MOVE_TOLERANCE_PX = 18
 interface BasketballCourtProps {
   shots: ShotRecord[]
   onCourtTap?: (x: number, y: number) => void
-  onMarkerActivate?: (shot: ShotRecord) => void
+  onMarkerActivate?: (shot: ShotRecord, marker: SVGGElement) => void
   className?: string
   /** When set, this marker plays a short pulse (newly recorded shot). */
   newlyPlacedShotId?: string | null
@@ -286,17 +287,17 @@ export default function BasketballCourt({
             onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onClick={onMarkerActivate ? event => {
               event.stopPropagation()
-              onMarkerActivate(shot)
+              onMarkerActivate(shot, event.currentTarget)
             } : undefined}
             onKeyDown={onMarkerActivate ? event => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
-                onMarkerActivate(shot)
+                onMarkerActivate(shot, event.currentTarget)
               }
             } : undefined}
             style={onMarkerActivate ? { cursor: 'pointer' } : undefined}
           >
-            <circle cx={shot.x} cy={shot.y} r={2.1} fill="transparent" />
+            <circle cx={shot.x} cy={shot.y} r={BASKETBALL_MARKER_HIT_RADIUS_FEET} fill="transparent" />
             <circle
               cx={shot.x}
               cy={shot.y}
@@ -318,17 +319,17 @@ export default function BasketballCourt({
             onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onClick={onMarkerActivate ? event => {
               event.stopPropagation()
-              onMarkerActivate(shot)
+              onMarkerActivate(shot, event.currentTarget)
             } : undefined}
             onKeyDown={onMarkerActivate ? event => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
-                onMarkerActivate(shot)
+                onMarkerActivate(shot, event.currentTarget)
               }
             } : undefined}
             style={onMarkerActivate ? { cursor: 'pointer' } : undefined}
           >
-            <circle cx={shot.x} cy={shot.y} r={2.1} fill="transparent" />
+            <circle cx={shot.x} cy={shot.y} r={BASKETBALL_MARKER_HIT_RADIUS_FEET} fill="transparent" />
             <line
               x1={shot.x - 0.6}
               y1={shot.y - 0.6}

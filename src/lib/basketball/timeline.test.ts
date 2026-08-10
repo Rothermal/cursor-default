@@ -9,6 +9,8 @@ import { captureBasketballCourtEvent, prepareBasketballGameStart } from './comma
 import { captureBasketballFoul } from './foulFreeThrowCommands'
 import { captureBasketballTimeout } from './timeoutCommands'
 import {
+  BASKETBALL_MARKER_HIT_RADIUS_FEET,
+  BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET,
   basketballShotDetailForEvent,
   buildBasketballTimelineReview,
   filterBasketballTimelineGroups,
@@ -121,6 +123,48 @@ describe('BKE-3A Basketball Timeline review', () => {
     })
     expect(shotGroup?.events.map(event => event.title)).toEqual(['Made 2PT', 'Assist'])
     expect(review.activeGroups[0].title).toBe('Official timeout')
+  })
+
+  it('uses the rebuilt event projection for period filters when the cached projection is stale', () => {
+    const state = stateWithReviewFamilies()
+    if (state.sportGameState?.sportId !== 'basketball') throw new Error('Expected Basketball state')
+    const staleState: GameState = {
+      ...state,
+      sportGameState: {
+        ...state.sportGameState,
+        projection: {
+          ...state.sportGameState.projection,
+          periods: [],
+          participants: {},
+        },
+      },
+    }
+
+    const review = buildBasketballTimelineReview(staleState)
+
+    expect(review.periods).toContainEqual({ id: 'regulation-1', label: 'Q1' })
+    expect(review.participants).toHaveLength(2)
+  })
+
+  it('deduplicates repeated global stream diagnostics', () => {
+    const state = stateWithReviewFamilies()
+    if (!state.eventStream) throw new Error('Expected event stream')
+    const malformedState: GameState = {
+      ...state,
+      eventStream: {
+        ...state.eventStream,
+        events: [
+          ...state.eventStream.events,
+          null,
+          null,
+        ] as unknown as typeof state.eventStream.events,
+      },
+    }
+
+    const review = buildBasketballTimelineReview(malformedState)
+
+    expect(review.complete).toBe(false)
+    expect(new Set(review.globalWarnings).size).toBe(review.globalWarnings.length)
   })
 
   it('applies overlapping family, period, side, and participant filters to complete groups', () => {
@@ -240,6 +284,8 @@ describe('BKE-3A Basketball Timeline review', () => {
       'same-time-b',
       'older',
     ])
+    expect(BASKETBALL_MARKER_HIT_RADIUS_FEET * 2)
+      .toBeLessThanOrEqual(BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET)
   })
 })
 

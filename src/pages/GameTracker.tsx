@@ -1,4 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock3, Link2, List, Minus, ReceiptText, Target, Trash2, UserX } from 'lucide-react'
 import { useGame } from '../context/GameContext'
@@ -233,6 +240,21 @@ export default function GameTracker() {
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
   const [showAllShots, setShowAllShots] = useState(false)
   const [basketballWorkspace, setBasketballWorkspace] = useState<'track' | 'timeline'>('track')
+  const basketballTrackTabRef = useRef<HTMLButtonElement>(null)
+  const basketballTimelineTabRef = useRef<HTMLButtonElement>(null)
+
+  const handleBasketballWorkspaceKeyDown = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    let nextWorkspace: 'track' | 'timeline' | null = null
+    if (event.key === 'ArrowLeft' || event.key === 'Home') nextWorkspace = 'track'
+    if (event.key === 'ArrowRight' || event.key === 'End') nextWorkspace = 'timeline'
+    if (!nextWorkspace) return
+    event.preventDefault()
+    setBasketballWorkspace(nextWorkspace)
+    window.requestAnimationFrame(() => {
+      const target = nextWorkspace === 'track' ? basketballTrackTabRef.current : basketballTimelineTabRef.current
+      target?.focus()
+    })
+  }, [])
 
   const teamRules = useMemo(
     () => (sport ? resolveTeamStatsConfig(sport, teamStatsConfig) : null),
@@ -1016,12 +1038,15 @@ export default function GameTracker() {
         <div className="mx-auto w-full max-w-lg px-3 pb-2">
           <div className="grid h-11 grid-cols-2 rounded-lg border border-slate-300 bg-slate-100 p-1" role="tablist" aria-label="Basketball game workspace">
             <button
+              ref={basketballTrackTabRef}
               type="button"
               id="basketball-track-tab"
               role="tab"
               aria-controls="basketball-track-panel"
               aria-selected={basketballWorkspace === 'track'}
+              tabIndex={basketballWorkspace === 'track' ? 0 : -1}
               onClick={() => setBasketballWorkspace('track')}
+              onKeyDown={handleBasketballWorkspaceKeyDown}
               className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${
                 basketballWorkspace === 'track'
                   ? 'bg-white text-slate-900 shadow-sm'
@@ -1032,12 +1057,15 @@ export default function GameTracker() {
               Track
             </button>
             <button
+              ref={basketballTimelineTabRef}
               type="button"
               id="basketball-timeline-tab"
               role="tab"
               aria-controls="basketball-timeline-panel"
               aria-selected={basketballWorkspace === 'timeline'}
+              tabIndex={basketballWorkspace === 'timeline' ? 0 : -1}
               onClick={() => setBasketballWorkspace('timeline')}
+              onKeyDown={handleBasketballWorkspaceKeyDown}
               className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${
                 basketballWorkspace === 'timeline'
                   ? 'bg-white text-slate-900 shadow-sm'
@@ -1056,7 +1084,7 @@ export default function GameTracker() {
           id={isBasketballEventMode ? 'basketball-track-panel' : undefined}
           role={isBasketballEventMode ? 'tabpanel' : undefined}
           aria-labelledby={isBasketballEventMode ? 'basketball-track-tab' : undefined}
-          className="contents"
+          className="w-full"
         >
       <PlayerSelectorStrip
         players={players}

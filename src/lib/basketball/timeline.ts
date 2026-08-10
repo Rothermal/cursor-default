@@ -125,7 +125,8 @@ const BOUNDARY_TYPES = new Set<BasketballMatchEvent['eventType']>([
   'basketball.match_reopened',
 ])
 
-export const BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET = 1.75
+export const BASKETBALL_MARKER_HIT_RADIUS_FEET = 2.1
+export const BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET = BASKETBALL_MARKER_HIT_RADIUS_FEET * 2
 
 export function buildBasketballTimelineReview(state: GameState): BasketballTimelineReview {
   if (
@@ -138,14 +139,19 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
 
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
   const inspection = rebuilt.inspection
+  const hasRebuiltBasketballProjection = rebuilt.state !== state &&
+    rebuilt.state.sportGameState?.sportId === 'basketball'
+  const reviewState = hasRebuiltBasketballProjection ? rebuilt.state : state
+  const sportState = reviewState.sportGameState
+  if (sportState?.sportId !== 'basketball') return emptyTimelineReview()
   const validActive = inspection.activeEvents.filter(isBasketballMatchEvent)
   const validDeleted = inspection.deletedEvents.filter(isBasketballMatchEvent)
   const allEvents = [...validActive, ...validDeleted]
   const eventsById = new Map(allEvents.map(event => [event.id, event]))
   const diagnosticsByEvent = diagnosticsForEvents(inspection.diagnostics)
-  const relationshipWarnings = state.sportGameState.projection.relationshipWarnings
+  const relationshipWarnings = sportState.projection.relationshipWarnings
   const reviews = allEvents.map(event => reviewEvent(
-    state,
+    reviewState,
     event,
     eventsById,
     diagnosticsByEvent,
@@ -156,7 +162,6 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
   const deletedReviews = validDeleted.map(event => eventById.get(event.id)!).filter(Boolean)
   const activeCounts = groupCounts(activeReviews)
   const deletedCounts = groupCounts(deletedReviews)
-  const sportState = state.sportGameState
   const periods = sportState.projection.periods
     .filter(period => sportState.projection.startedPeriodIds.includes(period.id))
     .sort((left, right) => left.order - right.order)
@@ -172,9 +177,9 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
   return {
     complete: inspection.complete,
     diagnostics: inspection.diagnostics,
-    globalWarnings: inspection.diagnostics
+    globalWarnings: [...new Set(inspection.diagnostics
       .filter(item => item.eventId === null)
-      .map(item => item.message),
+      .map(item => item.message))],
     activeGroups: groupReviews(activeReviews, activeCounts, deletedCounts, false),
     removedGroups: groupReviews(deletedReviews, deletedCounts, activeCounts, true),
     periods,
@@ -203,6 +208,14 @@ export function basketballShotDetailForEvent(
   eventId: string
 ): BasketballShotDetailModel | null {
   const review = buildBasketballTimelineReview(state)
+  return basketballShotDetailFromReview(state, review, eventId)
+}
+
+export function basketballShotDetailFromReview(
+  state: GameState,
+  review: BasketballTimelineReview,
+  eventId: string
+): BasketballShotDetailModel | null {
   const eventReview = review.eventById.get(eventId)
   if (!eventReview || eventReview.event.eventType !== 'basketball.shot') return null
   const shot = eventReview.event
@@ -233,8 +246,8 @@ export function basketballShotDetailForEvent(
     shotId: shot.id,
     heading: shot.payload.attempt === 'free_throw' ? 'Free throw detail' : 'Shot detail',
     ordinalLabel,
-    periodLabel: periodLabel(state, shot.period.id),
-    shooterLabel: actorLabel(state, shot),
+    periodLabel: eventReview.periodLabel,
+    shooterLabel: eventReview.actorLabel,
     teamLabel: teamLabel(state, shot.teamSide),
     resultLabel: shot.payload.made ? 'Made' : 'Missed',
     valueLabel: `${shot.payload.value} point${shot.payload.valueSource === 'manual_override' ? ' (manual)' : ''}`,

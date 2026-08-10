@@ -30,7 +30,9 @@ import {
   undoLatestBasketballCourtCapture,
 } from '../../lib/basketball/courtCorrections'
 import {
+  basketballShotDetailFromReview,
   basketballShotDetailForEvent,
+  buildBasketballTimelineReview,
   legacyBasketballShotDetail,
   overlappingBasketballShots,
   type BasketballShotDetailModel,
@@ -110,6 +112,9 @@ export default function ShotChartPanel({
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
   const [overlapChoices, setOverlapChoices] = useState<ShotRecord[]>([])
   const pendingPulseIdRef = useRef<string | null>(null)
+  const overlapDialogRef = useRef<HTMLElement>(null)
+  const overlapFirstChoiceRef = useRef<HTMLButtonElement>(null)
+  const overlapOriginRef = useRef<SVGGElement | null>(null)
   const isEventBasketball = hasStartedBasketballEventGame(state)
   const eventCaptureOpen = !isEventBasketball || (
     state.sportGameState?.sportId === 'basketball' &&
@@ -122,6 +127,12 @@ export default function ShotChartPanel({
   const clearPreview = useMemo(
     () => isEventBasketball ? previewBasketballClearShotChart(state) : null,
     [isEventBasketball, state]
+  )
+  const basketballReview = useMemo(
+    () => isEventBasketball && overlapChoices.length > 1
+      ? buildBasketballTimelineReview(state)
+      : null,
+    [isEventBasketball, overlapChoices.length, state]
   )
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
@@ -298,21 +309,61 @@ export default function ShotChartPanel({
     [shotChart, players, selection]
   )
 
-  const openShotDetail = useCallback((shot: ShotRecord) => {
-    const detail = isEventBasketball
-      ? basketballShotDetailForEvent(state, shot.id)
-      : legacyBasketballShotDetail(state, shot.id)
-    if (detail) setShotDetail(detail)
-  }, [isEventBasketball, state])
+  const detailForShot = useCallback((shot: ShotRecord) => {
+    if (!isEventBasketball) return legacyBasketballShotDetail(state, shot.id)
+    return basketballReview
+      ? basketballShotDetailFromReview(state, basketballReview, shot.id)
+      : basketballShotDetailForEvent(state, shot.id)
+  }, [basketballReview, isEventBasketball, state])
 
-  const handleMarkerActivate = useCallback((shot: ShotRecord) => {
+  const openShotDetail = useCallback((shot: ShotRecord) => {
+    const detail = detailForShot(shot)
+    if (detail) setShotDetail(detail)
+  }, [detailForShot])
+
+  const handleMarkerActivate = useCallback((shot: ShotRecord, marker: SVGGElement) => {
     const choices = overlappingBasketballShots(visibleShots, shot.id)
     if (choices.length > 1) {
+      overlapOriginRef.current = marker
       setOverlapChoices(choices)
       return
     }
     openShotDetail(shot)
   }, [openShotDetail, visibleShots])
+
+  const closeOverlapChooser = useCallback(() => setOverlapChoices([]), [])
+
+  useEffect(() => {
+    if (overlapChoices.length <= 1) return
+    const origin = overlapOriginRef.current
+    overlapFirstChoiceRef.current?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeOverlapChooser()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const buttons = Array.from(
+        overlapDialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? []
+      )
+      if (buttons.length === 0) return
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      origin?.focus()
+    }
+  }, [closeOverlapChooser, overlapChoices.length])
 
   const handleClearChartConfirm = () => {
     setShowClearConfirm(false)
@@ -460,9 +511,10 @@ export default function ShotChartPanel({
       {overlapChoices.length > 1 && (
         <div
           className="fixed inset-0 z-[55] flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-4"
-          onClick={() => setOverlapChoices([])}
+          onClick={closeOverlapChooser}
         >
           <section
+            ref={overlapDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="overlapping-shots-title"
@@ -473,17 +525,16 @@ export default function ShotChartPanel({
               <h2 id="overlapping-shots-title" className="text-base font-bold text-slate-900">Select shot</h2>
             </header>
             <div className="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto">
-              {overlapChoices.map(shot => {
-                const detail = isEventBasketball
-                  ? basketballShotDetailForEvent(state, shot.id)
-                  : legacyBasketballShotDetail(state, shot.id)
+              {overlapChoices.map((shot, index) => {
+                const detail = detailForShot(shot)
                 return (
                   <button
                     key={shot.id}
+                    ref={index === 0 ? overlapFirstChoiceRef : undefined}
                     type="button"
                     className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-blue-50"
                     onClick={() => {
-                      setOverlapChoices([])
+                      closeOverlapChooser()
                       openShotDetail(shot)
                     }}
                   >
@@ -501,7 +552,7 @@ export default function ShotChartPanel({
               })}
             </div>
             <footer className="border-t border-slate-200 px-4 py-3">
-              <button type="button" className="btn-secondary w-full py-2.5" onClick={() => setOverlapChoices([])}>
+              <button type="button" className="btn-secondary w-full py-2.5" onClick={closeOverlapChooser}>
                 Cancel
               </button>
             </footer>

@@ -3,7 +3,7 @@ import { AlertTriangle, ChevronDown, CircleDot, Layers3 } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import {
   BASKETBALL_TIMELINE_FAMILIES,
-  basketballShotDetailForEvent,
+  basketballShotDetailFromReview,
   buildBasketballTimelineReview,
   filterBasketballTimelineGroups,
   type BasketballShotDetailModel,
@@ -44,7 +44,7 @@ export default function BasketballTimeline() {
   const removedEventCount = removedGroups.reduce((sum, group) => sum + group.events.length, 0)
 
   const openShotDetail = (eventId: string) => {
-    setShotDetail(basketballShotDetailForEvent(state, eventId))
+    setShotDetail(basketballShotDetailFromReview(state, review, eventId))
   }
 
   return (

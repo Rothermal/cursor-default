@@ -78,7 +78,7 @@ export default function BasketballShotDetailDialog({
           </div>
 
           <section className="border-b border-slate-200 px-4 py-4" aria-labelledby="shot-location-title">
-            <h3 id="shot-location-title" className="text-xs font-semibold uppercase text-slate-500">Location</h3>
+            <h3 id="shot-location-title" className="text-xs font-semibold uppercase text-slate-500">Court location</h3>
             <p className="mt-1 text-sm font-semibold text-slate-800">{detail.locationLabel}</p>
           </section>
 
