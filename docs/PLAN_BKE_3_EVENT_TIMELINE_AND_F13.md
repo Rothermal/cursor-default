@@ -210,8 +210,9 @@ read-only tracker experience without adding correction authority.
 
 - Extend `BasketballCourt` with an explicit marker activation callback. Marker pointer/tap handling
   stops propagation so selecting a shot cannot trigger background court capture.
-- One marker opens detail directly. Markers within the approved overlap tolerance open a compact
-  chooser ordered deterministically before detail opens.
+- Pointer activation resolves to the nearest marker inside the generous touch targets. A compact,
+  deterministic chooser appears only when the nearest candidates are effectively equidistant;
+  keyboard activation opens the explicitly focused marker.
 - Closing detail returns to the same court/filter/scroll context.
 - Legacy aggregate Basketball markers receive read-only core detail only: derived full-game shot
   number, shooter, result/value, zone/location, and recorded timestamp.
@@ -221,7 +222,8 @@ read-only tracker experience without adding correction authority.
 
 - Cover every event-family label/filter, capture grouping, period default, side/participant filter,
   corrected/removed state, and unhealthy-stream display.
-- Prove marker activation does not add a shot and overlap selection is deterministic.
+- Prove marker activation does not add a shot, nearest-marker resolution is stable, and ambiguous
+  touch selection is deterministic.
 - Verify event and legacy shot ordinals use full-game attempts rather than the current display filter.
 - Park/reload an event game and preserve Timeline/detail context derived from authoritative state.
 
@@ -433,7 +435,7 @@ Each slice adds focused pure tests before UI exposure. The final BKE-3 gate incl
 9. Use one shared responsive detail sheet from markers and Timeline.
 10. Include explicit court location editing in BKE-3.
 11. Support full assist/rebound/block add, remove, and re-link.
-12. Use a deterministic chooser for overlapping markers.
+12. Resolve pointer taps to the nearest marker and use a deterministic chooser for near-equal candidates.
 13. Show current corrected values plus revision metadata; do not retain prior value snapshots.
 14. Keep removed events collapsed by default.
 15. Restore the selected event by default and require explicit dependent selections.

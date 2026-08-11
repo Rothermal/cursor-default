@@ -4,9 +4,11 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
 import { classifyShotZone, normalizedCourtLocationToFeet } from './courtGeometry'
+import { resolveBasketballPeriodSegment } from './rules'
 import type {
   BasketballMatchEvent,
   BasketballShotEvent,
+  BasketballSportGameState,
   BasketballTeamSide,
 } from './types'
 
@@ -126,7 +128,7 @@ const BOUNDARY_TYPES = new Set<BasketballMatchEvent['eventType']>([
 ])
 
 export const BASKETBALL_MARKER_HIT_RADIUS_FEET = 2.1
-export const BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET = BASKETBALL_MARKER_HIT_RADIUS_FEET * 2
+export const BASKETBALL_MARKER_TIE_EPSILON_FEET = 0.35
 
 export function buildBasketballTimelineReview(state: GameState): BasketballTimelineReview {
   if (
@@ -149,31 +151,27 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
   const allEvents = [...validActive, ...validDeleted]
   const eventsById = new Map(allEvents.map(event => [event.id, event]))
   const diagnosticsByEvent = diagnosticsForEvents(inspection.diagnostics)
-  const relationshipWarnings = sportState.projection.relationshipWarnings
+  const periods = periodOptionsForEvents(sportState, allEvents)
+  const participants = participantOptionsForEvents(sportState, validActive, validDeleted)
+  const knownParticipantIds = new Set(participants.map(participant => participant.id))
+  const relationshipWarnings = hasRebuiltBasketballProjection
+    ? sportState.projection.relationshipWarnings.filter(item =>
+        eventsById.has(item.eventId) || eventsById.has(item.relatedEventId)
+      )
+    : []
   const reviews = allEvents.map(event => reviewEvent(
     reviewState,
     event,
     eventsById,
     diagnosticsByEvent,
-    relationshipWarnings
+    relationshipWarnings,
+    knownParticipantIds
   ))
   const eventById = new Map(reviews.map(review => [review.id, review]))
   const activeReviews = validActive.map(event => eventById.get(event.id)!).filter(Boolean)
   const deletedReviews = validDeleted.map(event => eventById.get(event.id)!).filter(Boolean)
   const activeCounts = groupCounts(activeReviews)
   const deletedCounts = groupCounts(deletedReviews)
-  const periods = sportState.projection.periods
-    .filter(period => sportState.projection.startedPeriodIds.includes(period.id))
-    .sort((left, right) => left.order - right.order)
-    .map(period => ({ id: period.id, label: period.label }))
-  const participants = Object.values(sportState.projection.participants)
-    .map(participant => ({
-      id: participant.participantId,
-      label: participantLabel(participant.displayName, participant.number),
-      teamSide: participant.teamSide,
-    }))
-    .sort((left, right) => left.teamSide.localeCompare(right.teamSide) || left.label.localeCompare(right.label))
-
   return {
     complete: inspection.complete,
     diagnostics: inspection.diagnostics,
@@ -184,9 +182,7 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
     removedGroups: groupReviews(deletedReviews, deletedCounts, activeCounts, true),
     periods,
     participants,
-    defaultPeriodId: sportState.projection.status === 'in_progress' && sportState.projection.currentPeriodId
-      ? sportState.projection.currentPeriodId
-      : 'all',
+    defaultPeriodId: defaultPeriodIdForEvents(sportState, validActive, hasRebuiltBasketballProjection),
     eventById,
   }
 }
@@ -309,21 +305,125 @@ export function legacyBasketballShotDetail(
   }
 }
 
-export function overlappingBasketballShots(
+export function basketballMarkerChoicesAtPoint(
   shots: ShotRecord[],
   selectedShotId: string,
-  toleranceFeet = BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET
+  point: { x: number; y: number } | null,
+  hitRadiusFeet = BASKETBALL_MARKER_HIT_RADIUS_FEET,
+  tieEpsilonFeet = BASKETBALL_MARKER_TIE_EPSILON_FEET
 ): ShotRecord[] {
   const selected = shots.find(shot => shot.id === selectedShotId)
   if (!selected) return []
-  const squaredTolerance = toleranceFeet * toleranceFeet
-  return shots
-    .filter(shot => {
-      const dx = shot.x - selected.x
-      const dy = shot.y - selected.y
-      return dx * dx + dy * dy <= squaredTolerance
+  if (!point) return [selected]
+  const candidates = shots
+    .map(shot => ({
+      shot,
+      distance: Math.hypot(shot.x - point.x, shot.y - point.y),
+    }))
+    .filter(candidate => candidate.distance <= hitRadiusFeet)
+    .sort((left, right) => left.distance - right.distance || compareMarkerChoices(left.shot, right.shot))
+  if (candidates.length === 0) return [selected]
+  const nearestDistance = candidates[0].distance
+  return candidates
+    .filter(candidate => candidate.distance - nearestDistance <= tieEpsilonFeet)
+    .map(candidate => candidate.shot)
+    .sort(compareMarkerChoices)
+}
+
+function periodOptionsForEvents(
+  sportState: BasketballSportGameState,
+  events: BasketballMatchEvent[]
+): BasketballTimelinePeriodOption[] {
+  const periods = new Map<string, number>()
+  for (const event of events) {
+    const existingOrder = periods.get(event.period.id)
+    if (existingOrder === undefined || event.period.order < existingOrder) {
+      periods.set(event.period.id, event.period.order)
+    }
+  }
+  return [...periods.entries()]
+    .sort((left, right) => left[1] - right[1] || left[0].localeCompare(right[0]))
+    .map(([id]) => ({
+      id,
+      label: resolveBasketballPeriodSegment(sportState.setup.rulesSnapshot, id)?.label ??
+        sportState.projection.periods.find(period => period.id === id)?.label ?? id,
+    }))
+}
+
+function participantOptionsForEvents(
+  sportState: BasketballSportGameState,
+  activeEvents: BasketballMatchEvent[],
+  deletedEvents: BasketballMatchEvent[]
+): BasketballTimelineParticipantOption[] {
+  const participants = new Map<string, BasketballTimelineParticipantOption>()
+  for (const participant of sportState.setup.participants) {
+    participants.set(participant.id, {
+      id: participant.id,
+      label: participantLabel(participant.displayName, participant.number),
+      teamSide: participant.teamSide,
     })
-    .sort((left, right) => right.timestamp - left.timestamp || left.id.localeCompare(right.id))
+  }
+  for (const event of [...activeEvents].sort(compareGameEventCaptureOrder)) {
+    if (event.eventType === 'basketball.match_roster_added') {
+      const participant = event.payload.participant
+      participants.set(participant.id, {
+        id: participant.id,
+        label: participantLabel(participant.displayName, participant.number),
+        teamSide: participant.teamSide,
+      })
+    } else if (event.eventType === 'basketball.participant_resolved') {
+      const participant = participants.get(event.payload.participantId)
+      if (participant) {
+        participants.set(participant.id, {
+          ...participant,
+          label: participantLabel(event.payload.displayName, event.payload.number),
+        })
+      }
+    }
+  }
+  for (const event of [...activeEvents, ...deletedEvents]) {
+    if (event.eventType === 'basketball.match_roster_added' && !participants.has(event.payload.participant.id)) {
+      const participant = event.payload.participant
+      participants.set(participant.id, {
+        id: participant.id,
+        label: participantLabel(participant.displayName, participant.number),
+        teamSide: participant.teamSide,
+      })
+    }
+    if (event.teamSide === 'neutral') continue
+    for (const actor of event.actors) {
+      if (!actor.participantId || participants.has(actor.participantId)) continue
+      participants.set(actor.participantId, {
+        id: actor.participantId,
+        label: actor.label || 'Unknown participant',
+        teamSide: event.teamSide,
+      })
+    }
+  }
+  return [...participants.values()]
+    .sort((left, right) => left.teamSide.localeCompare(right.teamSide) || left.label.localeCompare(right.label))
+}
+
+function defaultPeriodIdForEvents(
+  sportState: BasketballSportGameState,
+  activeEvents: BasketballMatchEvent[],
+  hasRebuiltProjection: boolean
+): 'all' | string {
+  if (
+    hasRebuiltProjection &&
+    sportState.projection.status === 'in_progress' &&
+    sportState.projection.currentPeriodId
+  ) return sportState.projection.currentPeriodId
+
+  let currentPeriodId: string | null = null
+  for (const event of [...activeEvents].sort(compareGameEventCaptureOrder)) {
+    if (event.eventType === 'basketball.period_started') currentPeriodId = event.payload.periodId
+    if (event.eventType === 'basketball.period_ended' && currentPeriodId === event.payload.periodId) {
+      currentPeriodId = null
+    }
+    if (event.eventType === 'basketball.match_ended') currentPeriodId = null
+  }
+  return currentPeriodId ?? 'all'
 }
 
 function reviewEvent(
@@ -331,7 +431,8 @@ function reviewEvent(
   event: BasketballMatchEvent,
   eventsById: Map<string, BasketballMatchEvent>,
   diagnosticsByEvent: Map<string, string[]>,
-  relationshipWarnings: Array<{ eventId: string; relatedEventId: string; message: string }>
+  relationshipWarnings: Array<{ eventId: string; relatedEventId: string; message: string }>,
+  knownParticipantIds: Set<string>
 ): BasketballTimelineEventReview {
   const participantIds = participantIdsForEvent(state, event)
   const warnings = [
@@ -339,7 +440,7 @@ function reviewEvent(
     ...relationshipWarnings
       .filter(item => item.eventId === event.id || item.relatedEventId === event.id)
       .map(item => item.message),
-    ...missingActorWarnings(state, event),
+    ...missingActorWarnings(knownParticipantIds, event),
   ]
   return {
     id: event.id,
@@ -580,19 +681,21 @@ function participantIdsForEvent(state: GameState, event: BasketballMatchEvent): 
       continue
     }
     if (actor.kind === 'player' && state.sportGameState?.sportId === 'basketball') {
-      const participant = Object.values(state.sportGameState.projection.participants)
+      const projectedParticipant = Object.values(state.sportGameState.projection.participants)
         .find(candidate => candidate.playerId === actor.playerId)
-      if (participant) ids.add(participant.participantId)
+      const setupParticipant = state.sportGameState.setup.participants
+        .find(candidate => candidate.playerId === actor.playerId)
+      const participantId = projectedParticipant?.participantId ?? setupParticipant?.id
+      if (participantId) ids.add(participantId)
     }
   }
   return [...ids]
 }
 
-function missingActorWarnings(state: GameState, event: BasketballMatchEvent): string[] {
-  if (state.sportGameState?.sportId !== 'basketball') return []
+function missingActorWarnings(knownParticipantIds: Set<string>, event: BasketballMatchEvent): string[] {
   return event.actors.flatMap(actor => {
     if (!actor.participantId) return []
-    return state.sportGameState!.projection.participants[actor.participantId]
+    return knownParticipantIds.has(actor.participantId)
       ? []
       : [`${actor.label || 'Event actor'} is unavailable in the current participant projection.`]
   })
@@ -600,7 +703,8 @@ function missingActorWarnings(state: GameState, event: BasketballMatchEvent): st
 
 function periodLabel(state: GameState, periodId: string): string {
   if (state.sportGameState?.sportId !== 'basketball') return periodId
-  return state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ?? periodId
+  return state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ??
+    resolveBasketballPeriodSegment(state.sportGameState.setup.rulesSnapshot, periodId)?.label ?? periodId
 }
 
 function teamLabel(state: GameState, side: BasketballMatchEvent['teamSide']): string {
@@ -706,6 +810,10 @@ function isBasketballMatchEvent(event: { sportId: string }): event is Basketball
 
 function compareLegacyShots(left: ShotRecord, right: ShotRecord): number {
   return left.timestamp - right.timestamp || left.id.localeCompare(right.id)
+}
+
+function compareMarkerChoices(left: ShotRecord, right: ShotRecord): number {
+  return right.timestamp - left.timestamp || left.id.localeCompare(right.id)
 }
 
 function emptyTimelineReview(): BasketballTimelineReview {

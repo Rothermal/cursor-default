@@ -33,8 +33,8 @@ import {
   basketballShotDetailFromReview,
   basketballShotDetailForEvent,
   buildBasketballTimelineReview,
+  basketballMarkerChoicesAtPoint,
   legacyBasketballShotDetail,
-  overlappingBasketballShots,
   type BasketballShotDetailModel,
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
@@ -321,8 +321,12 @@ export default function ShotChartPanel({
     if (detail) setShotDetail(detail)
   }, [detailForShot])
 
-  const handleMarkerActivate = useCallback((shot: ShotRecord, marker: SVGGElement) => {
-    const choices = overlappingBasketballShots(visibleShots, shot.id)
+  const handleMarkerActivate = useCallback((
+    shot: ShotRecord,
+    marker: SVGGElement,
+    point: { x: number; y: number } | null
+  ) => {
+    const choices = basketballMarkerChoicesAtPoint(visibleShots, shot.id, point)
     if (choices.length > 1) {
       overlapOriginRef.current = marker
       setOverlapChoices(choices)

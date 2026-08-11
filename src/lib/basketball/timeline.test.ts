@@ -10,12 +10,11 @@ import { captureBasketballFoul } from './foulFreeThrowCommands'
 import { captureBasketballTimeout } from './timeoutCommands'
 import {
   BASKETBALL_MARKER_HIT_RADIUS_FEET,
-  BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET,
+  basketballMarkerChoicesAtPoint,
   basketballShotDetailForEvent,
   buildBasketballTimelineReview,
   filterBasketballTimelineGroups,
   legacyBasketballShotDetail,
-  overlappingBasketballShots,
 } from './timeline'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
@@ -125,11 +124,17 @@ describe('BKE-3A Basketball Timeline review', () => {
     expect(review.activeGroups[0].title).toBe('Official timeout')
   })
 
-  it('uses the rebuilt event projection for period filters when the cached projection is stale', () => {
+  it('derives period and participant filters from valid events when an incomplete stream has stale projection data', () => {
     const state = stateWithReviewFamilies()
-    if (state.sportGameState?.sportId !== 'basketball') throw new Error('Expected Basketball state')
+    if (state.sportGameState?.sportId !== 'basketball' || !state.eventStream) {
+      throw new Error('Expected Basketball event state')
+    }
     const staleState: GameState = {
       ...state,
+      eventStream: {
+        ...state.eventStream,
+        events: [...state.eventStream.events, null] as unknown as typeof state.eventStream.events,
+      },
       sportGameState: {
         ...state.sportGameState,
         projection: {
@@ -142,8 +147,16 @@ describe('BKE-3A Basketball Timeline review', () => {
 
     const review = buildBasketballTimelineReview(staleState)
 
+    expect(review.complete).toBe(false)
     expect(review.periods).toContainEqual({ id: 'regulation-1', label: 'Q1' })
     expect(review.participants).toHaveLength(2)
+    expect(review.defaultPeriodId).toBe('regulation-1')
+    expect(review.activeGroups.length).toBeGreaterThan(0)
+    expect(review.activeGroups
+      .flatMap(group => group.events)
+      .flatMap(event => event.warnings)
+      .some(warning => warning.includes('unavailable in the current participant projection')))
+      .toBe(false)
   })
 
   it('deduplicates repeated global stream diagnostics', () => {
@@ -271,21 +284,21 @@ describe('BKE-3A Basketball Timeline review', () => {
     expect(detail?.relationships).toEqual([])
   })
 
-  it('orders overlapping marker choices deterministically without including distant shots', () => {
+  it('resolves large marker hit areas by tap distance and asks only on near-equal choices', () => {
     const shots = [
       legacyShot('older', 'player-1', 1_000, true, 0, 0),
-      legacyShot('newer', 'player-2', 3_000, false, 1, 1),
-      legacyShot('same-time-b', 'player-1', 2_000, true, 0.5, 0.5),
+      legacyShot('newer', 'player-2', 3_000, false, BASKETBALL_MARKER_HIT_RADIUS_FEET * 2, 0),
       legacyShot('far', 'player-1', 4_000, true, 8, 8),
     ]
 
-    expect(overlappingBasketballShots(shots, 'older').map(shot => shot.id)).toEqual([
-      'newer',
-      'same-time-b',
-      'older',
-    ])
-    expect(BASKETBALL_MARKER_HIT_RADIUS_FEET * 2)
-      .toBeLessThanOrEqual(BASKETBALL_MARKER_OVERLAP_TOLERANCE_FEET)
+    expect(basketballMarkerChoicesAtPoint(shots, 'newer', { x: 0, y: 0 }).map(shot => shot.id))
+      .toEqual(['older'])
+    expect(basketballMarkerChoicesAtPoint(shots, 'older', {
+      x: BASKETBALL_MARKER_HIT_RADIUS_FEET,
+      y: 0,
+    }).map(shot => shot.id)).toEqual(['newer', 'older'])
+    expect(basketballMarkerChoicesAtPoint(shots, 'older', null).map(shot => shot.id))
+      .toEqual(['older'])
   })
 })
 

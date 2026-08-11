@@ -824,7 +824,7 @@ active period and a period break, plus completed, suspended, and abandoned state
 
 **Precondition:** Development build with a healthy, local Basketball event game containing grouped
 and independent events for both sides, at least two periods, one removed/restored event, and two
-located shots within the marker overlap tolerance. Keep one ordinary legacy Basketball game for the
+located shots with overlapping touch targets. Keep one ordinary legacy Basketball game for the
 legacy-detail checks.
 
 | Step | Action | Expected |
@@ -833,7 +833,7 @@ legacy-detail checks.
 | 11a11.2 | Review independent events and a multi-event shot/assist or shot/rebound capture | Timeline is newest first; persisted command members share one expandable group; independent or later-linked events remain separate |
 | 11a11.3 | Exercise event-family, period, side, and participant filters | Filters overlap without changing authority; active play defaults to the current period, a completed game defaults to Full match, and grouped context stays intact |
 | 11a11.4 | Undo and restore an event, then inspect Timeline | Removed events stay collapsed by default with their current payload; revision metadata says Revised without claiming that values changed; companion removal counts stay visible |
-| 11a11.5 | Tap a single court marker, then one marker in an overlapping cluster | A single marker opens detail directly; a cluster opens a deterministic newest-first chooser; neither gesture opens capture or adds a shot |
+| 11a11.5 | Tap each marker near its center, then tap an effectively equidistant point inside both markers' touch targets | Center taps open the nearest marker directly even when touch targets overlap; only the ambiguous tap opens the deterministic newest-first chooser; neither gesture opens capture or adds a shot |
 | 11a11.6 | Open an event shot from both court and Timeline | Both paths use the same detail surface and show full-game field-goal or FT ordinal, period, shooter/side, result/value, location, relationships, revision metadata, ids, recorder, and timestamps |
 | 11a11.7 | Open a legacy shot marker | Detail shows full-chart ordinal, shooter, result/value, zone/location, and timestamp only; it never guesses assist/rebound/block links or exposes editing |
 | 11a11.8 | Load a malformed or semantically incomplete event stream | Timeline keeps coherent review context read-only, surfaces global or event-anchored diagnostics, and never reveals a legacy mutation fallback |

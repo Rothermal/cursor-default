@@ -172,7 +172,7 @@ with projection-derived period foul/bonus presentation, consistent inactive-peri
 local suspend/abandon/reasoned-reopen controls, and mixed-flow hydration/reprojection coverage. BKE-2
 is complete. BKE-3 is approved in four slices. BKE-3A is complete with a pure Basketball review
 reader, Track/Timeline workspace, filtered capture groups, shared event/legacy shot detail, marker
-activation, and deterministic overlap selection. BKE-3B arbitrary remove/restore is next, followed
+activation, and nearest-marker selection with deterministic ambiguity handling. BKE-3B arbitrary remove/restore is next, followed
 by 3C F13 shot/location/relationship editing and 3D remaining editors plus recorded-later additions.
 Event games remain internal and local-only.
 

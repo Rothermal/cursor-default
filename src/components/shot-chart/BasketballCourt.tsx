@@ -33,7 +33,11 @@ const TAP_MOVE_TOLERANCE_PX = 18
 interface BasketballCourtProps {
   shots: ShotRecord[]
   onCourtTap?: (x: number, y: number) => void
-  onMarkerActivate?: (shot: ShotRecord, marker: SVGGElement) => void
+  onMarkerActivate?: (
+    shot: ShotRecord,
+    marker: SVGGElement,
+    point: { x: number; y: number } | null
+  ) => void
   className?: string
   /** When set, this marker plays a short pulse (newly recorded shot). */
   newlyPlacedShotId?: string | null
@@ -99,11 +103,11 @@ interface PendingTap {
 
 /** Convert a screen-space point to court feet via the SVG's current transform. */
 function clientPointToCourt(
-  rect: SVGRectElement,
+  element: SVGGraphicsElement,
   clientX: number,
   clientY: number
 ): { x: number; y: number } | null {
-  const svg = rect.ownerSVGElement
+  const svg = element.ownerSVGElement
   if (!svg) return null
   const pt = svg.createSVGPoint()
   pt.x = clientX
@@ -287,12 +291,16 @@ export default function BasketballCourt({
             onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onClick={onMarkerActivate ? event => {
               event.stopPropagation()
-              onMarkerActivate(shot, event.currentTarget)
+              onMarkerActivate(
+                shot,
+                event.currentTarget,
+                clientPointToCourt(event.currentTarget, event.clientX, event.clientY)
+              )
             } : undefined}
             onKeyDown={onMarkerActivate ? event => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
-                onMarkerActivate(shot, event.currentTarget)
+                onMarkerActivate(shot, event.currentTarget, null)
               }
             } : undefined}
             style={onMarkerActivate ? { cursor: 'pointer' } : undefined}
@@ -319,12 +327,16 @@ export default function BasketballCourt({
             onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onClick={onMarkerActivate ? event => {
               event.stopPropagation()
-              onMarkerActivate(shot, event.currentTarget)
+              onMarkerActivate(
+                shot,
+                event.currentTarget,
+                clientPointToCourt(event.currentTarget, event.clientX, event.clientY)
+              )
             } : undefined}
             onKeyDown={onMarkerActivate ? event => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
-                onMarkerActivate(shot, event.currentTarget)
+                onMarkerActivate(shot, event.currentTarget, null)
               }
             } : undefined}
             style={onMarkerActivate ? { cursor: 'pointer' } : undefined}
