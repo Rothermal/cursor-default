@@ -299,6 +299,111 @@ export function applyGameEventMutations<TEvent extends GameEvent>(
   return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
 }
 
+export function applyGameEventAppendsAndMutations<TEvent extends GameEvent>(
+  state: GameState,
+  appendedEvents: readonly GameEvent[],
+  mutations: readonly GameEventMutation[],
+  now: string,
+  registry: GameEventRegistry<TEvent>,
+  projectors: GameEventProjectorRegistry<TEvent>
+): GameEventMutationResult {
+  if (!state.eventStream) {
+    return failed(state, 'stream_not_initialized', 'Initialize the event stream before editing events.')
+  }
+  if (appendedEvents.length === 0 && mutations.length === 0) {
+    return failed(state, 'empty_mutation_batch', 'At least one event append or mutation is required.')
+  }
+
+  const existingIds = new Set<string>()
+  const sequenceKeys = new Set<string>()
+  for (const raw of state.eventStream.events) {
+    if (!isGameEventEnvelope(raw)) continue
+    existingIds.add(raw.id)
+    sequenceKeys.add(eventSequenceKey(raw))
+  }
+
+  const appendedIds = new Set<string>()
+  for (const event of appendedEvents) {
+    if (
+      !isGameEventEnvelope(event) ||
+      event.revision !== 1 ||
+      event.deletedAt !== null ||
+      !registry.inspect(event).ok
+    ) {
+      return failed(state, 'invalid_event', 'Every appended event must be a valid new event.')
+    }
+    if (state.sport?.id !== event.sportId) {
+      return failed(state, 'sport_mismatch', 'Every appended event must match the active game sport.')
+    }
+    if (existingIds.has(event.id) || appendedIds.has(event.id)) {
+      return failed(state, 'duplicate_event_id', 'Every appended event must have a unique id.')
+    }
+    const sequenceKey = eventSequenceKey(event)
+    if (sequenceKeys.has(sequenceKey)) {
+      return failed(
+        state,
+        'duplicate_event_sequence',
+        'Every appended event must have a unique recorder sequence.'
+      )
+    }
+    appendedIds.add(event.id)
+    sequenceKeys.add(sequenceKey)
+  }
+
+  const events = [...state.eventStream.events]
+  const targetedIds = new Set<string>()
+  for (const mutation of mutations) {
+    if (appendedIds.has(mutation.eventId) || targetedIds.has(mutation.eventId)) {
+      return failed(
+        state,
+        'duplicate_mutation_target',
+        'An event may be introduced or revised only once in an atomic change.'
+      )
+    }
+    targetedIds.add(mutation.eventId)
+    const index = state.eventStream.events.findIndex(
+      raw => isGameEventEnvelope(raw) && raw.id === mutation.eventId
+    )
+    if (index < 0) return failed(state, 'event_not_found', 'The event was not found.')
+    const stored = state.eventStream.events[index]
+    const inspected = registry.inspect(stored)
+    if (!inspected.ok) {
+      return failed(state, 'invalid_event', 'A quarantined event cannot be edited by the typed mutation API.')
+    }
+    if (state.sport?.id !== inspected.event.sportId) {
+      return failed(state, 'sport_mismatch', 'The event sport does not match the active game.')
+    }
+    const outcome = applyMutationToEvent(stored, inspected.event, mutation, now)
+    if ('error' in outcome) {
+      return failed(
+        state,
+        outcome.error,
+        outcome.error === 'already_deleted'
+          ? 'The event is already deleted.'
+          : 'The event is not deleted.'
+      )
+    }
+    if (!isGameEventEnvelope(outcome.event) || !registry.inspect(outcome.event).ok) {
+      return failed(state, 'invalid_event', 'The event update failed validation.')
+    }
+    events[index] = cloneEvent(outcome.event)
+  }
+
+  events.push(...appendedEvents.map(cloneEvent))
+  const rebuilt = rebuildGameEventProjection({
+    ...state,
+    eventStream: { ...state.eventStream, events },
+  }, registry, projectors)
+  if (!rebuilt.inspection.complete) {
+    return failed(
+      state,
+      'incomplete_projection',
+      'The atomic event changes would create invalid or incomplete match history.'
+    )
+  }
+  return { ok: true, state: rebuilt.state, inspection: rebuilt.inspection }
+}
+
 function applyMutationToEvent(
   stored: unknown,
   runtime: GameEvent,
@@ -341,6 +446,10 @@ function applyMutationToEvent(
 type RevisionOutcome =
   | { event: GameEvent }
   | { error: 'already_deleted' | 'not_deleted' }
+
+function eventSequenceKey(event: Pick<GameEvent, 'recorderUserId' | 'sequence'>): string {
+  return `${event.recorderUserId ?? 'local'}\u0000${event.sequence}`
+}
 
 function reviseEvent<TEvent extends GameEvent>(
   state: GameState,

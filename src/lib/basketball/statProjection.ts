@@ -17,6 +17,13 @@ export interface BasketballStatProjectionContext {
   shotChart: ShotRecord[]
 }
 
+const BKE3C_RECORDED_LATER_TYPES = new Set<BasketballStatEvent['eventType']>([
+  'basketball.shot',
+  'basketball.assist',
+  'basketball.rebound',
+  'basketball.block',
+])
+
 export function createBasketballStatProjectionContext(): BasketballStatProjectionContext {
   return {
     activeEventsById: new Map(),
@@ -95,7 +102,10 @@ function validateStatMoment(
   if (!segment || segment.order !== event.period.order) {
     return 'Basketball stat event period is invalid.'
   }
-  if (projection.currentPeriodId !== event.period.id) {
+  if (
+    projection.currentPeriodId !== event.period.id &&
+    !BKE3C_RECORDED_LATER_TYPES.has(event.eventType)
+  ) {
     return 'Basketball stat event does not target the current period.'
   }
   return null

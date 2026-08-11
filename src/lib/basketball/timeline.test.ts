@@ -6,7 +6,12 @@ import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import type { GameEvent } from '../gameEvents/types'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
-import { captureBasketballCourtEvent, prepareBasketballGameStart } from './commands'
+import {
+  captureBasketballCourtEvent,
+  prepareBasketballGameStart,
+  reopenBasketballMatch,
+  suspendBasketballMatch,
+} from './commands'
 import { captureBasketballFoul } from './foulFreeThrowCommands'
 import { captureBasketballTimeout } from './timeoutCommands'
 import {
@@ -281,6 +286,26 @@ describe('BKE-3A Basketball Timeline review', () => {
       removed: true,
       revised: true,
     })
+  })
+
+  it('does not label terminal lifecycle boundaries as recorded later', () => {
+    const suspended = suspendBasketballMatch(startedState(), {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-10T14:05:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000001501',
+    })
+    if (!suspended.ok) throw new Error(suspended.message)
+    const reopened = reopenBasketballMatch(suspended.state, {
+      recorderUserId: 'recorder-1',
+      reason: 'Resume after review',
+      occurredAt: '2026-08-10T14:06:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000001502',
+    })
+    if (!reopened.ok) throw new Error(reopened.message)
+
+    const review = buildBasketballTimelineReview(reopened.state)
+    expect(review.eventById.get('70000000-0000-4000-8000-000000001501')?.recordedLater).toBe(false)
+    expect(review.eventById.get('70000000-0000-4000-8000-000000001502')?.recordedLater).toBe(false)
   })
 
   it('builds event shot detail with full-game ordinal and active relationships', () => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, RotateCcw, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import {
   BASKETBALL_TIMELINE_FAMILIES,
@@ -12,6 +12,8 @@ import {
   type BasketballTimelineGroup,
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from './BasketballShotDetailDialog'
+import BasketballShotEditor from './BasketballShotEditor'
+import BasketballHistoricalShotEditor from './BasketballHistoricalShotEditor'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from './BasketballTimelineCorrectionDialog'
@@ -27,6 +29,15 @@ export default function BasketballTimeline() {
   }))
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
   const [correctionIntent, setCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
+  const [editingShotId, setEditingShotId] = useState<string | null>(null)
+  const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
+  const [addingShot, setAddingShot] = useState(false)
+
+  useEffect(() => {
+    if (!highlightEventId) return
+    const timer = window.setTimeout(() => setHighlightEventId(null), 1_600)
+    return () => window.clearTimeout(timer)
+  }, [highlightEventId])
 
   useEffect(() => {
     if (
@@ -70,7 +81,17 @@ export default function BasketballTimeline() {
               {activeGroups.length} {activeGroups.length === 1 ? 'capture' : 'captures'}
             </p>
           </div>
-          {!review.complete && (
+          {correctionsEnabled && (
+            <button
+              type="button"
+              onClick={() => setAddingShot(true)}
+              className="btn-secondary flex min-h-10 items-center gap-2 px-3 text-sm"
+            >
+              <Plus size={16} aria-hidden />
+              Add shot
+            </button>
+          )}
+          {!review.complete && !correctionsEnabled && (
             <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
               <AlertTriangle size={14} aria-hidden />
               Diagnostics
@@ -148,6 +169,7 @@ export default function BasketballTimeline() {
                   onOpenShot={openShotDetail}
                   onCorrect={setCorrectionIntent}
                   correctionsEnabled={correctionsEnabled}
+                  highlightEventId={highlightEventId}
                 />
               </li>
             ))}
@@ -170,6 +192,7 @@ export default function BasketballTimeline() {
                     onOpenShot={openShotDetail}
                     onCorrect={setCorrectionIntent}
                     correctionsEnabled={correctionsEnabled}
+                    highlightEventId={highlightEventId}
                     removed
                   />
                 </li>
@@ -183,6 +206,12 @@ export default function BasketballTimeline() {
         <BasketballShotDetailDialog
           detail={shotDetail}
           onClose={() => setShotDetail(null)}
+          onEdit={correctionsEnabled && shotDetail.source === 'event' && !shotDetail.removed
+            ? () => {
+                setShotDetail(null)
+                setEditingShotId(shotDetail.shotId)
+              }
+            : undefined}
           onRemove={correctionsEnabled && shotDetail.source === 'event' && !shotDetail.removed
             ? () => {
                 setShotDetail(null)
@@ -205,6 +234,27 @@ export default function BasketballTimeline() {
           onApplied={() => setShotDetail(null)}
         />
       )}
+
+      {editingShotId && (
+        <BasketballShotEditor
+          eventId={editingShotId}
+          onClose={() => setEditingShotId(null)}
+          onApplied={eventId => {
+            setEditingShotId(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
+      {addingShot && (
+        <BasketballHistoricalShotEditor
+          onClose={() => setAddingShot(false)}
+          onApplied={eventId => {
+            setAddingShot(false)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
     </section>
   )
 }
@@ -214,12 +264,14 @@ function TimelineGroup({
   onOpenShot,
   onCorrect,
   correctionsEnabled,
+  highlightEventId,
   removed = false,
 }: {
   group: BasketballTimelineGroup
   onOpenShot: (eventId: string) => void
   onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
   correctionsEnabled: boolean
+  highlightEventId: string | null
   removed?: boolean
 }) {
   const grouped = group.captureCommandId !== null && group.events.length > 1
@@ -231,6 +283,7 @@ function TimelineGroup({
         onOpenShot={onOpenShot}
         onCorrect={onCorrect}
         correctionsEnabled={correctionsEnabled}
+        highlighted={highlightEventId === group.events[0].id}
         removed={removed}
       />
     )
@@ -262,6 +315,7 @@ function TimelineGroup({
             onOpenShot={onOpenShot}
             onCorrect={onCorrect}
             correctionsEnabled={correctionsEnabled}
+            highlighted={highlightEventId === review.id}
             removed={removed}
             nested
           />
@@ -292,6 +346,7 @@ function TimelineEventRow({
   onCorrect,
   correctionsEnabled,
   removed,
+  highlighted = false,
   nested = false,
 }: {
   review: BasketballTimelineEventReview
@@ -300,6 +355,7 @@ function TimelineEventRow({
   onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
   correctionsEnabled: boolean
   removed: boolean
+  highlighted?: boolean
   nested?: boolean
 }) {
   const shot = review.event.eventType === 'basketball.shot'
@@ -313,6 +369,9 @@ function TimelineEventRow({
           {!nested && <StatusBadges group={group} removed={removed} />}
           {review.revised && nested && (
             <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Revised</span>
+          )}
+          {review.recordedLater && nested && (
+            <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">Recorded later</span>
           )}
         </div>
         <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
@@ -358,7 +417,9 @@ function TimelineEventRow({
       </div>
     </>
   )
-  const className = `${nested ? 'rounded-md px-2.5 py-2' : 'rounded-lg border border-slate-200 bg-white px-3 py-3'} flex w-full items-start gap-3`
+  const className = `${nested ? 'rounded-md px-2.5 py-2' : 'rounded-lg border border-slate-200 bg-white px-3 py-3'} ${
+    highlighted ? 'ring-2 ring-emerald-400 ring-offset-1' : ''
+  } flex w-full items-start gap-3`
 
   return <div className={className}>{content}</div>
 }
@@ -368,6 +429,7 @@ function StatusBadges({ group, removed }: { group: BasketballTimelineGroup; remo
     <>
       {removed && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">Removed</span>}
       {group.revised && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Revised</span>}
+      {group.recordedLater && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">Recorded later</span>}
       {group.boundary && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">Boundary</span>}
       {!removed && group.removedCompanionCount > 0 && (
         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">

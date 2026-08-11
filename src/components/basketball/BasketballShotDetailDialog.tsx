@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { CircleAlert, RotateCcw, Trash2, X } from 'lucide-react'
+import { CircleAlert, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import type { BasketballShotDetailModel } from '../../lib/basketball/timeline'
 
 interface BasketballShotDetailDialogProps {
   detail: BasketballShotDetailModel
   onClose: () => void
+  onEdit?: () => void
   onRemove?: () => void
   onRestore?: () => void
 }
@@ -12,6 +13,7 @@ interface BasketballShotDetailDialogProps {
 export default function BasketballShotDetailDialog({
   detail,
   onClose,
+  onEdit,
   onRemove,
   onRestore,
 }: BasketballShotDetailDialogProps) {
@@ -138,6 +140,16 @@ export default function BasketballShotDetailDialog({
         </div>
 
         <footer className="flex gap-2 border-t border-slate-200 bg-white px-4 py-3">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 text-sm font-bold text-blue-800"
+            >
+              <Pencil size={17} aria-hidden />
+              Edit
+            </button>
+          )}
           {(onRemove || onRestore) && (
             <button
               type="button"

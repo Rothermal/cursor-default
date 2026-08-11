@@ -2,8 +2,9 @@
 
 ## Scope
 
-BKE-3A and BKE-3B provide local event review, shared shot detail, arbitrary removal, persisted
-capture-group removal, and conservative restoration. Basketball event cloud transport remains off.
+BKE-3A through BKE-3C provide local event review, shared shot detail and editing, arbitrary removal,
+persisted capture-group removal, conservative restoration, atomic relationship correction, and
+recorded-later field-goal additions. Basketball event cloud transport remains off.
 
 ## Automated Coverage
 
@@ -14,6 +15,11 @@ capture-group removal, and conservative restoration. Basketball event cloud tran
   turnover/steal unlinking, foul/trip unlinking, lifecycle boundaries, projection effects, and
   quick-Undo receipt invalidation. Stale-preview rejection is library-level/unit-only because an
   open React dialog re-derives its preview whenever authoritative state changes.
+- `src/lib/basketball/shotEditCommands.test.ts` covers made/missed and 2PT/3PT transitions,
+  locate/unlocate behavior, stale-link cleanup, atomic relationship append/re-link/restore, free-throw
+  constraints, stale draft rejection, and recorded-later field-goal additions.
+- `src/lib/gameEvents/gameEvents.test.ts` covers the append-plus-mutate final candidate, one rebuild,
+  and pre-projection duplicate id/recorder-sequence rejection.
 - The full Vitest suite, TypeScript production build, and ESLint remain required for every slice.
 
 ## Manual Matrix
@@ -33,3 +39,13 @@ capture-group removal, and conservative restoration. Basketball event cloud tran
    and terminal games require Reopen before correction.
 8. Create a quick-Undo restore opportunity, then apply a Timeline correction. Confirm the old quick
    restore is no longer available. Park/reload and verify current revisions and tombstones persist.
+9. Open the same active shot from a court marker and Timeline detail. Edit shooter/side, result, and
+   value; confirm both entry points use the same confirmation and the saved row/marker highlights.
+10. Move a located field goal, deliberately override its geometry-derived value, remove its location,
+    and locate an unlocated field goal. Confirm value source, zone, marker, score, and totals agree.
+11. Add, remove, re-link, and explicitly restore valid assist/rebound/block relationships. Change the
+    shot so a surviving link becomes invalid and confirm it remains a standalone stat as previewed.
+12. Add a field goal to a previously started period with an optional relationship. Confirm it uses
+    current append order, displays `Recorded later`, retains the selected period, and saves atomically.
+13. Attempt an invalid free-throw location, incompatible relationship, and stale-draft save. Confirm
+    every failure leaves the full stream, projected score/stats, and quick-Undo receipt unchanged.

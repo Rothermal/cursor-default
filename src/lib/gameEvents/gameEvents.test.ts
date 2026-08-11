@@ -4,6 +4,7 @@ import { createInitialState, gameReducer } from '../gameReducer'
 import {
   addGameEvent,
   addGameEvents,
+  applyGameEventAppendsAndMutations,
   applyGameEventMutations,
   deleteGameEvent,
   initializeGameEventStream,
@@ -408,6 +409,100 @@ describe('game event mutations and projections', () => {
       '2026-07-17T12:09:00.000Z',
       null,
     ])
+  })
+
+  it('appends and revises against one final candidate with one projection rebuild', () => {
+    let projectionCalls = 0
+    const countingProjectors = new GameEventProjectorRegistry<FixtureEvent>([{
+      sportId: 'soccer',
+      project: (current, events) => {
+        projectionCalls += 1
+        const total = events.reduce((sum, item) => sum + item.payload.value, 0)
+        return {
+          playerStatsById: Object.fromEntries(
+            current.players.map(player => [player.id, { fixture_scores: total }])
+          ),
+          homeTeamScore: total,
+          opponentScore: 0,
+          shotChart: [],
+        }
+      },
+    }])
+    const initialized = initializeGameEventStream(state(), registry, countingProjectors)
+    if (!initialized.ok) throw new Error('fixture initialization failed')
+    const existing = event('30500000-0000-4000-8000-000000000001')
+    const added = addGameEvent(initialized.state, existing, registry, countingProjectors)
+    if (!added.ok) throw new Error('fixture add failed')
+    projectionCalls = 0
+
+    const appended = event('30500000-0000-4000-8000-000000000002', {
+      sequence: 2,
+      payload: { value: 3 },
+    })
+    const result = applyGameEventAppendsAndMutations(
+      added.state,
+      [appended],
+      [{ type: 'update', eventId: existing.id, changes: { payload: { value: 2 } } }],
+      '2026-07-17T12:09:30.000Z',
+      registry,
+      countingProjectors
+    )
+
+    expect(result.ok).toBe(true)
+    expect(projectionCalls).toBe(1)
+    if (!result.ok) throw new Error(result.error.message)
+    expect(result.state.homeTeamScore).toBe(5)
+    expect(result.state.eventStream?.events).toHaveLength(2)
+    expect(result.state.eventStream?.events[0]).toMatchObject({ revision: 2, payload: { value: 2 } })
+    expect(result.state.eventStream?.events[1]).toMatchObject({ revision: 1, payload: { value: 3 } })
+  })
+
+  it('rejects duplicate append identity and sequence before projection and rolls back', () => {
+    let projectionCalls = 0
+    const countingProjectors = new GameEventProjectorRegistry<FixtureEvent>([{
+      sportId: 'soccer',
+      project: (_current, events) => {
+        projectionCalls += 1
+        return {
+          playerStatsById: {},
+          homeTeamScore: events.length,
+          opponentScore: 0,
+          shotChart: [],
+        }
+      },
+    }])
+    const initialized = initializeGameEventStream(state(), registry, countingProjectors)
+    if (!initialized.ok) throw new Error('fixture initialization failed')
+    const existing = event('30600000-0000-4000-8000-000000000001')
+    const added = addGameEvent(initialized.state, existing, registry, countingProjectors)
+    if (!added.ok) throw new Error('fixture add failed')
+    projectionCalls = 0
+
+    const duplicateId = applyGameEventAppendsAndMutations(
+      added.state,
+      [{ ...event(existing.id), sequence: 2 }],
+      [],
+      '2026-07-17T12:09:40.000Z',
+      registry,
+      countingProjectors
+    )
+    const duplicateSequence = applyGameEventAppendsAndMutations(
+      added.state,
+      [event('30600000-0000-4000-8000-000000000002')],
+      [],
+      '2026-07-17T12:09:50.000Z',
+      registry,
+      countingProjectors
+    )
+
+    expect(duplicateId).toMatchObject({ ok: false, error: { code: 'duplicate_event_id' } })
+    expect(duplicateSequence).toMatchObject({
+      ok: false,
+      error: { code: 'duplicate_event_sequence' },
+    })
+    expect(duplicateId.state).toBe(added.state)
+    expect(duplicateSequence.state).toBe(added.state)
+    expect(projectionCalls).toBe(0)
   })
 
   it('preserves raw schemas for batch tombstone and restore while updates migrate', () => {

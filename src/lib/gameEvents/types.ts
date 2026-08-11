@@ -148,6 +148,7 @@ export type GameEventMutationErrorCode =
   | 'stream_not_initialized'
   | 'event_not_found'
   | 'duplicate_event_id'
+  | 'duplicate_event_sequence'
   | 'empty_mutation_batch'
   | 'duplicate_mutation_target'
   | 'invalid_event'
