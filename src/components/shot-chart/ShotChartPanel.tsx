@@ -38,6 +38,9 @@ import {
   type BasketballShotDetailModel,
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
+import BasketballTimelineCorrectionDialog, {
+  type BasketballTimelineCorrectionIntent,
+} from '../basketball/BasketballTimelineCorrectionDialog'
 
 function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
@@ -110,6 +113,7 @@ export default function ShotChartPanel({
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [correctionError, setCorrectionError] = useState<string | null>(null)
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
+  const [timelineCorrectionIntent, setTimelineCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
   const [overlapChoices, setOverlapChoices] = useState<ShotRecord[]>([])
   const pendingPulseIdRef = useRef<string | null>(null)
   const overlapDialogRef = useRef<HTMLElement>(null)
@@ -129,10 +133,17 @@ export default function ShotChartPanel({
     [isEventBasketball, state]
   )
   const basketballReview = useMemo(
-    () => isEventBasketball && overlapChoices.length > 1
+    () => isEventBasketball
       ? buildBasketballTimelineReview(state)
       : null,
-    [isEventBasketball, overlapChoices.length, state]
+    [isEventBasketball, state]
+  )
+  const timelineCorrectionsEnabled = Boolean(
+    basketballReview?.complete &&
+    state.sportGameState?.sportId === 'basketball' && (
+      state.sportGameState.projection.status === 'in_progress' ||
+      state.sportGameState.projection.status === 'period_break'
+    )
   )
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
@@ -566,7 +577,28 @@ export default function ShotChartPanel({
       )}
 
       {shotDetail && (
-        <BasketballShotDetailDialog detail={shotDetail} onClose={() => setShotDetail(null)} />
+        <BasketballShotDetailDialog
+          detail={shotDetail}
+          onClose={() => setShotDetail(null)}
+          onRemove={timelineCorrectionsEnabled && shotDetail.source === 'event'
+            ? () => {
+                setShotDetail(null)
+                setTimelineCorrectionIntent({
+                  kind: 'remove',
+                  eventId: shotDetail.shotId,
+                  scope: 'event',
+                })
+              }
+            : undefined}
+        />
+      )}
+
+      {timelineCorrectionIntent && (
+        <BasketballTimelineCorrectionDialog
+          intent={timelineCorrectionIntent}
+          onClose={() => setTimelineCorrectionIntent(null)}
+          onApplied={() => setShotDetail(null)}
+        />
       )}
 
       <ConfirmDialog

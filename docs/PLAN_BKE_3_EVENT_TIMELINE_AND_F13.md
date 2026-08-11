@@ -5,7 +5,7 @@ review with an editable Timeline and delivering the held F13 shot-detail experie
 event model.
 
 Status: Approved through the BKE-3 product and delivery Q&A. Implementation is split into BKE-3A
-through BKE-3D. BKE-3A is complete; BKE-3B is next.
+through BKE-3D. BKE-3A and BKE-3B are complete; BKE-3C is next.
 
 Depends on:
 
@@ -228,6 +228,10 @@ read-only tracker experience without adding correction authority.
 - Park/reload an event game and preserve Timeline/detail context derived from authoritative state.
 
 ## 7. BKE-3B: Remove and Restore
+
+Status: Complete. `src/lib/basketball/timelineCorrections.ts` owns consequence preview and checked
+apply commands; `BasketballTimelineCorrectionDialog` is shared by Timeline rows and shot detail.
+See [REGRESSION_BKE_3_TIMELINE.md](REGRESSION_BKE_3_TIMELINE.md).
 
 ### 7.1 Checked correction commands
 

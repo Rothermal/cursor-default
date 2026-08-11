@@ -1054,7 +1054,7 @@ function withUndoReceipt(
   }
 }
 
-function reconcileBasketballPlayerRows(state: GameState): GameState {
+export function reconcileBasketballPlayerRows(state: GameState): GameState {
   if (state.sportGameState?.sportId !== 'basketball') return state
   const sportState = state.sportGameState
   const projected = Object.values(sportState.projection.participants)

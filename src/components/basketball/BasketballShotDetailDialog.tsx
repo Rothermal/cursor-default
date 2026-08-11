@@ -1,15 +1,19 @@
 import { useEffect, useRef } from 'react'
-import { CircleAlert, X } from 'lucide-react'
+import { CircleAlert, RotateCcw, Trash2, X } from 'lucide-react'
 import type { BasketballShotDetailModel } from '../../lib/basketball/timeline'
 
 interface BasketballShotDetailDialogProps {
   detail: BasketballShotDetailModel
   onClose: () => void
+  onRemove?: () => void
+  onRestore?: () => void
 }
 
 export default function BasketballShotDetailDialog({
   detail,
   onClose,
+  onRemove,
+  onRestore,
 }: BasketballShotDetailDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -133,8 +137,22 @@ export default function BasketballShotDetailDialog({
           </details>
         </div>
 
-        <footer className="border-t border-slate-200 bg-white px-4 py-3">
-          <button type="button" onClick={onClose} className="btn-primary w-full py-3">
+        <footer className="flex gap-2 border-t border-slate-200 bg-white px-4 py-3">
+          {(onRemove || onRestore) && (
+            <button
+              type="button"
+              onClick={onRestore ?? onRemove}
+              className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border text-sm font-bold ${
+                onRestore
+                  ? 'border-blue-200 bg-blue-50 text-blue-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-800'
+              }`}
+            >
+              {onRestore ? <RotateCcw size={17} aria-hidden /> : <Trash2 size={17} aria-hidden />}
+              {onRestore ? 'Restore' : 'Remove'}
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="btn-primary min-h-11 flex-1">
             Close
           </button>
         </footer>
