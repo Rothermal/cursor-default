@@ -12,7 +12,8 @@ capture-group removal, and conservative restoration. Basketball event cloud tran
 - `src/lib/basketball/timelineCorrections.test.ts` covers shot/dependent and capture-group removal,
   default source-only restore, optional compatible-dependent restore, stale preview rejection,
   turnover/steal unlinking, foul/trip unlinking, lifecycle boundaries, projection effects, and
-  quick-Undo receipt invalidation.
+  quick-Undo receipt invalidation. Stale-preview rejection is library-level/unit-only because an
+  open React dialog re-derives its preview whenever authoritative state changes.
 - The full Vitest suite, TypeScript production build, and ESLint remain required for every slice.
 
 ## Manual Matrix

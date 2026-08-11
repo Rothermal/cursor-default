@@ -113,6 +113,7 @@ export default function ShotChartPanel({
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [correctionError, setCorrectionError] = useState<string | null>(null)
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
+  const [shotDetailCorrectionsEnabled, setShotDetailCorrectionsEnabled] = useState(false)
   const [timelineCorrectionIntent, setTimelineCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
   const [overlapChoices, setOverlapChoices] = useState<ShotRecord[]>([])
   const pendingPulseIdRef = useRef<string | null>(null)
@@ -133,17 +134,10 @@ export default function ShotChartPanel({
     [isEventBasketball, state]
   )
   const basketballReview = useMemo(
-    () => isEventBasketball
+    () => isEventBasketball && overlapChoices.length > 1
       ? buildBasketballTimelineReview(state)
       : null,
-    [isEventBasketball, state]
-  )
-  const timelineCorrectionsEnabled = Boolean(
-    basketballReview?.complete &&
-    state.sportGameState?.sportId === 'basketball' && (
-      state.sportGameState.projection.status === 'in_progress' ||
-      state.sportGameState.projection.status === 'period_break'
-    )
+    [isEventBasketball, overlapChoices.length, state]
   )
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
@@ -328,9 +322,23 @@ export default function ShotChartPanel({
   }, [basketballReview, isEventBasketball, state])
 
   const openShotDetail = useCallback((shot: ShotRecord) => {
-    const detail = detailForShot(shot)
+    if (!isEventBasketball) {
+      const detail = legacyBasketballShotDetail(state, shot.id)
+      setShotDetailCorrectionsEnabled(false)
+      if (detail) setShotDetail(detail)
+      return
+    }
+    const review = basketballReview ?? buildBasketballTimelineReview(state)
+    const detail = basketballShotDetailFromReview(state, review, shot.id)
+    setShotDetailCorrectionsEnabled(Boolean(
+      review.complete &&
+      state.sportGameState?.sportId === 'basketball' && (
+        state.sportGameState.projection.status === 'in_progress' ||
+        state.sportGameState.projection.status === 'period_break'
+      )
+    ))
     if (detail) setShotDetail(detail)
-  }, [detailForShot])
+  }, [basketballReview, isEventBasketball, state])
 
   const handleMarkerActivate = useCallback((
     shot: ShotRecord,
@@ -580,7 +588,7 @@ export default function ShotChartPanel({
         <BasketballShotDetailDialog
           detail={shotDetail}
           onClose={() => setShotDetail(null)}
-          onRemove={timelineCorrectionsEnabled && shotDetail.source === 'event'
+          onRemove={shotDetailCorrectionsEnabled && shotDetail.source === 'event'
             ? () => {
                 setShotDetail(null)
                 setTimelineCorrectionIntent({

@@ -63,15 +63,37 @@ export default function BasketballTimelineCorrectionDialog({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  const previewResult = useMemo(() => intent.kind === 'remove'
-    ? previewBasketballTimelineRemoval(state, intent.eventId, intent.scope)
-    : previewBasketballTimelineRestore(state, intent.eventId, selectedDependentIds), [
+  const baseRestoreResult = useMemo(() => intent.kind === 'restore'
+    ? previewBasketballTimelineRestore(state, intent.eventId)
+    : null, [intent, state])
+
+  const previewResult = useMemo(() => {
+    if (intent.kind === 'remove') {
+      return previewBasketballTimelineRemoval(state, intent.eventId, intent.scope)
+    }
+    if (selectedDependentIds.length === 0 && baseRestoreResult) return baseRestoreResult
+    return previewBasketballTimelineRestore(
+      state,
+      intent.eventId,
+      selectedDependentIds,
+      baseRestoreResult?.ok
+        ? {
+            eventLabel: baseRestoreResult.value.eventLabel,
+            restoreOptions: baseRestoreResult.value.restoreOptions,
+          }
+        : undefined
+    )
+  }, [
+    baseRestoreResult,
     intent,
     selectedDependentIds,
     state,
   ])
 
   const preview = previewResult.ok ? previewResult.value : null
+  const baseRestorePreview = baseRestoreResult?.ok ? baseRestoreResult.value : null
+  const displayPreview = preview ?? baseRestorePreview
+  const restoreOptions = baseRestorePreview?.restoreOptions ?? []
   const previewError = previewResult.ok ? null : previewResult.message
   const title = intent.kind === 'remove'
     ? intent.scope === 'capture_group' ? 'Remove capture?' : 'Remove event?'
@@ -109,7 +131,11 @@ export default function BasketballTimelineCorrectionDialog({
             <h2 id="basketball-timeline-correction-title" className="text-base font-bold text-slate-900">
               {title}
             </h2>
-            {preview && <p className="mt-0.5 truncate text-sm font-medium text-slate-600">{preview.eventLabel}</p>}
+            {displayPreview && (
+              <p className="mt-0.5 truncate text-sm font-medium text-slate-600">
+                {displayPreview.eventLabel}
+              </p>
+            )}
           </div>
           <button
             ref={closeRef}
@@ -124,6 +150,28 @@ export default function BasketballTimelineCorrectionDialog({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {intent.kind === 'restore' && restoreOptions.length > 0 && (
+            <fieldset className="mb-4 border-y border-slate-200 py-3">
+              <legend className="text-xs font-semibold uppercase text-slate-500">Related removed events</legend>
+              <p className="mt-1 text-xs text-slate-500">Nothing extra is restored unless selected.</p>
+              <div className="mt-2 space-y-1">
+                {restoreOptions.map(option => (
+                  <label key={option.eventId} className="flex min-h-11 items-center gap-3 py-1 text-sm font-medium text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={selectedDependentIds.includes(option.eventId)}
+                      onChange={event => setSelectedDependentIds(current => event.target.checked
+                        ? [...current, option.eventId]
+                        : current.filter(id => id !== option.eventId))}
+                      className="h-5 w-5 rounded border-slate-300 text-blue-600"
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
           {preview === null ? (
             <p role="alert" className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-900">
               <AlertTriangle className="mt-0.5 shrink-0" size={17} aria-hidden />
@@ -131,28 +179,6 @@ export default function BasketballTimelineCorrectionDialog({
             </p>
           ) : (
             <>
-              {preview.kind === 'restore' && preview.restoreOptions.length > 0 && (
-                <fieldset className="mb-4 border-y border-slate-200 py-3">
-                  <legend className="text-xs font-semibold uppercase text-slate-500">Related removed events</legend>
-                  <p className="mt-1 text-xs text-slate-500">Nothing extra is restored unless selected.</p>
-                  <div className="mt-2 space-y-1">
-                    {preview.restoreOptions.map(option => (
-                      <label key={option.eventId} className="flex min-h-11 items-center gap-3 py-1 text-sm font-medium text-slate-800">
-                        <input
-                          type="checkbox"
-                          checked={selectedDependentIds.includes(option.eventId)}
-                          onChange={event => setSelectedDependentIds(current => event.target.checked
-                            ? [...current, option.eventId]
-                            : current.filter(id => id !== option.eventId))}
-                          className="h-5 w-5 rounded border-slate-300 text-blue-600"
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
-
               <h3 className="text-xs font-semibold uppercase text-slate-500">Match effects</h3>
               <ul className="mt-2 space-y-2 text-sm text-slate-700">
                 {preview.consequenceLines.map(line => (

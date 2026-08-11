@@ -72,7 +72,8 @@ interface PreparedBasketballState {
 }
 
 interface BasketballInvariantIssue {
-  key: string
+  identity: string
+  severity: number
   message: string
 }
 
@@ -95,6 +96,7 @@ export function previewBasketballTimelineRemoval(
   for (const target of targetEvents) {
     const unavailable = validateRemovalAvailability(
       prepared.value.active,
+      prepared.value.deleted,
       target,
       new Set(targetEvents.map(candidate => candidate.id))
     )
@@ -104,7 +106,8 @@ export function previewBasketballTimelineRemoval(
   const plan = buildRemovalPlan(prepared.value.active, targetEvents)
   const candidate = validatePlan(prepared.value.state, plan.mutations)
   if (!candidate.ok) return candidate
-  const eventLabel = eventLabelForState(prepared.value.state, event.id)
+  const labels = buildBasketballTimelineReview(prepared.value.state).eventById
+  const eventLabel = labels.get(event.id)?.title ?? 'Basketball event'
   return {
     ok: true,
     value: {
@@ -136,29 +139,42 @@ export function removeBasketballTimelineEvents(
   if (eventStreamFingerprint(state) !== preview.streamFingerprint) {
     return failure(state, 'command_failed', 'The Timeline changed. Review the removal again before applying it.')
   }
-  const current = previewBasketballTimelineRemoval(state, preview.eventId, preview.scope)
-  if (!current.ok) return failure(state, current.code, current.message)
-  if (
-    current.value.streamFingerprint !== preview.streamFingerprint ||
-    current.value.captureCommandId !== preview.captureCommandId ||
-    !sameStringSet(current.value.affectedEventIds, preview.affectedEventIds)
-  ) {
-    return failure(state, 'command_failed', 'The removal consequences changed. Review them again before applying.')
-  }
   const prepared = prepareState(state)
   if (!prepared.ok) return failure(state, prepared.code, prepared.message)
   const event = prepared.value.active.find(candidate => candidate.id === preview.eventId)
   if (!event) return failure(state, 'nothing_to_undo', 'This Basketball event is no longer active.')
+  const captureCommandId = captureCommandIdForEvent(event)
+  if (preview.scope === 'capture_group' && captureCommandId !== preview.captureCommandId) {
+    return failure(state, 'command_failed', 'The removal capture group changed. Review it again before applying.')
+  }
   const targets = preview.scope === 'capture_group'
     ? prepared.value.active.filter(candidate => captureCommandIdForEvent(candidate) === preview.captureCommandId)
     : [event]
-  return applyTimelinePlan(state, buildRemovalPlan(prepared.value.active, targets).mutations, timestamp)
+  const removingIds = new Set(targets.map(candidate => candidate.id))
+  for (const target of targets) {
+    const unavailable = validateRemovalAvailability(
+      prepared.value.active,
+      prepared.value.deleted,
+      target,
+      removingIds
+    )
+    if (unavailable) return failure(state, 'command_failed', unavailable)
+  }
+  const plan = buildRemovalPlan(prepared.value.active, targets)
+  if (!sameStringSet(plan.mutations.map(mutation => mutation.eventId), preview.affectedEventIds)) {
+    return failure(state, 'command_failed', 'The removal consequences changed. Review them again before applying.')
+  }
+  return applyTimelinePlan(state, prepared.value.state, plan.mutations, timestamp)
 }
 
 export function previewBasketballTimelineRestore(
   state: GameState,
   eventId: string,
-  selectedDependentIds: string[] = []
+  selectedDependentIds: string[] = [],
+  knownCompatiblePreview?: Pick<
+    BasketballTimelineRestorePreview,
+    'eventLabel' | 'restoreOptions'
+  >
 ): BasketballCommandResult<BasketballTimelineRestorePreview> {
   const prepared = prepareState(state)
   if (!prepared.ok) return prepared
@@ -171,7 +187,18 @@ export function previewBasketballTimelineRestore(
   const baseMutation: GameEventMutation = { type: 'restore', eventId }
   const baseCandidate = validatePlan(prepared.value.state, [baseMutation])
   if (!baseCandidate.ok) return baseCandidate
-  const options = compatibleRestoreOptions(prepared.value, event)
+  const relatedDeletedIds = new Set(prepared.value.deleted
+    .filter(candidate => candidate.id !== event.id && relationshipSourceId(candidate) === event.id)
+    .map(candidate => candidate.id))
+  const canReusePreview = knownCompatiblePreview?.restoreOptions.every(option =>
+    relatedDeletedIds.has(option.eventId)
+  )
+  const labels = canReusePreview
+    ? null
+    : buildBasketballTimelineReview(prepared.value.state).eventById
+  const options = canReusePreview && knownCompatiblePreview
+    ? knownCompatiblePreview.restoreOptions
+    : compatibleRestoreOptions(prepared.value, event, labels!)
   const compatibleIds = new Set(options.map(option => option.eventId))
   const selected = [...new Set(selectedDependentIds)]
   if (selected.some(id => !compatibleIds.has(id))) {
@@ -199,7 +226,9 @@ export function previewBasketballTimelineRestore(
     value: {
       kind: 'restore',
       eventId,
-      eventLabel: eventLabelForState(prepared.value.state, event.id),
+      eventLabel: canReusePreview && knownCompatiblePreview
+        ? knownCompatiblePreview.eventLabel
+        : labels?.get(event.id)?.title ?? 'Basketball event',
       streamFingerprint: eventStreamFingerprint(prepared.value.state),
       consequenceLines: correctionConsequenceLines(
         prepared.value.state,
@@ -225,20 +254,31 @@ export function restoreBasketballTimelineEvent(
   if (eventStreamFingerprint(state) !== preview.streamFingerprint) {
     return failure(state, 'command_failed', 'The Timeline changed. Review the restoration again before applying it.')
   }
-  const current = previewBasketballTimelineRestore(
-    state,
-    preview.eventId,
-    preview.selectedDependentIds
+  const prepared = prepareState(state)
+  if (!prepared.ok) return failure(state, prepared.code, prepared.message)
+  const source = prepared.value.deleted.find(event => event.id === preview.eventId)
+  if (!source) return failure(state, 'restore_unavailable', 'This Basketball event is no longer removed.')
+  if (READ_ONLY_EVENT_TYPES.has(source.eventType)) {
+    return failure(state, 'restore_unavailable', 'Basketball lifecycle and identity boundaries are read-only.')
+  }
+  const selected = [...new Set(preview.selectedDependentIds)]
+  const selectedEvents = selected.map(eventId =>
+    prepared.value.deleted.find(event => event.id === eventId)
   )
-  if (!current.ok) return failure(state, current.code, current.message)
-  if (!sameStringSet(current.value.affectedEventIds, preview.affectedEventIds)) {
-    return failure(state, 'command_failed', 'The restoration consequences changed. Review them again before applying.')
+  if (
+    selectedEvents.some(event => !event) ||
+    selectedEvents.some(event => event && relationshipSourceId(event) !== source.id)
+  ) {
+    return failure(state, 'restore_unavailable', 'A selected related event can no longer be restored with this event.')
   }
   const mutations: GameEventMutation[] = [
     { type: 'restore', eventId: preview.eventId },
-    ...preview.selectedDependentIds.map(eventId => ({ type: 'restore' as const, eventId })),
+    ...selected.map(eventId => ({ type: 'restore' as const, eventId })),
   ]
-  return applyTimelinePlan(state, mutations, timestamp)
+  if (!sameStringSet(mutations.map(mutation => mutation.eventId), preview.affectedEventIds)) {
+    return failure(state, 'command_failed', 'The restoration consequences changed. Review them again before applying.')
+  }
+  return applyTimelinePlan(state, prepared.value.state, mutations, timestamp)
 }
 
 function prepareState(state: GameState): BasketballCommandResult<PreparedBasketballState> {
@@ -282,6 +322,7 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedBasketb
 
 function validateRemovalAvailability(
   activeEvents: BasketballMatchEvent[],
+  deletedEvents: BasketballMatchEvent[],
   event: BasketballMatchEvent,
   removingIds = new Set([event.id])
 ): string | null {
@@ -290,7 +331,7 @@ function validateRemovalAvailability(
   }
   if (event.eventType !== 'basketball.match_roster_added') return null
   const participantId = event.payload.participant.id
-  const dependent = activeEvents.find(candidate =>
+  const dependent = [...activeEvents, ...deletedEvents].find(candidate =>
     !removingIds.has(candidate.id) && (
       candidate.actors.some(actor => actor.participantId === participantId) ||
       (candidate.eventType === 'basketball.participant_resolved' &&
@@ -298,7 +339,7 @@ function validateRemovalAvailability(
     )
   )
   return dependent
-    ? 'This late roster addition has later participant history and cannot be removed.'
+    ? 'This late roster addition has later active or removed participant history and cannot be removed.'
     : null
 }
 
@@ -429,7 +470,8 @@ function buildRemovalPlan(
 
 function compatibleRestoreOptions(
   prepared: PreparedBasketballState,
-  source: BasketballMatchEvent
+  source: BasketballMatchEvent,
+  labels: ReadonlyMap<string, { title: string }>
 ): BasketballTimelineRestoreOption[] {
   const candidates = prepared.deleted.filter(event =>
     event.id !== source.id && relationshipSourceId(event) === source.id
@@ -442,7 +484,7 @@ function compatibleRestoreOptions(
     .sort(compareGameEventCaptureOrder)
     .map(event => ({
       eventId: event.id,
-      label: eventLabelForState(prepared.state, event.id),
+      label: labels.get(event.id)?.title ?? 'Basketball event',
     }))
 }
 
@@ -463,13 +505,14 @@ function relationshipSourceId(event: BasketballMatchEvent): string | null {
 
 function validatePlan(
   state: GameState,
-  mutations: GameEventMutation[]
+  mutations: GameEventMutation[],
+  now = new Date().toISOString()
 ): BasketballCommandResult<GameState> {
   const baselineState = clearQuickUndoReceipt(state)
   const result = applyGameEventMutations(
     baselineState,
     mutations,
-    new Date().toISOString(),
+    now,
     gameEventRegistry,
     gameEventProjectors
   )
@@ -492,62 +535,34 @@ function validatePlan(
   if (newWarning) {
     return commandFailure('command_failed', `This correction would create an invalid relationship: ${newWarning.message}`)
   }
-  const baselineFacts = basketballInvariantIssues(state)
-  const candidateFacts = basketballInvariantIssues(result.state)
-  const baselineFactKeys = new Set(baselineFacts.map(issue => issue.key))
-  const newFact = candidateFacts.find(issue => !baselineFactKeys.has(issue.key))
-  if (newFact) return commandFailure('command_failed', newFact.message)
+  const worsenedInvariant = firstWorsenedInvariant(
+    basketballInvariantIssues(state),
+    basketballInvariantIssues(result.state)
+  )
+  if (worsenedInvariant) return commandFailure('command_failed', worsenedInvariant.message)
   return { ok: true, value: result.state }
 }
 
 function applyTimelinePlan(
   originalState: GameState,
+  baselineState: GameState,
   mutations: GameEventMutation[],
   now: string
 ): BasketballStateCommandResult {
-  const baselineState = clearQuickUndoReceipt(originalState)
-  const validated = validatePlan(baselineState, mutations)
+  const validated = validatePlan(baselineState, mutations, now)
   if (!validated.ok) return failure(originalState, validated.code, validated.message)
-  const result = applyGameEventMutations(
-    baselineState,
-    mutations,
-    now,
-    gameEventRegistry,
-    gameEventProjectors
-  )
-  if (!result.ok || !result.inspection.complete) {
-    return failure(
-      originalState,
-      'command_failed',
-      result.ok ? 'The correction did not produce a complete Basketball projection.' : result.error.message
-    )
-  }
-  const finalValidation = validateAcceptedCandidate(baselineState, result.state)
-  if (finalValidation) return failure(originalState, 'command_failed', finalValidation)
-  return { ok: true, state: reconcileBasketballPlayerRows(result.state) }
-}
-
-function validateAcceptedCandidate(baseline: GameState, candidate: GameState): string | null {
-  if (
-    baseline.sportGameState?.sportId !== 'basketball' ||
-    candidate.sportGameState?.sportId !== 'basketball'
-  ) return 'Basketball projection is unavailable.'
-  const warning = firstNewRelationshipWarning(
-    baseline.sportGameState.projection.relationshipWarnings,
-    candidate.sportGameState.projection.relationshipWarnings
-  )
-  if (warning) return `This correction would create an invalid relationship: ${warning.message}`
-  const baselineIssues = basketballInvariantIssues(baseline)
-  const baselineIssueKeys = new Set(baselineIssues.map(issue => issue.key))
-  return basketballInvariantIssues(candidate)
-    .find(issue => !baselineIssueKeys.has(issue.key))?.message ?? null
+  return { ok: true, state: reconcileBasketballPlayerRows(validated.value) }
 }
 
 function basketballInvariantIssues(state: GameState): BasketballInvariantIssue[] {
   if (state.sportGameState?.sportId !== 'basketball' || !state.eventStream) return []
   const inspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
   if (!inspection.complete) {
-    return [{ key: 'incomplete-history', message: 'Basketball event history is incomplete.' }]
+    return [{
+      identity: 'incomplete-history',
+      severity: 1,
+      message: 'Basketball event history is incomplete.',
+    }]
   }
   const events = inspection.activeEvents.filter(isBasketballMatchEvent)
   const issues: BasketballInvariantIssue[] = []
@@ -561,7 +576,8 @@ function basketballInvariantIssues(state: GameState): BasketballInvariantIssue[]
   for (const [subjectKey, eventIds] of ejectionSubjects) {
     if (eventIds.length < 2) continue
     issues.push({
-      key: `duplicate-ejection:${subjectKey}:${[...eventIds].sort().join(',')}`,
+      identity: `duplicate-ejection:${subjectKey}`,
+      severity: eventIds.length - 1,
       message: 'Restoring this event would duplicate an active official ejection fact.',
     })
   }
@@ -575,13 +591,26 @@ function basketballInvariantIssues(state: GameState): BasketballInvariantIssue[]
       const used = state.sportGameState.projection.periodTimeouts[period.id]?.[side] ?? 0
       if (used > allowance) {
         issues.push({
-          key: `timeout-inventory:${period.id}:${side}:${used}`,
+          identity: `timeout-inventory:${period.id}:${side}`,
+          severity: used - allowance,
           message: `Restoring this timeout would exceed the ${period.label} ${side} timeout inventory.`,
         })
       }
     }
   }
   return issues
+}
+
+function firstWorsenedInvariant(
+  baseline: BasketballInvariantIssue[],
+  candidate: BasketballInvariantIssue[]
+): BasketballInvariantIssue | null {
+  const baselineSeverity = new Map(
+    baseline.map(issue => [issue.identity, issue.severity])
+  )
+  return candidate.find(issue =>
+    issue.severity > (baselineSeverity.get(issue.identity) ?? 0)
+  ) ?? null
 }
 
 function correctionConsequenceLines(
@@ -710,10 +739,6 @@ function eventStreamFingerprint(state: GameState): string {
     if (!isGameEventEnvelope(raw)) return `invalid:${JSON.stringify(raw)}`
     return `${raw.id}:${raw.revision}:${raw.deletedAt ?? 'active'}`
   }).join('|')
-}
-
-function eventLabelForState(state: GameState, eventId: string): string {
-  return buildBasketballTimelineReview(state).eventById.get(eventId)?.title ?? 'Basketball event'
 }
 
 function captureCommandIdForEvent(event: BasketballMatchEvent): string | null {

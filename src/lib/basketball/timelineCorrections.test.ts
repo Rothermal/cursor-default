@@ -3,6 +3,9 @@ import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
+import { addGameEvents } from '../gameEvents/mutations'
+import { rebuildGameEventProjection } from '../gameEvents/projection'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import type { GameEvent } from '../gameEvents/types'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
@@ -11,6 +14,7 @@ import {
   prepareBasketballGameStart,
 } from './commands'
 import { captureBasketballStealTurnover } from './directCommands'
+import { captureBasketballOfficialEjection } from './ejectionCommands'
 import {
   captureBasketballFoul,
   captureBasketballFreeThrowAttempt,
@@ -210,6 +214,94 @@ describe('BKE-3B Basketball Timeline corrections', () => {
     expect(restored.state.players.find(candidate => candidate.id === 'player-2')?.stats.ast).toBe(1)
   })
 
+  it('rejects conflicting restore selections while retaining individually compatible options', () => {
+    const foul = captureBasketballFoul(withOpponent(), {
+      recorderUserId: 'recorder-1',
+      teamSide: 'tracked',
+      offender: { kind: 'player', playerId: 'player-1' },
+      class: 'personal',
+      context: 'shooting',
+      freeThrows: {
+        maximumAttempts: 2,
+        oneAndOne: false,
+        technical: false,
+        possessionRetained: false,
+      },
+      occurredAt: '2026-08-10T15:02:10.000Z',
+      eventIds: [
+        '75000000-0000-4000-8000-000000000251',
+        '75000000-0000-4000-8000-000000000252',
+      ],
+      captureCommandId: '75000000-0000-4000-8000-000000000259',
+    })
+    if (!foul.ok || !foul.tripEventId) throw new Error('Expected trip fixture')
+    const attempt = captureBasketballFreeThrowAttempt(foul.state, {
+      recorderUserId: 'recorder-1',
+      tripEventId: foul.tripEventId,
+      shooterPlayerId: 'opponent-9',
+      made: true,
+      occurredAt: '2026-08-10T15:02:20.000Z',
+      eventId: '75000000-0000-4000-8000-000000000253',
+    })
+    if (!attempt.ok || !attempt.state.eventStream) throw new Error('Expected attempt fixture')
+    const trip = event(attempt.state, foul.tripEventId)
+    const firstAttempt = event(attempt.state, attempt.eventIds[0])
+    if (!trip || !firstAttempt) throw new Error('Expected source events')
+    const deletedAt = '2026-08-10T15:02:30.000Z'
+    const secondAttemptId = '75000000-0000-4000-8000-000000000254'
+    const damagedState: GameState = {
+      ...attempt.state,
+      eventStream: {
+        ...attempt.state.eventStream,
+        events: [
+          ...attempt.state.eventStream.events.map(raw => {
+            if (!isGameEventEnvelope(raw)) return raw
+            if (raw.id !== trip.id && raw.id !== firstAttempt.id) return raw
+            return { ...raw, revision: raw.revision + 1, updatedAt: deletedAt, deletedAt }
+          }),
+          {
+            ...structuredClone(firstAttempt),
+            id: secondAttemptId,
+            sequence: firstAttempt.sequence + 1,
+            revision: 2,
+            createdAt: '2026-08-10T15:02:25.000Z',
+            updatedAt: deletedAt,
+            deletedAt,
+          },
+        ],
+      },
+    }
+    const rebuilt = rebuildGameEventProjection(damagedState, gameEventRegistry, gameEventProjectors)
+    expect(rebuilt.inspection.complete).toBe(true)
+    const basePreview = previewBasketballTimelineRestore(rebuilt.state, trip.id)
+    if (!basePreview.ok) throw new Error(basePreview.message)
+    expect(basePreview.value.restoreOptions.map(option => option.eventId)).toEqual([
+      firstAttempt.id,
+      secondAttemptId,
+    ])
+    expect(previewBasketballTimelineRestore(
+      rebuilt.state,
+      trip.id,
+      [firstAttempt.id],
+      basePreview.value
+    ).ok).toBe(true)
+    expect(previewBasketballTimelineRestore(
+      rebuilt.state,
+      trip.id,
+      [secondAttemptId],
+      basePreview.value
+    ).ok).toBe(true)
+    expect(previewBasketballTimelineRestore(
+      rebuilt.state,
+      trip.id,
+      [firstAttempt.id, secondAttemptId],
+      basePreview.value
+    )).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('duplicate attempt position'),
+    })
+  })
+
   it('rejects a stale preview by identity after any later Timeline change', () => {
     const state = madeShotWithAssist()
     const preview = previewBasketballTimelineRemoval(state, shotId)
@@ -367,8 +459,74 @@ describe('BKE-3B Basketball Timeline corrections', () => {
 
     expect(previewBasketballTimelineRemoval(shot.state, rosterEventId)).toMatchObject({
       ok: false,
-      message: expect.stringContaining('later participant history'),
+      message: expect.stringContaining('active or removed participant history'),
     })
+
+    const shotPreview = previewBasketballTimelineRemoval(shot.state, shot.eventIds[0])
+    if (!shotPreview.ok) throw new Error(shotPreview.message)
+    const removedShot = removeBasketballTimelineEvents(shot.state, shotPreview.value)
+    if (!removedShot.ok) throw new Error(removedShot.message)
+    expect(previewBasketballTimelineRemoval(removedShot.state, rosterEventId)).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('active or removed participant history'),
+    })
+  })
+
+  it('allows a correction that reduces a pre-existing duplicate-ejection violation', () => {
+    const started = prepareBasketballGameStart(setupState(), {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-10T15:08:00.000Z',
+      eventId: '75000000-0000-4000-8000-000000000801',
+      participantIds: [
+        '75000000-0000-4000-8000-000000000811',
+        '75000000-0000-4000-8000-000000000812',
+      ],
+    })
+    if (!started.ok) throw new Error(started.message)
+    const first = captureBasketballOfficialEjection(started.state, {
+      recorderUserId: 'recorder-1',
+      teamSide: 'tracked',
+      subject: { kind: 'player', playerId: 'player-1' },
+      reason: 'Official ruling',
+      occurredAt: '2026-08-10T15:08:30.000Z',
+      eventId: '75000000-0000-4000-8000-000000000821',
+    })
+    if (!first.ok) throw new Error(first.message)
+    const firstEvent = event(first.state, first.eventId)
+    if (!firstEvent) throw new Error('Expected ejection event')
+    const damaged = addGameEvents(first.state, [
+      {
+        ...structuredClone(firstEvent),
+        id: '75000000-0000-4000-8000-000000000822',
+        sequence: firstEvent.sequence + 1,
+        occurredAt: '2026-08-10T15:08:40.000Z',
+        createdAt: '2026-08-10T15:08:40.000Z',
+        updatedAt: '2026-08-10T15:08:40.000Z',
+      },
+      {
+        ...structuredClone(firstEvent),
+        id: '75000000-0000-4000-8000-000000000823',
+        sequence: firstEvent.sequence + 2,
+        occurredAt: '2026-08-10T15:08:50.000Z',
+        createdAt: '2026-08-10T15:08:50.000Z',
+        updatedAt: '2026-08-10T15:08:50.000Z',
+      },
+    ], gameEventRegistry, gameEventProjectors)
+    if (!damaged.ok) throw new Error(damaged.error.message)
+    expect(damaged.state.sportGameState?.sportId === 'basketball'
+      ? damaged.state.sportGameState.projection.ejections.length
+      : 0).toBe(3)
+
+    const preview = previewBasketballTimelineRemoval(
+      damaged.state,
+      '75000000-0000-4000-8000-000000000823'
+    )
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    const corrected = removeBasketballTimelineEvents(damaged.state, preview.value)
+    expect(corrected.ok).toBe(true)
+    if (!corrected.ok || corrected.state.sportGameState?.sportId !== 'basketball') return
+    expect(corrected.state.sportGameState.projection.ejections).toHaveLength(2)
   })
 
   it('keeps lifecycle boundaries read-only', () => {
