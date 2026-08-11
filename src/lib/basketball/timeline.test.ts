@@ -4,6 +4,7 @@ import type { GameState, Player, ShotRecord } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { applyGameEventMutations } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
+import type { GameEvent } from '../gameEvents/types'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import { captureBasketballCourtEvent, prepareBasketballGameStart } from './commands'
 import { captureBasketballFoul } from './foulFreeThrowCommands'
@@ -15,6 +16,7 @@ import {
   buildBasketballTimelineReview,
   filterBasketballTimelineGroups,
   legacyBasketballShotDetail,
+  resolveBasketballMarkerActivation,
 } from './timeline'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
@@ -155,8 +157,42 @@ describe('BKE-3A Basketball Timeline review', () => {
     expect(review.activeGroups
       .flatMap(group => group.events)
       .flatMap(event => event.warnings)
-      .some(warning => warning.includes('unavailable in the current participant projection')))
+      .some(warning => warning.includes('unavailable in the authoritative match roster')))
       .toBe(false)
+  })
+
+  it('keeps dangling actor references filterable while surfacing an event warning', () => {
+    const state = stateWithReviewFamilies()
+    if (!state.eventStream) throw new Error('Expected event stream')
+    const shotId = '70000000-0000-4000-8000-000000001201'
+    const ghostId = '70000000-0000-4000-8000-000000001999'
+    const ghostState: GameState = {
+      ...state,
+      eventStream: {
+        ...state.eventStream,
+        events: state.eventStream.events.map(rawEvent => {
+          const event = rawEvent as GameEvent
+          return event.id === shotId
+            ? {
+                ...event,
+                actors: event.actors.map((actor, index) => index === 0
+                  ? { ...actor, participantId: ghostId, label: 'Ghost Player' }
+                  : actor),
+              }
+            : event
+        }),
+      },
+    }
+
+    const review = buildBasketballTimelineReview(ghostState)
+
+    expect(review.participants).toContainEqual({
+      id: ghostId,
+      label: 'Unavailable: Ghost Player',
+      teamSide: 'tracked',
+    })
+    expect(review.eventById.get(shotId)?.warnings)
+      .toContain('Ghost Player is unavailable in the authoritative match roster.')
   })
 
   it('deduplicates repeated global stream diagnostics', () => {
@@ -299,6 +335,16 @@ describe('BKE-3A Basketball Timeline review', () => {
     }).map(shot => shot.id)).toEqual(['newer', 'older'])
     expect(basketballMarkerChoicesAtPoint(shots, 'older', null).map(shot => shot.id))
       .toEqual(['older'])
+
+    expect(resolveBasketballMarkerActivation(shots, 'newer', { x: 0, y: 0 }))
+      .toMatchObject({ kind: 'detail', shot: { id: 'older' } })
+    const ambiguous = resolveBasketballMarkerActivation(shots, 'older', {
+      x: BASKETBALL_MARKER_HIT_RADIUS_FEET,
+      y: 0,
+    })
+    expect(ambiguous?.kind).toBe('chooser')
+    if (ambiguous?.kind !== 'chooser') throw new Error('Expected marker chooser')
+    expect(ambiguous.shots.map(shot => shot.id)).toEqual(['newer', 'older'])
   })
 })
 

@@ -152,8 +152,9 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
   const eventsById = new Map(allEvents.map(event => [event.id, event]))
   const diagnosticsByEvent = diagnosticsForEvents(inspection.diagnostics)
   const periods = periodOptionsForEvents(sportState, allEvents)
-  const participants = participantOptionsForEvents(sportState, validActive, validDeleted)
-  const knownParticipantIds = new Set(participants.map(participant => participant.id))
+  const participantMetadata = participantReviewMetadata(sportState, validActive, validDeleted)
+  const participants = participantMetadata.options
+  const knownParticipantIds = participantMetadata.authoritativeIds
   const relationshipWarnings = hasRebuiltBasketballProjection
     ? sportState.projection.relationshipWarnings.filter(item =>
         eventsById.has(item.eventId) || eventsById.has(item.relatedEventId)
@@ -330,6 +331,21 @@ export function basketballMarkerChoicesAtPoint(
     .sort(compareMarkerChoices)
 }
 
+export type BasketballMarkerActivation =
+  | { kind: 'detail'; shot: ShotRecord }
+  | { kind: 'chooser'; shots: ShotRecord[] }
+
+export function resolveBasketballMarkerActivation(
+  shots: ShotRecord[],
+  selectedShotId: string,
+  point: { x: number; y: number } | null
+): BasketballMarkerActivation | null {
+  const choices = basketballMarkerChoicesAtPoint(shots, selectedShotId, point)
+  if (choices.length > 1) return { kind: 'chooser', shots: choices }
+  const resolved = choices[0] ?? shots.find(shot => shot.id === selectedShotId)
+  return resolved ? { kind: 'detail', shot: resolved } : null
+}
+
 function periodOptionsForEvents(
   sportState: BasketballSportGameState,
   events: BasketballMatchEvent[]
@@ -350,18 +366,35 @@ function periodOptionsForEvents(
     }))
 }
 
-function participantOptionsForEvents(
+function participantReviewMetadata(
   sportState: BasketballSportGameState,
   activeEvents: BasketballMatchEvent[],
   deletedEvents: BasketballMatchEvent[]
-): BasketballTimelineParticipantOption[] {
+): {
+  options: BasketballTimelineParticipantOption[]
+  authoritativeIds: Set<string>
+} {
   const participants = new Map<string, BasketballTimelineParticipantOption>()
+  const authoritativeIds = new Set<string>()
   for (const participant of sportState.setup.participants) {
+    authoritativeIds.add(participant.id)
     participants.set(participant.id, {
       id: participant.id,
       label: participantLabel(participant.displayName, participant.number),
       teamSide: participant.teamSide,
     })
+  }
+  for (const event of [...activeEvents, ...deletedEvents]) {
+    if (event.eventType !== 'basketball.match_roster_added') continue
+    const participant = event.payload.participant
+    authoritativeIds.add(participant.id)
+    if (!participants.has(participant.id)) {
+      participants.set(participant.id, {
+        id: participant.id,
+        label: participantLabel(participant.displayName, participant.number),
+        teamSide: participant.teamSide,
+      })
+    }
   }
   for (const event of [...activeEvents].sort(compareGameEventCaptureOrder)) {
     if (event.eventType === 'basketball.match_roster_added') {
@@ -382,26 +415,21 @@ function participantOptionsForEvents(
     }
   }
   for (const event of [...activeEvents, ...deletedEvents]) {
-    if (event.eventType === 'basketball.match_roster_added' && !participants.has(event.payload.participant.id)) {
-      const participant = event.payload.participant
-      participants.set(participant.id, {
-        id: participant.id,
-        label: participantLabel(participant.displayName, participant.number),
-        teamSide: participant.teamSide,
-      })
-    }
     if (event.teamSide === 'neutral') continue
     for (const actor of event.actors) {
       if (!actor.participantId || participants.has(actor.participantId)) continue
       participants.set(actor.participantId, {
         id: actor.participantId,
-        label: actor.label || 'Unknown participant',
+        label: `Unavailable: ${actor.label || 'Unknown participant'}`,
         teamSide: event.teamSide,
       })
     }
   }
-  return [...participants.values()]
-    .sort((left, right) => left.teamSide.localeCompare(right.teamSide) || left.label.localeCompare(right.label))
+  return {
+    options: [...participants.values()]
+      .sort((left, right) => left.teamSide.localeCompare(right.teamSide) || left.label.localeCompare(right.label)),
+    authoritativeIds,
+  }
 }
 
 function defaultPeriodIdForEvents(
@@ -697,7 +725,7 @@ function missingActorWarnings(knownParticipantIds: Set<string>, event: Basketbal
     if (!actor.participantId) return []
     return knownParticipantIds.has(actor.participantId)
       ? []
-      : [`${actor.label || 'Event actor'} is unavailable in the current participant projection.`]
+      : [`${actor.label || 'Event actor'} is unavailable in the authoritative match roster.`]
   })
 }
 
