@@ -366,10 +366,11 @@ export function reconcileBasketballShotEditDraftRelationships(
   state: GameState,
   draft: BasketballShotEditDraft
 ): BasketballShotEditDraft {
+  const optionsByKind = basketballShotRelationshipOptionsByKind(state, draft)
   const relationships = { ...draft.relationships }
   for (const kind of ['assist', 'rebound', 'block'] as const) {
     const selectedKey = basketballShotRelationshipSelectionKey(relationships[kind])
-    const remainsAvailable = basketballShotRelationshipOptions(state, draft, kind)
+    const remainsAvailable = optionsByKind[kind]
       .some(option => option.key === selectedKey)
     if (!remainsAvailable) relationships[kind] = { mode: 'none' }
   }
@@ -419,16 +420,44 @@ export function basketballShotRelationshipOptions(
   kind: BasketballShotRelationshipKind
 ): BasketballShotRelationshipOption[] {
   const prepared = prepareShotEditState(state, draft.eventId)
-  if (!prepared.ok) return [{ key: 'none', label: 'None', selection: { mode: 'none' }, removed: false }]
+  return prepared.ok
+    ? basketballShotRelationshipOptionsFromPrepared(prepared.value, draft, kind)
+    : unavailableRelationshipOptions()
+}
+
+export function basketballShotRelationshipOptionsByKind(
+  state: GameState,
+  draft: BasketballShotEditDraft
+): Record<BasketballShotRelationshipKind, BasketballShotRelationshipOption[]> {
+  const prepared = prepareShotEditState(state, draft.eventId)
+  if (!prepared.ok) {
+    return {
+      assist: unavailableRelationshipOptions(),
+      rebound: unavailableRelationshipOptions(),
+      block: unavailableRelationshipOptions(),
+    }
+  }
+  return {
+    assist: basketballShotRelationshipOptionsFromPrepared(prepared.value, draft, 'assist'),
+    rebound: basketballShotRelationshipOptionsFromPrepared(prepared.value, draft, 'rebound'),
+    block: basketballShotRelationshipOptionsFromPrepared(prepared.value, draft, 'block'),
+  }
+}
+
+function basketballShotRelationshipOptionsFromPrepared(
+  prepared: PreparedShotEditState,
+  draft: BasketballShotEditDraft,
+  kind: BasketballShotRelationshipKind
+): BasketballShotRelationshipOption[] {
   const shooterResult = basketballActorForSelection(
-    prepared.value.state,
+    prepared.state,
     'shooter',
     draft.teamSide,
     draft.shooter,
     { allowUnavailable: true }
   )
-  if (!shooterResult.ok) return [{ key: 'none', label: 'None', selection: { mode: 'none' }, removed: false }]
-  const eventOptions = [...prepared.value.active, ...prepared.value.deleted]
+  if (!shooterResult.ok) return unavailableRelationshipOptions()
+  const eventOptions = [...prepared.active, ...prepared.deleted]
     .filter((event): event is RelatedEvent => relationshipKindForEvent(event) === kind)
     .filter(event => event.payload.relatedEventId === null || event.payload.relatedEventId === draft.eventId)
     .filter(event => !event.deletedAt || event.payload.relatedEventId === draft.eventId)
@@ -441,7 +470,7 @@ export function basketballShotRelationshipOptions(
       removed: event.deletedAt !== null,
     }))
 
-  const newActorOptions = basketballShotActorOptions(prepared.value.state)
+  const newActorOptions = basketballShotActorOptions(prepared.state)
     .filter(option => newRelationshipSideAllowed(kind, option.teamSide, draft))
     .filter(option => kind !== 'assist' || !selectionMatchesActor(option.selection, shooterResult.value))
     .map(option => ({
@@ -459,6 +488,10 @@ export function basketballShotRelationshipOptions(
     ...eventOptions,
     ...newActorOptions,
   ]
+}
+
+function unavailableRelationshipOptions(): BasketballShotRelationshipOption[] {
+  return [{ key: 'none', label: 'None', selection: { mode: 'none' }, removed: false }]
 }
 
 export function previewBasketballShotEdit(

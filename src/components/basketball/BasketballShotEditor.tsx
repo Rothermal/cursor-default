@@ -7,7 +7,7 @@ import {
   applyBasketballShotEdit,
   basketballShotActorOptions,
   basketballShotActorSelectionKey,
-  basketballShotRelationshipOptions,
+  basketballShotRelationshipOptionsByKind,
   basketballShotRelationshipSelectionKey,
   buildBasketballShotEditDraft,
   previewBasketballShotEdit,
@@ -72,12 +72,7 @@ export default function BasketballShotEditor({
   }
 
   const shooterOptions = basketballShotActorOptions(state, draft.teamSide)
-  const relationshipOptions = Object.fromEntries(
-    (['assist', 'rebound', 'block'] as const).map(kind => [
-      kind,
-      basketballShotRelationshipOptions(state, draft, kind),
-    ])
-  ) as Record<BasketballShotRelationshipKind, ReturnType<typeof basketballShotRelationshipOptions>>
+  const relationshipOptions = basketballShotRelationshipOptionsByKind(state, draft)
 
   const marker: ShotRecord[] = draft.location ? [{
     id: draft.eventId,
