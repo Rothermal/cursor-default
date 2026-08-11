@@ -80,6 +80,7 @@ export default function BasketballTimelineCorrectionDialog({
         ? {
             eventLabel: baseRestoreResult.value.eventLabel,
             restoreOptions: baseRestoreResult.value.restoreOptions,
+            streamFingerprint: baseRestoreResult.value.streamFingerprint,
           }
         : undefined
     )

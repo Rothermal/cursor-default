@@ -279,6 +279,18 @@ describe('BKE-3B Basketball Timeline corrections', () => {
       firstAttempt.id,
       secondAttemptId,
     ])
+    const staleCachePreview = previewBasketballTimelineRestore(
+      rebuilt.state,
+      trip.id,
+      [],
+      {
+        eventLabel: 'Stale cached label',
+        restoreOptions: basePreview.value.restoreOptions,
+        streamFingerprint: 'stale-stream',
+      }
+    )
+    if (!staleCachePreview.ok) throw new Error(staleCachePreview.message)
+    expect(staleCachePreview.value.eventLabel).not.toBe('Stale cached label')
     expect(previewBasketballTimelineRestore(
       rebuilt.state,
       trip.id,

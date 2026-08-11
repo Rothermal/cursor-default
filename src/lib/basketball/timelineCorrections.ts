@@ -173,7 +173,7 @@ export function previewBasketballTimelineRestore(
   selectedDependentIds: string[] = [],
   knownCompatiblePreview?: Pick<
     BasketballTimelineRestorePreview,
-    'eventLabel' | 'restoreOptions'
+    'eventLabel' | 'restoreOptions' | 'streamFingerprint'
   >
 ): BasketballCommandResult<BasketballTimelineRestorePreview> {
   const prepared = prepareState(state)
@@ -190,15 +190,19 @@ export function previewBasketballTimelineRestore(
   const relatedDeletedIds = new Set(prepared.value.deleted
     .filter(candidate => candidate.id !== event.id && relationshipSourceId(candidate) === event.id)
     .map(candidate => candidate.id))
-  const canReusePreview = knownCompatiblePreview?.restoreOptions.every(option =>
-    relatedDeletedIds.has(option.eventId)
-  )
-  const labels = canReusePreview
-    ? null
-    : buildBasketballTimelineReview(prepared.value.state).eventById
-  const options = canReusePreview && knownCompatiblePreview
-    ? knownCompatiblePreview.restoreOptions
-    : compatibleRestoreOptions(prepared.value, event, labels!)
+  const streamFingerprint = eventStreamFingerprint(prepared.value.state)
+  const canReusePreview = knownCompatiblePreview?.streamFingerprint === streamFingerprint &&
+    knownCompatiblePreview.restoreOptions.every(option => relatedDeletedIds.has(option.eventId))
+  let eventLabel: string
+  let options: BasketballTimelineRestoreOption[]
+  if (canReusePreview && knownCompatiblePreview) {
+    eventLabel = knownCompatiblePreview.eventLabel
+    options = knownCompatiblePreview.restoreOptions
+  } else {
+    const labels = buildBasketballTimelineReview(prepared.value.state).eventById
+    eventLabel = labels.get(event.id)?.title ?? 'Basketball event'
+    options = compatibleRestoreOptions(prepared.value, event, labels)
+  }
   const compatibleIds = new Set(options.map(option => option.eventId))
   const selected = [...new Set(selectedDependentIds)]
   if (selected.some(id => !compatibleIds.has(id))) {
@@ -226,10 +230,8 @@ export function previewBasketballTimelineRestore(
     value: {
       kind: 'restore',
       eventId,
-      eventLabel: canReusePreview && knownCompatiblePreview
-        ? knownCompatiblePreview.eventLabel
-        : labels?.get(event.id)?.title ?? 'Basketball event',
-      streamFingerprint: eventStreamFingerprint(prepared.value.state),
+      eventLabel,
+      streamFingerprint,
       consequenceLines: correctionConsequenceLines(
         prepared.value.state,
         candidate.value,

@@ -113,7 +113,7 @@ export default function ShotChartPanel({
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [correctionError, setCorrectionError] = useState<string | null>(null)
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
-  const [shotDetailCorrectionsEnabled, setShotDetailCorrectionsEnabled] = useState(false)
+  const [shotDetailReviewComplete, setShotDetailReviewComplete] = useState(false)
   const [timelineCorrectionIntent, setTimelineCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
   const [overlapChoices, setOverlapChoices] = useState<ShotRecord[]>([])
   const pendingPulseIdRef = useRef<string | null>(null)
@@ -124,6 +124,10 @@ export default function ShotChartPanel({
   const eventCaptureOpen = !isEventBasketball || (
     state.sportGameState?.sportId === 'basketball' &&
     state.sportGameState.projection.status === 'in_progress'
+  )
+  const basketballCorrectionsOpen = state.sportGameState?.sportId === 'basketball' && (
+    state.sportGameState.projection.status === 'in_progress' ||
+    state.sportGameState.projection.status === 'period_break'
   )
   const eventCaptureUnits = useMemo(
     () => isEventBasketball ? basketballLiveCaptureUnits(state) : [],
@@ -324,19 +328,13 @@ export default function ShotChartPanel({
   const openShotDetail = useCallback((shot: ShotRecord) => {
     if (!isEventBasketball) {
       const detail = legacyBasketballShotDetail(state, shot.id)
-      setShotDetailCorrectionsEnabled(false)
+      setShotDetailReviewComplete(false)
       if (detail) setShotDetail(detail)
       return
     }
     const review = basketballReview ?? buildBasketballTimelineReview(state)
     const detail = basketballShotDetailFromReview(state, review, shot.id)
-    setShotDetailCorrectionsEnabled(Boolean(
-      review.complete &&
-      state.sportGameState?.sportId === 'basketball' && (
-        state.sportGameState.projection.status === 'in_progress' ||
-        state.sportGameState.projection.status === 'period_break'
-      )
-    ))
+    setShotDetailReviewComplete(review.complete)
     if (detail) setShotDetail(detail)
   }, [basketballReview, isEventBasketball, state])
 
@@ -588,7 +586,7 @@ export default function ShotChartPanel({
         <BasketballShotDetailDialog
           detail={shotDetail}
           onClose={() => setShotDetail(null)}
-          onRemove={shotDetailCorrectionsEnabled && shotDetail.source === 'event'
+          onRemove={shotDetailReviewComplete && basketballCorrectionsOpen && shotDetail.source === 'event'
             ? () => {
                 setShotDetail(null)
                 setTimelineCorrectionIntent({
