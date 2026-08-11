@@ -4,6 +4,7 @@
  */
 import { useRef } from 'react'
 import type { ShotRecord } from '../../types'
+import { BASKETBALL_MARKER_HIT_RADIUS_FEET } from '../../lib/basketball/timeline'
 import {
   COURT_WIDTH,
   BASELINE_Y,
@@ -32,6 +33,11 @@ const TAP_MOVE_TOLERANCE_PX = 18
 interface BasketballCourtProps {
   shots: ShotRecord[]
   onCourtTap?: (x: number, y: number) => void
+  onMarkerActivate?: (
+    shot: ShotRecord,
+    marker: SVGGElement,
+    point: { x: number; y: number } | null
+  ) => void
   className?: string
   /** When set, this marker plays a short pulse (newly recorded shot). */
   newlyPlacedShotId?: string | null
@@ -97,11 +103,11 @@ interface PendingTap {
 
 /** Convert a screen-space point to court feet via the SVG's current transform. */
 function clientPointToCourt(
-  rect: SVGRectElement,
+  element: SVGGraphicsElement,
   clientX: number,
   clientY: number
 ): { x: number; y: number } | null {
-  const svg = rect.ownerSVGElement
+  const svg = element.ownerSVGElement
   if (!svg) return null
   const pt = svg.createSVGPoint()
   pt.x = clientX
@@ -118,6 +124,7 @@ function clientPointToCourt(
 export default function BasketballCourt({
   shots,
   onCourtTap,
+  onMarkerActivate,
   className,
   newlyPlacedShotId = null,
   emptyHint,
@@ -257,20 +264,84 @@ export default function BasketballCourt({
         <line x1={0} y1={BACKBOARD_Y} x2={0} y2={-BASKET_RADIUS} strokeWidth={0.2} />
       </g>
 
+      {interactive && onCourtTap && (
+        <rect
+          x={-halfW - padding}
+          y={svgCourtTop - padding}
+          width={viewW}
+          height={viewH}
+          fill="transparent"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          style={{ touchAction: 'pan-y', cursor: 'crosshair' }}
+        />
+      )}
+
       {shots.map(shot =>
         shot.made ? (
-          <circle
+          <g
             key={shot.id}
             className={shot.id === newlyPlacedShotId ? 'shot-marker-pulse' : undefined}
-            cx={shot.x}
-            cy={shot.y}
-            r={0.8}
-            fill="rgba(34,197,94,0.95)"
-            stroke="rgba(21,128,61,0.95)"
-            strokeWidth={0.2}
-          />
+            role={onMarkerActivate ? 'button' : undefined}
+            tabIndex={onMarkerActivate ? 0 : undefined}
+            aria-label={onMarkerActivate ? 'View made shot detail' : undefined}
+            onPointerDown={onMarkerActivate ? event => event.stopPropagation() : undefined}
+            onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
+            onClick={onMarkerActivate ? event => {
+              event.stopPropagation()
+              onMarkerActivate(
+                shot,
+                event.currentTarget,
+                clientPointToCourt(event.currentTarget, event.clientX, event.clientY)
+              )
+            } : undefined}
+            onKeyDown={onMarkerActivate ? event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onMarkerActivate(shot, event.currentTarget, null)
+              }
+            } : undefined}
+            style={onMarkerActivate ? { cursor: 'pointer' } : undefined}
+          >
+            <circle cx={shot.x} cy={shot.y} r={BASKETBALL_MARKER_HIT_RADIUS_FEET} fill="transparent" />
+            <circle
+              cx={shot.x}
+              cy={shot.y}
+              r={0.8}
+              fill="rgba(34,197,94,0.95)"
+              stroke="rgba(21,128,61,0.95)"
+              strokeWidth={0.2}
+              pointerEvents="none"
+            />
+          </g>
         ) : (
-          <g key={shot.id} className={shot.id === newlyPlacedShotId ? 'shot-marker-pulse' : undefined}>
+          <g
+            key={shot.id}
+            className={shot.id === newlyPlacedShotId ? 'shot-marker-pulse' : undefined}
+            role={onMarkerActivate ? 'button' : undefined}
+            tabIndex={onMarkerActivate ? 0 : undefined}
+            aria-label={onMarkerActivate ? 'View missed shot detail' : undefined}
+            onPointerDown={onMarkerActivate ? event => event.stopPropagation() : undefined}
+            onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
+            onClick={onMarkerActivate ? event => {
+              event.stopPropagation()
+              onMarkerActivate(
+                shot,
+                event.currentTarget,
+                clientPointToCourt(event.currentTarget, event.clientX, event.clientY)
+              )
+            } : undefined}
+            onKeyDown={onMarkerActivate ? event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onMarkerActivate(shot, event.currentTarget, null)
+              }
+            } : undefined}
+            style={onMarkerActivate ? { cursor: 'pointer' } : undefined}
+          >
+            <circle cx={shot.x} cy={shot.y} r={BASKETBALL_MARKER_HIT_RADIUS_FEET} fill="transparent" />
             <line
               x1={shot.x - 0.6}
               y1={shot.y - 0.6}
@@ -279,6 +350,7 @@ export default function BasketballCourt({
               stroke="rgba(220,38,38,0.95)"
               strokeWidth={0.35}
               strokeLinecap="round"
+              pointerEvents="none"
             />
             <line
               x1={shot.x + 0.6}
@@ -288,6 +360,7 @@ export default function BasketballCourt({
               stroke="rgba(220,38,38,0.95)"
               strokeWidth={0.35}
               strokeLinecap="round"
+              pointerEvents="none"
             />
           </g>
         )
@@ -316,21 +389,6 @@ export default function BasketballCourt({
             to log an event
           </text>
         </g>
-      )}
-
-      {interactive && onCourtTap && (
-        <rect
-          x={-halfW - padding}
-          y={svgCourtTop - padding}
-          width={viewW}
-          height={viewH}
-          fill="transparent"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-          style={{ touchAction: 'pan-y', cursor: 'crosshair' }}
-        />
       )}
     </svg>
   )

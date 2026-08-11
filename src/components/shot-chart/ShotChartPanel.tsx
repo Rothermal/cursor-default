@@ -29,6 +29,15 @@ import {
   previewBasketballClearShotChart,
   undoLatestBasketballCourtCapture,
 } from '../../lib/basketball/courtCorrections'
+import {
+  basketballShotDetailFromReview,
+  basketballShotDetailForEvent,
+  buildBasketballTimelineReview,
+  legacyBasketballShotDetail,
+  resolveBasketballMarkerActivation,
+  type BasketballShotDetailModel,
+} from '../../lib/basketball/timeline'
+import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
 
 function newShotId(): string {
   return `shot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
@@ -100,7 +109,12 @@ export default function ShotChartPanel({
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [correctionError, setCorrectionError] = useState<string | null>(null)
+  const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
+  const [overlapChoices, setOverlapChoices] = useState<ShotRecord[]>([])
   const pendingPulseIdRef = useRef<string | null>(null)
+  const overlapDialogRef = useRef<HTMLElement>(null)
+  const overlapFirstChoiceRef = useRef<HTMLButtonElement>(null)
+  const overlapOriginRef = useRef<SVGGElement | null>(null)
   const isEventBasketball = hasStartedBasketballEventGame(state)
   const eventCaptureOpen = !isEventBasketball || (
     state.sportGameState?.sportId === 'basketball' &&
@@ -113,6 +127,12 @@ export default function ShotChartPanel({
   const clearPreview = useMemo(
     () => isEventBasketball ? previewBasketballClearShotChart(state) : null,
     [isEventBasketball, state]
+  )
+  const basketballReview = useMemo(
+    () => isEventBasketball && overlapChoices.length > 1
+      ? buildBasketballTimelineReview(state)
+      : null,
+    [isEventBasketball, overlapChoices.length, state]
   )
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
@@ -289,6 +309,67 @@ export default function ShotChartPanel({
     [shotChart, players, selection]
   )
 
+  const detailForShot = useCallback((shot: ShotRecord) => {
+    if (!isEventBasketball) return legacyBasketballShotDetail(state, shot.id)
+    return basketballReview
+      ? basketballShotDetailFromReview(state, basketballReview, shot.id)
+      : basketballShotDetailForEvent(state, shot.id)
+  }, [basketballReview, isEventBasketball, state])
+
+  const openShotDetail = useCallback((shot: ShotRecord) => {
+    const detail = detailForShot(shot)
+    if (detail) setShotDetail(detail)
+  }, [detailForShot])
+
+  const handleMarkerActivate = useCallback((
+    shot: ShotRecord,
+    marker: SVGGElement,
+    point: { x: number; y: number } | null
+  ) => {
+    const activation = resolveBasketballMarkerActivation(visibleShots, shot.id, point)
+    if (!activation) return
+    if (activation.kind === 'chooser') {
+      overlapOriginRef.current = marker
+      setOverlapChoices(activation.shots)
+      return
+    }
+    openShotDetail(activation.shot)
+  }, [openShotDetail, visibleShots])
+
+  const closeOverlapChooser = useCallback(() => setOverlapChoices([]), [])
+
+  useEffect(() => {
+    if (overlapChoices.length <= 1) return
+    const origin = overlapOriginRef.current
+    overlapFirstChoiceRef.current?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeOverlapChooser()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const buttons = Array.from(
+        overlapDialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? []
+      )
+      if (buttons.length === 0) return
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      origin?.focus()
+    }
+  }, [closeOverlapChooser, overlapChoices.length])
+
   const handleClearChartConfirm = () => {
     setShowClearConfirm(false)
     if (isEventBasketball) {
@@ -327,6 +408,7 @@ export default function ShotChartPanel({
         <BasketballCourt
           shots={visibleShots}
           onCourtTap={eventCaptureOpen && !captureDisabled ? onCourtTap : undefined}
+          onMarkerActivate={handleMarkerActivate}
           className="w-full"
           newlyPlacedShotId={pulseShotId}
           emptyHint={eventCaptureOpen && !captureDisabled
@@ -429,6 +511,62 @@ export default function ShotChartPanel({
             }
           }}
         />
+      )}
+
+      {overlapChoices.length > 1 && (
+        <div
+          className="fixed inset-0 z-[55] flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-4"
+          onClick={closeOverlapChooser}
+        >
+          <section
+            ref={overlapDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="overlapping-shots-title"
+            className="w-full max-w-md overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+            onClick={event => event.stopPropagation()}
+          >
+            <header className="border-b border-slate-200 px-4 py-3">
+              <h2 id="overlapping-shots-title" className="text-base font-bold text-slate-900">Select shot</h2>
+            </header>
+            <div className="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto">
+              {overlapChoices.map((shot, index) => {
+                const detail = detailForShot(shot)
+                return (
+                  <button
+                    key={shot.id}
+                    ref={index === 0 ? overlapFirstChoiceRef : undefined}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-blue-50"
+                    onClick={() => {
+                      closeOverlapChooser()
+                      openShotDetail(shot)
+                    }}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-slate-900">
+                        {detail?.ordinalLabel ?? 'Shot'} | {detail?.shooterLabel ?? 'Unknown shooter'}
+                      </span>
+                      <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                        {detail ? `${detail.resultLabel} ${detail.valueLabel}` : shot.made ? 'Made' : 'Missed'}
+                      </span>
+                    </span>
+                    <span className={`h-3 w-3 shrink-0 rounded-full ${shot.made ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                  </button>
+                )
+              })}
+            </div>
+            <footer className="border-t border-slate-200 px-4 py-3">
+              <button type="button" className="btn-secondary w-full py-2.5" onClick={closeOverlapChooser}>
+                Cancel
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {shotDetail && (
+        <BasketballShotDetailDialog detail={shotDetail} onClose={() => setShotDetail(null)} />
       )}
 
       <ConfirmDialog

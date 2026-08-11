@@ -9,8 +9,8 @@ BKE-1A, all BKE-1B slices, and all BKE-1C slices are complete. BKE-2 product and
 are approved in [PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md);
 BKE-2A through BKE-2D are complete, including the full local tracker parity and exit audit. BKE-3
 product and delivery decisions are approved in
-[PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md); implementation is
-split into BKE-3A through BKE-3D, with BKE-3A next.
+[PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md); BKE-3A is complete and
+implementation continues with BKE-3B remove/restore.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
