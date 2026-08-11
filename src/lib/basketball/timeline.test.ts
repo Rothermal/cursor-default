@@ -288,7 +288,7 @@ describe('BKE-3A Basketball Timeline review', () => {
     })
   })
 
-  it('does not label terminal lifecycle boundaries as recorded later', () => {
+  it('restores live period context after reopen without labelling new capture as recorded later', () => {
     const suspended = suspendBasketballMatch(startedState(), {
       recorderUserId: 'recorder-1',
       occurredAt: '2026-08-10T14:05:00.000Z',
@@ -302,10 +302,20 @@ describe('BKE-3A Basketball Timeline review', () => {
       eventId: '70000000-0000-4000-8000-000000001502',
     })
     if (!reopened.ok) throw new Error(reopened.message)
+    const liveShot = captureBasketballCourtEvent(reopened.state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-10T14:07:00.000Z',
+      eventIds: ['70000000-0000-4000-8000-000000001503'],
+    })
+    if (!liveShot.ok) throw new Error(liveShot.message)
 
-    const review = buildBasketballTimelineReview(reopened.state)
+    const review = buildBasketballTimelineReview(liveShot.state)
     expect(review.eventById.get('70000000-0000-4000-8000-000000001501')?.recordedLater).toBe(false)
     expect(review.eventById.get('70000000-0000-4000-8000-000000001502')?.recordedLater).toBe(false)
+    expect(review.eventById.get('70000000-0000-4000-8000-000000001503')?.recordedLater).toBe(false)
   })
 
   it('builds event shot detail with full-game ordinal and active relationships', () => {

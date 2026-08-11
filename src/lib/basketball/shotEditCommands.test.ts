@@ -19,6 +19,8 @@ import {
   buildBasketballShotEditDraft,
   previewBasketballHistoricalShot,
   previewBasketballShotEdit,
+  reconcileBasketballHistoricalShotDraftRelationships,
+  reconcileBasketballShotEditDraftRelationships,
 } from './shotEditCommands'
 import {
   previewBasketballTimelineRemoval,
@@ -251,6 +253,54 @@ describe('BKE-3C Basketball shot editing', () => {
     })
   })
 
+  it('drops relationship selections invalidated by result or shooter changes', () => {
+    const state = madeShotWithAssist()
+    const editDraft = buildBasketballShotEditDraft(state, shotId)
+    if (!editDraft.ok) throw new Error(editDraft.message)
+    const reconciledEdit = reconcileBasketballShotEditDraftRelationships(state, {
+      ...editDraft.value,
+      shooter: {
+        kind: 'participant',
+        participantId: '76000000-0000-4000-8000-000000000102',
+      },
+      relationships: {
+        ...editDraft.value.relationships,
+        block: {
+          mode: 'new',
+          teamSide: 'opponent',
+          actor: {
+            kind: 'participant',
+            participantId: '76000000-0000-4000-8000-000000000152',
+          },
+        },
+      },
+    })
+    expect(reconciledEdit.relationships.assist).toEqual({ mode: 'none' })
+    expect(reconciledEdit.relationships.block).toEqual({ mode: 'none' })
+
+    const historicalDraft = buildBasketballHistoricalShotDraft(state)
+    if (!historicalDraft.ok) throw new Error(historicalDraft.message)
+    const reconciledHistorical = reconcileBasketballHistoricalShotDraftRelationships(state, {
+      ...historicalDraft.value,
+      shooter: {
+        kind: 'participant',
+        participantId: '76000000-0000-4000-8000-000000000102',
+      },
+      relationships: {
+        ...historicalDraft.value.relationships,
+        assist: {
+          mode: 'new',
+          teamSide: 'tracked',
+          actor: {
+            kind: 'participant',
+            participantId: '76000000-0000-4000-8000-000000000102',
+          },
+        },
+      },
+    })
+    expect(reconciledHistorical.relationships.assist).toEqual({ mode: 'none' })
+  })
+
   it('adds a recorded-later field goal and linked assist to a completed period', () => {
     const first = startedState()
     const ended = endBasketballPeriod(first, {
@@ -301,5 +351,23 @@ describe('BKE-3C Basketball shot editing', () => {
       recordedLater: true,
       periodLabel: 'Q1',
     })
+  })
+
+  it('classifies historical value source from the normalized stored location', () => {
+    const state = startedState()
+    const draftResult = buildBasketballHistoricalShotDraft(state)
+    if (!draftResult.ok) throw new Error(draftResult.message)
+    const preview = previewBasketballHistoricalShot(state, {
+      ...draftResult.value,
+      value: 3,
+      location: { x: 0, y: -100 },
+    }, 'recorder-1', '2026-08-10T14:13:00.000Z')
+    if (!preview.ok) throw new Error(preview.message)
+    const applied = applyBasketballHistoricalShot(state, preview.value)
+    if (!applied.ok) throw new Error(applied.message)
+
+    expect(applied.state.eventStream?.events.find(event =>
+      isGameEventEnvelope(event) && event.id === draftResult.value.eventId
+    )).toMatchObject({ payload: { valueSource: 'manual_override' } })
   })
 })

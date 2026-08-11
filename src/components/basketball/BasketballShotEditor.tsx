@@ -11,6 +11,7 @@ import {
   basketballShotRelationshipSelectionKey,
   buildBasketballShotEditDraft,
   previewBasketballShotEdit,
+  reconcileBasketballShotEditDraftRelationships,
   type BasketballShotEditDraft,
   type BasketballShotEditPreview,
   type BasketballShotRelationshipKind,
@@ -90,7 +91,9 @@ export default function BasketballShotEditor({
   }] : []
 
   const update = (changes: Partial<BasketballShotEditDraft>) => {
-    setDraft(current => current ? { ...current, ...changes } : current)
+    setDraft(current => current
+      ? reconcileBasketballShotEditDraftRelationships(state, { ...current, ...changes })
+      : current)
     setPreview(null)
     setError(null)
   }

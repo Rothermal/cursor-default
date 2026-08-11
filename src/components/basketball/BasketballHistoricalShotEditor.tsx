@@ -10,6 +10,7 @@ import {
   basketballShotActorSelectionKey,
   buildBasketballHistoricalShotDraft,
   previewBasketballHistoricalShot,
+  reconcileBasketballHistoricalShotDraftRelationships,
   type BasketballHistoricalShotDraft,
   type BasketballHistoricalShotPreview,
   type BasketballShotRelationshipKind,
@@ -91,7 +92,9 @@ export default function BasketballHistoricalShotEditor({
   }] : []
 
   const update = (changes: Partial<BasketballHistoricalShotDraft>) => {
-    setDraft(current => current ? { ...current, ...changes } : current)
+    setDraft(current => current
+      ? reconcileBasketballHistoricalShotDraftRelationships(state, { ...current, ...changes })
+      : current)
     setPreview(null)
     setError(null)
   }

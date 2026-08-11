@@ -555,6 +555,8 @@ function recordedLaterEventIds(events: BasketballMatchEvent[]): Set<string> {
       endedPeriods.add(event.payload.periodId)
     } else if (event.eventType === 'basketball.match_ended') {
       currentPeriodId = null
+    } else if (event.eventType === 'basketball.match_reopened') {
+      currentPeriodId = event.period.id
     }
   }
   return result

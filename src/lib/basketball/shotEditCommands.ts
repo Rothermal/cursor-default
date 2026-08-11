@@ -362,6 +362,57 @@ export function basketballShotRelationshipSelectionKey(
   return `new:${selection.teamSide}:${basketballShotActorSelectionKey(selection.actor, selection.teamSide)}`
 }
 
+export function reconcileBasketballShotEditDraftRelationships(
+  state: GameState,
+  draft: BasketballShotEditDraft
+): BasketballShotEditDraft {
+  const relationships = { ...draft.relationships }
+  for (const kind of ['assist', 'rebound', 'block'] as const) {
+    const selectedKey = basketballShotRelationshipSelectionKey(relationships[kind])
+    const remainsAvailable = basketballShotRelationshipOptions(state, draft, kind)
+      .some(option => option.key === selectedKey)
+    if (!remainsAvailable) relationships[kind] = { mode: 'none' }
+  }
+  return { ...draft, relationships }
+}
+
+export function reconcileBasketballHistoricalShotDraftRelationships(
+  state: GameState,
+  draft: BasketballHistoricalShotDraft
+): BasketballHistoricalShotDraft {
+  const shooter = basketballActorForSelection(
+    state,
+    'shooter',
+    draft.teamSide,
+    draft.shooter,
+    { allowUnavailable: true }
+  )
+  const relationships = { ...draft.relationships }
+  for (const kind of ['assist', 'rebound', 'block'] as const) {
+    const selection = relationships[kind]
+    if (selection.mode === 'none') continue
+    if (
+      selection.mode === 'event' ||
+      !shooter.ok ||
+      !newRelationshipSideAllowed(kind, selection.teamSide, draft)
+    ) {
+      relationships[kind] = { mode: 'none' }
+      continue
+    }
+    const actor = basketballActorForSelection(
+      state,
+      relationshipRole(kind),
+      selection.teamSide,
+      selection.actor,
+      { allowUnavailable: true }
+    )
+    if (!actor.ok || (kind === 'assist' && sameActor(actor.value, shooter.value))) {
+      relationships[kind] = { mode: 'none' }
+    }
+  }
+  return { ...draft, relationships }
+}
+
 export function basketballShotRelationshipOptions(
   state: GameState,
   draft: BasketballShotEditDraft,
@@ -567,7 +618,8 @@ function buildHistoricalShotEvents(
     ? { ok: true as const, value: null }
     : normalizeBasketballCourtLocation(draft.location)
   if (!location.ok) return location
-  const detectedValue = draft.location && isThreePointer(draft.location.x, draft.location.y) ? 3 : 2
+  const storedPoint = location.value ? normalizedCourtLocationToFeet(location.value) : null
+  const detectedValue = storedPoint && isThreePointer(storedPoint.x, storedPoint.y) ? 3 : 2
   const hasRelations = Object.values(draft.relationships).some(selection => selection.mode !== 'none')
   let nextSequence = nextBasketballEventSequence(state.eventStream.events, recorderUserId)
   const events: BasketballMatchEvent[] = [createBasketballStatEvent({
