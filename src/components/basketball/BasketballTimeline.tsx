@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, CircleDot, Layers3 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, RotateCcw, Trash2 } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import {
   BASKETBALL_TIMELINE_FAMILIES,
@@ -12,6 +12,9 @@ import {
   type BasketballTimelineGroup,
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from './BasketballShotDetailDialog'
+import BasketballTimelineCorrectionDialog, {
+  type BasketballTimelineCorrectionIntent,
+} from './BasketballTimelineCorrectionDialog'
 
 export default function BasketballTimeline() {
   const { state } = useGame()
@@ -23,6 +26,7 @@ export default function BasketballTimeline() {
     participantId: 'all',
   }))
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
+  const [correctionIntent, setCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
 
   useEffect(() => {
     if (
@@ -42,6 +46,10 @@ export default function BasketballTimeline() {
     [filters, review.removedGroups]
   )
   const removedEventCount = removedGroups.reduce((sum, group) => sum + group.events.length, 0)
+  const correctionsEnabled = review.complete && state.sportGameState?.sportId === 'basketball' && (
+    state.sportGameState.projection.status === 'in_progress' ||
+    state.sportGameState.projection.status === 'period_break'
+  )
 
   const openShotDetail = (eventId: string) => {
     setShotDetail(basketballShotDetailFromReview(state, review, eventId))
@@ -135,7 +143,12 @@ export default function BasketballTimeline() {
           <ol className="space-y-2">
             {activeGroups.map(group => (
               <li key={group.id}>
-                <TimelineGroup group={group} onOpenShot={openShotDetail} />
+                <TimelineGroup
+                  group={group}
+                  onOpenShot={openShotDetail}
+                  onCorrect={setCorrectionIntent}
+                  correctionsEnabled={correctionsEnabled}
+                />
               </li>
             ))}
           </ol>
@@ -152,7 +165,13 @@ export default function BasketballTimeline() {
                 <li className="px-3 py-5 text-center text-sm text-slate-500">No removed events match these filters.</li>
               ) : removedGroups.map(group => (
                 <li key={group.id}>
-                  <TimelineGroup group={group} onOpenShot={openShotDetail} removed />
+                  <TimelineGroup
+                    group={group}
+                    onOpenShot={openShotDetail}
+                    onCorrect={setCorrectionIntent}
+                    correctionsEnabled={correctionsEnabled}
+                    removed
+                  />
                 </li>
               ))}
             </ol>
@@ -161,7 +180,30 @@ export default function BasketballTimeline() {
       </div>
 
       {shotDetail && (
-        <BasketballShotDetailDialog detail={shotDetail} onClose={() => setShotDetail(null)} />
+        <BasketballShotDetailDialog
+          detail={shotDetail}
+          onClose={() => setShotDetail(null)}
+          onRemove={correctionsEnabled && shotDetail.source === 'event' && !shotDetail.removed
+            ? () => {
+                setShotDetail(null)
+                setCorrectionIntent({ kind: 'remove', eventId: shotDetail.shotId, scope: 'event' })
+              }
+            : undefined}
+          onRestore={correctionsEnabled && shotDetail.source === 'event' && shotDetail.removed
+            ? () => {
+                setShotDetail(null)
+                setCorrectionIntent({ kind: 'restore', eventId: shotDetail.shotId })
+              }
+            : undefined}
+        />
+      )}
+
+      {correctionIntent && (
+        <BasketballTimelineCorrectionDialog
+          intent={correctionIntent}
+          onClose={() => setCorrectionIntent(null)}
+          onApplied={() => setShotDetail(null)}
+        />
       )}
     </section>
   )
@@ -170,10 +212,14 @@ export default function BasketballTimeline() {
 function TimelineGroup({
   group,
   onOpenShot,
+  onCorrect,
+  correctionsEnabled,
   removed = false,
 }: {
   group: BasketballTimelineGroup
   onOpenShot: (eventId: string) => void
+  onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
+  correctionsEnabled: boolean
   removed?: boolean
 }) {
   const grouped = group.captureCommandId !== null && group.events.length > 1
@@ -183,6 +229,8 @@ function TimelineGroup({
         review={group.events[0]}
         group={group}
         onOpenShot={onOpenShot}
+        onCorrect={onCorrect}
+        correctionsEnabled={correctionsEnabled}
         removed={removed}
       />
     )
@@ -212,10 +260,26 @@ function TimelineGroup({
             review={review}
             group={group}
             onOpenShot={onOpenShot}
+            onCorrect={onCorrect}
+            correctionsEnabled={correctionsEnabled}
             removed={removed}
             nested
           />
         ))}
+        {correctionsEnabled && !removed && !group.boundary && (
+          <button
+            type="button"
+            onClick={() => onCorrect({
+              kind: 'remove',
+              eventId: group.events[0].id,
+              scope: 'capture_group',
+            })}
+            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-rose-200 bg-white text-sm font-bold text-rose-800"
+          >
+            <Trash2 size={16} aria-hidden />
+            Remove capture
+          </button>
+        )}
       </div>
     </details>
   )
@@ -225,12 +289,16 @@ function TimelineEventRow({
   review,
   group,
   onOpenShot,
+  onCorrect,
+  correctionsEnabled,
   removed,
   nested = false,
 }: {
   review: BasketballTimelineEventReview
   group: BasketballTimelineGroup
   onOpenShot: (eventId: string) => void
+  onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
+  correctionsEnabled: boolean
   removed: boolean
   nested?: boolean
 }) {
@@ -260,18 +328,39 @@ function TimelineEventRow({
           </p>
         ))}
       </div>
-      {shot && <span className="shrink-0 text-xs font-bold text-blue-700">View</span>}
+      <div className="flex shrink-0 items-center gap-1">
+        {shot && (
+          <button
+            type="button"
+            onClick={() => onOpenShot(review.id)}
+            className="flex h-10 w-10 items-center justify-center rounded-md text-blue-700 active:bg-blue-50"
+            aria-label={`View ${review.title}`}
+            title="View details"
+          >
+            <Eye size={17} aria-hidden />
+          </button>
+        )}
+        {correctionsEnabled && !review.boundary && (
+          <button
+            type="button"
+            onClick={() => onCorrect(removed
+              ? { kind: 'restore', eventId: review.id }
+              : { kind: 'remove', eventId: review.id, scope: 'event' })}
+            className={`flex h-10 w-10 items-center justify-center rounded-md ${
+              removed ? 'text-blue-700 active:bg-blue-50' : 'text-rose-700 active:bg-rose-50'
+            }`}
+            aria-label={`${removed ? 'Restore' : 'Remove'} ${review.title}`}
+            title={removed ? 'Restore event' : 'Remove event'}
+          >
+            {removed ? <RotateCcw size={17} aria-hidden /> : <Trash2 size={17} aria-hidden />}
+          </button>
+        )}
+      </div>
     </>
   )
   const className = `${nested ? 'rounded-md px-2.5 py-2' : 'rounded-lg border border-slate-200 bg-white px-3 py-3'} flex w-full items-start gap-3`
 
-  return shot ? (
-    <button type="button" className={`${className} active:bg-blue-50`} onClick={() => onOpenShot(review.id)}>
-      {content}
-    </button>
-  ) : (
-    <div className={className}>{content}</div>
-  )
+  return <div className={className}>{content}</div>
 }
 
 function StatusBadges({ group, removed }: { group: BasketballTimelineGroup; removed: boolean }) {
