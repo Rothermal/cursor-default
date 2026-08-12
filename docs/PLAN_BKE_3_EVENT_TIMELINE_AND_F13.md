@@ -346,6 +346,26 @@ blocks until BKE-3D generalizes replay across the remaining event families.
 
 ## 9. BKE-3D: Remaining Editors and Exit Audit
 
+BKE-3D is delivered in four implementation slices so each domain keeps a reviewable command/UI/test
+surface:
+
+| Slice | Scope | Exit condition |
+|---|---|---|
+| BKE-3D1 | Shared non-shot editor/detail foundation; assist, rebound, steal, block, and turnover correction; recorded-later standalone and paired Steal + Turnover additions | Every related-stat and turnover fact can be revised or added through one checked atomic command without weakening shot or turnover relationships |
+| BKE-3D2 | Score-adjustment and manual-minutes correction/addition | Signed score/minutes changes preserve reason, non-negative total, player, clock-model, and started-period rules |
+| BKE-3D3 | Structured foul, free-throw trip, and free-throw attempt correction/addition | Foul/trip/attempt edits repair dependencies atomically and preserve stable trip positions |
+| BKE-3D4 | Ejection and timeout correction/addition, complete parity fixtures, regression record, and BKE-3 exit audit | All remaining user-recorded families have checked Timeline workflows and BKE-4 can begin from a stable local model |
+
+Each slice uses its own feature branch and PR. Event type and stable event identity remain immutable
+through every editor.
+
+BKE-3D1 status: Complete. `relatedEventEditCommands.ts` owns checked assist/rebound/steal/block/
+turnover drafts, target compatibility, reverse steal-link repair, historical additions, and paired
+Steal + Turnover capture. Existing event edits only offer relationship targets in valid capture
+order; historical paired capture appends Turnover before Steal so no forward reference is created.
+`BasketballTimeline` routes these families through one read-only detail sheet and shared responsive
+edit/add workflows. BKE-3D2 is next.
+
 ### 9.1 Event-family matrix
 
 | Family | Editable fields and constraints |
