@@ -25,6 +25,13 @@ import BasketballRelatedEventEditor from './BasketballRelatedEventEditor'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from './BasketballTimelineCorrectionDialog'
+import {
+  basketballManualMinutesAvailable,
+  isBasketballEditableValueEvent,
+  type BasketballEditableValueEventType,
+} from '../../lib/basketball/valueEventEditCommands'
+import BasketballValueEventEditor from './BasketballValueEventEditor'
+import { basketballRecoverableScoreAdjustmentId } from '../../lib/basketball/scoreAdjustmentRecovery'
 
 export default function BasketballTimeline() {
   const { state } = useGame()
@@ -40,10 +47,12 @@ export default function BasketballTimeline() {
   const [editingShotId, setEditingShotId] = useState<string | null>(null)
   const [eventDetail, setEventDetail] = useState<BasketballTimelineEventReview | null>(null)
   const [editingRelatedEventId, setEditingRelatedEventId] = useState<string | null>(null)
+  const [editingValueEventId, setEditingValueEventId] = useState<string | null>(null)
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [addingShot, setAddingShot] = useState(false)
   const [addingRelatedType, setAddingRelatedType] = useState<BasketballHistoricalRelatedEventType | null>(null)
+  const [addingValueType, setAddingValueType] = useState<BasketballEditableValueEventType | null>(null)
 
   useEffect(() => {
     if (!highlightEventId) return
@@ -73,6 +82,9 @@ export default function BasketballTimeline() {
     state.sportGameState.projection.status === 'in_progress' ||
     state.sportGameState.projection.status === 'period_break'
   )
+  const recoveryEventId = review.complete
+    ? null
+    : basketballRecoverableScoreAdjustmentId(state, review.diagnostics)
 
   const openShotDetail = (eventId: string) => {
     setShotDetail(basketballShotDetailFromReview(state, review, eventId))
@@ -186,6 +198,7 @@ export default function BasketballTimeline() {
                   onOpenEvent={openEventDetail}
                   onCorrect={setCorrectionIntent}
                   correctionsEnabled={correctionsEnabled}
+                  recoveryEventId={recoveryEventId}
                   highlightEventId={highlightEventId}
                 />
               </li>
@@ -210,6 +223,7 @@ export default function BasketballTimeline() {
                     onOpenEvent={openEventDetail}
                     onCorrect={setCorrectionIntent}
                     correctionsEnabled={correctionsEnabled}
+                    recoveryEventId={recoveryEventId}
                     highlightEventId={highlightEventId}
                     removed
                   />
@@ -252,13 +266,14 @@ export default function BasketballTimeline() {
             ? state.gameInfo?.teamName || 'Tracked team'
             : state.gameInfo?.opponentName || 'Opponent'}
           onClose={() => setEventDetail(null)}
-          onEdit={correctionsEnabled && !eventDetail.removed
+          onEdit={(correctionsEnabled || eventDetail.id === recoveryEventId) && !eventDetail.removed
             ? () => {
-                setEditingRelatedEventId(eventDetail.id)
+                if (isBasketballEditableValueEvent(eventDetail.event)) setEditingValueEventId(eventDetail.id)
+                else setEditingRelatedEventId(eventDetail.id)
                 setEventDetail(null)
               }
             : undefined}
-          onRemove={correctionsEnabled && !eventDetail.removed
+          onRemove={(correctionsEnabled || eventDetail.id === recoveryEventId) && !eventDetail.removed
             ? () => {
                 setCorrectionIntent({ kind: 'remove', eventId: eventDetail.id, scope: 'event' })
                 setEventDetail(null)
@@ -297,6 +312,18 @@ export default function BasketballTimeline() {
         />
       )}
 
+      {editingValueEventId && (
+        <BasketballValueEventEditor
+          mode="edit"
+          eventId={editingValueEventId}
+          onClose={() => setEditingValueEventId(null)}
+          onApplied={eventId => {
+            setEditingValueEventId(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
       {showAddChooser && (
         <BasketballAddEventChooser
           onClose={() => setShowAddChooser(false)}
@@ -308,6 +335,11 @@ export default function BasketballTimeline() {
             setShowAddChooser(false)
             setAddingRelatedType(eventType)
           }}
+          onValue={eventType => {
+            setShowAddChooser(false)
+            setAddingValueType(eventType)
+          }}
+          minutesAvailable={basketballManualMinutesAvailable(state)}
         />
       )}
 
@@ -331,6 +363,18 @@ export default function BasketballTimeline() {
           }}
         />
       )}
+
+      {addingValueType && (
+        <BasketballValueEventEditor
+          mode="add"
+          eventType={addingValueType}
+          onClose={() => setAddingValueType(null)}
+          onApplied={eventId => {
+            setAddingValueType(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
     </section>
   )
 }
@@ -341,6 +385,7 @@ function TimelineGroup({
   onOpenEvent,
   onCorrect,
   correctionsEnabled,
+  recoveryEventId,
   highlightEventId,
   removed = false,
 }: {
@@ -349,6 +394,7 @@ function TimelineGroup({
   onOpenEvent: (eventId: string) => void
   onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
   correctionsEnabled: boolean
+  recoveryEventId: string | null
   highlightEventId: string | null
   removed?: boolean
 }) {
@@ -362,6 +408,7 @@ function TimelineGroup({
         onOpenEvent={onOpenEvent}
         onCorrect={onCorrect}
         correctionsEnabled={correctionsEnabled}
+        recoveryEventId={recoveryEventId}
         highlighted={highlightEventId === group.events[0].id}
         removed={removed}
       />
@@ -395,6 +442,7 @@ function TimelineGroup({
             onOpenEvent={onOpenEvent}
             onCorrect={onCorrect}
             correctionsEnabled={correctionsEnabled}
+            recoveryEventId={recoveryEventId}
             highlighted={highlightEventId === review.id}
             removed={removed}
             nested
@@ -426,6 +474,7 @@ function TimelineEventRow({
   onOpenEvent,
   onCorrect,
   correctionsEnabled,
+  recoveryEventId,
   removed,
   highlighted = false,
   nested = false,
@@ -436,12 +485,13 @@ function TimelineEventRow({
   onOpenEvent: (eventId: string) => void
   onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
   correctionsEnabled: boolean
+  recoveryEventId: string | null
   removed: boolean
   highlighted?: boolean
   nested?: boolean
 }) {
   const shot = review.event.eventType === 'basketball.shot'
-  const relatedEvent = isBasketballEditableRelatedEvent(review.event)
+  const relatedEvent = isBasketballEditableRelatedEvent(review.event) || isBasketballEditableValueEvent(review.event)
   const content = (
     <>
       <div className="min-w-0 flex-1 text-left">
@@ -493,7 +543,7 @@ function TimelineEventRow({
             <Eye size={17} aria-hidden />
           </button>
         )}
-        {correctionsEnabled && !review.boundary && (
+        {(correctionsEnabled || review.id === recoveryEventId) && !review.boundary && (
           <button
             type="button"
             onClick={() => onCorrect(removed

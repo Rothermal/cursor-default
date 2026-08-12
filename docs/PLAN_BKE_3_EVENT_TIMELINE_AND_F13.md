@@ -5,7 +5,7 @@ review with an editable Timeline and delivering the held F13 shot-detail experie
 event model.
 
 Status: Approved through the BKE-3 product and delivery Q&A. Implementation is split into BKE-3A
-through BKE-3D. BKE-3A through BKE-3C are complete; BKE-3D is next.
+through BKE-3D. BKE-3A through BKE-3C and BKE-3D1/D2 are complete; BKE-3D3 is next.
 
 Depends on:
 
@@ -367,7 +367,25 @@ New links are period-local across the shot and related-event editors; an existin
 remains visible and preserved until explicitly changed. Relinking a turnover also moves capture-group
 membership from the detached steal to the newly linked steal so group removal follows visible facts.
 `BasketballTimeline` routes these families through one read-only detail sheet and shared responsive
-edit/add workflows. BKE-3D2 is next.
+edit/add workflows.
+
+BKE-3D2 status: Complete. `valueEventEditCommands.ts` owns checked score-adjustment and manual-
+minutes drafts, previews, edits, and recorded-later additions. Score edits retain the existing
+reason/note contract, enforce non-zero whole-number deltas, and reject either side projecting below
+zero after old attribution is removed and the replacement is applied. Minutes edits require a
+resolved participant, the manual clock model, a signed non-zero whole-number delta, and non-negative
+totals for both the former and replacement participant. Score and minutes replay now accepts any
+started period; minutes alone also accepts `period_break`, leaving every later administrative family
+on its current-period rule until its owning slice. Timeline detail and Add Event share the responsive
+value editor, successful mutations clear quick Undo, and projector validation remains the final
+fail-closed backstop. BKE-3D3 is next.
+
+Review hardening: signed value inputs retain their raw editing text so leading negative signs and blank
+intermediate values are safe. Manual-minutes pickers expose only participants with resolved player
+identity. A narrowly recognized pre-BKE-3D2 stream whose first semantic failure is a negative-score
+adjustment keeps only that adjustment's Edit/Remove recovery actions available and surfaces an explicit
+Timeline warning; the repair must yield one complete projection, while all new invalid mutations and
+unrelated diagnostic streams remain blocked.
 
 ### 9.1 Event-family matrix
 

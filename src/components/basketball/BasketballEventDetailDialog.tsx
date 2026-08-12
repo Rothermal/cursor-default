@@ -54,9 +54,9 @@ export default function BasketballEventDetailDialog({
             <DetailCell label="Team" value={teamLabel} />
           </div>
           <section className="border-b border-slate-200 px-4 py-4">
-            <h3 className="text-xs font-semibold uppercase text-slate-500">Relationship</h3>
+            <h3 className="text-xs font-semibold uppercase text-slate-500">{detailHeading(review)}</h3>
             <p className="mt-1 text-sm font-semibold text-slate-800">
-              {review.relationshipLabels.length > 0 ? review.relationshipLabels.join(' | ') : 'Standalone event'}
+              {detailValue(review)}
             </p>
           </section>
           {review.warnings.length > 0 && (
@@ -85,6 +85,25 @@ export default function BasketballEventDetailDialog({
       </section>
     </div>
   )
+}
+
+function detailHeading(review: BasketballTimelineEventReview): string {
+  if (review.event.eventType === 'basketball.score_adjustment') return 'Adjustment'
+  if (review.event.eventType === 'basketball.minutes_adjustment') return 'Minutes'
+  return 'Relationship'
+}
+
+function detailValue(review: BasketballTimelineEventReview): string {
+  const event = review.event
+  if (event.eventType === 'basketball.score_adjustment') {
+    const reason = event.payload.reason.replace(/_/g, ' ')
+    const amount = event.payload.delta > 0 ? `+${event.payload.delta}` : String(event.payload.delta)
+    return event.payload.note ? `${amount} | ${reason} | ${event.payload.note}` : `${amount} | ${reason}`
+  }
+  if (event.eventType === 'basketball.minutes_adjustment') {
+    return event.payload.deltaMinutes > 0 ? `+${event.payload.deltaMinutes}` : String(event.payload.deltaMinutes)
+  }
+  return review.relationshipLabels.length > 0 ? review.relationshipLabels.join(' | ') : 'Standalone event'
 }
 
 function DetailCell({ label, value }: { label: string; value: string }) {

@@ -11,6 +11,10 @@ import type {
   BasketballSportGameState,
   BasketballTeamSide,
 } from './types'
+import {
+  BASKETBALL_NEGATIVE_SCORE_RECOVERY_MESSAGE,
+  isBasketballNegativeScoreDiagnostic,
+} from './scoreAdjustmentRecovery'
 
 export type BasketballTimelineFamily =
   | 'all'
@@ -181,8 +185,10 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
     complete: inspection.complete,
     diagnostics: inspection.diagnostics,
     globalWarnings: [...new Set(inspection.diagnostics
-      .filter(item => item.eventId === null)
-      .map(item => item.message))],
+      .filter(item => item.eventId === null || isBasketballNegativeScoreDiagnostic(item))
+      .map(item => isBasketballNegativeScoreDiagnostic(item)
+        ? BASKETBALL_NEGATIVE_SCORE_RECOVERY_MESSAGE
+        : item.message))],
     activeGroups: groupReviews(activeReviews, activeCounts, deletedCounts, false),
     removedGroups: groupReviews(deletedReviews, deletedCounts, activeCounts, true),
     periods,

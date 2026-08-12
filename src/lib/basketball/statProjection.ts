@@ -24,6 +24,7 @@ const BKE3_RECORDED_LATER_TYPES = new Set<BasketballStatEvent['eventType']>([
   'basketball.steal',
   'basketball.block',
   'basketball.turnover',
+  'basketball.score_adjustment',
 ])
 
 export function createBasketballStatProjectionContext(): BasketballStatProjectionContext {
@@ -84,6 +85,9 @@ export function applyBasketballStatEvent(
       applyTurnover(projection, event)
       return null
     case 'basketball.score_adjustment':
+      if (projection.score[event.teamSide] + event.payload.delta < 0) {
+        return 'Basketball score cannot project below zero.'
+      }
       projection.score[event.teamSide] += event.payload.delta
       return null
   }

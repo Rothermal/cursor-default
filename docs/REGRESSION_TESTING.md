@@ -843,6 +843,28 @@ legacy-detail checks.
 
 ---
 
+## 11a12. Basketball score and minutes Timeline editors (BKE-3D2)
+
+**Precondition:** Healthy local Basketball event game using manual minutes, with two players and at
+least two started periods. Keep an anchored-clock fixture and a terminal game for fail-closed checks.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a12.1 | Open a score adjustment in Timeline detail and choose Edit | Team, signed delta, reason, and note are prefilled; event id/type stay immutable |
+| 11a12.2 | Change score side/delta/reason, require a note for Official correction, review, and save | One revision applies atomically, score reprojects, reason/note persist, and the row is highlighted |
+| 11a12.3 | Enter zero, a fractional delta, a blank official note, or a value that would make either score negative | Review is rejected inline and state remains unchanged |
+| 11a12.4 | Edit a manual-minutes row to another player/side with positive and negative whole-number deltas | Old attribution is removed, new attribution is applied, and player/side totals rebuild exactly |
+| 11a12.5 | Attempt to reduce either the former or replacement participant below zero | Review is rejected with a minutes-specific error and no revision is written |
+| 11a12.6 | Use Add Event for score and minutes, select a prior started period, review, and save | Each row appends with current capture ordering, selected period context, and a Recorded later badge; no fake clock is entered |
+| 11a12.7 | Repeat minutes add/edit on an anchored-clock game | Manual minutes are unavailable and no event can be appended or revised |
+| 11a12.8 | Open Add Event during a period break and add minutes to any started period | The checked historical flow succeeds; live fouls/timeouts/ejections retain their existing period guards |
+| 11a12.9 | Change Timeline after opening an editor, bind the game to cloud, or try a terminal game without Reopen | Save fails closed for stale, cloud, or terminal state; a reasoned Reopen restores local editing |
+| 11a12.10 | Park/reload and run focused tests, `pnpm test`, `pnpm lint`, and `pnpm build` | Score/minutes revisions, reasons, participants, periods, totals, and badges rederive identically; all checks pass |
+| 11a12.11 | Clear a signed-adjustment input, type a leading minus and then an integer, and repeat with an unresolved participant present | The negative text remains intact through typing; Review receives the signed integer; unresolved players do not appear in the minutes picker |
+| 11a12.12 | Load a pre-BKE-3D2 stream whose first semantic failure is a score adjustment below zero | Timeline identifies the flagged adjustment and retains only its Edit/Remove recovery actions; a complete repair succeeds, while unrelated diagnostics and any new negative-score mutation remain blocked |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production
