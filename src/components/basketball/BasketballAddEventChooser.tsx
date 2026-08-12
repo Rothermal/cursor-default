@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { Activity, CircleDot, Plus, X } from 'lucide-react'
+import { Activity, CircleDot, Clock3, Plus, SlidersHorizontal, X } from 'lucide-react'
 import type { BasketballHistoricalRelatedEventType } from '../../lib/basketball/relatedEventEditCommands'
+import type { BasketballEditableValueEventType } from '../../lib/basketball/valueEventEditCommands'
 
 interface Props {
   onClose: () => void
   onShot: () => void
   onRelated: (eventType: BasketballHistoricalRelatedEventType) => void
+  onValue: (eventType: BasketballEditableValueEventType) => void
+  minutesAvailable: boolean
 }
 
 const choices: Array<{ type: BasketballHistoricalRelatedEventType; label: string }> = [
@@ -17,7 +20,7 @@ const choices: Array<{ type: BasketballHistoricalRelatedEventType; label: string
   { type: 'basketball.steal_turnover', label: 'Steal + Turnover' },
 ]
 
-export default function BasketballAddEventChooser({ onClose, onShot, onRelated }: Props) {
+export default function BasketballAddEventChooser({ onClose, onShot, onRelated, onValue, minutesAvailable }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => closeRef.current?.focus(), [])
   useEffect(() => {
@@ -43,6 +46,14 @@ export default function BasketballAddEventChooser({ onClose, onShot, onRelated }
               {choice.label}
             </button>
           ))}
+          <button type="button" onClick={() => onValue('basketball.score_adjustment')} className="btn-secondary flex min-h-14 items-center justify-center gap-2">
+            <SlidersHorizontal size={18} aria-hidden />Score adjustment
+          </button>
+          {minutesAvailable && (
+            <button type="button" onClick={() => onValue('basketball.minutes_adjustment')} className="btn-secondary flex min-h-14 items-center justify-center gap-2">
+              <Clock3 size={18} aria-hidden />Minutes adjustment
+            </button>
+          )}
         </div>
       </section>
     </div>

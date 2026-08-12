@@ -25,6 +25,11 @@ import BasketballRelatedEventEditor from './BasketballRelatedEventEditor'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from './BasketballTimelineCorrectionDialog'
+import {
+  isBasketballEditableValueEvent,
+  type BasketballEditableValueEventType,
+} from '../../lib/basketball/valueEventEditCommands'
+import BasketballValueEventEditor from './BasketballValueEventEditor'
 
 export default function BasketballTimeline() {
   const { state } = useGame()
@@ -40,10 +45,12 @@ export default function BasketballTimeline() {
   const [editingShotId, setEditingShotId] = useState<string | null>(null)
   const [eventDetail, setEventDetail] = useState<BasketballTimelineEventReview | null>(null)
   const [editingRelatedEventId, setEditingRelatedEventId] = useState<string | null>(null)
+  const [editingValueEventId, setEditingValueEventId] = useState<string | null>(null)
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [addingShot, setAddingShot] = useState(false)
   const [addingRelatedType, setAddingRelatedType] = useState<BasketballHistoricalRelatedEventType | null>(null)
+  const [addingValueType, setAddingValueType] = useState<BasketballEditableValueEventType | null>(null)
 
   useEffect(() => {
     if (!highlightEventId) return
@@ -254,7 +261,8 @@ export default function BasketballTimeline() {
           onClose={() => setEventDetail(null)}
           onEdit={correctionsEnabled && !eventDetail.removed
             ? () => {
-                setEditingRelatedEventId(eventDetail.id)
+                if (isBasketballEditableValueEvent(eventDetail.event)) setEditingValueEventId(eventDetail.id)
+                else setEditingRelatedEventId(eventDetail.id)
                 setEventDetail(null)
               }
             : undefined}
@@ -297,6 +305,18 @@ export default function BasketballTimeline() {
         />
       )}
 
+      {editingValueEventId && (
+        <BasketballValueEventEditor
+          mode="edit"
+          eventId={editingValueEventId}
+          onClose={() => setEditingValueEventId(null)}
+          onApplied={eventId => {
+            setEditingValueEventId(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
       {showAddChooser && (
         <BasketballAddEventChooser
           onClose={() => setShowAddChooser(false)}
@@ -308,6 +328,12 @@ export default function BasketballTimeline() {
             setShowAddChooser(false)
             setAddingRelatedType(eventType)
           }}
+          onValue={eventType => {
+            setShowAddChooser(false)
+            setAddingValueType(eventType)
+          }}
+          minutesAvailable={state.sportGameState?.sportId === 'basketball' &&
+            state.sportGameState.setup.rulesSnapshot.clockModel === 'none'}
         />
       )}
 
@@ -327,6 +353,19 @@ export default function BasketballTimeline() {
           onClose={() => setAddingRelatedType(null)}
           onApplied={eventId => {
             setAddingRelatedType(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
+
+      {addingValueType && (
+        <BasketballValueEventEditor
+          mode="add"
+          eventType={addingValueType}
+          onClose={() => setAddingValueType(null)}
+          onApplied={eventId => {
+            setAddingValueType(null)
             setHighlightEventId(eventId)
           }}
         />
@@ -441,7 +480,7 @@ function TimelineEventRow({
   nested?: boolean
 }) {
   const shot = review.event.eventType === 'basketball.shot'
-  const relatedEvent = isBasketballEditableRelatedEvent(review.event)
+  const relatedEvent = isBasketballEditableRelatedEvent(review.event) || isBasketballEditableValueEvent(review.event)
   const content = (
     <>
       <div className="min-w-0 flex-1 text-left">
