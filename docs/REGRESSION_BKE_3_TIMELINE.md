@@ -23,7 +23,10 @@ remains off.
   and pre-projection duplicate id/recorder-sequence rejection.
 - `src/lib/basketball/relatedEventEditCommands.test.ts` covers rebound attribution/link revision,
   reverse turnover-to-steal relinking, paired historical Steal + Turnover capture, capture-order-safe
-  forward-link rejection, recorded-later projection, stale drafts, and atomic apply behavior.
+  forward-link rejection, capture-group removal after relinking, cross-period compatibility,
+  recorded-later projection, stale drafts, and atomic apply behavior.
+- `src/lib/basketball/shotEditCommands.test.ts` also proves new links stay period-local while an
+  already-stored cross-period link remains visible and survives unrelated shot edits.
 - The full Vitest suite, TypeScript production build, and ESLint remain required for every slice.
 
 ## Manual Matrix

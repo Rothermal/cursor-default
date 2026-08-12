@@ -3,6 +3,8 @@ import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
+import { applyGameEventMutations } from '../gameEvents/mutations'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
   addBasketballLateParticipant,
@@ -18,10 +20,15 @@ import {
   buildBasketballHistoricalRelatedEventDraft,
   buildBasketballRelatedEventEditDraft,
   basketballRelatedEventTargetOptions,
+  deriveBasketballRelatedEventEditor,
   previewBasketballHistoricalRelatedEvent,
   previewBasketballRelatedEventEdit,
 } from './relatedEventEditCommands'
 import { buildBasketballTimelineReview } from './timeline'
+import {
+  previewBasketballTimelineRemoval,
+  removeBasketballTimelineEvents,
+} from './timelineCorrections'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
 
@@ -176,10 +183,30 @@ describe('BKE-3D1 related-event editing', () => {
     expect(events.find(event => event.id === paired.eventIds[0]))
       .toMatchObject({ payload: { captureCommandId: '78000000-0000-4000-8000-000000000309' } })
     expect(events.find(event => event.id === paired.eventIds[1]))
-      .toMatchObject({ payload: { captureCommandId: '78000000-0000-4000-8000-000000000309' } })
-    expect(events.find(event => event.id === standalone.eventIds[0]))
       .toMatchObject({ payload: { captureCommandId: null } })
+    expect(events.find(event => event.id === standalone.eventIds[0]))
+      .toMatchObject({ payload: { captureCommandId: '78000000-0000-4000-8000-000000000309' } })
     expect(applied.state.sportGameState.projection.participants[
+      '78000000-0000-4000-8000-000000000101'
+    ].stats.stl).toBe(1)
+
+    const removalPreview = previewBasketballTimelineRemoval(
+      applied.state,
+      paired.eventIds[0],
+      'capture_group'
+    )
+    if (!removalPreview.ok) throw new Error(removalPreview.message)
+    expect(removalPreview.value.affectedEventIds).toEqual(expect.arrayContaining([
+      paired.eventIds[0],
+      standalone.eventIds[0],
+    ]))
+    expect(removalPreview.value.affectedEventIds).not.toContain(paired.eventIds[1])
+    const removed = removeBasketballTimelineEvents(applied.state, removalPreview.value)
+    if (!removed.ok || removed.state.sportGameState?.sportId !== 'basketball') throw new Error('Removal failed')
+    expect(removed.state.eventStream?.events.find(event =>
+      isGameEventEnvelope(event) && event.id === paired.eventIds[1]
+    )).toMatchObject({ deletedAt: null, payload: { relatedEventId: null, captureCommandId: null } })
+    expect(removed.state.sportGameState.projection.participants[
       '78000000-0000-4000-8000-000000000101'
     ].stats.stl).toBe(1)
   })
@@ -368,5 +395,62 @@ describe('BKE-3D1 related-event editing', () => {
       ...q1Draft,
       relatedEventId: secondShot.eventIds[0],
     }, 'recorder-1')).toMatchObject({ ok: false, message: expect.stringContaining('not compatible') })
+  })
+
+  it('keeps an existing cross-period link visible and preserves it on unrelated edits', () => {
+    const shot = captureBasketballCourtEvent(startedState(), {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 4, y: 10 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-11T14:30:00.000Z',
+      eventIds: ['78000000-0000-4000-8000-000000000901'],
+    })
+    if (!shot.ok) throw new Error(shot.message)
+    const ended = endBasketballPeriod(shot.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-11T14:31:00.000Z',
+      eventId: '78000000-0000-4000-8000-000000000902',
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    const q2 = startNextBasketballPeriod(ended.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-11T14:32:00.000Z',
+      eventId: '78000000-0000-4000-8000-000000000903',
+    })
+    if (!q2.ok) throw new Error(q2.message)
+    const assist = captureBasketballDirectStat(q2.state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-2',
+      statId: 'ast',
+      occurredAt: '2026-08-11T14:33:00.000Z',
+      eventId: '78000000-0000-4000-8000-000000000904',
+    })
+    if (!assist.ok) throw new Error(assist.message)
+    const linked = applyGameEventMutations(assist.state, [{
+      type: 'update',
+      eventId: assist.eventIds[0],
+      changes: { payload: { relatedEventId: shot.eventIds[0], captureCommandId: null } },
+    }], '2026-08-11T14:33:10.000Z', gameEventRegistry, gameEventProjectors)
+    if (!linked.ok) throw new Error(linked.error.message)
+    const draft = buildBasketballRelatedEventEditDraft(linked.state, assist.eventIds[0])
+    if (!draft.ok) throw new Error(draft.message)
+    const editor = deriveBasketballRelatedEventEditor(linked.state, draft.value)
+
+    expect(editor.draft.relatedEventId).toBe(shot.eventIds[0])
+    expect(editor.targetOptions).toEqual(expect.arrayContaining([{
+      eventId: shot.eventIds[0],
+      label: 'Q1 - Field goal #1: Made 2PT: Alex One',
+    }]))
+    const preview = previewBasketballRelatedEventEdit(linked.state, {
+      ...editor.draft,
+      actor: { kind: 'unknown', label: 'Bench assist' },
+    }, 'recorder-1', '2026-08-11T14:34:00.000Z')
+    if (!preview.ok) throw new Error(preview.message)
+    const applied = applyBasketballRelatedEventEdit(linked.state, preview.value)
+    if (!applied.ok) throw new Error(applied.message)
+    expect(applied.state.eventStream?.events.find(event =>
+      isGameEventEnvelope(event) && event.id === assist.eventIds[0]
+    )).toMatchObject({ payload: { relatedEventId: shot.eventIds[0] } })
   })
 })

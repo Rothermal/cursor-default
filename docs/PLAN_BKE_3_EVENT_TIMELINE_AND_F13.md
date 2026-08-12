@@ -363,6 +363,9 @@ BKE-3D1 status: Complete. `relatedEventEditCommands.ts` owns checked assist/rebo
 turnover drafts, target compatibility, reverse steal-link repair, historical additions, and paired
 Steal + Turnover capture. Existing event edits only offer relationship targets in valid capture
 order; historical paired capture appends Turnover before Steal so no forward reference is created.
+New links are period-local across the shot and related-event editors; an existing cross-period link
+remains visible and preserved until explicitly changed. Relinking a turnover also moves capture-group
+membership from the detached steal to the newly linked steal so group removal follows visible facts.
 `BasketballTimeline` routes these families through one read-only detail sheet and shared responsive
 edit/add workflows. BKE-3D2 is next.
 

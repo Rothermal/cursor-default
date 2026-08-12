@@ -3,6 +3,8 @@ import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { isGameEventEnvelope } from '../gameEvents/envelope'
+import { applyGameEventMutations } from '../gameEvents/mutations'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
   addBasketballLateParticipant,
@@ -17,6 +19,7 @@ import {
   applyBasketballHistoricalShot,
   buildBasketballHistoricalShotDraft,
   buildBasketballShotEditDraft,
+  basketballShotRelationshipOptionsByKind,
   previewBasketballHistoricalShot,
   previewBasketballShotEdit,
   reconcileBasketballHistoricalShotDraftRelationships,
@@ -351,6 +354,71 @@ describe('BKE-3C Basketball shot editing', () => {
       recordedLater: true,
       periodLabel: 'Q1',
     })
+  })
+
+  it('preserves an existing cross-period link but rejects a new one', () => {
+    const q1Shot = captureBasketballCourtEvent(startedState(), {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-10T14:20:00.000Z',
+      eventIds: ['76000000-0000-4000-8000-000000000601'],
+    })
+    if (!q1Shot.ok) throw new Error(q1Shot.message)
+    const ended = endBasketballPeriod(q1Shot.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-10T14:21:00.000Z',
+      eventId: '76000000-0000-4000-8000-000000000602',
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    const q2 = startNextBasketballPeriod(ended.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-10T14:22:00.000Z',
+      eventId: '76000000-0000-4000-8000-000000000603',
+    })
+    if (!q2.ok) throw new Error(q2.message)
+    const firstAssist = captureBasketballDirectStat(q2.state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-2',
+      statId: 'ast',
+      occurredAt: '2026-08-10T14:23:00.000Z',
+      eventId: '76000000-0000-4000-8000-000000000604',
+    })
+    if (!firstAssist.ok) throw new Error(firstAssist.message)
+    const linked = applyGameEventMutations(firstAssist.state, [{
+      type: 'update',
+      eventId: firstAssist.eventIds[0],
+      changes: { payload: { relatedEventId: q1Shot.eventIds[0], captureCommandId: null } },
+    }], '2026-08-10T14:23:10.000Z', gameEventRegistry, gameEventProjectors)
+    if (!linked.ok) throw new Error(linked.error.message)
+    const secondAssist = captureBasketballDirectStat(linked.state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-2',
+      statId: 'ast',
+      occurredAt: '2026-08-10T14:24:00.000Z',
+      eventId: '76000000-0000-4000-8000-000000000605',
+    })
+    if (!secondAssist.ok) throw new Error(secondAssist.message)
+    const draft = buildBasketballShotEditDraft(secondAssist.state, q1Shot.eventIds[0])
+    if (!draft.ok) throw new Error(draft.message)
+    const options = basketballShotRelationshipOptionsByKind(secondAssist.state, draft.value)
+
+    expect(options.assist).toEqual(expect.arrayContaining([expect.objectContaining({
+      key: `event:${firstAssist.eventIds[0]}`,
+      label: expect.stringContaining('Q2, existing cross-period link'),
+    })]))
+    expect(options.assist.some(option => option.key === `event:${secondAssist.eventIds[0]}`)).toBe(false)
+    const preview = previewBasketballShotEdit(secondAssist.state, {
+      ...draft.value,
+      location: { x: 1, y: 9 },
+    }, 'recorder-1', '2026-08-10T14:25:00.000Z')
+    if (!preview.ok) throw new Error(preview.message)
+    const applied = applyBasketballShotEdit(secondAssist.state, preview.value)
+    if (!applied.ok) throw new Error(applied.message)
+    expect(applied.state.eventStream?.events.find(event =>
+      isGameEventEnvelope(event) && event.id === firstAssist.eventIds[0]
+    )).toMatchObject({ payload: { relatedEventId: q1Shot.eventIds[0] } })
   })
 
   it('classifies historical value source from the normalized stored location', () => {

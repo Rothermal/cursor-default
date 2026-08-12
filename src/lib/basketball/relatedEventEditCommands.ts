@@ -499,7 +499,7 @@ function buildEditPlan(
       mutations.push({
         type: 'update',
         eventId: steal.id,
-        changes: { payload: { ...steal.payload, relatedEventId: null } },
+        changes: { payload: { ...steal.payload, relatedEventId: null, captureCommandId: null } },
       })
       notes.push(`${actorLabel(steal.actors[0])}'s steal remains as a standalone stat.`)
     }
@@ -509,7 +509,13 @@ function buildEditPlan(
         mutations.push({
           type: 'update',
           eventId: selected.id,
-          changes: { payload: { ...selected.payload, relatedEventId: event.id } },
+          changes: {
+            payload: {
+              ...selected.payload,
+              relatedEventId: event.id,
+              captureCommandId: event.payload.captureCommandId,
+            },
+          },
         })
       }
     }
@@ -638,10 +644,19 @@ function targetOptionsFromPrepared(
   const standalone = [{ eventId: null, label: 'Standalone' }]
   if (draft.eventType === 'basketball.steal_turnover') return standalone
   const existingEvent = prepared.active.find(event => event.id === draft.eventId)
+  const currentTargetId = existingEvent?.eventType === 'basketball.turnover'
+    ? prepared.active.find(candidate =>
+        candidate.eventType === 'basketball.steal' && candidate.payload.relatedEventId === existingEvent.id
+      )?.id ?? null
+    : existingEvent && isBasketballEditableRelatedEvent(existingEvent)
+      ? existingEvent.payload.relatedEventId
+      : null
   const capturedBeforeDraft = (event: BasketballMatchEvent) =>
     !existingEvent || compareGameEventCaptureOrder(event, existingEvent) < 0
   const inDraftPeriod = (event: BasketballMatchEvent) =>
     event.period.id === draft.period.id && event.period.order === draft.period.order
+  const isCurrentTarget = (event: BasketballMatchEvent) => event.id === currentTargetId
+  const targetLabel = buildTargetLabeler(prepared)
   const actor = basketballActorForSelection(
     prepared.state,
     actorRole(draft.eventType),
@@ -661,11 +676,11 @@ function targetOptionsFromPrepared(
         .filter((event): event is BasketballStealEvent => event.eventType === 'basketball.steal')
         .filter(event =>
           event.teamSide !== draft.teamSide &&
-          inDraftPeriod(event) &&
+          (inDraftPeriod(event) || isCurrentTarget(event)) &&
           compareGameEventCaptureOrder(event, existingTurnover) > 0 &&
           (event.payload.relatedEventId === null || event.payload.relatedEventId === draft.eventId)
         )
-        .map(event => ({ eventId: event.id, label: targetLabel(prepared, event) })),
+        .map(event => ({ eventId: event.id, label: targetLabel(event) })),
     ]
   }
   const shots = prepared.active.filter((event): event is BasketballShotEvent => event.eventType === 'basketball.shot')
@@ -676,7 +691,7 @@ function targetOptionsFromPrepared(
         .filter((event): event is BasketballTurnoverEvent => event.eventType === 'basketball.turnover')
         .filter(event =>
           event.teamSide !== draft.teamSide &&
-          inDraftPeriod(event) &&
+          (inDraftPeriod(event) || isCurrentTarget(event)) &&
           capturedBeforeDraft(event) &&
           !prepared.active.some(candidate =>
             candidate.id !== draft.eventId &&
@@ -684,13 +699,13 @@ function targetOptionsFromPrepared(
             candidate.payload.relatedEventId === event.id
           )
         )
-        .map(event => ({ eventId: event.id, label: targetLabel(prepared, event) })),
+        .map(event => ({ eventId: event.id, label: targetLabel(event) })),
     ]
   }
   return [
     ...standalone,
     ...shots.filter(shot =>
-      inDraftPeriod(shot) &&
+      (inDraftPeriod(shot) || isCurrentTarget(shot)) &&
       capturedBeforeDraft(shot) &&
       relationshipCompatible(draft, actor.value, shot) &&
       !prepared.active.some(candidate =>
@@ -700,29 +715,34 @@ function targetOptionsFromPrepared(
         candidate.payload.relatedEventId === shot.id
       )
     )
-      .map(shot => ({ eventId: shot.id, label: targetLabel(prepared, shot) })),
+      .map(shot => ({ eventId: shot.id, label: targetLabel(shot) })),
   ]
 }
 
-function targetLabel(
-  prepared: PreparedState,
-  event: BasketballShotEvent | BasketballStealEvent | BasketballTurnoverEvent
-): string {
-  const periodLabel = prepared.state.sportGameState?.sportId === 'basketball'
-    ? prepared.state.sportGameState.projection.periods.find(period => period.id === event.period.id)?.label ?? event.period.id
-    : event.period.id
-  const sameFamily = prepared.active
-    .filter(candidate => event.eventType === 'basketball.shot'
-      ? candidate.eventType === 'basketball.shot' && candidate.payload.attempt === event.payload.attempt
-      : candidate.eventType === event.eventType)
-    .sort(compareGameEventCaptureOrder)
-  const ordinal = sameFamily.findIndex(candidate => candidate.id === event.id) + 1
-  const familyLabel = event.eventType === 'basketball.shot'
-    ? `${event.payload.attempt === 'field_goal' ? 'Field goal' : 'Free throw'} #${ordinal}: ${event.payload.made ? 'Made' : 'Missed'} ${event.payload.value}PT`
-    : event.eventType === 'basketball.steal'
-      ? `Steal #${ordinal}`
-      : `Turnover #${ordinal}`
-  return `${periodLabel} - ${familyLabel}: ${actorLabel(event.actors[0])}`
+function buildTargetLabeler(prepared: PreparedState) {
+  const periodLabels = new Map(prepared.state.sportGameState?.sportId === 'basketball'
+    ? prepared.state.sportGameState.projection.periods.map(period => [period.id, period.label])
+    : [])
+  const ordinals = new Map<string, number>()
+  const counts = new Map<string, number>()
+  for (const event of [...prepared.active].sort(compareGameEventCaptureOrder)) {
+    const key = event.eventType === 'basketball.shot'
+      ? `${event.eventType}:${event.payload.attempt}`
+      : event.eventType
+    const ordinal = (counts.get(key) ?? 0) + 1
+    counts.set(key, ordinal)
+    ordinals.set(event.id, ordinal)
+  }
+  return (event: BasketballShotEvent | BasketballStealEvent | BasketballTurnoverEvent): string => {
+    const periodLabel = periodLabels.get(event.period.id) ?? event.period.id
+    const ordinal = ordinals.get(event.id) ?? 0
+    const familyLabel = event.eventType === 'basketball.shot'
+      ? `${event.payload.attempt === 'field_goal' ? 'Field goal' : 'Free throw'} #${ordinal}: ${event.payload.made ? 'Made' : 'Missed'} ${event.payload.value}PT`
+      : event.eventType === 'basketball.steal'
+        ? `Steal #${ordinal}`
+        : `Turnover #${ordinal}`
+    return `${periodLabel} - ${familyLabel}: ${actorLabel(event.actors[0])}`
+  }
 }
 
 function relationshipCompatible(
