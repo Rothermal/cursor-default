@@ -83,9 +83,12 @@ export function applyBasketballStatEvent(
     case 'basketball.turnover':
       applyTurnover(projection, event)
       return null
-    case 'basketball.score_adjustment':
-      projection.score[event.teamSide] += event.payload.delta
+    case 'basketball.score_adjustment': {
+      const nextScore = projection.score[event.teamSide] + event.payload.delta
+      if (nextScore < 0) return 'Basketball score cannot project below zero.'
+      projection.score[event.teamSide] = nextScore
       return null
+    }
   }
 }
 
