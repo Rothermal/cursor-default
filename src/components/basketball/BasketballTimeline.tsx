@@ -32,6 +32,11 @@ import {
 } from '../../lib/basketball/valueEventEditCommands'
 import BasketballValueEventEditor from './BasketballValueEventEditor'
 import { basketballRecoverableScoreAdjustmentId } from '../../lib/basketball/scoreAdjustmentRecovery'
+import {
+  isBasketballEditableFoulFreeThrowEvent,
+  type BasketballFoulFreeThrowDraftType,
+} from '../../lib/basketball/foulFreeThrowEditCommands'
+import BasketballFoulFreeThrowEditor from './BasketballFoulFreeThrowEditor'
 
 export default function BasketballTimeline() {
   const { state } = useGame()
@@ -48,11 +53,13 @@ export default function BasketballTimeline() {
   const [eventDetail, setEventDetail] = useState<BasketballTimelineEventReview | null>(null)
   const [editingRelatedEventId, setEditingRelatedEventId] = useState<string | null>(null)
   const [editingValueEventId, setEditingValueEventId] = useState<string | null>(null)
+  const [editingFoulFreeThrowEventId, setEditingFoulFreeThrowEventId] = useState<string | null>(null)
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [addingShot, setAddingShot] = useState(false)
   const [addingRelatedType, setAddingRelatedType] = useState<BasketballHistoricalRelatedEventType | null>(null)
   const [addingValueType, setAddingValueType] = useState<BasketballEditableValueEventType | null>(null)
+  const [addingFoulFreeThrowType, setAddingFoulFreeThrowType] = useState<BasketballFoulFreeThrowDraftType | null>(null)
 
   useEffect(() => {
     if (!highlightEventId) return
@@ -241,7 +248,12 @@ export default function BasketballTimeline() {
           onEdit={correctionsEnabled && shotDetail.source === 'event' && !shotDetail.removed
             ? () => {
                 setShotDetail(null)
-                setEditingShotId(shotDetail.shotId)
+                const event = review.eventById.get(shotDetail.shotId)?.event
+                if (event && isBasketballEditableFoulFreeThrowEvent(event) && event.eventType === 'basketball.shot') {
+                  setEditingFoulFreeThrowEventId(shotDetail.shotId)
+                } else {
+                  setEditingShotId(shotDetail.shotId)
+                }
               }
             : undefined}
           onRemove={correctionsEnabled && shotDetail.source === 'event' && !shotDetail.removed
@@ -266,9 +278,15 @@ export default function BasketballTimeline() {
             ? state.gameInfo?.teamName || 'Tracked team'
             : state.gameInfo?.opponentName || 'Opponent'}
           onClose={() => setEventDetail(null)}
-          onEdit={(correctionsEnabled || eventDetail.id === recoveryEventId) && !eventDetail.removed
+          onEdit={(correctionsEnabled || eventDetail.id === recoveryEventId) &&
+            !eventDetail.removed && (
+              isBasketballEditableFoulFreeThrowEvent(eventDetail.event) ||
+              isBasketballEditableValueEvent(eventDetail.event) ||
+              isBasketballEditableRelatedEvent(eventDetail.event)
+            )
             ? () => {
-                if (isBasketballEditableValueEvent(eventDetail.event)) setEditingValueEventId(eventDetail.id)
+                if (isBasketballEditableFoulFreeThrowEvent(eventDetail.event)) setEditingFoulFreeThrowEventId(eventDetail.id)
+                else if (isBasketballEditableValueEvent(eventDetail.event)) setEditingValueEventId(eventDetail.id)
                 else setEditingRelatedEventId(eventDetail.id)
                 setEventDetail(null)
               }
@@ -324,6 +342,18 @@ export default function BasketballTimeline() {
         />
       )}
 
+      {editingFoulFreeThrowEventId && (
+        <BasketballFoulFreeThrowEditor
+          mode="edit"
+          eventId={editingFoulFreeThrowEventId}
+          onClose={() => setEditingFoulFreeThrowEventId(null)}
+          onApplied={eventId => {
+            setEditingFoulFreeThrowEventId(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
       {showAddChooser && (
         <BasketballAddEventChooser
           onClose={() => setShowAddChooser(false)}
@@ -338,6 +368,10 @@ export default function BasketballTimeline() {
           onValue={eventType => {
             setShowAddChooser(false)
             setAddingValueType(eventType)
+          }}
+          onFoulFreeThrow={eventType => {
+            setShowAddChooser(false)
+            setAddingFoulFreeThrowType(eventType)
           }}
           minutesAvailable={basketballManualMinutesAvailable(state)}
         />
@@ -371,6 +405,18 @@ export default function BasketballTimeline() {
           onClose={() => setAddingValueType(null)}
           onApplied={eventId => {
             setAddingValueType(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
+      {addingFoulFreeThrowType && (
+        <BasketballFoulFreeThrowEditor
+          mode="add"
+          eventType={addingFoulFreeThrowType}
+          onClose={() => setAddingFoulFreeThrowType(null)}
+          onApplied={eventId => {
+            setAddingFoulFreeThrowType(null)
             setHighlightEventId(eventId)
           }}
         />
