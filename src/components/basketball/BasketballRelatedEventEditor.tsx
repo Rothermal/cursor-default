@@ -5,10 +5,9 @@ import { useGame } from '../../context/GameContext'
 import {
   applyBasketballRelatedEventEdit,
   basketballRelatedEventActorOptions,
-  basketballRelatedEventTargetOptions,
   buildBasketballRelatedEventEditDraft,
+  deriveBasketballRelatedEventEditor,
   previewBasketballRelatedEventEdit,
-  reconcileBasketballRelatedEventDraft,
   type BasketballRelatedEventEditDraft,
   type BasketballRelatedEventEditPreview,
 } from '../../lib/basketball/relatedEventEditCommands'
@@ -47,25 +46,21 @@ export default function BasketballRelatedEventEditor({ eventId, onClose, onAppli
     return () => window.removeEventListener('keydown', keydown)
   }, [onClose, preview])
 
-  const actorOptions = useMemo(() => draft
-    ? basketballRelatedEventActorOptions(
-        state,
-        draft.teamSide,
-        draft.eventType,
-        draft.turnoverKind,
-        draft.actor
-      )
-    : [], [draft, state])
-  const targetOptions = useMemo(() => draft
-    ? basketballRelatedEventTargetOptions(state, draft)
-    : [], [draft, state])
+  const editor = useMemo(
+    () => draft ? deriveBasketballRelatedEventEditor(state, draft) : null,
+    [draft, state]
+  )
 
   if (!draft) {
     return <BasketballEditorFrame title="Edit event" onClose={onClose} closeRef={closeRef}><div className="p-4"><BasketballEditorErrorMessage message={error ?? 'This event is unavailable.'} /></div></BasketballEditorFrame>
   }
 
+  const effectiveDraft = editor?.draft ?? draft
+  const actorOptions = editor?.actorOptions ?? []
+  const targetOptions = editor?.targetOptions ?? []
+
   const update = (changes: Partial<BasketballRelatedEventEditDraft>) => {
-    setDraft(reconcileBasketballRelatedEventDraft(state, { ...draft, ...changes }))
+    setDraft({ ...effectiveDraft, ...changes })
     setPreview(null)
     setError(null)
   }
@@ -81,7 +76,7 @@ export default function BasketballRelatedEventEditor({ eventId, onClose, onAppli
   }
 
   const requestPreview = () => {
-    const result = previewBasketballRelatedEventEdit(state, draft, user?.id ?? null)
+    const result = previewBasketballRelatedEventEdit(state, effectiveDraft, user?.id ?? null)
     if (!result.ok) return setError(result.message)
     setPreview(result.value)
   }
@@ -126,7 +121,7 @@ export default function BasketballRelatedEventEditor({ eventId, onClose, onAppli
           {draft.eventType === 'basketball.rebound' && <BasketballEditorSegmentedControl label="Rebound" value={draft.reboundKind} options={[{ value: 'offensive', label: 'Offensive' }, { value: 'defensive', label: 'Defensive' }]} onChange={value => update({ reboundKind: value as 'offensive' | 'defensive' })} />}
         </BasketballEditorSection>
         <BasketballEditorSection title="Relationship">
-          <BasketballEditorSelectField label="Linked event" value={draft.relatedEventId ?? 'none'} options={targetOptions.map(option => ({ value: option.eventId ?? 'none', label: option.label }))} onChange={value => update({ relatedEventId: value === 'none' ? null : value })} />
+          <BasketballEditorSelectField label="Linked event" value={effectiveDraft.relatedEventId ?? 'none'} options={targetOptions.map(option => ({ value: option.eventId ?? 'none', label: option.label }))} onChange={value => update({ relatedEventId: value === 'none' ? null : value })} />
           <p className="text-xs text-slate-500">Standalone stats keep their totals.</p>
         </BasketballEditorSection>
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}

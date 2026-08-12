@@ -62,17 +62,8 @@ function setupState(): GameState {
 }
 
 function startedState(): GameState {
-  const started = prepareBasketballGameStart(setupState(), {
-    recorderUserId: 'recorder-1',
-    occurredAt: '2026-08-11T14:00:00.000Z',
-    eventId: '78000000-0000-4000-8000-000000000001',
-    participantIds: [
-      '78000000-0000-4000-8000-000000000101',
-      '78000000-0000-4000-8000-000000000102',
-    ],
-  })
-  if (!started.ok) throw new Error(started.message)
-  const opponent = addBasketballLateParticipant(started.state, {
+  const base = trackedOnlyStartedState()
+  const opponent = addBasketballLateParticipant(base, {
     recorderUserId: 'recorder-1',
     teamSide: 'opponent',
     displayName: 'Opponent Nine',
@@ -85,6 +76,20 @@ function startedState(): GameState {
   })
   if (!opponent.ok) throw new Error(opponent.message)
   return opponent.state
+}
+
+function trackedOnlyStartedState(): GameState {
+  const started = prepareBasketballGameStart(setupState(), {
+    recorderUserId: 'recorder-1',
+    occurredAt: '2026-08-11T14:00:00.000Z',
+    eventId: '78000000-0000-4000-8000-000000000001',
+    participantIds: [
+      '78000000-0000-4000-8000-000000000101',
+      '78000000-0000-4000-8000-000000000102',
+    ],
+  })
+  if (!started.ok) throw new Error(started.message)
+  return started.state
 }
 
 describe('BKE-3D1 related-event editing', () => {
@@ -168,6 +173,12 @@ describe('BKE-3D1 related-event editing', () => {
       .toMatchObject({ revision: 2, payload: { relatedEventId: null } })
     expect(events.find(event => event.id === standalone.eventIds[0]))
       .toMatchObject({ revision: 2, payload: { relatedEventId: paired.eventIds[0] } })
+    expect(events.find(event => event.id === paired.eventIds[0]))
+      .toMatchObject({ payload: { captureCommandId: '78000000-0000-4000-8000-000000000309' } })
+    expect(events.find(event => event.id === paired.eventIds[1]))
+      .toMatchObject({ payload: { captureCommandId: '78000000-0000-4000-8000-000000000309' } })
+    expect(events.find(event => event.id === standalone.eventIds[0]))
+      .toMatchObject({ payload: { captureCommandId: null } })
     expect(applied.state.sportGameState.projection.participants[
       '78000000-0000-4000-8000-000000000101'
     ].stats.stl).toBe(1)
@@ -287,5 +298,75 @@ describe('BKE-3D1 related-event editing', () => {
 
     expect(basketballRelatedEventTargetOptions(secondAssist.state, secondDraft.value))
       .toEqual([{ eventId: null, label: 'Standalone' }])
+  })
+
+  it('builds every historical family without an opponent participant', () => {
+    const state = trackedOnlyStartedState()
+    const eventTypes = [
+      'basketball.assist',
+      'basketball.rebound',
+      'basketball.steal',
+      'basketball.block',
+      'basketball.turnover',
+      'basketball.steal_turnover',
+    ] as const
+
+    for (const eventType of eventTypes) {
+      const draft = buildBasketballHistoricalRelatedEventDraft(state, eventType)
+      expect(draft.ok, eventType).toBe(true)
+      if (draft.ok && eventType === 'basketball.steal_turnover') {
+        expect(draft.value.pairedTurnoverActor).toEqual({ kind: 'unknown', label: 'Unknown player' })
+      }
+    }
+  })
+
+  it('offers clearly labelled relationship targets only from the selected period', () => {
+    const firstShot = captureBasketballCourtEvent(startedState(), {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 12, y: 24 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-11T14:11:00.000Z',
+      eventIds: ['78000000-0000-4000-8000-000000000801'],
+    })
+    if (!firstShot.ok) throw new Error(firstShot.message)
+    const ended = endBasketballPeriod(firstShot.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-11T14:12:00.000Z',
+      eventId: '78000000-0000-4000-8000-000000000802',
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    const second = startNextBasketballPeriod(ended.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-11T14:13:00.000Z',
+      eventId: '78000000-0000-4000-8000-000000000803',
+    })
+    if (!second.ok) throw new Error(second.message)
+    const secondShot = captureBasketballCourtEvent(second.state, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 8, y: 18 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+      occurredAt: '2026-08-11T14:14:00.000Z',
+      eventIds: ['78000000-0000-4000-8000-000000000804'],
+    })
+    if (!secondShot.ok) throw new Error(secondShot.message)
+    const draft = buildBasketballHistoricalRelatedEventDraft(secondShot.state, 'basketball.assist')
+    if (!draft.ok) throw new Error(draft.message)
+    const q1Draft = {
+      ...draft.value,
+      period: { id: 'regulation-1', order: 1 },
+      actor: { kind: 'participant' as const, participantId: '78000000-0000-4000-8000-000000000102' },
+    }
+    const options = basketballRelatedEventTargetOptions(secondShot.state, q1Draft)
+
+    expect(options).toEqual([
+      { eventId: null, label: 'Standalone' },
+      { eventId: firstShot.eventIds[0], label: 'Q1 - Field goal #1: Made 2PT: Alex One' },
+    ])
+    expect(previewBasketballHistoricalRelatedEvent(secondShot.state, {
+      ...q1Draft,
+      relatedEventId: secondShot.eventIds[0],
+    }, 'recorder-1')).toMatchObject({ ok: false, message: expect.stringContaining('not compatible') })
   })
 })

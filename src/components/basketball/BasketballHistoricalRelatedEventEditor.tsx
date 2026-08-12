@@ -5,10 +5,9 @@ import { useGame } from '../../context/GameContext'
 import {
   applyBasketballHistoricalRelatedEvent,
   basketballRelatedEventActorOptions,
-  basketballRelatedEventTargetOptions,
   buildBasketballHistoricalRelatedEventDraft,
+  deriveBasketballRelatedEventEditor,
   previewBasketballHistoricalRelatedEvent,
-  reconcileBasketballRelatedEventDraft,
   type BasketballHistoricalRelatedEventDraft,
   type BasketballHistoricalRelatedEventPreview,
   type BasketballHistoricalRelatedEventType,
@@ -52,18 +51,21 @@ export default function BasketballHistoricalRelatedEventEditor({ eventType, onCl
   const periodOptions = (sportState?.projection.periods ?? [])
     .filter(period => sportState?.projection.startedPeriodIds.includes(period.id))
     .map(period => ({ value: period.id, label: period.label }))
-  const actorOptions = useMemo(() => draft
-    ? basketballRelatedEventActorOptions(state, draft.teamSide, draft.eventType, draft.turnoverKind, draft.actor)
-    : [], [draft, state])
+  const editor = useMemo(
+    () => draft ? deriveBasketballRelatedEventEditor(state, draft) : null,
+    [draft, state]
+  )
   const pairedTurnoverOptions = useMemo(() => draft
     ? basketballRelatedEventActorOptions(state, oppositeSide(draft.teamSide), 'basketball.turnover', draft.pairedTurnoverKind, draft.pairedTurnoverActor)
     : [], [draft, state])
-  const targetOptions = useMemo(() => draft ? basketballRelatedEventTargetOptions(state, draft) : [], [draft, state])
-
   if (!draft) return <BasketballEditorFrame title="Add event" onClose={onClose} closeRef={closeRef}><div className="p-4"><BasketballEditorErrorMessage message={error ?? 'This event cannot be added.'} /></div></BasketballEditorFrame>
 
+  const effectiveDraft = editor?.draft ?? draft
+  const actorOptions = editor?.actorOptions ?? []
+  const targetOptions = editor?.targetOptions ?? []
+
   const update = (changes: Partial<BasketballHistoricalRelatedEventDraft>) => {
-    setDraft(reconcileBasketballRelatedEventDraft(state, { ...draft, ...changes }))
+    setDraft({ ...effectiveDraft, ...changes })
     setPreview(null)
     setError(null)
   }
@@ -85,7 +87,7 @@ export default function BasketballHistoricalRelatedEventEditor({ eventType, onCl
     if (options[0]) update({ pairedTurnoverKind, pairedTurnoverActor: options[0].selection })
   }
   const requestPreview = () => {
-    const result = previewBasketballHistoricalRelatedEvent(state, draft, user?.id ?? null)
+    const result = previewBasketballHistoricalRelatedEvent(state, effectiveDraft, user?.id ?? null)
     if (!result.ok) return setError(result.message)
     setPreview(result.value)
   }
@@ -136,7 +138,7 @@ export default function BasketballHistoricalRelatedEventEditor({ eventType, onCl
           </BasketballEditorSection>
         ) : (
           <BasketballEditorSection title="Relationship">
-            <BasketballEditorSelectField label="Linked event" value={draft.relatedEventId ?? 'none'} options={targetOptions.map(option => ({ value: option.eventId ?? 'none', label: option.label }))} onChange={value => update({ relatedEventId: value === 'none' ? null : value })} />
+            <BasketballEditorSelectField label="Linked event" value={effectiveDraft.relatedEventId ?? 'none'} options={targetOptions.map(option => ({ value: option.eventId ?? 'none', label: option.label }))} onChange={value => update({ relatedEventId: value === 'none' ? null : value })} />
           </BasketballEditorSection>
         )}
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}

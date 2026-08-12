@@ -76,6 +76,13 @@ export interface BasketballRelationshipTargetOption {
   label: string
 }
 
+export interface BasketballRelatedEventEditorDerivation<TDraft extends
+  BasketballRelatedEventEditDraft | BasketballHistoricalRelatedEventDraft> {
+  draft: TDraft
+  actorOptions: BasketballShotActorOption[]
+  targetOptions: BasketballRelationshipTargetOption[]
+}
+
 export interface BasketballRelatedEventPreview<TDraft> {
   draft: TDraft
   streamFingerprint: string
@@ -182,11 +189,19 @@ export function buildBasketballHistoricalRelatedEventDraft(
   const period = projection.periods.find(candidate => candidate.id === projection.currentPeriodId) ??
     projection.periods.find(candidate => projection.startedPeriodIds.includes(candidate.id))
   if (!period) return commandFailure('invalid_period', 'Start a Basketball period before adding an event.')
-  const actor = defaultActor(prepared.value.state, 'tracked', eventType === 'basketball.turnover' ? false : true)
-  const pairedActor = defaultActor(prepared.value.state, 'opponent', false)
-  if (!actor || !pairedActor) {
-    return commandFailure('invalid_actor', 'Add Basketball participants before adding an event.')
-  }
+  const actor = basketballRelatedEventActorOptions(
+    prepared.value.state,
+    'tracked',
+    eventType,
+    'player'
+  )[0]?.selection
+  if (!actor) return commandFailure('invalid_actor', 'Add a tracked Basketball participant before adding an event.')
+  const pairedActor = basketballRelatedEventActorOptions(
+    prepared.value.state,
+    'opponent',
+    'basketball.turnover',
+    'player'
+  )[0]?.selection ?? { kind: 'unknown', label: 'Unknown player' }
   return {
     ok: true,
     value: {
@@ -237,6 +252,32 @@ export function basketballRelatedEventTargetOptions(
   const prepared = prepareState(state)
   if (!prepared.ok) return [{ eventId: null, label: 'Standalone' }]
   return targetOptionsFromPrepared(prepared.value, draft)
+}
+
+export function deriveBasketballRelatedEventEditor<TDraft extends
+  BasketballRelatedEventEditDraft | BasketballHistoricalRelatedEventDraft>(
+  state: GameState,
+  draft: TDraft
+): BasketballRelatedEventEditorDerivation<TDraft> {
+  const prepared = prepareState(state)
+  const preparedState = prepared.ok ? prepared.value.state : state
+  const targetOptions = prepared.ok
+    ? targetOptionsFromPrepared(prepared.value, draft)
+    : [{ eventId: null, label: 'Standalone' }]
+  const reconciledDraft = targetOptions.some(option => option.eventId === draft.relatedEventId)
+    ? draft
+    : { ...draft, relatedEventId: null }
+  return {
+    draft: reconciledDraft,
+    actorOptions: basketballRelatedEventActorOptions(
+      preparedState,
+      reconciledDraft.teamSide,
+      reconciledDraft.eventType,
+      reconciledDraft.turnoverKind,
+      reconciledDraft.actor
+    ),
+    targetOptions,
+  }
 }
 
 export function reconcileBasketballRelatedEventDraft<TDraft extends
@@ -599,6 +640,8 @@ function targetOptionsFromPrepared(
   const existingEvent = prepared.active.find(event => event.id === draft.eventId)
   const capturedBeforeDraft = (event: BasketballMatchEvent) =>
     !existingEvent || compareGameEventCaptureOrder(event, existingEvent) < 0
+  const inDraftPeriod = (event: BasketballMatchEvent) =>
+    event.period.id === draft.period.id && event.period.order === draft.period.order
   const actor = basketballActorForSelection(
     prepared.state,
     actorRole(draft.eventType),
@@ -618,10 +661,11 @@ function targetOptionsFromPrepared(
         .filter((event): event is BasketballStealEvent => event.eventType === 'basketball.steal')
         .filter(event =>
           event.teamSide !== draft.teamSide &&
+          inDraftPeriod(event) &&
           compareGameEventCaptureOrder(event, existingTurnover) > 0 &&
           (event.payload.relatedEventId === null || event.payload.relatedEventId === draft.eventId)
         )
-        .map(event => ({ eventId: event.id, label: `Steal: ${actorLabel(event.actors[0])}` })),
+        .map(event => ({ eventId: event.id, label: targetLabel(prepared, event) })),
     ]
   }
   const shots = prepared.active.filter((event): event is BasketballShotEvent => event.eventType === 'basketball.shot')
@@ -632,6 +676,7 @@ function targetOptionsFromPrepared(
         .filter((event): event is BasketballTurnoverEvent => event.eventType === 'basketball.turnover')
         .filter(event =>
           event.teamSide !== draft.teamSide &&
+          inDraftPeriod(event) &&
           capturedBeforeDraft(event) &&
           !prepared.active.some(candidate =>
             candidate.id !== draft.eventId &&
@@ -639,12 +684,13 @@ function targetOptionsFromPrepared(
             candidate.payload.relatedEventId === event.id
           )
         )
-        .map(event => ({ eventId: event.id, label: `Turnover: ${actorLabel(event.actors[0])}` })),
+        .map(event => ({ eventId: event.id, label: targetLabel(prepared, event) })),
     ]
   }
   return [
     ...standalone,
     ...shots.filter(shot =>
+      inDraftPeriod(shot) &&
       capturedBeforeDraft(shot) &&
       relationshipCompatible(draft, actor.value, shot) &&
       !prepared.active.some(candidate =>
@@ -654,11 +700,29 @@ function targetOptionsFromPrepared(
         candidate.payload.relatedEventId === shot.id
       )
     )
-      .map(shot => ({
-        eventId: shot.id,
-        label: `${shot.payload.made ? 'Made' : 'Missed'} ${shot.payload.value}PT: ${actorLabel(shot.actors[0])}`,
-      })),
+      .map(shot => ({ eventId: shot.id, label: targetLabel(prepared, shot) })),
   ]
+}
+
+function targetLabel(
+  prepared: PreparedState,
+  event: BasketballShotEvent | BasketballStealEvent | BasketballTurnoverEvent
+): string {
+  const periodLabel = prepared.state.sportGameState?.sportId === 'basketball'
+    ? prepared.state.sportGameState.projection.periods.find(period => period.id === event.period.id)?.label ?? event.period.id
+    : event.period.id
+  const sameFamily = prepared.active
+    .filter(candidate => event.eventType === 'basketball.shot'
+      ? candidate.eventType === 'basketball.shot' && candidate.payload.attempt === event.payload.attempt
+      : candidate.eventType === event.eventType)
+    .sort(compareGameEventCaptureOrder)
+  const ordinal = sameFamily.findIndex(candidate => candidate.id === event.id) + 1
+  const familyLabel = event.eventType === 'basketball.shot'
+    ? `${event.payload.attempt === 'field_goal' ? 'Field goal' : 'Free throw'} #${ordinal}: ${event.payload.made ? 'Made' : 'Missed'} ${event.payload.value}PT`
+    : event.eventType === 'basketball.steal'
+      ? `Steal #${ordinal}`
+      : `Turnover #${ordinal}`
+  return `${periodLabel} - ${familyLabel}: ${actorLabel(event.actors[0])}`
 }
 
 function relationshipCompatible(
@@ -712,15 +776,6 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedState> 
       deleted: inspection.deletedEvents.filter(isBasketballMatchEvent),
     },
   }
-}
-
-function defaultActor(
-  state: GameState,
-  side: BasketballTeamSide,
-  allowTeam: boolean
-): BasketballCaptureActorSelection | null {
-  return basketballShotActorOptions(state, side)
-    .find(option => allowTeam || option.selection.kind !== 'team')?.selection ?? null
 }
 
 function actorRole(eventType: BasketballHistoricalRelatedEventType): string {
