@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import {
+  isBasketballEditableRelatedEvent,
+  type BasketballHistoricalRelatedEventType,
+} from '../../lib/basketball/relatedEventEditCommands'
+import {
   BASKETBALL_TIMELINE_FAMILIES,
   basketballShotDetailFromReview,
   buildBasketballTimelineReview,
@@ -14,6 +18,10 @@ import {
 import BasketballShotDetailDialog from './BasketballShotDetailDialog'
 import BasketballShotEditor from './BasketballShotEditor'
 import BasketballHistoricalShotEditor from './BasketballHistoricalShotEditor'
+import BasketballAddEventChooser from './BasketballAddEventChooser'
+import BasketballEventDetailDialog from './BasketballEventDetailDialog'
+import BasketballHistoricalRelatedEventEditor from './BasketballHistoricalRelatedEventEditor'
+import BasketballRelatedEventEditor from './BasketballRelatedEventEditor'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from './BasketballTimelineCorrectionDialog'
@@ -30,8 +38,12 @@ export default function BasketballTimeline() {
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
   const [correctionIntent, setCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
   const [editingShotId, setEditingShotId] = useState<string | null>(null)
+  const [eventDetail, setEventDetail] = useState<BasketballTimelineEventReview | null>(null)
+  const [editingRelatedEventId, setEditingRelatedEventId] = useState<string | null>(null)
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
+  const [showAddChooser, setShowAddChooser] = useState(false)
   const [addingShot, setAddingShot] = useState(false)
+  const [addingRelatedType, setAddingRelatedType] = useState<BasketballHistoricalRelatedEventType | null>(null)
 
   useEffect(() => {
     if (!highlightEventId) return
@@ -66,6 +78,10 @@ export default function BasketballTimeline() {
     setShotDetail(basketballShotDetailFromReview(state, review, eventId))
   }
 
+  const openEventDetail = (eventId: string) => {
+    setEventDetail(review.eventById.get(eventId) ?? null)
+  }
+
   return (
     <section
       id="basketball-timeline-panel"
@@ -84,11 +100,11 @@ export default function BasketballTimeline() {
           {correctionsEnabled && (
             <button
               type="button"
-              onClick={() => setAddingShot(true)}
+              onClick={() => setShowAddChooser(true)}
               className="btn-secondary flex min-h-10 items-center gap-2 px-3 text-sm"
             >
               <Plus size={16} aria-hidden />
-              Add shot
+              Add event
             </button>
           )}
           {!review.complete && !correctionsEnabled && (
@@ -167,6 +183,7 @@ export default function BasketballTimeline() {
                 <TimelineGroup
                   group={group}
                   onOpenShot={openShotDetail}
+                  onOpenEvent={openEventDetail}
                   onCorrect={setCorrectionIntent}
                   correctionsEnabled={correctionsEnabled}
                   highlightEventId={highlightEventId}
@@ -190,6 +207,7 @@ export default function BasketballTimeline() {
                   <TimelineGroup
                     group={group}
                     onOpenShot={openShotDetail}
+                    onOpenEvent={openEventDetail}
                     onCorrect={setCorrectionIntent}
                     correctionsEnabled={correctionsEnabled}
                     highlightEventId={highlightEventId}
@@ -227,6 +245,28 @@ export default function BasketballTimeline() {
         />
       )}
 
+      {eventDetail && (
+        <BasketballEventDetailDialog
+          review={eventDetail}
+          teamLabel={eventDetail.teamSide === 'tracked'
+            ? state.gameInfo?.teamName || 'Tracked team'
+            : state.gameInfo?.opponentName || 'Opponent'}
+          onClose={() => setEventDetail(null)}
+          onEdit={correctionsEnabled && !eventDetail.removed
+            ? () => {
+                setEditingRelatedEventId(eventDetail.id)
+                setEventDetail(null)
+              }
+            : undefined}
+          onRemove={correctionsEnabled && !eventDetail.removed
+            ? () => {
+                setCorrectionIntent({ kind: 'remove', eventId: eventDetail.id, scope: 'event' })
+                setEventDetail(null)
+              }
+            : undefined}
+        />
+      )}
+
       {correctionIntent && (
         <BasketballTimelineCorrectionDialog
           intent={correctionIntent}
@@ -246,11 +286,47 @@ export default function BasketballTimeline() {
         />
       )}
 
+      {editingRelatedEventId && (
+        <BasketballRelatedEventEditor
+          eventId={editingRelatedEventId}
+          onClose={() => setEditingRelatedEventId(null)}
+          onApplied={eventId => {
+            setEditingRelatedEventId(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
+      {showAddChooser && (
+        <BasketballAddEventChooser
+          onClose={() => setShowAddChooser(false)}
+          onShot={() => {
+            setShowAddChooser(false)
+            setAddingShot(true)
+          }}
+          onRelated={eventType => {
+            setShowAddChooser(false)
+            setAddingRelatedType(eventType)
+          }}
+        />
+      )}
+
       {addingShot && (
         <BasketballHistoricalShotEditor
           onClose={() => setAddingShot(false)}
           onApplied={eventId => {
             setAddingShot(false)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
+      {addingRelatedType && (
+        <BasketballHistoricalRelatedEventEditor
+          eventType={addingRelatedType}
+          onClose={() => setAddingRelatedType(null)}
+          onApplied={eventId => {
+            setAddingRelatedType(null)
             setHighlightEventId(eventId)
           }}
         />
@@ -262,6 +338,7 @@ export default function BasketballTimeline() {
 function TimelineGroup({
   group,
   onOpenShot,
+  onOpenEvent,
   onCorrect,
   correctionsEnabled,
   highlightEventId,
@@ -269,6 +346,7 @@ function TimelineGroup({
 }: {
   group: BasketballTimelineGroup
   onOpenShot: (eventId: string) => void
+  onOpenEvent: (eventId: string) => void
   onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
   correctionsEnabled: boolean
   highlightEventId: string | null
@@ -281,6 +359,7 @@ function TimelineGroup({
         review={group.events[0]}
         group={group}
         onOpenShot={onOpenShot}
+        onOpenEvent={onOpenEvent}
         onCorrect={onCorrect}
         correctionsEnabled={correctionsEnabled}
         highlighted={highlightEventId === group.events[0].id}
@@ -313,6 +392,7 @@ function TimelineGroup({
             review={review}
             group={group}
             onOpenShot={onOpenShot}
+            onOpenEvent={onOpenEvent}
             onCorrect={onCorrect}
             correctionsEnabled={correctionsEnabled}
             highlighted={highlightEventId === review.id}
@@ -343,6 +423,7 @@ function TimelineEventRow({
   review,
   group,
   onOpenShot,
+  onOpenEvent,
   onCorrect,
   correctionsEnabled,
   removed,
@@ -352,6 +433,7 @@ function TimelineEventRow({
   review: BasketballTimelineEventReview
   group: BasketballTimelineGroup
   onOpenShot: (eventId: string) => void
+  onOpenEvent: (eventId: string) => void
   onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
   correctionsEnabled: boolean
   removed: boolean
@@ -359,6 +441,7 @@ function TimelineEventRow({
   nested?: boolean
 }) {
   const shot = review.event.eventType === 'basketball.shot'
+  const relatedEvent = isBasketballEditableRelatedEvent(review.event)
   const content = (
     <>
       <div className="min-w-0 flex-1 text-left">
@@ -392,6 +475,17 @@ function TimelineEventRow({
           <button
             type="button"
             onClick={() => onOpenShot(review.id)}
+            className="flex h-10 w-10 items-center justify-center rounded-md text-blue-700 active:bg-blue-50"
+            aria-label={`View ${review.title}`}
+            title="View details"
+          >
+            <Eye size={17} aria-hidden />
+          </button>
+        )}
+        {relatedEvent && (
+          <button
+            type="button"
+            onClick={() => onOpenEvent(review.id)}
             className="flex h-10 w-10 items-center justify-center rounded-md text-blue-700 active:bg-blue-50"
             aria-label={`View ${review.title}`}
             title="View details"

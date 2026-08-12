@@ -450,11 +450,12 @@ function basketballShotRelationshipOptionsFromPrepared(
     .filter((event): event is RelatedEvent => relationshipKindForEvent(event) === kind)
     .filter(event => event.payload.relatedEventId === null || event.payload.relatedEventId === draft.eventId)
     .filter(event => !event.deletedAt || event.payload.relatedEventId === draft.eventId)
+    .filter(event => samePeriod(event, prepared.shot) || event.payload.relatedEventId === draft.eventId)
     .filter(event => relationshipCompatible(kind, event, draft, shooterResult.value))
     .sort(compareGameEventCaptureOrder)
     .map(event => ({
       key: `event:${event.id}`,
-      label: `${event.deletedAt ? 'Restore' : event.payload.relatedEventId ? 'Keep' : 'Link'}: ${actorLabel(event.actors[0])}`,
+      label: `${event.deletedAt ? 'Restore' : event.payload.relatedEventId ? 'Keep' : 'Link'}: ${actorLabel(event.actors[0])}${samePeriod(event, prepared.shot) ? '' : ` (${periodLabel(prepared.state, event.period.id)}, existing cross-period link)`}`,
       selection: { mode: 'event' as const, eventId: event.id },
       removed: event.deletedAt !== null,
     }))
@@ -822,7 +823,8 @@ function buildShotEditPlan(
       draft.relationships[kind],
       kind,
       draft,
-      shooter.value
+      shooter.value,
+      original
     )
     if (!selectedResult.ok) return selectedResult
     const selected = selectedResult.value
@@ -900,7 +902,8 @@ function resolveRelationshipSelection(
   selection: BasketballShotRelationshipSelection,
   kind: BasketballShotRelationshipKind,
   draft: BasketballShotEditDraft,
-  shooter: GameEventActor
+  shooter: GameEventActor,
+  original: BasketballShotEvent
 ): BasketballCommandResult<{
   event: RelatedEvent | null
   newActor: { teamSide: BasketballTeamSide; selection: BasketballCaptureActorSelection } | null
@@ -913,6 +916,9 @@ function resolveRelationshipSelection(
     const event = events.find(candidate => candidate.id === selection.eventId)
     if (!event || (event.payload.relatedEventId !== null && event.payload.relatedEventId !== draft.eventId)) {
       return commandFailure('command_failed', `The selected ${kind} is no longer available for this shot.`)
+    }
+    if (!samePeriod(event, original) && event.payload.relatedEventId !== draft.eventId) {
+      return commandFailure('command_failed', `A ${kind} can only be linked to a shot in the same period.`)
     }
     const compatible = relationshipCompatible(kind, event, draft, shooter)
     if (!compatible && event.payload.relatedEventId === draft.eventId) {
@@ -972,6 +978,19 @@ function relationshipCompatible(
     !draft.made &&
     draft.value !== 1 &&
     event.teamSide !== draft.teamSide
+}
+
+function samePeriod(
+  left: Pick<BasketballMatchEvent, 'period'>,
+  right: Pick<BasketballMatchEvent, 'period'>
+): boolean {
+  return left.period.id === right.period.id && left.period.order === right.period.order
+}
+
+function periodLabel(state: GameState, periodId: string): string {
+  return state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ?? periodId
+    : periodId
 }
 
 function newRelationshipSideAllowed(

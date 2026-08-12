@@ -2,9 +2,10 @@
 
 ## Scope
 
-BKE-3A through BKE-3C provide local event review, shared shot detail and editing, arbitrary removal,
-persisted capture-group removal, conservative restoration, atomic relationship correction, and
-recorded-later field-goal additions. Basketball event cloud transport remains off.
+BKE-3A through BKE-3D1 provide local event review, shared shot detail and editing, arbitrary removal,
+persisted capture-group removal, conservative restoration, atomic shot and related-stat relationship
+correction, and recorded-later shot/related-stat/turnover additions. Basketball event cloud transport
+remains off.
 
 ## Automated Coverage
 
@@ -20,6 +21,12 @@ recorded-later field-goal additions. Basketball event cloud transport remains of
   constraints, stale draft rejection, and recorded-later field-goal additions.
 - `src/lib/gameEvents/gameEvents.test.ts` covers the append-plus-mutate final candidate, one rebuild,
   and pre-projection duplicate id/recorder-sequence rejection.
+- `src/lib/basketball/relatedEventEditCommands.test.ts` covers rebound attribution/link revision,
+  reverse turnover-to-steal relinking, paired historical Steal + Turnover capture, capture-order-safe
+  forward-link rejection, capture-group removal after relinking, cross-period compatibility,
+  recorded-later projection, stale drafts, and atomic apply behavior.
+- `src/lib/basketball/shotEditCommands.test.ts` also proves new links stay period-local while an
+  already-stored cross-period link remains visible and survives unrelated shot edits.
 - The full Vitest suite, TypeScript production build, and ESLint remain required for every slice.
 
 ## Manual Matrix
@@ -49,3 +56,9 @@ recorded-later field-goal additions. Basketball event cloud transport remains of
     current append order, displays `Recorded later`, retains the selected period, and saves atomically.
 13. Attempt an invalid free-throw location, incompatible relationship, and stale-draft save. Confirm
     every failure leaves the full stream, projected score/stats, and quick-Undo receipt unchanged.
+14. Open assist, rebound, steal, block, and turnover rows through their shared detail sheet. Edit
+    actor/side and family fields, then confirm incompatible relationships clear and totals reproject.
+15. Relink an existing turnover from one later steal to another. Confirm the former steal remains a
+    standalone total and the selected steal points to the turnover after one atomic Save.
+16. Use Add Event for every D1 family, including unknown/team attribution and a paired Steal +
+    Turnover in an earlier started period. Confirm the pair groups together and shows Recorded later.

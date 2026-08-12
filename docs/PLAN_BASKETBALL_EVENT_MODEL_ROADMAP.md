@@ -10,7 +10,9 @@ are approved in [PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md](PLAN_BKE_2_COMPLETE_EVENT
 BKE-2A through BKE-2D are complete, including the full local tracker parity and exit audit. BKE-3
 product and delivery decisions are approved in
 [PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md); BKE-3A through BKE-3C
-are complete and implementation continues with BKE-3D remaining editors and exit audit.
+are complete, as is BKE-3D1 related-stat/turnover editing. Implementation continues with BKE-3D2
+score-adjustment and manual-minutes editors. BKE-3D is split into four delivery slices through the
+remaining editors and exit audit.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
