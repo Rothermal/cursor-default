@@ -380,6 +380,13 @@ on its current-period rule until its owning slice. Timeline detail and Add Event
 value editor, successful mutations clear quick Undo, and projector validation remains the final
 fail-closed backstop. BKE-3D3 is next.
 
+Review hardening: signed value inputs retain their raw editing text so leading negative signs and blank
+intermediate values are safe. Manual-minutes pickers expose only participants with resolved player
+identity. A narrowly recognized pre-BKE-3D2 stream whose first semantic failure is a negative-score
+adjustment keeps only that adjustment's Edit/Remove recovery actions available and surfaces an explicit
+Timeline warning; the repair must yield one complete projection, while all new invalid mutations and
+unrelated diagnostic streams remain blocked.
+
 ### 9.1 Event-family matrix
 
 | Family | Editable fields and constraints |

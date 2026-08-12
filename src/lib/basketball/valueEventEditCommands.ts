@@ -15,6 +15,7 @@ import {
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballUuid } from './id'
+import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
 import { basketballShotActorOptions, type BasketballShotActorOption } from './shotEditCommands'
 import { createBasketballStatEvent } from './statEvents'
 import type {
@@ -63,6 +64,7 @@ type EditableValueEvent = BasketballScoreAdjustmentEvent | BasketballMinutesAdju
 interface PreparedState {
   state: GameState
   active: BasketballMatchEvent[]
+  recoveryEventId: string | null
 }
 
 interface ValuePlan {
@@ -82,21 +84,31 @@ export function basketballMinutesActorOptions(
   state: GameState,
   side: BasketballTeamSide
 ): BasketballShotActorOption[] {
-  return basketballShotActorOptions(state, side)
-    .filter(option => option.selection.kind === 'participant')
+  const participants = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.projection.participants
+    : {}
+  return basketballShotActorOptions(state, side).filter(option =>
+    option.selection.kind === 'participant' &&
+    Boolean(participants[option.selection.participantId]?.playerId)
+  )
+}
+
+export function basketballManualMinutesAvailable(state: GameState): boolean {
+  return state.sportGameState?.sportId === 'basketball' &&
+    state.sportGameState.setup.rulesSnapshot.clockModel === 'none'
 }
 
 export function buildBasketballValueEventEditDraft(
   state: GameState,
   eventId: string
 ): BasketballCommandResult<BasketballValueEventDraft> {
-  const prepared = prepareState(state)
+  const prepared = prepareState(state, eventId)
   if (!prepared.ok) return prepared
   const event = prepared.value.active.find(candidate =>
     candidate.id === eventId && isBasketballEditableValueEvent(candidate)
   ) as EditableValueEvent | undefined
   if (!event) return commandFailure('command_failed', 'This active Basketball event is unavailable for editing.')
-  if (event.eventType === 'basketball.minutes_adjustment' && !manualMinutesAvailable(prepared.value.state)) {
+  if (event.eventType === 'basketball.minutes_adjustment' && !basketballManualMinutesAvailable(prepared.value.state)) {
     return commandFailure('command_failed', 'Manual Basketball minutes are unavailable when the game clock is authoritative.')
   }
   return {
@@ -129,7 +141,7 @@ export function buildBasketballHistoricalValueEventDraft(
 ): BasketballCommandResult<BasketballValueEventDraft> {
   const prepared = prepareState(state)
   if (!prepared.ok) return prepared
-  if (eventType === 'basketball.minutes_adjustment' && !manualMinutesAvailable(prepared.value.state)) {
+  if (eventType === 'basketball.minutes_adjustment' && !basketballManualMinutesAvailable(prepared.value.state)) {
     return commandFailure('command_failed', 'Manual Basketball minutes are unavailable when the game clock is authoritative.')
   }
   const projection = prepared.value.state.sportGameState?.sportId === 'basketball'
@@ -144,7 +156,7 @@ export function buildBasketballHistoricalValueEventDraft(
   const actor = eventType === 'basketball.minutes_adjustment'
     ? defaultMinutesActor?.selection
     : { kind: 'team' as const }
-  if (!actor) return commandFailure('invalid_actor', 'Add a tracked Basketball participant before adding minutes.')
+  if (!actor) return commandFailure('invalid_actor', 'Add a resolved Basketball participant before adding minutes.')
   return {
     ok: true,
     value: {
@@ -188,7 +200,7 @@ export function applyBasketballValueEvent(
   if (eventStreamFingerprint(state) !== preview.streamFingerprint) {
     return failure(state, 'command_failed', 'The Timeline changed. Review the event again before saving.')
   }
-  const prepared = prepareState(state)
+  const prepared = prepareState(state, preview.mode === 'edit' ? preview.draft.eventId : undefined)
   if (!prepared.ok) return failure(state, prepared.code, prepared.message)
   const plan = buildPlan(prepared.value, preview.draft, preview.mode, preview.recorderUserId, preview.occurredAt)
   if (!plan.ok) return failure(state, plan.code, plan.message)
@@ -216,7 +228,7 @@ function previewValueEvent(
 ): BasketballCommandResult<BasketballValueEventPreview> {
   const occurredAt = validTimestamp(now)
   if (!occurredAt) return commandFailure('invalid_timestamp', 'Basketball event timestamp is invalid.')
-  const prepared = prepareState(state)
+  const prepared = prepareState(state, mode === 'edit' ? draft.eventId : undefined)
   if (!prepared.ok) return prepared
   const fingerprint = eventStreamFingerprint(prepared.value.state)
   if (fingerprint !== draft.sourceFingerprint) {
@@ -270,12 +282,14 @@ function buildPlan(
   if (draft.eventType === 'basketball.minutes_adjustment' && actor.value.kind !== 'player') {
     return commandFailure('invalid_actor', 'Minutes require a resolved Basketball player.')
   }
-  const totalError = validateProjectedTotals(
-    prepared.state,
-    existing && isBasketballEditableValueEvent(existing) ? existing : null,
-    draft,
-    actor.value
-  )
+  const totalError = prepared.recoveryEventId === draft.eventId
+    ? null
+    : validateProjectedTotals(
+        prepared.state,
+        existing && isBasketballEditableValueEvent(existing) ? existing : null,
+        draft,
+        actor.value
+      )
   if (totalError) return commandFailure('command_failed', totalError)
   const payload: BasketballScoreAdjustmentPayload | BasketballMinutesAdjustmentPayload =
     draft.eventType === 'basketball.score_adjustment'
@@ -357,7 +371,7 @@ function validateDraft(
       return commandFailure('command_failed', 'Official Basketball score corrections require a note.')
     }
   } else {
-    if (!manualMinutesAvailable(state)) {
+    if (!basketballManualMinutesAvailable(state)) {
       return commandFailure('command_failed', 'Manual Basketball minutes are unavailable when the game clock is authoritative.')
     }
     if (draft.actor.kind !== 'participant') {
@@ -427,7 +441,10 @@ function applyPlan(
   return { ok: true, value: result.state }
 }
 
-function prepareState(state: GameState): BasketballCommandResult<PreparedState> {
+function prepareState(
+  state: GameState,
+  requestedRecoveryEventId?: string
+): BasketballCommandResult<PreparedState> {
   if (
     state.sport?.id !== 'basketball' ||
     state.gameDataAuthority !== 'sport_events' ||
@@ -440,11 +457,22 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedState> 
     return commandFailure('cloud_flow_unsupported', 'Basketball event editing is local-only during development.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
-  if (!rebuilt.inspection.complete || rebuilt.state.sportGameState?.sportId !== 'basketball' || !rebuilt.state.eventStream) {
+  const recoveryEventId = basketballRecoverableScoreAdjustmentId(
+    state,
+    rebuilt.inspection.diagnostics
+  )
+  const recovering = Boolean(
+    requestedRecoveryEventId && recoveryEventId === requestedRecoveryEventId
+  )
+  if (
+    (!rebuilt.inspection.complete && !recovering) ||
+    rebuilt.state.sportGameState?.sportId !== 'basketball' ||
+    !rebuilt.state.eventStream
+  ) {
     return commandFailure('command_failed', 'Resolve Basketball Timeline diagnostics before editing events.')
   }
   const status = rebuilt.state.sportGameState.projection.status
-  if (status !== 'in_progress' && status !== 'period_break') {
+  if (!recovering && status !== 'in_progress' && status !== 'period_break') {
     return commandFailure('invalid_period', 'Reopen the Basketball game before editing events.')
   }
   const inspection = inspectGameEventStream(rebuilt.state.eventStream, gameEventRegistry)
@@ -456,13 +484,9 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedState> 
     value: {
       state: rebuilt.state,
       active: inspection.activeEvents.filter(isBasketballMatchEvent),
+      recoveryEventId: recovering ? recoveryEventId : null,
     },
   }
-}
-
-function manualMinutesAvailable(state: GameState): boolean {
-  return state.sportGameState?.sportId === 'basketball' &&
-    state.sportGameState.setup.rulesSnapshot.clockModel === 'none'
 }
 
 function actorToSelection(actor: GameEventActor): BasketballCaptureActorSelection {

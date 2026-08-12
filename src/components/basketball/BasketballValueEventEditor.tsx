@@ -31,15 +31,18 @@ type Props = {
 )
 
 export default function BasketballValueEventEditor(props: Props) {
+  const { onApplied, onClose } = props
   const { state, dispatch } = useGame()
   const { user } = useAuth()
-  const initial = useMemo(
-    () => props.mode === 'edit'
-      ? buildBasketballValueEventEditDraft(state, props.eventId)
-      : buildBasketballHistoricalValueEventDraft(state, props.eventType),
-    [props, state]
-  )
+  const editEventId = props.mode === 'edit' ? props.eventId : null
+  const addEventType = props.mode === 'add' ? props.eventType : null
+  const initial = useMemo(() => {
+    if (editEventId !== null) return buildBasketballValueEventEditDraft(state, editEventId)
+    if (addEventType !== null) return buildBasketballHistoricalValueEventDraft(state, addEventType)
+    throw new Error('Basketball value editor requires an edit or add target.')
+  }, [addEventType, editEventId, state])
   const [draft, setDraft] = useState<BasketballValueEventDraft | null>(() => initial.ok ? initial.value : null)
+  const [deltaInput, setDeltaInput] = useState(() => initial.ok ? String(initial.value.delta) : '')
   const [preview, setPreview] = useState<BasketballValueEventPreview | null>(null)
   const [error, setError] = useState<string | null>(() => initial.ok ? null : initial.message)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -49,15 +52,15 @@ export default function BasketballValueEventEditor(props: Props) {
     const keydown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       if (preview) setPreview(null)
-      else props.onClose()
+      else onClose()
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [preview, props])
+  }, [onClose, preview])
 
   if (!draft) {
     return (
-      <BasketballEditorFrame title={props.mode === 'edit' ? 'Edit event' : 'Add event'} onClose={props.onClose} closeRef={closeRef}>
+      <BasketballEditorFrame title={props.mode === 'edit' ? 'Edit event' : 'Add event'} onClose={onClose} closeRef={closeRef}>
         <div className="p-4"><BasketballEditorErrorMessage message={error ?? 'This event is unavailable.'} /></div>
       </BasketballEditorFrame>
     )
@@ -67,9 +70,11 @@ export default function BasketballValueEventEditor(props: Props) {
   const actorOptions = draft.eventType === 'basketball.minutes_adjustment'
     ? basketballMinutesActorOptions(state, draft.teamSide)
     : []
-  const periodOptions = (sportState?.projection.periods ?? [])
-    .filter(period => sportState?.projection.startedPeriodIds.includes(period.id))
-    .map(period => ({ value: period.id, label: period.label }))
+  const periodOptions = props.mode === 'add'
+    ? (sportState?.projection.periods ?? [])
+        .filter(period => sportState?.projection.startedPeriodIds.includes(period.id))
+        .map(period => ({ value: period.id, label: period.label }))
+    : []
 
   const update = (changes: Partial<BasketballValueEventDraft>) => {
     setDraft(current => current ? { ...current, ...changes } : current)
@@ -87,9 +92,10 @@ export default function BasketballValueEventEditor(props: Props) {
   }
 
   const requestPreview = () => {
+    const previewDraft = { ...draft, delta: Number(deltaInput) }
     const result = props.mode === 'edit'
-      ? previewBasketballValueEventEdit(state, draft, user?.id ?? null)
-      : previewBasketballHistoricalValueEvent(state, draft, user?.id ?? null)
+      ? previewBasketballValueEventEdit(state, previewDraft, user?.id ?? null)
+      : previewBasketballHistoricalValueEvent(state, previewDraft, user?.id ?? null)
     if (!result.ok) return setError(result.message)
     setPreview(result.value)
   }
@@ -103,7 +109,7 @@ export default function BasketballValueEventEditor(props: Props) {
       return
     }
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
-    props.onApplied(result.highlightEventId)
+    onApplied(result.highlightEventId)
   }
 
   if (preview) {
@@ -131,7 +137,7 @@ export default function BasketballValueEventEditor(props: Props) {
 
   const label = draft.eventType === 'basketball.score_adjustment' ? 'score adjustment' : 'minutes adjustment'
   return (
-    <BasketballEditorFrame title={`${props.mode === 'edit' ? 'Edit' : 'Add'} ${label}`} onClose={props.onClose} closeRef={closeRef}>
+    <BasketballEditorFrame title={`${props.mode === 'edit' ? 'Edit' : 'Add'} ${label}`} onClose={onClose} closeRef={closeRef}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <BasketballEditorSection title={props.mode === 'add' ? 'Recorded later' : 'Adjustment'}>
           {props.mode === 'add' && (
@@ -162,8 +168,12 @@ export default function BasketballValueEventEditor(props: Props) {
             <input
               type="number"
               step="1"
-              value={draft.delta}
-              onChange={event => update({ delta: Number(event.target.value) })}
+              value={deltaInput}
+              onChange={event => {
+                setDeltaInput(event.target.value)
+                setPreview(null)
+                setError(null)
+              }}
               className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-800"
             />
           </label>
@@ -194,7 +204,7 @@ export default function BasketballValueEventEditor(props: Props) {
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
       <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
-        <button type="button" onClick={props.onClose} className="btn-secondary min-h-11">Cancel</button>
+        <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
         <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
           {props.mode === 'edit' ? <Pencil size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
           Review

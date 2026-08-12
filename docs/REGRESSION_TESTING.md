@@ -860,6 +860,8 @@ least two started periods. Keep an anchored-clock fixture and a terminal game fo
 | 11a12.8 | Open Add Event during a period break and add minutes to any started period | The checked historical flow succeeds; live fouls/timeouts/ejections retain their existing period guards |
 | 11a12.9 | Change Timeline after opening an editor, bind the game to cloud, or try a terminal game without Reopen | Save fails closed for stale, cloud, or terminal state; a reasoned Reopen restores local editing |
 | 11a12.10 | Park/reload and run focused tests, `pnpm test`, `pnpm lint`, and `pnpm build` | Score/minutes revisions, reasons, participants, periods, totals, and badges rederive identically; all checks pass |
+| 11a12.11 | Clear a signed-adjustment input, type a leading minus and then an integer, and repeat with an unresolved participant present | The negative text remains intact through typing; Review receives the signed integer; unresolved players do not appear in the minutes picker |
+| 11a12.12 | Load a pre-BKE-3D2 stream whose first semantic failure is a score adjustment below zero | Timeline identifies the flagged adjustment and retains only its Edit/Remove recovery actions; a complete repair succeeds, while unrelated diagnostics and any new negative-score mutation remain blocked |
 
 ---
 

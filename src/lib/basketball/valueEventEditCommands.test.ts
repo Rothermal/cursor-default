@@ -12,7 +12,17 @@ import {
 import { adjustBasketballScore, captureBasketballDirectStat } from './directCommands'
 import { buildBasketballTimelineReview } from './timeline'
 import {
+  previewBasketballTimelineRemoval,
+  removeBasketballTimelineEvents,
+} from './timelineCorrections'
+import {
+  buildBasketballShotEditDraft,
+  previewBasketballShotEdit,
+} from './shotEditCommands'
+import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
+import {
   applyBasketballValueEvent,
+  basketballMinutesActorOptions,
   buildBasketballHistoricalValueEventDraft,
   buildBasketballValueEventEditDraft,
   previewBasketballHistoricalValueEvent,
@@ -69,6 +79,54 @@ function startedState(): GameState {
   })
   if (!started.ok) throw new Error(started.message)
   return started.state
+}
+
+function madeThreeWithOffset(): {
+  state: GameState
+  shotId: string
+  adjustmentId: string
+} {
+  const shot = captureBasketballDirectStat(startedState(), {
+    recorderUserId: 'recorder-1',
+    playerId: 'player-1',
+    statId: '3pt',
+    occurredAt: '2026-08-11T14:09:00.000Z',
+    eventId: '7a000000-0000-4000-8000-000000000501',
+  })
+  if (!shot.ok) throw new Error(shot.message)
+  const adjustment = adjustBasketballScore(shot.state, {
+    recorderUserId: 'recorder-1',
+    teamSide: 'tracked',
+    delta: -3,
+    reason: 'scoreboard_control',
+    occurredAt: '2026-08-11T14:09:10.000Z',
+    eventId: '7a000000-0000-4000-8000-000000000502',
+  })
+  if (!adjustment.ok) throw new Error(adjustment.message)
+  return { state: adjustment.state, shotId: shot.eventIds[0], adjustmentId: adjustment.eventIds[0] }
+}
+
+function legacyNegativeScoreState(): ReturnType<typeof madeThreeWithOffset> {
+  const captured = madeThreeWithOffset()
+  return {
+    ...captured,
+    state: {
+      ...captured.state,
+      eventStream: captured.state.eventStream && {
+        ...captured.state.eventStream,
+        events: captured.state.eventStream.events.map(raw =>
+          isGameEventEnvelope(raw) && raw.id === captured.shotId
+            ? {
+                ...raw,
+                revision: raw.revision + 1,
+                updatedAt: '2026-08-11T14:09:20.000Z',
+                payload: { ...raw.payload, made: false },
+              }
+            : raw
+        ),
+      },
+    },
+  }
 }
 
 describe('BKE-3D2 score and minutes event editing', () => {
@@ -241,5 +299,82 @@ describe('BKE-3D2 score and minutes event editing', () => {
     }
     expect(buildBasketballHistoricalValueEventDraft(anchored, 'basketball.minutes_adjustment'))
       .toMatchObject({ ok: false, message: expect.stringContaining('clock is authoritative') })
+  })
+
+  it('keeps newly introduced negative-score histories blocked', () => {
+    const captured = madeThreeWithOffset()
+    const draft = buildBasketballShotEditDraft(captured.state, captured.shotId)
+    if (!draft.ok) throw new Error(draft.message)
+    expect(previewBasketballShotEdit(captured.state, {
+      ...draft.value,
+      made: false,
+    }, 'recorder-1')).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('invalid or incomplete match history'),
+    })
+  })
+
+  it('lets an existing negative-score adjustment be edited or removed to repair the stream', () => {
+    const legacy = legacyNegativeScoreState()
+    const review = buildBasketballTimelineReview(legacy.state)
+    expect(review.complete).toBe(false)
+    expect(review.globalWarnings).toContain(
+      'Basketball score history is below zero. Edit or remove the flagged score adjustment to repair this game.'
+    )
+    expect(review.eventById.get(legacy.adjustmentId)?.warnings).toContain(
+      'Basketball score cannot project below zero.'
+    )
+    expect(basketballRecoverableScoreAdjustmentId(legacy.state, review.diagnostics))
+      .toBe(legacy.adjustmentId)
+
+    const draft = buildBasketballValueEventEditDraft(legacy.state, legacy.adjustmentId)
+    if (!draft.ok) throw new Error(draft.message)
+    const preview = previewBasketballValueEventEdit(legacy.state, {
+      ...draft.value,
+      delta: 1,
+    }, 'recorder-1', '2026-08-11T14:10:00.000Z')
+    if (!preview.ok) throw new Error(preview.message)
+    const edited = applyBasketballValueEvent(legacy.state, preview.value)
+    if (!edited.ok || edited.state.sportGameState?.sportId !== 'basketball') throw new Error('Recovery edit failed')
+    expect(buildBasketballTimelineReview(edited.state).complete).toBe(true)
+    expect(edited.state.sportGameState.projection.score.tracked).toBe(1)
+
+    const removalPreview = previewBasketballTimelineRemoval(
+      legacy.state,
+      legacy.adjustmentId
+    )
+    if (!removalPreview.ok) throw new Error(removalPreview.message)
+    const removed = removeBasketballTimelineEvents(
+      legacy.state,
+      removalPreview.value,
+      '2026-08-11T14:10:10.000Z'
+    )
+    if (!removed.ok || removed.state.sportGameState?.sportId !== 'basketball') throw new Error('Recovery removal failed')
+    expect(buildBasketballTimelineReview(removed.state).complete).toBe(true)
+    expect(removed.state.sportGameState.projection.score.tracked).toBe(0)
+  })
+
+  it('omits unresolved participants from manual-minutes choices', () => {
+    const state = startedState()
+    if (state.sportGameState?.sportId !== 'basketball') throw new Error('Basketball state unavailable')
+    const unresolvedId = '7a000000-0000-4000-8000-000000000101'
+    const unresolved: GameState = {
+      ...state,
+      sportGameState: {
+        ...state.sportGameState,
+        projection: {
+          ...state.sportGameState.projection,
+          participants: {
+            ...state.sportGameState.projection.participants,
+            [unresolvedId]: {
+              ...state.sportGameState.projection.participants[unresolvedId],
+              playerId: null,
+            },
+          },
+        },
+      },
+    }
+    expect(basketballMinutesActorOptions(unresolved, 'tracked').map(option => option.selection))
+      .not.toContainEqual({ kind: 'participant', participantId: unresolvedId })
   })
 })

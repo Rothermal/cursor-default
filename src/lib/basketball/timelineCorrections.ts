@@ -11,6 +11,7 @@ import type {
   BasketballStateCommandResult,
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
+import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
 import { buildBasketballTimelineReview } from './timeline'
 import type {
   BasketballMatchEvent,
@@ -82,7 +83,7 @@ export function previewBasketballTimelineRemoval(
   eventId: string,
   scope: BasketballTimelineRemovalScope = 'event'
 ): BasketballCommandResult<BasketballTimelineRemovalPreview> {
-  const prepared = prepareState(state)
+  const prepared = prepareState(state, eventId)
   if (!prepared.ok) return prepared
   const event = prepared.value.active.find(candidate => candidate.id === eventId)
   if (!event) return commandFailure('nothing_to_undo', 'This Basketball event is no longer active.')
@@ -139,7 +140,7 @@ export function removeBasketballTimelineEvents(
   if (eventStreamFingerprint(state) !== preview.streamFingerprint) {
     return failure(state, 'command_failed', 'The Timeline changed. Review the removal again before applying it.')
   }
-  const prepared = prepareState(state)
+  const prepared = prepareState(state, preview.eventId)
   if (!prepared.ok) return failure(state, prepared.code, prepared.message)
   const event = prepared.value.active.find(candidate => candidate.id === preview.eventId)
   if (!event) return failure(state, 'nothing_to_undo', 'This Basketball event is no longer active.')
@@ -283,7 +284,10 @@ export function restoreBasketballTimelineEvent(
   return applyTimelinePlan(state, prepared.value.state, mutations, timestamp)
 }
 
-function prepareState(state: GameState): BasketballCommandResult<PreparedBasketballState> {
+function prepareState(
+  state: GameState,
+  requestedRecoveryEventId?: string
+): BasketballCommandResult<PreparedBasketballState> {
   if (
     state.sport?.id !== 'basketball' ||
     state.sportGameState?.sportId !== 'basketball' ||
@@ -295,17 +299,21 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedBasketb
     return commandFailure('cloud_flow_unsupported', 'Basketball Timeline correction is local-only during development.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
+  const recovering = Boolean(
+    requestedRecoveryEventId &&
+    basketballRecoverableScoreAdjustmentId(state, rebuilt.inspection.diagnostics) === requestedRecoveryEventId
+  )
   if (
-    !rebuilt.inspection.complete ||
+    (!rebuilt.inspection.complete && !recovering) ||
     rebuilt.state.sportGameState?.sportId !== 'basketball' ||
     !rebuilt.state.eventStream
   ) {
     return commandFailure('command_failed', 'Resolve Basketball Timeline diagnostics before changing events.')
   }
-  if (
+  if (!recovering && (
     rebuilt.state.sportGameState.projection.status !== 'in_progress' &&
     rebuilt.state.sportGameState.projection.status !== 'period_break'
-  ) {
+  )) {
     return commandFailure('invalid_period', 'Reopen the Basketball game before changing Timeline events.')
   }
   const inspection = inspectGameEventStream(rebuilt.state.eventStream, gameEventRegistry)
