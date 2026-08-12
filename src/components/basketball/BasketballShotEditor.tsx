@@ -61,6 +61,19 @@ export default function BasketballShotEditor({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose, placingLocation, preview])
 
+  const shooterOptions = useMemo(
+    () => draft ? basketballShotActorOptions(state, draft.teamSide) : [],
+    [draft, state]
+  )
+  const relationshipOptions = useMemo(
+    () => draft ? basketballShotRelationshipOptionsByKind(state, draft) : {
+      assist: [],
+      rebound: [],
+      block: [],
+    },
+    [draft, state]
+  )
+
   if (!draft) {
     return (
       <BasketballEditorFrame title="Edit shot" onClose={onClose} closeRef={closeRef}>
@@ -70,9 +83,6 @@ export default function BasketballShotEditor({
       </BasketballEditorFrame>
     )
   }
-
-  const shooterOptions = basketballShotActorOptions(state, draft.teamSide)
-  const relationshipOptions = basketballShotRelationshipOptionsByKind(state, draft)
 
   const marker: ShotRecord[] = draft.location ? [{
     id: draft.eventId,

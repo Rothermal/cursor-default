@@ -414,17 +414,6 @@ export function reconcileBasketballHistoricalShotDraftRelationships(
   return { ...draft, relationships }
 }
 
-export function basketballShotRelationshipOptions(
-  state: GameState,
-  draft: BasketballShotEditDraft,
-  kind: BasketballShotRelationshipKind
-): BasketballShotRelationshipOption[] {
-  const prepared = prepareShotEditState(state, draft.eventId)
-  return prepared.ok
-    ? basketballShotRelationshipOptionsFromPrepared(prepared.value, draft, kind)
-    : unavailableRelationshipOptions()
-}
-
 export function basketballShotRelationshipOptionsByKind(
   state: GameState,
   draft: BasketballShotEditDraft
