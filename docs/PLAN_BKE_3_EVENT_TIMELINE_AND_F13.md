@@ -5,7 +5,7 @@ review with an editable Timeline and delivering the held F13 shot-detail experie
 event model.
 
 Status: Approved through the BKE-3 product and delivery Q&A. Implementation is split into BKE-3A
-through BKE-3D. BKE-3A and BKE-3B are complete; BKE-3C is next.
+through BKE-3D. BKE-3A through BKE-3C are complete; BKE-3D is next.
 
 Depends on:
 
@@ -284,6 +284,13 @@ See [REGRESSION_BKE_3_TIMELINE.md](REGRESSION_BKE_3_TIMELINE.md).
 - Park/reload after deletion and restore; current revisions and deleted payloads remain explainable.
 
 ## 8. BKE-3C: F13 Shot and Relationship Editing
+
+Status: Complete. `shotEditCommands.ts` owns checked shot drafts, previews, existing-shot edits,
+relationship changes, and recorded-later field-goal additions. Marker and Timeline detail share
+`BasketballShotEditor`; Timeline also exposes `BasketballHistoricalShotEditor`. The generic
+`applyGameEventAppendsAndMutations` primitive validates one final append-plus-mutate candidate and
+rebuilds it once. Historical validation is intentionally narrow to shots, assists, rebounds, and
+blocks until BKE-3D generalizes replay across the remaining event families.
 
 ### 8.1 Shot editor
 

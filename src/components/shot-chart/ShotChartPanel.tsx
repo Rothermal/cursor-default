@@ -38,6 +38,7 @@ import {
   type BasketballShotDetailModel,
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
+import BasketballShotEditor from '../basketball/BasketballShotEditor'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from '../basketball/BasketballTimelineCorrectionDialog'
@@ -115,6 +116,7 @@ export default function ShotChartPanel({
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
   const [shotDetailReviewComplete, setShotDetailReviewComplete] = useState(false)
   const [timelineCorrectionIntent, setTimelineCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
+  const [editingShotId, setEditingShotId] = useState<string | null>(null)
   const [overlapChoices, setOverlapChoices] = useState<ShotRecord[]>([])
   const pendingPulseIdRef = useRef<string | null>(null)
   const overlapDialogRef = useRef<HTMLElement>(null)
@@ -586,6 +588,12 @@ export default function ShotChartPanel({
         <BasketballShotDetailDialog
           detail={shotDetail}
           onClose={() => setShotDetail(null)}
+          onEdit={shotDetailReviewComplete && basketballCorrectionsOpen && shotDetail.source === 'event'
+            ? () => {
+                setShotDetail(null)
+                setEditingShotId(shotDetail.shotId)
+              }
+            : undefined}
           onRemove={shotDetailReviewComplete && basketballCorrectionsOpen && shotDetail.source === 'event'
             ? () => {
                 setShotDetail(null)
@@ -604,6 +612,18 @@ export default function ShotChartPanel({
           intent={timelineCorrectionIntent}
           onClose={() => setTimelineCorrectionIntent(null)}
           onApplied={() => setShotDetail(null)}
+        />
+      )}
+
+      {editingShotId && (
+        <BasketballShotEditor
+          eventId={editingShotId}
+          onClose={() => setEditingShotId(null)}
+          onApplied={eventId => {
+            setEditingShotId(null)
+            setPulseShotId(eventId)
+            window.setTimeout(() => setPulseShotId(null), 1_200)
+          }}
         />
       )}
 

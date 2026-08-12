@@ -63,6 +63,7 @@ export interface BasketballTimelineEventReview {
   families: BasketballTimelineFamily[]
   revised: boolean
   removed: boolean
+  recordedLater: boolean
   boundary: boolean
   relationshipLabels: string[]
   warnings: string[]
@@ -77,6 +78,7 @@ export interface BasketballTimelineGroup {
   periodLabel: string
   occurredAt: string
   revised: boolean
+  recordedLater: boolean
   boundary: boolean
   removedCompanionCount: number
   activeCompanionCount: number
@@ -160,13 +162,15 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
         eventsById.has(item.eventId) || eventsById.has(item.relatedEventId)
       )
     : []
+  const recordedLaterIds = recordedLaterEventIds(allEvents)
   const reviews = allEvents.map(event => reviewEvent(
     reviewState,
     event,
     eventsById,
     diagnosticsByEvent,
     relationshipWarnings,
-    knownParticipantIds
+    knownParticipantIds,
+    recordedLaterIds.has(event.id)
   ))
   const eventById = new Map(reviews.map(review => [review.id, review]))
   const activeReviews = validActive.map(event => eventById.get(event.id)!).filter(Boolean)
@@ -460,7 +464,8 @@ function reviewEvent(
   eventsById: Map<string, BasketballMatchEvent>,
   diagnosticsByEvent: Map<string, string[]>,
   relationshipWarnings: Array<{ eventId: string; relatedEventId: string; message: string }>,
-  knownParticipantIds: Set<string>
+  knownParticipantIds: Set<string>,
+  recordedLater: boolean
 ): BasketballTimelineEventReview {
   const participantIds = participantIdsForEvent(state, event)
   const warnings = [
@@ -481,6 +486,7 @@ function reviewEvent(
     families: familiesForEvent(event),
     revised: event.revision > 1,
     removed: event.deletedAt !== null,
+    recordedLater,
     boundary: BOUNDARY_TYPES.has(event.eventType),
     relationshipLabels: relationshipsForEvent(state, event, eventsById),
     warnings: [...new Set(warnings)],
@@ -514,6 +520,7 @@ function groupReviews(
         periodLabel: primary.periodLabel,
         occurredAt: last.event.occurredAt,
         revised: members.some(item => item.revised),
+        recordedLater: members.some(item => item.recordedLater),
         boundary: members.some(item => item.boundary),
         removedCompanionCount: removed
           ? ownCounts.get(id) ?? members.length
@@ -528,6 +535,40 @@ function groupReviews(
       const rightEvent = right.events[right.events.length - 1].event
       return compareGameEventCaptureOrder(rightEvent, leftEvent)
     })
+}
+
+function recordedLaterEventIds(events: BasketballMatchEvent[]): Set<string> {
+  const result = new Set<string>()
+  const endedPeriods = new Set<string>()
+  let currentPeriodId: string | null = null
+  for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    if (
+      isRecordedLaterEligible(event) &&
+      (currentPeriodId !== event.period.id || endedPeriods.has(event.period.id))
+    ) {
+      result.add(event.id)
+    }
+    if (event.eventType === 'basketball.period_started') {
+      currentPeriodId = event.payload.periodId
+      endedPeriods.delete(event.payload.periodId)
+    } else if (event.eventType === 'basketball.period_ended') {
+      endedPeriods.add(event.payload.periodId)
+    } else if (event.eventType === 'basketball.match_ended') {
+      currentPeriodId = null
+    } else if (event.eventType === 'basketball.match_reopened') {
+      currentPeriodId = event.period.id
+    }
+  }
+  return result
+}
+
+function isRecordedLaterEligible(event: BasketballMatchEvent): boolean {
+  return event.eventType !== 'basketball.period_started' &&
+    event.eventType !== 'basketball.period_ended' &&
+    event.eventType !== 'basketball.match_roster_added' &&
+    event.eventType !== 'basketball.participant_resolved' &&
+    event.eventType !== 'basketball.match_ended' &&
+    event.eventType !== 'basketball.match_reopened'
 }
 
 function groupTitle(
