@@ -91,6 +91,12 @@ export interface BasketballRelationshipOption {
   label: string
 }
 
+export interface BasketballFoulFreeThrowEditorOptions {
+  foulSources: BasketballRelationshipOption[]
+  tripOptions: BasketballRelationshipOption[]
+  positionOptions: number[]
+}
+
 export type BasketballFoulFreeThrowCommandResult =
   | { ok: true; state: GameState; highlightEventId: string }
   | { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string }
@@ -133,9 +139,26 @@ export function basketballFoulParticipantOptions(
   state: GameState,
   side: BasketballTeamSide
 ): BasketballShotActorOption[] {
-  return basketballShotActorOptions(state, side).filter(option =>
-    option.selection.kind === 'participant'
-  )
+  return basketballResolvedPlayerOptions(state, side)
+}
+
+export function basketballFoulFreeThrowEditorOptions(
+  state: GameState,
+  draft: BasketballFoulFreeThrowDraft
+): BasketballFoulFreeThrowEditorOptions {
+  const prepared = prepareState(state)
+  if (!prepared.ok) {
+    return {
+      foulSources: [{ eventId: null, label: 'No source foul' }],
+      tripOptions: [{ eventId: null, label: 'Ungrouped free throw' }],
+      positionOptions: [],
+    }
+  }
+  return {
+    foulSources: foulSourceOptions(prepared.value, draft),
+    tripOptions: freeThrowTripOptions(prepared.value, draft),
+    positionOptions: freeThrowPositionOptions(prepared.value, draft),
+  }
 }
 
 export function basketballFoulSourceOptions(
@@ -144,17 +167,24 @@ export function basketballFoulSourceOptions(
 ): BasketballRelationshipOption[] {
   const prepared = prepareState(state)
   if (!prepared.ok) return [{ eventId: null, label: 'No source foul' }]
-  const original = prepared.value.active.find(event => event.id === draft.eventId)
+  return foulSourceOptions(prepared.value, draft)
+}
+
+function foulSourceOptions(
+  prepared: PreparedState,
+  draft: BasketballFoulFreeThrowDraft
+): BasketballRelationshipOption[] {
+  const original = prepared.active.find(event => event.id === draft.eventId)
   return [
     { eventId: null, label: 'No source foul' },
-    ...prepared.value.active
+    ...prepared.active
       .filter((event): event is BasketballFoulEvent => event.eventType === 'basketball.foul')
       .filter(event =>
         event.period.id === draft.period.id &&
         event.teamSide === oppositeSide(draft.teamSide) &&
         (!original || compareGameEventCaptureOrder(event, original) < 0)
       )
-      .map(event => ({ eventId: event.id, label: eventOptionLabel(prepared.value.state, event) })),
+      .map(event => ({ eventId: event.id, label: eventOptionLabel(prepared.state, event) })),
   ]
 }
 
@@ -164,17 +194,24 @@ export function basketballFreeThrowTripOptions(
 ): BasketballRelationshipOption[] {
   const prepared = prepareState(state)
   if (!prepared.ok) return [{ eventId: null, label: 'Ungrouped free throw' }]
-  const original = prepared.value.active.find(event => event.id === draft.eventId)
+  return freeThrowTripOptions(prepared.value, draft)
+}
+
+function freeThrowTripOptions(
+  prepared: PreparedState,
+  draft: BasketballFoulFreeThrowDraft
+): BasketballRelationshipOption[] {
+  const original = prepared.active.find(event => event.id === draft.eventId)
   return [
     { eventId: null, label: 'Ungrouped free throw' },
-    ...prepared.value.active
+    ...prepared.active
       .filter((event): event is BasketballFreeThrowTripEvent => event.eventType === 'basketball.free_throw_trip')
       .filter(event =>
         event.period.id === draft.period.id &&
         event.teamSide === draft.teamSide &&
         (!original || compareGameEventCaptureOrder(event, original) < 0)
       )
-      .map(event => ({ eventId: event.id, label: eventOptionLabel(prepared.value.state, event) })),
+      .map(event => ({ eventId: event.id, label: eventOptionLabel(prepared.state, event) })),
   ]
 }
 
@@ -182,15 +219,22 @@ export function basketballFreeThrowPositionOptions(
   state: GameState,
   draft: BasketballFoulFreeThrowDraft
 ): number[] {
-  if (!draft.freeThrowTripId) return []
   const prepared = prepareState(state)
   if (!prepared.ok) return []
-  const trip = prepared.value.active.find((event): event is BasketballFreeThrowTripEvent =>
+  return freeThrowPositionOptions(prepared.value, draft)
+}
+
+function freeThrowPositionOptions(
+  prepared: PreparedState,
+  draft: BasketballFoulFreeThrowDraft
+): number[] {
+  if (!draft.freeThrowTripId) return []
+  const trip = prepared.active.find((event): event is BasketballFreeThrowTripEvent =>
     event.id === draft.freeThrowTripId && event.eventType === 'basketball.free_throw_trip'
   )
   if (!trip) return []
   const occupied = new Set(
-    [...prepared.value.active, ...prepared.value.deleted]
+    [...prepared.active, ...prepared.deleted]
       .filter((event): event is BasketballShotEvent =>
         event.id !== draft.eventId &&
         event.eventType === 'basketball.shot' &&
@@ -201,7 +245,7 @@ export function basketballFreeThrowPositionOptions(
       .map(event => event.payload.tripAttemptNumber!)
   )
   return Array.from({ length: trip.payload.maximumAttempts }, (_, index) => index + 1)
-    .filter(position => !occupied.has(position) || position === draft.tripAttemptNumber)
+    .filter(position => !occupied.has(position))
 }
 
 export function buildBasketballFoulFreeThrowEditDraft(
@@ -650,15 +694,34 @@ function buildAttemptPlan(
       mutations.push({ type: 'update', eventId: existing.id, changes: { payload, teamSide: draft.teamSide, actors: [shooter.value] } })
       lines.push('Update the free-throw shooter, result, or stable trip position.')
     }
+    const oneAndOneTripsToRepair = new Set<string>()
+    const previousTrip = existing.payload.freeThrowTripId
+      ? prepared.active.find((event): event is BasketballFreeThrowTripEvent =>
+          event.id === existing.payload.freeThrowTripId && event.eventType === 'basketball.free_throw_trip'
+        )
+      : null
+    if (
+      previousTrip?.payload.oneAndOne &&
+      existing.payload.tripAttemptNumber === 1 &&
+      (
+        trip?.id !== previousTrip.id ||
+        draft.tripAttemptNumber !== 1 ||
+        !draft.made
+      )
+    ) {
+      oneAndOneTripsToRepair.add(previousTrip.id)
+    }
     if (trip?.payload.oneAndOne && draft.tripAttemptNumber === 1 && !draft.made) {
-      const seconds = prepared.active.filter((event): event is BasketballShotEvent =>
+      oneAndOneTripsToRepair.add(trip.id)
+    }
+    for (const tripId of oneAndOneTripsToRepair) {
+      for (const second of prepared.active.filter((event): event is BasketballShotEvent =>
         event.eventType === 'basketball.shot' &&
         event.payload.attempt === 'free_throw' &&
-        event.payload.freeThrowTripId === trip.id &&
+        event.payload.freeThrowTripId === tripId &&
         event.payload.tripAttemptNumber === 2 &&
         event.id !== draft.eventId
-      )
-      for (const second of seconds) {
+      )) {
         mutations.push(ungroupAttemptMutation(second))
         lines.push('The existing second one-and-one attempt will remain recorded but become ungrouped.')
       }
@@ -759,9 +822,17 @@ function foulDependencyRepairs(
         mutations.push({
           type: 'update',
           eventId: event.id,
-          changes: { payload: { ...event.payload, sourceFoulEventId: null } },
+          changes: {
+            payload: {
+              ...event.payload,
+              sourceFoulEventId: null,
+              oneAndOne: false,
+            },
+          },
         })
-        lines.push('An incompatible free-throw award will remain recorded without a source-foul link.')
+        lines.push(event.payload.oneAndOne
+          ? 'An incompatible free-throw award will remain recorded without a source-foul link or one-and-one status.'
+          : 'An incompatible free-throw award will remain recorded without a source-foul link.')
       }
     }
     if (event.eventType === 'basketball.ejection' && event.payload.relatedFoulEventId === original.id) {

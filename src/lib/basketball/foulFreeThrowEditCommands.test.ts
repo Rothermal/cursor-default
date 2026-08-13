@@ -13,6 +13,7 @@ import {
 import { captureBasketballOfficialEjection } from './ejectionCommands'
 import {
   applyBasketballFoulFreeThrowChange,
+  basketballFoulParticipantOptions,
   buildBasketballFoulFreeThrowEditDraft,
   buildBasketballHistoricalFoulFreeThrowDraft,
   previewBasketballFoulFreeThrowEdit,
@@ -122,10 +123,14 @@ function id(value: number): string {
 
 describe('BKE-3D3 foul and free-throw event editing', () => {
   it('atomically repairs trip and ejection links made incompatible by a foul edit', () => {
-    const foul = captureFoul(startedState(), 2, {
+    const foul = captureFoul(startedState({
+      hasOneAndOne: true,
+      bonusThreshold: 1,
+      doubleBonusThreshold: 4,
+    }), 2, {
       freeThrows: {
         maximumAttempts: 2,
-        oneAndOne: false,
+        oneAndOne: true,
         technical: false,
         possessionRetained: false,
       },
@@ -158,7 +163,7 @@ describe('BKE-3D3 foul and free-throw event editing', () => {
     if (!applied.ok) throw new Error(applied.message)
 
     expect(activeEvent(applied.state, foul.tripEventId)).toMatchObject({
-      payload: { sourceFoulEventId: null },
+      payload: { sourceFoulEventId: null, oneAndOne: false },
     })
     expect(activeEvent(applied.state, ejection.eventId)).toMatchObject({
       payload: { relatedFoulEventId: null },
@@ -259,6 +264,24 @@ describe('BKE-3D3 foul and free-throw event editing', () => {
 
     const firstDraft = buildBasketballFoulFreeThrowEditDraft(state, id(701))
     if (!firstDraft.ok) throw new Error(firstDraft.message)
+    const detachedPreview = previewBasketballFoulFreeThrowEdit(state, {
+      ...firstDraft.value,
+      freeThrowTripId: null,
+      tripAttemptNumber: null,
+    }, 'recorder-1', '2026-08-12T12:14:30.000Z')
+    if (!detachedPreview.ok) throw new Error(detachedPreview.message)
+    expect(detachedPreview.value.consequenceLines).toContain(
+      'The existing second one-and-one attempt will remain recorded but become ungrouped.'
+    )
+    const detached = applyBasketballFoulFreeThrowChange(state, detachedPreview.value)
+    if (!detached.ok) throw new Error(detached.message)
+    expect(activeEvent(detached.state, id(701))).toMatchObject({
+      payload: { freeThrowTripId: null, tripAttemptNumber: null },
+    })
+    expect(activeEvent(detached.state, id(702))).toMatchObject({
+      payload: { freeThrowTripId: null, tripAttemptNumber: null },
+    })
+
     const preview = previewBasketballFoulFreeThrowEdit(state, {
       ...firstDraft.value,
       shooter: { kind: 'participant', participantId: id(104) },
@@ -376,6 +399,31 @@ describe('BKE-3D3 foul and free-throw event editing', () => {
       ...foul.state,
       cloudSync: { ...foul.state.cloudSync, gameId: 'cloud-game' },
     }, foul.foulEventId)).toMatchObject({ ok: false, code: 'cloud_flow_unsupported' })
+  })
+
+  it('omits unresolved participants from foul attribution choices', () => {
+    const state = startedState()
+    if (state.sportGameState?.sportId !== 'basketball') throw new Error('Basketball state unavailable')
+    const unresolvedId = id(101)
+    const unresolved: GameState = {
+      ...state,
+      sportGameState: {
+        ...state.sportGameState,
+        projection: {
+          ...state.sportGameState.projection,
+          participants: {
+            ...state.sportGameState.projection.participants,
+            [unresolvedId]: {
+              ...state.sportGameState.projection.participants[unresolvedId],
+              playerId: null,
+            },
+          },
+        },
+      },
+    }
+
+    expect(basketballFoulParticipantOptions(unresolved, 'tracked').map(option => option.selection))
+      .not.toContainEqual({ kind: 'participant', participantId: unresolvedId })
   })
 })
 

@@ -4,10 +4,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
 import {
   applyBasketballFoulFreeThrowChange,
+  basketballFoulFreeThrowEditorOptions,
   basketballFoulParticipantOptions,
-  basketballFoulSourceOptions,
-  basketballFreeThrowPositionOptions,
-  basketballFreeThrowTripOptions,
   basketballResolvedPlayerOptions,
   buildBasketballFoulFreeThrowEditDraft,
   buildBasketballHistoricalFoulFreeThrowDraft,
@@ -16,6 +14,7 @@ import {
   type BasketballFoulFreeThrowDraft,
   type BasketballFoulFreeThrowDraftType,
   type BasketballFoulFreeThrowPreview,
+  type BasketballRelationshipOption,
 } from '../../lib/basketball/foulFreeThrowEditCommands'
 import { basketballShotActorSelectionKey } from '../../lib/basketball/shotEditCommands'
 import type { BasketballTeamSide } from '../../lib/basketball/types'
@@ -99,9 +98,7 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
   const drawnBySide: BasketballTeamSide = draft.teamSide === 'tracked' ? 'opponent' : 'tracked'
   const drawnByOptions = basketballFoulParticipantOptions(state, drawnBySide)
   const shooterOptions = basketballResolvedPlayerOptions(state, draft.teamSide)
-  const foulSources = basketballFoulSourceOptions(state, draft)
-  const tripOptions = basketballFreeThrowTripOptions(state, draft)
-  const positionOptions = basketballFreeThrowPositionOptions(state, draft)
+  const { foulSources, tripOptions, positionOptions } = basketballFoulFreeThrowEditorOptions(state, draft)
 
   const update = (changes: Partial<BasketballFoulFreeThrowDraft>) => {
     setDraft(current => current ? { ...current, ...changes } : current)
@@ -351,7 +348,7 @@ function TripFields({
 }: {
   draft: BasketballFoulFreeThrowDraft
   update: (changes: Partial<BasketballFoulFreeThrowDraft>) => void
-  foulSources: ReturnType<typeof basketballFoulSourceOptions>
+  foulSources: BasketballRelationshipOption[]
 }) {
   return (
     <BasketballEditorSection title="Award">
@@ -400,7 +397,7 @@ function AttemptFields({
   draft: BasketballFoulFreeThrowDraft
   update: (changes: Partial<BasketballFoulFreeThrowDraft>) => void
   shooterOptions: ReturnType<typeof basketballResolvedPlayerOptions>
-  tripOptions: ReturnType<typeof basketballFreeThrowTripOptions>
+  tripOptions: BasketballRelationshipOption[]
   positionOptions: number[]
 }) {
   return (

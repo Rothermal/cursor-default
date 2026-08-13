@@ -386,10 +386,15 @@ export function BasketballEditorSegmentedControl({
   options: Array<{ value: string; label: string }>
   onChange: (value: string) => void
 }) {
+  const columnClass = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
+  }[options.length] ?? 'grid-cols-2'
   return (
     <fieldset>
       <legend className="mb-1 text-sm font-semibold text-slate-700">{label}</legend>
-      <div className={`grid gap-1 rounded-md bg-slate-100 p-1 ${options.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+      <div className={`grid gap-1 rounded-md bg-slate-100 p-1 ${columnClass}`}>
         {options.map(option => (
           <button
             key={option.value}
