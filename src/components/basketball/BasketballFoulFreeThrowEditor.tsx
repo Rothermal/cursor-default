@@ -78,6 +78,22 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
     return () => window.removeEventListener('keydown', keydown)
   }, [onClose, preview])
 
+  const optionEventId = draft?.eventId ?? null
+  const optionPeriodId = draft?.period.id ?? null
+  const optionTeamSide = draft?.teamSide ?? null
+  const optionTripId = draft?.freeThrowTripId ?? null
+  const relationshipOptions = useMemo(() => basketballFoulFreeThrowEditorOptions(
+    state,
+    optionEventId && optionPeriodId && optionTeamSide
+      ? {
+          eventId: optionEventId,
+          periodId: optionPeriodId,
+          teamSide: optionTeamSide,
+          freeThrowTripId: optionTripId,
+        }
+      : null
+  ), [optionEventId, optionPeriodId, optionTeamSide, optionTripId, state])
+
   if (!draft) {
     return (
       <BasketballEditorFrame title={props.mode === 'edit' ? 'Edit event' : 'Add event'} onClose={onClose} closeRef={closeRef}>
@@ -98,7 +114,7 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
   const drawnBySide: BasketballTeamSide = draft.teamSide === 'tracked' ? 'opponent' : 'tracked'
   const drawnByOptions = basketballFoulParticipantOptions(state, drawnBySide)
   const shooterOptions = basketballResolvedPlayerOptions(state, draft.teamSide)
-  const { foulSources, tripOptions, positionOptions } = basketballFoulFreeThrowEditorOptions(state, draft)
+  const { foulSources, tripOptions, positionOptions } = relationshipOptions
 
   const update = (changes: Partial<BasketballFoulFreeThrowDraft>) => {
     setDraft(current => current ? { ...current, ...changes } : current)

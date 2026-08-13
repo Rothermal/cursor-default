@@ -97,6 +97,13 @@ export interface BasketballFoulFreeThrowEditorOptions {
   positionOptions: number[]
 }
 
+export interface BasketballFoulFreeThrowOptionContext {
+  eventId: string
+  periodId: string
+  teamSide: BasketballTeamSide
+  freeThrowTripId: string | null
+}
+
 export type BasketballFoulFreeThrowCommandResult =
   | { ok: true; state: GameState; highlightEventId: string }
   | { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string }
@@ -144,99 +151,75 @@ export function basketballFoulParticipantOptions(
 
 export function basketballFoulFreeThrowEditorOptions(
   state: GameState,
-  draft: BasketballFoulFreeThrowDraft
+  context: BasketballFoulFreeThrowOptionContext | null
 ): BasketballFoulFreeThrowEditorOptions {
+  if (!context) return unavailableEditorOptions()
   const prepared = prepareState(state)
-  if (!prepared.ok) {
-    return {
-      foulSources: [{ eventId: null, label: 'No source foul' }],
-      tripOptions: [{ eventId: null, label: 'Ungrouped free throw' }],
-      positionOptions: [],
-    }
-  }
+  if (!prepared.ok) return unavailableEditorOptions()
   return {
-    foulSources: foulSourceOptions(prepared.value, draft),
-    tripOptions: freeThrowTripOptions(prepared.value, draft),
-    positionOptions: freeThrowPositionOptions(prepared.value, draft),
+    foulSources: foulSourceOptions(prepared.value, context),
+    tripOptions: freeThrowTripOptions(prepared.value, context),
+    positionOptions: freeThrowPositionOptions(prepared.value, context),
   }
 }
 
-export function basketballFoulSourceOptions(
-  state: GameState,
-  draft: BasketballFoulFreeThrowDraft
-): BasketballRelationshipOption[] {
-  const prepared = prepareState(state)
-  if (!prepared.ok) return [{ eventId: null, label: 'No source foul' }]
-  return foulSourceOptions(prepared.value, draft)
+function unavailableEditorOptions(): BasketballFoulFreeThrowEditorOptions {
+  return {
+    foulSources: [{ eventId: null, label: 'No source foul' }],
+    tripOptions: [{ eventId: null, label: 'Ungrouped free throw' }],
+    positionOptions: [],
+  }
 }
 
 function foulSourceOptions(
   prepared: PreparedState,
-  draft: BasketballFoulFreeThrowDraft
+  context: BasketballFoulFreeThrowOptionContext
 ): BasketballRelationshipOption[] {
-  const original = prepared.active.find(event => event.id === draft.eventId)
+  const original = prepared.active.find(event => event.id === context.eventId)
   return [
     { eventId: null, label: 'No source foul' },
     ...prepared.active
       .filter((event): event is BasketballFoulEvent => event.eventType === 'basketball.foul')
       .filter(event =>
-        event.period.id === draft.period.id &&
-        event.teamSide === oppositeSide(draft.teamSide) &&
+        event.period.id === context.periodId &&
+        event.teamSide === oppositeSide(context.teamSide) &&
         (!original || compareGameEventCaptureOrder(event, original) < 0)
       )
       .map(event => ({ eventId: event.id, label: eventOptionLabel(prepared.state, event) })),
   ]
 }
 
-export function basketballFreeThrowTripOptions(
-  state: GameState,
-  draft: BasketballFoulFreeThrowDraft
-): BasketballRelationshipOption[] {
-  const prepared = prepareState(state)
-  if (!prepared.ok) return [{ eventId: null, label: 'Ungrouped free throw' }]
-  return freeThrowTripOptions(prepared.value, draft)
-}
-
 function freeThrowTripOptions(
   prepared: PreparedState,
-  draft: BasketballFoulFreeThrowDraft
+  context: BasketballFoulFreeThrowOptionContext
 ): BasketballRelationshipOption[] {
-  const original = prepared.active.find(event => event.id === draft.eventId)
+  const original = prepared.active.find(event => event.id === context.eventId)
   return [
     { eventId: null, label: 'Ungrouped free throw' },
     ...prepared.active
       .filter((event): event is BasketballFreeThrowTripEvent => event.eventType === 'basketball.free_throw_trip')
       .filter(event =>
-        event.period.id === draft.period.id &&
-        event.teamSide === draft.teamSide &&
+        event.period.id === context.periodId &&
+        event.teamSide === context.teamSide &&
         (!original || compareGameEventCaptureOrder(event, original) < 0)
       )
       .map(event => ({ eventId: event.id, label: eventOptionLabel(prepared.state, event) })),
   ]
 }
 
-export function basketballFreeThrowPositionOptions(
-  state: GameState,
-  draft: BasketballFoulFreeThrowDraft
-): number[] {
-  const prepared = prepareState(state)
-  if (!prepared.ok) return []
-  return freeThrowPositionOptions(prepared.value, draft)
-}
-
 function freeThrowPositionOptions(
   prepared: PreparedState,
-  draft: BasketballFoulFreeThrowDraft
+  context: BasketballFoulFreeThrowOptionContext
 ): number[] {
-  if (!draft.freeThrowTripId) return []
+  if (!context.freeThrowTripId) return []
   const trip = prepared.active.find((event): event is BasketballFreeThrowTripEvent =>
-    event.id === draft.freeThrowTripId && event.eventType === 'basketball.free_throw_trip'
+    event.id === context.freeThrowTripId && event.eventType === 'basketball.free_throw_trip'
   )
   if (!trip) return []
   const occupied = new Set(
     [...prepared.active, ...prepared.deleted]
       .filter((event): event is BasketballShotEvent =>
-        event.id !== draft.eventId &&
+        event.id !== context.eventId &&
         event.eventType === 'basketball.shot' &&
         event.payload.attempt === 'free_throw' &&
         event.payload.freeThrowTripId === trip.id &&
