@@ -865,6 +865,29 @@ least two started periods. Keep an anchored-clock fixture and a terminal game fo
 
 ---
 
+## 11a13. Basketball foul and free-throw Timeline editors (BKE-3D3)
+
+**Precondition:** Healthy local Basketball event game with two resolved players per side, a linked
+foul/free-throw award, active and removed attempts, one-and-one rules, two started periods, and one
+official or automatic ejection linked to a foul.
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11a13.1 | Open a foul row and choose Edit | Offender, side, class, context, drawn-by, team control, incident id, and counting override are prefilled; id/type remain immutable |
+| 11a13.2 | Change a foul so its linked award or ejection is no longer compatible | Review names every unlink/removal; Save applies the foul and all dependency repairs atomically, then highlights the row |
+| 11a13.3 | Enable exceptional counting without a reason or choose an invalid offensive-control side | Review fails inline and the authoritative stream, totals, links, and quick Undo remain unchanged |
+| 11a13.4 | Edit an award's count, one-and-one, source foul, technical flag, possession rule, or side | Compatible changes reproject; incompatible source selection rejects; out-of-range or side-incompatible attempts remain recorded but become ungrouped |
+| 11a13.5 | Shrink an award containing active and removed positions, then inspect Timeline and the live trip workspace | No attempt renumbers; removed positions remain consumed; sparse or empty awards remain visible |
+| 11a13.6 | Edit a free-throw attempt's resolved shooter, result, award, and stable position | Score/player totals and grouping rebuild from the revised event while id/type stay fixed |
+| 11a13.7 | Select an occupied active or removed position, or select a one-and-one second position without a made first attempt | Review rejects the collision/sequence and writes no partial mutation |
+| 11a13.8 | Change a made one-and-one first attempt to Miss while a second attempt exists | Review states that the second attempt becomes ungrouped; both changes save atomically without deleting or renumbering either fact |
+| 11a13.9 | Use Add Event for Foul with linked award, standalone Award, and grouped/ungrouped FT Attempt in a prior started period | Events use current append order, retain selected period, show Recorded later, validate one-and-one at the award's append position, and project exact totals |
+| 11a13.10 | Change Timeline after Review, bind the game to cloud, or try terminal state without Reopen | Save fails closed for stale/cloud/terminal state; reasoned Reopen restores local editing |
+| 11a13.11 | Park/reload and test at narrow mobile and desktop widths with long team/player/staff labels | Drafts rederive from event authority; editor content scrolls without page overflow, actions remain reachable, and Escape closes safely |
+| 11a13.12 | Run focused tests, `pnpm test`, `pnpm lint`, and `pnpm build` | D3 commands, all Basketball/Soccer/legacy suites, lint, and production build pass with no new warning |
+
+---
+
 ## 11b. Soccer match-state foundation (SOC-2A)
 
 **Precondition:** Development branch with SOC-2A. Soccer remains hidden from production

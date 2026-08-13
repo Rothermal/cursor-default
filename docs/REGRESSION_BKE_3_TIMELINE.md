@@ -2,10 +2,10 @@
 
 ## Scope
 
-BKE-3A through BKE-3D1 provide local event review, shared shot detail and editing, arbitrary removal,
+BKE-3A through BKE-3D3 provide local event review, shared shot detail and editing, arbitrary removal,
 persisted capture-group removal, conservative restoration, atomic shot and related-stat relationship
-correction, and recorded-later shot/related-stat/turnover additions. Basketball event cloud transport
-remains off.
+correction, value-event correction, structured foul/free-throw correction, and recorded-later additions
+through those families. Basketball event cloud transport remains off.
 
 ## Automated Coverage
 
@@ -27,6 +27,13 @@ remains off.
   recorded-later projection, stale drafts, and atomic apply behavior.
 - `src/lib/basketball/shotEditCommands.test.ts` also proves new links stay period-local while an
   already-stored cross-period link remains visible and survives unrelated shot edits.
+- `src/lib/basketball/valueEventEditCommands.test.ts` covers score/minutes correction and addition,
+  signed input constraints, non-negative totals, started-period replay, stale previews, anchored-clock
+  exclusion, unresolved participants, and narrow legacy negative-score recovery.
+- `src/lib/basketball/foulFreeThrowEditCommands.test.ts` covers foul dependent-link repair, award
+  shrinking without attempt renumbering, shooter/result/position correction, one-and-one downstream
+  repair, consumed-position rejection, linked recorded-later foul/award addition, standalone award and
+  grouped-attempt addition, stale previews, and cloud rejection.
 - The full Vitest suite, TypeScript production build, and ESLint remain required for every slice.
 
 ## Manual Matrix
@@ -62,3 +69,11 @@ remains off.
     standalone total and the selected steal points to the turnover after one atomic Save.
 16. Use Add Event for every D1 family, including unknown/team attribution and a paired Steal +
     Turnover in an earlier started period. Confirm the pair groups together and shows Recorded later.
+17. Edit every structured foul field, including staff/team/player attribution and a reasoned counting
+    override. Confirm incompatible trip/ejection links are repaired exactly as previewed.
+18. Shrink and expand a free-throw award with active and removed attempts. Confirm out-of-range facts
+    become ungrouped, tombstoned positions remain consumed, and no remaining attempt renumbers.
+19. Edit a grouped attempt's shooter, result, trip, and position. Confirm duplicate positions reject;
+    changing a one-and-one first attempt to Miss ungroups an existing second attempt atomically.
+20. Add a foul with a linked award, a standalone award, and grouped/ungrouped attempts to a prior
+    started period. Confirm append ordering, Recorded later labels, bonus validation, score, and fouls.

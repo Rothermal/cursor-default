@@ -88,6 +88,8 @@ export default function BasketballEventDetailDialog({
 }
 
 function detailHeading(review: BasketballTimelineEventReview): string {
+  if (review.event.eventType === 'basketball.foul') return 'Foul ruling'
+  if (review.event.eventType === 'basketball.free_throw_trip') return 'Award'
   if (review.event.eventType === 'basketball.score_adjustment') return 'Adjustment'
   if (review.event.eventType === 'basketball.minutes_adjustment') return 'Minutes'
   return 'Relationship'
@@ -95,6 +97,16 @@ function detailHeading(review: BasketballTimelineEventReview): string {
 
 function detailValue(review: BasketballTimelineEventReview): string {
   const event = review.event
+  if (event.eventType === 'basketball.foul') {
+    const override = event.payload.countingOverride
+    const counting = override
+      ? `${override.personalFoul ? 'personal, ' : ''}${override.teamFoul ? 'team, ' : ''}${override.technical ? 'technical' : ''}`.replace(/, $/, '')
+      : 'Default counting'
+    return `${event.payload.class.replace(/_/g, ' ')} | ${event.payload.context.replace(/_/g, ' ')} | ${counting}`
+  }
+  if (event.eventType === 'basketball.free_throw_trip') {
+    return `${event.payload.maximumAttempts} position${event.payload.maximumAttempts === 1 ? '' : 's'}${event.payload.oneAndOne ? ' | one-and-one' : ''}${event.payload.technical ? ' | technical' : ''}${event.payload.possessionRetained ? ' | possession retained' : ''}`
+  }
   if (event.eventType === 'basketball.score_adjustment') {
     const reason = event.payload.reason.replace(/_/g, ' ')
     const amount = event.payload.delta > 0 ? `+${event.payload.delta}` : String(event.payload.delta)

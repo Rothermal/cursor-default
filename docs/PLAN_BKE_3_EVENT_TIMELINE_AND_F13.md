@@ -5,7 +5,7 @@ review with an editable Timeline and delivering the held F13 shot-detail experie
 event model.
 
 Status: Approved through the BKE-3 product and delivery Q&A. Implementation is split into BKE-3A
-through BKE-3D. BKE-3A through BKE-3C and BKE-3D1/D2 are complete; BKE-3D3 is next.
+through BKE-3D. BKE-3A through BKE-3C and BKE-3D1/D2/D3 are complete; BKE-3D4 is next.
 
 Depends on:
 
@@ -378,7 +378,7 @@ totals for both the former and replacement participant. Score and minutes replay
 started period; minutes alone also accepts `period_break`, leaving every later administrative family
 on its current-period rule until its owning slice. Timeline detail and Add Event share the responsive
 value editor, successful mutations clear quick Undo, and projector validation remains the final
-fail-closed backstop. BKE-3D3 is next.
+fail-closed backstop.
 
 Review hardening: signed value inputs retain their raw editing text so leading negative signs and blank
 intermediate values are safe. Manual-minutes pickers expose only participants with resolved player
@@ -386,6 +386,22 @@ identity. A narrowly recognized pre-BKE-3D2 stream whose first semantic failure 
 adjustment keeps only that adjustment's Edit/Remove recovery actions available and surfaces an explicit
 Timeline warning; the repair must yield one complete projection, while all new invalid mutations and
 unrelated diagnostic streams remain blocked.
+
+BKE-3D3 status: Complete. `foulFreeThrowEditCommands.ts` owns foul, free-throw award, and grouped or
+ungrouped free-throw attempt drafts, checked previews, edits, and recorded-later additions. Foul edits
+retain immutable event identity while revising offender/side/class/context/drawn-by/control/incident/
+counting fields and atomically unlinking incompatible awards or official ejections and removing invalid
+automatic ejections. Award edits preserve event identity and stable consumed positions; attempts made
+incompatible by side, maximum count, or one-and-one state remain authoritative as ungrouped free throws
+instead of being renumbered or deleted. Attempt edits revise resolved shooter, result, and compatible
+trip/position; active and removed attempts both consume their stored positions, and changing a
+one-and-one first attempt to a miss ungroups an existing second attempt in the same atomic save.
+Historical Add Event supports a foul with an optional linked award, standalone awards, and grouped or
+ungrouped attempts in any started period. One-and-one validation rebuilds the stream prefix through the
+award so bonus eligibility is checked at honest append order. Foul and award replay now accept started
+periods while preserving live-command current-period guards. `BasketballFoulFreeThrowEditor` supplies
+the shared responsive correction/addition surface, and free-throw shot detail routes to it while field
+goals retain the F13 shot editor. BKE-3D4 administration and the exit audit are next.
 
 ### 9.1 Event-family matrix
 

@@ -18,6 +18,7 @@ export interface BasketballStatProjectionContext {
 }
 
 const BKE3_RECORDED_LATER_TYPES = new Set<BasketballStatEvent['eventType']>([
+  'basketball.free_throw_trip',
   'basketball.shot',
   'basketball.assist',
   'basketball.rebound',
