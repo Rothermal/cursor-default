@@ -2,10 +2,11 @@
 
 ## Scope
 
-BKE-3A through BKE-3D3 provide local event review, shared shot detail and editing, arbitrary removal,
+BKE-3A through BKE-3D4 provide local event review, shared shot detail and editing, arbitrary removal,
 persisted capture-group removal, conservative restoration, atomic shot and related-stat relationship
 correction, value-event correction, structured foul/free-throw correction, and recorded-later additions
-through those families. Basketball event cloud transport remains off.
+through every user-recorded family. The BKE-3 exit audit is complete. Basketball event cloud transport
+remains off.
 
 ## Automated Coverage
 
@@ -34,6 +35,11 @@ through those families. Basketball event cloud transport remains off.
   shrinking without attempt renumbering, shooter/result/position correction, one-and-one downstream
   repair, consumed-position rejection, linked recorded-later foul/award addition, standalone award and
   grouped-attempt addition, stale previews, and cloud rejection.
+- `src/lib/basketball/administrationEditCommands.test.ts` covers player/staff and official/automatic
+  ejections, foul-link compatibility, charged/neutral timeout edits and additions, selected-period
+  inventory, prior-period replay, unresolved subjects, stale previews, and cloud rejection.
+- `src/lib/basketball/bke2Parity.test.ts` proves a mixed lifecycle/capture history rebuilds exactly and
+  that its timeout and ejection facts open through the final D4 editor command surface.
 - The full Vitest suite, TypeScript production build, and ESLint remain required for every slice.
 
 ## Manual Matrix
@@ -77,3 +83,25 @@ through those families. Basketball event cloud transport remains off.
     changing a one-and-one first attempt to Miss ungroups an existing second attempt atomically.
 20. Add a foul with a linked award, a standalone award, and grouped/ungrouped attempts to a prior
     started period. Confirm append ordering, Recorded later labels, bonus validation, score, and fouls.
+21. Open player and staff ejections from Timeline. Edit side, subject, reason, source, and compatible
+    foul link; confirm stale or later foul links and duplicate surviving ejections reject atomically.
+22. Add an official staff ejection and an automatic-threshold player ejection to a started period.
+    Confirm automatic capture rejects unless the player is disqualified at the event's append point.
+23. Edit a charged timeout between Full and 30-second while its side is at capacity. Confirm the edit
+    does not count its existing slot twice, but an additional charged timeout rejects.
+24. Add charged timeouts to both sides in regulation and overtime, including a prior started period.
+    Confirm each period uses its immutable regulation/overtime cap and totals do not cross periods.
+25. Add Media and Official neutral timeouts with labels. Confirm they remain attributed to game
+    administration, consume no team inventory, and remain separate in detail and Timeline filters.
+26. Repeat D4 edit/add from period break, terminal, cloud-bound, and diagnostic states. Confirm only
+    the open healthy local state succeeds and a reasoned Reopen is required after terminal lifecycle.
+
+## Exit Audit
+
+- Every visible user-recorded Basketball event family has checked edit, remove/restore, and historical
+  addition ownership. Lifecycle, roster, and participant-resolution events remain read-only boundaries.
+- Healthy event-game correction uses the event stream and final deterministic projection, not
+  `actionLog`, aggregate reducer actions, or `ShotRecord` as authority.
+- Timeline mutation clears quick Undo; stale preview fingerprints and changed consequence sets reject.
+- Local/internal and cloud-bound/legacy authority boundaries remain fail closed. BKE-4A is the next
+  roadmap phase.

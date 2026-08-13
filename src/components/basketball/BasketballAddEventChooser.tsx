@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Activity, CircleDot, Clock3, Plus, ShieldAlert, SlidersHorizontal, X } from 'lucide-react'
+import { Activity, CircleDot, Clock3, Plus, ShieldAlert, SlidersHorizontal, Timer, UserX, X } from 'lucide-react'
+import type { BasketballEditableAdministrationEventType } from '../../lib/basketball/administrationEditCommands'
 import type { BasketballFoulFreeThrowDraftType } from '../../lib/basketball/foulFreeThrowEditCommands'
 import type { BasketballHistoricalRelatedEventType } from '../../lib/basketball/relatedEventEditCommands'
 import type { BasketballEditableValueEventType } from '../../lib/basketball/valueEventEditCommands'
@@ -10,6 +11,7 @@ interface Props {
   onRelated: (eventType: BasketballHistoricalRelatedEventType) => void
   onValue: (eventType: BasketballEditableValueEventType) => void
   onFoulFreeThrow: (eventType: BasketballFoulFreeThrowDraftType) => void
+  onAdministration: (eventType: BasketballEditableAdministrationEventType) => void
   minutesAvailable: boolean
 }
 
@@ -22,7 +24,7 @@ const choices: Array<{ type: BasketballHistoricalRelatedEventType; label: string
   { type: 'basketball.steal_turnover', label: 'Steal + Turnover' },
 ]
 
-export default function BasketballAddEventChooser({ onClose, onShot, onRelated, onValue, onFoulFreeThrow, minutesAvailable }: Props) {
+export default function BasketballAddEventChooser({ onClose, onShot, onRelated, onValue, onFoulFreeThrow, onAdministration, minutesAvailable }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => closeRef.current?.focus(), [])
   useEffect(() => {
@@ -59,6 +61,12 @@ export default function BasketballAddEventChooser({ onClose, onShot, onRelated, 
           </button>
           <button type="button" onClick={() => onFoulFreeThrow('basketball.free_throw_attempt')} className="btn-secondary flex min-h-14 items-center justify-center gap-2">
             <CircleDot size={18} aria-hidden />Free-throw attempt
+          </button>
+          <button type="button" onClick={() => onAdministration('basketball.ejection')} className="btn-secondary flex min-h-14 items-center justify-center gap-2">
+            <UserX size={18} aria-hidden />Ejection
+          </button>
+          <button type="button" onClick={() => onAdministration('basketball.timeout')} className="btn-secondary flex min-h-14 items-center justify-center gap-2">
+            <Timer size={18} aria-hidden />Timeout
           </button>
           {minutesAvailable && (
             <button type="button" onClick={() => onValue('basketball.minutes_adjustment')} className="btn-secondary flex min-h-14 items-center justify-center gap-2">

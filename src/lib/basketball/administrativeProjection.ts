@@ -44,18 +44,14 @@ function validateAdministrativeMoment(
   if (projection.status === 'ended' || projection.status === 'suspended') {
     return 'Basketball match is not open for administrative events.'
   }
-  const recordedLaterEvent = event.eventType === 'basketball.minutes_adjustment' ||
-    event.eventType === 'basketball.foul'
-  if (projection.status !== 'in_progress' && !(recordedLaterEvent && projection.status === 'period_break')) {
-    return 'Basketball administrative events require an active period.'
+  if (projection.status !== 'in_progress' && projection.status !== 'period_break') {
+    return 'Basketball administrative events require an open match.'
   }
   const segment = projection.periods.find(period => period.id === event.period.id)
   const validPeriod = Boolean(segment && segment.order === event.period.order)
-  const validMoment = recordedLaterEvent
-    ? projection.startedPeriodIds.includes(event.period.id)
-    : projection.currentPeriodId === event.period.id
+  const validMoment = projection.startedPeriodIds.includes(event.period.id)
   if (!validPeriod || !validMoment) {
-    return 'Basketball administrative event does not target the current period.'
+    return 'Basketball administrative event does not target a started period.'
   }
   return null
 }

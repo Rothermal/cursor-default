@@ -170,7 +170,7 @@ capture, immutable finite/unlimited inventory enforcement, simultaneous tracker 
 newest matching current-period correction, and exact restore. BKE-2D completes local tracker parity
 with projection-derived period foul/bonus presentation, consistent inactive-period capture guards,
 local suspend/abandon/reasoned-reopen controls, and mixed-flow hydration/reprojection coverage. BKE-2
-is complete. BKE-3 is approved in four slices. BKE-3A adds a pure Basketball review reader,
+is complete. BKE-3 is complete in four slices. BKE-3A adds a pure Basketball review reader,
 Track/Timeline workspace, filtered capture groups, shared event/legacy shot detail, marker activation,
 and nearest-marker selection with deterministic ambiguity handling. BKE-3B adds checked arbitrary
 event and capture-group removal, conservative dependent restoration, consequence previews, stale
@@ -179,7 +179,9 @@ assist/rebound/block editing plus recorded-later field-goal additions. BKE-3D1 a
 assist/rebound/steal/block/turnover editing, capture-order-safe relationship repair, historical
 single-event additions, and atomic paired Steal + Turnover capture. BKE-3D2 adds checked score and
 manual-minutes edits/additions, started-period replay, signed/non-negative total enforcement, reason
-preservation, and manual-clock-only participant minutes. BKE-3D3 structured foul/free throws is next.
+preservation, and manual-clock-only participant minutes. BKE-3D3 adds structured foul/free-throw
+correction and dependency repair. BKE-3D4 adds ejection/timeout correction and historical additions,
+completes parity/regression evidence, and closes the local-model exit audit. BKE-4A is next.
 Event games remain internal and local-only.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
@@ -412,7 +414,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) | Basketball migration onto the shared event model. BKE-1, BKE-2, BKE-3A through BKE-3C, and BKE-3D1/D2 are complete; BKE-3D3 structured foul/free throws is next |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3 are complete; BKE-4A is next |
 
 ### Held / waiting for feedback
 
