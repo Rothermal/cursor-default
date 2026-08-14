@@ -77,14 +77,16 @@ ids, or the immutable setup snapshot.
 
 ## 6. Migration Sequence
 
-BKE-4 migrations are additive and run after `049_soccer_release_capabilities.sql`.
+BKE-4 migrations are forward-only and run after `049_soccer_release_capabilities.sql`. Function
+extraction preserves existing entry points; widened checks use staged replacement rather than a
+single drop/add validation scan.
 
 | Phase | Planned migration range | Notes |
 |---|---|---|
-| BKE-4A | 050-053 | Neutral platform extraction in four Soccer-parity slices |
-| BKE-4B | 054+ | Basketball binding, transport, recovery, and conflict contracts |
+| BKE-4A | 050-055 | Neutral platform extraction in four Soccer-parity slices; two constraint swaps use separate add and validate/remove migrations |
+| BKE-4B | 056+ | Basketball binding, transport, recovery, and conflict contracts |
 | BKE-4C | Following 4B | Basketball recorder/finalization contracts and audit integration |
-| BKE-4D | Prefer client-only unless Summary requires a narrow read RPC | No authority inference from legacy rows |
+| BKE-4D | None expected | Prefer client-only Summary work unless a narrow authority read RPC is required; never infer authority from legacy rows |
 | BKE-4E | Following 4C | Canonical Basketball aggregate pages and capability version |
 
 Every migration receives a static contract test in the repository. Database-runtime behavior must
@@ -96,8 +98,8 @@ PostgreSQL, RLS, triggers, or security-definer privileges.
 Each phase must run:
 
 - the full Vitest suite, production build, and ESLint;
-- migration contract tests and SQL diff review for grants, revokes, `search_path`, RLS, and trigger
-  replacement;
+- migration contract tests and SQL diff review for grants, revokes, `search_path`, RLS, trigger
+  replacement, check-constraint swaps, validation scans, and lock duration;
 - legacy Basketball aggregate-sync regression tests;
 - Soccer transport/finalization/summary/aggregate tests appropriate to the changed boundary;
 - event projection determinism and malformed-stream fail-closed tests; and
@@ -133,5 +135,5 @@ reopened for each implementation slice:
 
 Implement BKE-4A from
 [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md), merge all four
-parity slices, apply migrations 050-053 in order, and record Soccer runtime parity before beginning
+parity slices, apply migrations 050-055 in order, and record Soccer runtime parity before beginning
 Basketball transport in BKE-4B.

@@ -22,10 +22,10 @@ rollback review unnecessarily fragile. BKE-4A therefore mirrors the proven Socce
 
 | Slice | Planned migration | Scope |
 |---|---|---|
-| BKE-4A1 | `050_event_platform_cloud_transport.sql` | Shared constraints and sport predicate; authorization, base binding, participant snapshots, revision writes, and checkpoints |
-| BKE-4A2 | `051_event_platform_recovery.sql` | Immutable setup snapshots, existing-game adoption, same-recorder conflicts, and recovery wrappers |
-| BKE-4A3 | `052_event_platform_recorder_resolution.sql` | Recorder presence, current checkpoints, effective/selected primary, history, and v3 binding |
-| BKE-4A4 | `053_event_platform_finalization_recovery.sql` | Canonical publication allow-list, readiness, finalization, reopen, final-state trigger, late audit uploads, manager conflict preparation, and v4 binding |
+| BKE-4A1 | `050_event_platform_team_side_constraint.sql`, `051_event_platform_cloud_transport.sql` | Staged shared-side constraint; sport predicate, authorization, base binding, participant snapshots, revision writes, and checkpoints |
+| BKE-4A2 | `052_event_platform_recovery.sql` | Immutable setup snapshots, existing-game adoption, same-recorder conflicts, and recovery wrappers |
+| BKE-4A3 | `053_event_platform_recorder_resolution.sql` | Recorder presence, current checkpoints, effective/selected primary, history, and v3 binding |
+| BKE-4A4 | `054_event_platform_publication_constraint.sql`, `055_event_platform_finalization_recovery.sql` | Staged publication allow-list; readiness, finalization, reopen, final-state trigger, late audit uploads, manager conflict preparation, and v4 binding |
 
 Each slice is independently reviewable and must leave current Soccer calls operational before the
 next slice starts.
@@ -43,6 +43,13 @@ gates:
 - the games final-state trigger has a Soccer-only publication/reopen branch;
 - finalized audit upload and primary conflict preparation hard-code Soccer; and
 - the current Soccer capability handshake checks exact Soccer RPC signatures.
+
+The extraction baseline is the latest installed definition of every function, not the migration
+that first introduced its name. Migration 046 redefines `upsert_game_event_revisioned`,
+`confirm_game_event_stream_checkpoint`, `record_game_event_conflict`, and
+`enforce_game_identity_and_final_state`; A1 and A2 must preserve those finalization-era bodies and
+their late non-primary audit-upload behavior even though the neutral
+`can_upload_final_event_audit` core is not extracted until A4.
 
 The app currently calls Soccer wrappers including `bind_soccer_event_game_v4`, recorder/history
 RPCs, finalization/readiness/reopen RPCs, conflict preparation, checkpoint confirmation, and
@@ -79,10 +86,12 @@ part of the permanent backend contract, not temporary aliases to remove in BKE-4
 
 ## 5. BKE-4A1: Transport Foundation
 
-Migration 050 will:
+Migrations 050 and 051 will:
 
-1. replace the `game_events.team_side` check with
-   `team_side in ('tracked', 'opponent', 'neutral')` without rewriting existing rows;
+1. widen the `game_events.team_side` check to
+   `team_side in ('tracked', 'opponent', 'neutral')` without rewriting existing rows: migration 050
+   adds the replacement as `NOT VALID` while the old check remains active, and migration 051 first
+   validates the replacement, then removes the old check and finalizes the replacement name;
 2. add the event-capable sport predicate and contract comments;
 3. extract sport-neutral read/track authorization helpers without broadening team or personal-game
    access;
@@ -90,7 +99,8 @@ Migration 050 will:
 5. retain immutable game identity, stable local binding, personal/team scope, and no implicit team
    or player creation;
 6. preserve participant snapshot and one-way source-player resolution rules;
-7. extract revision upsert and exact recorder-checkpoint confirmation behavior; and
+7. extract the migration-046 revision-upsert and exact recorder-checkpoint bodies while continuing
+   to call the existing `can_upload_final_soccer_audit` compatibility helper until A4; and
 8. replace the existing Soccer entry points with signature-compatible wrappers.
 
 ### A1 proof
@@ -104,12 +114,13 @@ Migration 050 will:
 
 ## 6. BKE-4A2: Recovery and Conflicts
 
-Migration 051 will:
+Migration 052 will:
 
 1. extract immutable setup-snapshot creation and comparison into a sport-neutral binding v2 core;
 2. require setup sport identity to match the requested and stored sport;
 3. generalize same-recorder conflict recording/resolution without changing conflict ownership;
-4. preserve unrelated-event merge behavior and stale remote-revision rejection; and
+4. preserve the migration-046 late-audit authorization, unrelated-event merge behavior, and stale
+   remote-revision rejection by continuing to call `can_upload_final_soccer_audit` until A4; and
 5. retain `bind_soccer_event_game_v2`, `record_game_event_conflict`, and
    `resolve_game_event_conflict` compatibility contracts.
 
@@ -120,13 +131,13 @@ sport-neutral. BKE-4A does not rename a neutral API merely for symmetry.
 
 - Soccer setup snapshots remain immutable and byte-equivalent through rebind.
 - Another device can adopt the same Soccer recorder stream without replacing local conflict data.
-- Only the recorder, or the already-approved manager finalization path added in A4, can resolve a
+- Only the recorder, or the existing approved manager finalization path, can resolve a
   conflict.
 - No Basketball client path is added.
 
 ## 7. BKE-4A3: Recorder Resolution
 
-Migration 052 will:
+Migration 053 will:
 
 1. extract current-checkpoint evaluation and effective-primary selection by sport;
 2. generalize recorder presence, primary history, and manager selection cores;
@@ -145,9 +156,12 @@ Migration 052 will:
 
 ## 8. BKE-4A4: Finalization and Recovery
 
-Migration 053 will:
+Migrations 054 and 055 will:
 
-1. replace the canonical-publication sport check with the explicit Soccer/Basketball allow-list;
+1. widen the canonical-publication sport check to the explicit Soccer/Basketball allow-list:
+   migration 054 adds the replacement as `NOT VALID` while the Soccer-only check remains active,
+   and migration 055 validates the replacement before removing the old check and finalizing the
+   replacement name;
 2. extract shared manage/readiness/canonical-read, publication locking, invalidation, and reopen
    mechanics into neutral internal cores;
 3. keep sport-specific terminal-event and score validation in trusted wrappers/policy functions,
@@ -199,7 +213,7 @@ legacy cloud-sync tests to prove the extraction has enabled no Basketball behavi
 
 ### Manual Supabase matrix
 
-Apply migrations 050-053 in order to a test or deployed Supabase project and verify:
+Apply migrations 050-055 in order to a test or deployed Supabase project and verify:
 
 1. existing Soccer team and personal games still bind/resume;
 2. owner/admin/scorer/viewer permissions are unchanged;
@@ -216,7 +230,16 @@ Static SQL tests are not evidence that PostgreSQL RLS or trigger behavior execut
 
 ## 10. Rollback and Failure Handling
 
-- Each slice is additive and replaces functions atomically within one migration transaction.
+- Each migration applies transactionally, and function replacements are atomic. Constraint
+  widening is a validating schema change rather than a catalog-only operation.
+- For both widened checks, the `NOT VALID` add and the validation/removal live in consecutive
+  migrations so the first migration can commit and release its exclusive lock. The second migration
+  validates while the old constraint remains active, then takes the exclusive lock only after the
+  scan to remove the old constraint and finalize the replacement name.
+- Preflight table size and deployment activity before migrations 050 and 054. If the migration
+  runner cannot preserve the required transaction boundary or the lock window exceeds the
+  deployment budget, stop and revise the migration sequence rather than falling back to a direct
+  drop/add scan.
 - Do not drop Soccer wrappers, tables, history, publications, or audit rows.
 - A failed migration rolls back as a unit; do not manually apply partial function bodies.
 - Once neutral rows or Basketball publications exist, narrowing the constraints is not a valid
@@ -236,7 +259,7 @@ Static SQL tests are not evidence that PostgreSQL RLS or trigger behavior execut
 
 ## 12. Exit Gate
 
-BKE-4A is complete only after A1-A4 merge, migrations 050-053 are applied in order, automated tests
+BKE-4A is complete only after A1-A4 merge, migrations 050-055 are applied in order, automated tests
 are green, the manual Soccer parity matrix is recorded, and no Basketball client call site can yet
 bind or publish an event-backed game. BKE-4B may then add Basketball transport against the proven
 neutral layer.
