@@ -6,6 +6,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor, GameEventMutation } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { normalizeBasketballActorLabel, sameBasketballActorIdentity } from './actorIdentity'
 import {
   basketballActorForSelection,
   nextBasketballEventSequence,
@@ -334,7 +335,7 @@ function buildEjectionPlan(
       event.id !== draft.eventId &&
       event.eventType === 'basketball.ejection' &&
       event.teamSide === draft.teamSide &&
-      sameActor(event.actors.find(actor => actor.role === 'subject'), subject.value)
+      sameBasketballActorIdentity(event.actors.find(actor => actor.role === 'subject'), subject.value)
     )
   ) {
     return commandFailure('invalid_actor', 'That Basketball player or staff member is already ejected.')
@@ -347,7 +348,7 @@ function buildEjectionPlan(
       !foul ||
       foul.period.id !== draft.period.id ||
       foul.teamSide !== draft.teamSide ||
-      !sameActor(foul.actors.find(actor => actor.role === 'committed_by'), subject.value) ||
+      !sameBasketballActorIdentity(foul.actors.find(actor => actor.role === 'committed_by'), subject.value) ||
       (existing && compareGameEventCaptureOrder(foul, existing) >= 0)
     ) {
       return commandFailure('command_failed', 'The linked foul must be an earlier same-period foul for the ejected subject.')
@@ -612,15 +613,8 @@ function sameSubjectDraft(actor: GameEventActor | undefined, subject: Basketball
   if (!actor) return false
   return subject.kind === 'participant'
     ? actor.participantId === subject.participantId
-    : actor.kind === 'staff' && normalize(actor.label) === normalize(subject.label)
-}
-
-function sameActor(left: GameEventActor | undefined, right: GameEventActor | undefined): boolean {
-  if (!left || !right) return false
-  if (left.participantId || right.participantId) {
-    return Boolean(left.participantId && left.participantId === right.participantId)
-  }
-  return left.kind === right.kind && normalize(left.label) === normalize(right.label)
+    : actor.kind === 'staff' &&
+      normalizeBasketballActorLabel(actor.label) === normalizeBasketballActorLabel(subject.label)
 }
 
 function clearQuickUndoReceipt(state: GameState): GameState {
@@ -664,10 +658,6 @@ function sideLabel(side: BasketballTeamSide): string {
 function validTimestamp(value: string): string | null {
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null
-}
-
-function normalize(value: string | undefined): string {
-  return value?.trim().toLocaleLowerCase() ?? ''
 }
 
 function sameStringSet(left: string[], right: string[]): boolean {

@@ -169,6 +169,37 @@ describe('BKE-3D4 Basketball administration editing', () => {
     expect(activeEvent(staff.state, id(521))).toMatchObject({ actors: [{ kind: 'staff', label: 'Head Coach' }] })
   })
 
+  it('links staff ejections to matching fouls regardless of label casing or padding', () => {
+    const recordedFoul = foul(startedState(), 22, true)
+    if (!recordedFoul.ok || !recordedFoul.foulEventId) throw new Error('Staff foul fixture failed')
+    const draft = buildBasketballHistoricalAdministrationDraft(recordedFoul.state, 'basketball.ejection')
+    if (!draft.ok) throw new Error(draft.message)
+    const changedSubject = { kind: 'staff' as const, label: '  head coach  ' }
+
+    expect(basketballEjectionFoulOptions(recordedFoul.state, {
+      eventId: draft.value.eventId,
+      periodId: draft.value.period.id,
+      teamSide: 'tracked',
+      subject: changedSubject,
+    }).map(option => option.eventId)).toContain(recordedFoul.foulEventId)
+
+    const preview = previewBasketballHistoricalAdministration(recordedFoul.state, {
+      ...draft.value,
+      eventId: id(522),
+      subject: changedSubject,
+      reason: 'Second technical',
+      relatedFoulEventId: recordedFoul.foulEventId,
+    }, 'recorder-1', '2026-08-13T12:23:00.000Z')
+    if (!preview.ok) throw new Error(preview.message)
+    const applied = applyBasketballAdministrationChange(recordedFoul.state, preview.value)
+    if (!applied.ok) throw new Error(applied.message)
+
+    expect(activeEvent(applied.state, id(522))).toMatchObject({
+      actors: [{ kind: 'staff', label: 'head coach' }],
+      payload: { relatedFoulEventId: recordedFoul.foulEventId },
+    })
+  })
+
   it('edits charged timeouts without double-counting their slot and rejects exhausted additions', () => {
     const first = captureBasketballTimeout(startedState({ timeoutsPerPeriod: 1 }), {
       recorderUserId: 'recorder-1',

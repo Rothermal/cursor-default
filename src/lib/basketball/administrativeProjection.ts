@@ -1,5 +1,6 @@
 import { getBonusStatus } from '../basketballBonus'
 import type { GameEventActor } from '../gameEvents/types'
+import { sameBasketballActorIdentity } from './actorIdentity'
 import type { BasketballStatProjectionContext } from './statProjection'
 import type {
   BasketballAdministrativeEvent,
@@ -238,7 +239,7 @@ function validateEjectionRelationship(
     target?.eventType !== 'basketball.foul' ||
     target.teamSide !== event.teamSide ||
     !committedBy ||
-    !sameActor(subject, committedBy)
+    !sameBasketballActorIdentity(subject, committedBy)
   ) {
     projection.relationshipWarnings.push({
       eventId: event.id,
@@ -323,13 +324,6 @@ function optionalActorForRole(
   role: string
 ): GameEventActor | undefined {
   return event.actors.find(candidate => candidate.role === role)
-}
-
-function sameActor(left: GameEventActor, right: GameEventActor): boolean {
-  if (left.participantId || right.participantId) {
-    return Boolean(left.participantId && left.participantId === right.participantId)
-  }
-  return left.kind === right.kind && left.label === right.label
 }
 
 function oppositeSide(side: BasketballTeamSide): BasketballTeamSide {

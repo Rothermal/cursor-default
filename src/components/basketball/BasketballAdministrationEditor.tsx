@@ -60,12 +60,13 @@ export default function BasketballAdministrationEditor(props: Props) {
   }, [onClose, preview])
 
   const optionEventId = draft?.eventId ?? null
+  const optionEventType = draft?.eventType ?? null
   const optionPeriodId = draft?.period.id ?? null
   const optionTeamSide = draft?.teamSide ?? null
   const optionSubject = draft?.subject ?? null
   const foulOptions = useMemo(() => basketballEjectionFoulOptions(
     state,
-    optionEventId && optionPeriodId && optionTeamSide && optionSubject
+    optionEventType === 'basketball.ejection' && optionEventId && optionPeriodId && optionTeamSide && optionSubject
       ? {
           eventId: optionEventId,
           periodId: optionPeriodId,
@@ -73,7 +74,7 @@ export default function BasketballAdministrationEditor(props: Props) {
           subject: optionSubject,
         }
       : null
-  ), [optionEventId, optionPeriodId, optionSubject, optionTeamSide, state])
+  ), [optionEventId, optionEventType, optionPeriodId, optionSubject, optionTeamSide, state])
 
   if (!draft) {
     return (
@@ -148,8 +149,8 @@ export default function BasketballAdministrationEditor(props: Props) {
   return (
     <BasketballEditorFrame title={`${props.mode === 'edit' ? 'Edit' : 'Add'} ${label}`} onClose={onClose} closeRef={closeRef}>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <BasketballEditorSection title={props.mode === 'add' ? 'Recorded later' : 'Event'}>
-          {props.mode === 'add' && (
+        {props.mode === 'add' && (
+          <BasketballEditorSection title="Recorded later">
             <BasketballEditorSelectField label="Period" value={draft.period.id} options={periodOptions} onChange={periodId => {
               const period = sportState?.projection.periods.find(candidate => candidate.id === periodId)
               if (period) update({
@@ -157,8 +158,8 @@ export default function BasketballAdministrationEditor(props: Props) {
                 relatedFoulEventId: null,
               })
             }} />
-          )}
-        </BasketballEditorSection>
+          </BasketballEditorSection>
+        )}
 
         {draft.eventType === 'basketball.ejection'
           ? <EjectionFields
@@ -269,9 +270,16 @@ function TimeoutFields({
   opponentLabel: string
 }) {
   const neutral = draft.teamSide === 'neutral'
+  const lastChargedSide = useRef<BasketballTeamSide>(
+    draft.teamSide === 'neutral' ? 'tracked' : draft.teamSide
+  )
   const setMode = (mode: 'charged' | 'neutral') => update(mode === 'charged'
-    ? { teamSide: 'tracked', timeoutKind: 'full', timeoutLabel: 'Full timeout' }
+    ? { teamSide: lastChargedSide.current, timeoutKind: 'full', timeoutLabel: 'Full timeout' }
     : { teamSide: 'neutral', timeoutKind: 'official', timeoutLabel: 'Official timeout' })
+  const setTeamSide = (teamSide: BasketballTeamSide) => {
+    lastChargedSide.current = teamSide
+    update({ teamSide })
+  }
   const setKind = (timeoutKind: BasketballTimeoutKind) => update({
     timeoutKind,
     timeoutLabel: defaultTimeoutLabel(timeoutKind),
@@ -286,7 +294,7 @@ function TimeoutFields({
         <BasketballEditorSegmentedControl label="Team" value={draft.teamSide} options={[
           { value: 'tracked', label: trackedLabel },
           { value: 'opponent', label: opponentLabel },
-        ]} onChange={value => update({ teamSide: value as BasketballTeamSide })} />
+        ]} onChange={value => setTeamSide(value as BasketballTeamSide)} />
       )}
       <BasketballEditorSegmentedControl label="Kind" value={draft.timeoutKind} options={neutral
         ? [
