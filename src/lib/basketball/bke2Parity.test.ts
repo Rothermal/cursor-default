@@ -21,6 +21,7 @@ import {
 } from './ejectionCommands'
 import { captureBasketballFoul } from './foulFreeThrowCommands'
 import { basketballTimeoutInventory, captureBasketballTimeout } from './timeoutCommands'
+import { buildBasketballAdministrationEditDraft } from './administrationEditCommands'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
 
@@ -168,6 +169,14 @@ describe('BKE-2D complete event-tracker parity', () => {
     expect(basketballOfficialEjectionStatuses(state)[0]).toMatchObject({
       subjectLabel: 'Assistant Coach',
       teamSide: 'opponent',
+    })
+    expect(buildBasketballAdministrationEditDraft(state, timeout.eventId)).toMatchObject({
+      ok: true,
+      value: { eventType: 'basketball.timeout', timeoutKind: 'full' },
+    })
+    expect(buildBasketballAdministrationEditDraft(state, ejection.eventId)).toMatchObject({
+      ok: true,
+      value: { eventType: 'basketball.ejection', reason: 'Official ruling' },
     })
 
     const suspended = suspendBasketballMatch(state, {

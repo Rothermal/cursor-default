@@ -37,6 +37,11 @@ import {
   type BasketballFoulFreeThrowDraftType,
 } from '../../lib/basketball/foulFreeThrowEditCommands'
 import BasketballFoulFreeThrowEditor from './BasketballFoulFreeThrowEditor'
+import {
+  isBasketballEditableAdministrationEvent,
+  type BasketballEditableAdministrationEventType,
+} from '../../lib/basketball/administrationEditCommands'
+import BasketballAdministrationEditor from './BasketballAdministrationEditor'
 
 export default function BasketballTimeline() {
   const { state } = useGame()
@@ -54,12 +59,14 @@ export default function BasketballTimeline() {
   const [editingRelatedEventId, setEditingRelatedEventId] = useState<string | null>(null)
   const [editingValueEventId, setEditingValueEventId] = useState<string | null>(null)
   const [editingFoulFreeThrowEventId, setEditingFoulFreeThrowEventId] = useState<string | null>(null)
+  const [editingAdministrationEventId, setEditingAdministrationEventId] = useState<string | null>(null)
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [addingShot, setAddingShot] = useState(false)
   const [addingRelatedType, setAddingRelatedType] = useState<BasketballHistoricalRelatedEventType | null>(null)
   const [addingValueType, setAddingValueType] = useState<BasketballEditableValueEventType | null>(null)
   const [addingFoulFreeThrowType, setAddingFoulFreeThrowType] = useState<BasketballFoulFreeThrowDraftType | null>(null)
+  const [addingAdministrationType, setAddingAdministrationType] = useState<BasketballEditableAdministrationEventType | null>(null)
 
   useEffect(() => {
     if (!highlightEventId) return
@@ -276,18 +283,22 @@ export default function BasketballTimeline() {
           review={eventDetail}
           teamLabel={eventDetail.teamSide === 'tracked'
             ? state.gameInfo?.teamName || 'Tracked team'
-            : state.gameInfo?.opponentName || 'Opponent'}
+            : eventDetail.teamSide === 'opponent'
+              ? state.gameInfo?.opponentName || 'Opponent'
+              : 'Game administration'}
           onClose={() => setEventDetail(null)}
           onEdit={(correctionsEnabled || eventDetail.id === recoveryEventId) &&
             !eventDetail.removed && (
               isBasketballEditableFoulFreeThrowEvent(eventDetail.event) ||
               isBasketballEditableValueEvent(eventDetail.event) ||
-              isBasketballEditableRelatedEvent(eventDetail.event)
+              isBasketballEditableRelatedEvent(eventDetail.event) ||
+              isBasketballEditableAdministrationEvent(eventDetail.event)
             )
             ? () => {
                 if (isBasketballEditableFoulFreeThrowEvent(eventDetail.event)) setEditingFoulFreeThrowEventId(eventDetail.id)
                 else if (isBasketballEditableValueEvent(eventDetail.event)) setEditingValueEventId(eventDetail.id)
-                else setEditingRelatedEventId(eventDetail.id)
+                else if (isBasketballEditableRelatedEvent(eventDetail.event)) setEditingRelatedEventId(eventDetail.id)
+                else setEditingAdministrationEventId(eventDetail.id)
                 setEventDetail(null)
               }
             : undefined}
@@ -354,6 +365,18 @@ export default function BasketballTimeline() {
         />
       )}
 
+      {editingAdministrationEventId && (
+        <BasketballAdministrationEditor
+          mode="edit"
+          eventId={editingAdministrationEventId}
+          onClose={() => setEditingAdministrationEventId(null)}
+          onApplied={eventId => {
+            setEditingAdministrationEventId(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
       {showAddChooser && (
         <BasketballAddEventChooser
           onClose={() => setShowAddChooser(false)}
@@ -372,6 +395,10 @@ export default function BasketballTimeline() {
           onFoulFreeThrow={eventType => {
             setShowAddChooser(false)
             setAddingFoulFreeThrowType(eventType)
+          }}
+          onAdministration={eventType => {
+            setShowAddChooser(false)
+            setAddingAdministrationType(eventType)
           }}
           minutesAvailable={basketballManualMinutesAvailable(state)}
         />
@@ -417,6 +444,18 @@ export default function BasketballTimeline() {
           onClose={() => setAddingFoulFreeThrowType(null)}
           onApplied={eventId => {
             setAddingFoulFreeThrowType(null)
+            setHighlightEventId(eventId)
+          }}
+        />
+      )}
+
+      {addingAdministrationType && (
+        <BasketballAdministrationEditor
+          mode="add"
+          eventType={addingAdministrationType}
+          onClose={() => setAddingAdministrationType(null)}
+          onApplied={eventId => {
+            setAddingAdministrationType(null)
             setHighlightEventId(eventId)
           }}
         />
@@ -537,7 +576,12 @@ function TimelineEventRow({
   nested?: boolean
 }) {
   const shot = review.event.eventType === 'basketball.shot'
-  const relatedEvent = isBasketballEditableRelatedEvent(review.event) || isBasketballEditableValueEvent(review.event)
+  const relatedEvent = !shot && (
+    isBasketballEditableRelatedEvent(review.event) ||
+    isBasketballEditableValueEvent(review.event) ||
+    isBasketballEditableFoulFreeThrowEvent(review.event) ||
+    isBasketballEditableAdministrationEvent(review.event)
+  )
   const content = (
     <>
       <div className="min-w-0 flex-1 text-left">

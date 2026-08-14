@@ -1,5 +1,6 @@
 import { getBonusStatus } from '../basketballBonus'
 import type { GameEventActor } from '../gameEvents/types'
+import { sameBasketballActorIdentity } from './actorIdentity'
 import type { BasketballStatProjectionContext } from './statProjection'
 import type {
   BasketballAdministrativeEvent,
@@ -44,18 +45,14 @@ function validateAdministrativeMoment(
   if (projection.status === 'ended' || projection.status === 'suspended') {
     return 'Basketball match is not open for administrative events.'
   }
-  const recordedLaterEvent = event.eventType === 'basketball.minutes_adjustment' ||
-    event.eventType === 'basketball.foul'
-  if (projection.status !== 'in_progress' && !(recordedLaterEvent && projection.status === 'period_break')) {
-    return 'Basketball administrative events require an active period.'
+  if (projection.status !== 'in_progress' && projection.status !== 'period_break') {
+    return 'Basketball administrative events require an open match.'
   }
   const segment = projection.periods.find(period => period.id === event.period.id)
   const validPeriod = Boolean(segment && segment.order === event.period.order)
-  const validMoment = recordedLaterEvent
-    ? projection.startedPeriodIds.includes(event.period.id)
-    : projection.currentPeriodId === event.period.id
+  const validMoment = projection.startedPeriodIds.includes(event.period.id)
   if (!validPeriod || !validMoment) {
-    return 'Basketball administrative event does not target the current period.'
+    return 'Basketball administrative event does not target a started period.'
   }
   return null
 }
@@ -242,7 +239,7 @@ function validateEjectionRelationship(
     target?.eventType !== 'basketball.foul' ||
     target.teamSide !== event.teamSide ||
     !committedBy ||
-    !sameActor(subject, committedBy)
+    !sameBasketballActorIdentity(subject, committedBy)
   ) {
     projection.relationshipWarnings.push({
       eventId: event.id,
@@ -327,13 +324,6 @@ function optionalActorForRole(
   role: string
 ): GameEventActor | undefined {
   return event.actors.find(candidate => candidate.role === role)
-}
-
-function sameActor(left: GameEventActor, right: GameEventActor): boolean {
-  if (left.participantId || right.participantId) {
-    return Boolean(left.participantId && left.participantId === right.participantId)
-  }
-  return left.kind === right.kind && left.label === right.label
 }
 
 function oppositeSide(side: BasketballTeamSide): BasketballTeamSide {

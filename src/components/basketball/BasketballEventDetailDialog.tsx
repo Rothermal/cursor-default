@@ -92,6 +92,8 @@ function detailHeading(review: BasketballTimelineEventReview): string {
   if (review.event.eventType === 'basketball.free_throw_trip') return 'Award'
   if (review.event.eventType === 'basketball.score_adjustment') return 'Adjustment'
   if (review.event.eventType === 'basketball.minutes_adjustment') return 'Minutes'
+  if (review.event.eventType === 'basketball.ejection') return 'Ejection ruling'
+  if (review.event.eventType === 'basketball.timeout') return 'Timeout'
   return 'Relationship'
 }
 
@@ -114,6 +116,14 @@ function detailValue(review: BasketballTimelineEventReview): string {
   }
   if (event.eventType === 'basketball.minutes_adjustment') {
     return event.payload.deltaMinutes > 0 ? `+${event.payload.deltaMinutes}` : String(event.payload.deltaMinutes)
+  }
+  if (event.eventType === 'basketball.ejection') {
+    const source = event.payload.source === 'official_ruling' ? 'official ruling' : 'automatic threshold'
+    return `${event.payload.reason} | ${source}`
+  }
+  if (event.eventType === 'basketball.timeout') {
+    const owner = event.teamSide === 'neutral' ? 'game administration' : 'charged timeout'
+    return `${event.payload.label || event.payload.kind.replace(/_/g, ' ')} | ${owner}`
   }
   return review.relationshipLabels.length > 0 ? review.relationshipLabels.join(' | ') : 'Standalone event'
 }

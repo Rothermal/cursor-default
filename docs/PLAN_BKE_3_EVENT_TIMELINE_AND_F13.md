@@ -4,8 +4,8 @@ Detailed implementation plan for replacing the Basketball event game's limited R
 review with an editable Timeline and delivering the held F13 shot-detail experience on the shared
 event model.
 
-Status: Approved through the BKE-3 product and delivery Q&A. Implementation is split into BKE-3A
-through BKE-3D. BKE-3A through BKE-3C and BKE-3D1/D2/D3 are complete; BKE-3D4 is next.
+Status: Complete. BKE-3A through BKE-3D4 deliver the approved local Basketball Timeline, arbitrary
+correction, F13 editing, recorded-later additions, and exit audit. BKE-4A is next.
 
 Depends on:
 
@@ -401,7 +401,24 @@ ungrouped attempts in any started period. One-and-one validation rebuilds the st
 award so bonus eligibility is checked at honest append order. Foul and award replay now accept started
 periods while preserving live-command current-period guards. `BasketballFoulFreeThrowEditor` supplies
 the shared responsive correction/addition surface, and free-throw shot detail routes to it while field
-goals retain the F13 shot editor. BKE-3D4 administration and the exit audit are next.
+goals retain the F13 shot editor.
+
+BKE-3D4 status: Complete. `administrationEditCommands.ts` owns checked ejection and timeout drafts,
+previews, edits, and recorded-later additions. Ejections support resolved players or labeled staff,
+official or valid automatic-threshold sources, reason changes, and capture-order-safe same-period foul
+links; duplicate surviving ejections reject. Timeouts support charged full/30-second ownership and
+neutral media/official administration with labels. Finite timeout inventory is evaluated for the
+selected immutable period after excluding the edited event, so an in-place kind change does not consume
+its slot twice while cross-side/period additions still fail at capacity. Administrative replay accepts
+any started period; live capture remains current-period-only through its independent command context.
+`BasketballAdministrationEditor` owns the shared responsive Timeline/Add Event surface.
+
+Exit audit: Complete. Every user-recorded family routes through one checked Basketball editor and final
+projection validation; lifecycle and participant-identity events remain read-only boundaries. Timeline
+mutation clears quick Undo, terminal games require reasoned Reopen, event games remain local-only, and
+legacy reducer/`ShotRecord` authority is not used for event correction. The mixed BKE-2 parity fixture,
+family editor suites, `REGRESSION_BKE_3_TIMELINE.md`, full Vitest suite, lint, and production build are
+the recorded BKE-3 gate. BKE-4A may begin from this local model.
 
 ### 9.1 Event-family matrix
 
@@ -413,7 +430,7 @@ goals retain the F13 shot editor. BKE-3D4 administration and the exit audit are 
 | Foul | Offender, side, class, context, drawn-by, team-control side, incident, and reasoned counting override; clear invalid trip/ejection links atomically |
 | Free-throw trip | Award count/context, one-and-one, source foul, technical, and possession-retained fields; reject or atomically resolve invalid existing attempt/source relationships |
 | Free-throw attempt | Shooter, result, trip/position where compatible; positions never renumber and sparse/empty trips remain visible |
-| Ejection | Player/staff subject, side, reason, source, and optional compatible current-period foul link |
+| Ejection | Player/staff subject, side, reason, source, and optional compatible earlier same-period foul link |
 | Timeout | Charged owner/kind or neutral kind/label; enforce the selected period's immutable inventory |
 
 Lifecycle events, roster additions, and participant identity resolutions remain read-only Timeline
