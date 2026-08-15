@@ -161,13 +161,17 @@ remain BKE-4C/BKE-4D scope; BKE-4B opens only the current user's editable record
 
 1. Add migration 056 with the fixed authenticated Basketball v4 binding wrapper, explicit revoke,
    grant, `security definer`, and `search_path` contract.
-2. Move same-recorder merge/base/conflict helpers into `src/lib/gameEvents/` while preserving all
+2. Add regression coverage proving the effective migration-055
+   `confirm_game_event_stream_checkpoint` definition and migration-053
+   `is_event_checkpoint_current` both filter event scans by the stored/requested sport. Migration
+   056 must not reissue either function or restore migration 051's superseded unfiltered scan.
+3. Move same-recorder merge/base/conflict helpers into `src/lib/gameEvents/` while preserving all
    Soccer behavior and tests.
-3. Extract the bind/pull/merge/upload/resolve/checkpoint algorithm into a sport-neutral client
+4. Extract the bind/pull/merge/upload/resolve/checkpoint algorithm into a sport-neutral client
    transport with strict adapter boundaries.
-4. Keep Soccer as the first adapter and prove byte-equivalent RPC names, ordering, errors, recovered
+5. Keep Soccer as the first adapter and prove byte-equivalent RPC names, ordering, errors, recovered
    state, and checkpoint semantics.
-5. Add the Basketball adapter contract and participant/setup serialization tests without routing
+6. Add the Basketball adapter contract and participant/setup serialization tests without routing
    live GameContext sync yet.
 
 Exit: Soccer remains green through the shared engine, the Basketball wrapper is the only new public
@@ -222,6 +226,8 @@ Every slice runs full Vitest, build, lint, and `git diff --check`. Focused cover
 
 - migration 056 signature, fixed sport forwarding, revokes/grants, and absence of neutral-core or
   finalization grants;
+- effective migration-055 checkpoint confirmation and migration-053 checkpoint currency using the
+  same sport-filtered count, sequence, and revision scans, with no superseding 056 definition;
 - unchanged Soccer binding, merge, recovery, conflict, checkpoint, final-game audit, and cloud-load
   tests after shared extraction;
 - Basketball setup/participant serialization for tracked/opponent, late participants, stable ids,
