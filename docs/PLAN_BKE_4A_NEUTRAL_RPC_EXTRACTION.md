@@ -1,8 +1,8 @@
 # Plan: BKE-4A Sport-Neutral RPC Extraction
 
-Status: BKE-4A1 is implemented in migrations 050-051 with static contract coverage; database-runtime
-application and verification remain manual. BKE-4A2 is next. No Basketball client behavior is
-enabled by this phase.
+Status: BKE-4A1 and BKE-4A2 are implemented in migrations 050-052 with static contract coverage;
+database-runtime application and verification remain manual. BKE-4A3 is next. No Basketball
+client behavior is enabled by this phase.
 
 ## 1. Objective
 
@@ -122,7 +122,12 @@ Migrations 050 and 051 will:
 
 ## 6. BKE-4A2: Recovery and Conflicts
 
-Migration 052 will:
+Status: Implemented. Migration 052 extracts immutable setup/adoption into a private event-platform
+v2 binder, retains the permanent authenticated Soccer v2 wrapper, and reissues the latest shared
+conflict contracts with explicit supported-sport checks. The setup write now rejects a concurrent
+different snapshot atomically instead of reporting a successful rebind against the retained row.
+
+Migration 052:
 
 1. extract immutable setup-snapshot creation and comparison into a sport-neutral binding v2 core;
 2. require setup sport identity to match the requested and stored sport;

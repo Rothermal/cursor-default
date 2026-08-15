@@ -1,7 +1,8 @@
 # Regression: BKE-4A Event Platform Extraction
 
-Status: BKE-4A1 automated contract coverage is implemented. PostgreSQL runtime verification is
-required after applying migrations 050-051. Later BKE-4A slices will extend this record.
+Status: BKE-4A1 and BKE-4A2 automated contract coverage is implemented. PostgreSQL runtime
+verification is required after applying migrations 050-052. Later BKE-4A slices will extend this
+record.
 
 ## 1. Automated Gate
 
@@ -24,6 +25,16 @@ BKE-4A1 contract tests verify that:
 - revision writes retain stale/conflict/idempotent behavior and finalized non-primary Soccer audit
   uploads from migration 046; and
 - checkpoints still verify the exact recorder-owned event-id/revision set.
+
+BKE-4A2 contract tests verify that:
+
+- setup/adoption uses a private sport-neutral v2 core behind the existing Soccer v2 signature;
+- requested, stored-game, and setup-row sport identities must agree;
+- identical rebinds succeed while different setup snapshots lose the atomic conflict update and
+  fail without replacing the stored snapshot;
+- conflict rows remain recorder-owned and stale remote revisions still fail;
+- only finalized non-primary Soccer audit uploads retain the late conflict-recording exception; and
+- no authenticated Basketball recovery binder exists.
 
 Static tests do not execute PostgreSQL parsing, locks, RLS, or security-definer privileges.
 
@@ -91,14 +102,46 @@ With an authenticated test account:
 
 1. Bind or resume one personal Soccer event game through the existing app flow.
 2. Bind or resume one accepted-team Soccer event game as an authorized recorder.
-3. Confirm an identical rebind returns the same game and participant mapping.
-4. Attempt an incompatible local-id/team binding and confirm it fails.
-5. Upload a new event, an idempotent retry, a higher revision, a stale revision, and a tombstone.
-6. Confirm a checkpoint with the exact revision set, then verify count, sequence, duplicate-id, and
+3. From an authenticated client or test harness, call the permanent v1
+   `bind_soccer_event_game` RPC directly with one bound game's known local id and identical
+   participant payload. Confirm it returns the same `game_id` and `participant_id_map`; migration
+   052's live app chain reaches the neutral base binder through v2 and no longer exercises this
+   compatibility wrapper indirectly.
+4. Confirm an identical app-flow rebind returns the same game and participant mapping.
+5. Attempt an incompatible local-id/team binding and confirm it fails.
+6. Upload a new event, an idempotent retry, a higher revision, a stale revision, and a tombstone.
+7. Confirm a checkpoint with the exact revision set, then verify count, sequence, duplicate-id, and
    revision mismatches fail.
-7. For an already-finalized Soccer game with a queued non-primary stream, verify only eligible
+8. For an already-finalized Soccer game with a queued non-primary stream, verify only eligible
    pre-finalization audit rows and their checkpoint may finish uploading.
-8. Confirm current Soccer release capability negotiation still succeeds.
+9. Confirm current Soccer release capability negotiation still succeeds.
 
 Record the account/team role, game ids, migration versions, and pass/fail result. Do not create a
-Basketball client binding test in A1; no authenticated Basketball binder exists until BKE-4B.
+Basketball client binding test in A1 or A2; no authenticated Basketball binder exists until BKE-4B.
+
+## 6. After Migration 052
+
+Verify function visibility:
+
+```sql
+select
+  has_function_privilege('authenticated',
+    'public.bind_soccer_event_game_v2(uuid,text,uuid,uuid,text,text,text,date,jsonb,jsonb)',
+    'EXECUTE') as soccer_v2_wrapper_allowed,
+  has_function_privilege('authenticated',
+    'public.bind_event_game_v2(text,uuid,text,uuid,uuid,text,text,text,date,jsonb,jsonb)',
+    'EXECUTE') as neutral_v2_core_allowed,
+  has_function_privilege('authenticated',
+    'public.record_game_event_conflict(uuid,uuid,jsonb,jsonb)',
+    'EXECUTE') as conflict_record_allowed,
+  has_function_privilege('authenticated',
+    'public.resolve_game_event_conflict(uuid,text,jsonb)',
+    'EXECUTE') as conflict_resolve_allowed;
+```
+
+Expected: `true`, `false`, `true`, `true`.
+
+Repeat an identical Soccer v2 bind and confirm the game id, participants, setup bytes, and setup
+sport remain unchanged. Attempt the same game with a modified setup and confirm the RPC fails while
+the original row remains unchanged. Repeat the SOC-5B two-device unrelated-event and same-event
+conflict matrix, including an idempotent resolution retry and one stale remote-revision rejection.
