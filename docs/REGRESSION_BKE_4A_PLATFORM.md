@@ -102,14 +102,19 @@ With an authenticated test account:
 
 1. Bind or resume one personal Soccer event game through the existing app flow.
 2. Bind or resume one accepted-team Soccer event game as an authorized recorder.
-3. Confirm an identical rebind returns the same game and participant mapping.
-4. Attempt an incompatible local-id/team binding and confirm it fails.
-5. Upload a new event, an idempotent retry, a higher revision, a stale revision, and a tombstone.
-6. Confirm a checkpoint with the exact revision set, then verify count, sequence, duplicate-id, and
+3. From an authenticated client or test harness, call the permanent v1
+   `bind_soccer_event_game` RPC directly with one bound game's known local id and identical
+   participant payload. Confirm it returns the same `game_id` and `participant_id_map`; migration
+   052's live app chain reaches the neutral base binder through v2 and no longer exercises this
+   compatibility wrapper indirectly.
+4. Confirm an identical app-flow rebind returns the same game and participant mapping.
+5. Attempt an incompatible local-id/team binding and confirm it fails.
+6. Upload a new event, an idempotent retry, a higher revision, a stale revision, and a tombstone.
+7. Confirm a checkpoint with the exact revision set, then verify count, sequence, duplicate-id, and
    revision mismatches fail.
-7. For an already-finalized Soccer game with a queued non-primary stream, verify only eligible
+8. For an already-finalized Soccer game with a queued non-primary stream, verify only eligible
    pre-finalization audit rows and their checkpoint may finish uploading.
-8. Confirm current Soccer release capability negotiation still succeeds.
+9. Confirm current Soccer release capability negotiation still succeeds.
 
 Record the account/team role, game ids, migration versions, and pass/fail result. Do not create a
 Basketball client binding test in A1 or A2; no authenticated Basketball binder exists until BKE-4B.
