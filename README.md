@@ -126,6 +126,13 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/047_soccer_canonical_aggregate_sources.sql` - SOC-6C2 RLS/keyset canonical aggregate source RPCs, audited participant-link repair, merge-safe stable identities, and retention of migration 041's basketball shot-chart remount
 - `supabase/migrations/048_soccer_settings_foundation.sql` - SOC-6D1 generic personal/team sport-settings tables, strict soccer schema validation, read-only RLS, revision-aware write RPCs, and shared-setting audit events
 - `supabase/migrations/049_soccer_release_capabilities.sql` - SOC-6E1 authenticated read-only handshake for the complete Soccer cloud contract
+- `supabase/migrations/050_event_platform_team_side_constraint.sql` - BKE-4A1 staged event-platform team-side widening
+- `supabase/migrations/051_event_platform_cloud_transport.sql` - BKE-4A1 neutral transport foundation and Soccer wrappers
+- `supabase/migrations/052_event_platform_recovery.sql` - BKE-4A2 neutral setup recovery and conflict contracts
+- `supabase/migrations/053_event_platform_recorder_resolution.sql` - BKE-4A3 neutral recorder and primary-resolution contracts
+- `supabase/migrations/054_event_platform_publication_constraint.sql` - BKE-4A4 staged canonical-publication sport widening
+- `supabase/migrations/055_event_platform_finalization_recovery.sql` - BKE-4A4 neutral finalization/recovery mechanics and Soccer wrappers
+   > Apply **`054` and `055` separately and in order** so the staged constraint add commits before validation and replacement.
    > Apply **`049`** before enabling Soccer for cloud-team starts. Missing or stale capability contracts fail closed while local-only Soccer and existing/history access remain available.
    > Before **`047`**, run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` and review the repairable/unprovable participant counts.
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
@@ -286,7 +293,13 @@ supabase/
     ├── 046_soccer_finalization_recovery.sql
     ├── 047_soccer_canonical_aggregate_sources.sql
     ├── 048_soccer_settings_foundation.sql
-    └── 049_soccer_release_capabilities.sql
+    ├── 049_soccer_release_capabilities.sql
+    ├── 050_event_platform_team_side_constraint.sql
+    ├── 051_event_platform_cloud_transport.sql
+    ├── 052_event_platform_recovery.sql
+    ├── 053_event_platform_recorder_resolution.sql
+    ├── 054_event_platform_publication_constraint.sql
+    └── 055_event_platform_finalization_recovery.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
@@ -470,6 +483,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Basketball neutral event transport foundation (BKE-4A1)** - staged neutral-side constraint widening, private sport-neutral base binding, permanent Soccer compatibility wrapper, and migration-046-equivalent revision/checkpoint behavior ([plan](docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md))
 - [x] **Basketball event recovery extraction (BKE-4A2)** - private setup/adoption binding, atomic immutable-snapshot enforcement, permanent Soccer v2 compatibility, and sport-bounded same-recorder conflicts ([plan](docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md))
 - [x] **Basketball recorder-resolution extraction (BKE-4A3)** - private checkpoint, recorder, primary-selection, history, and independent-recorder binding cores behind permanent Soccer wrappers ([plan](docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md))
+- [x] **Basketball finalization/recovery extraction (BKE-4A4)** - staged canonical-publication widening, private neutral finalization/reopen/recovery cores, trusted Soccer policy wrappers, and aggregate-only Basketball compatibility ([plan](docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md), [regression](docs/REGRESSION_BKE_4A_PLATFORM.md))
 - [ ] **Basketball event-model migration (BKE-4 through BKE-6)** - cloud lifecycle and aggregates, settings/rollout, then clock and lineups ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
 - [ ] **Multi-game storage/ops follow-ups** — optional historical orphan cleanup tooling, full transactional/idempotent cloud sync, IndexedDB storage, import conflict UI, and richer quota recovery UX ([plan](docs/PLAN_MULTI_GAME_PARKING.md))

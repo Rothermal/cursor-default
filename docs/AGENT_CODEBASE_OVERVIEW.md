@@ -62,7 +62,7 @@ flowchart TB
 | [`src/lib/`](../src/lib/) | Pure helpers (scoring, team stats, shot chart, display) | Business logic without UI |
 | [`src/pages/`](../src/pages/) | One screen per route | UI for a feature |
 | [`src/components/`](../src/components/) | Shared UI (Scoreboard, StatButton, shot-chart/, team-stats/) | Reusable widgets |
-| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001-047) | Any DB change |
+| [`supabase/migrations/`](../supabase/migrations/) | Schema source of truth (001-055) | Any DB change |
 | [`docs/`](.) | Design specs and plans | Before building a feature |
 
 **Convention:** Pages orchestrate; heavy logic lives in `lib/` and the `GameContext` reducer.
@@ -187,8 +187,12 @@ wrapper, and migration-046-equivalent revision/checkpoint behavior. BKE-4A2 adds
 setup/adoption, atomic immutable-snapshot enforcement, the permanent Soccer v2 wrapper, and
 sport-bounded same-recorder conflict contracts. BKE-4A3 adds private checkpoint-health, primary,
 recorder presence/history, manager-selection, and independent-recorder binding cores behind the
-unchanged Soccer v3 surface. The neutral cores are not granted to authenticated clients, and no
-Basketball binding path exists yet. BKE-4A4 is next.
+unchanged Soccer v3 surface. BKE-4A4 stages and installs the canonical-publication allow-list and
+extracts private readiness, finalization, reopen, late-audit, conflict-preparation, checkpoint, v4
+binding, and final-state cores behind unchanged Soccer wrappers. Trusted Soccer terminal/score
+policy remains server-owned; canonical final-state enforcement applies to all Soccer games and only
+event-marked Basketball games, preserving legacy aggregate Basketball. No Basketball client binding
+or finalization path exists yet. BKE-4A is complete and BKE-4B is next.
 Event Basketball games remain internal and local-only.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
@@ -421,7 +425,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3 and BKE-4A1-A3 are complete; BKE-4A4 is next |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3 and BKE-4A are complete; BKE-4B is next |
 
 ### Held / waiting for feedback
 
