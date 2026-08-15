@@ -23,18 +23,21 @@ as $$
         from public.game_events event
         where event.game_id = checkpoint.game_id
           and event.recorded_by = checkpoint.recorded_by
+          and event.sport_id = p_sport_id
       )
       and checkpoint.max_sequence = (
         select coalesce(max(event.stream_sequence), -1)
         from public.game_events event
         where event.game_id = checkpoint.game_id
           and event.recorded_by = checkpoint.recorded_by
+          and event.sport_id = p_sport_id
       )
       and not exists (
         select 1
         from public.game_events event
         where event.game_id = checkpoint.game_id
           and event.recorded_by = checkpoint.recorded_by
+          and event.sport_id = p_sport_id
           and not exists (
             select 1
             from jsonb_array_elements(checkpoint.event_revisions) item

@@ -38,7 +38,8 @@ BKE-4A2 contract tests verify that:
 
 BKE-4A3 contract tests verify that:
 
-- exact checkpoint health remains revision-, count-, sequence-, and conflict-aware;
+- exact checkpoint health remains revision-, count-, sequence-, and conflict-aware, with every
+  event scan restricted to the stored game's sport so legacy mismatched rows fail closed;
 - selected-primary, creator-first, then oldest-healthy-checkpoint ordering stays deterministic;
 - recorder presence columns and primary-selection history retain the Soccer client contract;
 - personal owners and team owners/admins may select only a current conflict-free recorder;

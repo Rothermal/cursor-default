@@ -23,12 +23,20 @@ const expectPrivate = (functionName: string) => {
 
 describe('migration 053 event-platform recorder resolution', () => {
   it('extracts exact checkpoint health behind the existing generic helper', () => {
+    const checkpointCore = sql.slice(
+      sql.indexOf('create or replace function public.is_event_checkpoint_current'),
+      sql.indexOf(
+        'create or replace function public.is_game_event_checkpoint_current'
+      )
+    )
+
     expect(sql).toContain('create or replace function public.is_event_checkpoint_current')
     expect(sql).toContain('and game.sport_id = p_sport_id')
     expect(sql).toContain('checkpoint.event_count = (')
     expect(sql).toContain('checkpoint.max_sequence = (')
     expect(sql).toContain("item->>'id' = event.id::text")
     expect(sql).toContain("conflict.status = 'open'")
+    expect(checkpointCore.match(/and event\.sport_id = p_sport_id/g)).toHaveLength(3)
     expect(sql).toContain(
       'create or replace function public.is_game_event_checkpoint_current'
     )
