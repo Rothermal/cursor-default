@@ -29,8 +29,8 @@ describe('migration 051 event-platform cloud transport', () => {
     expect(sql).toContain(
       'revoke all on function public.is_event_platform_sport(text) from public'
     )
-    expect(sql).not.toContain(
-      'grant execute on function public.is_event_platform_sport(text) to authenticated'
+    expect(sql).not.toMatch(
+      /grant\s+execute\s+on\s+function\s+public\.is_event_platform_sport\s*\(\s*text\s*\)\s+to\s+(?:authenticated|anon|public)/
     )
   })
 
@@ -42,8 +42,8 @@ describe('migration 051 event-platform cloud transport', () => {
     expect(sql).toContain(
       'revoke all on function public.bind_event_game(\n  text, text, uuid, uuid, text, text, text, date, jsonb\n) from public'
     )
-    expect(sql).not.toContain(
-      'grant execute on function public.bind_event_game(\n  text, text, uuid, uuid, text, text, text, date, jsonb'
+    expect(sql).not.toMatch(
+      /grant\s+execute\s+on\s+function\s+public\.bind_event_game\s*\(\s*text\s*,\s*text\s*,\s*uuid\s*,\s*uuid\s*,\s*text\s*,\s*text\s*,\s*text\s*,\s*date\s*,\s*jsonb\s*\)\s+to\s+(?:authenticated|anon|public)/
     )
     expect(sql).toContain('create or replace function public.bind_soccer_event_game')
     expect(sql).toContain("select public.bind_event_game(\n    'soccer'")
