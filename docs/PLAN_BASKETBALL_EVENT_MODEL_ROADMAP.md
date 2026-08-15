@@ -13,7 +13,8 @@ product and delivery decisions are approved in
 and BKE-3D1 through BKE-3D4 are complete, including the exit audit. BKE-4 planning is recorded in
 [PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md), with BKE-4A detailed in
 [PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md). BKE-4A is implemented
-through migration 055; database-runtime verification remains manual and BKE-4B is next.
+through migration 055. BKE-4B decisions and delivery slices are approved in
+[PLAN_BKE_4B_BASKETBALL_TRANSPORT.md](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md), with BKE-4B1 next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
