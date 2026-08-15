@@ -1,7 +1,7 @@
 # Plan: BKE-4 Event Cloud Cutover
 
-Status: Proposed implementation plan. BKE-3 is complete. BKE-4A is the next phase; Basketball
-event-game creation remains internal-only through BKE-4E.
+Status: Approved implementation plan. BKE-4A1 is implemented with migrations 050-051; BKE-4A2 is
+next. Basketball event-game creation remains internal-only through BKE-4E.
 
 ## 1. Goal
 

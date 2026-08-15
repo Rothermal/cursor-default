@@ -1,6 +1,7 @@
 # Plan: BKE-4A Sport-Neutral RPC Extraction
 
-Status: Proposed implementation plan. Depends on completed BKE-3. No Basketball client behavior is
+Status: BKE-4A1 is implemented in migrations 050-051 with static contract coverage; database-runtime
+application and verification remain manual. BKE-4A2 is next. No Basketball client behavior is
 enabled by this phase.
 
 ## 1. Objective
@@ -85,6 +86,13 @@ The extraction must not ask Soccer clients to adopt neutral RPC names. Compatibi
 part of the permanent backend contract, not temporary aliases to remove in BKE-4E.
 
 ## 5. BKE-4A1: Transport Foundation
+
+Status: Implemented. Migration 050 stages the unvalidated shared-side check. Migration 051 validates
+and installs it, adds the private Soccer/Basketball sport predicate and private neutral base binder,
+keeps `bind_soccer_event_game` as the authenticated compatibility wrapper, and preserves the latest
+migration-046 revision/checkpoint behavior. The already-neutral `can_read_game` and `can_track_game`
+helpers are reused unchanged. See
+[`REGRESSION_BKE_4A_PLATFORM.md`](REGRESSION_BKE_4A_PLATFORM.md).
 
 Migrations 050 and 051 will:
 
