@@ -1,8 +1,8 @@
 # Plan: BKE-4A Sport-Neutral RPC Extraction
 
-Status: BKE-4A1 and BKE-4A2 are implemented in migrations 050-052 with static contract coverage;
-database-runtime application and verification remain manual. BKE-4A3 is next. No Basketball
-client behavior is enabled by this phase.
+Status: BKE-4A1 through BKE-4A3 are implemented in migrations 050-053 with static contract
+coverage; database-runtime application and verification remain manual. BKE-4A4 is next. No
+Basketball client behavior is enabled by this phase.
 
 ## 1. Objective
 
@@ -150,7 +150,12 @@ sport-neutral. BKE-4A does not rename a neutral API merely for symmetry.
 
 ## 7. BKE-4A3: Recorder Resolution
 
-Migration 053 will:
+Status: Implemented. Migration 053 extracts sport-parameterized checkpoint health, effective
+primary resolution, recorder presence/history, manager selection, and independent-recorder binding
+behind private functions. Existing generic finalization helpers and all authenticated Soccer RPC
+signatures remain fixed wrappers, and no Basketball client entry point is granted.
+
+Migration 053:
 
 1. extract current-checkpoint evaluation and effective-primary selection by sport;
 2. generalize recorder presence, primary history, and manager selection cores;
