@@ -1,7 +1,7 @@
 # Regression: BKE-4A Event Platform Extraction
 
-Status: BKE-4A1 and BKE-4A2 automated contract coverage is implemented. PostgreSQL runtime
-verification is required after applying migrations 050-052. Later BKE-4A slices will extend this
+Status: BKE-4A1 through BKE-4A3 automated contract coverage is implemented. PostgreSQL runtime
+verification is required after applying migrations 050-053. Later BKE-4A slices will extend this
 record.
 
 ## 1. Automated Gate
@@ -35,6 +35,17 @@ BKE-4A2 contract tests verify that:
 - conflict rows remain recorder-owned and stale remote revisions still fail;
 - only finalized non-primary Soccer audit uploads retain the late conflict-recording exception; and
 - no authenticated Basketball recovery binder exists.
+
+BKE-4A3 contract tests verify that:
+
+- exact checkpoint health remains revision-, count-, sequence-, and conflict-aware, with every
+  event scan restricted to the stored game's sport so legacy mismatched rows fail closed;
+- selected-primary, creator-first, then oldest-healthy-checkpoint ordering stays deterministic;
+- recorder presence columns and primary-selection history retain the Soccer client contract;
+- personal owners and team owners/admins may select only a current conflict-free recorder;
+- independent recorder binding cannot copy another stream or replace creator-owned shared metadata;
+  and
+- neutral recorder/primary/binding functions remain private behind fixed Soccer wrappers.
 
 Static tests do not execute PostgreSQL parsing, locks, RLS, or security-definer privileges.
 
@@ -145,3 +156,38 @@ Repeat an identical Soccer v2 bind and confirm the game id, participants, setup 
 sport remain unchanged. Attempt the same game with a modified setup and confirm the RPC fails while
 the original row remains unchanged. Repeat the SOC-5B two-device unrelated-event and same-event
 conflict matrix, including an idempotent resolution retry and one stale remote-revision rejection.
+
+## 7. After Migration 053
+
+Verify the authenticated role can execute only the shipped Soccer recorder surface, not the neutral
+cores:
+
+```sql
+select
+  has_function_privilege('authenticated',
+    'public.get_soccer_game_recorders(uuid)', 'EXECUTE')
+      as soccer_recorders_allowed,
+  has_function_privilege('authenticated',
+    'public.set_soccer_primary_recorder(uuid,uuid)', 'EXECUTE')
+      as soccer_selection_allowed,
+  has_function_privilege('authenticated',
+    'public.bind_soccer_event_game_v3(uuid,text,uuid,uuid,text,text,text,date,jsonb,jsonb)',
+    'EXECUTE') as soccer_v3_binding_allowed,
+  has_function_privilege('authenticated',
+    'public.get_event_game_recorders(text,uuid)', 'EXECUTE')
+      as neutral_recorders_allowed,
+  has_function_privilege('authenticated',
+    'public.set_event_primary_recorder(text,uuid,uuid)', 'EXECUTE')
+      as neutral_selection_allowed,
+  has_function_privilege('authenticated',
+    'public.bind_event_game_v3(text,uuid,text,uuid,uuid,text,text,text,date,jsonb,jsonb)',
+    'EXECUTE') as neutral_v3_binding_allowed;
+```
+
+Expected: `true`, `true`, `true`, `false`, `false`, `false`.
+
+For one personal and one team Soccer game, exercise creator/default primary selection, a second
+healthy recorder, manager selection, idempotent reselection, stale checkpoint rejection, open
+conflict rejection, final-game lockout, and primary history ordering. Confirm scorers and viewers
+cannot select a primary, independent streams remain separate, and a non-creator recorder cannot
+change shared game or participant snapshot metadata.
