@@ -18,6 +18,9 @@ primary selection, canonical finalization, reopen, and finalized correction inte
 
 ## 2. Approved Boundaries
 
+- BKE-4B1 starts only after migrations 054 and 055 are applied separately and in order and the
+  BKE-4A Soccer runtime parity record is complete. Migration 056 depends on the v4 neutral platform
+  installed by 055.
 - Event transport is automatic through the existing local sync queue for authenticated users.
 - Personal games and authorized team games ship together.
 - Owners, admins, and scorers may create or resume their own recorder stream. Viewers cannot create
@@ -224,6 +227,8 @@ Every slice runs full Vitest, build, lint, and `git diff --check`. Focused cover
 - Basketball setup/participant serialization for tracked/opponent, late participants, stable ids,
   source-player links, and neutral/team actor exclusion;
 - personal/team binding authorization and viewer/non-member rejection;
+- stored game, requested binding, and per-event sport identity agreement, including wrong-sport
+  adapter/event rejection before upload can produce a checkpoint;
 - pull-before-upload ordering, idempotent retry, tombstones, stale/idempotent/conflicting revisions,
   exact checkpoint count/sequence/revision/fingerprint, and partial first sync;
 - unrelated-event merge, same-event conflict, local/cloud choice, invalid choice rejection, pending

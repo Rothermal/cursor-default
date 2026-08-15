@@ -139,7 +139,9 @@ reopened for each implementation slice:
 
 ## 10. Next Step
 
-Implement BKE-4B1 from
+Before beginning BKE-4B1, apply migrations 054 and 055 separately and in order, then record the
+remaining BKE-4A Soccer runtime parity in `REGRESSION_BKE_4A_PLATFORM.md`. After that gate is green,
+implement BKE-4B1 from
 [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md): add the narrow
 Basketball binding wrapper, extract the shared client transport, and prove Soccer parity before
 routing live Basketball synchronization.
