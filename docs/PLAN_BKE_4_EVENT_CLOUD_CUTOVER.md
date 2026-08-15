@@ -37,7 +37,7 @@ the event-game opt-in; BKE-5 owns settings and user-visible rollout.
 | Phase | Purpose | Exit condition |
 |---|---|---|
 | BKE-4A | Extract a sport-neutral SQL/RPC platform while retaining Soccer wrappers | Every current Soccer client call and tested database contract remains unchanged; `neutral` and the Soccer/Basketball publication allow-list are available, but no Basketball client transport exists |
-| BKE-4B | Add Basketball binding, revision transport, pull-before-upload recovery, conflicts, and offline retry | An internally gated Basketball event game binds idempotently, round-trips its recorder stream, and remains locally authoritative through failures |
+| BKE-4B | Add Basketball binding, revision transport, pull-before-upload recovery, conflicts, and offline retry | An internally gated Basketball event game binds idempotently, round-trips its recorder stream, remains locally authoritative through failures, and fails closed if finalization is attempted before BKE-4C |
 | BKE-4C | Add Basketball recorder presence, primary selection, finalization, reopen, and finalized correction integration | A healthy primary stream finalizes transactionally; reopen is audited; independent streams remain isolated |
 | BKE-4D | Build one explicit-authority Basketball Summary | Local, cloud-primary, alternate-recorder, and canonical sources route through one fail-closed read model; only an owned local source is editable |
 | BKE-4E | Add canonical Basketball aggregate readers, compatibility retirement rules, capability negotiation, and release evidence | All aggregate destinations agree on canonical publications and the backend can safely negotiate new event-game creation; the internal creation gate remains closed |
@@ -74,7 +74,11 @@ canonical event publications.
 
 Event-backed creation remains behind the existing internal gate through BKE-4E. BKE-4 transport
 may adopt healthy internally created local games without changing event ids, revisions, participant
-ids, or the immutable setup snapshot.
+ids, or the immutable setup snapshot. A BKE-4B cloud binding creates the event setup snapshot that
+activates canonical final-state enforcement. Until BKE-4C adds trusted Basketball terminal and
+score policy plus the authenticated finalization wrapper, those games must reject both direct final
+status writes and finalization attempts. BKE-4B regression evidence treats that state as intentional
+fail-closed behavior, not a transport defect.
 
 ## 6. Migration Sequence
 
