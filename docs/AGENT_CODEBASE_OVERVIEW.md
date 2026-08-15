@@ -129,8 +129,8 @@ Uses **HashRouter** — URLs look like `http://localhost:5173/#/game`, not `/gam
 for event-authoritative games. Shared infrastructure lives in `src/lib/gameEvents/`: the
 generic engine validates, migrates, quarantines, and orders events, then one projector per
 sport rebuilds aggregate state. BKE-1A adds final-state-only atomic update/delete/restore batches
-and definition-scoped neutral sides; the current cloud constraint still rejects neutral until
-BKE-4A. `src/lib/sportGameState/` owns the multi-sport state union, normalization dispatch, setup
+and definition-scoped neutral sides; migrations 050-051 stage and validate the cloud constraint's
+`neutral` widening. `src/lib/sportGameState/` owns the multi-sport state union, normalization dispatch, setup
 fingerprint, and fail-closed legacy aggregate capability. SOC-2A registers production soccer
 match-state schemas and SOC-3A adds shots, own goals, score adjustments, and their semantic
 projector rules in `src/lib/soccer/`. Soccer's concrete state holds its immutable resolved setup
@@ -181,8 +181,11 @@ single-event additions, and atomic paired Steal + Turnover capture. BKE-3D2 adds
 manual-minutes edits/additions, started-period replay, signed/non-negative total enforcement, reason
 preservation, and manual-clock-only participant minutes. BKE-3D3 adds structured foul/free-throw
 correction and dependency repair. BKE-3D4 adds ejection/timeout correction and historical additions,
-completes parity/regression evidence, and closes the local-model exit audit. BKE-4A is next.
-Event games remain internal and local-only.
+completes parity/regression evidence, and closes the local-model exit audit. BKE-4A1 adds the staged
+shared-side widening, private event-platform sport predicate and base binder, permanent Soccer base
+wrapper, and migration-046-equivalent revision/checkpoint behavior. The neutral cores are not
+granted to authenticated clients, and no Basketball binding path exists yet. BKE-4A2 is next.
+Event Basketball games remain internal and local-only.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -414,7 +417,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3 are complete; BKE-4A is planned next in four Soccer-parity slices |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3 and BKE-4A1 are complete; BKE-4A2 is next |
 
 ### Held / waiting for feedback
 
