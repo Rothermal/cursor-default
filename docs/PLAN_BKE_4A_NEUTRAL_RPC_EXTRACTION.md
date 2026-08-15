@@ -1,8 +1,8 @@
 # Plan: BKE-4A Sport-Neutral RPC Extraction
 
-Status: BKE-4A1 through BKE-4A3 are implemented in migrations 050-053 with static contract
-coverage; database-runtime application and verification remain manual. BKE-4A4 is next. No
-Basketball client behavior is enabled by this phase.
+Status: BKE-4A1 through BKE-4A4 are implemented in migrations 050-055 with static contract
+coverage. BKE-4A implementation is complete; database-runtime application and verification remain
+manual, and BKE-4B is next. No Basketball client behavior is enabled by this phase.
 
 ## 1. Objective
 
@@ -174,6 +174,13 @@ Migration 053:
 
 ## 8. BKE-4A4: Finalization and Recovery
 
+Status: Implemented. Migration 054 stages the Soccer/Basketball canonical-publication allow-list.
+Migration 055 validates and installs it, extracts finalization and recovery mechanics behind
+private event-platform functions, and retains every shipped Soccer signature as a fixed wrapper.
+Soccer terminal and score rules remain trusted server policy. The final-state trigger applies
+canonical publication rules to every Soccer game and only to Basketball games carrying an event
+setup snapshot, so aggregate-only Basketball keeps its existing finalization path.
+
 Migrations 054 and 055 will:
 
 1. widen the canonical-publication sport check to the explicit Soccer/Basketball allow-list:
@@ -277,7 +284,7 @@ Static SQL tests are not evidence that PostgreSQL RLS or trigger behavior execut
 
 ## 12. Exit Gate
 
-BKE-4A is complete only after A1-A4 merge, migrations 050-055 are applied in order, automated tests
-are green, the manual Soccer parity matrix is recorded, and no Basketball client call site can yet
-bind or publish an event-backed game. BKE-4B may then add Basketball transport against the proven
-neutral layer.
+BKE-4A implementation is complete after A1-A4 merge with green automated tests and no Basketball
+client call site able to bind or publish an event-backed game. Operational sign-off still requires
+migrations 050-055 to be applied in order and the manual Soccer parity matrix to be recorded.
+BKE-4B may add Basketball transport against the proven neutral layer.

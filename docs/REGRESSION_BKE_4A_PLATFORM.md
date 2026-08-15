@@ -1,8 +1,7 @@
 # Regression: BKE-4A Event Platform Extraction
 
-Status: BKE-4A1 through BKE-4A3 automated contract coverage is implemented. PostgreSQL runtime
-verification is required after applying migrations 050-053. Later BKE-4A slices will extend this
-record.
+Status: BKE-4A1 through BKE-4A4 automated contract coverage is implemented. BKE-4A code is
+complete; PostgreSQL runtime verification is required after applying migrations 050-055.
 
 ## 1. Automated Gate
 
@@ -46,6 +45,19 @@ BKE-4A3 contract tests verify that:
 - independent recorder binding cannot copy another stream or replace creator-owned shared metadata;
   and
 - neutral recorder/primary/binding functions remain private behind fixed Soccer wrappers.
+
+BKE-4A4 contract tests verify that:
+
+- migration 054 stages the Soccer/Basketball publication allow-list as `NOT VALID`, and migration
+  055 validates it before replacing the Soccer-only constraint;
+- readiness, canonical reads, finalization, reopen, v4 binding, manager conflict preparation, and
+  primary checkpoint confirmation live behind private neutral cores and fixed Soccer wrappers;
+- Soccer terminal state and canonical scores are derived by trusted server policy;
+- publication history remains append-only and reopen requires a reason;
+- finalized non-primary audit uploads use the stored event-platform sport;
+- direct canonical-final enforcement covers every Soccer game and only event-marked Basketball
+  games, preserving aggregate-only Basketball behavior; and
+- no Basketball binding or finalization RPC is granted to authenticated clients.
 
 Static tests do not execute PostgreSQL parsing, locks, RLS, or security-definer privileges.
 
@@ -191,3 +203,37 @@ healthy recorder, manager selection, idempotent reselection, stale checkpoint re
 conflict rejection, final-game lockout, and primary history ordering. Confirm scorers and viewers
 cannot select a primary, independent streams remain separate, and a non-creator recorder cannot
 change shared game or participant snapshot metadata.
+
+## 8. After Migration 054
+
+Inspect `game_event_canonical_publications` constraints. Expected: the validated Soccer-only
+`game_event_canonical_publications_sport_id_check` remains active and the replacement
+`game_event_canonical_publications_sport_id_event_platform_check` allows Soccer/Basketball with
+`convalidated = false`. Apply migration 054 and commit it before running 055.
+
+## 9. After Migration 055
+
+Repeat the constraint query. Expected: one validated
+`game_event_canonical_publications_sport_id_check` allowing `soccer` and `basketball`.
+
+Verify authenticated access remains limited to the existing Soccer finalization/readiness/reopen,
+v4 binding, and conflict-preparation wrappers plus the already-generic event writer, conflict, and
+checkpoint RPCs. Confirm `finalize_event_game`, `reopen_event_game`, `bind_event_game_v4`, and all
+other neutral finalization cores return `false` from `has_function_privilege` for `authenticated`.
+
+## 10. Finalization Runtime Matrix
+
+1. Finalize a healthy personal and team Soccer game and confirm stored-event-derived scores,
+   canonical readback, idempotent retry, primary lock, and final status.
+2. Finish an eligible pre-finalization non-primary audit queue after finalization; reject rows with
+   timestamps after publication.
+3. Reopen with a reason and confirm the publication is invalidated, not deleted, and the primary is
+   unlocked. Confirm direct Soccer final/reopen status writes still fail.
+4. Finalize one legacy aggregate Basketball game through its existing path and confirm later writes
+   remain blocked by the immutable-final rule.
+5. For a Basketball game carrying a matching event setup snapshot, confirm a direct final-status
+   write fails without an active canonical publication. Do not call a Basketball neutral binder or
+   finalizer; BKE-4B/BKE-4C own those client contracts.
+
+Record migration versions, account/team roles, game ids, and pass/fail results. Static tests do not
+replace this PostgreSQL trigger, privilege, and transaction evidence.

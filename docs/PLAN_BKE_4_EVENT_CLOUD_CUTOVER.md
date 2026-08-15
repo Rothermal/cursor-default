@@ -1,7 +1,8 @@
 # Plan: BKE-4 Event Cloud Cutover
 
-Status: Approved implementation plan. BKE-4A1 through BKE-4A3 are implemented through migration
-053; BKE-4A4 is next. Basketball event-game creation remains internal-only through BKE-4E.
+Status: Approved implementation plan. BKE-4A is implemented through migration 055; database-runtime
+verification remains manual and BKE-4B is next. Basketball event-game creation remains
+internal-only through BKE-4E.
 
 ## 1. Goal
 
@@ -133,7 +134,6 @@ reopened for each implementation slice:
 
 ## 10. Next Step
 
-Implement BKE-4A from
-[`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md), merge all four
-parity slices, apply migrations 050-055 in order, and record Soccer runtime parity before beginning
-Basketball transport in BKE-4B.
+Apply migrations 054 and 055 as separate ordered migrations and record the remaining BKE-4A Soccer
+runtime parity. Then implement Basketball binding, transport, recovery, and conflicts in BKE-4B
+against the private neutral platform while keeping event-game creation internally gated.
