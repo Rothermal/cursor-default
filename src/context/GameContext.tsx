@@ -31,8 +31,8 @@ import {
   BasketballCloudRecoveryError,
   syncBasketballEventGameToCloud,
 } from '../lib/basketball/cloudSync'
-import { applyGameEventConflictResolution } from '../lib/gameEvents/cloudConflicts'
-import { isGameEventEnvelope } from '../lib/gameEvents/envelope'
+import { resolveEventConflictInState } from '../lib/gameEvents/eventConflictResolution'
+import { eventCloudTransportAdapterForSport } from '../lib/eventCloudTransportAdapters'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
@@ -1028,62 +1028,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
     (eventId: string, resolution: 'local' | 'remote') => {
       const current = stateRef.current
       const sportId = current.sportGameState?.sportId
-      if (sportId !== 'soccer' && sportId !== 'basketball') {
+      const adapter = eventCloudTransportAdapterForSport(sportId)
+      if (!adapter) {
         return { ok: false as const, reason: 'This game does not support event conflict recovery.' }
       }
-      const conflict = current.cloudSync.eventConflicts?.find(item => item.eventId === eventId)
-      if (!conflict || !current.eventStream) {
-        return { ok: false as const, reason: 'That event conflict is no longer available.' }
-      }
-      if (
-        conflict.localEvent.sportId !== sportId ||
-        conflict.remoteEvent.sportId !== sportId ||
-        !current.eventStream.events.some(
-          event => isGameEventEnvelope(event) && event.id === eventId
-        )
-      ) {
-        return { ok: false as const, reason: 'That event conflict is invalid for this game.' }
-      }
-      const applied = applyGameEventConflictResolution(
-        current.eventStream,
-        conflict,
+      const resolved = resolveEventConflictInState(
+        current,
+        eventId,
         resolution,
-        new Date().toISOString(),
-        sportId === 'basketball' ? 'advance' : 'preserve'
+        adapter,
+        new Date().toISOString()
       )
-      const remainingConflicts = (current.cloudSync.eventConflicts ?? []).filter(
-        item => item.eventId !== eventId
-      )
-      const candidate: GameState = {
-        ...current,
-        eventStream: applied.eventStream,
-        cloudSync: {
-          ...current.cloudSync,
-          eventSyncBase: {
-            ...(current.cloudSync.eventSyncBase ?? {}),
-            [eventId]: applied.syncBase,
-          },
-          eventConflicts: remainingConflicts,
-          pendingEventConflictResolutions: [
-            ...(current.cloudSync.pendingEventConflictResolutions ?? []),
-            applied.pending,
-          ],
-          status: remainingConflicts.length > 0 ? 'error' : 'idle',
-          lastError:
-            remainingConflicts.length > 0
-              ? 'Review competing event revisions before syncing.'
-              : null,
-        },
+      if (!resolved.ok) {
+        return { ok: false as const, reason: resolved.reason }
       }
-      const rebuilt = rebuildGameEventProjection(candidate, gameEventRegistry, gameEventProjectors)
-      if (!rebuilt.inspection.complete) {
-        return {
-          ok: false as const,
-          reason: rebuilt.inspection.diagnostics[0]?.message ?? 'That resolution is not valid.',
-        }
-      }
-      stateRef.current = rebuilt.state
-      dispatch({ type: 'HYDRATE_STATE', state: rebuilt.state })
+      stateRef.current = resolved.state
+      dispatch({ type: 'HYDRATE_STATE', state: resolved.state })
       return { ok: true as const }
     },
     []

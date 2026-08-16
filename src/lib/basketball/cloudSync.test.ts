@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sports } from '../../config/sports'
-import type { GameState, Player } from '../../types'
+import type { GameEventSyncConflict, GameState, Player } from '../../types'
+import { eventCloudTransportAdapterForSport } from '../eventCloudTransportAdapters'
+import { resolveEventConflictInState } from '../gameEvents/eventConflictResolution'
 import type { GameEvent } from '../gameEvents/types'
 import { createInitialState } from '../gameReducer'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
@@ -427,5 +429,61 @@ describe('Basketball event cloud transport adapter', () => {
     await expect(loadBasketballCloudGameById('user-1', 'cloud-game-1')).rejects.toThrow(
       'Cloud Basketball participant identity does not match the immutable setup.'
     )
+  })
+
+  it('resolves a Basketball cloud choice through the adapter advance policy', () => {
+    const source = startedState()
+    const original = source.eventStream!.events[0] as GameEvent
+    const localEvent: GameEvent = {
+      ...structuredClone(original),
+      revision: 2,
+      updatedAt: '2026-08-15T12:02:00.000Z',
+    }
+    const remoteEvent: GameEvent = {
+      ...structuredClone(original),
+      revision: 3,
+      updatedAt: '2026-08-15T12:03:00.000Z',
+    }
+    const conflict: GameEventSyncConflict = {
+      conflictId: 'conflict-1',
+      eventId: original.id,
+      localEvent,
+      remoteEvent,
+      detectedAt: '2026-08-15T12:04:00.000Z',
+    }
+    const state: GameState = {
+      ...source,
+      eventStream: {
+        ...source.eventStream!,
+        events: source.eventStream!.events.map(event =>
+          (event as GameEvent).id === original.id ? localEvent : event
+        ),
+      },
+      cloudSync: {
+        ...source.cloudSync,
+        eventConflicts: [conflict],
+      },
+    }
+    const adapter = eventCloudTransportAdapterForSport('basketball')
+    if (!adapter) throw new Error('missing Basketball adapter')
+
+    const result = resolveEventConflictInState(
+      state,
+      original.id,
+      'remote',
+      adapter,
+      '2026-08-15T12:05:00.000Z'
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.state.eventStream?.events[0]).toMatchObject({
+      revision: 4,
+      updatedAt: '2026-08-15T12:05:00.000Z',
+    })
+    expect(result.state.cloudSync.eventConflicts).toEqual([])
+    expect(result.state.cloudSync.pendingEventConflictResolutions).toEqual([
+      expect.objectContaining({ conflictId: 'conflict-1', resolution: 'remote' }),
+    ])
   })
 })

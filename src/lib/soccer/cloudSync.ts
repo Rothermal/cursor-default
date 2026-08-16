@@ -124,7 +124,7 @@ function rebuildEventGameState(state: GameState) {
   return rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
 }
 
-const soccerEventCloudTransportAdapter: EventCloudTransportAdapter = {
+export const soccerEventCloudTransportAdapter: EventCloudTransportAdapter = {
   sportId: 'soccer',
   sportLabel: 'Soccer',
   bindingRpc: 'bind_soccer_event_game_v4',
