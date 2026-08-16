@@ -580,6 +580,7 @@ describe('gameParking', () => {
     expect(result.skippedExisting).toBe(0)
     expect(result.skippedAtCap).toBe(0)
     expect(result.skippedInvalid).toBe(0)
+    expect(result.skippedCloudBinding).toBe(0)
     expect(getActiveLocalGameId('user-1')).toBeNull()
     expect(localStorage.getItem(GAME_STORAGE_KEY)).toBeNull()
     expect(activeBeforeExport.localGameId).toBeTruthy()
@@ -600,6 +601,36 @@ describe('gameParking', () => {
 
     expect(result.imported).toBe(1)
     expect(getParkedGameRecord('legacy-import', 'user-1')?.gameState.eventStream).toBeNull()
+  })
+
+  it('round-trips event recovery metadata through export and import', () => {
+    const recoveryState = gameState(basketball, 'Recovery', 'Bears')
+    recoveryState.cloudSync = {
+      ...recoveryState.cloudSync,
+      gameId: 'cloud-recovery-game',
+      eventSyncBase: {
+        'event-1': { revision: 2, fingerprint: 'remote-fingerprint' },
+      },
+      eventConflicts: [{ eventId: 'event-1', conflictId: 'conflict-1' } as never],
+      pendingEventConflictResolutions: [{
+        eventId: 'event-2',
+        conflictId: 'conflict-2',
+        resolution: 'local',
+      }],
+    }
+    const [saved] = saveActiveGameState(recoveryState, 'user-1')
+    const exported = exportParkedGames('user-1')
+    localStorage.clear()
+
+    const result = importParkedGames(exported, 'user-1')
+    const imported = getParkedGameRecord(saved.localGameId, 'user-1')?.gameState
+
+    expect(result.imported).toBe(1)
+    expect(imported?.cloudSync.eventSyncBase).toEqual(recoveryState.cloudSync.eventSyncBase)
+    expect(imported?.cloudSync.eventConflicts).toEqual(recoveryState.cloudSync.eventConflicts)
+    expect(imported?.cloudSync.pendingEventConflictResolutions).toEqual(
+      recoveryState.cloudSync.pendingEventConflictResolutions
+    )
   })
 
   it('preserves event authority while quarantining malformed imported event data', () => {
@@ -638,6 +669,7 @@ describe('gameParking', () => {
     expect(result.skippedExisting).toBe(1)
     expect(result.skippedAtCap).toBe(0)
     expect(result.skippedInvalid).toBe(0)
+    expect(result.skippedCloudBinding).toBe(0)
     expect(getParkedGameRecord(existing.localGameId, 'user-1')?.gameState.gameInfo).toMatchObject({
       teamName: 'Aces',
       opponentName: 'Bears',
@@ -663,6 +695,35 @@ describe('gameParking', () => {
     expect(result.skipped).toBe(2)
     expect(result.skippedInvalid).toBe(2)
     expect(listParkedGames('user-1')).toEqual([])
+  })
+
+  it('keeps one local record per cloud game binding during import', () => {
+    const existingState = gameState(basketball, 'Aces', 'Bears')
+    existingState.cloudSync.gameId = 'cloud-game-1'
+    saveActiveGameState(existingState, 'user-1')
+
+    const duplicateState = gameState(basketball, 'Imported', 'Hawks')
+    duplicateState.cloudSync.gameId = 'cloud-game-1'
+    const secondDuplicate = gameState(basketball, 'Imported 2', 'Owls')
+    secondDuplicate.cloudSync.gameId = 'cloud-game-2'
+    const thirdDuplicate = gameState(basketball, 'Imported 3', 'Foxes')
+    thirdDuplicate.cloudSync.gameId = 'cloud-game-2'
+
+    const result = importParkedGames(
+      importPayload([
+        importedRecord('duplicate-existing-binding', duplicateState),
+        importedRecord('first-new-binding', secondDuplicate),
+        importedRecord('duplicate-new-binding', thirdDuplicate),
+      ]),
+      'user-1'
+    )
+
+    expect(result.imported).toBe(1)
+    expect(result.skipped).toBe(2)
+    expect(result.skippedCloudBinding).toBe(2)
+    expect(getParkedGameRecord('duplicate-existing-binding', 'user-1')).toBeNull()
+    expect(getParkedGameRecord('first-new-binding', 'user-1')).not.toBeNull()
+    expect(getParkedGameRecord('duplicate-new-binding', 'user-1')).toBeNull()
   })
 
   it('imports what fits and skips remaining valid rows at the parked-game limit', () => {

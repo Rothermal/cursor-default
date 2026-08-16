@@ -13,9 +13,10 @@ product and delivery decisions are approved in
 and BKE-3D1 through BKE-3D4 are complete, including the exit audit. BKE-4 planning is recorded in
 [PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md), with BKE-4A detailed in
 [PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md). BKE-4A is implemented
-through migration 055. BKE-4B1 shared transport/migration 056 and BKE-4B2 automatic sync are
-implemented; BKE-4B3 recovery and conflict completion is next under the approved slices in
-[PLAN_BKE_4B_BASKETBALL_TRANSPORT.md](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md).
+through migration 055. BKE-4B1 shared transport/migration 056, BKE-4B2 automatic sync, and BKE-4B3
+recovery/conflict implementation are complete under the approved slices in
+[PLAN_BKE_4B_BASKETBALL_TRANSPORT.md](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md); its live two-device
+Supabase matrix remains the BKE-4B exit signoff.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

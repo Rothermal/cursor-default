@@ -3,7 +3,7 @@ import type {
   GameEventSyncConflict,
   PendingGameEventConflictResolution,
 } from '../../types'
-import { cloneEvent, isGameEventEnvelope } from './envelope'
+import { cloneEvent, isGameEventEnvelope, isPlainObject } from './envelope'
 import {
   canonicalGameEventStreamForFingerprint,
   compareGameEvents,
@@ -133,6 +133,33 @@ export function applyGameEventConflictResolution(
       eventId: conflict.eventId,
       resolution,
     },
+  }
+}
+
+export function gameEventSyncConflictFromRow(
+  value: unknown,
+  sportId?: string
+): GameEventSyncConflict | null {
+  if (!isPlainObject(value)) return null
+  if (
+    typeof value.id !== 'string' ||
+    typeof value.event_id !== 'string' ||
+    typeof value.detected_at !== 'string' ||
+    !isGameEventEnvelope(value.local_event) ||
+    !isGameEventEnvelope(value.remote_event)
+  ) return null
+  if (
+    value.local_event.id !== value.event_id ||
+    value.remote_event.id !== value.event_id ||
+    value.local_event.sportId !== value.remote_event.sportId ||
+    (sportId !== undefined && value.local_event.sportId !== sportId)
+  ) return null
+  return {
+    conflictId: value.id,
+    eventId: value.event_id,
+    localEvent: value.local_event,
+    remoteEvent: value.remote_event,
+    detectedAt: value.detected_at,
   }
 }
 

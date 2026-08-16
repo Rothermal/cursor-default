@@ -1,7 +1,7 @@
 # Regression: BKE-4B Basketball Event Transport
 
-Status: BKE-4B1 and BKE-4B2 automated coverage are implemented. Migration 056 is required for live
-Basketball event binding. BKE-4B3 recovery/adoption and the full role/device matrix remain open.
+Status: BKE-4B1 through BKE-4B3 automated coverage is implemented. Migration 056 is required for
+live Basketball event binding. The live role/device matrix remains the BKE-4B exit signoff.
 
 ## BKE-4B1 Automated Gate
 
@@ -58,10 +58,39 @@ Coverage additionally verifies:
 - event games do not seed aggregate cloud-resume hydration or call legacy snapshot sync; and
 - local match completion does not change cloud status to final or expose finalization.
 
-BKE-4B3 owns current-recorder cloud adoption, conflict UI, durable cross-device recovery, and the
-full role/device matrix. Basketball canonical finalization remains BKE-4C.
+## BKE-4B3 Recovery And Conflict Gate
 
-Interim boundary: if the same recorder creates a Basketball same-event conflict from another
-device or browser profile before BKE-4B3, the durable conflict intentionally blocks checkpoint and
-retry. Local tracking remains authoritative and usable, but there is no Basketball conflict-review
-surface in BKE-4B2; BKE-4B3 must resolve the conflict before cloud sync can continue.
+Coverage additionally verifies:
+
+- cloud open resumes a matching same-sport parked binding before loading or creating a stream;
+- current-recorder Basketball adoption strictly rebuilds immutable setup, participants, raw events,
+  sync base, open conflicts, projection, player rows, and a clean fingerprint;
+- empty current-recorder history can start an independent stream from the immutable setup without
+  depending on the new-game creation toggle;
+- malformed setup, participant identity, event history, conflict rows, and projections fail closed;
+- the shared conflict dialog and `GameContext` resolution support both sports while Basketball
+  advances either selected copy above competing revisions and Soccer preserves its existing policy;
+- conflict/base/pending-resolution state survives local normalization, parking, export/import, and
+  retry; duplicate cloud bindings are skipped during import with an explicit reason;
+- existing active-game confirmation and transactional parked-capacity failure preserve the current
+  game; and
+- legacy Basketball and Soccer open/sync paths remain isolated.
+
+Basketball canonical finalization and authority-aware summary remain BKE-4C/BKE-4D.
+
+## Live Exit Matrix
+
+Record account ids, roles, local/cloud game ids, browser profiles, and pass/fail notes for:
+
+| # | Scenario | Result / notes |
+|---|---|---|
+| 1 | Personal first bind, idempotent retry, offline capture, reconnect, exact checkpoint | Pending |
+| 2 | Team owner/admin/scorer independent binding; viewer/non-member denial | Pending |
+| 3 | Same recorder, two profiles, unrelated additions merge without loss | Pending |
+| 4 | Same event conflict; verify both This Device and Cloud choices | Pending |
+| 5 | Interrupted bind/event/checkpoint retries the same cloud game | Pending |
+| 6 | Malformed/duplicate remote source fails without replacing local state | Pending |
+| 7 | Matching parked resume, fresh adoption, active-game cancel, at-capacity failure | Pending |
+| 8 | Local complete/abandon uploads while cloud finalization remains blocked | Pending |
+| 9 | Legacy Basketball unchanged; event game writes no aggregate stat/shot rows | Pending |
+| 10 | Soccer bind/recovery/conflict/finalization/reopen parity | Pending |

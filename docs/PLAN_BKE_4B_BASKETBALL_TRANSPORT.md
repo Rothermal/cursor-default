@@ -1,8 +1,9 @@
 # Plan: BKE-4B Basketball Event Transport
 
-Status: Product and delivery Q&A approved. BKE-4B1 shared transport/backend entry and BKE-4B2
-Basketball automatic sync are implemented. BKE-4B3 recovery, conflicts, and offline exit evidence
-is next. Migration 056 is required before Basketball event sync can run.
+Status: Product and delivery Q&A approved. BKE-4B1 shared transport/backend entry, BKE-4B2
+Basketball automatic sync, and BKE-4B3 recovery/conflict implementation are complete. The live
+two-device Supabase matrix remains the BKE-4B exit signoff. Migration 056 is required before
+Basketball event sync can run.
 
 ## 1. Objective
 
@@ -221,6 +222,16 @@ sync or seed legacy aggregate resume targets. BKE-4B3 owns cloud adoption and co
 
 Exit: two devices can merge unrelated work, detect and explicitly resolve competing revisions,
 recover after offline/partial sync, and resume without data loss or duplicate cloud/local games.
+
+Implementation record: strict Basketball cloud adoption rebuilds the current authenticated
+recorder from the immutable setup, participant map, raw event stream, sync base, and durable open
+conflicts. Cloud Games and Game Info resume an existing same-sport parked binding before any cloud
+load or independent-stream prompt. Shared tracker conflict controls preserve Soccer's remote
+revision behavior and use Basketball's advancing remote-choice policy. Reload, parking, recovery
+export/import, and offline retry retain base/conflict/pending-resolution metadata; parked import
+rejects duplicate cloud bindings. Malformed setup, participant, stream, projection, and conflict
+data fail closed. Existing transactional parking capacity and active-game confirmation guards are
+reused. Automated coverage is complete; the section 11 live matrix remains owner signoff.
 
 ## 9. Authorization Matrix
 

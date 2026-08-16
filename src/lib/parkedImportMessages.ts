@@ -16,6 +16,9 @@ export function formatParkedImportMessage(result: ImportParkedGamesResult): stri
   if (result.skippedInvalid > 0) {
     skippedParts.push(`${formatCount(result.skippedInvalid, 'invalid row')}`)
   }
+  if (result.skippedCloudBinding > 0) {
+    skippedParts.push(`${formatCount(result.skippedCloudBinding, 'duplicate cloud binding')}`)
+  }
 
   const skippedText = skippedParts.length > 0 ? `; skipped ${skippedParts.join(', ')}` : ''
   return `${formatCount(result.imported, 'parked game')} imported${skippedText}. Reloading...`

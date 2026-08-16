@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sports } from '../../config/sports'
-import type { GameState, Player } from '../../types'
+import type { GameEventSyncConflict, GameState, Player } from '../../types'
+import { eventCloudTransportAdapterForSport } from '../eventCloudTransportAdapters'
+import { resolveEventConflictInState } from '../gameEvents/eventConflictResolution'
+import type { GameEvent } from '../gameEvents/types'
 import { createInitialState } from '../gameReducer'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
@@ -13,6 +16,8 @@ import {
   basketballCloudParticipants,
   BasketballCloudRecoveryError,
   basketballEventCloudTransportAdapter,
+  createBasketballIndependentRecorderState,
+  loadBasketballCloudGameById,
   syncBasketballEventGameToCloud,
 } from './cloudSync'
 
@@ -20,11 +25,13 @@ const cloudMock = vi.hoisted(() => ({
   rpc: vi.fn(),
   upsert: vi.fn(),
   load: vi.fn(),
+  from: vi.fn(),
 }))
 
 vi.mock('../supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => cloudMock.rpc(...args),
+    from: (...args: unknown[]) => cloudMock.from(...args),
   },
 }))
 
@@ -86,11 +93,61 @@ function startedState(sourceTeam = false): GameState {
   return result.state
 }
 
+function queryResult(data: unknown, error: { message: string } | null = null) {
+  const result = { data, error }
+  const chain: Record<string, unknown> & PromiseLike<typeof result> = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
+    then: (onFulfilled, onRejected) => Promise.resolve(result).then(onFulfilled, onRejected),
+  }
+  return chain
+}
+
+function mockBasketballCloudRows(
+  source: GameState,
+  conflicts: unknown[] = []
+): void {
+  if (source.sportGameState?.sportId !== 'basketball') {
+    throw new Error('missing Basketball setup')
+  }
+  const setup = source.sportGameState.setup
+  const participants = setup.participants.map((participant, index) => ({
+    id: `cloud-participant-${index + 1}`,
+    client_participant_id: participant.id,
+    client_player_id: participant.playerId,
+    display_name: participant.displayName,
+    jersey_number: participant.number,
+  }))
+  cloudMock.from.mockImplementation((table: string) => {
+    if (table === 'games') {
+      return queryResult({
+        id: 'cloud-game-1',
+        team_id: setup.sourceTeamId,
+        season_id: setup.sourceSeasonId,
+        created_by: 'user-1',
+        tracked_team_name: 'Aces',
+        opponent_name: 'Bears',
+        tournament_name: null,
+        game_date: '2026-08-15',
+        status: 'in_progress',
+      })
+    }
+    if (table === 'game_event_setup_snapshots') {
+      return queryResult({ setup_snapshot: setup })
+    }
+    if (table === 'game_participants') return queryResult(participants)
+    if (table === 'game_event_conflicts') return queryResult(conflicts)
+    throw new Error(`unexpected table ${table}`)
+  })
+}
+
 describe('Basketball event cloud transport adapter', () => {
   beforeEach(() => {
     cloudMock.rpc.mockReset()
     cloudMock.upsert.mockReset()
     cloudMock.load.mockReset()
+    cloudMock.from.mockReset()
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
       name === 'bind_basketball_event_game_v4'
         ? {
@@ -265,6 +322,168 @@ describe('Basketball event cloud transport adapter', () => {
     expect(cloudMock.upsert).not.toHaveBeenCalled()
     expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
       'bind_basketball_event_game_v4',
+    ])
+  })
+
+  it('adopts the current recorder stream from an exact immutable cloud setup', async () => {
+    const remote = startedState()
+    mockBasketballCloudRows(remote)
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: remote.eventStream,
+      inspection: { complete: true, activeEvents: remote.eventStream!.events, deletedEvents: [], diagnostics: [] },
+      quarantinedRows: [],
+      error: null,
+    })
+
+    const adopted = await loadBasketballCloudGameById('user-1', 'cloud-game-1')
+
+    expect(adopted).not.toBeNull()
+    expect(adopted).toMatchObject({
+      gameDataAuthority: 'sport_events',
+      cloudSync: {
+        gameId: 'cloud-game-1',
+        status: 'synced',
+        eventConflicts: [],
+        pendingEventConflictResolutions: [],
+      },
+      sportGameState: {
+        sportId: 'basketball',
+        projection: { status: 'in_progress' },
+      },
+    })
+    expect(adopted?.eventStream).toEqual(remote.eventStream)
+    expect(adopted?.cloudSync.lastSyncedGameFingerprint).toEqual(expect.any(String))
+    expect(cloudMock.load).toHaveBeenCalledWith(
+      'cloud-game-1',
+      'user-1',
+      expect.objectContaining({ 'cloud-participant-1': 'player-1' }),
+      expect.anything()
+    )
+  })
+
+  it('reports an empty recorder stream and can create an independent local start', async () => {
+    const source = startedState()
+    mockBasketballCloudRows(source)
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: { version: 1, events: [] },
+      inspection: { complete: true, activeEvents: [], deletedEvents: [], diagnostics: [] },
+      quarantinedRows: [],
+      error: null,
+    })
+
+    await expect(loadBasketballCloudGameById('user-2', 'cloud-game-1')).resolves.toBeNull()
+    const independent = await createBasketballIndependentRecorderState('user-2', 'cloud-game-1')
+
+    expect(independent.cloudSync.gameId).toBe('cloud-game-1')
+    expect(independent.eventStream?.events).toHaveLength(1)
+    expect(independent.eventStream?.events[0]).toMatchObject({
+      sportId: 'basketball',
+      eventType: 'basketball.period_started',
+      recorderUserId: 'user-2',
+      sequence: 1,
+    })
+  })
+
+  it('quarantines malformed conflict rows without replacing a coherent local game', async () => {
+    const remote = startedState()
+    const remoteEvent = remote.eventStream!.events[0] as GameEvent
+    mockBasketballCloudRows(remote, [{
+      id: 'conflict-1',
+      event_id: remoteEvent.id,
+      local_event: { invalid: true },
+      remote_event: remoteEvent,
+      detected_at: '2026-08-15T12:05:00.000Z',
+    }])
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: remote.eventStream,
+      inspection: { complete: true, activeEvents: remote.eventStream!.events, deletedEvents: [], diagnostics: [] },
+      quarantinedRows: [],
+      error: null,
+    })
+
+    await expect(loadBasketballCloudGameById('user-1', 'cloud-game-1')).rejects.toThrow(
+      'Cloud Basketball conflict history is invalid.'
+    )
+  })
+
+  it('rejects participant rows that disagree with the immutable setup', async () => {
+    const remote = startedState()
+    mockBasketballCloudRows(remote)
+    const originalFrom = cloudMock.from.getMockImplementation()!
+    cloudMock.from.mockImplementation((table: string) => {
+      if (table === 'game_participants') {
+        return queryResult([{
+          id: 'cloud-participant-1',
+          client_participant_id: remote.sportGameState!.setup.participants[0]!.id,
+          client_player_id: 'player-1',
+          display_name: 'Changed Name',
+          jersey_number: '4',
+        }])
+      }
+      return originalFrom(table)
+    })
+
+    await expect(loadBasketballCloudGameById('user-1', 'cloud-game-1')).rejects.toThrow(
+      'Cloud Basketball participant identity does not match the immutable setup.'
+    )
+  })
+
+  it('resolves a Basketball cloud choice through the adapter advance policy', () => {
+    const source = startedState()
+    const original = source.eventStream!.events[0] as GameEvent
+    const localEvent: GameEvent = {
+      ...structuredClone(original),
+      revision: 2,
+      updatedAt: '2026-08-15T12:02:00.000Z',
+    }
+    const remoteEvent: GameEvent = {
+      ...structuredClone(original),
+      revision: 3,
+      updatedAt: '2026-08-15T12:03:00.000Z',
+    }
+    const conflict: GameEventSyncConflict = {
+      conflictId: 'conflict-1',
+      eventId: original.id,
+      localEvent,
+      remoteEvent,
+      detectedAt: '2026-08-15T12:04:00.000Z',
+    }
+    const state: GameState = {
+      ...source,
+      eventStream: {
+        ...source.eventStream!,
+        events: source.eventStream!.events.map(event =>
+          (event as GameEvent).id === original.id ? localEvent : event
+        ),
+      },
+      cloudSync: {
+        ...source.cloudSync,
+        eventConflicts: [conflict],
+      },
+    }
+    const adapter = eventCloudTransportAdapterForSport('basketball')
+    if (!adapter) throw new Error('missing Basketball adapter')
+
+    const result = resolveEventConflictInState(
+      state,
+      original.id,
+      'remote',
+      adapter,
+      '2026-08-15T12:05:00.000Z'
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.state.eventStream?.events[0]).toMatchObject({
+      revision: 4,
+      updatedAt: '2026-08-15T12:05:00.000Z',
+    })
+    expect(result.state.cloudSync.eventConflicts).toEqual([])
+    expect(result.state.cloudSync.pendingEventConflictResolutions).toEqual([
+      expect.objectContaining({ conflictId: 'conflict-1', resolution: 'remote' }),
     ])
   })
 })
