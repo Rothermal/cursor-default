@@ -295,8 +295,8 @@ function prepareState(
   ) {
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
-  if (hasCloudBinding(state)) {
-    return commandFailure('cloud_flow_unsupported', 'Basketball Timeline correction is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
   const recovering = Boolean(
@@ -815,14 +815,8 @@ function validTimestamp(value: string): string | null {
   return value && Number.isFinite(Date.parse(value)) ? value : null
 }
 
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId ||
-    state.cloudSync.gameId ||
-    state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 ||
-    state.cloudSync.lastSyncedGameFingerprint
-  )
+function isFinalCloudGame(state: GameState): boolean {
+  return state.cloudSync.gameStatus === 'final'
 }
 
 function failure(

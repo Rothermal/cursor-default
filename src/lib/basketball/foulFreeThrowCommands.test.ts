@@ -477,7 +477,10 @@ describe('BKE-2C1 Basketball foul and free-throw commands', () => {
       state: ended.state,
       code: 'invalid_period',
     })
-    const cloud = { ...state, cloudSync: { ...state.cloudSync, gameId: 'game-1' } }
+    const cloud = {
+      ...state,
+      cloudSync: { ...state.cloudSync, gameId: 'game-1', gameStatus: 'final' as const },
+    }
     expect(captureFoul(cloud, 8)).toMatchObject({
       ok: false,
       state: cloud,
@@ -834,7 +837,7 @@ describe('BKE-2C1 Basketball foul and trip corrections', () => {
     if (!captured.ok || !captured.tripEventId) throw new Error('Trip fixture failed.')
     const cloud = {
       ...captured.state,
-      cloudSync: { ...captured.state.cloudSync, gameId: 'game-1' },
+      cloudSync: { ...captured.state.cloudSync, gameId: 'game-1', gameStatus: 'final' },
     }
     expect(previewBasketballFoulDecrement(cloud, { kind: 'player', playerId: 'player-1' }))
       .toMatchObject({ ok: false, code: 'cloud_flow_unsupported' })

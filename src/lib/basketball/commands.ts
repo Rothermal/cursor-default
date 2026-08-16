@@ -185,11 +185,11 @@ export function setBasketballEventCreationIntent(
         'Event mode can be enabled only for a new Basketball game.'
       )
     }
-    if (hasCloudBinding(state)) {
+    if (hasExistingCloudGameBinding(state)) {
       return failure(
         state,
         'cloud_flow_unsupported',
-        'Basketball event mode is local-only during development.'
+        'An existing cloud game cannot be converted to Basketball event mode.'
       )
     }
     if (hasLegacyAggregateActivity(state)) {
@@ -213,7 +213,7 @@ export function setBasketballEventCreationIntent(
       'Event mode cannot be disabled after event or aggregate tracking has begun.'
     )
   }
-  if (hasCloudBinding(state)) {
+  if (hasExistingCloudGameBinding(state)) {
     return failure(
       state,
       'cloud_flow_unsupported',
@@ -237,11 +237,11 @@ export function prepareBasketballGameStart(
       'This Basketball game was not created for the event model.'
     )
   }
-  if (hasCloudBinding(state)) {
+  if (hasExistingCloudGameBinding(state)) {
     return failure(
       state,
       'cloud_flow_unsupported',
-      'Basketball event games cannot start through cloud checkout yet.'
+      'An existing cloud game cannot be converted to Basketball event mode.'
     )
   }
   if (state.eventStream || state.sportGameState) {
@@ -330,6 +330,9 @@ export function buildBasketballMatchSetup(
   if (!resolvedRules) {
     return commandFailure('invalid_setup', 'Basketball team-stat rules are unavailable.')
   }
+  if (state.cloudSync.teamId && !state.cloudSync.seasonId) {
+    return commandFailure('invalid_setup', 'Cloud team Basketball games require a source season.')
+  }
   const participants: BasketballMatchParticipant[] = roster.map((player, index) => ({
     id: participantIds?.[index] ?? createBasketballUuid(),
     playerId: player.id,
@@ -345,8 +348,8 @@ export function buildBasketballMatchSetup(
     setup = {
       version: 1,
       trackedTeamDesignation: 'home',
-      sourceTeamId: null,
-      sourceSeasonId: null,
+      sourceTeamId: state.cloudSync.teamId,
+      sourceSeasonId: state.cloudSync.teamId ? state.cloudSync.seasonId : null,
       rulesSource: structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE),
       rulesSnapshot: createBasketballMatchRules(resolvedRules),
       participants,
@@ -440,12 +443,8 @@ export function addBasketballLateParticipant(
   state: GameState,
   options: BasketballLateParticipantOptions
 ): BasketballStateCommandResult {
-  if (hasCloudBinding(state)) {
-    return failure(
-      state,
-      'cloud_flow_unsupported',
-      'Basketball event roster changes are local-only during development.'
-    )
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
     state,
@@ -506,8 +505,8 @@ export function endBasketballPeriod(
   state: GameState,
   options: BasketballLifecycleCommandOptions
 ): BasketballStateCommandResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
     state,
@@ -539,8 +538,8 @@ export function startNextBasketballPeriod(
   state: GameState,
   options: BasketballLifecycleCommandOptions
 ): BasketballStateCommandResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
     state,
@@ -575,8 +574,8 @@ export function completeBasketballMatch(
   state: GameState,
   options: BasketballLifecycleCommandOptions
 ): BasketballStateCommandResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
     state,
@@ -633,8 +632,8 @@ export function reopenBasketballMatch(
   state: GameState,
   options: BasketballReopenCommandOptions
 ): BasketballStateCommandResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const reason = options.reason.trim()
   if (!reason) {
@@ -670,8 +669,8 @@ export function captureBasketballCourtEvent(
   state: GameState,
   options: BasketballCourtCaptureOptions
 ): BasketballCourtCaptureResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event capture is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const contextResult = getBasketballCommandContext(
     state,
@@ -949,8 +948,8 @@ function endBasketballMatchLocally(
   options: BasketballLifecycleCommandOptions,
   reason: 'suspended' | 'abandoned'
 ): BasketballStateCommandResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event lifecycle is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
     state,
@@ -1139,14 +1138,12 @@ function normalizeBasketballCommandTimestamp(
   return { ok: true, value: timestamp }
 }
 
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId ||
-    state.cloudSync.gameId ||
-    state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 ||
-    state.cloudSync.lastSyncedGameFingerprint
-  )
+function isFinalCloudGame(state: GameState): boolean {
+  return state.cloudSync.gameStatus === 'final'
+}
+
+function hasExistingCloudGameBinding(state: GameState): boolean {
+  return Boolean(state.cloudSync.gameId || state.cloudSync.lastSyncedGameFingerprint)
 }
 
 function standaloneStatDescriptor(statId: BasketballCourtStatId) {

@@ -26,7 +26,7 @@ export function basketballRecoverableScoreAdjustmentId(
     state.gameDataAuthority !== 'sport_events' ||
     state.sportGameState?.sportId !== 'basketball' ||
     !state.eventStream ||
-    hasCloudBinding(state)
+    isFinalCloudGame(state)
   ) return null
 
   const streamInspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
@@ -41,11 +41,8 @@ export function basketballRecoverableScoreAdjustmentId(
   return event?.eventType === 'basketball.score_adjustment' ? event.id : null
 }
 
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId || state.cloudSync.gameId || state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 || state.cloudSync.lastSyncedGameFingerprint
-  )
+function isFinalCloudGame(state: GameState): boolean {
+  return state.cloudSync.gameStatus === 'final'
 }
 
 function isBasketballMatchEvent(event: { sportId: string }): event is BasketballMatchEvent {

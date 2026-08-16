@@ -1,9 +1,8 @@
 # Plan: BKE-4B Basketball Event Transport
 
-Status: Product and delivery Q&A approved. BKE-4B1 shared transport and backend entry is
-implemented; BKE-4B2 Basketball automatic sync is next, followed by BKE-4B3
-recovery/conflicts/offline exit evidence. Migration 056 must be applied before BKE-4B2 runtime
-testing.
+Status: Product and delivery Q&A approved. BKE-4B1 shared transport/backend entry and BKE-4B2
+Basketball automatic sync are implemented. BKE-4B3 recovery, conflicts, and offline exit evidence
+is next. Migration 056 is required before Basketball event sync can run.
 
 ## 1. Objective
 
@@ -184,7 +183,7 @@ Implementation record: migration 056 adds only `bind_basketball_event_game_v4`;
 module API through an adapter and compatibility re-export; and the Basketball adapter is callable
 only by tests/direct imports. `GameContext` remains unchanged for BKE-4B2.
 
-### BKE-4B2: Basketball Automatic Sync
+### BKE-4B2: Basketball Automatic Sync (Implemented)
 
 1. Route healthy marked Basketball games through the event transport in `GameContext`; leave every
    aggregate Basketball game on `syncGameSnapshotToCloud`.
@@ -198,6 +197,15 @@ only by tests/direct imports. `GameContext` remains unchanged for BKE-4B2.
 
 Exit: one-device personal/team Basketball event games sync automatically, retry safely, remain
 locally authoritative, and cannot accidentally use aggregate sync or cloud finalization.
+
+Implementation record: `cloudSyncRouteForState` exhaustively separates aggregate, Soccer event,
+Basketball event, and unsupported states; `GameContext` routes healthy marked Basketball records
+through the shared event queue and applies Basketball recovery snapshots only when the sync-start
+fingerprint still matches. Existing-team setup snapshots immutable source team/season ids, while
+the internal creation toggle continues to gate new event games. Nonfinal bound games remain fully
+editable after their first sync, locally ended streams continue uploading against an in-progress
+cloud row, and finalized cloud rows remain read-only. Event routes never call aggregate snapshot
+sync or seed legacy aggregate resume targets. BKE-4B3 owns cloud adoption and conflict controls.
 
 ### BKE-4B3: Recovery, Conflicts, And Exit Audit
 

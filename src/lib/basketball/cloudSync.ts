@@ -96,8 +96,8 @@ export const basketballEventCloudTransportAdapter: EventCloudTransportAdapter = 
   rebuild: rebuildEventGameState,
 }
 
-// BKE-4B2 will route marked games here from GameContext. Keeping this callable but unrouted lets
-// BKE-4B1 verify the full adapter contract without changing production sync behavior.
+// GameContext routes only structurally marked Basketball event games here. The adapter performs
+// the full health check before binding or uploading, so malformed streams fail closed.
 export function syncBasketballEventGameToCloud(
   input: SyncBasketballEventGameInput
 ): Promise<SyncBasketballEventGameResult> {

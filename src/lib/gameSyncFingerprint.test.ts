@@ -3,8 +3,11 @@ import type { GameState } from '../types'
 import {
   buildGameSyncFingerprint,
   canHydrateAsActiveGame,
+  cloudSyncRouteForState,
   currentPeriodForCloudHydrate,
   isAggregateCloudSyncEligible,
+  isBasketballEventCloudSyncEligible,
+  isEventCloudSyncEligible,
   shouldBlockDiscardUnsyncedGame,
   shouldBlockManualCloudHydrate,
   shouldDeferCloudResumeHydration,
@@ -105,6 +108,27 @@ describe('gameSyncFingerprint', () => {
     expect(markedFingerprint).toMatch(/^\{"gameDataAuthority":"sport_events","sportId":/)
     expect(markedFingerprint).not.toBe(legacyFingerprint)
     expect(isAggregateCloudSyncEligible(marked)).toBe(false)
+  })
+
+  it('routes only complete marked Basketball event shells to event transport', () => {
+    const eventState = baseState({
+      gameDataAuthority: 'sport_events',
+      eventStream: { version: 1, events: [] },
+      sportGameState: { sportId: 'basketball' } as GameState['sportGameState'],
+    })
+
+    expect(isBasketballEventCloudSyncEligible(eventState)).toBe(true)
+    expect(isEventCloudSyncEligible(eventState)).toBe(true)
+    expect(isAggregateCloudSyncEligible(eventState)).toBe(false)
+    expect(cloudSyncRouteForState(eventState)).toBe('basketball_events')
+
+    expect(cloudSyncRouteForState({ ...eventState, eventStream: null })).toBe('unsupported')
+    expect(cloudSyncRouteForState({ ...eventState, sportGameState: null })).toBe('unsupported')
+    expect(cloudSyncRouteForState({ ...eventState, gameDataAuthority: null })).toBe('unsupported')
+  })
+
+  it('keeps ordinary Basketball snapshots on the aggregate route', () => {
+    expect(cloudSyncRouteForState(baseState())).toBe('aggregate')
   })
 
   it('canonicalizes raw event order and object keys for dirty detection', () => {

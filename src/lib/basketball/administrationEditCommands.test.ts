@@ -333,7 +333,7 @@ describe('BKE-3D4 Basketball administration editing', () => {
     })
     expect(buildBasketballHistoricalAdministrationDraft({
       ...state,
-      cloudSync: { ...state.cloudSync, gameId: 'cloud-game' },
+      cloudSync: { ...state.cloudSync, gameId: 'cloud-game', gameStatus: 'final' },
     }, 'basketball.timeout')).toMatchObject({ ok: false, code: 'cloud_flow_unsupported' })
 
     const suspended = suspendBasketballMatch(state, {

@@ -79,8 +79,8 @@ export function captureBasketballTimeout(
   state: GameState,
   options: BasketballTimeoutCaptureOptions
 ): BasketballTimeoutCaptureResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event capture is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballCommandContext(state, options.recorderUserId, options.occurredAt)
   if (!context.ok) return failure(state, context.code, context.message)
@@ -180,8 +180,8 @@ export function previewBasketballTimeoutDecrement(
   state: GameState,
   target: BasketballTimeoutDecrementTarget
 ): BasketballCommandResult<BasketballTimeoutRemovalPreview> {
-  if (hasCloudBinding(state)) {
-    return commandFailure('cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const event = newestMatchingTimeout(state, target)
   const inventory = basketballTimeoutInventory(state)
@@ -217,8 +217,8 @@ export function removeBasketballTimeout(
   target: BasketballTimeoutDecrementTarget,
   now = new Date().toISOString()
 ): BasketballStateCommandResult {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  if (isFinalCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   if (!now || !Number.isFinite(Date.parse(now))) {
     return failure(state, 'invalid_timestamp', 'Basketball correction timestamp is invalid.')
@@ -325,14 +325,8 @@ function withUndoReceipt(
   }
 }
 
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId ||
-    state.cloudSync.gameId ||
-    state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 ||
-    state.cloudSync.lastSyncedGameFingerprint
-  )
+function isFinalCloudGame(state: GameState): boolean {
+  return state.cloudSync.gameStatus === 'final'
 }
 
 function failure(

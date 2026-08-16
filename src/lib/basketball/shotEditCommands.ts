@@ -594,8 +594,8 @@ function prepareHistoricalShotState(state: GameState): BasketballCommandResult<G
   ) {
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
-  if (state.cloudSync.gameId || state.cloudSync.teamId) {
-    return commandFailure('cloud_flow_unsupported', 'Basketball shot additions are local-only during development.')
+  if (state.cloudSync.gameStatus === 'final') {
+    return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
   if (
@@ -728,8 +728,8 @@ function prepareShotEditState(
   ) {
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
-  if (state.cloudSync.gameId || state.cloudSync.teamId) {
-    return commandFailure('cloud_flow_unsupported', 'Basketball shot editing is local-only during development.')
+  if (state.cloudSync.gameStatus === 'final') {
+    return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
   if (

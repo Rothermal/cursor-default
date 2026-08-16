@@ -262,7 +262,7 @@ describe('BKE-2C4 Basketball timeouts', () => {
 
     const cloud = {
       ...periodTwo.state,
-      cloudSync: { ...periodTwo.state.cloudSync, gameId: 'cloud-game' },
+      cloudSync: { ...periodTwo.state.cloudSync, gameId: 'cloud-game', gameStatus: 'final' },
     }
     expect(captureBasketballTimeout(cloud, {
       recorderUserId: 'recorder-1',

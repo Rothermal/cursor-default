@@ -27,6 +27,10 @@ import {
   SoccerCloudRecoveryError,
   syncSoccerEventGameToCloud,
 } from '../lib/soccer/cloudSync'
+import {
+  BasketballCloudRecoveryError,
+  syncBasketballEventGameToCloud,
+} from '../lib/basketball/cloudSync'
 import { applyGameEventConflictResolution } from '../lib/soccer/cloudConflicts'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
@@ -47,6 +51,8 @@ import {
   shouldRejectSkippedFinalSync,
   shouldSkipAutoHydrateForDifferentCloudGame,
   withLastSyncedGameFingerprint,
+  cloudSyncRouteForState,
+  isEventCloudSyncEligible,
   isCloudSyncEligible,
   isSoccerEventCloudSyncEligible,
 } from '../lib/gameSyncFingerprint'
@@ -340,7 +346,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const debounceTimerRef = useRef<number | null>(null)
   const prevUserIdRef = useRef<string | null>(userId)
   const hydratedUserRef = useRef<string | null>(null)
-  const soccerEventCloudEligible = isSoccerEventCloudSyncEligible(state)
+  const eventCloudEligible = isEventCloudSyncEligible(state)
 
   useLayoutEffect(() => {
     stateRef.current = state
@@ -630,10 +636,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!userId) return
-    if (!state.cloudSync.gameId || soccerEventCloudEligible) return
+    if (!state.cloudSync.gameId || eventCloudEligible) return
     if (!canHydrateAsActiveGame(state.cloudSync.gameStatus ?? '')) return
     setResumeTarget(userId, state.cloudSync.gameId)
-  }, [soccerEventCloudEligible, state.cloudSync.gameId, state.cloudSync.gameStatus, userId])
+  }, [eventCloudEligible, state.cloudSync.gameId, state.cloudSync.gameStatus, userId])
 
   useEffect(() => {
     if ((!isConfigured || !isOnline) && state.cloudSync.status !== 'offline') {
@@ -727,16 +733,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const synced = isSoccerEventCloudSyncEligible(snapshot)
+        const syncRoute = cloudSyncRouteForState(snapshot)
+        const synced = syncRoute === 'soccer_events'
           ? await syncSoccerEventGameToCloud({
               state: snapshot,
               userId: snapshotUserId!,
               localGameId: record.localGameId,
             })
-          : await syncGameSnapshotToCloud({
+          : syncRoute === 'basketball_events'
+          ? await syncBasketballEventGameToCloud({
+              state: snapshot,
+              userId: snapshotUserId!,
+              localGameId: record.localGameId,
+            })
+          : syncRoute === 'aggregate'
+          ? await syncGameSnapshotToCloud({
               state: snapshot,
               userId: snapshotUserId!,
             })
+          : (() => {
+              throw new Error('This game does not support cloud sync.')
+            })()
         const latestRecord = getParkedGameRecord(record.localGameId, snapshotUserId)
         if (!latestRecord) return
 
@@ -836,7 +853,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (
           snapshotUserId &&
           isStillActiveRecord &&
-          !isSoccerEventCloudSyncEligible(snapshot)
+          !isEventCloudSyncEligible(snapshot)
         ) {
           setResumeTarget(snapshotUserId, synced.gameId)
         }
@@ -855,7 +872,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
         const latestState = latestRecord.gameState
         const canApplyRecovery =
-          error instanceof SoccerCloudRecoveryError &&
+          (error instanceof SoccerCloudRecoveryError ||
+            error instanceof BasketballCloudRecoveryError) &&
           buildGameSyncFingerprint(latestState) === snapshotFingerprint
         const recoveredState = canApplyRecovery ? error.recoveredState : latestState
         const attempts = latestRecord.sync.attempts + 1
