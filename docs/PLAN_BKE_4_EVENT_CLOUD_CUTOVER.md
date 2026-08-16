@@ -1,9 +1,9 @@
 # Plan: BKE-4 Event Cloud Cutover
 
-Status: Approved implementation plan. BKE-4A is implemented through migration 055; BKE-4B1 adds
-migration 056 and the shared transport adapter; and BKE-4B2 automatic Basketball sync is
-implemented. BKE-4B3 recovery and conflicts are next under
-[`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md).
+Status: Approved implementation plan. BKE-4A and BKE-4B1 through BKE-4B3 are implemented through
+migration 056. The BKE-4B live two-device matrix remains pending and is carried into BKE-4C exit
+evidence. BKE-4C product and delivery decisions are approved under
+[`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md).
 Basketball event-game creation remains internal-only through BKE-4E.
 
 ## 1. Goal
@@ -140,9 +140,8 @@ reopened for each implementation slice:
 
 ## 10. Next Step
 
-Before beginning BKE-4B1, apply migrations 054 and 055 separately and in order, then record the
-remaining BKE-4A Soccer runtime parity in `REGRESSION_BKE_4A_PLATFORM.md`. After that gate is green,
-implement BKE-4B1 from
-[`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md): add the narrow
-Basketball binding wrapper, extract the shared client transport, and prove Soccer parity before
-routing live Basketball synchronization.
+Implement BKE-4C1 from
+[`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md): add the
+fixed Basketball recorder/readiness wrappers and trusted terminal/score policy without exposing
+finalization UI early. Keep the BKE-4B live matrix open and complete it with the combined BKE-4C
+cloud-lifecycle evidence.

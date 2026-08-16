@@ -208,7 +208,7 @@ editable after their first sync, locally ended streams continue uploading agains
 cloud row, and finalized cloud rows remain read-only. Event routes never call aggregate snapshot
 sync or seed legacy aggregate resume targets. BKE-4B3 owns cloud adoption and conflict controls.
 
-### BKE-4B3: Recovery, Conflicts, And Exit Audit
+### BKE-4B3: Recovery, Conflicts, And Exit Audit (Implemented)
 
 1. Add strict Basketball cloud loading/adoption for the current recorder and matching parked-game
    resume-first behavior.
