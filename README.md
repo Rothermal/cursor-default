@@ -307,7 +307,8 @@ supabase/
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
 ├── audit_soccer_participant_sources_pre_047.sql
-└── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
+├── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
+└── verify_soccer_v1_binding_compatibility.sql
 
 docs/
 ├── AGENT_CODEBASE_OVERVIEW.md # Agent/contributor entry: routes, sync, doc workflow

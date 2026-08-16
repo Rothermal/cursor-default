@@ -20,6 +20,12 @@ This is an owner-only practical smoke sign-off. Admin/scorer/viewer/nonmember ro
 non-primary audit stream, multi-recorder conflict paths, and malformed fixtures were not claimed as
 tested in this pass.
 
+One single-user compatibility check remains an immediate gate: execute
+`supabase/scripts/verify_soccer_v1_binding_compatibility.sql` in the Supabase SQL Editor. It invokes
+the permanent v1 `bind_soccer_event_game` wrapper against the latest non-final personal Soccer game
+inside a rolled-back transaction. Record a pass only when it returns exactly one row with
+`same_game_id` and `same_participant_id_map` both `true`.
+
 ## 1. Automated Gate
 
 Run:
