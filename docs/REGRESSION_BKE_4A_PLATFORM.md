@@ -1,7 +1,30 @@
 # Regression: BKE-4A Event Platform Extraction
 
-Status: BKE-4A1 through BKE-4A4 automated contract coverage is implemented. BKE-4A code is
-complete; PostgreSQL runtime verification is required after applying migrations 050-055.
+Status: BKE-4A1 through BKE-4A4 automated contract coverage is implemented and migrations 050-055
+are applied. Owner-only Soccer runtime parity passed on 2026-08-15. The broader role,
+multi-recorder, malformed-data, and legacy Basketball matrix remains follow-up evidence rather than
+a blocker for the current single-user rollout.
+
+## Owner Runtime Record: 2026-08-15
+
+- Environment: deployed Supabase project and deployed app, authenticated as the owner.
+- Migrations 054 and 055 were already applied in order.
+- `game_event_canonical_publications_sport_id_check` was present once, validated, and allowed
+  `soccer` and `basketball`.
+- Personal Soccer passed event capture, cloud sync, Cloud Games resume without duplication,
+  finalization, canonical score readback, idempotent finalization, and reasoned reopen.
+- Team-owner Soccer passed event capture, cloud sync, Cloud Games resume, finalization, and reopen.
+- No app or Supabase errors were observed.
+
+This is an owner-only practical smoke sign-off. Admin/scorer/viewer/nonmember roles, a late
+non-primary audit stream, multi-recorder conflict paths, and malformed fixtures were not claimed as
+tested in this pass.
+
+One single-user compatibility check remains an immediate gate: execute
+`supabase/scripts/verify_soccer_v1_binding_compatibility.sql` in the Supabase SQL Editor. It invokes
+the permanent v1 `bind_soccer_event_game` wrapper against the latest non-final personal Soccer game
+inside a rolled-back transaction. Record a pass only when it returns exactly one row with
+`same_game_id` and `same_participant_id_map` both `true`.
 
 ## 1. Automated Gate
 

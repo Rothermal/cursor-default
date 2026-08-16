@@ -132,6 +132,8 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/053_event_platform_recorder_resolution.sql` - BKE-4A3 neutral recorder and primary-resolution contracts
 - `supabase/migrations/054_event_platform_publication_constraint.sql` - BKE-4A4 staged canonical-publication sport widening
 - `supabase/migrations/055_event_platform_finalization_recovery.sql` - BKE-4A4 neutral finalization/recovery mechanics and Soccer wrappers
+- `supabase/migrations/056_basketball_event_cloud_transport.sql` - BKE-4B1 fixed Basketball v4 binding wrapper over the private event-platform transport
+   > Apply **`056`** before BKE-4B2 runtime testing; BKE-4B1 does not route live Basketball sync.
    > Apply **`054` and `055` separately and in order** so the staged constraint add commits before validation and replacement.
    > Apply **`049`** before enabling Soccer for cloud-team starts. Missing or stale capability contracts fail closed while local-only Soccer and existing/history access remain available.
    > Before **`047`**, run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` and review the repairable/unprovable participant counts.
@@ -299,12 +301,14 @@ supabase/
     ├── 052_event_platform_recovery.sql
     ├── 053_event_platform_recorder_resolution.sql
     ├── 054_event_platform_publication_constraint.sql
-    └── 055_event_platform_finalization_recovery.sql
+    ├── 055_event_platform_finalization_recovery.sql
+    └── 056_basketball_event_cloud_transport.sql
 
 supabase/scripts/
 ├── audit_data_integrity_pre_019.sql
 ├── audit_soccer_participant_sources_pre_047.sql
-└── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
+├── normalize_exhibition_games.sql   # Identify/link/clear legacy exhibition tournament_name rows
+└── verify_soccer_v1_binding_compatibility.sql
 
 docs/
 ├── AGENT_CODEBASE_OVERVIEW.md # Agent/contributor entry: routes, sync, doc workflow
@@ -484,6 +488,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Basketball event recovery extraction (BKE-4A2)** - private setup/adoption binding, atomic immutable-snapshot enforcement, permanent Soccer v2 compatibility, and sport-bounded same-recorder conflicts ([plan](docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md))
 - [x] **Basketball recorder-resolution extraction (BKE-4A3)** - private checkpoint, recorder, primary-selection, history, and independent-recorder binding cores behind permanent Soccer wrappers ([plan](docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md))
 - [x] **Basketball finalization/recovery extraction (BKE-4A4)** - staged canonical-publication widening, private neutral finalization/reopen/recovery cores, trusted Soccer policy wrappers, and aggregate-only Basketball compatibility ([plan](docs/PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md), [regression](docs/REGRESSION_BKE_4A_PLATFORM.md))
+- [x] **Basketball shared event transport (BKE-4B1)** - fixed Basketball v4 binding wrapper, sport-neutral pull/merge/upload/checkpoint engine, shared conflict ownership, Soccer parity, and a non-routed Basketball adapter ([plan](docs/PLAN_BKE_4B_BASKETBALL_TRANSPORT.md), [regression](docs/REGRESSION_BKE_4B_TRANSPORT.md))
 - [ ] **Basketball event transport (BKE-4B)** - shared bind/pull/merge/upload/checkpoint transport, automatic Basketball sync, cross-device recovery, explicit conflicts, and offline retry in three slices ([plan](docs/PLAN_BKE_4B_BASKETBALL_TRANSPORT.md))
 - [ ] **Basketball event-model migration (BKE-4 through BKE-6)** - cloud lifecycle and aggregates, settings/rollout, then clock and lineups ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))

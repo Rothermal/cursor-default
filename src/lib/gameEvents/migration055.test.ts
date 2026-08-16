@@ -112,8 +112,8 @@ describe('migration 055 event-platform finalization and recovery', () => {
     )
     expect(sql).toContain('p_recorded_by <> publication.primary_recorded_by')
     expect(sql).toContain('publication.sport_id = p_sport_id')
-    expect(sql).toContain(
-      'public.can_upload_final_event_audit(\n      v_game_sport_id'
+    expect(sql).toMatch(
+      /public\.can_upload_final_event_audit\s*\(\s*v_game_sport_id/
     )
     expect(sql).toContain('only pre-finalization audit events may finish uploading')
     expect(sql).toContain("v_game.status = 'final'")

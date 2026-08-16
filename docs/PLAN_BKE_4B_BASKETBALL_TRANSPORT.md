@@ -1,8 +1,9 @@
 # Plan: BKE-4B Basketball Event Transport
 
-Status: Product and delivery Q&A approved. Implementation has not started. BKE-4B is split into
-three reviewable slices: BKE-4B1 shared transport and backend entry, BKE-4B2 Basketball automatic
-sync, and BKE-4B3 recovery/conflicts/offline exit evidence.
+Status: Product and delivery Q&A approved. BKE-4B1 shared transport and backend entry is
+implemented; BKE-4B2 Basketball automatic sync is next, followed by BKE-4B3
+recovery/conflicts/offline exit evidence. Migration 056 must be applied before BKE-4B2 runtime
+testing.
 
 ## 1. Objective
 
@@ -157,7 +158,7 @@ remain BKE-4C/BKE-4D scope; BKE-4B opens only the current user's editable record
 
 ## 8. Delivery Slices
 
-### BKE-4B1: Shared Transport And Backend Entry
+### BKE-4B1: Shared Transport And Backend Entry (Implemented)
 
 1. Add migration 056 with the fixed authenticated Basketball v4 binding wrapper, explicit revoke,
    grant, `security definer`, and `search_path` contract.
@@ -176,6 +177,12 @@ remain BKE-4C/BKE-4D scope; BKE-4B opens only the current user's editable record
 
 Exit: Soccer remains green through the shared engine, the Basketball wrapper is the only new public
 RPC, and a pure/mock Basketball adapter can round-trip a healthy stream without changing app flow.
+
+Implementation record: migration 056 adds only `bind_basketball_event_game_v4`;
+`src/lib/gameEvents/cloudTransport.ts` owns the shared algorithm;
+`src/lib/gameEvents/cloudConflicts.ts` owns merge/base/conflict helpers; Soccer retains its public
+module API through an adapter and compatibility re-export; and the Basketball adapter is callable
+only by tests/direct imports. `GameContext` remains unchanged for BKE-4B2.
 
 ### BKE-4B2: Basketball Automatic Sync
 
