@@ -10,6 +10,7 @@ import type {
   BasketballCommandResult,
   BasketballStateCommandResult,
 } from './commands'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
 import { buildBasketballTimelineReview } from './timeline'
@@ -295,7 +296,7 @@ function prepareState(
   ) {
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
@@ -813,10 +814,6 @@ function sameStringSet(left: string[], right: string[]): boolean {
 
 function validTimestamp(value: string): string | null {
   return value && Number.isFinite(Date.parse(value)) ? value : null
-}
-
-function isFinalCloudGame(state: GameState): boolean {
-  return state.cloudSync.gameStatus === 'final'
 }
 
 function failure(

@@ -4,6 +4,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import {
   basketballActorForSelection,
   basketballCaptureTargetForPlayerId,
@@ -491,7 +492,7 @@ function commandContext(
 ):
   | { ok: true; context: Exclude<ReturnType<typeof getBasketballCommandContext>, { ok: false }>['value'] }
   | { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string } {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballCommandContext(state, recorderUserId, occurredAt)
@@ -560,10 +561,6 @@ function withCaptureTarget(
 
 function oppositeSide(side: BasketballTeamSide): BasketballTeamSide {
   return side === 'tracked' ? 'opponent' : 'tracked'
-}
-
-function isFinalCloudGame(state: GameState): boolean {
-  return state.cloudSync.gameStatus === 'final'
 }
 
 function failure(

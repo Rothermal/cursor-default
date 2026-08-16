@@ -4,6 +4,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import {
   basketballActorForSelection,
   getBasketballCommandContext,
@@ -68,7 +69,7 @@ export function captureBasketballOfficialEjection(
   state: GameState,
   options: BasketballOfficialEjectionOptions
 ): BasketballEjectionCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballCommandContext(state, options.recorderUserId, options.occurredAt)
@@ -200,7 +201,7 @@ export function previewBasketballEjectionRemoval(
   state: GameState,
   eventId: string
 ): BasketballCommandResult<BasketballEjectionRemovalPreview> {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const event = removableOfficialEjection(state, eventId)
@@ -229,7 +230,7 @@ export function removeBasketballOfficialEjection(
   eventId: string,
   now = new Date().toISOString()
 ): BasketballStateCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   if (!now || !Number.isFinite(Date.parse(now))) {
@@ -417,10 +418,6 @@ function withUndoReceipt(
       },
     },
   }
-}
-
-function isFinalCloudGame(state: GameState): boolean {
-  return state.cloudSync.gameStatus === 'final'
 }
 
 function failure(

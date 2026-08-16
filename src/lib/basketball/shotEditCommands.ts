@@ -21,6 +21,7 @@ import {
   type BasketballCourtPoint,
 } from './courtGeometry'
 import { createBasketballUuid } from './id'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballStatEvent } from './statEvents'
 import type {
   BasketballAssistEvent,
@@ -594,7 +595,7 @@ function prepareHistoricalShotState(state: GameState): BasketballCommandResult<G
   ) {
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
-  if (state.cloudSync.gameStatus === 'final') {
+  if (isFinalBasketballCloudGame(state)) {
     return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
@@ -728,7 +729,7 @@ function prepareShotEditState(
   ) {
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
-  if (state.cloudSync.gameStatus === 'final') {
+  if (isFinalBasketballCloudGame(state)) {
     return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)

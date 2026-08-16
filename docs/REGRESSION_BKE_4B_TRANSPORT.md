@@ -60,3 +60,8 @@ Coverage additionally verifies:
 
 BKE-4B3 owns current-recorder cloud adoption, conflict UI, durable cross-device recovery, and the
 full role/device matrix. Basketball canonical finalization remains BKE-4C.
+
+Interim boundary: if the same recorder creates a Basketball same-event conflict from another
+device or browser profile before BKE-4B3, the durable conflict intentionally blocks checkpoint and
+retry. Local tracking remains authoritative and usable, but there is no Basketball conflict-review
+surface in BKE-4B2; BKE-4B3 must resolve the conflict before cloud sync can continue.

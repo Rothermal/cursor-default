@@ -31,7 +31,7 @@ import {
   BasketballCloudRecoveryError,
   syncBasketballEventGameToCloud,
 } from '../lib/basketball/cloudSync'
-import { applyGameEventConflictResolution } from '../lib/soccer/cloudConflicts'
+import { applyGameEventConflictResolution } from '../lib/gameEvents/cloudConflicts'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'

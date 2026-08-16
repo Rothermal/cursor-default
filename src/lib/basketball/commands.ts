@@ -24,6 +24,7 @@ import {
   isThreePointer,
   type BasketballCourtPoint,
 } from './courtGeometry'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballLifecycleEvent } from './events'
 import { createBasketballUuid } from './id'
 import {
@@ -443,7 +444,7 @@ export function addBasketballLateParticipant(
   state: GameState,
   options: BasketballLateParticipantOptions
 ): BasketballStateCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
@@ -505,7 +506,7 @@ export function endBasketballPeriod(
   state: GameState,
   options: BasketballLifecycleCommandOptions
 ): BasketballStateCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
@@ -538,7 +539,7 @@ export function startNextBasketballPeriod(
   state: GameState,
   options: BasketballLifecycleCommandOptions
 ): BasketballStateCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
@@ -574,7 +575,7 @@ export function completeBasketballMatch(
   state: GameState,
   options: BasketballLifecycleCommandOptions
 ): BasketballStateCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
@@ -632,7 +633,7 @@ export function reopenBasketballMatch(
   state: GameState,
   options: BasketballReopenCommandOptions
 ): BasketballStateCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const reason = options.reason.trim()
@@ -669,7 +670,7 @@ export function captureBasketballCourtEvent(
   state: GameState,
   options: BasketballCourtCaptureOptions
 ): BasketballCourtCaptureResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const contextResult = getBasketballCommandContext(
@@ -948,7 +949,7 @@ function endBasketballMatchLocally(
   options: BasketballLifecycleCommandOptions,
   reason: 'suspended' | 'abandoned'
 ): BasketballStateCommandResult {
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballLifecycleContext(
@@ -1136,10 +1137,6 @@ function normalizeBasketballCommandTimestamp(
     return commandFailure('invalid_timestamp', 'Basketball event timestamp is invalid.')
   }
   return { ok: true, value: timestamp }
-}
-
-function isFinalCloudGame(state: GameState): boolean {
-  return state.cloudSync.gameStatus === 'final'
 }
 
 function hasExistingCloudGameBinding(state: GameState): boolean {

@@ -6,6 +6,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventActor, GameEventMutation } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import {
   basketballActorForSelection,
   createBasketballCaptureCommandId,
@@ -1117,7 +1118,7 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedState> 
     state.sportGameState?.sportId !== 'basketball' ||
     !state.eventStream
   ) return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
-  if (isFinalCloudGame(state)) {
+  if (isFinalBasketballCloudGame(state)) {
     return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
@@ -1173,10 +1174,6 @@ function eventStreamFingerprint(state: GameState): string {
       ? `${raw.id}:${raw.revision}:${raw.updatedAt}:${raw.deletedAt ?? ''}`
       : JSON.stringify(raw)
   ).join('|')
-}
-
-function isFinalCloudGame(state: GameState): boolean {
-  return state.cloudSync.gameStatus === 'final'
 }
 
 function validTimestamp(value: string): string | null {
