@@ -7,7 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock3, Link2, List, Minus, ReceiptText, Target, Trash2, UserX } from 'lucide-react'
+import { BadgeAlert, Clock3, Link2, List, Minus, ReceiptText, Target, Trash2, UserX } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { computeCategoryTotal } from '../config/sports'
@@ -37,6 +37,7 @@ import BasketballEjectionDialog, {
 } from '../components/basketball/BasketballEjectionDialog'
 import BasketballTimeoutDialog from '../components/basketball/BasketballTimeoutDialog'
 import BasketballTimeline from '../components/basketball/BasketballTimeline'
+import EventCloudConflictDialog from '../components/game-events/EventCloudConflictDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
@@ -166,7 +167,7 @@ function countLabel(count: number, singular: string, plural = `${singular}s`): s
 
 export default function GameTracker() {
   const navigate = useNavigate()
-  const { state, dispatch, flushCloudSync, parkingError } = useGame()
+  const { state, dispatch, flushCloudSync, parkingError, resolveEventConflict } = useGame()
   const { user } = useAuth()
   const teamAccess = useTeamRole(state.cloudSync.teamId)
   const {
@@ -236,6 +237,9 @@ export default function GameTracker() {
   const [pendingLocalEnd, setPendingLocalEnd] = useState<'suspend' | 'abandon' | null>(null)
   const [showReopenDialog, setShowReopenDialog] = useState(false)
   const [reopenError, setReopenError] = useState<string | null>(null)
+  const [conflictOpen, setConflictOpen] = useState(false)
+  const [syncBusy, setSyncBusy] = useState(false)
+  const [cloudRecoveryError, setCloudRecoveryError] = useState<string | null>(null)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
   const [showAllShots, setShowAllShots] = useState(false)
@@ -313,6 +317,47 @@ export default function GameTracker() {
   }, [sport, gameInfo, players, dispatch, state.cloudSync.teamId, state.gameDataAuthority, teamAccess.role])
 
   const isBasketballEventMode = hasStartedBasketballEventGame(state)
+  const cloudConflicts = isBasketballEventMode
+    ? state.cloudSync.eventConflicts ?? []
+    : []
+
+  useEffect(() => {
+    if (cloudConflicts.length > 0) setConflictOpen(true)
+  }, [cloudConflicts.length])
+
+  const exportBasketballRecovery = () => {
+    const blob = new Blob([
+      JSON.stringify({
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        kind: 'basketball-game-recovery',
+        gameState: state,
+      }, null, 2),
+    ], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `statkeeper-basketball-recovery-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const resolveBasketballConflict = (eventId: string, resolution: 'local' | 'remote') => {
+    const result = resolveEventConflict(eventId, resolution)
+    if (!result.ok) {
+      setCloudRecoveryError(result.reason)
+      return
+    }
+    setCloudRecoveryError(null)
+    if (cloudConflicts.length === 1) setConflictOpen(false)
+  }
+
+  const retryBasketballSync = async () => {
+    setSyncBusy(true)
+    const result = await flushCloudSync()
+    setSyncBusy(false)
+    if (!result.ok) setCloudRecoveryError(result.reason)
+  }
 
   useEffect(() => {
     if (!isBasketballEventMode) setBasketballWorkspace('track')
@@ -999,6 +1044,28 @@ export default function GameTracker() {
             {parkingError}
           </div>
         )}
+        {cloudRecoveryError && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {cloudRecoveryError}
+          </div>
+        )}
+        {cloudConflicts.length > 0 ? (
+          <div className="mt-3 flex items-center gap-3 border border-amber-300 bg-amber-50 px-3 py-3 text-amber-900">
+            <BadgeAlert size={20} className="shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">Needs Attention</p>
+              <p className="text-xs">{cloudConflicts.length} {cloudConflicts.length === 1 ? 'event needs' : 'events need'} review</p>
+            </div>
+            <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white">Review</button>
+          </div>
+        ) : isBasketballEventMode && state.cloudSync.status === 'error' ? (
+          <div className="mt-3 flex items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
+            <BadgeAlert size={20} className="shrink-0" />
+            <p className="min-w-0 flex-1 truncate text-xs" title={state.cloudSync.lastError ?? undefined}>{state.cloudSync.lastError ?? 'Cloud sync needs attention.'}</p>
+            <button type="button" onClick={() => { void retryBasketballSync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-red-700 px-3 text-xs font-bold text-white disabled:opacity-50">{syncBusy ? 'Retrying...' : 'Retry'}</button>
+            <button type="button" onClick={exportBasketballRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
+          </div>
+        ) : null}
         {basketballSportState && (
           <BasketballLifecycleControls
             sportState={basketballSportState}
@@ -1895,6 +1962,16 @@ export default function GameTracker() {
         onConfirm={handleCompleteBasketballMatch}
         onCancel={() => setShowCompleteConfirm(false)}
       />
+
+      {conflictOpen && cloudConflicts.length > 0 && (
+        <EventCloudConflictDialog
+          conflicts={cloudConflicts}
+          busy={syncBusy}
+          onResolve={resolveBasketballConflict}
+          onExport={exportBasketballRecovery}
+          onClose={() => setConflictOpen(false)}
+        />
+      )}
     </div>
   )
 }

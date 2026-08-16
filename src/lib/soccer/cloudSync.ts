@@ -2,7 +2,6 @@ import { sports } from '../../config/sports'
 import type { GameState, GameEventSyncConflict, Player } from '../../types'
 import { createInitialCloudSyncState } from '../gameReducer'
 import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
-import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { loadGameEventStreamForRecorder } from '../gameEvents/cloud'
 import {
   assertHealthyEventGame,
@@ -15,7 +14,10 @@ import {
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { supabase } from '../supabase'
-import { gameEventSyncBase } from '../gameEvents/cloudConflicts'
+import {
+  gameEventSyncBase,
+  gameEventSyncConflictFromRow,
+} from '../gameEvents/cloudConflicts'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import type { SoccerMatchParticipant, SoccerSportGameState } from './types'
 
@@ -49,14 +51,6 @@ interface SoccerCloudParticipantRow {
   jersey_number: string | null
 }
 
-interface SoccerCloudConflictRow {
-  id: string
-  event_id: string
-  local_event: unknown
-  remote_event: unknown
-  detected_at: string
-}
-
 export interface SyncSoccerEventGameInput {
   state: GameState
   userId: string
@@ -82,7 +76,6 @@ export class SoccerCloudRecoveryError extends Error {
     this.recoveredState = recoveredState
   }
 }
-
 export function soccerCloudParticipants(
   sportState: SoccerSportGameState
 ): SoccerCloudParticipant[] {
@@ -249,7 +242,7 @@ export async function loadSoccerCloudGameById(
       .map(row => [row.client_player_id!, row.id])
   )
   const conflicts = (conflictData ?? [])
-    .map(row => cloudConflictFromRow(row as SoccerCloudConflictRow))
+    .map(row => gameEventSyncConflictFromRow(row, 'soccer'))
     .filter((conflict): conflict is GameEventSyncConflict => conflict !== null)
   const baseState: GameState = {
     sport: soccerSport,
@@ -295,17 +288,5 @@ export async function loadSoccerCloudGameById(
       ...rebuilt.state.cloudSync,
       lastSyncedGameFingerprint: fingerprint,
     },
-  }
-}
-
-function cloudConflictFromRow(row: SoccerCloudConflictRow): GameEventSyncConflict | null {
-  if (!isGameEventEnvelope(row.local_event) || !isGameEventEnvelope(row.remote_event)) return null
-  if (row.local_event.id !== row.event_id || row.remote_event.id !== row.event_id) return null
-  return {
-    conflictId: row.id,
-    eventId: row.event_id,
-    localEvent: row.local_event,
-    remoteEvent: row.remote_event,
-    detectedAt: row.detected_at,
   }
 }

@@ -13,6 +13,7 @@ function result(partial: Partial<ImportParkedGamesResult>): ImportParkedGamesRes
     skippedExisting: 0,
     skippedAtCap: 0,
     skippedInvalid: 0,
+    skippedCloudBinding: 0,
     summaries: [],
     ...partial,
   }
@@ -38,14 +39,15 @@ describe('formatParkedImportMessage', () => {
       formatParkedImportMessage(
         result({
           imported: 2,
-          skipped: 6,
+          skipped: 7,
           skippedExisting: 3,
           skippedAtCap: 2,
           skippedInvalid: 1,
+          skippedCloudBinding: 1,
         })
       )
     ).toBe(
-      '2 parked games imported; skipped 3 existing games kept, 2 games over the parked-game limit, 1 invalid row. Reloading...'
+      '2 parked games imported; skipped 3 existing games kept, 2 games over the parked-game limit, 1 invalid row, 1 duplicate cloud binding. Reloading...'
     )
   })
 })

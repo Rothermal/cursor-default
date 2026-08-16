@@ -96,6 +96,7 @@ export interface ImportParkedGamesResult {
   skippedExisting: number
   skippedAtCap: number
   skippedInvalid: number
+  skippedCloudBinding: number
   summaries: ParkedGameSummary[]
 }
 
@@ -918,10 +919,16 @@ export function importParkedGames(raw: string, ownerId: string | null): ImportPa
   const summaries = { ...manifest.summaries }
   const gameIds = [...manifest.gameIds]
   const writtenLocalGameIds: string[] = []
+  const cloudGameIds = new Set(
+    gameIds
+      .map(localGameId => readRecord(localGameId)?.gameState.cloudSync.gameId ?? null)
+      .filter((gameId): gameId is string => Boolean(gameId))
+  )
   let imported = 0
   let skippedExisting = 0
   let skippedAtCap = 0
   let skippedInvalid = 0
+  let skippedCloudBinding = 0
 
   try {
     for (const incoming of payload.records) {
@@ -935,13 +942,17 @@ export function importParkedGames(raw: string, ownerId: string | null): ImportPa
         skippedExisting += 1
         continue
       }
+      const updatedAt = typeof incoming.updatedAt === 'string' ? incoming.updatedAt : nowIso()
+      const gameState = normalizePersistedGameState(incoming.gameState)
+      const cloudGameId = gameState.cloudSync.gameId
+      if (cloudGameId && cloudGameIds.has(cloudGameId)) {
+        skippedCloudBinding += 1
+        continue
+      }
       if (gameIds.length >= MAX_PARKED_GAMES) {
         skippedAtCap += 1
         continue
       }
-
-      const updatedAt = typeof incoming.updatedAt === 'string' ? incoming.updatedAt : nowIso()
-      const gameState = normalizePersistedGameState(incoming.gameState)
       const sync = normalizeSyncState(incoming.sync, null, gameState)
       const record: ParkedGameRecord = {
         localGameId,
@@ -956,6 +967,7 @@ export function importParkedGames(raw: string, ownerId: string | null): ImportPa
       writtenLocalGameIds.push(record.localGameId)
       gameIds.push(record.localGameId)
       summaries[record.localGameId] = record.summary
+      if (cloudGameId) cloudGameIds.add(cloudGameId)
       imported += 1
     }
 
@@ -979,7 +991,7 @@ export function importParkedGames(raw: string, ownerId: string | null): ImportPa
     throw error
   }
 
-  const skipped = skippedExisting + skippedAtCap + skippedInvalid
+  const skipped = skippedExisting + skippedAtCap + skippedInvalid + skippedCloudBinding
 
   return {
     imported,
@@ -987,6 +999,7 @@ export function importParkedGames(raw: string, ownerId: string | null): ImportPa
     skippedExisting,
     skippedAtCap,
     skippedInvalid,
+    skippedCloudBinding,
     summaries: listParkedGames(ownerId),
   }
 }

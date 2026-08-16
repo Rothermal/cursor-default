@@ -7,6 +7,14 @@ import { useGame } from '../context/GameContext'
 import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
 import {
+  createBasketballIndependentRecorderState,
+  loadBasketballCloudGameById,
+} from '../lib/basketball/cloudSync'
+import {
+  resolveEventRecorderOpenSource,
+  type EventRecorderOpenSource,
+} from '../lib/gameEvents/cloudOpen'
+import {
   resolveSoccerRecorderOpenSource,
   type SoccerRecorderOpenSource,
 } from '../lib/soccer/cloudOpen'
@@ -35,6 +43,7 @@ interface GameInfoGameRow extends TeamInfoGame {
   tournament_name: string | null
   tournament_id: string | null
   notes: string | null
+  sport_id: string | null
 }
 
 interface GameInfoTeamRow {
@@ -214,7 +223,7 @@ export default function GameInfo() {
       const { data: gameData, error: gameError } = await supabaseClient
         .from('games')
         .select(
-          'id,team_id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,status,tournament_name,tournament_id,notes'
+          'id,team_id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,status,tournament_name,tournament_id,notes,sport_id'
         )
         .eq('id', gameId)
         .single()
@@ -383,6 +392,79 @@ export default function GameInfo() {
         return
       }
       if (!openGameSnapshot(soccerGame)) {
+        setOpeningGame(false)
+        return
+      }
+      setOpeningGame(false)
+      navigate('/game')
+      return
+    }
+    if (game.sport_id === 'basketball') {
+      if (game.status === 'final') {
+        setError('Basketball event-game final review is not available until BKE-4D.')
+        return
+      }
+      if (!canTrackGames(teamRole)) return
+
+      setOpeningGame(true)
+      setError(null)
+      let source: EventRecorderOpenSource<GameState>
+      try {
+        source = await resolveEventRecorderOpenSource(
+          'basketball',
+          game.id,
+          activeLocalGameId,
+          parkedGames,
+          () => loadBasketballCloudGameById(user.id, game.id)
+        )
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Could not load Basketball game')
+        setOpeningGame(false)
+        return
+      }
+
+      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+      if (source.kind === 'local') {
+        if (
+          hasActiveGame &&
+          activeLocalGameId !== source.localGameId &&
+          !window.confirm('Park your current game and resume this local recorder stream?')
+        ) {
+          setOpeningGame(false)
+          return
+        }
+        if (!resumeParkedGame(source.localGameId)) {
+          setOpeningGame(false)
+          return
+        }
+        setOpeningGame(false)
+        navigate('/game')
+        return
+      }
+
+      let basketballGame = source.kind === 'cloud' ? source.state : null
+      if (source.kind === 'empty') {
+        const startIndependent = window.confirm(
+          'Start your own independent recorder stream for this game? Select Cancel to stay on Game Info.'
+        )
+        if (!startIndependent) {
+          setOpeningGame(false)
+          return
+        }
+        basketballGame = await createBasketballIndependentRecorderState(user.id, game.id).catch(caught => {
+          setError(caught instanceof Error ? caught.message : 'Could not start recorder stream')
+          return null
+        })
+      }
+      if (!basketballGame) {
+        setOpeningGame(false)
+        return
+      }
+      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+        setOpeningGame(false)
+        return
+      }
+      if (!openGameSnapshot(basketballGame)) {
         setOpeningGame(false)
         return
       }

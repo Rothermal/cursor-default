@@ -32,6 +32,7 @@ import {
   syncBasketballEventGameToCloud,
 } from '../lib/basketball/cloudSync'
 import { applyGameEventConflictResolution } from '../lib/gameEvents/cloudConflicts'
+import { isGameEventEnvelope } from '../lib/gameEvents/envelope'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
 import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
@@ -313,7 +314,7 @@ interface GameContextType {
   flushCloudSync: () => Promise<FlushCloudSyncResult>
   flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
   markSoccerCloudGameReopened: (gameId: string) => void
-  resolveSoccerEventConflict: (
+  resolveEventConflict: (
     eventId: string,
     resolution: 'local' | 'remote'
   ) => { ok: true } | { ok: false; reason: string }
@@ -1023,18 +1024,32 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [userId])
 
-  const resolveSoccerEventConflict = useCallback(
+  const resolveEventConflict = useCallback(
     (eventId: string, resolution: 'local' | 'remote') => {
       const current = stateRef.current
+      const sportId = current.sportGameState?.sportId
+      if (sportId !== 'soccer' && sportId !== 'basketball') {
+        return { ok: false as const, reason: 'This game does not support event conflict recovery.' }
+      }
       const conflict = current.cloudSync.eventConflicts?.find(item => item.eventId === eventId)
       if (!conflict || !current.eventStream) {
         return { ok: false as const, reason: 'That event conflict is no longer available.' }
+      }
+      if (
+        conflict.localEvent.sportId !== sportId ||
+        conflict.remoteEvent.sportId !== sportId ||
+        !current.eventStream.events.some(
+          event => isGameEventEnvelope(event) && event.id === eventId
+        )
+      ) {
+        return { ok: false as const, reason: 'That event conflict is invalid for this game.' }
       }
       const applied = applyGameEventConflictResolution(
         current.eventStream,
         conflict,
         resolution,
-        new Date().toISOString()
+        new Date().toISOString(),
+        sportId === 'basketball' ? 'advance' : 'preserve'
       )
       const remainingConflicts = (current.cloudSync.eventConflicts ?? []).filter(
         item => item.eventId !== eventId
@@ -1156,7 +1171,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         flushCloudSync,
         flushCloudGameSync,
         markSoccerCloudGameReopened,
-        resolveSoccerEventConflict,
+        resolveEventConflict,
       }}
     >
       {children}

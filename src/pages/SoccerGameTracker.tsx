@@ -85,7 +85,7 @@ type MarkerFamilyFilter = 'all' | 'shots' | 'defense' | 'incidents'
 
 export default function SoccerGameTracker() {
   const navigate = useNavigate()
-  const { state, dispatch, flushCloudSync, resolveSoccerEventConflict } = useGame()
+  const { state, dispatch, flushCloudSync, resolveEventConflict } = useGame()
   const { user } = useAuth()
   const soccerState = state.sportGameState?.sportId === 'soccer'
     ? state.sportGameState
@@ -194,7 +194,7 @@ export default function SoccerGameTracker() {
   }
 
   const resolveConflict = (eventId: string, resolution: 'local' | 'remote') => {
-    const result = resolveSoccerEventConflict(eventId, resolution)
+    const result = resolveEventConflict(eventId, resolution)
     if (!result.ok) {
       setError(result.reason)
       return
