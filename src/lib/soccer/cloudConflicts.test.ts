@@ -125,4 +125,28 @@ describe('same-recorder cloud event recovery', () => {
     )
     expect(result.eventStream.events[0]).toEqual(conflict.remoteEvent)
   })
+
+  it('can advance a cloud choice for sports that require a new winning revision', () => {
+    const id = '10000000-0000-4000-8000-000000000001'
+    const conflict: GameEventSyncConflict = {
+      conflictId: '20000000-0000-4000-8000-000000000001',
+      eventId: id,
+      localEvent: event(id, 4, 'local'),
+      remoteEvent: event(id, 3, 'remote'),
+      detectedAt: '2026-07-22T12:01:00.000Z',
+    }
+    const result = applyGameEventConflictResolution(
+      stream(conflict.localEvent),
+      conflict,
+      'remote',
+      '2026-07-22T12:02:00.000Z',
+      'advance'
+    )
+
+    expect(result.eventStream.events[0]).toMatchObject({
+      revision: 5,
+      updatedAt: '2026-07-22T12:02:00.000Z',
+      payload: { value: 'remote' },
+    })
+  })
 })
