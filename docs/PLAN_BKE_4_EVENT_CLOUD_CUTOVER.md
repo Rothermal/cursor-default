@@ -1,8 +1,8 @@
 # Plan: BKE-4 Event Cloud Cutover
 
-Status: Approved implementation plan. BKE-4A is implemented through migration 055 and BKE-4B1 is
-implemented with migration 056 plus the non-routed shared transport adapter. BKE-4B2 automatic
-Basketball sync is next under
+Status: Approved implementation plan. BKE-4A is implemented through migration 055; BKE-4B1 adds
+migration 056 and the shared transport adapter; and BKE-4B2 automatic Basketball sync is
+implemented. BKE-4B3 recovery and conflicts are next under
 [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md).
 Basketball event-game creation remains internal-only through BKE-4E.
 

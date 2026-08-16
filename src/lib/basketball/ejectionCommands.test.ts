@@ -265,7 +265,7 @@ describe('BKE-2C3 Basketball official ejections', () => {
 
     const cloud = {
       ...state,
-      cloudSync: { ...state.cloudSync, gameId: 'cloud-game' },
+      cloudSync: { ...state.cloudSync, gameId: 'cloud-game', gameStatus: 'final' },
     }
     expect(captureBasketballOfficialEjection(cloud, {
       recorderUserId: 'recorder-1',

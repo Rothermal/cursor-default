@@ -1,7 +1,7 @@
 # Regression: BKE-4B Basketball Event Transport
 
-Status: BKE-4B1 automated coverage is implemented. Migration 056 and live Basketball routing are
-not active until the migration is applied and BKE-4B2 is merged.
+Status: BKE-4B1 and BKE-4B2 automated coverage are implemented. Migration 056 is required for live
+Basketball event binding. BKE-4B3 recovery/adoption and the full role/device matrix remain open.
 
 ## BKE-4B1 Automated Gate
 
@@ -43,6 +43,25 @@ select
 
 Expected: `true`, `false`.
 
-BKE-4B1 does not route `GameContext`, write legacy `game_stats`/`shot_chart`, load Basketball cloud
-games, or expose Basketball finalization. BKE-4B2 owns automatic sync and BKE-4B3 owns adoption,
-conflict UI, offline recovery, and the full role/device matrix.
+## BKE-4B2 Automatic Sync Gate
+
+Coverage additionally verifies:
+
+- complete marked Basketball event states select only `basketball_events`, while incomplete marked
+  states fail closed and ordinary Basketball remains on `aggregate`;
+- `GameContext` routes Basketball through `syncBasketballEventGameToCloud`, preserves the shared
+  sync-start/post-await guards, and applies Basketball recovery only to an unchanged snapshot;
+- existing-team event setup records immutable source team/season ids and tracked source-player
+  links, while personal setup keeps them null;
+- nonfinal cloud-bound Basketball games remain editable after first bind and finalized rows remain
+  read-only;
+- event games do not seed aggregate cloud-resume hydration or call legacy snapshot sync; and
+- local match completion does not change cloud status to final or expose finalization.
+
+BKE-4B3 owns current-recorder cloud adoption, conflict UI, durable cross-device recovery, and the
+full role/device matrix. Basketball canonical finalization remains BKE-4C.
+
+Interim boundary: if the same recorder creates a Basketball same-event conflict from another
+device or browser profile before BKE-4B3, the durable conflict intentionally blocks checkpoint and
+retry. Local tracking remains authoritative and usable, but there is no Basketball conflict-review
+surface in BKE-4B2; BKE-4B3 must resolve the conflict before cloud sync can continue.

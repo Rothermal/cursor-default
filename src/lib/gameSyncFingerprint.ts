@@ -50,8 +50,35 @@ export function isSoccerEventCloudSyncEligible(state: GameState): boolean {
   )
 }
 
+/** Marked Basketball games own their event stream and must never fall through to aggregate sync. */
+export function isBasketballEventCloudSyncEligible(state: GameState): boolean {
+  return Boolean(
+    state.sport?.id === 'basketball' &&
+      state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
+      state.eventStream !== null &&
+      state.sportGameState?.sportId === 'basketball'
+  )
+}
+
+export function isEventCloudSyncEligible(state: GameState): boolean {
+  return (
+    isSoccerEventCloudSyncEligible(state) ||
+    isBasketballEventCloudSyncEligible(state)
+  )
+}
+
+export type CloudSyncRoute = 'aggregate' | 'soccer_events' | 'basketball_events' | 'unsupported'
+
+/** Exhaustive transport selection keeps event games out of legacy aggregate tables. */
+export function cloudSyncRouteForState(state: GameState): CloudSyncRoute {
+  if (isSoccerEventCloudSyncEligible(state)) return 'soccer_events'
+  if (isBasketballEventCloudSyncEligible(state)) return 'basketball_events'
+  if (isAggregateCloudSyncEligible(state)) return 'aggregate'
+  return 'unsupported'
+}
+
 export function isCloudSyncEligible(state: GameState): boolean {
-  return isAggregateCloudSyncEligible(state) || isSoccerEventCloudSyncEligible(state)
+  return cloudSyncRouteForState(state) !== 'unsupported'
 }
 
 /**

@@ -251,13 +251,6 @@ export default function GameSetup() {
       })
       setTeams(loadedTeams)
 
-      if (isBasketballEventIntent) {
-        setTeamMode('new')
-        setSelectedTeamId('')
-        setLoadingTeams(false)
-        return
-      }
-
       const requestedTeam = requestedTeamId
         ? loadedTeams.find(team => team.id === requestedTeamId)
         : null
@@ -441,8 +434,6 @@ export default function GameSetup() {
   const showBasketballEventToggle = Boolean(
     isBasketballEventModelCreationAvailable() &&
       sport?.id === 'basketball' &&
-      !requestedTeamId &&
-      teamMode === 'new' &&
       (isBasketballEventIntent || !state.gameInfo)
   )
 
@@ -459,11 +450,6 @@ export default function GameSetup() {
   }
 
   const updateTeamMode = (nextMode: 'existing' | 'new') => {
-    if (
-      nextMode === 'existing' &&
-      isBasketballEventIntent &&
-      !updateBasketballEventIntent(false)
-    ) return
     setTeamMode(nextMode)
   }
 
@@ -523,10 +509,6 @@ export default function GameSetup() {
 
   const handleNext = async () => {
     if (!canProceed) return
-    if (isBasketballEventIntent && teamMode !== 'new') {
-      setSetupError('Basketball event mode is local-only during development.')
-      return
-    }
     if (isCloudFlow && teamMode === 'existing' && !canTrackGames(selectedTeam?.accessRole ?? null)) {
       setSetupError('Viewer access is read-only. Choose a team you can track.')
       return
@@ -617,9 +599,7 @@ export default function GameSetup() {
     }
 
     const resolvedSeasonIdForSync =
-      isBasketballEventIntent
-        ? null
-        : teamMode === 'existing' && selectedTeam
+      teamMode === 'existing' && selectedTeam
         ? selectedTeam.season_id
         : teamMode === 'new' && selectedNewTeamSeasonId
           ? selectedNewTeamSeasonId
@@ -835,7 +815,7 @@ export default function GameSetup() {
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-amber-950">Event Model</span>
                 <span className="block text-xs text-amber-800">
-                  Internal local-only Basketball tracking preview
+                  Internal Basketball event tracking preview
                 </span>
               </span>
               <input

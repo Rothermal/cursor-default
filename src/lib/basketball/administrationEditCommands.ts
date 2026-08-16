@@ -7,6 +7,7 @@ import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEve
 import type { GameEventActor, GameEventMutation } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
 import { normalizeBasketballActorLabel, sameBasketballActorIdentity } from './actorIdentity'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import {
   basketballActorForSelection,
   nextBasketballEventSequence,
@@ -569,8 +570,8 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedState> 
     state.sportGameState?.sportId !== 'basketball' ||
     !state.eventStream
   ) return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
-  if (hasCloudBinding(state)) {
-    return commandFailure('cloud_flow_unsupported', 'Basketball event editing is local-only during development.')
+  if (isFinalBasketballCloudGame(state)) {
+    return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
   if (!rebuilt.inspection.complete || rebuilt.state.sportGameState?.sportId !== 'basketball' || !rebuilt.state.eventStream) {
@@ -636,13 +637,6 @@ function eventStreamFingerprint(state: GameState): string {
       ? `${raw.id}:${raw.revision}:${raw.updatedAt}:${raw.deletedAt ?? ''}`
       : JSON.stringify(raw)
   ).join('|')
-}
-
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId || state.cloudSync.gameId || state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 || state.cloudSync.lastSyncedGameFingerprint
-  )
 }
 
 function periodLabel(state: GameState, periodId: string): string {

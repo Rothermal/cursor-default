@@ -3,7 +3,11 @@ import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
-import { addBasketballLateParticipant, prepareBasketballGameStart } from './commands'
+import {
+  abandonBasketballMatch,
+  addBasketballLateParticipant,
+  prepareBasketballGameStart,
+} from './commands'
 import {
   assertHealthyBasketballEventGame,
   basketballCloudParticipants,
@@ -35,9 +39,10 @@ function player(id: string, name: string, number = ''): Player {
   return { id, name, number, stats: {} }
 }
 
-function startedState(): GameState {
+function startedState(sourceTeam = false): GameState {
+  const base = createInitialState()
   const initial: GameState = {
-    ...createInitialState(),
+    ...base,
     gameDataAuthority: 'sport_events',
     sport: basketball,
     gameInfo: {
@@ -64,6 +69,9 @@ function startedState(): GameState {
       timeoutsPerPeriod: null,
       timeoutsPerOvertime: null,
     },
+    cloudSync: sourceTeam
+      ? { ...base.cloudSync, teamId: 'team-1', seasonId: 'season-1' }
+      : base.cloudSync,
   }
   const result = prepareBasketballGameStart(initial, {
     recorderUserId: 'user-1',
@@ -166,7 +174,7 @@ describe('Basketball event cloud transport adapter', () => {
     }))
   })
 
-  it('round-trips a healthy stream through the shared engine without app routing', async () => {
+  it('round-trips a healthy stream using only event transport contracts', async () => {
     const result = await syncBasketballEventGameToCloud({
       state: startedState(),
       userId: 'user-1',
@@ -189,6 +197,51 @@ describe('Basketball event cloud transport adapter', () => {
       expect.objectContaining({ sportId: 'basketball' }),
       expect.objectContaining({ 'player-1': 'cloud-participant-1' })
     )
+  })
+
+  it('binds an authorized team game with immutable team and season sources', async () => {
+    await syncBasketballEventGameToCloud({
+      state: startedState(true),
+      userId: 'user-1',
+      localGameId: '80000000-0000-4000-8000-000000000001',
+    })
+
+    expect(cloudMock.rpc).toHaveBeenNthCalledWith(
+      1,
+      'bind_basketball_event_game_v4',
+      expect.objectContaining({
+        p_source_team_id: 'team-1',
+        p_source_season_id: 'season-1',
+        p_participants: expect.arrayContaining([
+          expect.objectContaining({
+            client_player_id: 'player-1',
+            source_player_id: 'player-1',
+          }),
+        ]),
+      })
+    )
+  })
+
+  it('uploads a locally ended stream while the cloud game remains nonfinal', async () => {
+    const ended = abandonBasketballMatch(startedState(), {
+      recorderUserId: 'user-1',
+      occurredAt: '2026-08-15T12:03:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000301',
+    })
+    if (!ended.ok) throw new Error(ended.message)
+
+    const result = await syncBasketballEventGameToCloud({
+      state: ended.state,
+      userId: 'user-1',
+      localGameId: '80000000-0000-4000-8000-000000000001',
+    })
+
+    expect(ended.state.sportGameState?.sportId).toBe('basketball')
+    expect(ended.state.sportGameState?.sportId === 'basketball'
+      ? ended.state.sportGameState.projection.status
+      : null).toBe('ended')
+    expect(result.gameStatus).toBe('in_progress')
+    expect(cloudMock.upsert).toHaveBeenCalledTimes(2)
   })
 
   it('rejects a wrong-sport remote stream before upload or checkpoint', async () => {

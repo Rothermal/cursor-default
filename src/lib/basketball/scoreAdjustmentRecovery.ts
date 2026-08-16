@@ -3,6 +3,7 @@ import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventDiagnostic } from '../gameEvents/types'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import type { BasketballMatchEvent } from './types'
 
 export const BASKETBALL_NEGATIVE_SCORE_DIAGNOSTIC = 'Basketball score cannot project below zero.'
@@ -26,7 +27,7 @@ export function basketballRecoverableScoreAdjustmentId(
     state.gameDataAuthority !== 'sport_events' ||
     state.sportGameState?.sportId !== 'basketball' ||
     !state.eventStream ||
-    hasCloudBinding(state)
+    isFinalBasketballCloudGame(state)
   ) return null
 
   const streamInspection = inspectGameEventStream(state.eventStream, gameEventRegistry)
@@ -39,13 +40,6 @@ export function basketballRecoverableScoreAdjustmentId(
     .filter(isBasketballMatchEvent)
     .find(candidate => candidate.id === failure.eventId)
   return event?.eventType === 'basketball.score_adjustment' ? event.id : null
-}
-
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId || state.cloudSync.gameId || state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 || state.cloudSync.lastSyncedGameFingerprint
-  )
 }
 
 function isBasketballMatchEvent(event: { sportId: string }): event is BasketballMatchEvent {

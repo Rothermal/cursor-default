@@ -304,7 +304,7 @@ describe('BKE-2B Basketball direct commands', () => {
 
     const cloud = {
       ...before,
-      cloudSync: { ...before.cloudSync, gameId: 'game-1' },
+      cloudSync: { ...before.cloudSync, gameId: 'game-1', gameStatus: 'final' },
     }
     expect(adjustBasketballScore(cloud, {
       recorderUserId: 'recorder-1',

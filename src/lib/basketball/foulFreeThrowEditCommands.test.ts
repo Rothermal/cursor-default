@@ -397,7 +397,7 @@ describe('BKE-3D3 foul and free-throw event editing', () => {
     })
     expect(buildBasketballFoulFreeThrowEditDraft({
       ...foul.state,
-      cloudSync: { ...foul.state.cloudSync, gameId: 'cloud-game' },
+      cloudSync: { ...foul.state.cloudSync, gameId: 'cloud-game', gameStatus: 'final' },
     }, foul.foulEventId)).toMatchObject({ ok: false, code: 'cloud_flow_unsupported' })
   })
 

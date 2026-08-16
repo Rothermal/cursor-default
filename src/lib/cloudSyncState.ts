@@ -1,7 +1,7 @@
 import type { CloudSyncState, GameAction, GameState } from '../types'
 
 /**
- * Active soccer recovery must replace the full reducer state. A metadata-only
+ * Active event-game recovery must replace the full reducer state. A metadata-only
  * patch would leave React holding the pre-merge event stream, which the normal
  * persistence effect could then write over the recovered parked snapshot.
  */

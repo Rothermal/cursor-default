@@ -3,6 +3,7 @@ import { addGameEvent, addGameEvents } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import type { GameEventActor } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import {
   basketballActorForSelection,
   basketballCaptureTargetForPlayerId,
@@ -372,8 +373,8 @@ function directCommandContext(
   occurredAt?: string
 ): { ok: true; context: Exclude<ReturnType<typeof getBasketballCommandContext>, { ok: false }>['value'] } |
   { ok: false; state: GameState; code: BasketballCommandErrorCode; message: string } {
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event capture is local-only during development.')
+  if (isFinalBasketballCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const context = getBasketballCommandContext(state, recorderUserId, occurredAt)
   return context.ok ? { ok: true, context: context.value } : failure(state, context.code, context.message)
@@ -526,16 +527,6 @@ function turnoverSelectionForOptions(
 
 function oppositeSide(side: BasketballTeamSide): BasketballTeamSide {
   return side === 'tracked' ? 'opponent' : 'tracked'
-}
-
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId ||
-    state.cloudSync.gameId ||
-    state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 ||
-    state.cloudSync.lastSyncedGameFingerprint
-  )
 }
 
 function failure(

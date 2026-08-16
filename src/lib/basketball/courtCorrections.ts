@@ -5,6 +5,7 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEvents/stream'
 import type { GameEventMutation } from '../gameEvents/types'
 import { isTeamPseudoPlayer, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
+import { isFinalBasketballCloudGame } from './cloudPolicy'
 import type {
   BasketballBonusStatus,
   BasketballCourtUndoReceipt,
@@ -229,8 +230,8 @@ export function previewBasketballFoulDecrement(
   state: GameState,
   target: BasketballFoulDecrementTarget
 ): BasketballCommandResult<BasketballFoulDecrementPreview> {
-  if (hasCloudBinding(state)) {
-    return commandFailure('cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  if (isFinalBasketballCloudGame(state)) {
+    return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const plan = foulDecrementPlan(state, target)
   if (!plan) {
@@ -256,7 +257,7 @@ export function canDecrementBasketballFoul(
   state: GameState,
   target: BasketballFoulDecrementTarget
 ): boolean {
-  if (hasCloudBinding(state) || state.sportGameState?.sportId !== 'basketball') return false
+  if (isFinalBasketballCloudGame(state) || state.sportGameState?.sportId !== 'basketball') return false
   const currentPeriodId = state.sportGameState.projection.status === 'in_progress'
     ? state.sportGameState.projection.currentPeriodId
     : null
@@ -275,8 +276,8 @@ export function decrementBasketballFoul(
 ): BasketballStateCommandResult {
   const timestamp = validTimestamp(now)
   if (!timestamp) return failure(state, 'invalid_timestamp', 'Basketball correction timestamp is invalid.')
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  if (isFinalBasketballCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const plan = foulDecrementPlan(state, target)
   if (!plan) {
@@ -294,8 +295,8 @@ export function previewBasketballFreeThrowTripRemoval(
   state: GameState,
   tripEventId: string
 ): BasketballCommandResult<BasketballFreeThrowTripRemovalPreview> {
-  if (hasCloudBinding(state)) {
-    return commandFailure('cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  if (isFinalBasketballCloudGame(state)) {
+    return commandFailure('cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const plan = freeThrowTripRemovalPlan(state, tripEventId)
   return plan
@@ -310,8 +311,8 @@ export function removeBasketballFreeThrowTrip(
 ): BasketballStateCommandResult {
   const timestamp = validTimestamp(now)
   if (!timestamp) return failure(state, 'invalid_timestamp', 'Basketball correction timestamp is invalid.')
-  if (hasCloudBinding(state)) {
-    return failure(state, 'cloud_flow_unsupported', 'Basketball event correction is local-only during development.')
+  if (isFinalBasketballCloudGame(state)) {
+    return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const plan = freeThrowTripRemovalPlan(state, tripEventId)
   if (!plan) {
@@ -1118,16 +1119,6 @@ export function reconcileBasketballPlayerRows(state: GameState): GameState {
 
 function validTimestamp(value: string): string | null {
   return value && Number.isFinite(Date.parse(value)) ? value : null
-}
-
-function hasCloudBinding(state: GameState): boolean {
-  return Boolean(
-    state.cloudSync.teamId ||
-    state.cloudSync.gameId ||
-    state.cloudSync.seasonId ||
-    Object.keys(state.cloudSync.playerIdMap).length > 0 ||
-    state.cloudSync.lastSyncedGameFingerprint
-  )
 }
 
 function failure(

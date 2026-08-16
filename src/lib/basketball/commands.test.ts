@@ -123,7 +123,7 @@ describe('BKE-1C1 Basketball commands', () => {
     expect(hasStartedBasketballEventGame({ ...started, eventStream: null })).toBe(false)
   })
 
-  it('does not convert an aggregate setup or cloud-bound game', () => {
+  it('does not convert an aggregate setup or existing cloud game', () => {
     const aggregateSetup = {
       ...freshState(),
       gameInfo: setupState().gameInfo,
@@ -136,12 +136,41 @@ describe('BKE-1C1 Basketball commands', () => {
 
     const cloudBound = {
       ...freshState(),
-      cloudSync: { ...freshState().cloudSync, teamId: 'team-1' },
+      cloudSync: { ...freshState().cloudSync, gameId: 'game-1' },
     }
     expect(setBasketballEventCreationIntent(cloudBound, true)).toMatchObject({
       ok: false,
       state: cloudBound,
       code: 'cloud_flow_unsupported',
+    })
+  })
+
+  it('starts an authorized team event game with immutable source ids', () => {
+    const before = setupState()
+    before.cloudSync = {
+      ...before.cloudSync,
+      teamId: 'team-1',
+      seasonId: 'season-1',
+      playerIdMap: {
+        'player-1': 'player-1',
+        'player-2': 'player-2',
+      },
+    }
+    const result = prepareBasketballGameStart(before, {
+      recorderUserId: 'recorder-1',
+      occurredAt,
+      eventId: '70000000-0000-4000-8000-000000000011',
+      participantIds: [
+        '70000000-0000-4000-8000-000000000111',
+        '70000000-0000-4000-8000-000000000112',
+      ],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.state.sportGameState?.sportId !== 'basketball') return
+    expect(result.state.sportGameState.setup).toMatchObject({
+      sourceTeamId: 'team-1',
+      sourceSeasonId: 'season-1',
     })
   })
 
@@ -804,8 +833,19 @@ describe('BKE-2A Basketball lifecycle commands', () => {
     })
   })
 
-  it('abandons a period break, reopens to that break, and rejects cloud lifecycle changes', () => {
+  it('keeps active cloud-bound games editable and finalized games read-only', () => {
     const state = startedState()
+    const bound = {
+      ...state,
+      cloudSync: { ...state.cloudSync, gameId: 'cloud-game', gameStatus: 'in_progress' as const },
+    }
+    expect(captureBasketballCourtEvent(bound, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: { kind: 'shot', made: true, shotType: '2pt' },
+    })).toMatchObject({ ok: true })
+
     const ended = endBasketballPeriod(state, {
       recorderUserId: 'recorder-1',
       occurredAt: '2026-08-02T16:12:00.000Z',
@@ -836,7 +876,7 @@ describe('BKE-2A Basketball lifecycle commands', () => {
 
     const cloud = {
       ...state,
-      cloudSync: { ...state.cloudSync, gameId: 'cloud-game' },
+      cloudSync: { ...state.cloudSync, gameId: 'cloud-game', gameStatus: 'final' },
     }
     expect(suspendBasketballMatch(cloud, { recorderUserId: 'recorder-1' }))
       .toMatchObject({ ok: false, state: cloud, code: 'cloud_flow_unsupported' })
