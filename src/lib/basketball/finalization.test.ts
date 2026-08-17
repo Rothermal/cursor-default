@@ -1,15 +1,42 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
+import { eventRevisionCheckpoint, eventStreamFingerprint } from '../gameEvents/cloudTransport'
+import { inspectGameEventStream } from '../gameEvents/stream'
+import { gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState } from '../gameReducer'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
-import { prepareBasketballGameStart } from './commands'
+import {
+  completeBasketballMatch,
+  endBasketballPeriod,
+  prepareBasketballGameStart,
+  startNextBasketballPeriod,
+} from './commands'
+import { adjustBasketballScore } from './directCommands'
 import {
   BASKETBALL_CANONICAL_PAYLOAD_SCHEMA_VERSION,
   createBasketballCanonicalSnapshot,
   EVENT_PLATFORM_CANONICAL_ENVELOPE_VERSION,
+  finalizeBasketballGame,
+  loadBasketballCanonicalPublication,
+  loadBasketballFinalizationReadiness,
   parseBasketballCanonicalSnapshot,
+  prepareBasketballFinalization,
+  type BasketballFinalizationPreview,
 } from './finalization'
+import type { BasketballRecorderProjection, BasketballRecorderSummary } from './recorders'
+
+const cloudMock = vi.hoisted(() => ({ rpc: vi.fn() }))
+const recorderMock = vi.hoisted(() => ({
+  loadRecorders: vi.fn(),
+  loadProjection: vi.fn(),
+}))
+
+vi.mock('../supabase', () => ({ supabase: { rpc: cloudMock.rpc } }))
+vi.mock('./recorders', () => ({
+  loadBasketballGameRecorders: recorderMock.loadRecorders,
+  loadBasketballRecorderProjection: recorderMock.loadProjection,
+}))
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
 const recorderId = 'recorder-1'
@@ -63,6 +90,92 @@ function startedState(): GameState {
   if (!result.ok) throw new Error(result.message)
   return result.state
 }
+
+function completedState(): GameState {
+  let state = startedState()
+  const adjusted = adjustBasketballScore(state, {
+    recorderUserId: recorderId,
+    teamSide: 'tracked',
+    delta: 2,
+    reason: 'scoreboard_control',
+    occurredAt: '2026-08-16T18:01:00.000Z',
+    eventId: '92000000-0000-4000-8000-000000000002',
+  })
+  if (!adjusted.ok) throw new Error(adjusted.message)
+  state = adjusted.state
+
+  for (let period = 1; period <= 4; period += 1) {
+    const ended = endBasketballPeriod(state, {
+      recorderUserId: recorderId,
+      occurredAt: `2026-08-16T18:${String(period * 2).padStart(2, '0')}:00.000Z`,
+      eventId: `92000000-0000-4000-8000-${String(100 + period).padStart(12, '0')}`,
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    state = ended.state
+    if (period < 4) {
+      const started = startNextBasketballPeriod(state, {
+        recorderUserId: recorderId,
+        occurredAt: `2026-08-16T18:${String(period * 2 + 1).padStart(2, '0')}:00.000Z`,
+        eventId: `92000000-0000-4000-8000-${String(200 + period).padStart(12, '0')}`,
+      })
+      if (!started.ok) throw new Error(started.message)
+      state = started.state
+    }
+  }
+
+  const completed = completeBasketballMatch(state, {
+    recorderUserId: recorderId,
+    occurredAt: '2026-08-16T18:10:00.000Z',
+    eventId: '92000000-0000-4000-8000-000000000300',
+  })
+  if (!completed.ok) throw new Error(completed.message)
+  return completed.state
+}
+
+const recorder: BasketballRecorderSummary = {
+  recorderId,
+  displayName: 'Recorder One',
+  eventCount: 10,
+  checkpointEventCount: 10,
+  checkpointSyncedAt: '2026-08-16T18:11:00.000Z',
+  checkpointCurrent: true,
+  unresolvedConflictCount: 0,
+  isPrimary: true,
+  primarySource: 'selected',
+  canSelectPrimary: true,
+}
+
+function recorderProjection(state = completedState()): BasketballRecorderProjection {
+  return {
+    recorder,
+    state,
+    eventStream: state.eventStream!,
+    inspection: inspectGameEventStream(state.eventStream!, gameEventRegistry),
+  }
+}
+
+function readinessRow() {
+  return {
+    game_status: 'in_progress',
+    can_finalize: true,
+    can_reopen: false,
+    primary_recorded_by: recorderId,
+    primary_display_name: 'Recorder One',
+    primary_ended: true,
+    primary_checkpoint_current: true,
+    primary_conflict_count: 0,
+    primary_locked: false,
+    active_publication_id: null,
+    finalized_at: null,
+    non_primary_attention_count: 1,
+  }
+}
+
+beforeEach(() => {
+  cloudMock.rpc.mockReset()
+  recorderMock.loadRecorders.mockReset()
+  recorderMock.loadProjection.mockReset()
+})
 
 describe('Basketball canonical snapshot contract', () => {
   it('creates a source-only versioned snapshot and round-trips it strictly', () => {
@@ -147,5 +260,168 @@ describe('Basketball canonical snapshot contract', () => {
     const wrongRecorder = startedState()
     expect(() => createBasketballCanonicalSnapshot('game-1', 'recorder-2', wrongRecorder))
       .toThrow('do not belong to the primary recorder')
+  })
+})
+
+describe('Basketball finalization repository', () => {
+  it('strictly parses authoritative readiness', async () => {
+    cloudMock.rpc.mockResolvedValue({ data: [readinessRow()], error: null })
+
+    await expect(loadBasketballFinalizationReadiness('game-1')).resolves.toEqual({
+      gameStatus: 'in_progress',
+      canFinalize: true,
+      canReopen: false,
+      primaryRecorderId: recorderId,
+      primaryDisplayName: 'Recorder One',
+      primaryEnded: true,
+      primaryCheckpointCurrent: true,
+      primaryConflictCount: 0,
+      primaryLocked: false,
+      activePublicationId: null,
+      finalizedAt: null,
+      nonPrimaryAttentionCount: 1,
+    })
+
+    cloudMock.rpc.mockResolvedValue({
+      data: [{ ...readinessRow(), can_finalize: 'true' }],
+      error: null,
+    })
+    await expect(loadBasketballFinalizationReadiness('game-1')).rejects.toThrow(
+      'finalization capability'
+    )
+  })
+
+  it('rebuilds a healthy terminal primary into an explicit review preview', async () => {
+    const projection = recorderProjection()
+    cloudMock.rpc.mockResolvedValue({ data: [readinessRow()], error: null })
+    recorderMock.loadRecorders.mockResolvedValue([recorder])
+    recorderMock.loadProjection.mockResolvedValue(projection)
+
+    await expect(prepareBasketballFinalization('game-1')).resolves.toMatchObject({
+      gameId: 'game-1',
+      recorder,
+      score: { tracked: 2, opponent: 0 },
+      endReason: 'completed',
+      snapshot: {
+        canonicalSchemaVersion: BASKETBALL_CANONICAL_PAYLOAD_SCHEMA_VERSION,
+        primaryRecorderId: recorderId,
+      },
+    })
+  })
+
+  it('confirms the exact isolated primary checkpoint before returning a review', async () => {
+    const projection = recorderProjection()
+    let readinessCalls = 0
+    cloudMock.rpc.mockImplementation((name: string) => {
+      if (name === 'get_basketball_finalization_readiness') {
+        readinessCalls += 1
+        return Promise.resolve({
+          data: [{
+            ...readinessRow(),
+            primary_checkpoint_current: readinessCalls > 1,
+          }],
+          error: null,
+        })
+      }
+      if (name === 'confirm_basketball_primary_checkpoint_for_finalization') {
+        return Promise.resolve({ data: '2026-08-16T18:11:00.000Z', error: null })
+      }
+      throw new Error(`Unexpected RPC: ${name}`)
+    })
+    recorderMock.loadRecorders.mockResolvedValue([{
+      ...recorder,
+      checkpointCurrent: false,
+    }])
+    recorderMock.loadProjection.mockResolvedValue(projection)
+
+    await expect(prepareBasketballFinalization('game-1')).resolves.toMatchObject({
+      readiness: { primaryCheckpointCurrent: true },
+    })
+    expect(cloudMock.rpc).toHaveBeenCalledWith(
+      'confirm_basketball_primary_checkpoint_for_finalization',
+      {
+        p_game_id: 'game-1',
+        p_primary_recorded_by: recorderId,
+        p_stream_version: projection.eventStream.version,
+        p_event_revisions: eventRevisionCheckpoint(projection.state),
+        p_event_count: eventRevisionCheckpoint(projection.state).length,
+        p_max_sequence: expect.any(Number),
+        p_stream_fingerprint: eventStreamFingerprint(projection.state),
+      }
+    )
+  })
+
+  it('submits the exact reviewed checkpoint and parses finalization identity', async () => {
+    const projection = recorderProjection()
+    const preview: BasketballFinalizationPreview = {
+      gameId: 'game-1',
+      readiness: {
+        gameStatus: 'in_progress',
+        canFinalize: true,
+        canReopen: false,
+        primaryRecorderId: recorderId,
+        primaryDisplayName: recorder.displayName,
+        primaryEnded: true,
+        primaryCheckpointCurrent: true,
+        primaryConflictCount: 0,
+        primaryLocked: false,
+        activePublicationId: null,
+        finalizedAt: null,
+        nonPrimaryAttentionCount: 0,
+      },
+      recorder,
+      projection,
+      snapshot: createBasketballCanonicalSnapshot('game-1', recorderId, projection.state),
+      score: { tracked: 2, opponent: 0 },
+      endReason: 'completed',
+    }
+    cloudMock.rpc.mockResolvedValue({
+      data: {
+        publication_id: 'publication-1',
+        publication_number: 1,
+        primary_recorded_by: recorderId,
+        finalized_at: '2026-08-16T18:12:00.000Z',
+      },
+      error: null,
+    })
+
+    await expect(finalizeBasketballGame(preview)).resolves.toMatchObject({
+      publicationId: 'publication-1',
+      publicationNumber: 1,
+      primaryRecorderId: recorderId,
+      score: { tracked: 2, opponent: 0 },
+    })
+    expect(cloudMock.rpc).toHaveBeenCalledWith('finalize_basketball_event_game', {
+      p_game_id: 'game-1',
+      p_primary_recorded_by: recorderId,
+      p_event_revisions: eventRevisionCheckpoint(projection.state),
+      p_stream_fingerprint: eventStreamFingerprint(projection.state),
+      p_canonical_snapshot: preview.snapshot,
+    })
+  })
+
+  it('loads and validates active Basketball publication identity', async () => {
+    const snapshot = createBasketballCanonicalSnapshot('game-1', recorderId, completedState())
+    cloudMock.rpc.mockResolvedValue({
+      data: [{
+        publication_id: 'publication-1',
+        publication_number: 1,
+        primary_recorded_by: recorderId,
+        primary_display_name: 'Recorder One',
+        canonical_snapshot: snapshot,
+        snapshot_fingerprint: 'snapshot-fingerprint',
+        finalized_by: 'manager-1',
+        finalized_by_display_name: 'Manager One',
+        finalized_at: '2026-08-16T18:12:00.000Z',
+      }],
+      error: null,
+    })
+
+    await expect(loadBasketballCanonicalPublication('game-1')).resolves.toMatchObject({
+      publicationId: 'publication-1',
+      publicationNumber: 1,
+      primaryRecorderId: recorderId,
+      snapshot,
+    })
   })
 })

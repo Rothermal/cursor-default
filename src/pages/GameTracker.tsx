@@ -46,6 +46,7 @@ import { isTeamPseudoPlayer, playersWithTeamPlaceholders } from '../lib/teamPlay
 import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { gameInfoPath } from '../lib/teamInfo'
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
@@ -978,7 +979,11 @@ export default function GameTracker() {
     setLifecycleError(null)
     setShowCompleteConfirm(false)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
-    navigate('/summary')
+    navigate(
+      result.state.cloudSync.gameId
+        ? gameInfoPath(result.state.cloudSync.gameId, result.state.cloudSync.teamId)
+        : '/summary'
+    )
   }
 
   const applyLocalBasketballEnd = () => {
@@ -994,6 +999,9 @@ export default function GameTracker() {
     setLifecycleError(null)
     setPendingLocalEnd(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
+    if (pendingLocalEnd === 'abandon' && result.state.cloudSync.gameId) {
+      navigate(gameInfoPath(result.state.cloudSync.gameId, result.state.cloudSync.teamId))
+    }
   }
 
   const handleReopenBasketballMatch = (reason: string) => {
@@ -1962,7 +1970,9 @@ export default function GameTracker() {
       <ConfirmDialog
         open={showCompleteConfirm}
         title="End this game?"
-        message="This records the current result and makes ordinary game capture read-only."
+        message={state.cloudSync.gameId
+          ? 'This records the result locally and opens Game Info to review and finalize the cloud result.'
+          : 'This records the current result and makes ordinary game capture read-only.'}
         confirmLabel="End Game"
         cancelLabel="Keep Tracking"
         destructive={false}

@@ -1,10 +1,10 @@
 # Plan: BKE-4C Basketball Recorders and Finalization
 
-Status: Product and delivery Q&A approved. BKE-4C1 backend policy/contracts and BKE-4C2 recorder
-presence/primary selection are implemented; BKE-4C3 transactional canonical finalization is next.
-Migration 057 is required. The BKE-4B live two-device Supabase matrix remains pending and is
-carried into the combined BKE-4C exit evidence. Basketball event-game creation remains
-internal-only through BKE-4E.
+Status: Product and delivery Q&A approved. BKE-4C1 backend policy/contracts, BKE-4C2 recorder
+presence/primary selection, and BKE-4C3 transactional canonical finalization are implemented;
+BKE-4C4 reopen/republication hardening is next. Migrations 057 and 058 are required. The BKE-4B
+live two-device Supabase matrix remains pending and is carried into the combined BKE-4C exit
+evidence. Basketball event-game creation remains internal-only through BKE-4E.
 
 ## 1. Objective
 
@@ -215,7 +215,7 @@ status only. Game Info now supports personal Basketball cloud games through crea
 without weakening team role checks. Active and parked `GameContext` state is never hydrated by
 inspection, and finalization/reopen remain absent.
 
-### BKE-4C3: Transactional Canonical Finalization
+### BKE-4C3: Transactional Canonical Finalization (Implemented)
 
 1. Add the fixed Basketball finalization wrapper over the shared core. Before invoking that core,
    the wrapper must reject a missing or unsupported `canonicalSchemaVersion`; BKE-4C3 accepts only
@@ -228,6 +228,17 @@ inspection, and finalization/reopen remain absent.
 
 Exit: one healthy Completed or Abandoned primary stream can become one immutable active canonical
 publication, and all ordinary final writes fail closed.
+
+Implementation record: migration 058 preserves the private shared transaction while dispatching
+Basketball to its trusted server score/terminal policy, and exposes only a fixed authenticated
+Basketball wrapper that rejects missing or unsupported canonical payload schema versions before
+delegation. `src/lib/basketball/finalization.ts` strictly parses readiness, conflicts, active
+publications, and finalization results; reprojects the selected cloud recorder in isolation;
+confirms an exact checkpoint when required; and submits the reviewed source-only snapshot. Ending
+a bound Completed or Abandoned Basketball game hands off to Game Info, which flushes an owned
+primary, presents score/terminal/health warnings for explicit confirmation, supports manager
+conflict preparation, and shows canonical publication authority/audit metadata after success.
+Final canonical detail review remains BKE-4D, and reopen remains absent until BKE-4C4.
 
 ### BKE-4C4: Reopen, Republication, and Exit Hardening
 
@@ -329,7 +340,7 @@ The August 2026 Q&A approved all recommended options:
 
 ## 15. Next Step
 
-Apply migration 057 and run the BKE-4C1/C2 runtime checks in
-[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then start BKE-4C3 on a
-fresh feature branch with the fixed Basketball finalization wrapper, server-side canonical schema
-enforcement, canonical preview/rebuild, and explicit Game Info confirmation.
+Apply migration 058 after 057 and run the BKE-4C1-C3 runtime checks in
+[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then start BKE-4C4 on a
+fresh feature branch with the fixed Basketball reopen wrapper, owned-binding refresh, corrected
+republication, and combined cloud-lifecycle exit hardening.

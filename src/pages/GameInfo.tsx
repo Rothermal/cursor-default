@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import ResultBadge from '../components/team-info/ResultBadge'
+import BasketballFinalizationPanel from '../components/basketball/BasketballFinalizationPanel'
 import BasketballRecorderManager from '../components/basketball/BasketballRecorderManager'
 import { computePlayerScore, sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
@@ -172,10 +173,12 @@ export default function GameInfo() {
   const userId = user?.id ?? null
   const {
     state,
+    dispatch,
     activeLocalGameId,
     parkedGames,
     openGameSnapshot,
     resumeParkedGame,
+    flushCloudGameSync,
     parkingError,
   } = useGame()
   const supabaseClient = supabase
@@ -688,11 +691,42 @@ export default function GameInfo() {
             </section>
 
             {sport?.id === 'basketball' && (
-              <BasketballRecorderManager
-                gameId={game.id}
-                currentUserId={userId}
-                canManage={canManageRecorderAuthority}
-              />
+              <>
+                <BasketballRecorderManager
+                  gameId={game.id}
+                  currentUserId={userId}
+                  canManage={canManageRecorderAuthority}
+                />
+                <BasketballFinalizationPanel
+                  gameId={game.id}
+                  gameStatus={game.status}
+                  currentUserId={userId}
+                  canManage={canManageRecorderAuthority}
+                  trackedScore={game.home_team_score ?? null}
+                  opponentScore={game.opponent_score ?? null}
+                  ownedLocalTerminal={Boolean(
+                    state.cloudSync.gameId === game.id &&
+                    state.sportGameState?.sportId === 'basketball' &&
+                    state.sportGameState.projection.status === 'ended'
+                  )}
+                  flushCloudSync={() => flushCloudGameSync(game.id)}
+                  onFinalized={result => {
+                    setGame(current => current ? {
+                      ...current,
+                      status: 'final',
+                      home_team_score: result.score.tracked,
+                      opponent_score: result.score.opponent,
+                      home_score_adjustment: 0,
+                    } : current)
+                    if (state.cloudSync.gameId === game.id) {
+                      dispatch({
+                        type: 'SET_CLOUD_SYNC_STATE',
+                        cloudSync: { gameStatus: 'final' },
+                      })
+                    }
+                  }}
+                />
+              </>
             )}
 
             <section className="card space-y-3">
