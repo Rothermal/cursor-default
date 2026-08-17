@@ -1,9 +1,9 @@
 # Plan: BKE-4C Basketball Recorders and Finalization
 
-Status: Product and delivery Q&A approved. BKE-4B1 through BKE-4B3 are implemented and migration
-056 is required. The BKE-4B live two-device Supabase matrix remains pending and is carried into
-the combined BKE-4C exit evidence. Basketball event-game creation remains internal-only through
-BKE-4E.
+Status: Product and delivery Q&A approved. BKE-4C1 backend policy/contracts are implemented in
+migration 057; BKE-4C2 recorder presence and primary selection are next. The BKE-4B live
+two-device Supabase matrix remains pending and is carried into the combined BKE-4C exit evidence.
+Basketball event-game creation remains internal-only through BKE-4E.
 
 ## 1. Objective
 
@@ -172,7 +172,7 @@ broaden app-admin access or weaken team RLS.
 
 ## 9. Delivery Slices
 
-### BKE-4C1: Backend Policy and Contracts
+### BKE-4C1: Backend Policy and Contracts (Implemented)
 
 1. Add the fixed Basketball recorder, history, primary-selection, readiness, canonical-reader, and
    manager-side primary-checkpoint confirmation wrappers needed by later slices.
@@ -184,6 +184,13 @@ broaden app-admin access or weaken team RLS.
 
 Exit: PostgreSQL can report Basketball recorder/readiness state and validate a prospective
 canonical source, but no new user-facing finalization action is exposed.
+
+Implementation record: migration 057 adds fixed Basketball preparation wrappers while keeping the
+generic cores and Basketball policy private. Non-managers receive limited recorder status and
+primary history stays manager-only. Shared readiness preserves Soccer and recognizes Basketball
+Completed/Abandoned endings. `src/lib/basketball/finalization.ts` defines the source-only
+Basketball canonical payload schema version 1 inside the existing platform version-2 envelope.
+No Basketball finalization or reopen wrapper is granted.
 
 ### BKE-4C2: Recorder Presence and Primary Selection
 
@@ -308,6 +315,7 @@ The August 2026 Q&A approved all recommended options:
 
 ## 15. Next Step
 
-Start BKE-4C1 on a fresh feature branch. Audit the effective migrations 053 and 055 first, then add
-the smallest fixed Basketball wrapper/policy migration and client canonical contract needed to
-prove terminal and score semantics without exposing finalization UI early.
+Apply migration 057 and record the BKE-4C1 runtime checks in
+[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then start BKE-4C2 on a
+fresh feature branch with strict recorder RPC parsing, isolated read-only stream projection, and
+the compact tracker/Game Info primary-selection surfaces.

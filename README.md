@@ -133,6 +133,8 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/054_event_platform_publication_constraint.sql` - BKE-4A4 staged canonical-publication sport widening
 - `supabase/migrations/055_event_platform_finalization_recovery.sql` - BKE-4A4 neutral finalization/recovery mechanics and Soccer wrappers
 - `supabase/migrations/056_basketball_event_cloud_transport.sql` - BKE-4B1 fixed Basketball v4 binding wrapper over the private event-platform transport
+- `supabase/migrations/057_basketball_recorder_finalization_contracts.sql` - BKE-4C1 fixed Basketball recorder/readiness preparation wrappers and private terminal/score policy
+   > Apply **`057`** before BKE-4C2 recorder/readiness UI; finalization and reopen remain unavailable until later BKE-4C slices.
    > Apply **`056`** before running BKE-4B2 Basketball event sync; the client fails closed when the binder is unavailable.
    > Apply **`054` and `055` separately and in order** so the staged constraint add commits before validation and replacement.
    > Apply **`049`** before enabling Soccer for cloud-team starts. Missing or stale capability contracts fail closed while local-only Soccer and existing/history access remain available.
@@ -492,6 +494,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Basketball automatic event sync (BKE-4B2)** - fail-closed aggregate/event routing, personal and authorized-team binding, durable queue/recovery integration, editable nonfinal cloud games, and no legacy stat/shot dual writes ([plan](docs/PLAN_BKE_4B_BASKETBALL_TRANSPORT.md), [regression](docs/REGRESSION_BKE_4B_TRANSPORT.md))
 - [x] **Basketball event recovery and conflicts (BKE-4B3)** - strict current-recorder cloud adoption, resume-first parked bindings, shared explicit conflict controls, durable recovery metadata, malformed-source quarantine, and duplicate-binding protection ([plan](docs/PLAN_BKE_4B_BASKETBALL_TRANSPORT.md), [regression](docs/REGRESSION_BKE_4B_TRANSPORT.md))
 - [ ] **Basketball event transport (BKE-4B)** - shared bind/pull/merge/upload/checkpoint transport, automatic Basketball sync, cross-device recovery, explicit conflicts, and offline retry in three slices ([plan](docs/PLAN_BKE_4B_BASKETBALL_TRANSPORT.md))
+- [x] **Basketball recorder/finalization contracts (BKE-4C1)** - role-limited recorder preparation wrappers, Basketball terminal/score policy, manager checkpoint confirmation, and the canonical payload contract without enabling publication ([plan](docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md), [regression](docs/REGRESSION_BKE_4C_FINALIZATION.md))
 - [ ] **Basketball recorder authority and finalization (BKE-4C)** - recorder presence, deterministic primary selection, canonical publication, audited reopen/republication, and finalized correction integration in four slices ([plan](docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md))
 - [ ] **Basketball event-model migration (BKE-4 through BKE-6)** - cloud lifecycle and aggregates, settings/rollout, then clock and lineups ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))
