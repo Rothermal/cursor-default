@@ -1,8 +1,7 @@
 # Regression: BKE-4C Basketball Recorder Authority and Finalization
 
-Status: BKE-4C1 automated coverage is implemented. Migration 057 is required before Basketball
-recorder/readiness clients ship in BKE-4C2. Canonical finalization and reopen remain unavailable
-until BKE-4C3/BKE-4C4.
+Status: BKE-4C1 backend contracts and BKE-4C2 recorder authority UI are implemented. Migration 057
+is required. Canonical finalization and reopen remain unavailable until BKE-4C3/BKE-4C4.
 
 ## BKE-4C1 Automated Gate
 
@@ -33,6 +32,25 @@ Coverage verifies:
 - migration 053, 055, and 056 contracts remain green.
 
 Static tests do not execute PostgreSQL parsing, RLS, locks, or security-definer behavior.
+
+## BKE-4C2 Automated Gate
+
+Coverage verifies:
+
+- manager recorder rows retain event/checkpoint/conflict detail while limited-reader nulls parse
+  without inventing values;
+- malformed booleans, duplicate recorders, multiple primaries, invalid history, and mismatched
+  primary-selection responses fail closed;
+- explicit primary and Needs Attention state derive from independent recorder rows without
+  blending;
+- another recorder loads into a fresh Basketball cloud shell, validates sport/ownership, and
+  reprojects without dispatching into active or parked `GameContext` state;
+- tracker presence refreshes after sync and through bounded focus/visibility/online polling;
+- Game Info limits selection, history, and opt-in stream inspection to managers while preserving
+  compact scorer/viewer status;
+- personal Basketball Game Info uses creator authority and skips team membership queries, while
+  team games continue to use owner/admin/scorer/viewer role checks; and
+- Basketball finalization and reopen remain unavailable.
 
 ## Apply Migration 057
 
@@ -85,7 +103,7 @@ select
 
 Expected: both values are `true`.
 
-## BKE-4C1 Runtime Matrix
+## BKE-4C1/C2 Runtime Matrix
 
 Use one personal Basketball event game and one accepted-team Basketball event game with at least
 two independent recorders when available.
