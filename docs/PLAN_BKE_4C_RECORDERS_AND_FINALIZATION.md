@@ -156,6 +156,7 @@ Expected Basketball wrappers are sport-fixed equivalents of the permanent Soccer
 - primary selection;
 - finalization readiness and canonical publication readers;
 - primary-conflict preparation where needed for finalization;
+- manager-side primary checkpoint confirmation for a selected recorder's exact cloud stream;
 - canonical finalization; and
 - reason-required reopen.
 
@@ -173,8 +174,8 @@ broaden app-admin access or weaken team RLS.
 
 ### BKE-4C1: Backend Policy and Contracts
 
-1. Add the fixed Basketball recorder, history, primary-selection, readiness, and canonical-reader
-   wrappers needed by later slices.
+1. Add the fixed Basketball recorder, history, primary-selection, readiness, canonical-reader, and
+   manager-side primary-checkpoint confirmation wrappers needed by later slices.
 2. Add trusted Basketball terminal/score validation and preserve the existing Soccer policy.
 3. Define and strictly parse Basketball canonical payload schema version 1 inside the platform
    version-2 envelope.
