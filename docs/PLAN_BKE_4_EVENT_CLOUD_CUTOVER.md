@@ -1,7 +1,7 @@
 # Plan: BKE-4 Event Cloud Cutover
 
 Status: Approved implementation plan. BKE-4A, BKE-4B1 through BKE-4B3, and BKE-4C1 through
-BKE-4C3 are implemented through migration 058. The BKE-4B live two-device matrix remains pending
+BKE-4C4 are implemented through migration 059. The BKE-4B live two-device matrix remains pending
 and is carried into BKE-4C exit evidence. BKE-4C product and delivery decisions are approved under
 [`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md).
 Basketball event-game creation remains internal-only through BKE-4E.
@@ -140,8 +140,7 @@ reopened for each implementation slice:
 
 ## 10. Next Step
 
-Implement BKE-4C4 from
-[`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md): add the
-fixed Basketball reopen wrapper, owned-binding refresh, corrected append-only republication, and
-combined BKE-4B/BKE-4C exit hardening. Keep the live matrix open until that cloud-lifecycle evidence
-is complete.
+Complete the combined BKE-4B/BKE-4C live matrix from
+[`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md), then begin
+BKE-4D explicit-authority Basketball Summary work. Keep broader enablement closed until that
+cloud-lifecycle evidence is complete.

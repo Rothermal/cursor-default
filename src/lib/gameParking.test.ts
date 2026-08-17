@@ -889,12 +889,13 @@ describe('gameParking', () => {
     expect(getActiveLocalGameId('user-1')).toBeNull()
   })
 
-  it('restores every matching parked soccer binding to in progress after cloud reopen', () => {
-    const base = gameState(soccer, 'Aces', 'Bears')
+  it('restores a matching parked event binding to in progress after cloud reopen', () => {
+    const base = gameState(basketball, 'Aces', 'Bears')
     const bound = withLastSyncedGameFingerprint({
       ...base,
+      gameDataAuthority: 'sport_events',
       eventStream: { version: 1, events: [] },
-      sportGameState: { sportId: 'soccer', version: 2 } as never,
+      sportGameState: { sportId: 'basketball', version: 1 } as never,
       cloudSync: {
         ...base.cloudSync,
         teamId: 'team-1',

@@ -91,6 +91,27 @@ export interface BasketballFinalizationResult {
   endReason: 'completed' | 'abandoned'
 }
 
+export interface BasketballCanonicalPublicationHistoryEntry {
+  publicationId: string
+  publicationNumber: number
+  primaryRecorderId: string
+  primaryDisplayName: string
+  finalizedBy: string
+  finalizedByDisplayName: string
+  finalizedAt: string
+  invalidatedBy: string | null
+  invalidatedByDisplayName: string | null
+  invalidatedAt: string | null
+  invalidationReason: string | null
+  isActive: boolean
+}
+
+export interface BasketballReopenResult {
+  gameId: string
+  publicationId: string
+  reopenedAt: string
+}
+
 export async function loadBasketballFinalizationReadiness(
   gameId: string
 ): Promise<BasketballFinalizationReadiness> {
@@ -221,6 +242,32 @@ export async function finalizeBasketballGame(
   }
 }
 
+export async function reopenBasketballCloudGame(
+  gameId: string,
+  reason: string
+): Promise<BasketballReopenResult> {
+  if (!supabase) throw new Error('Supabase client not configured')
+  const trimmedReason = reason.trim()
+  if (trimmedReason.length < 3) throw new Error('A reopen reason is required.')
+
+  const { data, error } = await supabase.rpc('reopen_basketball_event_game', {
+    p_game_id: gameId,
+    p_reason: trimmedReason,
+  })
+  if (error) throw new Error(`Basketball game could not reopen: ${error.message}`)
+
+  const row = objectRow(data)
+  const reopenedGameId = requiredString(row.game_id, 'reopened game id')
+  if (reopenedGameId !== gameId) {
+    throw new Error('Basketball reopen returned a different game.')
+  }
+  return {
+    gameId: reopenedGameId,
+    publicationId: requiredString(row.publication_id, 'invalidated publication id'),
+    reopenedAt: requiredTimestamp(row.reopened_at, 'reopen time'),
+  }
+}
+
 export async function loadBasketballCanonicalPublication(
   gameId: string
 ): Promise<BasketballCanonicalPublication | null> {
@@ -250,6 +297,71 @@ export async function loadBasketballCanonicalPublication(
     ),
     finalizedAt: requiredTimestamp(row.finalized_at, 'finalized time'),
   }
+}
+
+export async function loadBasketballCanonicalPublicationHistory(
+  gameId: string
+): Promise<BasketballCanonicalPublicationHistoryEntry[]> {
+  if (!supabase) throw new Error('Supabase client not configured')
+  const { data, error } = await supabase.rpc(
+    'get_basketball_canonical_publication_history',
+    { p_game_id: gameId }
+  )
+  if (error) throw new Error(`Basketball publication history could not load: ${error.message}`)
+  if (!Array.isArray(data)) throw new Error('Basketball publication history response is invalid.')
+
+  const history = data.map(raw => {
+    const row = objectRow(raw)
+    const isActive = requiredBoolean(row.is_active, 'publication active state')
+    const invalidatedBy = nullableString(row.invalidated_by, 'invalidation actor')
+    const invalidatedByDisplayName = nullableString(
+      row.invalidated_by_display_name,
+      'invalidation actor name'
+    )
+    const invalidatedAt = nullableTimestamp(row.invalidated_at, 'invalidation time')
+    const invalidationReason = nullableString(row.invalidation_reason, 'invalidation reason')
+    if (
+      (isActive && (
+        invalidatedBy !== null ||
+        invalidatedByDisplayName !== null ||
+        invalidatedAt !== null ||
+        invalidationReason !== null
+      )) ||
+      (!isActive && (
+        invalidatedBy === null ||
+        invalidatedByDisplayName === null ||
+        invalidatedAt === null ||
+        invalidationReason === null
+      ))
+    ) {
+      throw new Error('Basketball publication invalidation metadata is inconsistent.')
+    }
+    return {
+      publicationId: requiredString(row.publication_id, 'publication id'),
+      publicationNumber: requiredInteger(row.publication_number, 'publication number'),
+      primaryRecorderId: requiredString(row.primary_recorded_by, 'primary recorder'),
+      primaryDisplayName: requiredString(row.primary_display_name, 'primary recorder name'),
+      finalizedBy: requiredString(row.finalized_by, 'finalization actor'),
+      finalizedByDisplayName: requiredString(
+        row.finalized_by_display_name,
+        'finalization actor name'
+      ),
+      finalizedAt: requiredTimestamp(row.finalized_at, 'finalization time'),
+      invalidatedBy,
+      invalidatedByDisplayName,
+      invalidatedAt,
+      invalidationReason,
+      isActive,
+    }
+  })
+  if (
+    new Set(history.map(item => item.publicationId)).size !== history.length ||
+    new Set(history.map(item => item.publicationNumber)).size !== history.length ||
+    history.filter(item => item.isActive).length > 1
+  ) {
+    throw new Error('Basketball publication history contains duplicate authority.')
+  }
+  return history
 }
 
 export async function loadBasketballPrimaryFinalizationConflicts(

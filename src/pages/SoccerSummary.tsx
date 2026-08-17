@@ -52,7 +52,7 @@ export default function SoccerSummary() {
     openGameSnapshot,
     resumeParkedGame,
     flushCloudGameSync,
-    markSoccerCloudGameReopened,
+    markEventCloudGameReopened,
   } = useGame()
   const [source, setSource] = useState<SoccerSummarySource | null>(null)
   const [recorders, setRecorders] = useState<SoccerRecorderSummary[]>([])
@@ -553,7 +553,7 @@ export default function SoccerSummary() {
                     })
                   }}
                   onReopened={() => {
-                    markSoccerCloudGameReopened(cloudGameId)
+                    markEventCloudGameReopened(cloudGameId)
                     setReopenedGameId(cloudGameId)
                     void refresh({
                       gameId: cloudGameId,

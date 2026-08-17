@@ -179,6 +179,7 @@ export default function GameInfo() {
     openGameSnapshot,
     resumeParkedGame,
     flushCloudGameSync,
+    markEventCloudGameReopened,
     parkingError,
   } = useGame()
   const supabaseClient = supabase
@@ -724,6 +725,16 @@ export default function GameInfo() {
                         cloudSync: { gameStatus: 'final' },
                       })
                     }
+                  }}
+                  onReopened={() => {
+                    setGame(current => current ? {
+                      ...current,
+                      status: 'in_progress',
+                      home_team_score: null,
+                      opponent_score: 0,
+                      home_score_adjustment: 0,
+                    } : current)
+                    markEventCloudGameReopened(game.id)
                   }}
                 />
               </>
