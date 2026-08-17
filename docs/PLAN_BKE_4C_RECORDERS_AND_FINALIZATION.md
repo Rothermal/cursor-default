@@ -206,11 +206,14 @@ stream blending or finalization capability.
 
 ### BKE-4C3: Transactional Canonical Finalization
 
-1. Add the fixed Basketball finalization wrapper over the shared core.
+1. Add the fixed Basketball finalization wrapper over the shared core. Before invoking that core,
+   the wrapper must reject a missing or unsupported `canonicalSchemaVersion`; BKE-4C3 accepts only
+   Basketball canonical payload schema version 1.
 2. Build canonical preview/rebuild helpers and readiness refresh with current-recorder sync flush.
 3. Add the end-of-game handoff and Game Info confirmation flow.
-4. Prove idempotent publication, stale-request rejection, server-derived score, primary locking,
-   tied-Completed rejection, alternate warning behavior, and late non-primary audit isolation.
+4. Prove canonical-schema rejection at the server boundary, idempotent publication, stale-request
+   rejection, server-derived score, primary locking, tied-Completed rejection, alternate warning
+   behavior, and late non-primary audit isolation.
 
 Exit: one healthy Completed or Abandoned primary stream can become one immutable active canonical
 publication, and all ordinary final writes fail closed.
