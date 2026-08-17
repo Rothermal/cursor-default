@@ -140,7 +140,7 @@ reopened for each implementation slice:
 
 ## 10. Next Step
 
-Complete the combined BKE-4B/BKE-4C live matrix from
-[`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md), then begin
-BKE-4D explicit-authority Basketball Summary work. Keep broader enablement closed until that
-cloud-lifecycle evidence is complete.
+After applying migration 059, complete the minimum pre-BKE-4D runtime checkpoint from
+[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md), then begin BKE-4D
+explicit-authority Basketball Summary work. Keep broader enablement closed until the full combined
+BKE-4B/BKE-4C live matrix is complete.

@@ -348,6 +348,7 @@ The August 2026 Q&A approved all recommended options:
 
 ## 15. Next Step
 
-Apply migration 059 after 058 and complete the combined BKE-4B/BKE-4C runtime matrix in
-[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). BKE-4D explicit-authority
-Basketball Summary work is next; broader event-model enablement remains blocked on the live matrix.
+Apply migration 059 after 058 and run the minimum pre-BKE-4D runtime checkpoint in
+[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then begin BKE-4D
+explicit-authority Basketball Summary work. The full combined BKE-4B/BKE-4C matrix remains the
+broader event-model enablement gate.

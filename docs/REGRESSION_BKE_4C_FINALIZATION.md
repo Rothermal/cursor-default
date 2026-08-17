@@ -203,6 +203,25 @@ select
 Expected: `basketball_history_allowed = true`, `basketball_reopen_allowed = true`,
 `generic_reopen_allowed = false`, and `soccer_reopen_unchanged = true`.
 
+## Minimum Pre-BKE-4D Runtime Checkpoint
+
+After merging BKE-4C4 and applying migration 059, run this focused checkpoint before beginning
+BKE-4D Summary implementation. It does not replace the full exit matrix below:
+
+1. Finalize one healthy terminal primary, then retry the byte-identical request. Confirm one active
+   publication, one publication number, server-derived scores, and a locked primary.
+2. Prepare finalization, then change the selected primary or its checkpoint/revision/fingerprint.
+   Confirm the stale request is rejected without changing the active publication.
+3. Attempt ordinary primary writes after finalization. Confirm finalized-write denial while an
+   eligible already-queued non-primary audit upload remains unable to change canonical output.
+4. Reopen with a manager reason. Confirm the active row is invalidated rather than deleted, the
+   primary unlocks, published scores clear, the game returns to in-progress, and audit stores the
+   reason. Confirm a short reason and scorer/viewer request are denied without mutation.
+5. Open the owned local binding, append the local reopen/correction, sync, end, and explicitly
+   re-finalize. Confirm publication 2 is active and publication 1 remains invalidated history.
+6. Repeat the Soccer canonical finalization/reopen smoke to confirm migration 059 did not change
+   its fixed wrappers or shared runtime behavior.
+
 ## BKE-4C Exit Runtime Matrix
 
 Use one personal Basketball event game and one accepted-team Basketball event game with at least
