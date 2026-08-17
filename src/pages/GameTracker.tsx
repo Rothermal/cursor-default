@@ -37,6 +37,7 @@ import BasketballEjectionDialog, {
 } from '../components/basketball/BasketballEjectionDialog'
 import BasketballTimeoutDialog from '../components/basketball/BasketballTimeoutDialog'
 import BasketballTimeline from '../components/basketball/BasketballTimeline'
+import BasketballRecorderStatus from '../components/basketball/BasketballRecorderStatus'
 import EventCloudConflictDialog from '../components/game-events/EventCloudConflictDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
@@ -1066,6 +1067,13 @@ export default function GameTracker() {
             <button type="button" onClick={exportBasketballRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
           </div>
         ) : null}
+        {isBasketballEventMode && state.cloudSync.gameId && (
+          <BasketballRecorderStatus
+            gameId={state.cloudSync.gameId}
+            teamId={state.cloudSync.teamId}
+            refreshSignal={state.cloudSync.lastSyncedAt}
+          />
+        )}
         {basketballSportState && (
           <BasketballLifecycleControls
             sportState={basketballSportState}

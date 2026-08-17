@@ -8,7 +8,7 @@ const sql = readFileSync(
     'supabase/migrations/057_basketball_recorder_finalization_contracts.sql'
   ),
   'utf8'
-).toLowerCase()
+).replace(/\r\n/g, '\n').toLowerCase()
 
 const expectAuthenticated = (functionName: string) => {
   expect(sql).toMatch(new RegExp(

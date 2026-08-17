@@ -28,7 +28,7 @@ import {
 } from './state'
 import type { BasketballSportGameState } from './types'
 
-interface BasketballCloudGameRow {
+export interface BasketballCloudGameRow {
   id: string
   team_id: string | null
   season_id: string | null
@@ -48,7 +48,7 @@ interface BasketballCloudParticipantRow {
   jersey_number: string | null
 }
 
-interface BasketballCloudShell {
+export interface BasketballCloudShell {
   game: BasketballCloudGameRow
   state: GameState
   cloudToLocalPlayerId: Record<string, string>
@@ -277,7 +277,9 @@ export async function createBasketballIndependentRecorderState(
   return reconcileBasketballPlayerRows(started.state)
 }
 
-async function loadBasketballCloudShell(gameId: string): Promise<BasketballCloudShell> {
+export async function loadBasketballCloudShell(
+  gameId: string
+): Promise<BasketballCloudShell> {
   if (!supabase) throw new Error('Supabase client not configured')
   const [
     { data: gameData, error: gameError },

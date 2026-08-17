@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import ResultBadge from '../components/team-info/ResultBadge'
+import BasketballRecorderManager from '../components/basketball/BasketballRecorderManager'
 import { computePlayerScore, sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -32,12 +33,19 @@ import {
   teamInfoPath,
   type TeamInfoGame,
 } from '../lib/teamInfo'
-import { acceptedTeamRole, canTrackGames, type TeamRole } from '../lib/teamPermissions'
+import {
+  acceptedTeamRole,
+  canManageTeam,
+  canTrackGames,
+  type TeamRole,
+} from '../lib/teamPermissions'
 import type { GameState, SportConfig, StatAction } from '../types'
 
 interface GameInfoGameRow extends TeamInfoGame {
   id: string
-  team_id: string
+  team_id: string | null
+  created_by: string
+  tracked_team_name: string
   game_date: string
   opponent_name: string
   tournament_name: string | null
@@ -183,8 +191,11 @@ export default function GameInfo() {
   const [error, setError] = useState<string | null>(null)
 
   const sport = useMemo(
-    () => (team ? sports.find(item => item.id === team.seasons.sport) ?? null : null),
-    [team]
+    () => {
+      const sportId = team?.seasons.sport ?? game?.sport_id
+      return sports.find(item => item.id === sportId) ?? null
+    },
+    [game?.sport_id, team]
   )
 
   const score = useMemo(() => {
@@ -223,7 +234,7 @@ export default function GameInfo() {
       const { data: gameData, error: gameError } = await supabaseClient
         .from('games')
         .select(
-          'id,team_id,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,status,tournament_name,tournament_id,notes,sport_id'
+          'id,team_id,created_by,tracked_team_name,game_date,opponent_name,opponent_score,home_team_score,home_score_adjustment,status,tournament_name,tournament_id,notes,sport_id'
         )
         .eq('id', gameId)
         .single()
@@ -237,16 +248,38 @@ export default function GameInfo() {
       }
 
       const loadedGame = gameData as GameInfoGameRow
+      if (!loadedGame.team_id) {
+        const statsRes = await supabaseClient.rpc('get_game_stats_resolved', {
+          p_game_id: loadedGame.id,
+        })
+        if (cancelled) return
+
+        const statRows = ((statsRes.data ?? []) as GameStatRow[]).map(row => ({
+          ...row,
+          value: Number(row.value),
+        }))
+        const nextStatTotals: Record<string, number> = {}
+        for (const row of statRows) {
+          nextStatTotals[row.stat_id] = (nextStatTotals[row.stat_id] ?? 0) + row.value
+        }
+        setGame(loadedGame)
+        setStatTotals(nextStatTotals)
+        if (statsRes.error) setStatsError(statsRes.error.message)
+        setLoading(false)
+        return
+      }
+
+      const loadedTeamId = loadedGame.team_id
       const [teamRes, rosterRes, statsRes, membershipRes] = await Promise.all([
         supabaseClient
           .from('teams')
           .select('id,owner_id,name,nickname,season_id,seasons!inner(id,name,sport)')
-          .eq('id', loadedGame.team_id)
+          .eq('id', loadedTeamId)
           .single(),
         supabaseClient
           .from('team_players')
           .select('players!inner(id,first_name,last_name,nickname)')
-          .eq('team_id', loadedGame.team_id)
+          .eq('team_id', loadedTeamId)
           .eq('is_active', true),
         supabaseClient.rpc('get_game_stats_resolved', {
           p_game_id: loadedGame.id,
@@ -255,7 +288,7 @@ export default function GameInfo() {
           ? supabaseClient
               .from('team_members')
               .select('role,accepted_at')
-              .eq('team_id', loadedGame.team_id)
+              .eq('team_id', loadedTeamId)
               .eq('user_id', userId)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -314,9 +347,12 @@ export default function GameInfo() {
 
   const openFullGame = async () => {
     if (!game || !user) return
+    const canTrackCurrentGame = game.team_id
+      ? canTrackGames(teamRole)
+      : game.created_by === user.id
     if (
       game.status !== 'final' &&
-      !canTrackGames(teamRole) &&
+      !canTrackCurrentGame &&
       sport?.id !== 'soccer'
     ) return
     if (sport?.id === 'soccer') {
@@ -404,7 +440,7 @@ export default function GameInfo() {
         setError('Basketball event-game final review is not available until BKE-4D.')
         return
       }
-      if (!canTrackGames(teamRole)) return
+      if (!canTrackCurrentGame) return
 
       setOpeningGame(true)
       setError(null)
@@ -569,6 +605,15 @@ export default function GameInfo() {
   }
 
   const backTeamId = game?.team_id ?? fallbackTeamId
+  const trackedTeamName = team
+    ? teamDisplayName(team)
+    : game?.tracked_team_name ?? 'My Team'
+  const canTrackCurrentGame = Boolean(
+    game && userId && (game.team_id ? canTrackGames(teamRole) : game.created_by === userId)
+  )
+  const canManageRecorderAuthority = Boolean(
+    game && userId && (game.team_id ? canManageTeam(teamRole) : game.created_by === userId)
+  )
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -595,15 +640,15 @@ export default function GameInfo() {
             <p className="font-semibold text-slate-700">Game Info unavailable</p>
             <p className="text-sm text-slate-500">{error}</p>
           </section>
-        ) : game && team && !loading ? (
+        ) : game && !loading ? (
           <>
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-sm font-semibold text-slate-500">
                 {sport?.icon ? `${sport.icon} ` : ''}
-                {sport?.name ?? team.seasons.sport} / {team.seasons.name}
+                {sport?.name ?? game.sport_id ?? 'Sport'} / {team?.seasons.name ?? 'Personal game'}
               </p>
               <h1 className="mt-1 text-2xl font-bold text-slate-900 break-words">
-                {teamDisplayName(team)} vs {game.opponent_name}
+                {trackedTeamName} vs {game.opponent_name}
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {game.status === 'final' ? (
@@ -627,7 +672,7 @@ export default function GameInfo() {
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Team
                   </p>
-                  <p className="font-semibold text-slate-800">{teamDisplayName(team)}</p>
+                  <p className="font-semibold text-slate-800">{trackedTeamName}</p>
                 </div>
                 <div className="rounded-lg bg-slate-50 px-3 py-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -641,6 +686,14 @@ export default function GameInfo() {
               )}
               {game.notes?.trim() && <p className="text-sm text-slate-600">{game.notes}</p>}
             </section>
+
+            {sport?.id === 'basketball' && (
+              <BasketballRecorderManager
+                gameId={game.id}
+                currentUserId={userId}
+                canManage={canManageRecorderAuthority}
+              />
+            )}
 
             <section className="card space-y-3">
               <div>
@@ -677,7 +730,7 @@ export default function GameInfo() {
               </section>
             )}
 
-            {sport?.id === 'soccer' || game.status === 'final' || canTrackGames(teamRole) ? (
+            {sport?.id === 'soccer' || game.status === 'final' || canTrackCurrentGame ? (
               <button
                 type="button"
                 onClick={openFullGame}

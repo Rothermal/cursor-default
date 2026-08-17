@@ -1,9 +1,10 @@
 # Plan: BKE-4C Basketball Recorders and Finalization
 
-Status: Product and delivery Q&A approved. BKE-4C1 backend policy/contracts are implemented in
-migration 057; BKE-4C2 recorder presence and primary selection are next. The BKE-4B live
-two-device Supabase matrix remains pending and is carried into the combined BKE-4C exit evidence.
-Basketball event-game creation remains internal-only through BKE-4E.
+Status: Product and delivery Q&A approved. BKE-4C1 backend policy/contracts and BKE-4C2 recorder
+presence/primary selection are implemented; BKE-4C3 transactional canonical finalization is next.
+Migration 057 is required. The BKE-4B live two-device Supabase matrix remains pending and is
+carried into the combined BKE-4C exit evidence. Basketball event-game creation remains
+internal-only through BKE-4E.
 
 ## 1. Objective
 
@@ -192,7 +193,7 @@ Completed/Abandoned endings. `src/lib/basketball/finalization.ts` defines the so
 Basketball canonical payload schema version 1 inside the existing platform version-2 envelope.
 No Basketball finalization or reopen wrapper is granted.
 
-### BKE-4C2: Recorder Presence and Primary Selection
+### BKE-4C2: Recorder Presence and Primary Selection (Implemented)
 
 1. Add Basketball recorder client models, strict RPC parsing, primary history, and isolated
    read-only projection loading.
@@ -203,6 +204,16 @@ No Basketball finalization or reopen wrapper is granted.
 
 Exit: authorized users can understand recorder health and select one eligible primary without any
 stream blending or finalization capability.
+
+Implementation record: `src/lib/basketball/recorders.ts` strictly parses role-limited recorder and
+history RPC rows, rejects duplicate/multiple-primary output, and loads another recorder through an
+isolated cloud shell plus deterministic reprojection. A shared bounded-polling hook refreshes on
+sync, focus, visibility, and connectivity. The tracker shows compact primary health and links to
+Game Info; Game Info gives managers explicit eligible-primary selection, immutable history,
+non-primary warnings, and opt-in read-only stream inspection while scorers/viewers retain compact
+status only. Game Info now supports personal Basketball cloud games through creator authority
+without weakening team role checks. Active and parked `GameContext` state is never hydrated by
+inspection, and finalization/reopen remain absent.
 
 ### BKE-4C3: Transactional Canonical Finalization
 
@@ -318,7 +329,7 @@ The August 2026 Q&A approved all recommended options:
 
 ## 15. Next Step
 
-Apply migration 057 and record the BKE-4C1 runtime checks in
-[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then start BKE-4C2 on a
-fresh feature branch with strict recorder RPC parsing, isolated read-only stream projection, and
-the compact tracker/Game Info primary-selection surfaces.
+Apply migration 057 and run the BKE-4C1/C2 runtime checks in
+[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then start BKE-4C3 on a
+fresh feature branch with the fixed Basketball finalization wrapper, server-side canonical schema
+enforcement, canonical preview/rebuild, and explicit Game Info confirmation.
