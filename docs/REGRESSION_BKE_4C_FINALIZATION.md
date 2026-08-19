@@ -203,10 +203,11 @@ select
 Expected: `basketball_history_allowed = true`, `basketball_reopen_allowed = true`,
 `generic_reopen_allowed = false`, and `soccer_reopen_unchanged = true`.
 
-## Minimum Pre-BKE-4D Runtime Checkpoint
+## Minimum Pre-Enablement Runtime Checkpoint
 
-After merging BKE-4C4 and applying migration 059, run this focused checkpoint before beginning
-BKE-4D Summary implementation. It does not replace the full exit matrix below:
+After merging BKE-4C4 and applying migration 059, run this focused checkpoint before broader
+Basketball event-model enablement. The owner approved deferring it while creation remains internal,
+so it does not block BKE-4D Summary implementation. It does not replace the full exit matrix below:
 
 1. Finalize one healthy terminal primary, then retry the byte-identical request. Confirm one active
    publication, one publication number, server-derived scores, and a locked primary.
