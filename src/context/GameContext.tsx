@@ -313,7 +313,7 @@ interface GameContextType {
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
   flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
-  markSoccerCloudGameReopened: (gameId: string) => void
+  markEventCloudGameReopened: (gameId: string) => void
   resolveEventConflict: (
     eventId: string,
     resolution: 'local' | 'remote'
@@ -1005,7 +1005,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }, [isOnline, runCloudSync, userId])
 
-  const markSoccerCloudGameReopened = useCallback((gameId: string) => {
+  const markEventCloudGameReopened = useCallback((gameId: string) => {
     try {
       setParkedGames(markParkedCloudGameReopened(userId, gameId))
       if (stateRef.current.cloudSync.gameId === gameId) {
@@ -1130,7 +1130,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         discardParkedGame,
         flushCloudSync,
         flushCloudGameSync,
-        markSoccerCloudGameReopened,
+        markEventCloudGameReopened,
         resolveEventConflict,
       }}
     >

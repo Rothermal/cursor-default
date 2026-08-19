@@ -16,7 +16,10 @@ and BKE-3D1 through BKE-3D4 are complete, including the exit audit. BKE-4 planni
 through migration 055. BKE-4B1 shared transport/migration 056, BKE-4B2 automatic sync, and BKE-4B3
 recovery/conflict implementation are complete under the approved slices in
 [PLAN_BKE_4B_BASKETBALL_TRANSPORT.md](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md); its live two-device
-Supabase matrix remains the BKE-4B exit signoff.
+Supabase matrix remains the BKE-4B exit signoff. BKE-4C1 through BKE-4C4 are implemented through
+migration 059 under
+[PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md); the
+combined live matrix remains required before broader enablement, and BKE-4D Summary is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

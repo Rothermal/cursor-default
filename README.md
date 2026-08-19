@@ -135,7 +135,8 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/056_basketball_event_cloud_transport.sql` - BKE-4B1 fixed Basketball v4 binding wrapper over the private event-platform transport
 - `supabase/migrations/057_basketball_recorder_finalization_contracts.sql` - BKE-4C1 fixed Basketball recorder/readiness preparation wrappers and private terminal/score policy
 - `supabase/migrations/058_basketball_canonical_finalization.sql` - BKE-4C3 fixed schema-gated Basketball finalization wrapper and trusted shared-transaction policy dispatch
-   > Apply **`058`** after **`057`** for Basketball canonical finalization; reopen remains unavailable until BKE-4C4.
+- `supabase/migrations/059_basketball_reopen_republication.sql` - BKE-4C4 manager publication-history reader, fixed reason-required Basketball reopen wrapper, and append-only republication path
+   > Apply **`059`** after **`058`** for Basketball reopen and republication.
    > Apply **`057`** for BKE-4C2 recorder/readiness UI.
    > Apply **`056`** before running BKE-4B2 Basketball event sync; the client fails closed when the binder is unavailable.
    > Apply **`054` and `055` separately and in order** so the staged constraint add commits before validation and replacement.
@@ -499,6 +500,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [x] **Basketball recorder/finalization contracts (BKE-4C1)** - role-limited recorder preparation wrappers, Basketball terminal/score policy, manager checkpoint confirmation, and the canonical payload contract without enabling publication ([plan](docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md), [regression](docs/REGRESSION_BKE_4C_FINALIZATION.md))
 - [x] **Basketball recorder presence and primary selection (BKE-4C2)** - strict role-limited presence/history clients, isolated read-only stream projection, compact tracker health, and team/personal Game Info management without stream blending ([plan](docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md), [regression](docs/REGRESSION_BKE_4C_FINALIZATION.md))
 - [x] **Basketball transactional canonical finalization (BKE-4C3)** - schema-gated fixed finalization RPC, trusted server score policy, isolated primary preview/checkpoint preparation, explicit Game Info confirmation, conflict handling, and canonical authority metadata ([plan](docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md), [regression](docs/REGRESSION_BKE_4C_FINALIZATION.md))
+- [x] **Basketball reopen and republication (BKE-4C4)** - manager publication history, fixed reason-required reopen RPC, append-only invalidation, owned parked-binding recovery, and BKE-3 correction/re-finalization handoff ([plan](docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md), [regression](docs/REGRESSION_BKE_4C_FINALIZATION.md))
 - [ ] **Basketball recorder authority and finalization (BKE-4C)** - recorder presence, deterministic primary selection, canonical publication, audited reopen/republication, and finalized correction integration in four slices ([plan](docs/PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md))
 - [ ] **Basketball event-model migration (BKE-4 through BKE-6)** - cloud lifecycle and aggregates, settings/rollout, then clock and lineups ([roadmap](docs/PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md))
 - [ ] **Audit event-family follow-ups** — expand the SEC-6 trail to guardian changes, stat corrections, primary-recorder reassignment, and game lifecycle/finalization events ([plan](docs/PLAN_SEC_6_AUDIT_TRAIL.md))

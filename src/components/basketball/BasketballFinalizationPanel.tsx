@@ -1,14 +1,17 @@
-import { AlertTriangle, CheckCircle2, LockKeyhole, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, LockKeyhole, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { FlushCloudSyncResult } from '../../context/GameContext'
 import {
   finalizeBasketballGame,
   loadBasketballCanonicalPublication,
+  loadBasketballCanonicalPublicationHistory,
   loadBasketballFinalizationReadiness,
   loadBasketballPrimaryFinalizationConflicts,
   prepareBasketballFinalization,
+  reopenBasketballCloudGame,
   resolveBasketballPrimaryFinalizationConflict,
   type BasketballCanonicalPublication,
+  type BasketballCanonicalPublicationHistoryEntry,
   type BasketballFinalizationPreview,
   type BasketballFinalizationReadiness,
   type BasketballFinalizationResult,
@@ -25,6 +28,7 @@ interface BasketballFinalizationPanelProps {
   ownedLocalTerminal: boolean
   flushCloudSync?: () => Promise<FlushCloudSyncResult>
   onFinalized: (result: BasketballFinalizationResult) => void
+  onReopened: () => void
 }
 
 export default function BasketballFinalizationPanel({
@@ -37,25 +41,33 @@ export default function BasketballFinalizationPanel({
   ownedLocalTerminal,
   flushCloudSync,
   onFinalized,
+  onReopened,
 }: BasketballFinalizationPanelProps) {
   const [readiness, setReadiness] = useState<BasketballFinalizationReadiness | null>(null)
   const [publication, setPublication] = useState<BasketballCanonicalPublication | null>(null)
+  const [publicationHistory, setPublicationHistory] = useState<
+    BasketballCanonicalPublicationHistoryEntry[]
+  >([])
   const [preview, setPreview] = useState<BasketballFinalizationPreview | null>(null)
   const [conflicts, setConflicts] = useState<BasketballPrimaryFinalizationConflict[]>([])
   const [conflictsOpen, setConflictsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reopenOpen, setReopenOpen] = useState(false)
+  const [reopenReason, setReopenReason] = useState('')
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [nextReadiness, nextPublication] = await Promise.all([
+      const [nextReadiness, nextPublication, nextHistory] = await Promise.all([
         loadBasketballFinalizationReadiness(gameId),
         loadBasketballCanonicalPublication(gameId),
+        canManage ? loadBasketballCanonicalPublicationHistory(gameId) : Promise.resolve([]),
       ])
       setReadiness(nextReadiness)
       setPublication(nextPublication)
+      setPublicationHistory(nextHistory)
       setError(null)
     } catch (caught) {
       setError(
@@ -66,7 +78,7 @@ export default function BasketballFinalizationPanel({
     } finally {
       setLoading(false)
     }
-  }, [gameId])
+  }, [canManage, gameId])
 
   useEffect(() => {
     void refresh()
@@ -136,6 +148,25 @@ export default function BasketballFinalizationPanel({
       await refresh()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Primary conflict could not resolve.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleReopen = async () => {
+    if (!readiness?.canReopen || reopenReason.trim().length < 3 || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await reopenBasketballCloudGame(gameId, reopenReason)
+      setReopenOpen(false)
+      setReopenReason('')
+      setPreview(null)
+      onReopened()
+      await refresh()
+    } catch (caught) {
+      await refresh()
+      setError(caught instanceof Error ? caught.message : 'Basketball game could not reopen.')
     } finally {
       setBusy(false)
     }
@@ -224,6 +255,52 @@ export default function BasketballFinalizationPanel({
           <p className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
             {error}
           </p>
+        )}
+
+        {publication && canManage && readiness?.canReopen && (
+          <button
+            type="button"
+            onClick={() => setReopenOpen(true)}
+            disabled={busy}
+            className="flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 disabled:opacity-50"
+          >
+            <RotateCcw size={17} /> Reopen Cloud Game
+          </button>
+        )}
+
+        {canManage && (
+          publicationHistory.length > 1 || publicationHistory.some(item => !item.isActive)
+        ) && (
+          <section className="border-t border-slate-200 pt-3" aria-labelledby="basketball-publication-history-title">
+            <h3 id="basketball-publication-history-title" className="text-sm font-bold text-slate-800">
+              Publication History
+            </h3>
+            <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200">
+              {publicationHistory.map(item => (
+                <div key={item.publicationId} className="py-3 text-xs text-slate-600">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold text-slate-800">
+                      Publication {item.publicationNumber}
+                    </span>
+                    <span className={item.isActive ? 'font-bold text-emerald-700' : 'text-slate-500'}>
+                      {item.isActive ? 'Active' : 'Invalidated'}
+                    </span>
+                  </div>
+                  <p className="mt-1">Primary: {item.primaryDisplayName}</p>
+                  <p>
+                    Finalized by {item.finalizedByDisplayName} |{' '}
+                    {new Date(item.finalizedAt).toLocaleString()}
+                  </p>
+                  {!item.isActive && (
+                    <p className="mt-1 text-slate-500">
+                      {item.invalidationReason} | {item.invalidatedByDisplayName} |{' '}
+                      {new Date(item.invalidatedAt!).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {!publication && canManage && readiness?.canFinalize && (
@@ -328,6 +405,60 @@ export default function BasketballFinalizationPanel({
                 {busy ? 'Finalizing...' : 'Finalize and Lock'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {reopenOpen && (
+        <div
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 sm:items-center"
+          onClick={() => setReopenOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="basketball-cloud-reopen-title"
+            className="w-full bg-white p-4 sm:max-w-md"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <h2 id="basketball-cloud-reopen-title" className="min-w-0 flex-1 font-bold text-slate-900">
+                Reopen Cloud Game
+              </h2>
+              <button
+                type="button"
+                onClick={() => setReopenOpen(false)}
+                disabled={busy}
+                className="grid h-9 w-9 place-items-center text-slate-500"
+                aria-label="Close"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              The current publication stays in history. Reopen the owned recorder stream to make
+              corrections, sync it, and publish a new result.
+            </p>
+            <label className="mt-4 block text-xs font-bold text-slate-600" htmlFor="basketball-cloud-reopen-reason">
+              Reason
+            </label>
+            <textarea
+              id="basketball-cloud-reopen-reason"
+              value={reopenReason}
+              onChange={event => setReopenReason(event.target.value)}
+              rows={3}
+              className="mt-1 w-full resize-none border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => { void handleReopen() }}
+              disabled={busy || reopenReason.trim().length < 3}
+              className="mt-3 min-h-11 w-full bg-slate-800 px-3 text-sm font-bold text-white disabled:opacity-40"
+            >
+              {busy ? 'Reopening...' : 'Reopen Game'}
+            </button>
           </div>
         </div>
       )}

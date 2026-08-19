@@ -1,10 +1,9 @@
 # Plan: BKE-4C Basketball Recorders and Finalization
 
-Status: Product and delivery Q&A approved. BKE-4C1 backend policy/contracts, BKE-4C2 recorder
-presence/primary selection, and BKE-4C3 transactional canonical finalization are implemented;
-BKE-4C4 reopen/republication hardening is next. Migrations 057 and 058 are required. The BKE-4B
-live two-device Supabase matrix remains pending and is carried into the combined BKE-4C exit
-evidence. Basketball event-game creation remains internal-only through BKE-4E.
+Status: Product and delivery Q&A approved. BKE-4C1 through BKE-4C4 are implemented; migrations
+057 through 059 are required. The BKE-4B live two-device Supabase matrix remains pending and is
+carried into the combined BKE-4C exit evidence. Basketball event-game creation remains
+internal-only through BKE-4E.
 
 ## 1. Objective
 
@@ -240,7 +239,7 @@ primary, presents score/terminal/health warnings for explicit confirmation, supp
 conflict preparation, and shows canonical publication authority/audit metadata after success.
 Final canonical detail review remains BKE-4D, and reopen remains absent until BKE-4C4.
 
-### BKE-4C4: Reopen, Republication, and Exit Hardening
+### BKE-4C4: Reopen, Republication, and Exit Hardening (Implemented)
 
 1. Add the fixed Basketball reopen wrapper and reasoned Game Info workflow.
 2. Refresh/recover an owned local binding after reopen without granting cross-recorder edits.
@@ -250,6 +249,15 @@ Final canonical detail review remains BKE-4D, and reopen remains absent until BK
 
 Exit: finalized correction is reopen, owned-stream edit, sync, and explicit republication; audit
 history is append-only and the full cloud lifecycle is ready for BKE-4D Summary work.
+
+Implementation record: migration 059 exposes fixed authenticated Basketball publication-history
+and reopen surfaces while keeping the shared event-platform transaction private. Game Info
+requires a reason, presents newest-first active/invalidated publication metadata to managers, and
+refreshes matching user-owned parked bindings to in-progress through the sport-neutral recovery
+callback. The recorder owner then uses the existing BKE-3 local reopen/correction flow, syncs that
+independent stream, ends it, and explicitly finalizes a later publication. Strict client response
+parsing and static migration contracts are covered; the combined live Supabase matrix remains
+required before broader enablement.
 
 Each slice uses its own branch and PR. Any forward-only migration is isolated in the slice that
 needs it and called out for manual Supabase application. Exact migration numbers are assigned from
@@ -340,7 +348,7 @@ The August 2026 Q&A approved all recommended options:
 
 ## 15. Next Step
 
-Apply migration 058 after 057 and run the BKE-4C1-C3 runtime checks in
-[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then start BKE-4C4 on a
-fresh feature branch with the fixed Basketball reopen wrapper, owned-binding refresh, corrected
-republication, and combined cloud-lifecycle exit hardening.
+Apply migration 059 after 058 and run the minimum pre-BKE-4D runtime checkpoint in
+[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md). Then begin BKE-4D
+explicit-authority Basketball Summary work. The full combined BKE-4B/BKE-4C matrix remains the
+broader event-model enablement gate.

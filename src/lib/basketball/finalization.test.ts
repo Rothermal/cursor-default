@@ -19,9 +19,11 @@ import {
   EVENT_PLATFORM_CANONICAL_ENVELOPE_VERSION,
   finalizeBasketballGame,
   loadBasketballCanonicalPublication,
+  loadBasketballCanonicalPublicationHistory,
   loadBasketballFinalizationReadiness,
   parseBasketballCanonicalSnapshot,
   prepareBasketballFinalization,
+  reopenBasketballCloudGame,
   type BasketballFinalizationPreview,
 } from './finalization'
 import type { BasketballRecorderProjection, BasketballRecorderSummary } from './recorders'
@@ -423,5 +425,130 @@ describe('Basketball finalization repository', () => {
       primaryRecorderId: recorderId,
       snapshot,
     })
+  })
+
+  it('strictly parses append-only Basketball publication history', async () => {
+    cloudMock.rpc.mockResolvedValue({
+      data: [
+        {
+          publication_id: 'publication-2',
+          publication_number: 2,
+          primary_recorded_by: recorderId,
+          primary_display_name: 'Recorder One',
+          finalized_by: 'manager-1',
+          finalized_by_display_name: 'Manager One',
+          finalized_at: '2026-08-16T18:20:00.000Z',
+          invalidated_by: null,
+          invalidated_by_display_name: null,
+          invalidated_at: null,
+          invalidation_reason: null,
+          is_active: true,
+        },
+        {
+          publication_id: 'publication-1',
+          publication_number: 1,
+          primary_recorded_by: recorderId,
+          primary_display_name: 'Recorder One',
+          finalized_by: 'manager-1',
+          finalized_by_display_name: 'Manager One',
+          finalized_at: '2026-08-16T18:12:00.000Z',
+          invalidated_by: 'manager-1',
+          invalidated_by_display_name: 'Manager One',
+          invalidated_at: '2026-08-16T18:15:00.000Z',
+          invalidation_reason: 'Correct scorer',
+          is_active: false,
+        },
+      ],
+      error: null,
+    })
+
+    await expect(loadBasketballCanonicalPublicationHistory('game-1')).resolves.toMatchObject([
+      { publicationNumber: 2, isActive: true, invalidatedAt: null },
+      {
+        publicationNumber: 1,
+        isActive: false,
+        invalidationReason: 'Correct scorer',
+      },
+    ])
+    expect(cloudMock.rpc).toHaveBeenCalledWith(
+      'get_basketball_canonical_publication_history',
+      { p_game_id: 'game-1' }
+    )
+  })
+
+  it('rejects inconsistent Basketball publication history authority', async () => {
+    cloudMock.rpc.mockResolvedValue({
+      data: [{
+        publication_id: 'publication-1',
+        publication_number: 1,
+        primary_recorded_by: recorderId,
+        primary_display_name: 'Recorder One',
+        finalized_by: 'manager-1',
+        finalized_by_display_name: 'Manager One',
+        finalized_at: '2026-08-16T18:12:00.000Z',
+        invalidated_by: null,
+        invalidated_by_display_name: null,
+        invalidated_at: '2026-08-16T18:15:00.000Z',
+        invalidation_reason: 'Correct scorer',
+        is_active: true,
+      }],
+      error: null,
+    })
+
+    await expect(loadBasketballCanonicalPublicationHistory('game-1')).rejects.toThrow(
+      'invalidation metadata is inconsistent'
+    )
+  })
+
+  it('requires a reason and strictly parses Basketball reopen identity', async () => {
+    await expect(reopenBasketballCloudGame('game-1', '  ')).rejects.toThrow(
+      'reopen reason is required'
+    )
+    expect(cloudMock.rpc).not.toHaveBeenCalled()
+
+    cloudMock.rpc.mockResolvedValue({
+      data: {
+        game_id: 'game-1',
+        publication_id: 'publication-1',
+        reopened_at: '2026-08-16T18:15:00.000Z',
+      },
+      error: null,
+    })
+
+    await expect(reopenBasketballCloudGame('game-1', '  Correct scorer  ')).resolves.toEqual({
+      gameId: 'game-1',
+      publicationId: 'publication-1',
+      reopenedAt: '2026-08-16T18:15:00.000Z',
+    })
+    expect(cloudMock.rpc).toHaveBeenCalledWith('reopen_basketball_event_game', {
+      p_game_id: 'game-1',
+      p_reason: 'Correct scorer',
+    })
+  })
+
+  it('rejects malformed or mismatched Basketball reopen responses', async () => {
+    cloudMock.rpc.mockResolvedValue({
+      data: {
+        game_id: 'other-game',
+        publication_id: 'publication-1',
+        reopened_at: '2026-08-16T18:15:00.000Z',
+      },
+      error: null,
+    })
+    await expect(reopenBasketballCloudGame('game-1', 'Correct scorer')).rejects.toThrow(
+      'different game'
+    )
+
+    cloudMock.rpc.mockResolvedValue({
+      data: {
+        game_id: 'game-1',
+        publication_id: 'publication-1',
+        reopened_at: 'not-a-date',
+      },
+      error: null,
+    })
+    await expect(reopenBasketballCloudGame('game-1', 'Correct scorer')).rejects.toThrow(
+      'reopen time'
+    )
   })
 })

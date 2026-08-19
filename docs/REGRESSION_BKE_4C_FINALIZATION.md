@@ -1,8 +1,7 @@
 # Regression: BKE-4C Basketball Recorder Authority and Finalization
 
-Status: BKE-4C1 backend contracts, BKE-4C2 recorder authority UI, and BKE-4C3 transactional
-canonical finalization are implemented. Migrations 057 and 058 are required. Reopen remains
-unavailable until BKE-4C4.
+Status: BKE-4C1 through BKE-4C4 are implemented. Migrations 057 through 059 are required. The
+combined BKE-4B/BKE-4C live Supabase matrix remains pending before broader event-model enablement.
 
 ## BKE-4C1 Automated Gate
 
@@ -74,6 +73,25 @@ Coverage verifies:
 - a finalized Game Info surface shows canonical score, primary, publication number, finalizer, and
   time without routing into the legacy Basketball Summary; and
 - reopen remains unavailable.
+
+## BKE-4C4 Automated Gate
+
+Coverage verifies:
+
+- migration 059 grants only fixed authenticated Basketball publication-history and reopen
+  surfaces while the shared mutation core stays private and Soccer is not redefined;
+- the existing shared transaction requires manager/creator access and a reason, locks the game and
+  active publication, invalidates rather than deletes history, unlocks the selected primary, resets
+  published scores, returns the game to in-progress, and appends an access-audit event;
+- the client trims and requires a reopen reason, parses the returned game/publication/time
+  strictly, and rejects a mismatched game identity;
+- Game Info exposes reopen only for a manager/creator with an active canonical publication;
+- Game Info shows managers newest-first active and invalidated publication metadata without
+  exposing or blending canonical snapshots;
+- successful reopen refreshes every matching owned parked binding to in-progress without copying,
+  hydrating, or granting edits to another recorder stream; and
+- the normal owned-stream BKE-3 reopen/correction/sync/finalize path can append a later publication
+  while the invalidated publication remains durable history.
 
 ## Apply Migration 057
 
@@ -161,7 +179,50 @@ select public.finalize_basketball_event_game(
 
 Expected error: `Unsupported Basketball canonical payload schema version`.
 
-## BKE-4C1-C3 Runtime Matrix
+## Apply Migration 059
+
+Apply `supabase/migrations/059_basketball_reopen_republication.sql` after migration 058. Verify the
+fixed wrapper and private shared core:
+
+```sql
+select
+  has_function_privilege('authenticated',
+    'public.get_basketball_canonical_publication_history(uuid)', 'EXECUTE')
+      as basketball_history_allowed,
+  has_function_privilege('authenticated',
+    'public.reopen_basketball_event_game(uuid,text)', 'EXECUTE')
+      as basketball_reopen_allowed,
+  has_function_privilege('authenticated',
+    'public.reopen_event_game(text,uuid,text)', 'EXECUTE')
+      as generic_reopen_allowed,
+  has_function_privilege('authenticated',
+    'public.reopen_soccer_event_game(uuid,text)', 'EXECUTE')
+      as soccer_reopen_unchanged;
+```
+
+Expected: `basketball_history_allowed = true`, `basketball_reopen_allowed = true`,
+`generic_reopen_allowed = false`, and `soccer_reopen_unchanged = true`.
+
+## Minimum Pre-BKE-4D Runtime Checkpoint
+
+After merging BKE-4C4 and applying migration 059, run this focused checkpoint before beginning
+BKE-4D Summary implementation. It does not replace the full exit matrix below:
+
+1. Finalize one healthy terminal primary, then retry the byte-identical request. Confirm one active
+   publication, one publication number, server-derived scores, and a locked primary.
+2. Prepare finalization, then change the selected primary or its checkpoint/revision/fingerprint.
+   Confirm the stale request is rejected without changing the active publication.
+3. Attempt ordinary primary writes after finalization. Confirm finalized-write denial while an
+   eligible already-queued non-primary audit upload remains unable to change canonical output.
+4. Reopen with a manager reason. Confirm the active row is invalidated rather than deleted, the
+   primary unlocks, published scores clear, the game returns to in-progress, and audit stores the
+   reason. Confirm a short reason and scorer/viewer request are denied without mutation.
+5. Open the owned local binding, append the local reopen/correction, sync, end, and explicitly
+   re-finalize. Confirm publication 2 is active and publication 1 remains invalidated history.
+6. Repeat the Soccer canonical finalization/reopen smoke to confirm migration 059 did not change
+   its fixed wrappers or shared runtime behavior.
+
+## BKE-4C Exit Runtime Matrix
 
 Use one personal Basketball event game and one accepted-team Basketball event game with at least
 two independent recorders when available.
@@ -186,5 +247,10 @@ two independent recorders when available.
 | 16 | Use scorer/viewer or unrelated app-admin session | Finalization wrapper denies mutation; canonical status remains read-only where game access permits | Pending |
 | 17 | Inspect the finalized Basketball Game Info | Canonical score, primary, publication, finalizer, and timestamp render; legacy Summary stays unavailable | Pending |
 | 18 | Repeat Soccer recorder/readiness/finalization/reopen smoke | Existing Soccer behavior is unchanged | Pending |
+| 19 | Reopen a finalized game with a manager reason | Active publication is invalidated, primary unlocks, scores clear, game returns to in-progress, and audit records the reason | Pending |
+| 20 | Reopen with a short reason or scorer/viewer session | Request is denied and the active publication remains unchanged | Pending |
+| 21 | Open an owned local binding after cloud reopen | Matching local cloud status refreshes and only that recorder owner can append the local reopen/correction | Pending |
+| 22 | Correct, sync, end, and explicitly re-finalize | Publication number increments; the new row is active and the prior invalidated row remains in history | Pending |
+| 23 | Attempt ordinary writes while final or edits to another recorder | Server/client deny mutation without changing canonical output | Pending |
 
 The pending BKE-4B two-device matrix remains part of the combined BKE-4C exit evidence.
