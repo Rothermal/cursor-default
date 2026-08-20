@@ -10,8 +10,10 @@ import { loadCloudGameById, touchCloudGameLastOpened } from '../lib/cloudSync'
 import { loadSoccerCloudGameById } from '../lib/soccer/cloudSync'
 import {
   createBasketballIndependentRecorderState,
+  loadBasketballCloudDataAuthority,
   loadBasketballCloudGameById,
 } from '../lib/basketball/cloudSync'
+import { basketballSummaryPath } from '../lib/basketball/summary'
 import {
   resolveEventRecorderOpenSource,
   type EventRecorderOpenSource,
@@ -190,6 +192,8 @@ export default function GameInfo() {
   const [leaders, setLeaders] = useState<StatLeader[]>([])
   const [statTotals, setStatTotals] = useState<Record<string, number>>({})
   const [statsError, setStatsError] = useState<string | null>(null)
+  const [basketballDataAuthority, setBasketballDataAuthority] =
+    useState<'sport_events' | 'legacy' | null>(null)
   const [openingGame, setOpeningGame] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -234,6 +238,7 @@ export default function GameInfo() {
       setTeamRole(null)
       setLeaders([])
       setStatTotals({})
+      setBasketballDataAuthority(null)
 
       const { data: gameData, error: gameError } = await supabaseClient
         .from('games')
@@ -252,6 +257,18 @@ export default function GameInfo() {
       }
 
       const loadedGame = gameData as GameInfoGameRow
+      if (loadedGame.sport_id === 'basketball') {
+        try {
+          const authority = await loadBasketballCloudDataAuthority(loadedGame.id)
+          if (cancelled) return
+          setBasketballDataAuthority(authority)
+        } catch (caught) {
+          if (cancelled) return
+          setError(caught instanceof Error ? caught.message : 'Basketball authority could not load')
+          setLoading(false)
+          return
+        }
+      }
       if (!loadedGame.team_id) {
         const statsRes = await supabaseClient.rpc('get_game_stats_resolved', {
           p_game_id: loadedGame.id,
@@ -439,12 +456,15 @@ export default function GameInfo() {
       navigate('/game')
       return
     }
-    if (game.sport_id === 'basketball') {
-      if (game.status === 'final') {
-        setError('Basketball event-game final review is not available until BKE-4D.')
+    if (game.sport_id === 'basketball' && basketballDataAuthority === 'sport_events') {
+      if (game.status === 'final' || !canTrackCurrentGame) {
+        navigate(basketballSummaryPath({
+          gameId: game.id,
+          from: 'game-info',
+          teamId: team?.id ?? fallbackTeamId,
+        }))
         return
       }
-      if (!canTrackCurrentGame) return
 
       setOpeningGame(true)
       setError(null)
@@ -691,7 +711,7 @@ export default function GameInfo() {
               {game.notes?.trim() && <p className="text-sm text-slate-600">{game.notes}</p>}
             </section>
 
-            {sport?.id === 'basketball' && (
+            {sport?.id === 'basketball' && basketballDataAuthority === 'sport_events' && (
               <>
                 <BasketballRecorderManager
                   gameId={game.id}
@@ -775,7 +795,10 @@ export default function GameInfo() {
               </section>
             )}
 
-            {sport?.id === 'soccer' || game.status === 'final' || canTrackCurrentGame ? (
+            {sport?.id === 'soccer' ||
+            basketballDataAuthority === 'sport_events' ||
+            game.status === 'final' ||
+            canTrackCurrentGame ? (
               <button
                 type="button"
                 onClick={openFullGame}
@@ -785,7 +808,8 @@ export default function GameInfo() {
                 {openingGame
                   ? 'Opening...'
                   : game.status === 'final' ||
-                      (sport?.id === 'soccer' && !canTrackGames(teamRole))
+                      (sport?.id === 'soccer' && !canTrackGames(teamRole)) ||
+                      (basketballDataAuthority === 'sport_events' && !canTrackCurrentGame)
                     ? 'View full summary'
                     : 'Open game'}
               </button>

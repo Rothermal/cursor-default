@@ -60,6 +60,23 @@ export interface SyncBasketballEventGameInput {
   localGameId: string
 }
 
+export async function loadBasketballCloudDataAuthority(
+  gameId: string
+): Promise<'sport_events' | 'legacy'> {
+  if (!supabase) throw new Error('Supabase client not configured')
+  const { data, error } = await supabase
+    .from('game_event_setup_snapshots')
+    .select('sport_id')
+    .eq('game_id', gameId)
+    .maybeSingle()
+  if (error) throw new Error(`Basketball data authority could not load: ${error.message}`)
+  if (!data) return 'legacy'
+  if (data.sport_id !== 'basketball') {
+    throw new Error('Basketball game has an incompatible event setup snapshot.')
+  }
+  return 'sport_events'
+}
+
 export type SyncBasketballEventGameResult = SyncEventGameResult
 
 export class BasketballCloudRecoveryError extends Error {
