@@ -1,8 +1,8 @@
 # Plan: BKE-4E Canonical Aggregates and Release Readiness
 
 Status: Product and delivery Q&A approved on 2026-08-20. BKE-4E is planned in five implementation
-slices. BKE-4E1 is next. Basketball event-game creation remains internal-only, and the user-visible
-event-model opt-in remains BKE-5.
+slices. BKE-4E1 is implemented and BKE-4E2 is next. Basketball event-game creation remains
+internal-only, and the user-visible event-model opt-in remains BKE-5.
 
 ## 1. Goal
 
@@ -232,6 +232,7 @@ aggregate values are never written back to event snapshots or canonical publicat
 
 Rates are calculated after summing raw totals:
 
+- PPG = `bk_pts / bk_app`;
 - FG% = `bk_fgm / bk_fga`;
 - 2PT% = `bk_2pm / bk_2pa`;
 - 3PT% = `bk_3pm / bk_3pa`;
@@ -501,6 +502,8 @@ BKE-5 owns the visible choices:
 
 ### BKE-4E1: Canonical stat contract and pure aggregate engine
 
+Status: Implemented on 2026-08-20. See `docs/REGRESSION_BKE_4E_AGGREGATES.md`.
+
 Scope:
 
 - add the exact `bk_*` catalog, categories, formats, and approved rates;
@@ -676,5 +679,5 @@ BKE-4E. Every unresolved row remains a hard gate before BKE-5 exposes the event-
 
 ## 16. Next Step
 
-Begin BKE-4E1 on a fresh implementation branch after this planning PR merges. Keep the event-game
-creation gate internal and carry the complete BKE-4B through BKE-4E live matrix into BKE-4E5.
+Begin BKE-4E2 from the implemented pure aggregate contracts. Keep the event-game creation gate
+internal and carry the complete BKE-4B through BKE-4E live matrix into BKE-4E5.
