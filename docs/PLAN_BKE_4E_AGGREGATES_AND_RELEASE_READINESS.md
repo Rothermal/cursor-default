@@ -179,7 +179,7 @@ into scoped team totals. Career may combine all authorized team and personal con
 `src/lib/basketball/aggregateStats.ts` owns the exact aggregate vocabulary. Event projection and
 legacy rows map into this vocabulary; neither input vocabulary becomes aggregate authority.
 
-### 5.1 Raw canonical ids
+### 5.1 Canonical aggregate ids
 
 | Category | Canonical ids |
 |---|---|
@@ -191,30 +191,42 @@ legacy rows map into this vocabulary; neither input vocabulary becomes aggregate
 | Defense | `bk_stl`, `bk_blk` |
 | Discipline | `bk_pf`, `bk_dq`, `bk_eject` |
 
-`bk_pts`, `bk_fgm`, `bk_fga`, and `bk_reb` are deterministic conveniences derived from the same
-raw event counts during isolated projection. They are never accepted from a canonical snapshot as
-independent truth.
+No `bk_*` total is accepted from a canonical snapshot as independent truth. Every value is rebuilt
+from the isolated Basketball projection. Direct base mappings include makes, offensive/defensive
+rebounds, assists, turnovers, steals, blocks, and personal fouls. Attempts, combined totals,
+participation, discipline outcomes, and converted minutes are constructed deterministically by the
+aggregate engine.
 
 Recorded manual minutes map to `bk_min_sec` by multiplying valid projected minutes by 60. BKE-6
 can later supply exact interval seconds without changing the aggregate id. A result containing only
 manual/legacy minutes labels minutes as recorded rather than clock-derived.
 
-### 5.2 Legacy mapping
+### 5.2 Source mapping and constructed totals
 
-The compatibility map is one-way:
+Event projection and correction-resolved legacy rows use the same Basketball base counter
+vocabulary. Their one-way aggregate mapping is explicit:
 
-| Legacy id | Canonical contribution |
+| Canonical id | Required construction |
 |---|---|
-| `ft` / `ft_miss` | `bk_ftm` / `bk_fta` |
-| `2pt` / `2pt_miss` | `bk_2pm` / `bk_2pa` |
-| `3pt` / `3pt_miss` | `bk_3pm` / `bk_3pa` |
-| `oreb`, `dreb` | matching rebound ids and derived `bk_reb` |
-| `ast`, `stl`, `blk`, `to`, `pf` | matching canonical ids |
-| `min` | `bk_min_sec` after validation and conversion |
+| `bk_ftm` | `ft` |
+| `bk_fta` | `ft + ft_miss` |
+| `bk_2pm` | `2pt` |
+| `bk_2pa` | `2pt + 2pt_miss` |
+| `bk_3pm` | `3pt` |
+| `bk_3pa` | `3pt + 3pt_miss` |
+| `bk_fgm` | `2pt + 3pt` |
+| `bk_fga` | `bk_2pa + bk_3pa` |
+| `bk_pts` | `ft + (2 * 2pt) + (3 * 3pt)` |
+| `bk_oreb`, `bk_dreb` | `oreb`, `dreb` respectively |
+| `bk_reb` | `oreb + dreb` |
+| `bk_ast`, `bk_to`, `bk_stl`, `bk_blk`, `bk_pf` | the matching base counter |
+| `bk_min_sec` | validated projected `min * 60` before BKE-6 |
 
-Legacy points and shooting attempts derive from makes/misses exactly as current Basketball scoring
-does. Legacy stat corrections are resolved before mapping. Compatibility aliases are never written
-back to event snapshots or canonical publications.
+`bk_app` and `bk_start` derive only from Section 6.1 participation rules. `bk_dq` derives from the
+effective participant disqualification state, while `bk_eject` derives from effective explicit
+ejection records. Legacy sources cannot fabricate those event-only facts; their availability is
+tracked separately. Legacy stat corrections resolve before mapping. Base aliases and constructed
+aggregate values are never written back to event snapshots or canonical publications.
 
 ### 5.3 Rates
 
@@ -392,7 +404,10 @@ unchanged.
 - Opens on Scoring.
 - Sorts by total points, PPG, appearances, then display name.
 - Offers Scoring, Shooting, Rebounding, Playmaking, Defense, Discipline, and Participation.
-- Every canonical raw stat and approved rate is rankable.
+- Every canonical aggregate stat and approved rate is rankable when that metric is available for
+  the complete selected scope. A metric with structurally unavailable legacy contributions is
+  suppressed rather than sorting unknown as a genuine zero. This includes `bk_start` when starter
+  status is unknown and event-only `bk_dq` / `bk_eject` when eligible legacy games are present.
 - Zero-appearance active roster rows remain visible where the scope supplies a roster.
 
 ### 9.2 Team, season, and tournament
@@ -576,8 +591,10 @@ Every slice runs focused tests, the full Vitest suite, production build, ESLint,
 
 Required coverage includes:
 
-- exact canonical ids, uniqueness, categories, formatting, and one-way legacy mapping;
-- every BKE-2 player/team stat, manual-minute conversion, and denominator-safe rate;
+- exact canonical ids, uniqueness, categories, formatting, one-way base mapping, and explicit
+  make-plus-miss attempt construction;
+- every BKE-2 player/team stat, manual-minute conversion, denominator-safe rate, and no supplied
+  aggregate-total trust;
 - recorded starter/bench/late/DNP participation and removed-event behavior;
 - official tracked-side team totals versus resolved player totals;
 - completed/overtime/tie results and abandoned/reopened exclusion;
@@ -587,7 +604,8 @@ Required coverage includes:
 - keyset equality boundaries, page draining, deduplication, cancellation, and in-flight sharing;
 - malformed item partial quality versus page/access/capability failure;
 - owner/admin/scorer/viewer/non-member/app-admin-without-team-role authorization;
-- all five route destinations, Refresh/focus behavior, source transitions, and Summary links;
+- all five route destinations, Refresh/focus behavior, source transitions, Summary links, and
+  mixed-scope unavailable-metric ranking suppression;
 - strict capability versions, stale backend/client, malformed, offline, auth, access, retry, and
   account cache isolation;
 - no preflight failure mutation;
