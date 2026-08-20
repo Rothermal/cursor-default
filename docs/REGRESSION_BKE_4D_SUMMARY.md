@@ -1,7 +1,8 @@
 # Regression: BKE-4D Basketball Summary Authority
 
-Status: BKE-4D1 through BKE-4D3 are implemented. No migration is required. BKE-4D4 remains planned,
-and Basketball event-game creation remains internal through BKE-4E.
+Status: BKE-4D1 through BKE-4D4 are implemented. No migration is required. The full live/manual
+matrix remains release evidence, and Basketball event-game creation remains internal through
+BKE-4E.
 
 ## BKE-4D1 Automated Gate
 
@@ -114,3 +115,42 @@ pnpm build
    game is parked only after confirmation, the owned binding resumes, and Tracker opens.
 6. Use keyboard-only review for filters, rows, group disclosure, removed disclosure, details, and
    correction dialogs; close with Escape and confirm focus returns to the originating control.
+
+## BKE-4D4 Automated Gate
+
+Coverage verifies:
+
+- Shot Chart is a valid URL-backed Summary tab and invalid tabs still normalize to Overview;
+- active field goals derive from exactly one selected authority while free throws stay excluded;
+- corrected located shots use shared court geometry and unlocated shots remain in totals/review;
+- full-game ordinals, participant/period identity, result, value, and tracked/opponent side survive
+  derivation;
+- side, participant, period, result, and value filters overlap without changing the source;
+- ended or suspended parked event games resume into explicit Basketball Summary while active games
+  still resume into Tracker; and
+- existing court geometry and legacy navigation contracts remain unchanged.
+
+Run:
+
+```bash
+pnpm exec vitest run src/lib/basketball/summaryShots.test.ts src/lib/basketball/summary.test.ts src/lib/sportNavigation.test.ts src/components/shot-chart/courtGeometry.test.ts
+pnpm test
+pnpm lint
+pnpm build
+```
+
+## BKE-4D4 Focused Runtime Check
+
+1. Open Shot Chart from local, primary, alternate, and canonical authorities; confirm every source
+   switch replaces all markers, lists, totals, filters, and open detail state rather than blending.
+2. Filter tracked/opponent, participant, regulation/overtime period, made/missed, and 2PT/3PT;
+   confirm the court and both lists stay in parity and free throws remain absent.
+3. Select located, overlapping, and unlocated attempts by pointer and keyboard; confirm each opens
+   the shared full-game ordinal/detail and focus returns to the originating control.
+4. Edit/remove a shot from a healthy owned local game. Confirm remote, canonical, suspended,
+   completed, and abandoned sources show detail without mutation controls.
+5. Deep-link and refresh `tab=shots` from Tracker, Cloud Games, Game Info, Team, and a terminal
+   parked game; confirm Back returns to the recorded origin and no remote review hydrates
+   `GameContext`.
+6. Repeat on phone and desktop, then open representative legacy Basketball and Soccer summaries to
+   confirm their authority and shot-review paths are unchanged.

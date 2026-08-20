@@ -43,6 +43,9 @@ interface BasketballCourtProps {
   newlyPlacedShotId?: string | null
   /** When truthy, show empty-court hint when interactive and there are no shots. */
   emptyHint?: string | boolean
+  /** Optional review-only side tone; live capture keeps the existing result colors by default. */
+  markerTone?: (shot: ShotRecord) => 'tracked' | 'opponent' | null
+  markerLabel?: (shot: ShotRecord) => string
 }
 
 const LINE_COLOR = '#8B6914'
@@ -128,6 +131,8 @@ export default function BasketballCourt({
   className,
   newlyPlacedShotId = null,
   emptyHint,
+  markerTone,
+  markerLabel,
 }: BasketballCourtProps) {
   const lastTapAtRef = useRef(0)
   /**
@@ -279,14 +284,25 @@ export default function BasketballCourt({
         />
       )}
 
-      {shots.map(shot =>
-        shot.made ? (
+      {shots.map(shot => {
+        const tone = markerTone?.(shot) ?? null
+        const label = markerLabel?.(shot) ?? `View ${shot.made ? 'made' : 'missed'} shot detail`
+        const madeFill = tone === 'tracked'
+          ? 'rgba(37,99,235,0.95)'
+          : tone === 'opponent' ? 'rgba(217,119,6,0.95)' : 'rgba(34,197,94,0.95)'
+        const madeStroke = tone === 'tracked'
+          ? 'rgba(29,78,216,0.95)'
+          : tone === 'opponent' ? 'rgba(180,83,9,0.95)' : 'rgba(21,128,61,0.95)'
+        const missStroke = tone === 'tracked'
+          ? 'rgba(29,78,216,0.95)'
+          : tone === 'opponent' ? 'rgba(180,83,9,0.95)' : 'rgba(220,38,38,0.95)'
+        return shot.made ? (
           <g
             key={shot.id}
             className={shot.id === newlyPlacedShotId ? 'shot-marker-pulse' : undefined}
             role={onMarkerActivate ? 'button' : undefined}
             tabIndex={onMarkerActivate ? 0 : undefined}
-            aria-label={onMarkerActivate ? 'View made shot detail' : undefined}
+            aria-label={onMarkerActivate ? label : undefined}
             onPointerDown={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onClick={onMarkerActivate ? event => {
@@ -310,8 +326,8 @@ export default function BasketballCourt({
               cx={shot.x}
               cy={shot.y}
               r={0.8}
-              fill="rgba(34,197,94,0.95)"
-              stroke="rgba(21,128,61,0.95)"
+              fill={madeFill}
+              stroke={madeStroke}
               strokeWidth={0.2}
               pointerEvents="none"
             />
@@ -322,7 +338,7 @@ export default function BasketballCourt({
             className={shot.id === newlyPlacedShotId ? 'shot-marker-pulse' : undefined}
             role={onMarkerActivate ? 'button' : undefined}
             tabIndex={onMarkerActivate ? 0 : undefined}
-            aria-label={onMarkerActivate ? 'View missed shot detail' : undefined}
+            aria-label={onMarkerActivate ? label : undefined}
             onPointerDown={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onPointerUp={onMarkerActivate ? event => event.stopPropagation() : undefined}
             onClick={onMarkerActivate ? event => {
@@ -347,7 +363,7 @@ export default function BasketballCourt({
               y1={shot.y - 0.6}
               x2={shot.x + 0.6}
               y2={shot.y + 0.6}
-              stroke="rgba(220,38,38,0.95)"
+              stroke={missStroke}
               strokeWidth={0.35}
               strokeLinecap="round"
               pointerEvents="none"
@@ -357,14 +373,14 @@ export default function BasketballCourt({
               y1={shot.y - 0.6}
               x2={shot.x - 0.6}
               y2={shot.y + 0.6}
-              stroke="rgba(220,38,38,0.95)"
+              stroke={missStroke}
               strokeWidth={0.35}
               strokeLinecap="round"
               pointerEvents="none"
             />
           </g>
         )
-      )}
+      })}
 
       {interactive && onCourtTap && shots.length === 0 && emptyHint && (
         <g pointerEvents="none" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
