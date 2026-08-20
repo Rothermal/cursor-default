@@ -2,8 +2,8 @@
 
 Status: Approved implementation plan. BKE-4A, BKE-4B1 through BKE-4B3, and BKE-4C1 through
 BKE-4C4 are implemented through migration 059. The BKE-4B live two-device matrix remains pending
-and is carried into BKE-4C exit evidence. BKE-4C product and delivery decisions are approved under
-[`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md).
+and is carried into BKE-4C exit evidence. BKE-4D product and delivery decisions are approved under
+[`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md); BKE-4D1 is next.
 Basketball event-game creation remains internal-only through BKE-4E.
 
 ## 1. Goal
@@ -140,7 +140,7 @@ reopened for each implementation slice:
 
 ## 10. Next Step
 
-After applying migration 059, complete the minimum pre-BKE-4D runtime checkpoint from
-[`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md), then begin BKE-4D
-explicit-authority Basketball Summary work. Keep broader enablement closed until the full combined
-BKE-4B/BKE-4C live matrix is complete.
+Migration 059 is applied. The owner approved deferring the focused BKE-4C runtime checkpoint while
+event-game creation remains internal; retain it with the full combined BKE-4B/BKE-4C matrix as
+required evidence before broader enablement. Begin BKE-4D1 under
+[`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md).

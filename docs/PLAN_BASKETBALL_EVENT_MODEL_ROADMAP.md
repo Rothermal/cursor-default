@@ -19,7 +19,9 @@ recovery/conflict implementation are complete under the approved slices in
 Supabase matrix remains the BKE-4B exit signoff. BKE-4C1 through BKE-4C4 are implemented through
 migration 059 under
 [PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md); the
-combined live matrix remains required before broader enablement, and BKE-4D Summary is next.
+combined live matrix remains required before broader enablement. BKE-4D product and delivery
+decisions are approved in
+[PLAN_BKE_4D_SUMMARY_AUTHORITY.md](PLAN_BKE_4D_SUMMARY_AUTHORITY.md), and BKE-4D1 is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
