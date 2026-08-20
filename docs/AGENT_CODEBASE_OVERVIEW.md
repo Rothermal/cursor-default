@@ -214,8 +214,10 @@ parked-binding refresh, and append-only republication path. The BKE-4B matrix re
 BKE-4C exit evidence. BKE-4D1 adds one explicit-authority Basketball Summary source boundary for
 local, cloud-primary, manager-selected alternate, and canonical review. Final event games require
 the canonical publication, remote review remains page-local/read-only, unhealthy projections hide
-official output, and the legacy aggregate Basketball Summary remains separate. Only Overview is
-shipped; BKE-4D2 adds Players and Team Stats.
+official output, and the legacy aggregate Basketball Summary remains separate. BKE-4D2 adds
+stable participant review, traditional and safe derived player box scores, authoritative team
+totals, period foul/bonus/timeout context, discipline, and participant versus team/unknown
+attribution. Opponent rows are explicit-only and manual minutes are never inferred.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -447,7 +449,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) / [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md) / [`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md) / [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md) / [`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md) / [`REGRESSION_BKE_4D_SUMMARY.md`](REGRESSION_BKE_4D_SUMMARY.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3, BKE-4A, BKE-4B1 through BKE-4B3, BKE-4C1 through BKE-4C4, and BKE-4D1 are implemented; BKE-4D2 is next; the combined live matrix remains release evidence |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) / [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md) / [`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md) / [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md) / [`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md) / [`REGRESSION_BKE_4D_SUMMARY.md`](REGRESSION_BKE_4D_SUMMARY.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3, BKE-4A, BKE-4B1 through BKE-4B3, BKE-4C1 through BKE-4C4, and BKE-4D1 through BKE-4D2 are implemented; BKE-4D3 is next; the combined live matrix remains release evidence |
 
 ### Held / waiting for feedback
 
