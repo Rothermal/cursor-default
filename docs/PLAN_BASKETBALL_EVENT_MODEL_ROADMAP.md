@@ -23,7 +23,10 @@ combined live matrix remains required before broader enablement. BKE-4D product 
 decisions are approved in
 [PLAN_BKE_4D_SUMMARY_AUTHORITY.md](PLAN_BKE_4D_SUMMARY_AUTHORITY.md). BKE-4D1 through BKE-4D4 are
 implemented with the complete authority-aware Summary, including Overview, Players, Team Stats,
-Timeline, Shot Chart, and explicit entry/return routing. BKE-4E is next.
+Timeline, Shot Chart, and explicit entry/return routing. BKE-4E product and delivery decisions are
+approved in
+[PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md](PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md);
+BKE-4E1 is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

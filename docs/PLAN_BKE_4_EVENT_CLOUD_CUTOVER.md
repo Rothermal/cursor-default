@@ -4,7 +4,9 @@ Status: Approved implementation plan. BKE-4A, BKE-4B1 through BKE-4B3, BKE-4C1 t
 BKE-4C4 and BKE-4D1 through BKE-4D4 are implemented through migration 059. The BKE-4B live two-device matrix
 remains pending and is carried into BKE-4C exit evidence. BKE-4D product and delivery decisions
 are approved under [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md);
-BKE-4E is next.
+BKE-4E product and delivery decisions are approved under
+[`PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md`](PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md);
+BKE-4E1 is next.
 Basketball event-game creation remains internal-only through BKE-4E.
 
 ## 1. Goal
@@ -95,7 +97,7 @@ single drop/add validation scan.
 | BKE-4B | 056+ | Basketball binding, transport, recovery, and conflict contracts |
 | BKE-4C | Following 4B | Basketball recorder/finalization contracts and audit integration |
 | BKE-4D | None expected | Prefer client-only Summary work unless a narrow authority read RPC is required; never infer authority from legacy rows |
-| BKE-4E | Following 4C | Canonical Basketball aggregate pages and capability version |
+| BKE-4E | 060-061 | Canonical/legacy Basketball aggregate source pages, followed by the read-only capability handshake |
 
 Every migration receives a static contract test in the repository. Database-runtime behavior must
 also be exercised against a Supabase test or deployed project because Vitest does not execute
@@ -145,5 +147,6 @@ Migration 059 is applied; BKE-4D1 through BKE-4D4 provide the complete explicit-
 with Overview, Players, Team Stats, Timeline, and Shot Chart plus deterministic entry/return routes.
 The owner approved deferring the focused BKE-4C runtime checkpoint while event-game creation
 remains internal; retain it with the full combined BKE-4B/BKE-4C matrix as required evidence
-before broader enablement. Begin BKE-4E canonical aggregates, capability negotiation, and release
-readiness under this cutover roadmap.
+before broader enablement. BKE-4E is approved in five slices under
+[`PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md`](PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md).
+Begin BKE-4E1 on a fresh implementation branch while keeping event-game creation internal.
