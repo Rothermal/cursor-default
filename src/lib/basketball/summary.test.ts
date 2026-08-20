@@ -64,12 +64,14 @@ function startedState(): GameState {
 
 describe('Basketball summary model', () => {
   it('keeps the event summary route explicit and normalizes unshipped tabs', () => {
-    const path = basketballSummaryPath({ gameId: 'game-1', tab: 'players', from: 'games' })
+    const path = basketballSummaryPath({ gameId: 'game-1', tab: 'timeline', from: 'games' })
     const params = new URLSearchParams(path.split('?')[1])
     expect(params.get('sport')).toBe('basketball')
     expect(parseBasketballSummaryQuery(params)).toMatchObject({
-      gameId: 'game-1', tab: 'overview', requestedTab: 'players', from: 'games',
+      gameId: 'game-1', tab: 'overview', requestedTab: 'timeline', from: 'games',
     })
+    expect(parseBasketballSummaryQuery(new URLSearchParams('tab=players')).tab).toBe('players')
+    expect(parseBasketballSummaryQuery(new URLSearchParams('tab=team')).tab).toBe('team')
     expect(isBasketballSummaryRoute(createInitialState(), params)).toBe(true)
     expect(isBasketballSummaryRoute(createInitialState(), new URLSearchParams())).toBe(false)
     expect(isBasketballSummaryRoute(startedState(), new URLSearchParams('gameId=soccer-1')))

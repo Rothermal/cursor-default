@@ -68,7 +68,7 @@ export interface BasketballMatchLeader {
   leaders: BasketballLeaderEntry[]
 }
 
-const SHIPPED_TABS = new Set<BasketballSummaryTab>(['overview'])
+const SHIPPED_TABS = new Set<BasketballSummaryTab>(['overview', 'players', 'team'])
 const VALID_FROM = new Set<BasketballSummaryFrom>([
   'tracker',
   'games',

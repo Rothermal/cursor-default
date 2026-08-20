@@ -2,9 +2,11 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BasketballOverview from '../components/basketball-summary/BasketballOverview'
+import BasketballPlayers from '../components/basketball-summary/BasketballPlayers'
 import BasketballRecordingSelector from '../components/basketball-summary/BasketballRecordingSelector'
 import BasketballSummaryHeader from '../components/basketball-summary/BasketballSummaryHeader'
 import BasketballSummaryTabs from '../components/basketball-summary/BasketballSummaryTabs'
+import BasketballTeamStats from '../components/basketball-summary/BasketballTeamStats'
 import { useGame } from '../context/GameContext'
 import {
   basketballMatchLeaders,
@@ -178,21 +180,30 @@ export default function BasketballSummary() {
         onBack={() => navigate(basketballSummaryBackPath(query))}
         onRefresh={() => { void refresh() }}
       />
-      <BasketballSummaryTabs />
+      <BasketballSummaryTabs
+        activeTab={query.tab}
+        onChange={tab => navigate(basketballSummaryPath({
+          gameId: query.gameId,
+          tab,
+          recordingId: query.recordingId,
+          from: query.from,
+          teamId: query.teamId,
+        }))}
+      />
       <BasketballRecordingSelector
         recorders={source.recorders}
         selectedRecorderId={source.kind === 'cloud_recording' ? source.recorder.recorderId : null}
         disabled={refreshing}
         onChange={recordingId => navigate(summaryPath(query, recordingId))}
       />
-      <main className="mx-auto max-w-5xl px-4">
+      <div className="mx-auto max-w-5xl px-4">
         {refreshError && (
           <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <AlertTriangle size={18} className="mt-0.5 shrink-0" />
             <p>Showing the last loaded source. Refresh failed: {refreshError}</p>
           </div>
         )}
-        {!healthy ? (
+        {!healthy && (
           <section className="my-5 rounded-md border border-red-300 bg-red-50 p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle size={20} className="mt-0.5 shrink-0 text-red-700" />
@@ -209,7 +220,14 @@ export default function BasketballSummary() {
               </div>
             </div>
           </section>
-        ) : (
+        )}
+      </div>
+      {healthy && query.tab === 'players' ? (
+        <BasketballPlayers key={sourceKey(source)} source={source} />
+      ) : healthy && query.tab === 'team' ? (
+        <BasketballTeamStats key={sourceKey(source)} source={source} />
+      ) : healthy ? (
+        <main className="mx-auto max-w-5xl px-4">
           <BasketballOverview
             source={source}
             result={result}
@@ -217,10 +235,19 @@ export default function BasketballSummary() {
             comparisons={basketballTeamComparison(sportState.projection)}
             leaders={basketballMatchLeaders(sportState.projection)}
           />
-        )}
-      </main>
+        </main>
+      ) : null}
     </div>
   )
+}
+
+function sourceKey(source: BasketballSummarySource): string {
+  return [
+    source.kind,
+    source.state.cloudSync.gameId ?? 'local',
+    source.recorder?.recorderId ?? 'device',
+    source.publication?.publicationId ?? 'live',
+  ].join(':')
 }
 
 function summaryPath(

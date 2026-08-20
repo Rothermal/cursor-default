@@ -1,6 +1,6 @@
 # Plan: BKE-4D Basketball Summary Authority
 
-Status: Product and delivery Q&A approved. BKE-4D1 is implemented; BKE-4D2 is next. Basketball
+Status: Product and delivery Q&A approved. BKE-4D1 and BKE-4D2 are implemented; BKE-4D3 is next. Basketball
 event-game creation remains internal-only through BKE-4E, and the combined BKE-4B/BKE-4C live
 Supabase matrix remains required before broader enablement.
 
@@ -334,6 +334,16 @@ Stats. No migration was required.
 Exit: Players and Team Stats agree with the selected projection without fabricating opponent rows,
 losing team-kind activity, or deriving unsupported advanced metrics.
 
+Implementation record (August 2026): `src/lib/basketball/summaryDetails.ts` derives stable
+setup-then-late participant rows, traditional box scores, denominator-safe FG/2PT/3PT/FT/eFG/TS
+rates, assist-to-turnover ratio, and manual minute totals from one selected projection. Opponent
+rows exist only for explicit match participants. Team review reads authoritative side totals,
+event-derived period scoring, period fouls/bonus/timeouts, neutral timeouts, technicals, ejections,
+and participant versus team/unknown attribution. `BasketballPlayers` uses a compact mobile list and
+full accessible detail sheet; `BasketballTeamStats` presents complete side comparison and period
+context without summing visible player rows. Players and Team Stats are URL-backed tabs; source
+changes remount their local review state. No migration was required.
+
 ### BKE-4D3: Timeline
 
 1. Adapt the complete BKE-3 Timeline reader and family filters to one Summary source.
@@ -451,5 +461,5 @@ The August 2026 Q&A approved all 32 recommended choices:
 
 ## 13. Next Step
 
-Begin BKE-4D2 on a fresh implementation branch after BKE-4D1 merges. Keep event-game creation
+Begin BKE-4D3 on a fresh implementation branch after BKE-4D2 merges. Keep event-game creation
 internal and carry the combined BKE-4B/BKE-4C live matrix forward to the BKE-4E release evidence.
