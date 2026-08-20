@@ -74,6 +74,10 @@ describe('Basketball summary model', () => {
     expect(isBasketballSummaryRoute(createInitialState(), new URLSearchParams())).toBe(false)
     expect(isBasketballSummaryRoute(startedState(), new URLSearchParams('gameId=soccer-1')))
       .toBe(false)
+    expect(isBasketballSummaryRoute(
+      { ...createInitialState(), sport: basketball },
+      new URLSearchParams('sport=basketball')
+    )).toBe(false)
   })
 
   it('derives period scoring from active score events', () => {

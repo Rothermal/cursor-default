@@ -135,12 +135,9 @@ export function isBasketballSummaryRoute(
 ): boolean {
   if (params.get('gameId')) return params.get('sport') === 'basketball'
   return (
-    params.get('sport') === 'basketball' ||
-    (
-      state.gameDataAuthority === 'sport_events' &&
-      state.sport?.id === 'basketball' &&
-      state.sportGameState?.sportId === 'basketball'
-    )
+    state.gameDataAuthority === 'sport_events' &&
+    state.sport?.id === 'basketball' &&
+    state.sportGameState?.sportId === 'basketball'
   )
 }
 
