@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, Play, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
+import type { GameState } from '../../types'
 import {
   isBasketballEditableRelatedEvent,
   type BasketballHistoricalRelatedEventType,
@@ -8,12 +9,15 @@ import {
 import {
   BASKETBALL_TIMELINE_FAMILIES,
   basketballShotDetailFromReview,
+  basketballTimelineCorrectionsEnabled,
   buildBasketballTimelineReview,
   filterBasketballTimelineGroups,
+  groupBasketballTimelineByPeriod,
   type BasketballShotDetailModel,
   type BasketballTimelineEventReview,
   type BasketballTimelineFilters,
   type BasketballTimelineGroup,
+  type BasketballTimelinePeriodGroup,
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from './BasketballShotDetailDialog'
 import BasketballShotEditor from './BasketballShotEditor'
@@ -43,9 +47,29 @@ import {
 } from '../../lib/basketball/administrationEditCommands'
 import BasketballAdministrationEditor from './BasketballAdministrationEditor'
 
-export default function BasketballTimeline() {
-  const { state } = useGame()
-  const review = useMemo(() => buildBasketballTimelineReview(state), [state])
+interface Props {
+  reviewState?: GameState
+  mode?: 'tracker' | 'summary'
+  editingEnabled?: boolean
+  onOpenOwnedRecording?: () => void
+}
+
+export default function BasketballTimeline({
+  reviewState,
+  mode = 'tracker',
+  editingEnabled,
+  onOpenOwnedRecording,
+}: Props = {}) {
+  const { state: contextState } = useGame()
+  const state = reviewState ?? contextState
+  const summaryMode = mode === 'summary'
+  const allowMutations = editingEnabled ?? !summaryMode
+  const review = useMemo(
+    () => buildBasketballTimelineReview(state, {
+      groupOrder: summaryMode ? 'oldest_first' : 'newest_first',
+    }),
+    [state, summaryMode]
+  )
   const [filters, setFilters] = useState<BasketballTimelineFilters>(() => ({
     family: 'all',
     periodId: review.defaultPeriodId,
@@ -67,6 +91,19 @@ export default function BasketballTimeline() {
   const [addingValueType, setAddingValueType] = useState<BasketballEditableValueEventType | null>(null)
   const [addingFoulFreeThrowType, setAddingFoulFreeThrowType] = useState<BasketballFoulFreeThrowDraftType | null>(null)
   const [addingAdministrationType, setAddingAdministrationType] = useState<BasketballEditableAdministrationEventType | null>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
+  const rememberFocus = () => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+  }
+
+  const restoreFocus = () => {
+    const target = returnFocusRef.current
+    returnFocusRef.current = null
+    window.setTimeout(() => target?.focus(), 0)
+  }
 
   useEffect(() => {
     if (!highlightEventId) return
@@ -91,21 +128,34 @@ export default function BasketballTimeline() {
     () => filterBasketballTimelineGroups(review.removedGroups, filters),
     [filters, review.removedGroups]
   )
-  const removedEventCount = removedGroups.reduce((sum, group) => sum + group.events.length, 0)
-  const correctionsEnabled = review.complete && state.sportGameState?.sportId === 'basketball' && (
-    state.sportGameState.projection.status === 'in_progress' ||
-    state.sportGameState.projection.status === 'period_break'
+  const activePeriodGroups = useMemo(
+    () => groupBasketballTimelineByPeriod(activeGroups, review.periods),
+    [activeGroups, review.periods]
   )
-  const recoveryEventId = review.complete
+  const removedPeriodGroups = useMemo(
+    () => groupBasketballTimelineByPeriod(removedGroups, review.periods),
+    [removedGroups, review.periods]
+  )
+  const removedEventCount = removedGroups.reduce((sum, group) => sum + group.events.length, 0)
+  const correctionsEnabled = review.complete &&
+    basketballTimelineCorrectionsEnabled(state, allowMutations)
+  const recoveryEventId = review.complete || !allowMutations
     ? null
     : basketballRecoverableScoreAdjustmentId(state, review.diagnostics)
 
   const openShotDetail = (eventId: string) => {
+    rememberFocus()
     setShotDetail(basketballShotDetailFromReview(state, review, eventId))
   }
 
   const openEventDetail = (eventId: string) => {
+    rememberFocus()
     setEventDetail(review.eventById.get(eventId) ?? null)
+  }
+
+  const openCorrection = (intent: BasketballTimelineCorrectionIntent) => {
+    rememberFocus()
+    setCorrectionIntent(intent)
   }
 
   return (
@@ -126,11 +176,24 @@ export default function BasketballTimeline() {
           {correctionsEnabled && (
             <button
               type="button"
-              onClick={() => setShowAddChooser(true)}
+              onClick={() => {
+                rememberFocus()
+                setShowAddChooser(true)
+              }}
               className="btn-secondary flex min-h-10 items-center gap-2 px-3 text-sm"
             >
               <Plus size={16} aria-hidden />
               Add event
+            </button>
+          )}
+          {!correctionsEnabled && onOpenOwnedRecording && (
+            <button
+              type="button"
+              onClick={onOpenOwnedRecording}
+              className="btn-secondary flex min-h-10 items-center gap-2 px-3 text-sm"
+            >
+              <Play size={16} aria-hidden />
+              Open owned recording
             </button>
           )}
           {!review.complete && !correctionsEnabled && (
@@ -202,6 +265,17 @@ export default function BasketballTimeline() {
             <CircleDot className="mx-auto text-slate-300" size={28} aria-hidden />
             <p className="mt-2 text-sm font-semibold text-slate-700">No matching events</p>
           </div>
+        ) : summaryMode ? (
+          <TimelinePeriodGroups
+            sections={activePeriodGroups}
+            onOpenShot={openShotDetail}
+            onOpenEvent={openEventDetail}
+            onCorrect={openCorrection}
+            correctionsEnabled={correctionsEnabled}
+            recoveryEventId={recoveryEventId}
+            highlightEventId={highlightEventId}
+            summaryMode
+          />
         ) : (
           <ol className="space-y-2">
             {activeGroups.map(group => (
@@ -210,10 +284,11 @@ export default function BasketballTimeline() {
                   group={group}
                   onOpenShot={openShotDetail}
                   onOpenEvent={openEventDetail}
-                  onCorrect={setCorrectionIntent}
+                  onCorrect={openCorrection}
                   correctionsEnabled={correctionsEnabled}
                   recoveryEventId={recoveryEventId}
                   highlightEventId={highlightEventId}
+                  summaryMode={false}
                 />
               </li>
             ))}
@@ -229,17 +304,32 @@ export default function BasketballTimeline() {
             <ol className="space-y-2 border-t border-slate-100 p-2">
               {removedGroups.length === 0 ? (
                 <li className="px-3 py-5 text-center text-sm text-slate-500">No removed events match these filters.</li>
+              ) : summaryMode ? (
+                <li>
+                  <TimelinePeriodGroups
+                    sections={removedPeriodGroups}
+                    onOpenShot={openShotDetail}
+                    onOpenEvent={openEventDetail}
+                    onCorrect={openCorrection}
+                    correctionsEnabled={correctionsEnabled}
+                    recoveryEventId={recoveryEventId}
+                    highlightEventId={highlightEventId}
+                    summaryMode
+                    removed
+                  />
+                </li>
               ) : removedGroups.map(group => (
                 <li key={group.id}>
                   <TimelineGroup
                     group={group}
                     onOpenShot={openShotDetail}
                     onOpenEvent={openEventDetail}
-                    onCorrect={setCorrectionIntent}
+                    onCorrect={openCorrection}
                     correctionsEnabled={correctionsEnabled}
                     recoveryEventId={recoveryEventId}
                     highlightEventId={highlightEventId}
                     removed
+                    summaryMode={false}
                   />
                 </li>
               ))}
@@ -251,7 +341,10 @@ export default function BasketballTimeline() {
       {shotDetail && (
         <BasketballShotDetailDialog
           detail={shotDetail}
-          onClose={() => setShotDetail(null)}
+          onClose={() => {
+            setShotDetail(null)
+            restoreFocus()
+          }}
           onEdit={correctionsEnabled && shotDetail.source === 'event' && !shotDetail.removed
             ? () => {
                 setShotDetail(null)
@@ -275,6 +368,7 @@ export default function BasketballTimeline() {
                 setCorrectionIntent({ kind: 'restore', eventId: shotDetail.shotId })
               }
             : undefined}
+          showCaptureSequence={summaryMode}
         />
       )}
 
@@ -286,7 +380,10 @@ export default function BasketballTimeline() {
             : eventDetail.teamSide === 'opponent'
               ? state.gameInfo?.opponentName || 'Opponent'
               : 'Game administration'}
-          onClose={() => setEventDetail(null)}
+          onClose={() => {
+            setEventDetail(null)
+            restoreFocus()
+          }}
           onEdit={(correctionsEnabled || eventDetail.id === recoveryEventId) &&
             !eventDetail.removed && (
               isBasketballEditableFoulFreeThrowEvent(eventDetail.event) ||
@@ -308,13 +405,17 @@ export default function BasketballTimeline() {
                 setEventDetail(null)
               }
             : undefined}
+          captureLabel={summaryMode ? eventDetail.sequenceLabel : undefined}
         />
       )}
 
       {correctionIntent && (
         <BasketballTimelineCorrectionDialog
           intent={correctionIntent}
-          onClose={() => setCorrectionIntent(null)}
+          onClose={() => {
+            setCorrectionIntent(null)
+            restoreFocus()
+          }}
           onApplied={() => setShotDetail(null)}
         />
       )}
@@ -322,10 +423,14 @@ export default function BasketballTimeline() {
       {editingShotId && (
         <BasketballShotEditor
           eventId={editingShotId}
-          onClose={() => setEditingShotId(null)}
+          onClose={() => {
+            setEditingShotId(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setEditingShotId(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -333,10 +438,14 @@ export default function BasketballTimeline() {
       {editingRelatedEventId && (
         <BasketballRelatedEventEditor
           eventId={editingRelatedEventId}
-          onClose={() => setEditingRelatedEventId(null)}
+          onClose={() => {
+            setEditingRelatedEventId(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setEditingRelatedEventId(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -345,10 +454,14 @@ export default function BasketballTimeline() {
         <BasketballValueEventEditor
           mode="edit"
           eventId={editingValueEventId}
-          onClose={() => setEditingValueEventId(null)}
+          onClose={() => {
+            setEditingValueEventId(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setEditingValueEventId(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -357,10 +470,14 @@ export default function BasketballTimeline() {
         <BasketballFoulFreeThrowEditor
           mode="edit"
           eventId={editingFoulFreeThrowEventId}
-          onClose={() => setEditingFoulFreeThrowEventId(null)}
+          onClose={() => {
+            setEditingFoulFreeThrowEventId(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setEditingFoulFreeThrowEventId(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -369,17 +486,24 @@ export default function BasketballTimeline() {
         <BasketballAdministrationEditor
           mode="edit"
           eventId={editingAdministrationEventId}
-          onClose={() => setEditingAdministrationEventId(null)}
+          onClose={() => {
+            setEditingAdministrationEventId(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setEditingAdministrationEventId(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
 
       {showAddChooser && (
         <BasketballAddEventChooser
-          onClose={() => setShowAddChooser(false)}
+          onClose={() => {
+            setShowAddChooser(false)
+            restoreFocus()
+          }}
           onShot={() => {
             setShowAddChooser(false)
             setAddingShot(true)
@@ -406,10 +530,14 @@ export default function BasketballTimeline() {
 
       {addingShot && (
         <BasketballHistoricalShotEditor
-          onClose={() => setAddingShot(false)}
+          onClose={() => {
+            setAddingShot(false)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setAddingShot(false)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -417,10 +545,14 @@ export default function BasketballTimeline() {
       {addingRelatedType && (
         <BasketballHistoricalRelatedEventEditor
           eventType={addingRelatedType}
-          onClose={() => setAddingRelatedType(null)}
+          onClose={() => {
+            setAddingRelatedType(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setAddingRelatedType(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -429,10 +561,14 @@ export default function BasketballTimeline() {
         <BasketballValueEventEditor
           mode="add"
           eventType={addingValueType}
-          onClose={() => setAddingValueType(null)}
+          onClose={() => {
+            setAddingValueType(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setAddingValueType(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -441,10 +577,14 @@ export default function BasketballTimeline() {
         <BasketballFoulFreeThrowEditor
           mode="add"
           eventType={addingFoulFreeThrowType}
-          onClose={() => setAddingFoulFreeThrowType(null)}
+          onClose={() => {
+            setAddingFoulFreeThrowType(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setAddingFoulFreeThrowType(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -453,10 +593,14 @@ export default function BasketballTimeline() {
         <BasketballAdministrationEditor
           mode="add"
           eventType={addingAdministrationType}
-          onClose={() => setAddingAdministrationType(null)}
+          onClose={() => {
+            setAddingAdministrationType(null)
+            restoreFocus()
+          }}
           onApplied={eventId => {
             setAddingAdministrationType(null)
             setHighlightEventId(eventId)
+            restoreFocus()
           }}
         />
       )}
@@ -472,6 +616,7 @@ function TimelineGroup({
   correctionsEnabled,
   recoveryEventId,
   highlightEventId,
+  summaryMode,
   removed = false,
 }: {
   group: BasketballTimelineGroup
@@ -481,6 +626,7 @@ function TimelineGroup({
   correctionsEnabled: boolean
   recoveryEventId: string | null
   highlightEventId: string | null
+  summaryMode: boolean
   removed?: boolean
 }) {
   const grouped = group.captureCommandId !== null && group.events.length > 1
@@ -495,6 +641,7 @@ function TimelineGroup({
         correctionsEnabled={correctionsEnabled}
         recoveryEventId={recoveryEventId}
         highlighted={highlightEventId === group.events[0].id}
+        summaryMode={summaryMode}
         removed={removed}
       />
     )
@@ -512,7 +659,7 @@ function TimelineGroup({
             <StatusBadges group={group} removed={removed} />
           </div>
           <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
-            {group.actorLabel} | {group.periodLabel} | {formatTimelineTime(group.occurredAt)}
+            {group.actorLabel} | {group.periodLabel} | {summaryMode ? group.sequenceLabel : formatTimelineTime(group.occurredAt)}
           </p>
         </div>
         <ChevronDown className="mt-0.5 shrink-0 text-slate-400" size={17} aria-hidden />
@@ -529,6 +676,7 @@ function TimelineGroup({
             correctionsEnabled={correctionsEnabled}
             recoveryEventId={recoveryEventId}
             highlighted={highlightEventId === review.id}
+            summaryMode={summaryMode}
             removed={removed}
             nested
           />
@@ -561,6 +709,7 @@ function TimelineEventRow({
   correctionsEnabled,
   recoveryEventId,
   removed,
+  summaryMode,
   highlighted = false,
   nested = false,
 }: {
@@ -572,16 +721,12 @@ function TimelineEventRow({
   correctionsEnabled: boolean
   recoveryEventId: string | null
   removed: boolean
+  summaryMode: boolean
   highlighted?: boolean
   nested?: boolean
 }) {
   const shot = review.event.eventType === 'basketball.shot'
-  const relatedEvent = !shot && (
-    isBasketballEditableRelatedEvent(review.event) ||
-    isBasketballEditableValueEvent(review.event) ||
-    isBasketballEditableFoulFreeThrowEvent(review.event) ||
-    isBasketballEditableAdministrationEvent(review.event)
-  )
+  const detailAvailable = !shot
   const content = (
     <>
       <div className="min-w-0 flex-1 text-left">
@@ -598,7 +743,7 @@ function TimelineEventRow({
           )}
         </div>
         <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
-          {review.actorLabel} | {review.periodLabel} | {formatTimelineTime(review.event.occurredAt)}
+          {review.actorLabel} | {review.periodLabel} | {summaryMode ? review.sequenceLabel : formatTimelineTime(review.event.occurredAt)}
         </p>
         {review.relationshipLabels.length > 0 && (
           <p className="mt-1 text-xs text-slate-500">{review.relationshipLabels.join(' | ')}</p>
@@ -622,7 +767,7 @@ function TimelineEventRow({
             <Eye size={17} aria-hidden />
           </button>
         )}
-        {relatedEvent && (
+        {detailAvailable && (
           <button
             type="button"
             onClick={() => onOpenEvent(review.id)}
@@ -656,6 +801,60 @@ function TimelineEventRow({
   } flex w-full items-start gap-3`
 
   return <div className={className}>{content}</div>
+}
+
+function TimelinePeriodGroups({
+  sections,
+  onOpenShot,
+  onOpenEvent,
+  onCorrect,
+  correctionsEnabled,
+  recoveryEventId,
+  highlightEventId,
+  summaryMode,
+  removed = false,
+}: {
+  sections: BasketballTimelinePeriodGroup[]
+  onOpenShot: (eventId: string) => void
+  onOpenEvent: (eventId: string) => void
+  onCorrect: (intent: BasketballTimelineCorrectionIntent) => void
+  correctionsEnabled: boolean
+  recoveryEventId: string | null
+  highlightEventId: string | null
+  summaryMode: boolean
+  removed?: boolean
+}) {
+  return (
+    <div className="space-y-4">
+      {sections.map(section => (
+        <section key={section.periodId} aria-labelledby={`basketball-timeline-period-${removed ? 'removed-' : ''}${section.periodId}`}>
+          <h3
+            id={`basketball-timeline-period-${removed ? 'removed-' : ''}${section.periodId}`}
+            className="mb-2 text-xs font-bold uppercase text-slate-500"
+          >
+            {section.periodLabel}
+          </h3>
+          <ol className="space-y-2">
+            {section.groups.map(group => (
+              <li key={group.id}>
+                <TimelineGroup
+                  group={group}
+                  onOpenShot={onOpenShot}
+                  onOpenEvent={onOpenEvent}
+                  onCorrect={onCorrect}
+                  correctionsEnabled={correctionsEnabled}
+                  recoveryEventId={recoveryEventId}
+                  highlightEventId={highlightEventId}
+                  summaryMode={summaryMode}
+                  removed={removed}
+                />
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
+  )
 }
 
 function StatusBadges({ group, removed }: { group: BasketballTimelineGroup; removed: boolean }) {

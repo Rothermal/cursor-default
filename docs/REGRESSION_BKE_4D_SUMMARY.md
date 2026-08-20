@@ -1,6 +1,6 @@
 # Regression: BKE-4D Basketball Summary Authority
 
-Status: BKE-4D1 and BKE-4D2 are implemented. No migration is required. BKE-4D3 and BKE-4D4 remain planned,
+Status: BKE-4D1 through BKE-4D3 are implemented. No migration is required. BKE-4D4 remains planned,
 and Basketball event-game creation remains internal through BKE-4E.
 
 ## BKE-4D1 Automated Gate
@@ -74,3 +74,43 @@ Coverage verifies:
    Team / unknown attribution without being assigned to a player.
 5. Switch between primary and an authorized alternate recording while on Players and Team Stats;
    confirm all rows replace rather than blend and local detail state resets.
+
+## BKE-4D3 Automated Gate
+
+Coverage verifies:
+
+- Timeline is a valid URL-backed Summary tab while the unshipped Shot Chart still normalizes to
+  Overview;
+- the live tracker keeps newest-first capture review while Summary uses oldest-first capture order;
+- Summary groups captures by period and uses deterministic stream-sequence labels;
+- all overlapping BKE-3 event-family, period, side, and participant filters remain available;
+- active capture groups, removed companions, current revisions, recorded-later context, and
+  relationship warnings remain reviewable;
+- only an explicitly editable in-progress/period-break authority can expose correction, while a
+  read-only or terminal authority cannot; and
+- source-key remounting isolates filter/detail state across local, primary, alternate, and
+  canonical review.
+
+Run:
+
+```bash
+pnpm exec vitest run src/lib/basketball/timeline.test.ts src/lib/basketball/summary.test.ts src/lib/basketball/summarySource.test.ts
+pnpm lint
+pnpm build
+```
+
+## BKE-4D3 Focused Runtime Check
+
+1. Open Timeline from a healthy local event game and confirm Add/Edit/Remove/Restore match the
+   existing tracker Timeline; suspend or complete the game and confirm mutation controls disappear.
+2. Open primary, alternate, and canonical cloud sources and confirm the same event families and
+   details render without any mutation controls.
+3. Review active and removed multi-event capture groups, revised rows, and a recorded-later event;
+   confirm period grouping and Capture labels stay deterministic without displaying capture time as
+   elapsed game time.
+4. Apply every family/period/side/participant filter, change authority, and confirm filters and open
+   detail state reset rather than crossing recorder streams.
+5. With a matching parked current-account binding, use Open owned recording and confirm the current
+   game is parked only after confirmation, the owned binding resumes, and Tracker opens.
+6. Use keyboard-only review for filters, rows, group disclosure, removed disclosure, details, and
+   correction dialogs; close with Escape and confirm focus returns to the originating control.

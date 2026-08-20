@@ -7,6 +7,7 @@ import BasketballRecordingSelector from '../components/basketball-summary/Basket
 import BasketballSummaryHeader from '../components/basketball-summary/BasketballSummaryHeader'
 import BasketballSummaryTabs from '../components/basketball-summary/BasketballSummaryTabs'
 import BasketballTeamStats from '../components/basketball-summary/BasketballTeamStats'
+import BasketballTimeline from '../components/basketball/BasketballTimeline'
 import { useGame } from '../context/GameContext'
 import {
   basketballMatchLeaders,
@@ -30,7 +31,12 @@ export default function BasketballSummary() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const query = useMemo(() => parseBasketballSummaryQuery(searchParams), [searchParams])
-  const { state } = useGame()
+  const {
+    state,
+    activeLocalGameId,
+    parkedGames,
+    resumeParkedGame,
+  } = useGame()
   const [source, setSource] = useState<BasketballSummarySource | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -40,6 +46,26 @@ export default function BasketballSummary() {
   const requestIdRef = useRef(0)
   const sourceRef = useRef<BasketballSummarySource | null>(null)
   const routeKeyRef = useRef<string | null>(null)
+  const ownedLocalGameId = useMemo(() => {
+    if (!source || source.kind === 'local') return null
+    const cloudGameId = source.state.cloudSync.gameId
+    if (!cloudGameId) return null
+    return parkedGames.find(game =>
+      game.sportId === 'basketball' && game.cloudGameId === cloudGameId
+    )?.localGameId ?? null
+  }, [parkedGames, source])
+
+  const openOwnedRecording = useCallback(() => {
+    if (!ownedLocalGameId) return
+    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
+    if (
+      activeLocalGameId !== ownedLocalGameId &&
+      hasActiveGame &&
+      !window.confirm('Park your current game and resume this owned Basketball recording?')
+    ) return
+    if (activeLocalGameId !== ownedLocalGameId && !resumeParkedGame(ownedLocalGameId)) return
+    navigate('/game')
+  }, [activeLocalGameId, navigate, ownedLocalGameId, resumeParkedGame, state])
 
   const refresh = useCallback(async (showLoading = false) => {
     const requestId = ++requestIdRef.current
@@ -224,6 +250,14 @@ export default function BasketballSummary() {
       </div>
       {healthy && query.tab === 'players' ? (
         <BasketballPlayers key={sourceKey(source)} source={source} />
+      ) : healthy && query.tab === 'timeline' ? (
+        <BasketballTimeline
+          key={sourceKey(source)}
+          reviewState={source.state}
+          mode="summary"
+          editingEnabled={source.kind === 'local' && source.editable}
+          onOpenOwnedRecording={ownedLocalGameId ? openOwnedRecording : undefined}
+        />
       ) : healthy && query.tab === 'team' ? (
         <BasketballTeamStats key={sourceKey(source)} source={source} />
       ) : healthy ? (

@@ -8,6 +8,7 @@ interface Props {
   onClose: () => void
   onEdit?: () => void
   onRemove?: () => void
+  captureLabel?: string
 }
 
 export default function BasketballEventDetailDialog({
@@ -16,6 +17,7 @@ export default function BasketballEventDetailDialog({
   onClose,
   onEdit,
   onRemove,
+  captureLabel,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -41,7 +43,9 @@ export default function BasketballEventDetailDialog({
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase text-slate-500">{review.periodLabel}</p>
             <h2 id="basketball-event-detail-title" className="text-lg font-bold text-slate-900">{review.title}</h2>
-            <p className="mt-0.5 text-sm text-slate-600">{formatRecordedAt(review.event.occurredAt)}</p>
+            <p className="mt-0.5 text-sm text-slate-600">
+              {captureLabel ?? formatRecordedAt(review.event.occurredAt)}
+            </p>
           </div>
           <button ref={closeRef} type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-600" aria-label="Close event detail">
             <X size={19} aria-hidden />
@@ -74,6 +78,11 @@ export default function BasketballEventDetailDialog({
             <DetailRow label="Event type" value={review.event.eventType} />
             <DetailRow label="Revision" value={String(review.event.revision)} />
             <DetailRow label="Recorder" value={review.event.recorderUserId ?? 'Local'} />
+            <DetailRow label="Captured" value={formatRecordedAt(review.event.createdAt)} />
+            <DetailRow label="Updated" value={formatRecordedAt(review.event.updatedAt)} />
+            {review.event.deletedAt && (
+              <DetailRow label="Removed" value={formatRecordedAt(review.event.deletedAt)} />
+            )}
           </dl>
         </div>
 
@@ -88,17 +97,33 @@ export default function BasketballEventDetailDialog({
 }
 
 function detailHeading(review: BasketballTimelineEventReview): string {
+  if (review.event.eventType === 'basketball.period_started' || review.event.eventType === 'basketball.period_ended') return 'Period control'
+  if (review.event.eventType === 'basketball.match_ended' || review.event.eventType === 'basketball.match_reopened') return 'Game control'
+  if (review.event.eventType === 'basketball.match_roster_added' || review.event.eventType === 'basketball.participant_resolved') return 'Roster change'
   if (review.event.eventType === 'basketball.foul') return 'Foul ruling'
   if (review.event.eventType === 'basketball.free_throw_trip') return 'Award'
   if (review.event.eventType === 'basketball.score_adjustment') return 'Adjustment'
   if (review.event.eventType === 'basketball.minutes_adjustment') return 'Minutes'
   if (review.event.eventType === 'basketball.ejection') return 'Ejection ruling'
   if (review.event.eventType === 'basketball.timeout') return 'Timeout'
-  return 'Relationship'
+  return review.relationshipLabels.length > 0 ? 'Relationship' : 'Event context'
 }
 
 function detailValue(review: BasketballTimelineEventReview): string {
   const event = review.event
+  if (event.eventType === 'basketball.period_started') return `${review.periodLabel} opened for capture`
+  if (event.eventType === 'basketball.period_ended') return `${review.periodLabel} closed for capture`
+  if (event.eventType === 'basketball.match_roster_added') {
+    const destination = event.payload.destination === 'bench' ? 'bench' : 'DNP list'
+    return `${event.payload.participant.displayName} added to the ${destination}`
+  }
+  if (event.eventType === 'basketball.participant_resolved') {
+    return `Identity updated to ${event.payload.displayName}`
+  }
+  if (event.eventType === 'basketball.match_ended') {
+    return event.payload.reason.replace(/_/g, ' ')
+  }
+  if (event.eventType === 'basketball.match_reopened') return event.payload.reason ?? 'No reason recorded'
   if (event.eventType === 'basketball.foul') {
     const override = event.payload.countingOverride
     const counting = override
