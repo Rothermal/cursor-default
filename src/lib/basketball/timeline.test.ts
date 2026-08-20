@@ -18,8 +18,10 @@ import {
   BASKETBALL_MARKER_HIT_RADIUS_FEET,
   basketballMarkerChoicesAtPoint,
   basketballShotDetailForEvent,
+  basketballTimelineCorrectionsEnabled,
   buildBasketballTimelineReview,
   filterBasketballTimelineGroups,
+  groupBasketballTimelineByPeriod,
   legacyBasketballShotDetail,
   resolveBasketballMarkerActivation,
 } from './timeline'
@@ -129,6 +131,43 @@ describe('BKE-3A Basketball Timeline review', () => {
     })
     expect(shotGroup?.events.map(event => event.title)).toEqual(['Made 2PT', 'Assist'])
     expect(review.activeGroups[0].title).toBe('Official timeout')
+  })
+
+  it('supports oldest-first period-grouped Summary review with deterministic capture labels', () => {
+    const review = buildBasketballTimelineReview(stateWithReviewFamilies(), {
+      groupOrder: 'oldest_first',
+    })
+    const sections = groupBasketballTimelineByPeriod(review.activeGroups, review.periods)
+    const shotGroup = review.activeGroups.find(group =>
+      group.captureCommandId === '70000000-0000-4000-8000-000000001299'
+    )
+
+    expect(review.activeGroups[0]).toMatchObject({
+      title: 'Q1 started',
+      sequenceLabel: 'Capture #1',
+    })
+    expect(review.activeGroups[review.activeGroups.length - 1]?.title).toBe('Official timeout')
+    expect(shotGroup?.sequenceLabel).toBe('Captures #2-3')
+    expect(shotGroup?.events.map(event => event.sequenceLabel))
+      .toEqual(['Capture #2', 'Capture #3'])
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toMatchObject({ periodId: 'regulation-1', periodLabel: 'Q1' })
+    expect(sections[0].groups.map(group => group.id))
+      .toEqual(review.activeGroups.map(group => group.id))
+  })
+
+  it('allows correction only for editable non-terminal authority', () => {
+    const live = startedState()
+    const suspended = suspendBasketballMatch(live, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-10T14:05:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000001599',
+    })
+    if (!suspended.ok) throw new Error(suspended.message)
+
+    expect(basketballTimelineCorrectionsEnabled(live, true)).toBe(true)
+    expect(basketballTimelineCorrectionsEnabled(live, false)).toBe(false)
+    expect(basketballTimelineCorrectionsEnabled(suspended.state, true)).toBe(false)
   })
 
   it('derives period and participant filters from valid events when an incomplete stream has stale projection data', () => {

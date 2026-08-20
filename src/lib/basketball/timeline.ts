@@ -62,6 +62,7 @@ export interface BasketballTimelineEventReview {
   title: string
   actorLabel: string
   periodLabel: string
+  sequenceLabel: string
   teamSide: BasketballMatchEvent['teamSide']
   participantIds: string[]
   families: BasketballTimelineFamily[]
@@ -80,6 +81,7 @@ export interface BasketballTimelineGroup {
   title: string
   actorLabel: string
   periodLabel: string
+  sequenceLabel: string
   occurredAt: string
   revised: boolean
   recordedLater: boolean
@@ -100,6 +102,16 @@ export interface BasketballTimelineReview {
   eventById: Map<string, BasketballTimelineEventReview>
 }
 
+export interface BasketballTimelinePeriodGroup {
+  periodId: string
+  periodLabel: string
+  groups: BasketballTimelineGroup[]
+}
+
+export interface BasketballTimelineReviewOptions {
+  groupOrder?: 'newest_first' | 'oldest_first'
+}
+
 export interface BasketballShotDetailRelationship {
   id: string
   label: string
@@ -112,6 +124,7 @@ export interface BasketballShotDetailModel {
   heading: string
   ordinalLabel: string
   periodLabel: string | null
+  sequenceLabel: string | null
   shooterLabel: string
   teamLabel: string
   resultLabel: string
@@ -136,7 +149,10 @@ const BOUNDARY_TYPES = new Set<BasketballMatchEvent['eventType']>([
 export const BASKETBALL_MARKER_HIT_RADIUS_FEET = 2.1
 export const BASKETBALL_MARKER_TIE_EPSILON_FEET = 0.35
 
-export function buildBasketballTimelineReview(state: GameState): BasketballTimelineReview {
+export function buildBasketballTimelineReview(
+  state: GameState,
+  options: BasketballTimelineReviewOptions = {}
+): BasketballTimelineReview {
   if (
     state.sport?.id !== 'basketball' ||
     state.sportGameState?.sportId !== 'basketball' ||
@@ -189,13 +205,53 @@ export function buildBasketballTimelineReview(state: GameState): BasketballTimel
       .map(item => isBasketballNegativeScoreDiagnostic(item)
         ? BASKETBALL_NEGATIVE_SCORE_RECOVERY_MESSAGE
         : item.message))],
-    activeGroups: groupReviews(activeReviews, activeCounts, deletedCounts, false),
-    removedGroups: groupReviews(deletedReviews, deletedCounts, activeCounts, true),
+    activeGroups: groupReviews(
+      activeReviews,
+      activeCounts,
+      deletedCounts,
+      false,
+      options.groupOrder ?? 'newest_first'
+    ),
+    removedGroups: groupReviews(
+      deletedReviews,
+      deletedCounts,
+      activeCounts,
+      true,
+      options.groupOrder ?? 'newest_first'
+    ),
     periods,
     participants,
     defaultPeriodId: defaultPeriodIdForEvents(sportState, validActive, hasRebuiltBasketballProjection),
     eventById,
   }
+}
+
+export function groupBasketballTimelineByPeriod(
+  groups: BasketballTimelineGroup[],
+  periods: BasketballTimelinePeriodOption[]
+): BasketballTimelinePeriodGroup[] {
+  const periodOrder = new Map(periods.map((period, index) => [period.id, index]))
+  const result = new Map<string, BasketballTimelinePeriodGroup>()
+  for (const group of groups) {
+    const firstEvent = group.events[0]?.event
+    if (!firstEvent) continue
+    const periodId = firstEvent.period.id
+    const existing = result.get(periodId)
+    if (existing) {
+      existing.groups.push(group)
+    } else {
+      result.set(periodId, {
+        periodId,
+        periodLabel: group.periodLabel,
+        groups: [group],
+      })
+    }
+  }
+  return [...result.values()].sort((left, right) =>
+    (periodOrder.get(left.periodId) ?? Number.MAX_SAFE_INTEGER) -
+      (periodOrder.get(right.periodId) ?? Number.MAX_SAFE_INTEGER) ||
+    left.periodId.localeCompare(right.periodId)
+  )
 }
 
 export function filterBasketballTimelineGroups(
@@ -254,6 +310,7 @@ export function basketballShotDetailFromReview(
     heading: shot.payload.attempt === 'free_throw' ? 'Free throw detail' : 'Shot detail',
     ordinalLabel,
     periodLabel: eventReview.periodLabel,
+    sequenceLabel: eventReview.sequenceLabel,
     shooterLabel: eventReview.actorLabel,
     teamLabel: teamLabel(state, shot.teamSide),
     resultLabel: shot.payload.made ? 'Made' : 'Missed',
@@ -299,6 +356,7 @@ export function legacyBasketballShotDetail(
     heading: 'Shot detail',
     ordinalLabel: ordinal > 0 ? `Field goal #${ordinal}` : 'Field goal',
     periodLabel: null,
+    sequenceLabel: null,
     shooterLabel: player ? playerLabel(player) : 'Unknown shooter',
     teamLabel: legacyShotTeamLabel(state, player),
     resultLabel: shot.made ? 'Made' : 'Missed',
@@ -487,6 +545,7 @@ function reviewEvent(
     title: eventTitle(state, event),
     actorLabel: actorLabel(state, event),
     periodLabel: periodLabel(state, event.period.id),
+    sequenceLabel: `Capture #${event.sequence}`,
     teamSide: event.teamSide,
     participantIds,
     families: familiesForEvent(event),
@@ -503,7 +562,8 @@ function groupReviews(
   reviews: BasketballTimelineEventReview[],
   ownCounts: Map<string, number>,
   companionCounts: Map<string, number>,
-  removed: boolean
+  removed: boolean,
+  order: 'newest_first' | 'oldest_first'
 ): BasketballTimelineGroup[] {
   const grouped = new Map<string, BasketballTimelineEventReview[]>()
   for (const review of reviews) {
@@ -524,6 +584,7 @@ function groupReviews(
         title: groupTitle(members, primary),
         actorLabel: primary.actorLabel,
         periodLabel: primary.periodLabel,
+        sequenceLabel: sequenceLabelForEvents(members.map(item => item.event)),
         occurredAt: last.event.occurredAt,
         revised: members.some(item => item.revised),
         recordedLater: members.some(item => item.recordedLater),
@@ -539,8 +600,26 @@ function groupReviews(
     .sort((left, right) => {
       const leftEvent = left.events[left.events.length - 1].event
       const rightEvent = right.events[right.events.length - 1].event
-      return compareGameEventCaptureOrder(rightEvent, leftEvent)
+      return order === 'oldest_first'
+        ? compareGameEventCaptureOrder(leftEvent, rightEvent)
+        : compareGameEventCaptureOrder(rightEvent, leftEvent)
     })
+}
+
+export function basketballTimelineCorrectionsEnabled(
+  state: GameState,
+  authorityEditable: boolean
+): boolean {
+  if (!authorityEditable || state.sportGameState?.sportId !== 'basketball') return false
+  return state.sportGameState.projection.status === 'in_progress' ||
+    state.sportGameState.projection.status === 'period_break'
+}
+
+function sequenceLabelForEvents(events: BasketballMatchEvent[]): string {
+  const sequences = events.map(event => event.sequence).sort((left, right) => left - right)
+  const first = sequences[0]
+  const last = sequences[sequences.length - 1]
+  return first === last ? `Capture #${first}` : `Captures #${first}-${last}`
 }
 
 function recordedLaterEventIds(events: BasketballMatchEvent[]): Set<string> {

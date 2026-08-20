@@ -21,9 +21,9 @@ migration 059 under
 [PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md); the
 combined live matrix remains required before broader enablement. BKE-4D product and delivery
 decisions are approved in
-[PLAN_BKE_4D_SUMMARY_AUTHORITY.md](PLAN_BKE_4D_SUMMARY_AUTHORITY.md). BKE-4D1 and BKE-4D2 are
-implemented with the authority-aware Summary shell, Overview, Players, and Team Stats; BKE-4D3 is
-next.
+[PLAN_BKE_4D_SUMMARY_AUTHORITY.md](PLAN_BKE_4D_SUMMARY_AUTHORITY.md). BKE-4D1 through BKE-4D3 are
+implemented with the authority-aware Summary shell, Overview, Players, Team Stats, and the complete
+read-only-or-owned-local Timeline; BKE-4D4 is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

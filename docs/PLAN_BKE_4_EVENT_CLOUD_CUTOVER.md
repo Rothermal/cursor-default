@@ -1,10 +1,10 @@
 # Plan: BKE-4 Event Cloud Cutover
 
 Status: Approved implementation plan. BKE-4A, BKE-4B1 through BKE-4B3, BKE-4C1 through
-BKE-4C4, BKE-4D1, and BKE-4D2 are implemented through migration 059. The BKE-4B live two-device matrix
+BKE-4C4 and BKE-4D1 through BKE-4D3 are implemented through migration 059. The BKE-4B live two-device matrix
 remains pending and is carried into BKE-4C exit evidence. BKE-4D product and delivery decisions
 are approved under [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md);
-BKE-4D3 is next.
+BKE-4D4 is next.
 Basketball event-game creation remains internal-only through BKE-4E.
 
 ## 1. Goal
@@ -141,9 +141,10 @@ reopened for each implementation slice:
 
 ## 10. Next Step
 
-Migration 059 is applied; BKE-4D1 provides the explicit-authority Summary shell and Overview, and
-BKE-4D2 adds projection-derived Players and Team Stats.
+Migration 059 is applied; BKE-4D1 provides the explicit-authority Summary shell and Overview,
+BKE-4D2 adds projection-derived Players and Team Stats, and BKE-4D3 adds the authority-aware
+complete Timeline.
 The owner approved deferring the focused BKE-4C runtime checkpoint while event-game creation
 remains internal; retain it with the full combined BKE-4B/BKE-4C matrix as required evidence
-before broader enablement. Begin BKE-4D3 under
+before broader enablement. Begin BKE-4D4 under
 [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md).

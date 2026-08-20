@@ -1,6 +1,6 @@
 # Plan: BKE-4D Basketball Summary Authority
 
-Status: Product and delivery Q&A approved. BKE-4D1 and BKE-4D2 are implemented; BKE-4D3 is next. Basketball
+Status: Product and delivery Q&A approved. BKE-4D1 through BKE-4D3 are implemented; BKE-4D4 is next. Basketball
 event-game creation remains internal-only through BKE-4E, and the combined BKE-4B/BKE-4C live
 Supabase matrix remains required before broader enablement.
 
@@ -356,6 +356,17 @@ changes remount their local review state. No migration was required.
 Exit: all event families are reviewable for every healthy authority and correction never crosses a
 recorder or terminal boundary.
 
+Implementation record (August 2026): the shared `BasketballTimeline` accepts an explicit review
+state and preserves its existing live-tracker behavior while Summary requests oldest-first,
+period-grouped capture review. Timeline rows and details cover every BKE-3 family, active and
+removed capture groups, current revision/removal metadata, recorded-later context, and stable
+stream-sequence labels without presenting capture timestamps as game time. The complete BKE-3
+editor and correction stack remains shared. Only a complete local authority in progress or at a
+period break exposes mutation; terminal local and all cloud/canonical authorities remain read-only.
+A matching current-account parked binding exposes `Open owned recording`, and source-key remounts
+reset filters, details, and focus state. Dialog close/apply restores focus to the originating
+Timeline control. No migration was required.
+
 ### BKE-4D4: Shot Chart, Routing, and Exit Audit
 
 1. Add located field-goal markers, filters, overlap handling, shared detail, and unlocated review.
@@ -461,5 +472,5 @@ The August 2026 Q&A approved all 32 recommended choices:
 
 ## 13. Next Step
 
-Begin BKE-4D3 on a fresh implementation branch after BKE-4D2 merges. Keep event-game creation
+Begin BKE-4D4 on a fresh implementation branch after BKE-4D3 merges. Keep event-game creation
 internal and carry the combined BKE-4B/BKE-4C live matrix forward to the BKE-4E release evidence.

@@ -8,6 +8,7 @@ interface Props {
 const TABS: Array<{ id: BasketballSummaryTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'players', label: 'Players' },
+  { id: 'timeline', label: 'Timeline' },
   { id: 'team', label: 'Team Stats' },
 ]
 

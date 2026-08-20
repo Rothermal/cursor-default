@@ -8,6 +8,7 @@ interface BasketballShotDetailDialogProps {
   onEdit?: () => void
   onRemove?: () => void
   onRestore?: () => void
+  showCaptureSequence?: boolean
 }
 
 export default function BasketballShotDetailDialog({
@@ -16,6 +17,7 @@ export default function BasketballShotDetailDialog({
   onEdit,
   onRemove,
   onRestore,
+  showCaptureSequence = false,
 }: BasketballShotDetailDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -60,7 +62,10 @@ export default function BasketballShotDetailDialog({
               </div>
             )}
             <p className="mt-0.5 text-sm text-slate-600">
-              {[detail.periodLabel, formatRecordedAt(detail.occurredAt)].filter(Boolean).join(' | ')}
+              {[
+                detail.periodLabel,
+                showCaptureSequence ? detail.sequenceLabel : formatRecordedAt(detail.occurredAt),
+              ].filter(Boolean).join(' | ')}
             </p>
           </div>
           <button
