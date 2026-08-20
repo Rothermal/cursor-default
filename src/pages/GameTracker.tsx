@@ -47,6 +47,7 @@ import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameInfoPath } from '../lib/teamInfo'
+import { basketballSummaryPath } from '../lib/basketball/summary'
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
@@ -982,7 +983,7 @@ export default function GameTracker() {
     navigate(
       result.state.cloudSync.gameId
         ? gameInfoPath(result.state.cloudSync.gameId, result.state.cloudSync.teamId)
-        : '/summary'
+        : basketballSummaryPath({ from: 'tracker' })
     )
   }
 
@@ -1030,7 +1031,9 @@ export default function GameTracker() {
             Dashboard
           </button>
           <button
-            onClick={() => navigate('/summary')}
+            onClick={() => navigate(isBasketballEventMode
+              ? basketballSummaryPath({ from: 'tracker' })
+              : '/summary')}
             className="text-sm text-blue-600 font-semibold active:scale-95 transition-transform"
           >
             Summary →

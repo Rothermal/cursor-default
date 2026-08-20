@@ -9,6 +9,7 @@ const TABS: Array<{ id: BasketballSummaryTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'players', label: 'Players' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'shots', label: 'Shots' },
   { id: 'team', label: 'Team Stats' },
 ]
 
@@ -19,6 +20,7 @@ export default function BasketballSummaryTabs({ activeTab, onChange }: Props) {
         {TABS.map(tab => (
           <button
             key={tab.id}
+            id={`basketball-${tab.id}-tab`}
             type="button"
             onClick={() => onChange(tab.id)}
             className={`shrink-0 border-b-2 px-3 text-sm font-bold ${

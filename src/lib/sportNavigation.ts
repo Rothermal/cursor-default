@@ -1,5 +1,6 @@
 import type { GameState } from '../types'
 import type { ParkedGameSummary } from './gameParking'
+import { basketballSummaryPath } from './basketball/summary'
 
 type ResumableGameState = Pick<
   GameState,
@@ -51,7 +52,14 @@ export function routeForResumedGame(state: ResumableGameState): string {
     return state.sportGameState?.sportId === 'soccer' ? '/players' : '/setup'
   }
   if (state.sport.id === 'basketball' && state.gameDataAuthority === 'sport_events') {
-    if (state.eventStream?.events.length) return '/game'
+    if (state.eventStream?.events.length) {
+      if (
+        state.sportGameState?.sportId === 'basketball' &&
+        (state.sportGameState.projection?.status === 'suspended' ||
+          state.sportGameState.projection?.status === 'ended')
+      ) return basketballSummaryPath({ from: 'sport' })
+      return '/game'
+    }
     return state.gameInfo ? '/players' : '/setup'
   }
   if (state.players.length === 0) return '/players'

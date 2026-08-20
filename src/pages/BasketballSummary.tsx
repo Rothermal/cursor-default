@@ -6,6 +6,7 @@ import BasketballPlayers from '../components/basketball-summary/BasketballPlayer
 import BasketballRecordingSelector from '../components/basketball-summary/BasketballRecordingSelector'
 import BasketballSummaryHeader from '../components/basketball-summary/BasketballSummaryHeader'
 import BasketballSummaryTabs from '../components/basketball-summary/BasketballSummaryTabs'
+import BasketballShotReview from '../components/basketball-summary/BasketballShotReview'
 import BasketballTeamStats from '../components/basketball-summary/BasketballTeamStats'
 import BasketballTimeline from '../components/basketball/BasketballTimeline'
 import { useGame } from '../context/GameContext'
@@ -258,6 +259,8 @@ export default function BasketballSummary() {
           editingEnabled={source.kind === 'local' && source.editable}
           onOpenOwnedRecording={ownedLocalGameId ? openOwnedRecording : undefined}
         />
+      ) : healthy && query.tab === 'shots' ? (
+        <BasketballShotReview key={sourceKey(source)} source={source} />
       ) : healthy && query.tab === 'team' ? (
         <BasketballTeamStats key={sourceKey(source)} source={source} />
       ) : healthy ? (

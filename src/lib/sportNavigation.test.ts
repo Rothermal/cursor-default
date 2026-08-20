@@ -117,6 +117,28 @@ describe('sportNavigation', () => {
       sportGameState: { sportId: 'basketball' } as never,
       eventStream: { version: 1, events: [{}] },
     })).toBe('/game')
+    expect(routeForResumedGame({
+      gameDataAuthority: 'sport_events',
+      sport: basketball,
+      gameInfo,
+      players: [{ id: 'p1', name: 'One', number: '1', stats: {} }],
+      sportGameState: {
+        sportId: 'basketball',
+        projection: { status: 'ended' },
+      } as never,
+      eventStream: { version: 1, events: [{}] },
+    })).toBe('/summary?sport=basketball&tab=overview&from=sport')
+    expect(routeForResumedGame({
+      gameDataAuthority: 'sport_events',
+      sport: basketball,
+      gameInfo,
+      players: [{ id: 'p1', name: 'One', number: '1', stats: {} }],
+      sportGameState: {
+        sportId: 'basketball',
+        projection: { status: 'suspended' },
+      } as never,
+      eventStream: { version: 1, events: [{}] },
+    })).toBe('/summary?sport=basketball&tab=overview&from=sport')
   })
 
   it('formats parked sync labels', () => {

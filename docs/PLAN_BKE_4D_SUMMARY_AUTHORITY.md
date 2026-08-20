@@ -1,6 +1,6 @@
 # Plan: BKE-4D Basketball Summary Authority
 
-Status: Product and delivery Q&A approved. BKE-4D1 through BKE-4D3 are implemented; BKE-4D4 is next. Basketball
+Status: Product and delivery Q&A approved. BKE-4D1 through BKE-4D4 are implemented. Basketball
 event-game creation remains internal-only through BKE-4E, and the combined BKE-4B/BKE-4C live
 Supabase matrix remains required before broader enablement.
 
@@ -379,6 +379,19 @@ Exit: Overview, Players, Timeline, Shot Chart, and Team Stats all consume one ex
 remote sources remain read-only; final sources fail closed; and BKE-4E can build canonical
 aggregates without revisiting match-summary authority.
 
+Implementation record (August 2026): `summaryShots.ts` derives active field-goal review from the
+selected Summary authority, preserving full-game ordinals, participant/period identity, corrected
+normalized locations, and shared BKE-3 detail. The shipped Shot Chart filters by side, participant,
+period, result, and value without reloading its source; tracked/opponent marker color plus made/miss
+shape remain visible together. Deterministic overlap selection, accessible marker labels, a complete
+located-shot keyboard list, and a filter-aware unlocated-shot list all open the same detail model.
+Only a healthy editable local source exposes the shared shot editor/removal flow; remote, canonical,
+and terminal sources remain read-only. Tracker completion and Summary actions now use the explicit
+Basketball route, while terminal parked event games resume into Summary instead of the live tracker.
+Existing Cloud Games/Game Info source routes and URL-backed return context remain intact. No
+migration was required. The full live/manual matrix remains release evidence before broader
+event-game enablement.
+
 No Supabase migration is expected. If a missing authorized read contract is discovered, amend this
 plan and isolate the narrow fixed Basketball RPC before adding SQL. Do not add speculative Summary
 tables or broad direct-table reads.
@@ -472,5 +485,6 @@ The August 2026 Q&A approved all 32 recommended choices:
 
 ## 13. Next Step
 
-Begin BKE-4D4 on a fresh implementation branch after BKE-4D3 merges. Keep event-game creation
-internal and carry the combined BKE-4B/BKE-4C live matrix forward to the BKE-4E release evidence.
+Begin BKE-4E canonical aggregates, capability negotiation, and release readiness on a fresh
+planning branch. Keep event-game creation internal and carry the combined BKE-4B/BKE-4C plus
+BKE-4D manual matrix forward as required release evidence.

@@ -221,6 +221,11 @@ attribution. Opponent rows are explicit-only and manual minutes are never inferr
 the complete BKE-3 Timeline to explicit Summary authority with oldest-first period groups,
 deterministic capture labels, all-family details, removed/revised/recorded-later review, owned-local
 correction only, and matching parked-binding handoff. Remote and terminal sources stay read-only.
+BKE-4D4 adds active-field-goal Shot Chart review from the same selected authority, with corrected
+shared-court locations, side/participant/period/result/value filters, deterministic overlap,
+located and unlocated keyboard lists, shared detail/local-only correction, and explicit terminal
+tracker/parked-game Summary routing. BKE-4D is implementation-complete; its manual matrix remains
+release evidence for BKE-4E.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -452,7 +457,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) / [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md) / [`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md) / [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md) / [`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md) / [`REGRESSION_BKE_4D_SUMMARY.md`](REGRESSION_BKE_4D_SUMMARY.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3, BKE-4A, BKE-4B1 through BKE-4B3, BKE-4C1 through BKE-4C4, and BKE-4D1 through BKE-4D3 are implemented; BKE-4D4 is next; the combined live matrix remains release evidence |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) / [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md) / [`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md) / [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md) / [`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md) / [`REGRESSION_BKE_4D_SUMMARY.md`](REGRESSION_BKE_4D_SUMMARY.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3, BKE-4A, BKE-4B1 through BKE-4B3, BKE-4C1 through BKE-4C4, and BKE-4D1 through BKE-4D4 are implemented; BKE-4E is next; the combined live matrix remains release evidence |
 
 ### Held / waiting for feedback
 
