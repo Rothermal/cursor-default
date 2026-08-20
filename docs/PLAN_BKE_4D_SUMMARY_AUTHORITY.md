@@ -1,6 +1,6 @@
 # Plan: BKE-4D Basketball Summary Authority
 
-Status: Product and delivery Q&A approved. Implementation begins with BKE-4D1. Basketball
+Status: Product and delivery Q&A approved. BKE-4D1 is implemented; BKE-4D2 is next. Basketball
 event-game creation remains internal-only through BKE-4E, and the combined BKE-4B/BKE-4C live
 Supabase matrix remains required before broader enablement.
 
@@ -314,6 +314,15 @@ Each slice uses its own branch and PR. Later tabs stay hidden until their comple
 Exit: every authority kind produces one truthful Overview; final canonical failure is closed and
 legacy Basketball remains unchanged.
 
+Implementation record (August 2026): `src/lib/basketball/summarySource.ts` owns strict local,
+isolated cloud-primary, manager-selected alternate, and canonical source loading. Remote review
+never dispatches into `GameContext`; final games require a healthy canonical publication; and
+incomplete projections suppress official output. `src/lib/basketball/summary.ts` owns URL/back
+contracts plus pure result, period scoring, comparison, and tied-leader derivation. Marked event
+games route through `BasketballSummary`, while a narrow setup-snapshot authority probe preserves
+the legacy aggregate Summary path. Only Overview is visible until BKE-4D2 adds Players and Team
+Stats. No migration was required.
+
 ### BKE-4D2: Players and Team Stats
 
 1. Add participant and authoritative team read models.
@@ -442,5 +451,5 @@ The August 2026 Q&A approved all 32 recommended choices:
 
 ## 13. Next Step
 
-Begin BKE-4D1 on a fresh implementation branch after this plan merges. Keep event-game creation
+Begin BKE-4D2 on a fresh implementation branch after BKE-4D1 merges. Keep event-game creation
 internal and carry the combined BKE-4B/BKE-4C live matrix forward to the BKE-4E release evidence.

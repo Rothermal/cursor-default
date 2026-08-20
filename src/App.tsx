@@ -37,6 +37,8 @@ import SoccerGameTracker from './pages/SoccerGameTracker'
 import SoccerCloudReview from './pages/SoccerCloudReview'
 import SoccerSummary from './pages/SoccerSummary'
 import { isSoccerSummaryRoute } from './lib/soccer/summary'
+import BasketballSummary from './pages/BasketballSummary'
+import { isBasketballSummaryRoute } from './lib/basketball/summary'
 
 function GameSetupRoute() {
   const { state } = useGame()
@@ -67,6 +69,7 @@ function GameCheckoutRoute() {
 function GameSummaryRoute() {
   const { state } = useGame()
   const [searchParams] = useSearchParams()
+  if (isBasketballSummaryRoute(state, searchParams)) return <BasketballSummary />
   if (!isSoccerSummaryRoute(state.sport?.id, searchParams)) return <GameSummary />
   return <SoccerSummary />
 }
