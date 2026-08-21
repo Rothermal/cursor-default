@@ -37,6 +37,7 @@ describe('migration 060 Basketball aggregate source contracts', () => {
     expect(sql).toContain(
       'create or replace function public.get_soccer_player_aggregate_publications'
     )
+    expect(sql).toContain("p_sport_id = 'soccer'\n        or exists")
     for (const key of [
       'publicationid', 'publicationnumber', 'snapshotfingerprint', 'finalizedat',
       'eventcount', 'payloadbytes', 'canonicalsnapshot', 'participantsourcemap',

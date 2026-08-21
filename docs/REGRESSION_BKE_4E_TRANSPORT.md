@@ -8,7 +8,7 @@ the new RPCs. This slice does not add routes or expose Basketball event-game cre
 Run the focused transport, pure-engine, cloud-sync, and Soccer parity suites:
 
 ```powershell
-pnpm exec vitest run src/lib/basketball/migration060.test.ts src/lib/basketball/aggregateTransport.test.ts src/lib/basketball/aggregateStats.test.ts src/lib/basketball/aggregateProjection.test.ts src/lib/basketball/aggregateComposition.test.ts src/lib/basketball/aggregateDestinations.test.ts src/lib/basketball/aggregatePlayerDestinations.test.ts src/lib/cloudSyncHardening.test.ts src/lib/soccer/migration047.test.ts src/lib/soccer/aggregateTransport.test.ts
+pnpm exec vitest run src/lib/basketball/migration060.test.ts src/lib/basketball/aggregateTransport.test.ts src/lib/basketball/aggregateStats.test.ts src/lib/basketball/aggregateProjection.test.ts src/lib/basketball/aggregateComposition.test.ts src/lib/basketball/aggregateDestinations.test.ts src/lib/basketball/aggregatePlayerDestinations.test.ts src/lib/cloudSyncHardening.test.ts src/lib/cloudSyncHydrate.test.ts src/lib/soccer/migration047.test.ts src/lib/soccer/aggregateTransport.test.ts
 ```
 
 Then run the repository gates:
@@ -32,7 +32,11 @@ Coverage verifies:
   include placeholder-backed team contributions, and exclude every event-setup game;
 - only UUID-shaped, audited, non-cyclic participant merge lineage is repaired;
 - provable team-owned Basketball rows created before `games.sport_id` are backfilled while
-  ambiguous rows remain untouched, and new aggregate syncs persist the sport id;
+  ambiguous rows remain untouched, and new aggregate syncs persist the sport id without attempting
+  to mutate that identity on existing rows;
+- populated `games.sport_id` values no longer hide legacy games: cloud hydration skips actual
+  event-setup authority while preserving Soccer's pre-setup-snapshot event exception;
+- the shared canonical pager retains Soccer publications created before setup snapshots existed;
 - canonical and legacy pages drain independently, deduplicate source ids, and compose only after
   both families complete;
 - malformed page envelopes, access failures, and missing contracts reject the load;

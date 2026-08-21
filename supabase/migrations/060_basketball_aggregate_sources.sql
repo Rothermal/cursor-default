@@ -337,11 +337,14 @@ begin
       and game.sport_id = p_sport_id
       and game.status = 'final'
       and public.can_read_game(game.id)
-      and exists (
-        select 1
-        from public.game_event_setup_snapshots setup
-        where setup.game_id = game.id
-          and setup.sport_id = p_sport_id
+      and (
+        p_sport_id = 'soccer'
+        or exists (
+          select 1
+          from public.game_event_setup_snapshots setup
+          where setup.game_id = game.id
+            and setup.sport_id = p_sport_id
+        )
       )
       and public._event_aggregate_snapshot_completed(
         p_sport_id,

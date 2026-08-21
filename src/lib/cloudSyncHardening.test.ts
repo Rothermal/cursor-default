@@ -17,6 +17,7 @@ const mock = vi.hoisted(() => ({
   gameCheckouts: [] as Array<{ player_id: string; user_id: string; is_primary: boolean }>,
   checkoutUpserts: [] as Array<Array<{ player_id: string; user_id: string; is_primary: boolean }>>,
   gamePayloads: [] as Array<Record<string, unknown>>,
+  gameUpdatePayloads: [] as Array<Record<string, unknown>>,
 }))
 
 vi.mock('./supabase', () => ({
@@ -128,8 +129,9 @@ vi.mock('./supabase', () => ({
               }),
             }
           },
-          update: () => {
+          update: (payload: unknown) => {
             mock.ops.push('games.update')
+            mock.gameUpdatePayloads.push(payload as Record<string, unknown>)
             return {
               eq: () =>
                 Promise.resolve({
@@ -296,6 +298,7 @@ describe('syncGameSnapshotToCloud hardening', () => {
     mock.gameCheckouts.length = 0
     mock.checkoutUpserts.length = 0
     mock.gamePayloads.length = 0
+    mock.gameUpdatePayloads.length = 0
   })
 
   it('persists the sport id on new legacy aggregate games', async () => {
@@ -304,6 +307,16 @@ describe('syncGameSnapshotToCloud hardening', () => {
     await syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })
 
     expect(mock.gamePayloads[0]).toMatchObject({ sport_id: 'basketball' })
+  })
+
+  it('does not mutate sport identity when syncing an existing legacy game', async () => {
+    mock.gameStatsError = null
+    const existing = state()
+    existing.cloudSync.gameId = 'existing-game'
+
+    await syncGameSnapshotToCloud({ state: existing, userId: 'user-1' })
+
+    expect(mock.gameUpdatePayloads[0]).not.toHaveProperty('sport_id')
   })
 
   it('fails closed when the same-name teammate lookup errors', async () => {
