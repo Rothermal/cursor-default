@@ -103,14 +103,20 @@ describe('migration 060 Basketball aggregate source contracts', () => {
   it('preserves old Basketball history only when sport identity is provable', () => {
     expect(sql).toContain("set sport_id = 'basketball'")
     expect(sql).toContain('game.sport_id is null')
-    expect(sql).toContain("lower(trim(team.sport)) = 'basketball'")
+    expect(sql).toContain('join public.seasons season on season.id = team.season_id')
+    expect(sql).toContain("lower(trim(season.sport)) = 'basketball'")
+    expect(sql).not.toContain('team.sport')
+    expect(sql.match(/enable trigger enforce_game_identity_and_final_state/g)).toHaveLength(3)
+    expect(sql).toContain('exception when others then')
     expect(sql).toContain(
       'alter table public.games disable trigger enforce_game_identity_and_final_state'
     )
     expect(sql).toContain(
       'alter table public.games enable trigger enforce_game_identity_and_final_state'
     )
-    expect(sql).toContain('not exists (\n    select 1\n    from public.game_event_setup_snapshots setup')
+    expect(sql).toMatch(
+      /and not exists\s*\(\s*select 1\s*from public\.game_event_setup_snapshots setup/
+    )
   })
 
   it('repairs only audited non-cyclic participant lineage and retains future merge remounting', () => {
@@ -128,5 +134,7 @@ describe('migration 060 Basketball aggregate source contracts', () => {
 })
 
 function source(path: string): string {
-  return readFileSync(resolve(process.cwd(), path), 'utf8').toLowerCase()
+  return readFileSync(resolve(process.cwd(), path), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .toLowerCase()
 }

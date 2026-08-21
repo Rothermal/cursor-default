@@ -4,22 +4,32 @@
 -- these team-owned, non-event rows; ambiguous and personal rows remain untouched.
 -- The current identity trigger intentionally forbids runtime sport changes, so this
 -- migration performs the bounded repair under the table lock and restores the trigger
--- before exposing any new contracts.
-alter table public.games disable trigger enforce_game_identity_and_final_state;
-
-update public.games game
-set sport_id = 'basketball'
-from public.teams team
-where game.team_id = team.id
-  and game.sport_id is null
-  and lower(trim(team.sport)) = 'basketball'
-  and not exists (
-    select 1
-    from public.game_event_setup_snapshots setup
-    where setup.game_id = game.id
-  );
-
-alter table public.games enable trigger enforce_game_identity_and_final_state;
+-- before exposing any new contracts. Sport belongs to seasons, not teams.
+do $migration$
+begin
+  -- Normalize a database where a previous manually executed batch stopped after DISABLE.
+  execute 'alter table public.games enable trigger enforce_game_identity_and_final_state';
+  execute 'alter table public.games disable trigger enforce_game_identity_and_final_state';
+  begin
+    update public.games game
+    set sport_id = 'basketball'
+    from public.teams team
+    join public.seasons season on season.id = team.season_id
+    where game.team_id = team.id
+      and game.sport_id is null
+      and lower(trim(season.sport)) = 'basketball'
+      and not exists (
+        select 1
+        from public.game_event_setup_snapshots setup
+        where setup.game_id = game.id
+      );
+  exception when others then
+    execute 'alter table public.games enable trigger enforce_game_identity_and_final_state';
+    raise;
+  end;
+  execute 'alter table public.games enable trigger enforce_game_identity_and_final_state';
+end;
+$migration$;
 
 -- Repair only UUID-shaped participant identities with an audited, non-cyclic merge
 -- path to a surviving player authorized for the original team/personal game.
