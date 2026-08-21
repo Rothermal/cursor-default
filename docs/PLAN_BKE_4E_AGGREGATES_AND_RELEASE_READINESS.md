@@ -65,8 +65,9 @@ The focused Q&A approved all 24 recommended choices.
   visible player rows are not summed to invent team truth.
 - Cross-game percentages and rates use summed raw numerators and denominators, never averages of
   per-game percentages.
-- Before BKE-6, starters count as recorded appearances. Bench and late participants count when
-  they have a player-attributed event or positive recorded minutes. DNP participants do not.
+- Before BKE-6, starters count as recorded appearances. Bench, late, and setup-DNP participants
+  count when they have effective player-attributed stat activity or positive recorded minutes.
+  Discipline attribution alone does not prove an appearance.
 - Canonical score and result derive wins, losses, permitted ties, and regulation/overtime context.
   Abandoned and unhealthy games remain reviewable but do not enter records.
 
@@ -269,6 +270,8 @@ Until BKE-6 provides on-court intervals:
   player-attributed stat event exists or positive recorded minutes remain;
 - an inactive setup-DNP receives neither, while effective player-attributed activity or positive
   recorded minutes overrides that pregame designation for appearance credit only; and
+- an ejection without effective stat activity or positive recorded minutes records discipline but
+  does not prove that a bench or setup-DNP participant appeared; and
 - a participant with only removed activity does not appear unless their opening status qualifies.
 
 Legacy games count an appearance when the resolved player has a game-stat contribution or existing

@@ -97,6 +97,22 @@ describe('Basketball canonical aggregate projection', () => {
     )?.stats).toMatchObject({ bk_app: 1, bk_start: 1, bk_pts: 0 })
   })
 
+  it('records an ejection-only setup-DNP without fabricating an appearance', () => {
+    const source = makeCanonicalAggregateSource()
+    const ejection = source.canonicalSnapshot.eventStream.events.find(value =>
+      (value as { eventType?: string }).eventType === 'basketball.ejection'
+    ) as { actors: Array<{ participantId?: string; playerId?: string | null }> }
+    ejection.actors[0].participantId = AGGREGATE_PARTICIPANTS.dnp
+    ejection.actors[0].playerId = 'local-dnp'
+
+    const projected = projectBasketballCanonicalAggregateSource(source)
+    if (!projected.ok) throw new Error(projected.exclusion.message)
+    expect(projected.match.players.find(
+      player => player.playerId === AGGREGATE_PLAYERS.dnp
+    )?.stats).toMatchObject({ bk_app: 0, bk_start: 0, bk_eject: 1 })
+    expect(projected.match.teamStats.tracked.bk_eject).toBe(1)
+  })
+
   it('excludes inactive and abandoned sources and quarantines recorder mismatches', () => {
     expect(projectBasketballCanonicalAggregateSource(
       makeCanonicalAggregateSource({ active: false })

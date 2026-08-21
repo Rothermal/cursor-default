@@ -327,8 +327,7 @@ function snapshotPlayers(snapshot: BasketballCanonicalSnapshot): Player[] {
 function participantAggregateStats(
   participant: BasketballProjectedParticipant
 ): BasketballAggregateStats {
-  const qualifiesByActivity =
-    hasBasketballBaseContribution(participant.stats) || participant.ejected
+  const qualifiesByActivity = hasBasketballBaseContribution(participant.stats)
   const appeared = participant.openingStatus === 'starter' || qualifiesByActivity
   return basketballCanonicalStatsFromTotals(participant.stats, {
     appeared,

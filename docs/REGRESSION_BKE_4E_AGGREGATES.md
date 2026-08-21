@@ -31,7 +31,8 @@ Coverage verifies:
 - completed canonical snapshots rebuild through the production Basketball event projector;
 - inactive, abandoned, nonterminal, malformed, and wrong-recorder canonical sources stay out;
 - opening starters, active bench players, late players, inactive DNP players, setup-DNP players with
-  effective activity, and removed-only activity use the approved recorded-participation rules;
+  effective activity, ejection-only DNP players, and removed-only activity use the approved
+  recorded-participation rules;
 - only tracked participants aggregate, stable source ids are mandatory, and names/numbers never
   repair identity;
 - official side totals retain team/unknown contributions plus projected disqualifications and
