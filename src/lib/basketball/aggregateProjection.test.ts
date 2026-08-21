@@ -79,6 +79,24 @@ describe('Basketball canonical aggregate projection', () => {
     expect(projected.match.unresolvedParticipants.every(row => row.contributionCount > 0)).toBe(true)
   })
 
+  it('counts effective activity by a setup-DNP participant as an appearance, not a start', () => {
+    const source = makeCanonicalAggregateSource()
+    const madeShot = source.canonicalSnapshot.eventStream.events.find(value =>
+      (value as { sequence?: number }).sequence === 1
+    ) as { actors: Array<{ participantId?: string; playerId?: string | null }> }
+    madeShot.actors[0].participantId = AGGREGATE_PARTICIPANTS.dnp
+    madeShot.actors[0].playerId = 'local-dnp'
+
+    const projected = projectBasketballCanonicalAggregateSource(source)
+    if (!projected.ok) throw new Error(projected.exclusion.message)
+    expect(projected.match.players.find(
+      player => player.playerId === AGGREGATE_PLAYERS.dnp
+    )?.stats).toMatchObject({ bk_app: 1, bk_start: 0, bk_pts: 2 })
+    expect(projected.match.players.find(
+      player => player.playerId === AGGREGATE_PLAYERS.starter
+    )?.stats).toMatchObject({ bk_app: 1, bk_start: 1, bk_pts: 0 })
+  })
+
   it('excludes inactive and abandoned sources and quarantines recorder mismatches', () => {
     expect(projectBasketballCanonicalAggregateSource(
       makeCanonicalAggregateSource({ active: false })

@@ -267,7 +267,8 @@ Until BKE-6 provides on-court intervals:
 - an opening starter receives one appearance and one start;
 - an opening bench or late participant receives one appearance only when an effective
   player-attributed stat event exists or positive recorded minutes remain;
-- a DNP receives neither; and
+- an inactive setup-DNP receives neither, while effective player-attributed activity or positive
+  recorded minutes overrides that pregame designation for appearance credit only; and
 - a participant with only removed activity does not appear unless their opening status qualifies.
 
 Legacy games count an appearance when the resolved player has a game-stat contribution or existing

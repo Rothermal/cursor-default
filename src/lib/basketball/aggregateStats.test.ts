@@ -79,6 +79,11 @@ describe('Basketball canonical aggregate stat contract', () => {
     expect(formatBasketballAggregateDuration(600)).toBe('10:00')
     expect(formatBasketballAggregateRate({ numerator: 3, denominator: 4, value: 0.75 }, true))
       .toBe('75% (3/4)')
+    expect(formatBasketballAggregateRate(
+      { numerator: 3.5, denominator: 6, value: 3.5 / 6 },
+      true,
+      false
+    )).toBe('58%')
     expect(formatBasketballAggregateRate(null, false)).toBe('-')
   })
 })

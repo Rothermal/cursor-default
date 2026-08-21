@@ -329,8 +329,7 @@ function participantAggregateStats(
 ): BasketballAggregateStats {
   const qualifiesByActivity =
     hasBasketballBaseContribution(participant.stats) || participant.ejected
-  const appeared = participant.openingStatus === 'starter' ||
-    (participant.openingStatus === 'bench' && qualifiesByActivity)
+  const appeared = participant.openingStatus === 'starter' || qualifiesByActivity
   return basketballCanonicalStatsFromTotals(participant.stats, {
     appeared,
     started: participant.openingStatus === 'starter',

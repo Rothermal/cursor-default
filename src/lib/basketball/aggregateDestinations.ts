@@ -29,21 +29,33 @@ export interface BasketballAggregateCategoryDestination {
 
 const RATE_LABELS: Record<
   BasketballAggregateRateId,
-  { label: string; shortLabel: string; percentage: boolean }
+  { label: string; shortLabel: string; percentage: boolean; showOperands: boolean }
 > = {
-  points_per_game: { label: 'Points Per Game', shortLabel: 'PPG', percentage: false },
-  field_goal_percentage: { label: 'Field Goal Percentage', shortLabel: 'FG%', percentage: true },
-  two_point_percentage: { label: '2-Point Percentage', shortLabel: '2P%', percentage: true },
-  three_point_percentage: { label: '3-Point Percentage', shortLabel: '3P%', percentage: true },
-  free_throw_percentage: { label: 'Free Throw Percentage', shortLabel: 'FT%', percentage: true },
+  points_per_game: {
+    label: 'Points Per Game', shortLabel: 'PPG', percentage: false, showOperands: false,
+  },
+  field_goal_percentage: {
+    label: 'Field Goal Percentage', shortLabel: 'FG%', percentage: true, showOperands: true,
+  },
+  two_point_percentage: {
+    label: '2-Point Percentage', shortLabel: '2P%', percentage: true, showOperands: true,
+  },
+  three_point_percentage: {
+    label: '3-Point Percentage', shortLabel: '3P%', percentage: true, showOperands: true,
+  },
+  free_throw_percentage: {
+    label: 'Free Throw Percentage', shortLabel: 'FT%', percentage: true, showOperands: true,
+  },
   effective_field_goal_percentage: {
-    label: 'Effective Field Goal Percentage', shortLabel: 'eFG%', percentage: true,
+    label: 'Effective Field Goal Percentage', shortLabel: 'eFG%',
+    percentage: true, showOperands: false,
   },
   true_shooting_percentage: {
-    label: 'True Shooting Percentage', shortLabel: 'TS%', percentage: true,
+    label: 'True Shooting Percentage', shortLabel: 'TS%', percentage: true, showOperands: false,
   },
   assist_to_turnover_ratio: {
-    label: 'Assist-to-Turnover Ratio', shortLabel: 'AST/TO', percentage: false,
+    label: 'Assist-to-Turnover Ratio', shortLabel: 'AST/TO',
+    percentage: false, showOperands: false,
   },
 }
 
@@ -175,7 +187,8 @@ export function formatBasketballAggregateMetric(
   if (isRateId(metricId)) {
     return formatBasketballAggregateRate(
       player.rates[metricId],
-      RATE_LABELS[metricId].percentage
+      RATE_LABELS[metricId].percentage,
+      RATE_LABELS[metricId].showOperands
     )
   }
   return formatBasketballAggregateStat(metricId, player.stats[metricId])

@@ -249,12 +249,15 @@ export function formatBasketballAggregateStat(
 
 export function formatBasketballAggregateRate(
   value: BasketballAggregateRate | null,
-  percentage: boolean
+  percentage: boolean,
+  showOperands = true
 ): string {
   if (!value) return '-'
-  return percentage
-    ? `${Math.round(value.value * 100)}% (${value.numerator}/${value.denominator})`
-    : value.value.toFixed(2)
+  if (!percentage) return value.value.toFixed(2)
+  const formatted = `${Math.round(value.value * 100)}%`
+  return showOperands
+    ? `${formatted} (${value.numerator}/${value.denominator})`
+    : formatted
 }
 
 export function hasBasketballBaseContribution(totals: BasketballStatTotals): boolean {

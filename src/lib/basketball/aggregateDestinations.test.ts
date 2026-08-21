@@ -67,4 +67,16 @@ describe('Basketball aggregate destination adapter', () => {
     expect(basketballAggregateMetricLabel('effective_field_goal_percentage'))
       .toEqual({ label: 'Effective Field Goal Percentage', shortLabel: 'eFG%' })
   })
+
+  it('shows count operands for ordinary percentages but not eFG or true shooting formulas', () => {
+    const aggregate = aggregateBasketballSources(
+      { type: 'team', id: 'team-1' },
+      [],
+      [makeLegacyAggregateSource()]
+    )
+    const player = aggregate.players[0]
+    expect(formatBasketballAggregateMetric(player, 'field_goal_percentage')).toBe('57% (4/7)')
+    expect(formatBasketballAggregateMetric(player, 'effective_field_goal_percentage')).toBe('64%')
+    expect(formatBasketballAggregateMetric(player, 'true_shooting_percentage')).toBe('66%')
+  })
 })
