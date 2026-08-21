@@ -40,6 +40,25 @@ export type OptionalGameColumnGaps = {
   teamPlaceholders: boolean
 }
 
+export type LegacyCloudGameCandidate = {
+  id: string
+  sport_id?: string | null
+}
+
+/**
+ * Pick the first aggregate-authority row from an already ordered cloud-game list.
+ * Soccer predates setup snapshots but has always used event authority; later event
+ * sports are identified by their setup row instead of overloading games.sport_id.
+ */
+export function selectLatestLegacyCloudGameCandidate<T extends LegacyCloudGameCandidate>(
+  rows: T[],
+  eventSetupGameIds: ReadonlySet<string>
+): T | null {
+  return rows.find(row =>
+    row.sport_id !== 'soccer' && !eventSetupGameIds.has(row.id)
+  ) ?? null
+}
+
 /** Collapse per-row `game_stats` / resolved RPC rows into a player → stat map. */
 export function aggregateStatsByPlayer(
   rows: CloudStatRow[] | null | undefined

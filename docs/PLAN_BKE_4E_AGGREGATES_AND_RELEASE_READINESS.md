@@ -1,7 +1,7 @@
 # Plan: BKE-4E Canonical Aggregates and Release Readiness
 
 Status: Product and delivery Q&A approved on 2026-08-20. BKE-4E is planned in five implementation
-slices. BKE-4E1 is implemented and BKE-4E2 is next. Basketball event-game creation remains
+slices. BKE-4E1 and BKE-4E2 are implemented; BKE-4E3 is next. Basketball event-game creation remains
 internal-only, and the user-visible event-model opt-in remains BKE-5.
 
 ## 1. Goal
@@ -525,6 +525,8 @@ No migration.
 
 ### BKE-4E2: Paginated source transport
 
+Status: Implemented on 2026-08-20. See `docs/REGRESSION_BKE_4E_TRANSPORT.md`.
+
 Scope:
 
 - add migration 060 and its static contract tests;
@@ -683,5 +685,6 @@ BKE-4E. Every unresolved row remains a hard gate before BKE-5 exposes the event-
 
 ## 16. Next Step
 
-Begin BKE-4E2 from the implemented pure aggregate contracts. Keep the event-game creation gate
-internal and carry the complete BKE-4B through BKE-4E live matrix into BKE-4E5.
+Begin BKE-4E3 from the implemented pure aggregate and authenticated source-transport contracts.
+Keep the event-game creation gate internal and carry the complete BKE-4B through BKE-4E live
+matrix into BKE-4E5.

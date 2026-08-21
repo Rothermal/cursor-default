@@ -34,6 +34,7 @@ import {
   detectOptionalGameColumnGaps,
   hasAnyOptionalGameColumnGap,
   hasLoadByIdOptionalGameColumnGap,
+  selectLatestLegacyCloudGameCandidate,
   type CloudRosterRow,
 } from './cloudSyncHydrate'
 
@@ -261,9 +262,14 @@ async function ensureGame(
   if (!supabase) {
     throw new Error('Supabase client not configured')
   }
+  const sportId = state.sport?.id
+  if (!sportId) {
+    throw new Error('Game sport is required for cloud sync')
+  }
 
   const gameInsertPayload = {
     team_id: teamId,
+    sport_id: sportId,
     ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
     opponent_name: state.gameInfo!.opponentName,
     opponent_score: state.opponentScore,
@@ -301,6 +307,7 @@ async function ensureGame(
   ) {
     return {
       team_id: teamId,
+      sport_id: sportId,
       ...(omitSeasonId || !seasonIdForGame ? {} : { season_id: seasonIdForGame }),
       opponent_name: state.gameInfo!.opponentName,
       opponent_score: state.opponentScore,
@@ -1278,6 +1285,30 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
   }
 }
 
+async function selectLatestLegacyGameRow(
+  rows: CloudGameRow[] | null
+): Promise<CloudGameRow | null> {
+  if (!supabase || !rows?.length) return null
+  const authorityCandidates = rows.filter(row => row.sport_id !== 'soccer')
+  if (!authorityCandidates.length) return null
+
+  const { data, error } = await supabase
+    .from('game_event_setup_snapshots')
+    .select('game_id')
+    .in('game_id', authorityCandidates.map(row => row.id))
+  if (error) {
+    throw new Error(`Game authority load failed: ${error.message}`)
+  }
+  const eventSetupGameIds = new Set(
+    (data as Array<{ game_id: string }> | null)?.map(row => row.game_id) ?? []
+  )
+  return selectLatestLegacyCloudGameCandidate(rows, eventSetupGameIds)
+}
+
+async function isLegacyCloudGameRow(row: CloudGameRow): Promise<boolean> {
+  return (await selectLatestLegacyGameRow([row])) !== null
+}
+
 async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
   if (!supabase) {
     throw new Error('Supabase client not configured')
@@ -1294,16 +1325,13 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
     .select(`${baseColumns},${allOptional}`)
     .eq('created_by', userId)
     .not('team_id', 'is', null)
-    .is('sport_id', null)
     .in('status', ['in_progress', 'scheduled'])
     .order('last_opened_at', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   if (!advanced.error) {
     lastOpenedPreferenceSupport = 'supported'
-    return (advanced.data as CloudGameRow | null) ?? null
+    return selectLatestLegacyGameRow(advanced.data as CloudGameRow[] | null)
   }
 
   // Detect which optional columns are missing and rebuild the select list.
@@ -1317,51 +1345,41 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   const selectColumns = baseColumns + buildOptionalGameSelectSuffix(gaps)
 
-  let retryQuery = supabase
+  const retryQuery = supabase
     .from('games')
     .select(selectColumns)
     .eq('created_by', userId)
     .not('team_id', 'is', null)
     .in('status', ['in_progress', 'scheduled'])
 
-  if (!gaps.sportId) {
-    retryQuery = retryQuery.is('sport_id', null)
-  }
-
   const retry = await retryQuery
     .order(!gaps.lastOpened ? 'last_opened_at' : 'created_at', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   if (!retry.error) {
-    return (retry.data as CloudGameRow | null) ?? null
+    const rows = (retry.data as unknown as CloudGameRow[] | null) ?? []
+    return gaps.sportId ? rows[0] ?? null : selectLatestLegacyGameRow(rows)
   }
 
   // Final fallback: base columns only (no optional columns at all).
   const retryGaps = detectOptionalGameColumnGaps(retry.error)
   if (hasAnyOptionalGameColumnGap(retryGaps)) {
     const sportIdMissing = gaps.sportId || retryGaps.sportId
-    let finalQuery = supabase
+    const finalQuery = supabase
       .from('games')
       .select(baseColumns + (!sportIdMissing ? ',sport_id' : ''))
       .eq('created_by', userId)
       .not('team_id', 'is', null)
       .in('status', ['in_progress', 'scheduled'])
 
-    if (!sportIdMissing) {
-      finalQuery = finalQuery.is('sport_id', null)
-    }
-
     const finalRetry = await finalQuery
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
 
     if (finalRetry.error) {
       throw new Error(`Game load failed: ${finalRetry.error.message}`)
     }
-    return (finalRetry.data as CloudGameRow | null) ?? null
+    const rows = (finalRetry.data as unknown as CloudGameRow[] | null) ?? []
+    return sportIdMissing ? rows[0] ?? null : selectLatestLegacyGameRow(rows)
   }
 
   throw new Error(`Game load failed: ${retry.error.message}`)
@@ -1369,7 +1387,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
 export async function loadLatestCloudGame(userId: string): Promise<HydratedCloudGame | null> {
   const latestGame = await loadLatestGameRow(userId)
-  if (!latestGame || latestGame.sport_id) {
+  if (!latestGame) {
     return null
   }
 
@@ -1410,7 +1428,7 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
       return null
     }
     const fallbackRow = gameRowFallback as unknown as CloudGameRow
-    if (fallbackRow.sport_id) {
+    if (!gaps.sportId && !(await isLegacyCloudGameRow(fallbackRow))) {
       return null
     }
     return hydrateCloudGameFromRow(userId, fallbackRow)
@@ -1421,7 +1439,7 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
   }
 
   const selectedRow = gameRow as unknown as CloudGameRow
-  if (selectedRow.sport_id) {
+  if (!(await isLegacyCloudGameRow(selectedRow))) {
     return null
   }
   return hydrateCloudGameFromRow(userId, selectedRow)

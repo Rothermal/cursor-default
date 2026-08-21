@@ -7,6 +7,7 @@ import {
   detectOptionalGameColumnGaps,
   hasAnyOptionalGameColumnGap,
   hasLoadByIdOptionalGameColumnGap,
+  selectLatestLegacyCloudGameCandidate,
   type CloudRosterRow,
 } from './cloudSyncHydrate'
 
@@ -229,5 +230,27 @@ describe('optional game select fallbacks', () => {
     }
     expect(buildOptionalGameSelectSuffix(gaps)).toBe('')
     expect(buildOptionalGameSelectSuffix(gaps, { includeLastOpened: false })).toBe('')
+  })
+})
+
+describe('legacy cloud authority selection', () => {
+  it('uses setup snapshots instead of sport id nullness and preserves the old Soccer exception', () => {
+    const rows = [
+      { id: 'event-basketball', sport_id: 'basketball' },
+      { id: 'old-soccer', sport_id: 'soccer' },
+      { id: 'legacy-basketball', sport_id: 'basketball' },
+      { id: 'legacy-null', sport_id: null },
+    ]
+
+    expect(
+      selectLatestLegacyCloudGameCandidate(rows, new Set(['event-basketball']))
+    ).toEqual(rows[2])
+    expect(
+      selectLatestLegacyCloudGameCandidate(
+        rows.slice(0, 2),
+        new Set(['event-basketball'])
+      )
+    ).toBeNull()
+    expect(selectLatestLegacyCloudGameCandidate([rows[3]], new Set())).toEqual(rows[3])
   })
 })

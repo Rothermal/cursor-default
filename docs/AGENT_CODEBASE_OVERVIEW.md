@@ -231,10 +231,10 @@ legacy source transport, team/season/tournament destinations, player/career comp
 capability/release exit audit. Event games use active completed publications, legacy games retain
 resolved aggregate authority, and a game may contribute through exactly one source family.
 Personal games enter only stable-player Profile/Career scopes. BKE-4E1 implements the pure `bk_*`
-catalog, canonical and legacy per-game projection, participation, authoritative side totals,
-mixed-source composition, quality/provenance/metric availability, destination ranking helpers,
-and player/career segmentation without React or Supabase. BKE-4E2 is next; creation remains
-internal through BKE-4E and the visible opt-in remains BKE-5.
+engine. BKE-4E2 adds migration 060 fixed canonical/legacy source RPCs and strict dual-family client
+transport with keyset paging, Soccer wrapper parity, correction resolution, cancellation, metrics,
+partial malformed-item isolation, and fail-closed authority collisions. BKE-4E3 is next; creation
+remains internal through BKE-4E and the visible opt-in remains BKE-5.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -466,7 +466,7 @@ flowchart LR
 | [`PLAN_MULTI_GAME_PARKING.md`](PLAN_MULTI_GAME_PARKING.md) | P0–P3b shipped (incl. discard/hydrate race guards); IndexedDB + orphan ops follow-ups remain |
 | [`PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md`](PLAN_SOC_5_CLOUD_SYNC_AND_FINALIZATION.md) / [`PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md`](PLAN_SOC_5D_FINALIZATION_AND_RECOVERY.md) | SOC-5 decisions and phases; SOC-5A-D transport through canonical finalization implemented |
 | [`PLAN_SOC_6_SUMMARY_AND_RELEASE.md`](PLAN_SOC_6_SUMMARY_AND_RELEASE.md) / [`PLAN_SOC_6A_SUMMARY_FOUNDATION.md`](PLAN_SOC_6A_SUMMARY_FOUNDATION.md) / [`PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md`](PLAN_SOC_6B_DETAILED_MATCH_REVIEW.md) / [`PLAN_SOC_6C_CANONICAL_AGGREGATES.md`](PLAN_SOC_6C_CANONICAL_AGGREGATES.md) / [`PLAN_SOC_6D_SOCCER_SETTINGS.md`](PLAN_SOC_6D_SOCCER_SETTINGS.md) / [`PLAN_SOC_6E_RELEASE_HARDENING.md`](PLAN_SOC_6E_RELEASE_HARDENING.md) | SOC-6A through SOC-6E3 implemented; owner-only production opt-in approved with post-deployment validation pending |
-| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) / [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md) / [`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md) / [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md) / [`PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md`](PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md) / [`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md) / [`REGRESSION_BKE_4D_SUMMARY.md`](REGRESSION_BKE_4D_SUMMARY.md) / [`REGRESSION_BKE_4E_AGGREGATES.md`](REGRESSION_BKE_4E_AGGREGATES.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3, BKE-4A through BKE-4D, and BKE-4E1 are implemented; BKE-4E2 is next; the combined live matrix remains release evidence |
+| [`PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md`](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md) / [`PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md`](PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md) / [`PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md`](PLAN_BKE_3_EVENT_TIMELINE_AND_F13.md) / [`PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md`](PLAN_BKE_4_EVENT_CLOUD_CUTOVER.md) / [`PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md`](PLAN_BKE_4A_NEUTRAL_RPC_EXTRACTION.md) / [`PLAN_BKE_4B_BASKETBALL_TRANSPORT.md`](PLAN_BKE_4B_BASKETBALL_TRANSPORT.md) / [`PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md`](PLAN_BKE_4C_RECORDERS_AND_FINALIZATION.md) / [`PLAN_BKE_4D_SUMMARY_AUTHORITY.md`](PLAN_BKE_4D_SUMMARY_AUTHORITY.md) / [`PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md`](PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md) / [`REGRESSION_BKE_4C_FINALIZATION.md`](REGRESSION_BKE_4C_FINALIZATION.md) / [`REGRESSION_BKE_4D_SUMMARY.md`](REGRESSION_BKE_4D_SUMMARY.md) / [`REGRESSION_BKE_4E_AGGREGATES.md`](REGRESSION_BKE_4E_AGGREGATES.md) / [`REGRESSION_BKE_4E_TRANSPORT.md`](REGRESSION_BKE_4E_TRANSPORT.md) | Basketball migration onto the shared event model. BKE-1 through BKE-3, BKE-4A through BKE-4D, and BKE-4E1/E2 are implemented; BKE-4E3 is next; the combined live matrix remains release evidence |
 
 ### Held / waiting for feedback
 
