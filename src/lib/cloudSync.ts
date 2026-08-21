@@ -261,9 +261,14 @@ async function ensureGame(
   if (!supabase) {
     throw new Error('Supabase client not configured')
   }
+  const sportId = state.sport?.id
+  if (!sportId) {
+    throw new Error('Game sport is required for cloud sync')
+  }
 
   const gameInsertPayload = {
     team_id: teamId,
+    sport_id: sportId,
     ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
     opponent_name: state.gameInfo!.opponentName,
     opponent_score: state.opponentScore,
@@ -280,6 +285,7 @@ async function ensureGame(
   /** Updates must not set status — stale clients could reopen a final game id and revert it to in_progress. */
   const gameUpdatePayload = {
     team_id: teamId,
+    sport_id: sportId,
     ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
     opponent_name: state.gameInfo!.opponentName,
     opponent_score: state.opponentScore,
@@ -301,6 +307,7 @@ async function ensureGame(
   ) {
     return {
       team_id: teamId,
+      sport_id: sportId,
       ...(omitSeasonId || !seasonIdForGame ? {} : { season_id: seasonIdForGame }),
       opponent_name: state.gameInfo!.opponentName,
       opponent_score: state.opponentScore,
@@ -324,6 +331,7 @@ async function ensureGame(
   ) {
     return {
       team_id: teamId,
+      sport_id: sportId,
       ...(omitSeasonId || !seasonIdForGame ? {} : { season_id: seasonIdForGame }),
       opponent_name: state.gameInfo!.opponentName,
       opponent_score: state.opponentScore,
