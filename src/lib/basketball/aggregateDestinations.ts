@@ -264,6 +264,22 @@ export function basketballAggregateGenericQualityMessage(
     : `${count} Basketball games or player contributions could not be included.`
 }
 
+export function shouldAutoRefreshBasketballAggregates({
+  loading,
+  visible,
+  now,
+  lastRefreshAt,
+  debounceMs = 250,
+}: {
+  loading: boolean
+  visible: boolean
+  now: number
+  lastRefreshAt: number
+  debounceMs?: number
+}): boolean {
+  return visible && !loading && now - lastRefreshAt >= debounceMs
+}
+
 function metricDependencies(
   metricId: BasketballAggregateMetricId
 ): BasketballCanonicalStatId[] {

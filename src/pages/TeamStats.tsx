@@ -8,6 +8,7 @@ import { teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 import { SoccerAggregateDestinationPage } from '../components/soccer-aggregate/SoccerAggregateDestination'
+import { BasketballAggregateDestinationPage } from '../components/basketball-aggregate/BasketballAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -101,7 +102,7 @@ export default function TeamStats() {
       const teamData = teamRes.data as unknown as TeamRow
       setTeam(teamData)
       setTournaments((tourRes.data ?? []) as TournamentRow[])
-      if (teamData.seasons.sport === 'soccer') {
+      if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball') {
         setGames([])
         setLogRows([])
         setLoading(false)
@@ -309,6 +310,42 @@ export default function TeamStats() {
         seasonId={team.season_id}
         title="Team stats"
         subtitle={`${teamDisplayName(team)} · ${team.seasons.name}`}
+        backPath={teamInfoPath(teamId)}
+        overviewExtra={
+          <section className="space-y-2">
+            <h2 className="font-semibold text-slate-800">Explore</h2>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to={teamLeaderboardPath(teamId, team.season_id, true)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+              >
+                Season leaderboard
+              </Link>
+              {tournaments.map(tournament => (
+                <Link
+                  key={tournament.id}
+                  to={`/tournament-stats?tournamentId=${encodeURIComponent(tournament.id)}&teamId=${encodeURIComponent(teamId)}`}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                >
+                  {tournament.name}
+                </Link>
+              ))}
+            </div>
+          </section>
+        }
+      />
+    )
+  }
+
+  if (team.seasons.sport === 'basketball') {
+    return (
+      <BasketballAggregateDestinationPage
+        variant="team"
+        scope={{ type: 'team', id: teamId }}
+        teamIds={[teamId]}
+        teamIdForLinks={teamId}
+        title="Team stats"
+        subtitle={`${teamDisplayName(team)} - ${team.seasons.name}`}
         backPath={teamInfoPath(teamId)}
         overviewExtra={
           <section className="space-y-2">
