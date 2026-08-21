@@ -8,7 +8,7 @@ the new RPCs. This slice does not add routes or expose Basketball event-game cre
 Run the focused transport, pure-engine, cloud-sync, and Soccer parity suites:
 
 ```powershell
-pnpm exec vitest run src/lib/basketball/migration060.test.ts src/lib/basketball/aggregateTransport.test.ts src/lib/basketball/aggregateStats.test.ts src/lib/basketball/aggregateProjection.test.ts src/lib/basketball/aggregateComposition.test.ts src/lib/basketball/aggregateDestinations.test.ts src/lib/basketball/aggregatePlayerDestinations.test.ts src/lib/cloudSyncHardening.test.ts src/lib/cloudSyncHydrate.test.ts src/lib/soccer/migration047.test.ts src/lib/soccer/aggregateTransport.test.ts
+pnpm exec vitest run src/lib/basketball/migration060.test.ts src/lib/basketball/aggregateTransport.test.ts src/lib/basketball/aggregateStats.test.ts src/lib/basketball/aggregateProjection.test.ts src/lib/basketball/aggregateComposition.test.ts src/lib/basketball/aggregateDestinations.test.ts src/lib/basketball/aggregatePlayerDestinations.test.ts src/lib/cloudSyncAuthority.test.ts src/lib/cloudSyncHardening.test.ts src/lib/cloudSyncHydrate.test.ts src/lib/soccer/migration047.test.ts src/lib/soccer/aggregateTransport.test.ts
 ```
 
 Then run the repository gates:
