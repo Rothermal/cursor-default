@@ -410,6 +410,8 @@ deferred feature.
 
 SOC-0 reserves event shapes and settings groups for later planning. These modules are not
 part of the core six-phase release unless a detailed phase explicitly promotes them.
+After first live matches, the numbered `M*` inventory and sideline `S*` issues live in
+[`PLAN_SOC_FIELD_TEST_BACKLOG.md`](PLAN_SOC_FIELD_TEST_BACKLOG.md).
 
 | Module | Candidate data |
 |---|---|
