@@ -37,6 +37,7 @@ item is planned.
 2. Keep `M*` items listed so later season/coach requests do not get lost.
 3. When an item is confirmed, write a focused plan and Q&A the way SOC-4 / F5-F12
    were planned. File lists, acceptance, and regression belong in that plan.
+   Restart capture is planned in [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md).
 4. After a plan ships, mark the item implemented here and link the plan.
 
 Owner match notes live in [Section 8](#8-owner-match-notes). Confirmed items
@@ -412,7 +413,7 @@ or treating placement as a second shot event.
 
 ### S17 - Make the existing corner event obvious
 
-**Status:** confirmed — UI cleanup, small optional taker add-on  
+**Status:** planned — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)  
 **Theme:** restarts  
 **Where:** Field Quick **Team** → Team Event sheet → Corner / Offside;
 Left/Right shortcuts; `soccer.team_event` `kind: 'corner'`
@@ -485,7 +486,7 @@ heatmaps.
 
 ### S20 - Throw-ins
 
-**Status:** asked — not in the product  
+**Status:** planned with goal kicks — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)  
 **Theme:** restarts  
 **Where:** `SoccerTeamEventKind` is only `'corner' | 'offside'`
 
