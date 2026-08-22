@@ -415,7 +415,7 @@ After first live matches, the numbered `M*` inventory and sideline `S*` issues l
 
 | Module | Candidate data |
 |---|---|
-| Detailed goal metadata | Body part, assist delivery, rebound, error, build-up type |
+| Detailed goal metadata | Body part, assist delivery, rebound, error, build-up type. First-match header and goal-mouth placement are inventoried as `S15` / `S16` in [`PLAN_SOC_FIELD_TEST_BACKLOG.md`](PLAN_SOC_FIELD_TEST_BACKLOG.md) |
 | Technical actions | Dribble attempts/results, crosses, dispossessions, turnovers |
 | Passing | Passer, recipient, completion, start/end location, direction, type |
 | Advanced defending | Pressures, ground/aerial duels, dribbled past, errors |
