@@ -475,7 +475,7 @@ flowchart LR
 | [`DESIGN_SHOT_TRACKER_UI_REVAMP.md`](DESIGN_SHOT_TRACKER_UI_REVAMP.md) | Court-capture program status (F1–F13) |
 | [`PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md`](PLAN_COURT_CAPTURE_ENHANCEMENTS_ROADMAP.md) | Court-capture roadmap; F10 superseded by F13 |
 | [`PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md`](PLAN_F13_SHOT_DETAIL_EDIT_MODAL.md) | Superseded implementation draft; product intent is owned by the approved BKE-3 plan |
-| [`PLAN_SOC_FIELD_TEST_BACKLOG.md`](PLAN_SOC_FIELD_TEST_BACKLOG.md) | Post-SOC-6 soccer field-test backlog. Owner-confirmed through `S18` (sideline layout, default role, Timeline shot edit, opponent-actor lock, finalize mismatch, header, placement, corner UI cleanup, upside-down flip counts). Do not implement from the backlog; expand one confirmed item at a time |
+| [`PLAN_SOC_FIELD_TEST_BACKLOG.md`](PLAN_SOC_FIELD_TEST_BACKLOG.md) | Post-SOC-6 soccer field-test backlog. Owner-confirmed through `S19` (sideline layout, default role, Timeline shot edit, opponent-actor lock, finalize mismatch, header, placement, corner UI cleanup, upside-down flip counts, team formation lineup). Do not implement from the backlog; expand one confirmed item at a time |
 
 **Court program status:** F1-F9 and F12 are implemented; manual Supabase-heavy QA remains in
 [`REGRESSION_TESTING.md`](REGRESSION_TESTING.md). F10 standalone marker numbering is no

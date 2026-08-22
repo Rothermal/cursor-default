@@ -1,7 +1,7 @@
 # Soccer Field-Test Backlog
 
 Status: living inventory after first live matches. Owner-confirmed items are
-`S2`, `S3`, `S11`–`S18`. This is not an implementation plan.
+`S2`, `S3`, `S11`–`S19`. This is not an implementation plan.
 
 Soccer SOC-1 through SOC-6E3 are implemented. The next soccer work is no longer "finish
 the first release." It is the same kind of post-use backlog basketball used after court
@@ -200,8 +200,8 @@ record as unrelated open-play shots.
 kick, the next shot sheet defaults situation and source to that restart.
 The recorder can clear it.
 
-**Not this item:** treating throw-ins or goal kicks as core events. Corner
-kicker and left/right as first-class capture are `S17`.
+**Not this item:** treating throw-ins or goal kicks as core events. Making
+the existing corner sheet obvious is `S17`.
 
 ### S8 - Lineup as a live board
 
@@ -272,8 +272,8 @@ setup, prefill `initialRole` from it, and keep live Role / `soccer.role_changed`
 as the match override only. Do not write in-game role changes back unless the
 recorder explicitly updates the default.
 
-**Not this item:** formation drawings, minutes-by-role analysis, or treating
-role as a second player identity.
+**Not this item:** formation drawings (`S19`), minutes-by-role analysis, or
+treating role as a second player identity.
 
 ### S12 - Edit shots from Timeline, not only from the pitch
 
@@ -458,6 +458,31 @@ locations.
 
 **Not this item:** persisting the flip (`S9`).
 
+### S19 - Team formation lineup on a pitch
+
+**Status:** confirmed idea — later than live-tracker fixes  
+**Theme:** team settings / setup  
+**Where:** Teams / Team Manage; `SoccerTeamSettings` today is only a sparse
+rules override; Player Setup has starter/bench plus `initialRole`, no
+pitch
+
+Owner idea: set a soccer lineup on a pitch from the Teams page. Formations
+such as 4-3-3, 4-4-2, 3-4-3. Store it as a team setting.
+
+This is not a new event family. SOC-6D already has owner/admin team soccer
+settings with compare-and-swap writes. A formation would be a new optional
+settings field plus a visual editor: pick a shape, place named roster
+players on slots, save for the team.
+
+**Likely direction:** persist `{ formation, slots[] }` on team soccer
+settings. Player Setup can prefill starters and default roles (`S11`) from
+those slots. Live Role / substitution still override the match. Do not
+treat the formation as a live tactical board, and do not write every sub
+back to the team default.
+
+**Not this item:** in-match formation changes, opponent formations, or
+heatmaps.
+
 ## 5. Future modules (`M*`)
 
 Reserved in SOC-0 §8 and SOC-6 §9. First matches may request these; they
@@ -497,6 +522,7 @@ S3  Keep the pitch on screen
 S18 Flipped field keeps cluster counts upright
 S12 Edit shots from Timeline
 S11 Default player role carried between games
+S19 Team formation lineup on a pitch
 S1  Faster shot and goal capture
 S15 Mark a goal as a header
 S16 Optional goal-mouth placement after Goal
@@ -517,7 +543,9 @@ should be re-tested on the same games after `S13` is fixed. `S15` and `S16`
 come after `S1` so extra goal metadata stays a skippable step, not another
 full attacking sheet. `S18` rides with the Field-tab work. `S17` is UI
 for the corner event that already exists, then `S7` can link the next
-shot. `M*` items stay behind a new phase name if promoted.
+shot. `S19` waits until default roles (`S11`) exist so a 4-3-3 slot can
+carry a player and a role. `M*` items stay behind a new phase name if
+promoted.
 
 ## 7. Out of scope
 
@@ -558,3 +586,5 @@ Broader Basketball event work continues in
   clean (Quick Team → Corner/Offside, no taker, weak Timeline label).
 - Two pins on the same spot correctly counted as 2. Flip reversed
   placement correctly, but the cluster number was upside down (`S18`).
+- Teams page: set a soccer lineup on a pitch (4-3-3, 4-4-2, 3-4-3), stored
+  as a team setting. Just an idea (`S19`).
