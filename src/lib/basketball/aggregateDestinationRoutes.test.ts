@@ -34,7 +34,7 @@ describe('Basketball aggregate destination route contracts', () => {
     )
   })
 
-  it('links mixed-history game rows to the authority-aware Basketball Summary', () => {
+  it('routes canonical rows to event Summary and legacy rows through Game Info', () => {
     const source = readFileSync(
       resolve(
         process.cwd(),
@@ -43,7 +43,23 @@ describe('Basketball aggregate destination route contracts', () => {
       'utf8'
     )
     expect(source).toContain('basketballSummaryPath({')
+    expect(source).toContain("game.authority === 'canonical'")
     expect(source).toContain('gameId: game.gameId')
     expect(source).toContain("from: 'team'")
+    expect(source).toContain(': gameInfoPath(game.gameId, game.teamId ?? teamIdForLinks)')
+  })
+
+  it('filters ranking tie-breaks through scope metric availability', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/components/basketball-aggregate/BasketballAggregateDestination.tsx'
+      ),
+      'utf8'
+    )
+    expect(source).toContain('basketballAggregateRankingMetrics(aggregate, category)')
+    expect(source).not.toContain(
+      'sortBasketballAggregatePlayers(aggregate.players, metricId, category.rankingMetricIds)'
+    )
   })
 })

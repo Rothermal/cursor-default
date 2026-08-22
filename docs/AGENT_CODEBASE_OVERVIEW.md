@@ -235,7 +235,8 @@ engine. BKE-4E2 adds migration 060 fixed canonical/legacy source RPCs and strict
 transport with keyset paging, Soccer wrapper parity, correction resolution, cancellation, metrics,
 partial malformed-item isolation, and fail-closed authority collisions. BKE-4E3 routes Leaderboard,
 Team Stats, and Tournament Stats through shared mixed-history Basketball destinations with roster
-zero rows, provenance, quality, refresh, and authority-aware Summary links. BKE-4E4 is next; creation
+zero rows, provenance, quality, refresh, canonical Summary links, and legacy Game Info review paths.
+BKE-4E4 is next; creation
 remains internal through BKE-4E and the visible opt-in remains BKE-5.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper

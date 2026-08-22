@@ -9,6 +9,7 @@ import {
   basketballAggregateManagedDiagnostics,
   basketballAggregateMetricAvailable,
   basketballAggregateMetricLabel,
+  basketballAggregateRankingMetrics,
   basketballAggregateVisibleColumns,
   formatBasketballAggregateMetric,
   sortBasketballAggregatePlayers,
@@ -414,8 +415,12 @@ function Players({ aggregate }: { aggregate: BasketballAggregateResult }) {
 
 function PlayerTable({ aggregate, category, metricId }: { aggregate: BasketballAggregateResult; category: BasketballAggregateCategoryDestination; metricId: BasketballAggregateMetricId }) {
   const sorted = useMemo(
-    () => sortBasketballAggregatePlayers(aggregate.players, metricId, category.rankingMetricIds),
-    [aggregate.players, category.rankingMetricIds, metricId]
+    () => sortBasketballAggregatePlayers(
+      aggregate.players,
+      metricId,
+      basketballAggregateRankingMetrics(aggregate, category)
+    ),
+    [aggregate, category, metricId]
   )
   const columns = basketballAggregateVisibleColumns(category, metricId, aggregate)
   return (
@@ -452,7 +457,14 @@ function Games({ games, teamIdForLinks }: { games: BasketballAggregateGame[]; te
       {games.map(game => (
         <Link
           key={`${game.authority}:${game.sourceId}`}
-          to={basketballSummaryPath({ gameId: game.gameId, tab: 'overview', from: 'team', teamId: teamIdForLinks ?? game.teamId })}
+          to={game.authority === 'canonical'
+            ? basketballSummaryPath({
+                gameId: game.gameId,
+                tab: 'overview',
+                from: 'team',
+                teamId: game.teamId ?? teamIdForLinks,
+              })
+            : gameInfoPath(game.gameId, game.teamId ?? teamIdForLinks)}
           className="block rounded-lg border border-slate-200 bg-white px-3 py-3 hover:border-sky-300"
         >
           <div className="flex items-start justify-between gap-3">

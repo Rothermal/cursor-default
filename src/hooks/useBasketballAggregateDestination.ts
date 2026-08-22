@@ -54,6 +54,7 @@ export function useBasketballAggregateDestination({
   const [warningLoadKey, setWarningLoadKey] = useState<string | null>(null)
   const [reloadVersion, setReloadVersion] = useState(0)
   const loadingRef = useRef(false)
+  const lastAutoRefreshAtRef = useRef(0)
   const scopeKey = useMemo(() => JSON.stringify(scope), [scope])
   const teamKey = useMemo(() => [...new Set(teamIds)].sort().join(','), [teamIds])
   const loadKey = scope ? `${scopeKey}:${teamKey}` : null
@@ -131,17 +132,20 @@ export function useBasketballAggregateDestination({
   }, [enabled, loadKey, reloadVersion, scopeKey, setLoadingState, teamKey])
 
   useEffect(() => {
-    if (!enabled || !scope) return
-    let lastReloadAt = 0
+    lastAutoRefreshAtRef.current = 0
+  }, [scopeKey])
+
+  useEffect(() => {
+    if (!enabled || scopeKey === 'null') return
     const reloadVisible = () => {
       const now = Date.now()
       if (!shouldAutoRefreshBasketballAggregates({
         loading: loadingRef.current,
         visible: document.visibilityState === 'visible',
         now,
-        lastRefreshAt: lastReloadAt,
+        lastRefreshAt: lastAutoRefreshAtRef.current,
       })) return
-      lastReloadAt = now
+      lastAutoRefreshAtRef.current = now
       refresh()
     }
     window.addEventListener('focus', reloadVisible)
@@ -150,7 +154,7 @@ export function useBasketballAggregateDestination({
       window.removeEventListener('focus', reloadVisible)
       document.removeEventListener('visibilitychange', reloadVisible)
     }
-  }, [enabled, refresh, scope])
+  }, [enabled, refresh, scopeKey])
 
   const visibleResult = resultLoadKey === loadKey ? result : null
   return {

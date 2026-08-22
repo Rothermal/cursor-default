@@ -30,8 +30,8 @@ Coverage verifies:
 - official team totals remain projection-authoritative instead of summing visible player rows;
 - provenance, partial quality, manager diagnostics, empty states, Refresh, and focus reload remain
   explicit; and
-- game history identifies legacy/canonical authority and links to authority-aware Basketball
-  Summary.
+- game history identifies legacy/canonical authority, linking canonical rows to event Summary and
+  legacy rows through Game Info's legacy loader.
 
 ## Manual Smoke Check
 
@@ -43,8 +43,8 @@ final games and canonical event publications:
 2. Open Team Stats and compare Overview, Players, and Games against the same season history.
 3. Open Tournament Stats and confirm only that tournament's games contribute while placement and
    external-link controls remain available.
-4. Open a legacy and a canonical Games row. Each must load the Basketball Summary authority for the
-   selected cloud game rather than hydrate the live tracker.
+4. Open a legacy and a canonical Games row. Canonical history must open event Summary directly;
+   legacy history must open Game Info and then its hydrated legacy Summary.
 5. Use Refresh, then refocus the tab. The last coherent result remains visible during refresh and a
    failed refresh is labeled instead of replacing totals.
 

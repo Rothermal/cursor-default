@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { BasketballAggregateLoadResult } from '../lib/basketball/aggregateTransport'
 import { loadBasketballAggregateDestinationData } from './useBasketballAggregateDestination'
 
@@ -51,6 +53,16 @@ describe('Basketball aggregate destination loading', () => {
         activeRoster: [expect.objectContaining({ tournamentId: 'tournament-1' })],
       })
     )
+  })
+
+  it('keeps the focus-refresh debounce stable across equivalent scope renders', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/hooks/useBasketballAggregateDestination.ts'),
+      'utf8'
+    )
+    expect(source).toContain('const lastAutoRefreshAtRef = useRef(0)')
+    expect(source).toContain('lastRefreshAt: lastAutoRefreshAtRef.current')
+    expect(source).toContain('}, [enabled, refresh, scopeKey])')
   })
 })
 
