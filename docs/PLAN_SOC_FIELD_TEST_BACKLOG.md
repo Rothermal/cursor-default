@@ -1,6 +1,8 @@
 # Soccer Field-Test Backlog
 
-Status: living inventory after first live matches. This is not an implementation plan.
+Status: living inventory after first live matches. Owner-confirmed items are
+`S2`, `S3`, `S11`, `S12`, `S13`, `S14`, `S15`, and `S16`. This is not an
+implementation plan.
 
 Soccer SOC-1 through SOC-6E3 are implemented. The next soccer work is no longer "finish
 the first release." It is the same kind of post-use backlog basketball used after court
@@ -86,7 +88,8 @@ is the live gesture, not the schema.
 **Likely direction:** outcome-first sheet; remember last shooter; prompt assist
 or save only after Goal / Saved; keep the full sheet for edit and Timeline add.
 
-**Not this item:** new shot outcomes, xG, or detailed goal metadata (`M5`).
+**Not this item:** new shot outcomes, xG, header (`S15`), placement (`S16`),
+or the rest of detailed goal metadata (`M5`).
 
 ### S2 - Substitution from the Field tab
 
@@ -356,6 +359,56 @@ changing the RPC.
 **Not this item:** changing canonical publication rules or allowing
 finalize from an incomplete stream.
 
+### S15 - Mark a goal as a header
+
+**Status:** confirmed — new capture feature  
+**Theme:** goal metadata  
+**Where:** `soccer.shot` payload today is only `outcome`, `situation`, and
+optional `sourceEventId`; SOC-0 reserved body part under detailed goal
+metadata (`M5`)
+
+Owner request after first matches: the recorder needs to mark when a goal
+is a header. That is the first slice of `M5` body part, not a new event
+type.
+
+**Likely direction:** after Goal is chosen, show an optional Header chip
+(skip allowed). Store it on the existing `soccer.shot` event. Keep the
+core goal/shot totals unchanged. Own goals and non-goal shots can omit it
+until a later `M5` body-part catalog exists. Timeline and Summary should
+show Header when present.
+
+**Not this item:** foot / left-right / volley / rebound / build-up (`M5`),
+or making header a required field on every goal.
+
+### S16 - Shot and goal placement
+
+**Status:** confirmed — new capture feature  
+**Theme:** shot location  
+**Where:** `GameEvent.location` is the take/origin pin only; no end or
+goal-mouth location exists
+
+Owner request: track where the ball went, not only where it was struck.
+Example: shot from the left side that landed on the right. Two UX options
+were offered:
+
+1. A second pin on the same pitch (origin plus landing).
+2. After a goal, open a second view of the goal mouth and tap placement.
+
+Those capture different things. A second field pin is an on-pitch end
+location (wide right, far-post run). A goal-mouth view is where it
+entered the net (high left, low right).
+
+**Likely direction:** keep the existing field tap as origin. After Goal,
+open an optional goal-mouth sheet (skip allowed) and store a normalized
+goal placement. That matches "landed in the right side" for scored balls
+without a second map gesture on every shot. A secondary field pin can
+wait for Saved / Off target / Blocked if first matches still need
+on-pitch end location. Do not infer xG. Do not require placement to save
+the shot (`S1`).
+
+**Not this item:** expected-goals models, heatmaps as a separate product,
+or treating placement as a second shot event.
+
 ## 5. Future modules (`M*`)
 
 Reserved in SOC-0 §8 and SOC-6 §9. First matches may request these; they
@@ -367,7 +420,7 @@ are not S-series polish.
 | M2 | Per-90 and per-standard-match rates | First-release aggregates are totals and read-time rates with a real denominator |
 | M3 | Season shootout leaderboards | Shootout totals stay match-scoped |
 | M4 | Full opponent roster, lineup, and minutes | Simplified opponent is an SOC-0 decision |
-| M5 | Detailed goal metadata | Body part, delivery, rebound, error, build-up |
+| M5 | Detailed goal metadata | Header is pulled forward as `S15`. Remaining: other body parts, delivery, rebound, error, build-up. Goal-mouth / end placement is `S16`, not this row |
 | M6 | Technical actions | Dribbles, crosses, dispossessions |
 | M7 | Passing | Completion, start/end, type |
 | M8 | Advanced defending | Pressures, aerial/ground duels, dribbled past, errors |
@@ -395,6 +448,8 @@ S3  Keep the pitch on screen
 S12 Edit shots from Timeline
 S11 Default player role carried between games
 S1  Faster shot and goal capture
+S15 Mark a goal as a header
+S16 Optional goal-mouth placement after Goal
 S4  Recent-events undo on Field
 S8  Lineup as a live board
 S5  Reusable opponent identities
@@ -407,8 +462,9 @@ M1  Team standings, only after completed-match volume exists
 
 `S13` and `S14` are first because they leave a match uneditable or
 unfinalizable. Owner ranking of the remaining UX is `S2` then `S3`. `S14`
-should be re-tested on the same games after `S13` is fixed. `M*` items stay
-behind a new phase name if promoted.
+should be re-tested on the same games after `S13` is fixed. `S15` and `S16`
+come after `S1` so extra goal metadata stays a skippable step, not another
+full attacking sheet. `M*` items stay behind a new phase name if promoted.
 
 ## 7. Out of scope
 
@@ -441,3 +497,6 @@ Broader Basketball event work continues in
 - Same club, ended 3-1, Overview, Local, Cloud Finalization / Primary Mark:
   `Soccer finalization failed: Primary recorder changed; reload before
   finalizing`. Finalize stayed offered. Owner cannot finalize games (`S14`).
+- Need to mark when a goal is a header (`S15`).
+- Want shot/goal placement: shot from the left that landed on the right.
+  Either a second field pin, or a goal-mouth view after a goal (`S16`).
