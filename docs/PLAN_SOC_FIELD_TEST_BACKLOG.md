@@ -577,7 +577,8 @@ Do not use this backlog to:
 - enable Soccer by default or hide historical soccer records
 - migrate basketball inside a soccer PR (see the BKE roadmap)
 - infer possession, ratings, or xG from the current event set
-- treat throw-ins, goal kicks, or routine free kicks as core events
+- treat goal kicks or routine free kicks as core events; throw-ins stay
+  out unless `S20` is promoted
 
 Release evidence still belongs in `docs/REGRESSION_SOC_6E_RELEASE.md`.
 Broader Basketball event work continues in
