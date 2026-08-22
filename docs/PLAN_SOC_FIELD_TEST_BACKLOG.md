@@ -1,8 +1,7 @@
 # Soccer Field-Test Backlog
 
 Status: living inventory after first live matches. Owner-confirmed items are
-`S2`, `S3`, `S11`, `S12`, `S13`, `S14`, `S15`, and `S16`. This is not an
-implementation plan.
+`S2`, `S3`, `S11`–`S18`. This is not an implementation plan.
 
 Soccer SOC-1 through SOC-6E3 are implemented. The next soccer work is no longer "finish
 the first release." It is the same kind of post-use backlog basketball used after court
@@ -201,7 +200,8 @@ record as unrelated open-play shots.
 kick, the next shot sheet defaults situation and source to that restart.
 The recorder can clear it.
 
-**Not this item:** treating throw-ins or goal kicks as core events.
+**Not this item:** treating throw-ins or goal kicks as core events. Corner
+kicker and left/right as first-class capture are `S17`.
 
 ### S8 - Lineup as a live board
 
@@ -233,6 +233,7 @@ a personal soccer setting. Do not change stored coordinates or attacking
 direction events.
 
 **Not this item:** automatic end-switch rules (already event-owned).
+Upside-down cluster counts after flip are `S18`.
 
 ### S10 - Defense without a mode switch
 
@@ -409,6 +410,52 @@ the shot (`S1`).
 **Not this item:** expected-goals models, heatmaps as a separate product,
 or treating placement as a second shot event.
 
+### S17 - Corner side and taker
+
+**Status:** confirmed — new capture feature  
+**Theme:** restarts  
+**Where:** `soccer.team_event` `kind: 'corner'`; Quick Team; Left/Right
+corner shortcuts in `SoccerIncidentCaptureDialog`
+
+Corners are already core. Left/Right only write a corner-arc location.
+Save currently drops actors (`actors: []`), so the taker is never stored.
+SOC-4 kept corner attribution team-level on purpose.
+
+Owner request: track which side (left or right) and who is kicking. This
+is the same family as `S7` (link the next shot to that corner), not a new
+event type.
+
+**Likely direction:** keep one `soccer.team_event` corner. Persist
+left/right as an explicit side (or derive it from the corner location and
+attacking direction) and allow an optional taker: tracked participant,
+team, or opponent label. Show side and taker on Timeline and Field.
+`S7` can then default the next shot's source to that corner.
+
+**Not this item:** throw-ins, goal kicks, or making a taker required.
+
+### S18 - Flipped field keeps cluster counts upright
+
+**Status:** confirmed — display bug  
+**Theme:** field review  
+**Where:** `SoccerField` applies `rotate-180` to the whole SVG when
+`fieldFlipped` is true; `SoccerMarkerCluster` draws the count as SVG
+`<text>`
+
+Owner confirmation: two pins on the same spot correctly counted as 2
+events. Flip reversed placement correctly. The cluster number was then
+upside down.
+
+Tap mapping already remaps through `soccerFieldLocation(..., flipped)`.
+The count (and other in-SVG text such as a foul `!`) rotates with the
+pitch.
+
+**Likely direction:** keep stored coordinates. Counter-rotate marker
+labels/counts when the pitch is flipped, or flip by remapping display
+coordinates instead of rotating the entire SVG. Do not change event
+locations.
+
+**Not this item:** persisting the flip (`S9`).
+
 ## 5. Future modules (`M*`)
 
 Reserved in SOC-0 §8 and SOC-6 §9. First matches may request these; they
@@ -445,6 +492,7 @@ S13 Opponent incident cannot attach a tracked player / lock the match
 S14 Finalize must succeed or explain the real checkpoint mismatch
 S2  Substitution from the Field tab
 S3  Keep the pitch on screen
+S18 Flipped field keeps cluster counts upright
 S12 Edit shots from Timeline
 S11 Default player role carried between games
 S1  Faster shot and goal capture
@@ -457,6 +505,7 @@ S6  Sideline clock correction
 S9  Persist field orientation
 S10 Defense without a mode switch
 S7  Last restart as next shot source
+S17 Corner side and taker
 M1  Team standings, only after completed-match volume exists
 ```
 
@@ -464,7 +513,9 @@ M1  Team standings, only after completed-match volume exists
 unfinalizable. Owner ranking of the remaining UX is `S2` then `S3`. `S14`
 should be re-tested on the same games after `S13` is fixed. `S15` and `S16`
 come after `S1` so extra goal metadata stays a skippable step, not another
-full attacking sheet. `M*` items stay behind a new phase name if promoted.
+full attacking sheet. `S18` rides with the Field-tab work. `S17` extends
+the existing Team Event corner, then `S7` can link the next shot. `M*`
+items stay behind a new phase name if promoted.
 
 ## 7. Out of scope
 
@@ -500,3 +551,7 @@ Broader Basketball event work continues in
 - Need to mark when a goal is a header (`S15`).
 - Want shot/goal placement: shot from the left that landed on the right.
   Either a second field pin, or a goal-mouth view after a goal (`S16`).
+- Track corner kicks with left/right side and who is kicking (`S17`).
+  Related to existing Team Event corners and `S7`.
+- Two pins on the same spot correctly counted as 2. Flip reversed
+  placement correctly, but the cluster number was upside down (`S18`).
