@@ -1,7 +1,7 @@
 # Soccer Field-Test Backlog
 
 Status: living inventory after first live matches. Owner-confirmed items are
-`S2`, `S3`, `S11`–`S19`. This is not an implementation plan.
+`S2`, `S3`, `S11`–`S20`. This is not an implementation plan.
 
 Soccer SOC-1 through SOC-6E3 are implemented. The next soccer work is no longer "finish
 the first release." It is the same kind of post-use backlog basketball used after court
@@ -433,7 +433,7 @@ right corner — #7” instead of “Team event.” Optional taker is the only
 data add; do not invent a second event type. `S7` can still link the next
 shot to that corner.
 
-**Not this item:** throw-ins, goal kicks, or making a taker required.
+**Not this item:** throw-ins (`S20`), goal kicks, or making a taker required.
 
 ### S18 - Flipped field keeps cluster counts upright
 
@@ -482,6 +482,25 @@ back to the team default.
 
 **Not this item:** in-match formation changes, opponent formations, or
 heatmaps.
+
+### S20 - Throw-ins
+
+**Status:** asked — not in the product  
+**Theme:** restarts  
+**Where:** `SoccerTeamEventKind` is only `'corner' | 'offside'`
+
+There is no throw-in event, quick action, or stat. SOC-0 / SOC-4 left
+throw-ins, goal kicks, and routine free kicks out of the core catalog on
+purpose. Corners are the restart that did ship; they are just hard to
+find (`S17`).
+
+Owner asked after first matches whether throw-ins can be tracked.
+
+**Likely direction if promoted:** reuse the Team Event / `S17` sheet —
+side, optional taker, optional location — with `kind: 'throw_in'`. Do not
+require one on every restart. Goal kicks stay out until someone asks.
+
+**Not this item:** treating every dead ball as a core event.
 
 ## 5. Future modules (`M*`)
 
@@ -534,6 +553,7 @@ S9  Persist field orientation
 S10 Defense without a mode switch
 S7  Last restart as next shot source
 S17 Make the existing corner event obvious
+S20 Throw-ins, only if we want them in the same sheet as corners
 M1  Team standings, only after completed-match volume exists
 ```
 
@@ -588,3 +608,4 @@ Broader Basketball event work continues in
   placement correctly, but the cluster number was upside down (`S18`).
 - Teams page: set a soccer lineup on a pitch (4-3-3, 4-4-2, 3-4-3), stored
   as a team setting. Just an idea (`S19`).
+- Asked whether throw-ins can be tracked. They cannot today (`S20`).
