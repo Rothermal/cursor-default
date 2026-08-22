@@ -38,8 +38,9 @@ item is planned.
    were planned. File lists, acceptance, and regression belong in that plan.
 4. After a plan ships, mark the item implemented here and link the plan.
 
-Owner match notes can be appended under [Section 8](#8-owner-match-notes). Items
-below start from the shipped soccer surfaces, not from invented match anecdotes.
+Owner match notes live in [Section 8](#8-owner-match-notes). Confirmed items
+keep their code-backed likely direction so the next plan can start from a
+real screenshot or file path.
 
 ## 3. Shipped baseline
 
@@ -89,7 +90,7 @@ or save only after Goal / Saved; keep the full sheet for edit and Timeline add.
 
 ### S2 - Substitution from the Field tab
 
-**Status:** proposed  
+**Status:** confirmed — largest first-match challenge  
 **Theme:** lineup during live play  
 **Where:** `SoccerGameTracker` Field tab, `SoccerLiveActionDialog` `substitution`
 
@@ -97,14 +98,17 @@ Substitutions are a core youth-match action. The Field tab has Quick Goal, Foul,
 Card, and Team. Substitution lives in the header overflow action sheet with
 roles, clock correction, late participant, and rules.
 
+Owner confirmation: first live matches made this the biggest workflow gap.
+
 **Likely direction:** a Field-tab Sub control that opens the existing
-substitution window. Optional later: tap a Lineup row to start the same window.
+substitution window. Optional later: tap a Lineup row to start the same window
+(`S8`).
 
 **Not this item:** changing substitution-window or return-sub rules.
 
 ### S3 - Keep the pitch on screen
 
-**Status:** proposed  
+**Status:** confirmed — largest first-match challenge  
 **Theme:** mobile layout  
 **Where:** Field tab chrome in `SoccerGameTracker`
 
@@ -244,6 +248,114 @@ defense sheet from the current location/player. Keep one
 
 **Not this item:** pressures, duels, or dribbled-past (`M8`).
 
+### S11 - Default player role that carries between games
+
+**Status:** confirmed  
+**Theme:** roster / setup  
+**Where:** `SoccerPlayerSetup` `initialRole`; in-game `soccer.role_changed`; no player- or roster-level soccer role
+
+SOC-0 already says position stays off permanent player identity and that
+in-game role can change. Setup still defaults every new player to midfielder.
+`team_players.position` exists for basketball-style roster text and is unused
+by soccer setup.
+
+Owner confirmation: role may still change during a match, but the default
+should be assignable on the player/roster and reused the next time that
+player is in a soccer lineup.
+
+**Likely direction:** store a soccer default role on the roster/player used by
+setup, prefill `initialRole` from it, and keep live Role / `soccer.role_changed`
+as the match override only. Do not write in-game role changes back unless the
+recorder explicitly updates the default.
+
+**Not this item:** formation drawings, minutes-by-role analysis, or treating
+role as a second player identity.
+
+### S12 - Edit shots from Timeline, not only from the pitch
+
+**Status:** confirmed  
+**Theme:** correction  
+**Where:** tracker Timeline (`SoccerTimeline` → `SoccerLocatedEventEditor`);
+Field marker tap (`editFieldEvent` → `SoccerShotCaptureDialog`)
+
+Owner confirmation: located shots can be edited by selecting the marker on
+the pitch. The same shots cannot be edited from the event tracker / Timeline.
+
+Both paths are supposed to open `SoccerShotCaptureDialog` in `edit` mode.
+Timeline also nests that dialog inside the Timeline `busy` wrapper. The
+visible gap is the Timeline entry, not a missing shot schema.
+
+**Likely direction:** tapping Correct on a Timeline shot/own-goal must open
+the same attacking editor as a pitch marker, including unlocated Quick Goal
+rows. If save fails, show the reason on the sheet; do not fail silently.
+
+**Not this item:** out-of-order undo (`S4`) or changing revision rules.
+
+### S13 - Opponent foul can attach a tracked player and lock the match
+
+**Status:** confirmed — live correctness bug  
+**Theme:** opponent attribution  
+**Where:** `SoccerIncidentCaptureDialog`;
+`validateIncidentActor` in `src/lib/soccer/soc4.ts`
+
+Owner screenshot (Champlin Rebels 2026, Second Half 35:55, 2-0, Needs
+Attention): Timeline diagnostic
+
+> Committing actor cannot reference a tracked participant for the opponent.
+
+The newest foul was `Opponent / Murdoch Rothermal / direct free kick` at
+revision 2. Cloud sync showed the same truncated message, plus Retry/Export.
+Live controls were locked behind Review Timeline Issues.
+
+Cause: new incident sheets default `attribution` to `participant` even when
+`teamSide` is `opponent`. Opponent ActorEditor hides the Player chip, but
+save still sends the selected tracked participant. Projection then fails
+closed and parks the raw event.
+
+**Likely direction:** when the event side is opponent, never keep a tracked
+`participantId` on the committing actor. Default opponent incidents to
+unknown/label or team. Reject in the sheet before append. After a bad
+historical row exists, Timeline Correct must be able to convert it to an
+opponent label without leaving the stream incomplete.
+
+**Not this item:** a full opponent roster (`M4` / `S5`).
+
+### S14 - Cannot finalize a completed soccer game
+
+**Status:** confirmed — cloud blocker  
+**Theme:** finalization  
+**Where:** `SoccerFinalizationPanel`; `finalizeSoccerGame` in
+`src/lib/soccer/finalization.ts`;
+`finalize_soccer_event_game` in `046_soccer_finalization_recovery.sql`
+
+Owner screenshot (same club, ended 3-1, Overview, Local, Cloud
+Finalization / Primary: Mark):
+
+> Soccer finalization failed: Primary recorder changed; reload before finalizing
+
+Finalize and Lock stayed enabled. Reopen Match was also shown. The owner
+reports this on more than one game.
+
+The RPC text is misleading. `Primary recorder changed; reload before
+finalizing` is raised when the stored primary checkpoint is missing or its
+`event_revisions` / `stream_fingerprint` do not match the submitted
+snapshot. A real primary change uses `refresh finalization readiness`.
+The panel has no Reload control.
+
+This is likely compounded by `S13`: an incomplete local stream cannot
+publish a current checkpoint, then ended-match finalization compares a
+later local/primary snapshot to a stale checkpoint. The Summary badge can
+still say Local while Cloud Finalization is offered.
+
+**Likely direction:** show the real mismatch (checkpoint stale, stream
+incomplete, or primary changed). Offer Sync / reload readiness before
+submit. Do not offer Finalize when the local or primary projection is
+incomplete. After `S13` is repaired, re-test this match path before
+changing the RPC.
+
+**Not this item:** changing canonical publication rules or allowing
+finalize from an incomplete stream.
+
 ## 5. Future modules (`M*`)
 
 Reserved in SOC-0 §8 and SOC-6 §9. First matches may request these; they
@@ -272,11 +384,16 @@ completed matches. It still needs its own plan.
 
 ## 6. Recommended planning order
 
-Foundation and sideline speed first, then opponent identity, then modules.
+Correctness blockers first, then the confirmed sideline layout gaps, then
+setup/correction, then the rest.
 
 ```text
+S13 Opponent incident cannot attach a tracked player / lock the match
+S14 Finalize must succeed or explain the real checkpoint mismatch
 S2  Substitution from the Field tab
 S3  Keep the pitch on screen
+S12 Edit shots from Timeline
+S11 Default player role carried between games
 S1  Faster shot and goal capture
 S4  Recent-events undo on Field
 S8  Lineup as a live board
@@ -288,10 +405,10 @@ S7  Last restart as next shot source
 M1  Team standings, only after completed-match volume exists
 ```
 
-S2 and S3 are first because they are layout/entry-point work with no event-schema
-change. S1 and S4 are the basketball F6/F12 equivalents. S5 is the first item
-that may add match-scoped state. `M*` items stay behind a new phase name if
-promoted.
+`S13` and `S14` are first because they leave a match uneditable or
+unfinalizable. Owner ranking of the remaining UX is `S2` then `S3`. `S14`
+should be re-tested on the same games after `S13` is fixed. `M*` items stay
+behind a new phase name if promoted.
 
 ## 7. Out of scope
 
@@ -311,8 +428,16 @@ Broader Basketball event work continues in
 
 ## 8. Owner match notes
 
-Append confirmed notes from live matches here. Prefer one bullet per
-observation, then point it at an `S*` / `M*` id or a new id.
-
-- First live soccer matches are the reason this backlog exists. Specific
-  sideline notes can be added without waiting for a new plan.
+- First live soccer matches are the reason this backlog exists.
+- `S2` and `S3` were the biggest sideline challenges.
+- Default role should live on the player/roster and carry between games;
+  in-game role updates stay allowed (`S11`).
+- Shots can be edited from the pitch marker, not from the event tracker
+  (`S12`).
+- Champlin Rebels 2026 vs tryouts, Second Half 35:55, 2-0, Needs Attention:
+  opponent foul attributed to Murdoch Rothermal;
+  `Committing actor cannot reference a tracked participant for the opponent`
+  (`S13`). Sync toast showed the same truncated message with Retry / Export.
+- Same club, ended 3-1, Overview, Local, Cloud Finalization / Primary Mark:
+  `Soccer finalization failed: Primary recorder changed; reload before
+  finalizing`. Finalize stayed offered. Owner cannot finalize games (`S14`).
