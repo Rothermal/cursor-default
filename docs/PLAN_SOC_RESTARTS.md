@@ -31,8 +31,10 @@ Summary review, Vitest.
   `restartSide` stay valid; derive display side from location when possible.
 - Offside is not a restart. It stays a `team_event` kind on the same sheet
   so Quick Team can go away.
-- Player credit only when the taker is a tracked participant. Team/unknown
-  takers increment side totals only.
+- Optional taker is stored for Timeline/Field labels. Do not add
+  per-participant restart counters in this plan. Side totals increment for
+  every restart regardless of taker. Per-player restart counts wait for
+  later `soc_*` catalog ids.
 - Do not require a restart on every dead ball. Skip/unknown location is
   allowed.
 - Do not implement `S7` shot-source auto-link in this plan. Existing corner
@@ -77,7 +79,7 @@ This plan is the `S17` / `S20` execution slice.
 export type SoccerTeamEventKind = 'corner' | 'offside' | 'throw_in' | 'goal_kick'
 export type SoccerRestartSide = 'left' | 'right'
 
-export interface SoccerTeamEventPayload {
+export interface SoccerTeamEventPayload extends JsonObject {
   kind: SoccerTeamEventKind
   restartSide?: SoccerRestartSide | null
 }
@@ -102,18 +104,21 @@ Validate opponent takers with the same rule as `validateIncidentActor`
 
 ### Projection
 
-`SoccerSideTotals` adds:
+`SoccerSideAttackingTotals` (`types.ts`) adds:
 
 ```ts
 throwIns: number
 goalKicks: number
 ```
 
-Increment `teamSide` totals by kind. If `taker` is a tracked participant,
-increment matching player totals (`throwIns` / `goalKicks` / existing
-corners if we add a player corner count). First slice: player corner /
-throw-in / goal-kick counts on the match participant only. Do not add
-`soc_corner` / `soc_throw_in` / `soc_gk_kick` to `aggregateStats.ts`.
+Initialize both to `0` in `emptySideTotals` (`state.ts`; module-private,
+typed as `SoccerMatchProjection['sideTotals']['tracked']`).
+
+Increment `teamSide` totals by kind. Do not add per-participant restart
+counters and do not add `soc_corner` / `soc_throw_in` / `soc_gk_kick` to
+`aggregateStats.ts`. First-slice readers are Summary team comparison
+(side totals) and Timeline/Field labels (kind + side + optional taker).
+Per-player restart counts wait for a later catalog-id slice.
 
 ### Location helpers
 
@@ -152,12 +157,16 @@ Live defaults:
 
 **Domain**
 
-- `src/lib/soccer/types.ts` — kinds, `restartSide`, side totals
-- `src/lib/soccer/events.ts` — `validateTeamEvent`, allowed actors
-- `src/lib/soccer/soc4.ts` — `applyTeamEvent`
-- `src/lib/soccer/state.ts` — empty totals
+- `src/lib/soccer/types.ts` — kinds, `restartSide`, `SoccerSideAttackingTotals`
+- `src/lib/soccer/events.ts` — `validateTeamEvent` and the `soccer.team_event`
+  actor allow-list. Today that list is only `offside_player`
+  (`events.ts:152`); every other role, including a future `taker`, is
+  rejected at the registry. Widening the list is required.
+- `src/lib/soccer/soc4.ts` — `applyTeamEvent`. Today a corner then rejects
+  the one permitted role (`offside_player`). Keep per-kind rules: `taker`
+  only on restart kinds, `offside_player` only on offside.
+- `src/lib/soccer/state.ts` — `emptySideTotals` (module-private)
 - `src/lib/soccer/soc4.test.ts` — new kinds, historical corner, opponent taker reject
-- `src/lib/soccer/events.ts` actor allow-list (today corners reject all actors)
 
 **Live / review**
 
@@ -204,7 +213,11 @@ only — no new cloud RPCs.
 - [ ] **Step 2:** Run `pnpm exec vitest run src/lib/soccer/soc4.test.ts`
   and confirm the new cases fail.
 - [ ] **Step 3:** Implement kinds, validation, and `applyTeamEvent`.
-  Initialize new totals to `0` in `emptySoccerSideTotals`.
+  Widen the `soccer.team_event` allow-list in `events.ts` so `taker` is
+  permitted, then keep per-kind actor rules in `applyTeamEvent`. Add
+  `throwIns` / `goalKicks` to `SoccerSideAttackingTotals` and initialize
+  them to `0` in `emptySideTotals`. Do not add participant restart
+  counters.
 - [ ] **Step 4:** Re-run the soc4 tests until they pass.
 - [ ] **Step 5:** Commit `feat(soccer): add throw-in and goal-kick team events`
 
