@@ -1,7 +1,7 @@
 # Soccer Field-Test Backlog
 
 Status: living inventory after first live matches. Owner-confirmed items are
-`S2`, `S3`, `S11`–`S20`. This is not an implementation plan.
+`S2`, `S3`, `S11`–`S21`. This is not an implementation plan.
 
 Soccer SOC-1 through SOC-6E3 are implemented. The next soccer work is no longer "finish
 the first release." It is the same kind of post-use backlog basketball used after court
@@ -503,6 +503,38 @@ require one on every restart. Goal kicks stay out until someone asks.
 
 **Not this item:** treating every dead ball as a core event.
 
+### S21 - Name the season when creating it
+
+**Status:** confirmed — create-and-edit gap, soccer and basketball  
+**Theme:** seasons / teams  
+**Where:** Teams Create Team (`src/pages/Teams.tsx`); Season Info
+(`src/pages/SeasonInfo.tsx`); Settings → Data → Seasons (`src/pages/Admin.tsx`)
+
+Owner confirmation: when creating a new season there is no option to name
+it. Same for soccer and basketball. This is not only a later rename
+problem.
+
+The Teams create path is the one sport dashboards open
+(`/teams?sport=soccer` or `?sport=basketball`). Choosing **Create new
+season...** shows a two-column row: sport picker plus a text input that
+defaults to `new Date().getFullYear()` (`Teams.tsx:157`). That input has
+no label. The placeholder `Season name (required)` is hidden as soon as
+the year is prefilled, so the control reads as a locked year, not a name
+field.
+
+After create, Season Info only displays `season.name`. Team rows can be
+renamed; the season cannot. Settings → Data → Seasons has a labeled New
+Season name field and a pencil edit, but that is not the Teams create
+path the owner used.
+
+**Likely direction:** on Teams create, show a labeled Season name field
+(empty or clearly editable, not a silent year). Keep sport as its own
+control. Add rename on Season Info or keep Settings edit as a second
+path. Do not invent a second season identity besides `seasons.name`.
+
+**Not this item:** changing season sport after create, moving a team
+between seasons (already rejected), or season standings (`M1`).
+
 ## 5. Future modules (`M*`)
 
 Reserved in SOC-0 §8 and SOC-6 §9. First matches may request these; they
@@ -542,6 +574,7 @@ S3  Keep the pitch on screen
 S18 Flipped field keeps cluster counts upright
 S12 Edit shots from Timeline
 S11 Default player role carried between games
+S21 Name the season when creating it
 S19 Team formation lineup on a pitch
 S1  Faster shot and goal capture
 S15 Mark a goal as a header
@@ -611,3 +644,5 @@ Broader Basketball event work continues in
 - Teams page: set a soccer lineup on a pitch (4-3-3, 4-4-2, 3-4-3), stored
   as a team setting. Just an idea (`S19`).
 - Asked whether throw-ins can be tracked. They cannot today (`S20`).
+- Creating a new soccer or basketball season has no option to name it.
+  Not only later editing (`S21`).
