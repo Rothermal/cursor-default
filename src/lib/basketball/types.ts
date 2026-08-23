@@ -37,7 +37,7 @@ export interface BasketballOvertimeTemplate extends JsonObject {
   durationMs: number
 }
 
-export interface BasketballMatchRules extends JsonObject {
+export interface BasketballMatchRulesV1 extends JsonObject {
   periodsPerGame: number
   periodLabels: string[]
   regulationSegments: BasketballMatchSegment[]
@@ -51,6 +51,101 @@ export interface BasketballMatchRules extends JsonObject {
   timeoutsPerOvertime: number | null
   personalFoulLimit: number
   clockModel: BasketballClockModel
+}
+
+export interface BasketballMatchSegmentV2 extends BasketballMatchSegment {
+  foulWindowId: string
+  timeoutPoolId: string
+  lineupChangeBoundary: boolean
+}
+
+export interface BasketballFoulWindowRule extends JsonObject {
+  id: string
+  label: string
+  segmentIds: string[]
+  bonusThreshold: number | null
+  doubleBonusThreshold: number | null
+  hasOneAndOne: boolean
+}
+
+export interface BasketballTimeoutPoolRule extends JsonObject {
+  id: string
+  label: string
+  segmentIds: string[]
+  totalLimit: number | null
+  fullLimit: number | null
+  shortLimit: number | null
+  carryoverToPoolId: string | null
+}
+
+export interface BasketballFoulWindowTemplate extends JsonObject {
+  label: string
+  bonusThreshold: number | null
+  doubleBonusThreshold: number | null
+  hasOneAndOne: boolean
+}
+
+export interface BasketballTimeoutPoolTemplate extends JsonObject {
+  label: string
+  totalLimit: number | null
+  fullLimit: number | null
+  shortLimit: number | null
+}
+
+export interface BasketballTimeoutLimitAddition extends JsonObject {
+  total: number
+  full: number
+  short: number
+}
+
+export type BasketballOvertimeWindowMode = 'continue' | 'new_each' | 'shared_overtimes'
+
+export interface BasketballOvertimeFoulPolicy extends JsonObject {
+  mode: BasketballOvertimeWindowMode
+  regulationWindowId: string | null
+  window: BasketballFoulWindowTemplate | null
+}
+
+export interface BasketballOvertimeTimeoutPolicy extends JsonObject {
+  mode: BasketballOvertimeWindowMode
+  regulationPoolId: string | null
+  pool: BasketballTimeoutPoolTemplate | null
+  additionsPerOvertime: BasketballTimeoutLimitAddition
+}
+
+export interface BasketballOvertimeTemplateV2 extends BasketballOvertimeTemplate {
+  foulPolicy: BasketballOvertimeFoulPolicy
+  timeoutPolicy: BasketballOvertimeTimeoutPolicy
+  lineupChangeBoundary: boolean
+}
+
+export interface BasketballMatchRulesV2 extends JsonObject {
+  rulesSchemaVersion: 2
+  regulationSegments: BasketballMatchSegmentV2[]
+  overtimeTemplate: BasketballOvertimeTemplateV2
+  foulWindows: BasketballFoulWindowRule[]
+  timeoutPools: BasketballTimeoutPoolRule[]
+  personalFoulLimit: number
+  clockModel: 'none'
+}
+
+export type BasketballMatchRules = BasketballMatchRulesV1 | BasketballMatchRulesV2
+
+export type BasketballRulesV2Field =
+  | 'regulationSegments'
+  | 'overtimeTemplate'
+  | 'foulWindows'
+  | 'timeoutPools'
+  | 'personalFoulLimit'
+  | 'clockModel'
+
+export interface BasketballRuleOverridesV2 {
+  regulationSegments?: BasketballMatchSegmentV2[]
+  overtimeTemplate?: BasketballOvertimeTemplateV2
+  foulWindows?: BasketballFoulWindowRule[]
+  timeoutPools?: BasketballTimeoutPoolRule[]
+  personalFoulLimit?: number
+  clockModel?: 'none'
 }
 
 export interface BasketballRulesSource extends JsonObject {

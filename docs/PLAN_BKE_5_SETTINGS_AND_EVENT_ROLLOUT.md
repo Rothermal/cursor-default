@@ -1,7 +1,7 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. Implementation is split into BKE-5A through BKE-5D.
-BKE-5A through BKE-5C remain internal; BKE-5D must not open the user-visible event-model opt-in
+Status: Product and delivery Q&A approved. BKE-5A is implemented; BKE-5B through BKE-5D remain.
+BKE-5B and BKE-5C remain internal; BKE-5D must not open the user-visible event-model opt-in
 until the BKE-4 live release matrix and the targeted BKE-5 checks are accepted.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
@@ -238,7 +238,7 @@ interface BasketballSegmentRule {
   id: string
   order: number
   label: string
-  durationSeconds: number
+  durationMs: number
   foulWindowId: string
   timeoutPoolId: string
   lineupChangeBoundary: boolean
@@ -257,6 +257,7 @@ interface BasketballTimeoutPoolRule {
   id: string
   label: string
   segmentIds: string[]
+  totalLimit: number | null
   fullLimit: number | null
   shortLimit: number | null
   carryoverToPoolId: string | null
@@ -270,7 +271,7 @@ to contradictory windows. Neutral/media timeout events do not consume a charged 
 
 Youth Equal-Play demonstrates why these are separate: it has eight segments and eight lineup-change
 boundaries, but only two foul windows and two timeout pools, split at halftime after Period 4.
-Lineup enforcement remains BKE-6. `durationSeconds` and the approved structural fields are retained
+Lineup enforcement remains BKE-6. `durationMs` and the approved structural fields are retained
 for BKE-6, but `clockModel: 'none'` keeps BKE-5 projection clockless.
 
 ### 4.3 Compatibility boundary
@@ -467,7 +468,7 @@ Legacy after the flip.
 
 ## 9. Delivery Slices
 
-### BKE-5A: Profiles and compatibility
+### BKE-5A: Profiles and compatibility - implemented
 
 - Add the source-audited immutable catalog and profile fixtures.
 - Add version-2 segment/foul-window/timeout-pool rules, strict validation, sparse overrides,
@@ -476,6 +477,13 @@ Legacy after the flip.
 - Add Youth Equal-Play's eight segments, halftime foul/timeout windows, and lineup-boundary
   reservation; keep clock and lineup enforcement deferred.
 - Exit: every catalog fixture resolves and projects; existing event fixtures remain unchanged.
+
+Implementation note: `src/lib/basketball/profiles.ts` owns seven immutable version-1 catalog
+records whose rules snapshots use `rulesSchemaVersion: 2`. The version-aware readers and projector
+retain the untagged version-1 rules object exactly, resolve foul and timeout behavior by stable
+window ids, enforce total/full/30-second inventory plus forward unused-pool carryover, and label
+pre-BKE-5 sources as Legacy configuration. Event and sport-state envelope versions remain 1, and
+new profile-backed creation remains behind the existing internal gate until BKE-5C/BKE-5D.
 
 ### BKE-5B: Persistence and settings surfaces
 

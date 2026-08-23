@@ -5,7 +5,12 @@ import { compareGameEventCaptureOrder, inspectGameEventStream } from '../gameEve
 import type { GameEventActor } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
-import { basketballTimeoutCap } from './rules'
+import {
+  basketballTimeoutKindLimit,
+  basketballTimeoutUsageByPool,
+  resolveBasketballTimeoutPool,
+  resolveBasketballTimeoutPoolWithCarryover,
+} from './rules'
 import {
   basketballActorForSelection,
   getBasketballCommandContext,
@@ -97,6 +102,10 @@ export function captureBasketballTimeout(
     if (sideInventory.exhausted) {
       return failure(state, 'command_failed', 'That team has no charged timeouts remaining in this period.')
     }
+    const kindLimit = basketballTimeoutKindLimitForState(state, capture.teamSide, capture.kind)
+    if (kindLimit?.exhausted) {
+      return failure(state, 'command_failed', 'That team has no timeouts of this kind remaining.')
+    }
     const teamActor = basketballActorForSelection(
       state,
       'team',
@@ -157,17 +166,42 @@ export function basketballTimeoutInventory(state: GameState): BasketballTimeoutI
     ? sportState.projection.periods.find(candidate => candidate.id === periodId)
     : null
   if (!periodId || !segment) return null
-  const cap = basketballTimeoutCap(sportState.setup.rulesSnapshot, segment.kind)
-  const counts = sportState.projection.periodTimeouts[periodId] ?? { tracked: 0, opponent: 0 }
-  const activePeriodTimeouts = activeBasketballEvents(state).filter(
+  const rules = sportState.setup.rulesSnapshot
+  const activeEvents = activeBasketballEvents(state)
+  const rawPool = resolveBasketballTimeoutPool(rules, periodId)
+  const trackedPool = resolveBasketballTimeoutPoolWithCarryover(
+    rules,
+    periodId,
+    basketballTimeoutUsageByPool(activeEvents, rules, 'tracked')
+  )
+  const opponentPool = resolveBasketballTimeoutPoolWithCarryover(
+    rules,
+    periodId,
+    basketballTimeoutUsageByPool(activeEvents, rules, 'opponent')
+  )
+  if (!rawPool || !trackedPool || !opponentPool) return null
+  const chargedInPool = activeEvents.filter(
+    (event): event is BasketballTimeoutEvent =>
+      event.eventType === 'basketball.timeout' &&
+      event.teamSide !== 'neutral' &&
+      (event.payload.kind === 'full' || event.payload.kind === 'thirty_second') &&
+      resolveBasketballTimeoutPool(rules, event.period.id)?.id === rawPool.id
+  )
+  const activePeriodTimeouts = activeEvents.filter(
     (event): event is BasketballTimeoutEvent =>
       event.eventType === 'basketball.timeout' && event.period.id === periodId
   )
   return {
     periodId,
     periodLabel: segment.label,
-    tracked: sideInventory(counts.tracked, cap),
-    opponent: sideInventory(counts.opponent, cap),
+    tracked: sideInventory(
+      chargedInPool.filter(event => event.teamSide === 'tracked').length,
+      trackedPool.totalLimit
+    ),
+    opponent: sideInventory(
+      chargedInPool.filter(event => event.teamSide === 'opponent').length,
+      opponentPool.totalLimit
+    ),
     neutralMedia: activePeriodTimeouts.filter(event =>
       event.teamSide === 'neutral' && event.payload.kind === 'media'
     ).length,
@@ -175,6 +209,35 @@ export function basketballTimeoutInventory(state: GameState): BasketballTimeoutI
       event.teamSide === 'neutral' && event.payload.kind === 'official'
     ).length,
   }
+}
+
+function basketballTimeoutKindLimitForState(
+  state: GameState,
+  side: BasketballTeamSide,
+  kind: BasketballChargedTimeoutKind
+): { exhausted: boolean } | null {
+  const sportState = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState
+    : null
+  const periodId = sportState?.projection.currentPeriodId
+  if (!sportState || !periodId) return null
+  const rules = sportState.setup.rulesSnapshot
+  const events = activeBasketballEvents(state)
+  const pool = resolveBasketballTimeoutPoolWithCarryover(
+    rules,
+    periodId,
+    basketballTimeoutUsageByPool(events, rules, side)
+  )
+  if (!pool) return null
+  const limit = basketballTimeoutKindLimit(pool, kind)
+  if (limit === null) return { exhausted: false }
+  const used = events.filter(event =>
+    event.eventType === 'basketball.timeout' &&
+    event.teamSide === side &&
+    event.payload.kind === kind &&
+    resolveBasketballTimeoutPool(rules, event.period.id)?.id === pool.id
+  ).length
+  return { exhausted: used >= limit }
 }
 
 export function previewBasketballTimeoutDecrement(
