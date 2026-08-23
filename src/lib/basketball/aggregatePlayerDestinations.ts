@@ -9,9 +9,11 @@ import {
   type BasketballAggregateCategoryDestination,
 } from './aggregateDestinations'
 import {
+  BASKETBALL_CANONICAL_STAT_IDS,
   addBasketballAggregateStatsInPlace,
   basketballAggregateRates,
   emptyBasketballAggregateStats,
+  type BasketballCanonicalStatId,
 } from './aggregateStats'
 
 export interface BasketballAggregatePlayerIdentity {
@@ -31,6 +33,12 @@ export interface BasketballPlayerCareerSegment {
   oldestGameDate: string
   games: BasketballAggregateGame[]
   player: BasketballAggregatePlayer
+}
+
+export interface BasketballPlayerProfileBreakdown {
+  teamPlayer: BasketballAggregatePlayer
+  teamGames: BasketballAggregateGame[]
+  personalSegment: BasketballPlayerCareerSegment | null
 }
 
 export function selectBasketballAggregatePlayer(
@@ -126,5 +134,29 @@ export function basketballPlayerCareerSegments(
     right.newestGameDate.localeCompare(left.newestGameDate) ||
     left.teamName.localeCompare(right.teamName) ||
     left.key.localeCompare(right.key)
+  )
+}
+
+export function basketballPlayerProfileBreakdown(
+  scopedAggregate: BasketballAggregateResult,
+  playerAggregate: BasketballAggregateResult,
+  identity: BasketballAggregatePlayerIdentity
+): BasketballPlayerProfileBreakdown {
+  const personalSegment = basketballPlayerCareerSegments(playerAggregate, identity)
+    .find(segment => segment.kind === 'personal') ?? null
+
+  return {
+    teamPlayer: selectBasketballAggregatePlayer(scopedAggregate, identity),
+    teamGames: basketballPlayerAggregateGames(scopedAggregate, identity.playerId),
+    personalSegment,
+  }
+}
+
+export function basketballPlayerGameMetricAvailability(
+  games: BasketballAggregateGame[]
+): BasketballCanonicalStatId[] {
+  if (games.length === 0) return [...BASKETBALL_CANONICAL_STAT_IDS]
+  return BASKETBALL_CANONICAL_STAT_IDS.filter(metricId =>
+    games.every(game => game.availableMetricIds.includes(metricId))
   )
 }

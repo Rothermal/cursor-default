@@ -11,6 +11,7 @@ import { playerDisplayName, teamDisplayName } from '../lib/display'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
+import { BasketballPlayerAggregateDestination } from '../components/basketball-aggregate/BasketballPlayerAggregateDestination'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
@@ -159,7 +160,7 @@ export default function PlayerProfile() {
         nickname: tp.players.nickname,
       } as PlayerRow)
 
-      if (teamData.seasons.sport === 'soccer') {
+      if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball') {
         setLoading(false)
         return
       }
@@ -400,6 +401,8 @@ export default function PlayerProfile() {
 
   const careerQuery =
     `playerId=${encodeURIComponent(playerId)}&sport=${encodeURIComponent(team.seasons.sport)}`
+  const isAggregateDestination =
+    team.seasons.sport === 'soccer' || team.seasons.sport === 'basketball'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -432,9 +435,9 @@ export default function PlayerProfile() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
-        {(error || (team.seasons.sport !== 'soccer' ? parkingError : null)) && (
+        {(error || (!isAggregateDestination ? parkingError : null)) && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
-            {error ?? (team.seasons.sport !== 'soccer' ? parkingError : null)}
+            {error ?? (!isAggregateDestination ? parkingError : null)}
           </div>
         )}
 
@@ -448,6 +451,23 @@ export default function PlayerProfile() {
               seasonId: seasonIdFromUrl ?? team.season_id,
             }}
             teamIds={[]}
+            identity={{
+              playerId,
+              displayName: playerDisplayName(player),
+              number: player.jersey_number,
+              teamIds: [teamId],
+            }}
+            seasonName={team.seasons.name}
+          />
+        ) : team.seasons.sport === 'basketball' ? (
+          <BasketballPlayerAggregateDestination
+            variant="profile"
+            scope={{
+              type: 'player',
+              playerId,
+              teamId,
+              seasonId: seasonIdFromUrl ?? team.season_id,
+            }}
             identity={{
               playerId,
               displayName: playerDisplayName(player),
@@ -482,7 +502,7 @@ export default function PlayerProfile() {
           </section>
         )}
 
-        {team.seasons.sport !== 'soccer' && (
+        {!isAggregateDestination && (
           <section className="card space-y-3">
             <h2 className="font-semibold text-slate-700">Game Log</h2>
             {gameLog.length === 0 ? (

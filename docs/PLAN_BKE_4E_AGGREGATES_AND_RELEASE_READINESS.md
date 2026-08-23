@@ -1,7 +1,7 @@
 # Plan: BKE-4E Canonical Aggregates and Release Readiness
 
 Status: Product and delivery Q&A approved on 2026-08-20. BKE-4E is planned in five implementation
-slices. BKE-4E1 through BKE-4E3 are implemented; BKE-4E4 is next. Basketball event-game creation remains
+slices. BKE-4E1 through BKE-4E4 are implemented; BKE-4E5 is next. Basketball event-game creation remains
 internal-only, and the user-visible event-model opt-in remains BKE-5.
 
 ## 1. Goal
@@ -562,6 +562,8 @@ No migration.
 
 ### BKE-4E4: Player, Career, and compatibility retirement
 
+Status: Implemented on 2026-08-22. See `docs/REGRESSION_BKE_4E_PLAYER_CAREER.md`.
+
 Scope:
 
 - route Basketball Player Profile and Career through stable-player source pages;
@@ -687,7 +689,6 @@ BKE-4E. Every unresolved row remains a hard gate before BKE-5 exposes the event-
 
 ## 16. Next Step
 
-Begin BKE-4E4 from the implemented team-owned destinations and authenticated source-transport
-contracts.
-Keep the event-game creation gate internal and carry the complete BKE-4B through BKE-4E live
-matrix into BKE-4E5.
+Begin BKE-4E5 from the implemented five-destination aggregate boundary and complete BKE-4 cloud
+contracts. Keep the event-game creation gate internal and carry the complete BKE-4B through BKE-4E
+live matrix into the capability and release exit audit.

@@ -24,7 +24,7 @@ import type {
 import { formatBasketballAggregateStat } from '../../lib/basketball/aggregateStats'
 import type { BasketballAggregateLoadScope } from '../../lib/basketball/aggregateTransport'
 import { basketballSummaryPath } from '../../lib/basketball/summary'
-import { gameInfoPath } from '../../lib/teamInfo'
+import { gameInfoPath, playerInfoPath } from '../../lib/teamInfo'
 
 export type BasketballAggregateDestinationVariant = 'season' | 'team' | 'tournament'
 
@@ -33,6 +33,7 @@ interface BasketballAggregateDestinationProps {
   scope: BasketballAggregateLoadScope
   teamIds: string[]
   teamIdForLinks?: string | null
+  seasonId?: string | null
   overviewExtra?: ReactNode
   className?: string
 }
@@ -83,6 +84,7 @@ export function BasketballAggregateDestination({
   scope,
   teamIds,
   teamIdForLinks = null,
+  seasonId = null,
   overviewExtra,
   className = '',
 }: BasketballAggregateDestinationProps) {
@@ -158,7 +160,13 @@ export function BasketballAggregateDestination({
                   extra={overviewExtra}
                 />
               )}
-              {tab === 'players' && <Players aggregate={aggregate} />}
+              {tab === 'players' && (
+                <Players
+                  aggregate={aggregate}
+                  teamIdForLinks={teamIdForLinks}
+                  seasonId={seasonId}
+                />
+              )}
               {tab === 'games' && (
                 <Games games={aggregate.games} teamIdForLinks={teamIdForLinks} />
               )}
@@ -370,7 +378,15 @@ function ForAgainstSummary({ team }: { team: BasketballAggregateTeam }) {
   )
 }
 
-function Players({ aggregate }: { aggregate: BasketballAggregateResult }) {
+function Players({
+  aggregate,
+  teamIdForLinks,
+  seasonId,
+}: {
+  aggregate: BasketballAggregateResult
+  teamIdForLinks: string | null
+  seasonId: string | null
+}) {
   const [categoryId, setCategoryId] = useState('scoring')
   const category = BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES.find(item => item.id === categoryId)
     ?? BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES[0]
@@ -405,7 +421,13 @@ function Players({ aggregate }: { aggregate: BasketballAggregateResult }) {
         </label>
       )}
       {basketballAggregateCategoryHasValues(aggregate.players, category, aggregate) && availableRankingMetrics.length > 0 ? (
-        <PlayerTable aggregate={aggregate} category={category} metricId={metricId} />
+        <PlayerTable
+          aggregate={aggregate}
+          category={category}
+          metricId={metricId}
+          teamIdForLinks={teamIdForLinks}
+          seasonId={seasonId}
+        />
       ) : (
         <EmptyState title={`No ${category.label.toLowerCase()} statistics`} detail="This metric is unavailable for part of the selected history or has not been recorded." />
       )}
@@ -413,7 +435,7 @@ function Players({ aggregate }: { aggregate: BasketballAggregateResult }) {
   )
 }
 
-function PlayerTable({ aggregate, category, metricId }: { aggregate: BasketballAggregateResult; category: BasketballAggregateCategoryDestination; metricId: BasketballAggregateMetricId }) {
+function PlayerTable({ aggregate, category, metricId, teamIdForLinks, seasonId }: { aggregate: BasketballAggregateResult; category: BasketballAggregateCategoryDestination; metricId: BasketballAggregateMetricId; teamIdForLinks: string | null; seasonId: string | null }) {
   const sorted = useMemo(
     () => sortBasketballAggregatePlayers(
       aggregate.players,
@@ -433,17 +455,41 @@ function PlayerTable({ aggregate, category, metricId }: { aggregate: BasketballA
           </tr>
         </thead>
         <tbody>
-          {sorted.map((player, index) => (
+          {sorted.map((player, index) => {
+            const teamId = teamIdForLinks && player.teamIds.includes(teamIdForLinks)
+              ? teamIdForLinks
+              : player.teamIds[0] ?? null
+            return (
             <tr key={player.playerId} className="border-t border-slate-100">
               <th className="sticky left-0 z-10 bg-white px-3 py-2 text-left font-medium text-slate-800">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-5 shrink-0 text-xs text-slate-400">{index + 1}</span>
-                  <span className="truncate">{player.number ? `#${player.number} ` : ''}{player.displayName}</span>
+                  <div className="min-w-0 flex-1">
+                    {teamId ? (
+                      <Link
+                        to={playerInfoPath(player.playerId, teamId, seasonId)}
+                        className="block truncate hover:underline"
+                      >
+                        {player.number ? `#${player.number} ` : ''}{player.displayName}
+                      </Link>
+                    ) : (
+                      <span className="block truncate">
+                        {player.number ? `#${player.number} ` : ''}{player.displayName}
+                      </span>
+                    )}
+                    <Link
+                      to={`/career?playerId=${encodeURIComponent(player.playerId)}&sport=basketball`}
+                      className="text-[11px] font-semibold text-sky-700 hover:underline"
+                    >
+                      Career
+                    </Link>
+                  </div>
                 </div>
               </th>
               {columns.map(id => <td key={id} className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${id === metricId ? 'font-bold text-slate-900' : 'text-slate-600'}`}>{formatBasketballAggregateMetric(player, id)}</td>)}
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -490,4 +536,11 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
       <p className="text-sm text-slate-500 mt-1">{detail}</p>
     </div>
   )
+}
+
+export {
+  EmptyState as BasketballAggregateEmptyState,
+  ErrorState as BasketballAggregateErrorState,
+  LoadingState as BasketballAggregateLoadingState,
+  QualityNotice as BasketballAggregateQualityNotice,
 }

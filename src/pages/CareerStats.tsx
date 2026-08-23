@@ -9,6 +9,7 @@ import { withLastSyncedGameFingerprint, currentPeriodForCloudHydrate } from '../
 import { playerDisplayName } from '../lib/display'
 import PlayerStatSummaryTables, { type StatHighGameMap } from '../components/PlayerStatSummaryTables'
 import { SoccerPlayerAggregateDestination } from '../components/soccer-aggregate/SoccerPlayerAggregateDestination'
+import { BasketballPlayerAggregateDestination } from '../components/basketball-aggregate/BasketballPlayerAggregateDestination'
 import { buildResolvedByGameForPlayer } from '../lib/playerStatSummaryTables'
 import { careerSportOptions } from '../lib/careerSportOptions'
 import type { GameState } from '../types'
@@ -39,6 +40,8 @@ export default function CareerStats() {
   const playerId = searchParams.get('playerId')
   const sportParam = searchParams.get('sport')
   const isSoccerDestination = sportParam === 'soccer'
+  const isBasketballDestination = sportParam === 'basketball'
+  const isAggregateDestination = isSoccerDestination || isBasketballDestination
 
   const { isConfigured, user } = useAuth()
   const { state, openGameSnapshot, parkingError } = useGame()
@@ -120,7 +123,7 @@ export default function CareerStats() {
         }
       }
 
-      if (isSoccerDestination) {
+      if (isAggregateDestination) {
         setLoading(false)
         return
       }
@@ -148,7 +151,7 @@ export default function CareerStats() {
     return () => {
       cancelled = true
     }
-  }, [playerId, isConfigured, isSoccerDestination, supabaseClient])
+  }, [playerId, isAggregateDestination, isConfigured, supabaseClient])
 
   useEffect(() => {
     if (sportsInData.length === 0) return
@@ -422,7 +425,7 @@ export default function CareerStats() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
-        {parkingError && !isSoccerDestination && (
+        {parkingError && !isAggregateDestination && (
           <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
             {parkingError}
           </div>
@@ -461,6 +464,16 @@ export default function CareerStats() {
             variant="career"
             scope={{ type: 'career', playerId }}
             teamIds={[]}
+            identity={{
+              playerId,
+              displayName: playerDisplayName(player),
+              number: null,
+            }}
+          />
+        ) : isBasketballDestination && player ? (
+          <BasketballPlayerAggregateDestination
+            variant="career"
+            scope={{ type: 'career', playerId }}
             identity={{
               playerId,
               displayName: playerDisplayName(player),
