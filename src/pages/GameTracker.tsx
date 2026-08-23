@@ -1479,7 +1479,7 @@ export default function GameTracker() {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h3 id="basketball-timeouts-title" className="text-sm font-bold text-sky-950">Timeouts</h3>
-                  <p className="text-xs text-sky-800">{timeoutInventory.periodLabel}</p>
+                  <p className="text-xs text-sky-800">{timeoutInventory.scopeLabel}</p>
                 </div>
                 <button
                   type="button"

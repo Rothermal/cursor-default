@@ -442,36 +442,18 @@ export function basketballRulesAllowOneAndOne(
 
 export function basketballRulesToTeamStatsConfig(
   rules: BasketballMatchRules
-): BasketballTeamStatsConfig {
-  if (!isBasketballMatchRulesV2(rules)) {
-    return {
-      periodsPerGame: rules.periodsPerGame,
-      periodLabels: [...rules.periodLabels],
-      bonusThreshold: rules.bonusThreshold,
-      doubleBonusThreshold: rules.doubleBonusThreshold,
-      hasOneAndOne: rules.hasOneAndOne,
-      overtimeLabel: rules.overtimeLabel,
-      overtimeFoulsReset: rules.overtimeFoulsReset,
-      timeoutsPerPeriod: rules.timeoutsPerPeriod,
-      timeoutsPerOvertime: rules.timeoutsPerOvertime,
-    }
-  }
-  const firstSegment = rules.regulationSegments[0]
-  const firstWindow = resolveBasketballFoulWindow(rules, firstSegment.id)!
-  const firstPool = resolveBasketballTimeoutPool(rules, firstSegment.id)!
+): BasketballTeamStatsConfig | null {
+  if (isBasketballMatchRulesV2(rules)) return null
   return {
-    periodsPerGame: rules.regulationSegments.length,
-    periodLabels: rules.regulationSegments.map(segment => segment.label),
-    bonusThreshold: firstWindow.bonusThreshold ?? 1,
-    doubleBonusThreshold: firstWindow.doubleBonusThreshold ?? firstWindow.bonusThreshold ?? 1,
-    hasOneAndOne: firstWindow.hasOneAndOne,
-    overtimeLabel: rules.overtimeTemplate.label,
-    overtimeFoulsReset: rules.overtimeTemplate.foulPolicy.mode === 'new_each',
-    timeoutsPerPeriod: firstPool.totalLimit,
-    timeoutsPerOvertime: resolveBasketballTimeoutPool(
-      rules,
-      `${rules.overtimeTemplate.idPrefix}-1`
-    )?.totalLimit ?? null,
+    periodsPerGame: rules.periodsPerGame,
+    periodLabels: [...rules.periodLabels],
+    bonusThreshold: rules.bonusThreshold,
+    doubleBonusThreshold: rules.doubleBonusThreshold,
+    hasOneAndOne: rules.hasOneAndOne,
+    overtimeLabel: rules.overtimeLabel,
+    overtimeFoulsReset: rules.overtimeFoulsReset,
+    timeoutsPerPeriod: rules.timeoutsPerPeriod,
+    timeoutsPerOvertime: rules.timeoutsPerOvertime,
   }
 }
 

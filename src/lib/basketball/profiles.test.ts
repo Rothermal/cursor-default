@@ -8,6 +8,7 @@ import { createBasketballLifecycleEvent } from './events'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
 import {
   getBasketballRulesProfile,
+  basketballRulesProfileLabel,
   listBasketballRulesProfiles,
   normalizeBasketballRuleOverridesV2,
   previewBasketballProfileUpgrade,
@@ -16,6 +17,7 @@ import {
 } from './profiles'
 import {
   normalizeBasketballMatchRules,
+  basketballRulesToTeamStatsConfig,
   resolveBasketballFoulWindow,
   resolveBasketballTimeoutPool,
   resolveBasketballTimeoutPoolWithCarryover,
@@ -25,6 +27,7 @@ import { createBasketballSportGameState } from './state'
 import type {
   BasketballMatchParticipant,
   BasketballMatchEvent,
+  BasketballMatchRulesV1,
   BasketballMatchRulesV2,
   BasketballMatchSetup,
 } from './types'
@@ -160,7 +163,13 @@ describe('BKE-5A Basketball rules profiles', () => {
     expect(preview.differences).toEqual(expect.arrayContaining([
       expect.objectContaining({ field: 'regulationSegments', changedByProfile: true }),
     ]))
-    expect(preview.differences.some(difference => difference.field === 'personalFoulLimit')).toBe(false)
+    expect(preview.differences).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        field: 'personalFoulLimit',
+        changedByProfile: true,
+        overridden: true,
+      }),
+    ]))
   })
 
   it('rejects invalid references, assignments, thresholds, and timeout carryover', () => {
@@ -201,7 +210,7 @@ describe('BKE-5A Basketball rules profiles', () => {
   })
 
   it('normalizes v1 snapshots exactly and starts every v2 profile without catalog lookup', () => {
-    const legacy = {
+    const legacy: BasketballMatchRulesV1 = {
       periodsPerGame: 1,
       periodLabels: ['P1'],
       regulationSegments: [{
@@ -220,8 +229,20 @@ describe('BKE-5A Basketball rules profiles', () => {
     }
     expect(normalizeBasketballMatchRules(legacy)).toEqual(legacy)
     expect(normalizeBasketballMatchRules(legacy)).not.toHaveProperty('rulesSchemaVersion')
+    expect(basketballRulesToTeamStatsConfig(legacy)).toEqual({
+      periodsPerGame: 1,
+      periodLabels: ['P1'],
+      bonusThreshold: 5,
+      doubleBonusThreshold: 5,
+      hasOneAndOne: false,
+      overtimeLabel: 'OT',
+      overtimeFoulsReset: true,
+      timeoutsPerPeriod: 1,
+      timeoutsPerOvertime: 1,
+    })
 
     for (const profile of listBasketballRulesProfiles()) {
+      expect(basketballRulesToTeamStatsConfig(profile.rules), profile.profileId).toBeNull()
       const matchSetup = setup(profile.rules, profile.profileId)
       const initial: GameState = {
         ...createInitialState(),
@@ -247,6 +268,21 @@ describe('BKE-5A Basketball rules profiles', () => {
       if (rebuilt.state.sportGameState?.sportId !== 'basketball') throw new Error('Expected Basketball.')
       expect(rebuilt.state.sportGameState.projection.currentPeriodId).toBe('regulation-1')
     }
+  })
+
+  it('labels exact profile snapshots while exposing match overrides as custom', () => {
+    const profile = getBasketballRulesProfile('nfhs', 1)!
+    const source = setup(profile.rules, profile.profileId).rulesSource
+    expect(basketballRulesProfileLabel(profile.rules, source)).toBe('NFHS v1')
+    expect(basketballRulesProfileLabel(profile.rules, {
+      ...source,
+      hasExplicitMatchOverrides: true,
+    })).toBe('Custom')
+    expect(basketballRulesProfileLabel(profile.rules, {
+      ...source,
+      profileVersion: 99,
+    })).toBe('Custom')
+    expect(basketballRulesProfileLabel(null, null)).toBe('Not available')
   })
 
   it('projects equal-play fouls across period boundaries within the same half window', () => {

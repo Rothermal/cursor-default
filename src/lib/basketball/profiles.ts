@@ -1,14 +1,16 @@
 import type {
   BasketballFoulWindowRule,
+  BasketballMatchRules,
   BasketballMatchRulesV2,
   BasketballMatchSegmentV2,
   BasketballOvertimeFoulPolicy,
   BasketballOvertimeTimeoutPolicy,
   BasketballRuleOverridesV2,
   BasketballRulesV2Field,
+  BasketballRulesSource,
   BasketballTimeoutPoolRule,
 } from './types'
-import { validateBasketballMatchRules } from './rules'
+import { isBasketballMatchRulesV2, validateBasketballMatchRules } from './rules'
 
 const MINUTE_MS = 60_000
 
@@ -320,13 +322,27 @@ export function previewBasketballProfileUpgrade(
     current: currentResolved.value,
     candidate: candidateResolved.value,
     differences: RULE_FIELDS
-      .filter(field => !sameJson(currentResolved.value.rules[field], candidateResolved.value.rules[field]))
+      .filter(field =>
+        !sameJson(currentResolved.value.rules[field], candidateResolved.value.rules[field]) ||
+        !sameJson(currentBase.rules[field], targetBase.rules[field])
+      )
       .map(field => ({
         field,
         changedByProfile: !sameJson(currentBase.rules[field], targetBase.rules[field]),
         overridden: Object.prototype.hasOwnProperty.call(overrides, field),
       })),
   }
+}
+
+export function basketballRulesProfileLabel(
+  rules: BasketballMatchRules | null | undefined,
+  source: BasketballRulesSource | null | undefined
+): string {
+  if (!rules) return 'Not available'
+  if (!isBasketballMatchRulesV2(rules)) return 'Legacy configuration'
+  if (!source || source.hasExplicitMatchOverrides) return 'Custom'
+  const profile = getBasketballRulesProfile(source.profileId, source.profileVersion)
+  return profile ? `${profile.label} v${profile.profileVersion}` : 'Custom'
 }
 
 const RULE_FIELDS: BasketballRulesV2Field[] = [

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
-import { gameEventRegistry } from '../gameEvents/runtime'
+import { rebuildGameEventProjection } from '../gameEvents/projection'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { inspectGameEventStream } from '../gameEvents/stream'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import {
@@ -15,6 +16,7 @@ import {
   restoreLastBasketballCourtUndo,
 } from './courtCorrections'
 import { basketballTimeoutCap } from './rules'
+import { getBasketballRulesProfile } from './profiles'
 import {
   basketballTimeoutInventory,
   captureBasketballTimeout,
@@ -112,7 +114,7 @@ describe('BKE-2C4 Basketball timeouts', () => {
     state = capture(state, { mode: 'neutral', kind: 'official' }, 6)
     expect(basketballTimeoutInventory(state)).toEqual({
       periodId: 'regulation-1',
-      periodLabel: 'Q1',
+      scopeLabel: 'Q1',
       tracked: { used: 2, cap: 2, remaining: 0, exhausted: true },
       opponent: { used: 0, cap: 2, remaining: 2, exhausted: false },
       neutralMedia: 1,
@@ -231,6 +233,45 @@ describe('BKE-2C4 Basketball timeouts', () => {
     })
   })
 
+  it('labels shared pools and removes the newest charged timeout across their periods', () => {
+    let state = withProfile(startedState(), 'fiba')
+    state = capture(state, { mode: 'charged', teamSide: 'tracked', kind: 'full' }, 2)
+    const ended = endBasketballPeriod(state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-09T12:10:00.000Z',
+      eventId: id(10),
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    const periodTwo = startNextBasketballPeriod(ended.state, {
+      recorderUserId: 'recorder-1',
+      occurredAt: '2026-08-09T12:11:00.000Z',
+      eventId: id(11),
+    })
+    if (!periodTwo.ok) throw new Error(periodTwo.message)
+
+    expect(basketballTimeoutInventory(periodTwo.state)).toMatchObject({
+      periodId: 'regulation-2',
+      scopeLabel: 'First half',
+      tracked: { used: 1, cap: 2, remaining: 1 },
+    })
+    const target = { mode: 'charged', teamSide: 'tracked' } as const
+    expect(previewBasketballTimeoutDecrement(periodTwo.state, target)).toMatchObject({
+      ok: true,
+      value: { eventId: id(2), periodLabel: 'Q1', chargedRemainingAfter: 2 },
+    })
+    const removed = removeBasketballTimeout(
+      periodTwo.state,
+      target,
+      '2026-08-09T12:12:00.000Z'
+    )
+    expect(removed.ok).toBe(true)
+    if (!removed.ok) return
+    expect(basketballTimeoutInventory(removed.state)?.tracked).toMatchObject({
+      used: 0,
+      remaining: 2,
+    })
+  })
+
   it('does not correct earlier periods and rejects inactive or cloud-bound capture', () => {
     const periodOne = capture(
       startedState(),
@@ -274,3 +315,31 @@ describe('BKE-2C4 Basketball timeouts', () => {
     )).toMatchObject({ ok: false, code: 'cloud_flow_unsupported', state: cloud })
   })
 })
+
+function withProfile(state: GameState, profileId: 'fiba'): GameState {
+  if (state.sportGameState?.sportId !== 'basketball') {
+    throw new Error('Basketball state missing.')
+  }
+  const profile = getBasketballRulesProfile(profileId, 1)
+  if (!profile) throw new Error('Basketball profile missing.')
+  const candidate: GameState = {
+    ...state,
+    sportGameState: {
+      ...state.sportGameState,
+      setup: {
+        ...state.sportGameState.setup,
+        rulesSource: {
+          profileId,
+          profileVersion: profile.profileVersion,
+          personalRevision: null,
+          teamRevision: null,
+          hasExplicitMatchOverrides: false,
+        },
+        rulesSnapshot: profile.rules,
+      },
+    },
+  }
+  const rebuilt = rebuildGameEventProjection(candidate, gameEventRegistry, gameEventProjectors)
+  if (!rebuilt.inspection.complete) throw new Error('Basketball profile state did not project.')
+  return rebuilt.state
+}

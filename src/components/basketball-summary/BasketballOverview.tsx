@@ -7,9 +7,8 @@ import type {
 import type { BasketballSummarySource } from '../../lib/basketball/summarySource'
 import {
   basketballRegulationPeriodCount,
-  isBasketballMatchRulesV2,
 } from '../../lib/basketball/rules'
-import { getBasketballRulesProfile } from '../../lib/basketball/profiles'
+import { basketballRulesProfileLabel } from '../../lib/basketball/profiles'
 
 interface Props {
   source: BasketballSummarySource
@@ -32,9 +31,6 @@ export default function BasketballOverview({
     : null
   const rules = basketballState?.setup.rulesSnapshot
   const rulesSource = basketballState?.setup.rulesSource
-  const profile = rules && isBasketballMatchRulesV2(rules) && rulesSource
-    ? getBasketballRulesProfile(rulesSource.profileId, rulesSource.profileVersion)
-    : null
   const regulationMinutes = rules?.regulationSegments[0]
     ? Math.round(rules.regulationSegments[0].durationMs / 60_000)
     : null
@@ -59,9 +55,7 @@ export default function BasketballOverview({
           />
           <Metadata
             label="Rules profile"
-            value={rules && isBasketballMatchRulesV2(rules)
-              ? profile ? `${profile.label} v${profile.profileVersion}` : 'Custom'
-              : rules ? 'Legacy configuration' : 'Not available'}
+            value={basketballRulesProfileLabel(rules, rulesSource)}
           />
           <Metadata
             label="Recorder"

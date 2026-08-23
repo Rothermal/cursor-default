@@ -426,7 +426,7 @@ export async function loadBasketballCloudShell(
       notes: '',
       actionLog: [],
       currentPeriod: 1,
-      teamStatsConfig: { ...teamStatsConfig },
+      teamStatsConfig: teamStatsConfig ? { ...teamStatsConfig } : null,
       shotChart: [],
       eventStream: null,
       sportGameState: createBasketballSportGameState(normalized.setup),

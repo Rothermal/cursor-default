@@ -53,7 +53,7 @@ export interface BasketballTimeoutSideInventory {
 
 export interface BasketballTimeoutInventory {
   periodId: string
-  periodLabel: string
+  scopeLabel: string
   tracked: BasketballTimeoutSideInventory
   opponent: BasketballTimeoutSideInventory
   neutralMedia: number
@@ -100,7 +100,7 @@ export function captureBasketballTimeout(
     if (!inventory) return failure(state, 'invalid_period', 'Basketball timeout inventory is unavailable.')
     const sideInventory = inventory[capture.teamSide]
     if (sideInventory.exhausted) {
-      return failure(state, 'command_failed', 'That team has no charged timeouts remaining in this period.')
+      return failure(state, 'command_failed', 'That team has no charged timeouts remaining in this timeout pool.')
     }
     const kindLimit = basketballTimeoutKindLimitForState(state, capture.teamSide, capture.kind)
     if (kindLimit?.exhausted) {
@@ -193,7 +193,7 @@ export function basketballTimeoutInventory(state: GameState): BasketballTimeoutI
   )
   return {
     periodId,
-    periodLabel: segment.label,
+    scopeLabel: rawPool.label,
     tracked: sideInventory(
       chargedInPool.filter(event => event.teamSide === 'tracked').length,
       trackedPool.totalLimit
@@ -250,7 +250,7 @@ export function previewBasketballTimeoutDecrement(
   const event = newestMatchingTimeout(state, target)
   const inventory = basketballTimeoutInventory(state)
   if (!event || !inventory) {
-    return commandFailure('nothing_to_undo', 'There is no matching current-period Basketball timeout to remove.')
+    return commandFailure('nothing_to_undo', 'There is no matching Basketball timeout to remove in the current scope.')
   }
   const ownerLabel = event.teamSide === 'neutral'
     ? 'Game administration'
@@ -268,7 +268,7 @@ export function previewBasketballTimeoutDecrement(
       eventId: event.id,
       label: event.payload.label?.trim() || TIMEOUT_LABELS[event.payload.kind],
       ownerLabel,
-      periodLabel: inventory.periodLabel,
+      periodLabel: sportStatePeriodLabel(state, event.period.id),
       target,
       chargedRemainingAfter,
       requiresConfirmation: true,
@@ -289,7 +289,7 @@ export function removeBasketballTimeout(
   }
   const event = newestMatchingTimeout(state, target)
   if (!event) {
-    return failure(state, 'nothing_to_undo', 'There is no matching current-period Basketball timeout to remove.')
+    return failure(state, 'nothing_to_undo', 'There is no matching Basketball timeout to remove in the current scope.')
   }
   const receipt: BasketballCourtUndoReceipt = {
     kind: 'administrative_decrement',
@@ -331,10 +331,17 @@ function newestMatchingTimeout(
   const periodId = sportState?.projection.status === 'in_progress'
     ? sportState.projection.currentPeriodId
     : null
-  if (!periodId) return null
+  if (!sportState || !periodId) return null
+  const rules = sportState.setup.rulesSnapshot
+  const currentPoolId = resolveBasketballTimeoutPool(rules, periodId)?.id ?? null
   return activeBasketballEvents(state)
     .filter((event): event is BasketballTimeoutEvent =>
-      event.eventType === 'basketball.timeout' && event.period.id === periodId
+      event.eventType === 'basketball.timeout' && (
+        target.mode === 'charged'
+          ? currentPoolId !== null &&
+            resolveBasketballTimeoutPool(rules, event.period.id)?.id === currentPoolId
+          : event.period.id === periodId
+      )
     )
     .sort((left, right) => compareGameEventCaptureOrder(right, left))
     .find(event => target.mode === 'charged'
@@ -342,6 +349,12 @@ function newestMatchingTimeout(
         (event.payload.kind === 'full' || event.payload.kind === 'thirty_second')
       : event.teamSide === 'neutral' && event.payload.kind === target.kind
     ) ?? null
+}
+
+function sportStatePeriodLabel(state: GameState, periodId: string): string {
+  return state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ?? periodId
+    : periodId
 }
 
 function sideInventory(used: number, cap: number | null): BasketballTimeoutSideInventory {

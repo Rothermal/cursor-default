@@ -22,8 +22,8 @@ required for BKE-5A; event-game creation remains behind the internal gate.
 
 Each catalog record stores its exact source URLs, effective rules label, review date, enforced
 coverage, deferred coverage, and immutable profile version. `profiles.test.ts` verifies catalog
-uniqueness, provenance, structural values, current NFHS no-one-and-one behavior, separate NCAA
-Men's/Women's rules, NBA overtime bonus, and the Youth Equal-Play model.
+uniqueness, populated provenance fields, structural values, current NFHS no-one-and-one behavior,
+separate NCAA Men's/Women's rules, NBA overtime bonus, and the Youth Equal-Play model.
 
 The profiles are tracking presets, not complete officiating rulebooks. Clock-dependent exceptions,
 shot clocks, substitutions, playing-time enforcement, equipment, and defensive restrictions are
@@ -52,6 +52,8 @@ explicitly deferred.
 - A rules snapshot is projection authority; catalog lookup is not required to open an existing game.
 - Version-1 cloud/local/canonical snapshots normalize and reproject without receiving a version tag.
 - Version-1 timeout and overtime-foul behavior remains unchanged.
+- Version-2 cloud shells leave the legacy top-level team-stats configuration empty instead of
+  flattening shared foul windows or timeout pools into misleading period-scoped fields.
 - Pre-BKE-5 `rulesSource` values are treated as placeholders and display as Legacy configuration.
 - Aggregate Basketball stays on its existing reducer/snapshot path.
 - No SQL migration, capability change, settings persistence, or production creation toggle ships in
