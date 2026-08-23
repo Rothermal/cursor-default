@@ -287,6 +287,10 @@ The SOC-6 Q&A selected the recommended option for all 32 high-level questions:
 - Broader application reskin.
 - Basketball migration to the shared event model; see the BKE roadmap.
 
+First-match tracker issues and the numbered future-module inventory now live in
+[`PLAN_SOC_FIELD_TEST_BACKLOG.md`](PLAN_SOC_FIELD_TEST_BACKLOG.md). Do not implement
+those items from this SOC-6 roadmap.
+
 ## 10. Planning Handoff
 
 Each slice receives its own implementation plan and focused Q&A before code changes:
