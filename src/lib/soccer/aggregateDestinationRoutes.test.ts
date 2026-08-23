@@ -8,8 +8,9 @@ const page = (name: string) =>
 describe('soccer aggregate destination route contracts', () => {
   it('routes Leaderboard soccer seasons to canonical sources before legacy stats', () => {
     const source = page('Leaderboard')
-    const guard = 'if (isSoccerDestination)'
+    const guard = 'if (isCanonicalAggregateDestination)'
     expect(source).toContain("scope={{ type: 'season', id: selectedSeasonId }}")
+    expect(source).toContain('isSoccerDestination || isBasketballDestination')
     expect(source).toContain(guard)
     expect(source.indexOf(guard)).toBeLessThan(
       source.indexOf("rpc('get_season_stats_resolved'")

@@ -8,6 +8,7 @@ import {
   basketballAggregateRankingMetrics,
   basketballAggregateVisibleColumns,
   formatBasketballAggregateMetric,
+  shouldAutoRefreshBasketballAggregates,
   sortBasketballAggregatePlayers,
 } from './aggregateDestinations'
 import {
@@ -78,5 +79,17 @@ describe('Basketball aggregate destination adapter', () => {
     expect(formatBasketballAggregateMetric(player, 'field_goal_percentage')).toBe('57% (4/7)')
     expect(formatBasketballAggregateMetric(player, 'effective_field_goal_percentage')).toBe('64%')
     expect(formatBasketballAggregateMetric(player, 'true_shooting_percentage')).toBe('66%')
+  })
+
+  it('refreshes visible idle destinations with focus-event debouncing', () => {
+    expect(shouldAutoRefreshBasketballAggregates({
+      loading: false, visible: true, now: 1_000, lastRefreshAt: 0,
+    })).toBe(true)
+    expect(shouldAutoRefreshBasketballAggregates({
+      loading: true, visible: true, now: 1_000, lastRefreshAt: 0,
+    })).toBe(false)
+    expect(shouldAutoRefreshBasketballAggregates({
+      loading: false, visible: true, now: 100, lastRefreshAt: 0,
+    })).toBe(false)
   })
 })
