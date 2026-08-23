@@ -155,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAppAccessError(null)
     setAppAccessLoading(false)
     clearSoccerReleaseCapabilityCache()
+    clearBasketballReleaseCapabilityCache()
     clearPersistedGameStorage()
     await supabase.auth.signOut()
   }, [])

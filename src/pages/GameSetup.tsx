@@ -178,6 +178,20 @@ export default function GameSetup() {
           return
         }
       }
+      if (requestedSport.id === 'basketball' && isBasketballEventModelCreationAvailable()) {
+        if (!userId) {
+          setRequestedTeamSportError('Sign in before starting a Basketball event cloud game.')
+          setLoadingRequestedTeamSport(false)
+          return
+        }
+        const capability = await ensureBasketballReleaseCapabilities(userId)
+        if (cancelled) return
+        if (capability.status !== 'ready') {
+          setRequestedTeamSportError(capability.error)
+          setLoadingRequestedTeamSport(false)
+          return
+        }
+      }
 
       const hasActiveGame = Boolean(state.sport && state.players.length > 0)
       const sportMismatch = sport?.id !== requestedSport.id

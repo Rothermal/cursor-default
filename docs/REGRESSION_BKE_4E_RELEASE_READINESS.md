@@ -36,6 +36,10 @@ tournament writes, or binding. Legacy Basketball and genuinely local-only event 
 unavailable do not call it. Existing local/cloud games, Summary, recovery, and aggregate reads are
 never gated by release capability state.
 
+Automatic binding of a game created while cloud was unavailable remains outside this creation
+preflight. BKE-5 owns the visible retry/local-only choices and must preflight that later binding
+entry before broader event-model enablement.
+
 Successful checks are cached only for the active account. Failed checks are not cached, concurrent
 checks share one request, explicit retries bypass success cache, and auth-account changes clear the
 cache.

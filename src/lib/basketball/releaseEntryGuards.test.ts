@@ -27,6 +27,31 @@ describe('BKE-4E5 release entry guards', () => {
     expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_GAME_INFO'"))
   })
 
+  it('preflights Team Info starts before confirmation or game mutation', () => {
+    const teamInfo = source('src/pages/TeamInfo.tsx')
+    const handler = between(teamInfo, 'const handleStartGame = async () => {', '\n  useEffect(')
+    const capabilityIndex = handler.indexOf('await ensureBasketballReleaseCapabilities')
+
+    expect(capabilityIndex).toBeGreaterThanOrEqual(0)
+    expect(capabilityIndex).toBeLessThan(handler.indexOf('window.confirm'))
+    expect(capabilityIndex).toBeLessThan(handler.indexOf('startNewGame(sport)'))
+    expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_CLOUD_SYNC_STATE'"))
+  })
+
+  it('preflights team deep links before active-game confirmation or replacement', () => {
+    const setup = source('src/pages/GameSetup.tsx')
+    const loader = between(
+      setup,
+      'const loadRequestedTeamSport = async () => {',
+      '\n    void loadRequestedTeamSport()'
+    )
+    const capabilityIndex = loader.indexOf('await ensureBasketballReleaseCapabilities')
+
+    expect(capabilityIndex).toBeGreaterThanOrEqual(0)
+    expect(capabilityIndex).toBeLessThan(loader.indexOf('window.confirm'))
+    expect(capabilityIndex).toBeLessThan(loader.indexOf('startNewGame(requestedSport)'))
+  })
+
   it('keeps the internal creation gate closed outside development policy', () => {
     const policy = source('src/lib/sportAvailability.ts')
     expect(policy).toContain(
@@ -39,5 +64,7 @@ describe('BKE-4E5 release entry guards', () => {
     const auth = source('src/context/AuthContext.tsx')
     expect(auth).toContain('clearBasketballReleaseCapabilityCache()')
     expect(auth).toContain('capabilityUserId.current !== nextUserId')
+    const signOut = between(auth, 'const signOut = useCallback(async () => {', '\n  return (')
+    expect(signOut).toContain('clearBasketballReleaseCapabilityCache()')
   })
 })
