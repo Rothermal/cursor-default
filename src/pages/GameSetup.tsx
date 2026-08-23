@@ -14,6 +14,10 @@ import {
 } from '../lib/sportAvailability'
 import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 import {
+  ensureBasketballReleaseCapabilities,
+  requiresBasketballEventCloudPreflight,
+} from '../lib/basketball/releaseCapabilities'
+import {
   hasStartedBasketballEventGame,
   isBasketballEventSetupIntent,
   setBasketballEventCreationIntent,
@@ -103,6 +107,7 @@ export default function GameSetup() {
   const [loadingSeasonsForNewTeam, setLoadingSeasonsForNewTeam] = useState(false)
   const [selectedNewTeamSeasonId, setSelectedNewTeamSeasonId] = useState('')
   const [setupError, setSetupError] = useState<string | null>(null)
+  const [checkingBasketballCapabilities, setCheckingBasketballCapabilities] = useState(false)
   const [loadingRequestedTeamSport, setLoadingRequestedTeamSport] = useState(false)
   const [requestedTeamSportError, setRequestedTeamSportError] = useState<string | null>(null)
   const [requestedLocalFallbackSportId, setRequestedLocalFallbackSportId] = useState<string | null>(null)
@@ -169,6 +174,20 @@ export default function GameSetup() {
         if (capability.status !== 'ready') {
           setRequestedTeamSportError(capability.error)
           setRequestedLocalFallbackSportId(requestedSport.id)
+          setLoadingRequestedTeamSport(false)
+          return
+        }
+      }
+      if (requestedSport.id === 'basketball' && isBasketballEventModelCreationAvailable()) {
+        if (!userId) {
+          setRequestedTeamSportError('Sign in before starting a Basketball event cloud game.')
+          setLoadingRequestedTeamSport(false)
+          return
+        }
+        const capability = await ensureBasketballReleaseCapabilities(userId)
+        if (cancelled) return
+        if (capability.status !== 'ready') {
+          setRequestedTeamSportError(capability.error)
           setLoadingRequestedTeamSport(false)
           return
         }
@@ -514,6 +533,25 @@ export default function GameSetup() {
       return
     }
     setSetupError(null)
+
+    if (requiresBasketballEventCloudPreflight({
+      eventIntent: isBasketballEventIntent,
+      cloudAvailable: isCloudFlow,
+      teamMode,
+      selectedTeamId,
+    })) {
+      if (!userId) {
+        setSetupError('Sign in before starting a Basketball event cloud game.')
+        return
+      }
+      setCheckingBasketballCapabilities(true)
+      const capability = await ensureBasketballReleaseCapabilities(userId)
+      setCheckingBasketballCapabilities(false)
+      if (capability.status !== 'ready') {
+        setSetupError(capability.error)
+        return
+      }
+    }
 
     const nextTeamId = teamMode === 'existing' ? selectedTeamId || null : null
     const teamIdChanging = nextTeamId !== state.cloudSync.teamId
@@ -975,12 +1013,14 @@ export default function GameSetup() {
 
         <button
           onClick={() => { void handleNext() }}
-          disabled={!canProceed || creatingTournament}
+          disabled={!canProceed || creatingTournament || checkingBasketballCapabilities}
           className="btn-primary w-full mt-8"
         >
-          {creatingTournament
-            ? 'Saving tournament...'
-            : 'Next: Add Players →'}
+          {checkingBasketballCapabilities
+            ? 'Checking cloud support...'
+            : creatingTournament
+              ? 'Saving tournament...'
+              : 'Next: Add Players →'}
         </button>
       </div>
     </div>

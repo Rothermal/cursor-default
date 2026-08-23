@@ -1,8 +1,9 @@
 # Plan: BKE-4E Canonical Aggregates and Release Readiness
 
-Status: Product and delivery Q&A approved on 2026-08-20. BKE-4E is planned in five implementation
-slices. BKE-4E1 through BKE-4E4 are implemented; BKE-4E5 is next. Basketball event-game creation remains
-internal-only, and the user-visible event-model opt-in remains BKE-5.
+Status: Product and delivery Q&A approved on 2026-08-20. BKE-4E is implemented in five slices
+through migration 061. The consolidated live matrix remains pre-BKE-5 release evidence.
+Basketball event-game creation remains internal-only, and the user-visible event-model opt-in
+remains BKE-5.
 
 ## 1. Goal
 
@@ -310,7 +311,7 @@ details.
 
 ### 7.1 Migration 060
 
-`060_basketball_canonical_aggregate_sources.sql` will:
+`060_basketball_aggregate_sources.sql` will:
 
 - extract migration 047's source paging into private sport-neutral helpers while preserving exact
   fixed Soccer wrapper signatures and payloads;
@@ -434,9 +435,9 @@ unchanged.
 - History retains per-game totals, team/season labels where available, and direct Summary links.
 - A personal contribution is labeled Personal rather than assigned to a fabricated team.
 - Migration 060 has no personal-only player predicate, so Profile currently drains the authorized
-  unfiltered player history and extracts its Personal segment. BKE-4E5 measures this known cost in
-  the release matrix and either accepts it explicitly or extends migration 061 with a fixed
-  personal-only contract before release.
+  unfiltered player history and extracts its Personal segment. BKE-4E5 accepts this known cost for
+  the internal release so migration 061 remains handshake-only; its live matrix records page count
+  and timing, and BKE-5 adds a fixed Personal-only contract only if the cost is material.
 
 ### 9.4 Empty and problem states
 
@@ -586,6 +587,9 @@ No migration.
 
 ### BKE-4E5: Capability handshake and release exit audit
 
+Status: Implemented on 2026-08-23. See `docs/REGRESSION_BKE_4E_RELEASE_READINESS.md`. The live
+multi-device/role matrix remains required before BKE-5 exposes event-model opt-in.
+
 Scope:
 
 - add migration 061 and strict account-scoped client capability handling;
@@ -593,8 +597,8 @@ Scope:
 - consolidate BKE-4B through BKE-4E automated and manual release evidence;
 - audit stale PWA/client/backend, offline recovery, two-device/multi-recorder, roles, finalization,
   reopen, Summary, aggregates, mixed legacy history, personal games, and Soccer/legacy regression;
-- measure the Profile Personal-history drain and either accept the documented cost or add a fixed
-  personal-only player aggregate request in migration 061;
+- accept and measure the documented Profile Personal-history drain while keeping migration 061
+  handshake-only;
 - update runtime and migration documentation; and
 - keep production user opt-in closed for BKE-5.
 
@@ -695,6 +699,6 @@ BKE-4E. Every unresolved row remains a hard gate before BKE-5 exposes the event-
 
 ## 16. Next Step
 
-Begin BKE-4E5 from the implemented five-destination aggregate boundary and complete BKE-4 cloud
-contracts. Keep the event-game creation gate internal and carry the complete BKE-4B through BKE-4E
-live matrix into the capability and release exit audit.
+Apply migration 061 and complete the combined BKE-4B through BKE-4E live matrix before BKE-5
+exposes event-model opt-in. BKE-5 may be planned in parallel, but its visible rollout remains
+blocked on that evidence.

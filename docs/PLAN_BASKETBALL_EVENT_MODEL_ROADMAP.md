@@ -26,7 +26,8 @@ implemented with the complete authority-aware Summary, including Overview, Playe
 Timeline, Shot Chart, and explicit entry/return routing. BKE-4E product and delivery decisions are
 approved in
 [PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md](PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md);
-BKE-4E1 is next.
+BKE-4E1 through BKE-4E5 are implemented through migration 061. The combined BKE-4 live matrix
+remains required before BKE-5 exposes event-model opt-in.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

@@ -25,7 +25,11 @@ import {
   type TeamInfoGame,
 } from '../lib/teamInfo'
 import { acceptedTeamRole, canTrackGames } from '../lib/teamPermissions'
-import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import {
+  getSportAvailabilityPolicy,
+  isBasketballEventModelCreationAvailable,
+} from '../lib/sportAvailability'
+import { ensureBasketballReleaseCapabilities } from '../lib/basketball/releaseCapabilities'
 import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 
 interface TeamRow {
@@ -178,6 +182,16 @@ export default function TeamInfo() {
       if (capability.status !== 'ready') {
         setStartGameError(capability.error)
         setOfferLocalSoccer(true)
+        return
+      }
+    }
+    if (sport.id === 'basketball' && isBasketballEventModelCreationAvailable()) {
+      if (!user) return
+      setStartingGame(true)
+      const capability = await ensureBasketballReleaseCapabilities(user.id)
+      setStartingGame(false)
+      if (capability.status !== 'ready') {
+        setStartGameError(capability.error)
         return
       }
     }
