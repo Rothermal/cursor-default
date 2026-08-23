@@ -124,4 +124,17 @@ describe('Basketball aggregate destination route contracts', () => {
     expect(source).toContain('basketballSummaryPath({')
     expect(source).toContain(': gameInfoPath(game.gameId, game.teamId)')
   })
+
+  it('loads season metadata only for the Career destination', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx'
+      ),
+      'utf8'
+    )
+    expect(source).toContain(
+      "variant === 'career' ? segments.map(segment => segment.seasonId) : []"
+    )
+  })
 })

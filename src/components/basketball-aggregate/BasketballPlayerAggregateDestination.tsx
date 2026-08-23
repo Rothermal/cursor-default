@@ -110,7 +110,7 @@ export function BasketballPlayerAggregateDestination({
     [aggregate, profile, stableIdentity.playerId, variant]
   )
   const seasonNames = useBasketballAggregateSeasonNames(
-    segments.map(segment => segment.seasonId)
+    variant === 'career' ? segments.map(segment => segment.seasonId) : []
   )
 
   return (

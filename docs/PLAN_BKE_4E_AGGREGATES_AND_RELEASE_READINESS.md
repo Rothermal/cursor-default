@@ -433,6 +433,10 @@ unchanged.
   player.
 - History retains per-game totals, team/season labels where available, and direct Summary links.
 - A personal contribution is labeled Personal rather than assigned to a fabricated team.
+- Migration 060 has no personal-only player predicate, so Profile currently drains the authorized
+  unfiltered player history and extracts its Personal segment. BKE-4E5 measures this known cost in
+  the release matrix and either accepts it explicitly or extends migration 061 with a fixed
+  personal-only contract before release.
 
 ### 9.4 Empty and problem states
 
@@ -589,6 +593,8 @@ Scope:
 - consolidate BKE-4B through BKE-4E automated and manual release evidence;
 - audit stale PWA/client/backend, offline recovery, two-device/multi-recorder, roles, finalization,
   reopen, Summary, aggregates, mixed legacy history, personal games, and Soccer/legacy regression;
+- measure the Profile Personal-history drain and either accept the documented cost or add a fixed
+  personal-only player aggregate request in migration 061;
 - update runtime and migration documentation; and
 - keep production user opt-in closed for BKE-5.
 
