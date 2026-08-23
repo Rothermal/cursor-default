@@ -286,6 +286,12 @@ for BKE-6, but `clockModel: 'none'` keeps BKE-5 projection clockless.
   reopen, and republish.
 - A complete rules snapshot remains projection authority. Catalog availability is never required to
   read or publish an already-started game.
+- Treat every pre-BKE-5 version-1 `rulesSource` as a placeholder rather than provenance. Existing
+  setup creation unconditionally stamped `nfhs` version 1 even when `rulesSnapshot` resolved from a
+  different `seasons.team_stats_config`. These games display `Legacy configuration` or `Custom`
+  from their authoritative snapshot, never a named-profile claim, and are not eligible for a
+  profile-version upgrade diff. Only settings-backed version-2 sources may claim and upgrade an
+  exact catalog profile/version.
 
 ## 5. Settings Contracts
 
@@ -359,17 +365,24 @@ inherits the recorder's personal base or overrides.
 
 ## 6. Migration 062
 
-Migration 048 created generic tables but its granted public save functions and validator are
-Soccer-specific. Migration 062 reuses the tables without broadening those public functions:
+Migration 048 created generic tables and granted broad, sport-parameterized public save functions.
+Those functions are currently safe for unsupported sports because their shared validator accepts
+only Soccer schema version 1. Migration 062 preserves that fail-closed boundary: the broad functions
+continue rejecting Basketball, while only new fixed Basketball wrappers can reach Basketball
+validation and writes.
 
 1. Preserve the existing Soccer RPC names, argument lists, response rows, validation behavior,
    permissions, and `soccer_settings_changed` audit events exactly.
 2. Extract or reuse a private revisioned-write core that performs row locking, expected-revision
-   comparison, create/update, and deterministic response construction.
+   comparison, create/update, and deterministic response construction without choosing a sport or
+   schema on behalf of an authenticated caller.
 3. Add a strict private Basketball payload validator and fixed public wrappers such as
    `save_basketball_user_settings_revisioned(expected_revision, settings)` and
    `save_basketball_team_settings_revisioned(team_id, expected_revision, settings)`. Callers cannot
-   choose another sport id or settings schema through these wrappers.
+   choose another sport id or settings schema through these wrappers. The existing
+   `_validate_sport_settings_payload` and broad `save_*_sport_settings_revisioned` path must continue
+   rejecting `basketball`; teaching that validator to accept Basketball would bypass the fixed
+   surface and is forbidden.
 4. Enforce active app access and accepted team owner/admin authority consistently with Soccer.
    Direct table writes remain denied; current RLS-scoped reads remain the read surface.
 5. Emit `basketball_settings_changed` through the existing immutable audit trail without storing
@@ -377,11 +390,14 @@ Soccer-specific. Migration 062 reuses the tables without broadening those public
 6. Advance `get_basketball_release_capabilities()` to exact contract version 2 and advertise
    `settingsContractVersion: 1`. Old clients fail event-creation preflight as update-required while
    all historical access remains ungated.
-7. Revoke private helpers from public/authenticated callers, grant only the fixed wrappers, and
-   reload the PostgREST schema cache.
+7. Revoke every new private helper from public/authenticated callers, grant only the fixed
+   Basketball wrappers as Basketball write entry points, and reload the PostgREST schema cache. The
+   existing broad save functions remain granted for Soccer compatibility but remain incapable of
+   validating or writing Basketball.
 
 SQL regression must prove Soccer parity before and after migration 062, Basketball schema
-rejection, RLS/role behavior, CAS conflict behavior, audit emission, and exact capability parsing.
+rejection through the old broad functions, acceptance only through fixed Basketball wrappers,
+RLS/role behavior, CAS conflict behavior, audit emission, and exact capability parsing.
 
 ## 7. Mutation-Free Match Setup
 
