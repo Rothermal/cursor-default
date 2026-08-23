@@ -62,4 +62,79 @@ describe('Basketball aggregate destination route contracts', () => {
       'sortBasketballAggregatePlayers(aggregate.players, metricId, category.rankingMetricIds)'
     )
   })
+
+  it('routes Basketball Player Profile before legacy season and game-stat readers', () => {
+    const source = page('PlayerProfile')
+    const guard =
+      "teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball'"
+    expect(source).toContain('<BasketballPlayerAggregateDestination')
+    expect(source).toContain("type: 'player'")
+    expect(source.indexOf(guard)).toBeLessThan(
+      source.indexOf("rpc('get_season_stats_resolved'")
+    )
+    expect(source.indexOf(guard)).toBeLessThan(source.indexOf("from('game_stats')"))
+  })
+
+  it('routes Basketball Career before the legacy career and high-game readers', () => {
+    const source = page('CareerStats')
+    const guard = 'if (isAggregateDestination)'
+    expect(source).toContain('<BasketballPlayerAggregateDestination')
+    expect(source).toContain("scope={{ type: 'career', playerId }}")
+    expect(source.indexOf(guard)).toBeLessThan(
+      source.indexOf("rpc('get_career_stats_resolved'")
+    )
+    expect(source.indexOf(guard)).toBeLessThan(
+      source.indexOf("rpc('get_player_stat_high_games'")
+    )
+  })
+
+  it('keeps event aggregate components off legacy compatibility storage', () => {
+    const components = [
+      'src/components/basketball-aggregate/BasketballAggregateDestination.tsx',
+      'src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx',
+      'src/hooks/useBasketballAggregateDestination.ts',
+      'src/lib/basketball/aggregateTransport.ts',
+    ].map(path => readFileSync(resolve(process.cwd(), path), 'utf8')).join('\n')
+    for (const forbidden of ['game_stats', 'shot_chart', 'stat_corrections']) {
+      expect(components).not.toContain(forbidden)
+    }
+  })
+
+  it('exposes Player Profile and Career links from team-owned Basketball tables', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/components/basketball-aggregate/BasketballAggregateDestination.tsx'
+      ),
+      'utf8'
+    )
+    expect(source).toContain('playerInfoPath(player.playerId, teamId, seasonId)')
+    expect(source).toContain('&sport=basketball`}')
+  })
+
+  it('routes player history by each game authority', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx'
+      ),
+      'utf8'
+    )
+    expect(source).toContain("game.authority === 'canonical'")
+    expect(source).toContain('basketballSummaryPath({')
+    expect(source).toContain(': gameInfoPath(game.gameId, game.teamId)')
+  })
+
+  it('loads season metadata only for the Career destination', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx'
+      ),
+      'utf8'
+    )
+    expect(source).toContain(
+      "variant === 'career' ? segments.map(segment => segment.seasonId) : []"
+    )
+  })
 })

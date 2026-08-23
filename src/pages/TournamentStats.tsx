@@ -493,6 +493,7 @@ export default function TournamentStats() {
         scope={{ type: 'tournament', id: tournamentId }}
         teamIds={[teamId]}
         teamIdForLinks={teamId}
+        seasonId={team.season_id}
         title={tournament.name}
         subtitle={`${teamDisplayName(team)} - ${team.seasons.name}`}
         backPath={teamInfoPath(teamId)}

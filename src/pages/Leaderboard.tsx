@@ -437,6 +437,7 @@ export default function Leaderboard() {
             scope={{ type: 'season', id: selectedSeasonId }}
             teamIds={filteredTeams.map(team => team.id)}
             teamIdForLinks={selectedTeamId || null}
+            seasonId={selectedSeasonId}
           />
         )}
 

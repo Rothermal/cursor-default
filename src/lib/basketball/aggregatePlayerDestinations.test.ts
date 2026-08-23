@@ -3,6 +3,8 @@ import { aggregateBasketballSources } from './aggregateComposition'
 import {
   basketballPlayerAggregateGames,
   basketballPlayerCareerSegments,
+  basketballPlayerGameMetricAvailability,
+  basketballPlayerProfileBreakdown,
   selectBasketballAggregatePlayer,
   visibleBasketballPlayerAggregateCategories,
 } from './aggregatePlayerDestinations'
@@ -64,5 +66,98 @@ describe('Basketball player and career aggregate destinations', () => {
     )
     expect(visibleBasketballPlayerAggregateCategories(aggregate, aggregate.players[0])
       .map(category => category.id)).toEqual(['participation'])
+  })
+
+  it('keeps authorized personal games separate from scoped profile team totals', () => {
+    const aggregate = aggregateBasketballSources(
+      { type: 'player', id: AGGREGATE_PLAYERS.starter },
+      [
+        makeCanonicalAggregateSource(),
+        makeCanonicalAggregateSource({
+          gameId: 'personal-game',
+          cloudScope: 'personal',
+          teamId: null,
+          date: '2026-08-21',
+        }),
+      ],
+      [makeLegacyAggregateSource()]
+    )
+    const scoped = aggregateBasketballSources(
+      { type: 'player', id: AGGREGATE_PLAYERS.starter },
+      [makeCanonicalAggregateSource()],
+      [makeLegacyAggregateSource()]
+    )
+    const breakdown = basketballPlayerProfileBreakdown(
+      scoped,
+      aggregate,
+      {
+        playerId: AGGREGATE_PLAYERS.starter,
+        displayName: 'Starter One',
+        number: '1',
+      }
+    )
+
+    expect(breakdown.teamGames).toHaveLength(2)
+    expect(breakdown.teamPlayer.stats.bk_app).toBe(2)
+    expect(breakdown.personalSegment).toMatchObject({
+      kind: 'personal',
+      teamName: 'Personal',
+      games: [{ gameId: 'personal-game' }],
+    })
+  })
+
+  it('returns a zero profile row when only personal history is available', () => {
+    const aggregate = aggregateBasketballSources(
+      { type: 'player', id: AGGREGATE_PLAYERS.starter },
+      [makeCanonicalAggregateSource({
+        gameId: 'personal-only',
+        cloudScope: 'personal',
+        teamId: null,
+      })],
+      []
+    )
+    const scoped = aggregateBasketballSources(
+      { type: 'player', id: AGGREGATE_PLAYERS.starter },
+      [],
+      []
+    )
+    const breakdown = basketballPlayerProfileBreakdown(
+      scoped,
+      aggregate,
+      {
+        playerId: AGGREGATE_PLAYERS.starter,
+        displayName: 'Starter One',
+        number: '1',
+      }
+    )
+
+    expect(breakdown.teamPlayer.stats.bk_app).toBe(0)
+    expect(breakdown.teamGames).toEqual([])
+    expect(breakdown.personalSegment?.games).toHaveLength(1)
+  })
+
+  it('computes metric availability within each career segment', () => {
+    const aggregate = aggregateBasketballSources(
+      { type: 'career', id: AGGREGATE_PLAYERS.starter },
+      [
+        makeCanonicalAggregateSource(),
+        makeCanonicalAggregateSource({
+          gameId: 'personal-game',
+          cloudScope: 'personal',
+          teamId: null,
+        }),
+      ],
+      [makeLegacyAggregateSource()]
+    )
+    const segments = basketballPlayerCareerSegments(aggregate, {
+      playerId: AGGREGATE_PLAYERS.starter,
+      displayName: 'Starter One',
+      number: '1',
+    })
+    const personal = segments.find(segment => segment.kind === 'personal')!
+    const team = segments.find(segment => segment.kind === 'team')!
+
+    expect(basketballPlayerGameMetricAvailability(personal.games)).toContain('bk_start')
+    expect(basketballPlayerGameMetricAvailability(team.games)).not.toContain('bk_start')
   })
 })

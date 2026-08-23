@@ -344,6 +344,7 @@ export default function TeamStats() {
         scope={{ type: 'team', id: teamId }}
         teamIds={[teamId]}
         teamIdForLinks={teamId}
+        seasonId={team.season_id}
         title="Team stats"
         subtitle={`${teamDisplayName(team)} - ${team.seasons.name}`}
         backPath={teamInfoPath(teamId)}

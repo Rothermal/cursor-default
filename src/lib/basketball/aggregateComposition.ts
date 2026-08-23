@@ -96,6 +96,7 @@ export interface BasketballAggregateGame {
   opponentScore: number
   result: 'win' | 'draw' | 'loss'
   periods: BasketballAggregatePeriodScore[]
+  availableMetricIds: BasketballCanonicalStatId[]
   playerStats?: Record<string, BasketballAggregateStats>
 }
 
@@ -553,6 +554,7 @@ function gameRow(
     opponentScore: match.score.opponent,
     result: match.result,
     periods: structuredClone(match.periods),
+    availableMetricIds: [...match.availableMetricIds],
     ...(playerId && player
       ? { playerStats: { [playerId]: structuredClone(player.stats) } }
       : {}),
