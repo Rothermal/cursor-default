@@ -8,6 +8,7 @@ import {
   type AppAccessDenial,
 } from '../lib/appAccessSignal'
 import { clearSoccerReleaseCapabilityCache } from '../lib/soccer/releaseCapabilities'
+import { clearBasketballReleaseCapabilityCache } from '../lib/basketball/releaseCapabilities'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const nextUserId = user?.id ?? null
     if (capabilityUserId.current !== nextUserId) {
       clearSoccerReleaseCapabilityCache()
+      clearBasketballReleaseCapabilityCache()
       capabilityUserId.current = nextUserId
     }
   }, [user?.id])
