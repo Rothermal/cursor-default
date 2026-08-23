@@ -10,7 +10,13 @@ import type {
   BasketballMatchProjection,
   BasketballTeamSide,
 } from './types'
-import { basketballTimeoutCap } from './rules'
+import {
+  basketballTimeoutKindLimit,
+  basketballTimeoutUsageByPool,
+  resolveBasketballFoulWindow,
+  resolveBasketballTimeoutPool,
+  resolveBasketballTimeoutPoolWithCarryover,
+} from './rules'
 
 export function applyBasketballAdministrativeEvent(
   projection: BasketballMatchProjection,
@@ -31,7 +37,7 @@ export function applyBasketballAdministrativeEvent(
     case 'basketball.ejection':
       return applyEjection(projection, event, context)
     case 'basketball.timeout':
-      return applyTimeout(projection, event, rules)
+      return applyTimeout(projection, event, context, rules)
     case 'basketball.minutes_adjustment':
       return applyMinutesAdjustment(projection, event, rules)
   }
@@ -191,18 +197,34 @@ function applyEjection(
 function applyTimeout(
   projection: BasketballMatchProjection,
   event: Extract<BasketballAdministrativeEvent, { eventType: 'basketball.timeout' }>,
+  context: BasketballStatProjectionContext,
   rules: BasketballMatchRules
 ): string | null {
   if (event.teamSide === 'neutral') {
     projection.neutralTimeouts += 1
     return null
   }
-  const periodTimeouts = ensurePeriodSideCounts(projection.periodTimeouts, event.period.id)
-  const segment = projection.periods.find(candidate => candidate.id === event.period.id)
-  const cap = basketballTimeoutCap(rules, segment?.kind ?? 'regulation')
-  if (cap !== null && periodTimeouts[event.teamSide] >= cap) {
-    return 'Basketball charged-timeout inventory is exhausted for this period.'
+  const priorEvents = [...context.activeEventsById.values()]
+  const usage = basketballTimeoutUsageByPool(priorEvents, rules, event.teamSide)
+  const pool = resolveBasketballTimeoutPoolWithCarryover(rules, event.period.id, usage)
+  if (!pool) return 'Basketball charged-timeout inventory is unavailable for this period.'
+  const priorCharged = priorEvents.filter(candidate =>
+    candidate.eventType === 'basketball.timeout' &&
+    candidate.teamSide === event.teamSide &&
+    (candidate.payload.kind === 'full' || candidate.payload.kind === 'thirty_second') &&
+    resolveBasketballTimeoutPool(rules, candidate.period.id)?.id === pool.id
+  )
+  if (pool.totalLimit !== null && priorCharged.length >= pool.totalLimit) {
+    return 'Basketball charged-timeout inventory is exhausted for this timeout pool.'
   }
+  if (event.payload.kind === 'full' || event.payload.kind === 'thirty_second') {
+    const kindLimit = basketballTimeoutKindLimit(pool, event.payload.kind)
+    const kindUsed = priorCharged.filter(candidate => candidate.payload.kind === event.payload.kind).length
+    if (kindLimit !== null && kindUsed >= kindLimit) {
+      return 'Basketball charged-timeout inventory is exhausted for this timeout kind.'
+    }
+  }
+  const periodTimeouts = ensurePeriodSideCounts(projection.periodTimeouts, event.period.id)
   periodTimeouts[event.teamSide] += 1
   incrementTeamStat(projection, event.teamSide, `team_to_used_p${event.period.order}`)
   return null
@@ -255,19 +277,24 @@ export function updateBasketballBonusStatus(
   rules: BasketballMatchRules
 ): void {
   const counts = basketballBonusFoulCountsForPeriod(projection, periodId, rules)
-  if (!counts) return
+  const window = resolveBasketballFoulWindow(rules, periodId)
+  if (!counts || !window) return
+  if (window.bonusThreshold === null || window.doubleBonusThreshold === null) {
+    projection.bonusStatusByPeriod[periodId] = { tracked: 'none', opponent: 'none' }
+    return
+  }
   projection.bonusStatusByPeriod[periodId] = {
     tracked: getBonusStatus(
       counts.tracked,
-      rules.bonusThreshold,
-      rules.doubleBonusThreshold,
-      rules.hasOneAndOne
+      window.bonusThreshold,
+      window.doubleBonusThreshold,
+      window.hasOneAndOne
     ),
     opponent: getBonusStatus(
       counts.opponent,
-      rules.bonusThreshold,
-      rules.doubleBonusThreshold,
-      rules.hasOneAndOne
+      window.bonusThreshold,
+      window.doubleBonusThreshold,
+      window.hasOneAndOne
     ),
   }
 }
@@ -275,23 +302,25 @@ export function updateBasketballBonusStatus(
 export function basketballBonusFoulCountsForPeriod(
   projection: BasketballMatchProjection,
   periodId: string,
-  rules: Pick<BasketballMatchRules, 'overtimeFoulsReset'>
+  rules: BasketballMatchRules
 ): Record<BasketballTeamSide, number> | null {
   const segment = projection.periods.find(period => period.id === periodId)
-  if (!segment) return null
-  return segment.kind === 'overtime' && !rules.overtimeFoulsReset
-    ? projection.periods
-        .filter(period => period.kind === 'overtime' && period.order <= segment.order)
-        .reduce(
-          (total, period) => {
-            const periodCounts = projection.periodTeamFouls[period.id]
-            total.tracked += periodCounts?.tracked ?? 0
-            total.opponent += periodCounts?.opponent ?? 0
-            return total
-          },
-          { tracked: 0, opponent: 0 }
-        )
-    : projection.periodTeamFouls[periodId] ?? { tracked: 0, opponent: 0 }
+  const window = resolveBasketballFoulWindow(rules, periodId)
+  if (!segment || !window) return null
+  return projection.periods
+    .filter(period =>
+      period.order <= segment.order &&
+      resolveBasketballFoulWindow(rules, period.id)?.id === window.id
+    )
+    .reduce(
+      (total, period) => {
+        const periodCounts = projection.periodTeamFouls[period.id]
+        total.tracked += periodCounts?.tracked ?? 0
+        total.opponent += periodCounts?.opponent ?? 0
+        return total
+      },
+      { tracked: 0, opponent: 0 }
+    )
 }
 
 function ensurePeriodSideCounts(

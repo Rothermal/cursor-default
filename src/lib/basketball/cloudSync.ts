@@ -22,6 +22,7 @@ import { supabase } from '../supabase'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballLifecycleEvent } from './events'
 import { createBasketballUuid } from './id'
+import { basketballRulesToTeamStatsConfig } from './rules'
 import {
   createBasketballSportGameState,
   normalizeBasketballSportGameState,
@@ -403,18 +404,7 @@ export async function loadBasketballCloudShell(
   )
   const basketball = sports.find(sport => sport.id === 'basketball')
   if (!basketball) throw new Error('Basketball configuration is unavailable.')
-  const rules = normalized.setup.rulesSnapshot
-  const teamStatsConfig = {
-    periodsPerGame: rules.periodsPerGame,
-    periodLabels: [...rules.periodLabels],
-    bonusThreshold: rules.bonusThreshold,
-    doubleBonusThreshold: rules.doubleBonusThreshold,
-    hasOneAndOne: rules.hasOneAndOne,
-    overtimeLabel: rules.overtimeLabel,
-    overtimeFoulsReset: rules.overtimeFoulsReset,
-    timeoutsPerPeriod: rules.timeoutsPerPeriod,
-    timeoutsPerOvertime: rules.timeoutsPerOvertime,
-  }
+  const teamStatsConfig = basketballRulesToTeamStatsConfig(normalized.setup.rulesSnapshot)
   return {
     game,
     cloudToLocalPlayerId,
@@ -436,7 +426,7 @@ export async function loadBasketballCloudShell(
       notes: '',
       actionLog: [],
       currentPeriod: 1,
-      teamStatsConfig,
+      teamStatsConfig: teamStatsConfig ? { ...teamStatsConfig } : null,
       shotChart: [],
       eventStream: null,
       sportGameState: createBasketballSportGameState(normalized.setup),

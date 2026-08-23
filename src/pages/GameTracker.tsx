@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
-import { basketballTimeoutCap } from '../lib/basketball/rules'
+import { basketballRulesAllowOneAndOne } from '../lib/basketball/rules'
 import { basketballBonusFoulCountsForPeriod } from '../lib/basketball/administrativeProjection'
 import type { BasketballTeamStatsConfig, StatAction, StatCategory } from '../types'
 import Scoreboard from '../components/Scoreboard'
@@ -159,7 +159,9 @@ function timeoutCapForPeriod(
 ): number | undefined {
   if (!rules) return undefined
   const isOt = periodIndex > rules.periodsPerGame
-  const cap = basketballTimeoutCap(rules, isOt ? 'overtime' : 'regulation')
+  const cap = isOt
+    ? rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
+    : rules.timeoutsPerPeriod
   if (cap == null) return undefined
   return cap
 }
@@ -1115,7 +1117,10 @@ export default function GameTracker() {
             opponentFouls={currentBasketballFouls.opponent}
             trackedStatus={currentBasketballBonus.tracked}
             opponentStatus={currentBasketballBonus.opponent}
-            hasOneAndOne={basketballSportState.setup.rulesSnapshot.hasOneAndOne}
+            hasOneAndOne={basketballRulesAllowOneAndOne(
+              basketballSportState.setup.rulesSnapshot,
+              currentBasketballSegment.id
+            )}
           />
         )}
       </div>
@@ -1474,7 +1479,7 @@ export default function GameTracker() {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h3 id="basketball-timeouts-title" className="text-sm font-bold text-sky-950">Timeouts</h3>
-                  <p className="text-xs text-sky-800">{timeoutInventory.periodLabel}</p>
+                  <p className="text-xs text-sky-800">{timeoutInventory.scopeLabel}</p>
                 </div>
                 <button
                   type="button"

@@ -5,6 +5,10 @@ import type {
   BasketballSummaryResult,
 } from '../../lib/basketball/summary'
 import type { BasketballSummarySource } from '../../lib/basketball/summarySource'
+import {
+  basketballRegulationPeriodCount,
+} from '../../lib/basketball/rules'
+import { basketballRulesProfileLabel } from '../../lib/basketball/profiles'
 
 interface Props {
   source: BasketballSummarySource
@@ -46,12 +50,12 @@ export default function BasketballOverview({
           <Metadata
             label="Format"
             value={rules
-              ? `${rules.periodsPerGame} periods${regulationMinutes ? `, ${regulationMinutes} min` : ''}`
+              ? `${basketballRegulationPeriodCount(rules)} periods${regulationMinutes ? `, ${regulationMinutes} min` : ''}`
               : 'Not available'}
           />
           <Metadata
             label="Rules profile"
-            value={rulesSource?.profileId.toUpperCase() ?? 'Not available'}
+            value={basketballRulesProfileLabel(rules, rulesSource)}
           />
           <Metadata
             label="Recorder"

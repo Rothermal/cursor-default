@@ -17,6 +17,7 @@ import {
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballUuid } from './id'
+import { basketballRulesAllowOneAndOne } from './rules'
 import {
   basketballShotActorOptions,
   type BasketballShotActorOption,
@@ -800,7 +801,10 @@ function foulDependencyRepairs(
           !event.payload.technical &&
           foulCounts(payload, offender).teamFoul &&
           prepared.state.sportGameState?.sportId === 'basketball' &&
-          prepared.state.sportGameState.setup.rulesSnapshot.hasOneAndOne
+          basketballRulesAllowOneAndOne(
+            prepared.state.sportGameState.setup.rulesSnapshot,
+            original.period.id
+          )
         ))
       if (!compatible) {
         mutations.push({
@@ -971,7 +975,10 @@ function validateTripFields(
   }
   if (draft.oneAndOne && (
     state.sportGameState?.sportId !== 'basketball' ||
-    !state.sportGameState.setup.rulesSnapshot.hasOneAndOne
+    !basketballRulesAllowOneAndOne(
+      state.sportGameState.setup.rulesSnapshot,
+      draft.period.id
+    )
   )) {
     return 'The Basketball rules snapshot does not allow one-and-one free throws.'
   }

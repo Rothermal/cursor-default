@@ -20,6 +20,7 @@ import {
   previewBasketballShotEdit,
 } from './shotEditCommands'
 import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
+import type { BasketballMatchRulesV1 } from './types'
 import {
   applyBasketballValueEvent,
   basketballMinutesActorOptions,
@@ -282,6 +283,9 @@ describe('BKE-3D2 score and minutes event editing', () => {
       .toMatchObject({ ok: false, message: expect.stringContaining('Timeline changed') })
 
     const manualState = startedState()
+    const legacyRules = manualState.sportGameState?.sportId === 'basketball'
+      ? manualState.sportGameState.setup.rulesSnapshot as BasketballMatchRulesV1
+      : null
     const anchored: GameState = {
       ...manualState,
       sportGameState: manualState.sportGameState?.sportId === 'basketball'
@@ -290,7 +294,7 @@ describe('BKE-3D2 score and minutes event editing', () => {
             setup: {
               ...manualState.sportGameState.setup,
               rulesSnapshot: {
-                ...manualState.sportGameState.setup.rulesSnapshot,
+                ...legacyRules!,
                 clockModel: 'anchored',
               },
             },

@@ -17,7 +17,12 @@ import {
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballUuid } from './id'
-import { basketballTimeoutCap } from './rules'
+import {
+  basketballTimeoutKindLimit,
+  basketballTimeoutUsageByPool,
+  resolveBasketballTimeoutPool,
+  resolveBasketballTimeoutPoolWithCarryover,
+} from './rules'
 import { basketballShotActorOptions, type BasketballShotActorOption } from './shotEditCommands'
 import type {
   BasketballEjectionEvent,
@@ -387,20 +392,33 @@ function buildTimeoutPlan(
     const team = basketballActorForSelection(prepared.state, 'team', chargedSide, { kind: 'team' })
     if (!team.ok) return team
     actors = [team.value]
-    const segment = prepared.state.sportGameState?.sportId === 'basketball'
-      ? prepared.state.sportGameState.projection.periods.find(period => period.id === draft.period.id)
+    const rules = prepared.state.sportGameState?.sportId === 'basketball'
+      ? prepared.state.sportGameState.setup.rulesSnapshot
       : null
-    const cap = prepared.state.sportGameState?.sportId === 'basketball' && segment
-      ? basketballTimeoutCap(prepared.state.sportGameState.setup.rulesSnapshot, segment.kind)
-      : null
-    const used = prepared.active.filter(event =>
+    if (!rules) return commandFailure('invalid_period', 'Basketball timeout inventory is unavailable.')
+    const activeWithoutEdited = prepared.active.filter(event => event.id !== draft.eventId)
+    const pool = resolveBasketballTimeoutPoolWithCarryover(
+      rules,
+      draft.period.id,
+      basketballTimeoutUsageByPool(activeWithoutEdited, rules, chargedSide)
+    )
+    if (!pool) return commandFailure('invalid_period', 'Basketball timeout inventory is unavailable.')
+    const charged = prepared.active.filter(event =>
       event.id !== draft.eventId &&
       event.eventType === 'basketball.timeout' &&
-      event.period.id === draft.period.id &&
-      event.teamSide === chargedSide
-    ).length
-    if (cap !== null && used >= cap) {
+      event.teamSide === chargedSide &&
+      (event.payload.kind === 'full' || event.payload.kind === 'thirty_second') &&
+      resolveBasketballTimeoutPool(rules, event.period.id)?.id === pool.id
+    )
+    if (pool.totalLimit !== null && charged.length >= pool.totalLimit) {
       return commandFailure('command_failed', `The ${periodLabel(prepared.state, draft.period.id)} charged-timeout inventory is exhausted for that team.`)
+    }
+    if (draft.timeoutKind === 'full' || draft.timeoutKind === 'thirty_second') {
+      const kindLimit = basketballTimeoutKindLimit(pool, draft.timeoutKind)
+      const kindUsed = charged.filter(event => event.payload.kind === draft.timeoutKind).length
+      if (kindLimit !== null && kindUsed >= kindLimit) {
+        return commandFailure('command_failed', `The ${periodLabel(prepared.state, draft.period.id)} ${TIMEOUT_LABELS[draft.timeoutKind].toLowerCase()} inventory is exhausted for that team.`)
+      }
     }
   }
   const label = neutral

@@ -13,6 +13,12 @@ import type {
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
+import {
+  basketballTimeoutKindLimit,
+  basketballTimeoutUsageByPool,
+  resolveBasketballTimeoutPool,
+  resolveBasketballTimeoutPoolWithCarryover,
+} from './rules'
 import { buildBasketballTimelineReview } from './timeline'
 import type {
   BasketballMatchEvent,
@@ -593,23 +599,52 @@ function basketballInvariantIssues(state: GameState): BasketballInvariantIssue[]
     })
   }
   const rules = state.sportGameState.setup.rulesSnapshot
-  for (const period of state.sportGameState.projection.periods) {
-    const allowance = period.kind === 'overtime'
-      ? rules.timeoutsPerOvertime
-      : rules.timeoutsPerPeriod
-    if (allowance === null) continue
-    for (const side of ['tracked', 'opponent'] as const) {
-      const used = state.sportGameState.projection.periodTimeouts[period.id]?.[side] ?? 0
-      if (used > allowance) {
+  for (const side of ['tracked', 'opponent'] as const) {
+    const usage = basketballTimeoutUsageByPool(events, rules, side)
+    const pools = new Map<string, ReturnType<typeof resolveBasketballTimeoutPoolWithCarryover>>()
+    for (const period of state.sportGameState.projection.periods) {
+      const resolved = resolveBasketballTimeoutPoolWithCarryover(rules, period.id, usage)
+      if (!resolved) continue
+      const existing = pools.get(resolved.id)
+      pools.set(resolved.id, existing ? {
+        ...resolved,
+        totalLimit: widerLimit(existing.totalLimit, resolved.totalLimit),
+        fullLimit: widerLimit(existing.fullLimit, resolved.fullLimit),
+        shortLimit: widerLimit(existing.shortLimit, resolved.shortLimit),
+      } : resolved)
+    }
+    for (const pool of pools.values()) {
+      if (!pool) continue
+      const charged = events.filter(event =>
+        event.eventType === 'basketball.timeout' &&
+        event.teamSide === side &&
+        (event.payload.kind === 'full' || event.payload.kind === 'thirty_second') &&
+        resolveBasketballTimeoutPool(rules, event.period.id)?.id === pool.id
+      )
+      if (pool.totalLimit !== null && charged.length > pool.totalLimit) {
         issues.push({
-          identity: `timeout-inventory:${period.id}:${side}`,
-          severity: used - allowance,
-          message: `Restoring this timeout would exceed the ${period.label} ${side} timeout inventory.`,
+          identity: `timeout-inventory:${pool.id}:${side}:total`,
+          severity: charged.length - pool.totalLimit,
+          message: `Restoring this timeout would exceed the ${pool.label} ${side} timeout inventory.`,
+        })
+      }
+      for (const kind of ['full', 'thirty_second'] as const) {
+        const limit = basketballTimeoutKindLimit(pool, kind)
+        const used = charged.filter(event => event.payload.kind === kind).length
+        if (limit === null || used <= limit) continue
+        issues.push({
+          identity: `timeout-inventory:${pool.id}:${side}:${kind}`,
+          severity: used - limit,
+          message: `Restoring this timeout would exceed the ${pool.label} ${side} timeout-kind inventory.`,
         })
       }
     }
   }
   return issues
+}
+
+function widerLimit(left: number | null, right: number | null): number | null {
+  return left === null || right === null ? null : Math.max(left, right)
 }
 
 function firstWorsenedInvariant(

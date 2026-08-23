@@ -23,6 +23,7 @@ import type {
   BasketballMatchEvent,
   BasketballTeamSide,
 } from './types'
+import { basketballRulesAllowOneAndOne } from './rules'
 
 export type BasketballFoulOffender =
   | { kind: 'player'; playerId: string }
@@ -445,7 +446,10 @@ function validateFreeThrowAward(
   const sportState = state.sportGameState?.sportId === 'basketball'
     ? state.sportGameState
     : null
-  if (!sportState?.setup.rulesSnapshot.hasOneAndOne) {
+  if (!sportState || !basketballRulesAllowOneAndOne(
+    sportState.setup.rulesSnapshot,
+    foul.period.id
+  )) {
     return 'The Basketball rules snapshot does not allow one-and-one free throws.'
   }
   const projected = addGameEvent(state, foul, gameEventRegistry, gameEventProjectors)
