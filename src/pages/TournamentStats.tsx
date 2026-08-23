@@ -9,6 +9,7 @@ import { acceptedTeamRole, canManageTeam } from '../lib/teamPermissions'
 import { formatCompactGameStatLine } from '../lib/statDisplay'
 import { playerInfoPath, teamInfoPath, teamStatsPath } from '../lib/teamInfo'
 import { SoccerAggregateDestinationPage } from '../components/soccer-aggregate/SoccerAggregateDestination'
+import { BasketballAggregateDestinationPage } from '../components/basketball-aggregate/BasketballAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -142,7 +143,7 @@ export default function TournamentStats() {
       const teamData = teamRes.data as unknown as TeamRow
       setTournament(tr)
       setTeam(teamData)
-      if (teamData.seasons.sport === 'soccer') {
+      if (teamData.seasons.sport === 'soccer' || teamData.seasons.sport === 'basketball') {
         setGames([])
         setStatRows([])
         setPlayers([])
@@ -477,6 +478,61 @@ export default function TournamentStats() {
                 {placementError && (
                   <p className="text-xs text-red-600 mt-1">{placementError}</p>
                 )}
+              </section>
+            )}
+          </div>
+        }
+      />
+    )
+  }
+
+  if (team.seasons.sport === 'basketball') {
+    return (
+      <BasketballAggregateDestinationPage
+        variant="tournament"
+        scope={{ type: 'tournament', id: tournamentId }}
+        teamIds={[teamId]}
+        teamIdForLinks={teamId}
+        title={tournament.name}
+        subtitle={`${teamDisplayName(team)} - ${team.seasons.name}`}
+        backPath={teamInfoPath(teamId)}
+        overviewExtra={
+          <div className="space-y-4">
+            <section className="flex flex-wrap gap-2">
+              <Link
+                to={teamStatsPath(teamId)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+              >
+                Team stats
+              </Link>
+              {tournament.url && (
+                <a
+                  href={tournament.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                >
+                  Tournament site
+                </a>
+              )}
+            </section>
+            {(canEditPlacement || tournament.placement != null) && (
+              <section>
+                <h2 className="font-semibold text-slate-800 mb-2">Placement</h2>
+                {canEditPlacement ? (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex-1 min-w-[120px]">
+                      <span className="text-xs text-slate-500">Place</span>
+                      <input type="number" min={1} step={1} value={placementDraft} onChange={event => setPlacementDraft(event.target.value)} className="input-field mt-1" />
+                    </label>
+                    <button type="button" onClick={() => { void handleSavePlacement() }} disabled={savingPlacement} className="btn-primary py-2 px-4">
+                      {savingPlacement ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600">{placementLabel(tournament.placement)}</p>
+                )}
+                {placementError && <p className="text-xs text-red-600 mt-1">{placementError}</p>}
               </section>
             )}
           </div>

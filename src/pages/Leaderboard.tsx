@@ -7,6 +7,7 @@ import { teamDisplayName, playerDisplayName } from '../lib/display'
 import { playerInfoPath, teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { SoccerAggregateDestination } from '../components/soccer-aggregate/SoccerAggregateDestination'
+import { BasketballAggregateDestination } from '../components/basketball-aggregate/BasketballAggregateDestination'
 
 interface TeamRow {
   id: string
@@ -96,6 +97,10 @@ export default function Leaderboard() {
   )
   const isSoccerDestination =
     sport?.id === 'soccer' || scopedSport?.id === 'soccer'
+  const isBasketballDestination =
+    sport?.id === 'basketball' || scopedSport?.id === 'basketball'
+  const isCanonicalAggregateDestination =
+    isSoccerDestination || isBasketballDestination
 
   const pushLeaderboardParams = useCallback(
     (seasonId: string, teamId: string) => {
@@ -169,7 +174,7 @@ export default function Leaderboard() {
       setSeasonStats([])
       return
     }
-    if (isSoccerDestination) {
+    if (isCanonicalAggregateDestination) {
       setPlayers([])
       setSeasonStats([])
       setLoadingStats(false)
@@ -221,7 +226,7 @@ export default function Leaderboard() {
     return () => {
       cancelled = true
     }
-  }, [isSoccerDestination, selectedTeamId, supabaseClient])
+  }, [isCanonicalAggregateDestination, selectedTeamId, supabaseClient])
 
   const playerStatsMap = useMemo(() => {
     const map: Record<string, Record<string, number>> = {}
@@ -327,8 +332,8 @@ export default function Leaderboard() {
               {scopedSport ? `${scopedSport.name} Season Stats` : 'Season Leaderboard'}
             </h1>
             <p className="text-sm opacity-80">
-              {isSoccerDestination
-                ? 'Canonical statistics across completed matches'
+              {isCanonicalAggregateDestination
+                ? 'Authority-aware statistics across completed games'
                 : 'Resolved stats across finalized games'}
             </p>
           </div>
@@ -366,7 +371,7 @@ export default function Leaderboard() {
         <section className="card space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold text-slate-700">
-              {isSoccerDestination ? 'Team shortcuts' : 'Team'}
+              {isCanonicalAggregateDestination ? 'Team shortcuts' : 'Team'}
             </h2>
             {selectedTeamId && (
               <button
@@ -378,7 +383,7 @@ export default function Leaderboard() {
               </button>
             )}
           </div>
-          {isSoccerDestination && (
+          {isCanonicalAggregateDestination && (
             <p className="text-xs text-slate-500">
               The leaderboard includes every readable team in this season. This selection controls
               Team Stats and player links only.
@@ -426,7 +431,16 @@ export default function Leaderboard() {
           />
         )}
 
-        {selectedTeam && !isSoccerDestination && (
+        {isBasketballDestination && selectedSeasonId && (
+          <BasketballAggregateDestination
+            variant="season"
+            scope={{ type: 'season', id: selectedSeasonId }}
+            teamIds={filteredTeams.map(team => team.id)}
+            teamIdForLinks={selectedTeamId || null}
+          />
+        )}
+
+        {selectedTeam && !isCanonicalAggregateDestination && (
           <section className="card space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold text-slate-700">
