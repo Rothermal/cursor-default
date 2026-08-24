@@ -17,6 +17,7 @@ import {
   createBasketballTeamSettingsCacheRecord,
   defaultBasketballTeamSettings,
   parseCloudBasketballTeamSettings,
+  resolveBasketballTeamSettingsCloudRecord,
   validBasketballTeamSettingsCache,
 } from '../lib/basketball/teamSettingsSync'
 
@@ -103,39 +104,42 @@ export function useBasketballTeamSettings(
     try {
       const loaded = await loadTeamSportSettings(teamId, 'basketball')
       if (requestId !== requestRef.current) return
-      if (loaded.status === 'loaded') {
-        const parsed = parseCloudBasketballTeamSettings(loaded.record)
-        if (!parsed) {
+      if (loaded.status === 'loaded' || loaded.status === 'missing') {
+        const resolved = resolveBasketballTeamSettingsCloudRecord(
+          loaded.status === 'loaded' ? loaded.record : null
+        )
+        if (resolved.status === 'invalid') {
           setStatus('error')
           setError('Shared Basketball defaults use an unsupported or invalid schema.')
           return
         }
-        const cache = createBasketballTeamSettingsCacheRecord(parsed.settings, {
-          revision: parsed.revision,
-          cloudUpdatedAt: parsed.updatedAt,
-        })
-        const cacheResult = saveSportSettingsCache(scope, cache)
-        setSettings(parsed.settings)
-        setRevision(parsed.revision)
-        setLastSyncedAt(parsed.updatedAt)
-        setError(cacheResult.ok ? null : cacheResult.error)
-        setStatus('synced')
-        return
-      }
-      if (loaded.status === 'missing') {
-        const defaults = defaultBasketballTeamSettings()
+        if (resolved.status === 'missing') {
+          const cacheResult = saveSportSettingsCache(
+            scope,
+            createBasketballTeamSettingsCacheRecord(resolved.settings, {
+              revision: null,
+              cloudUpdatedAt: null,
+            })
+          )
+          setSettings(resolved.settings)
+          setRevision(null)
+          setLastSyncedAt(null)
+          setError(cacheResult.ok ? null : cacheResult.error)
+          setStatus('missing')
+          return
+        }
         const cacheResult = saveSportSettingsCache(
           scope,
-          createBasketballTeamSettingsCacheRecord(defaults, {
-            revision: null,
-            cloudUpdatedAt: null,
+          createBasketballTeamSettingsCacheRecord(resolved.record.settings, {
+            revision: resolved.record.revision,
+            cloudUpdatedAt: resolved.record.updatedAt,
           })
         )
-        setSettings(defaults)
-        setRevision(null)
-        setLastSyncedAt(null)
+        setSettings(resolved.record.settings)
+        setRevision(resolved.record.revision)
+        setLastSyncedAt(resolved.record.updatedAt)
         setError(cacheResult.ok ? null : cacheResult.error)
-        setStatus('missing')
+        setStatus('synced')
         return
       }
       if (loaded.status === 'not_configured') {

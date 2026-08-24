@@ -1,10 +1,11 @@
-import { Check, RefreshCw, Save, Settings2 } from 'lucide-react'
+import { ArrowRight, Check, RefreshCw, Save, Settings2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useBasketballTeamSettings } from '../../hooks/useBasketballTeamSettings'
 import { resolveBasketballRules } from '../../lib/basketball/profiles'
 import type { BasketballTeamSettingsV1 } from '../../lib/basketball/settings'
 import { basketballTeamSettingsFingerprint } from '../../lib/basketball/teamSettingsSync'
+import { settingsPath } from '../../lib/settingsNavigation'
 import BasketballRulesSettingsFields from './BasketballRulesSettingsFields'
 
 export default function BasketballTeamSettingsPanel({
@@ -110,6 +111,22 @@ export default function BasketballTeamSettingsPanel({
           </button>
         </div>
       )}
+
+      <div className="space-y-2 border-y border-blue-100 bg-blue-50 px-3 py-3 text-sm">
+        <p className="font-semibold text-blue-900">Which rules apply?</p>
+        <p className="text-blue-800">
+          These team defaults apply when setting up Basketball event-model games. Current legacy
+          games continue to use the team foul, timeout, and bonus rules configured for the team's
+          season.
+        </p>
+        <Link
+          to={settingsPath('data')}
+          className="inline-flex min-h-10 items-center gap-2 font-semibold text-blue-700"
+        >
+          Open Seasons
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
 
       <button
         type="button"

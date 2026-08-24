@@ -7,12 +7,23 @@ import {
   createBasketballTeamSettingsCacheRecord,
   defaultBasketballTeamSettings,
   parseCloudBasketballTeamSettings,
+  resolveBasketballTeamSettingsCloudRecord,
   validBasketballTeamSettingsCache,
 } from './teamSettingsSync'
 
 const now = '2026-08-24T12:00:00.000Z'
 
 describe('Basketball team settings synchronization', () => {
+  it('resolves a missing cloud row from the exact application default', () => {
+    expect(resolveBasketballTeamSettingsCloudRecord(null)).toEqual({
+      status: 'missing',
+      settings: {
+        baseProfile: { profileId: 'nfhs', profileVersion: 1 },
+        ruleOverrides: {},
+      },
+    })
+  })
+
   it('accepts strict version-one Basketball cache and cloud records', () => {
     const settings = defaultBasketballTeamSettings()
     const cache = createBasketballTeamSettingsCacheRecord(settings, {

@@ -11,6 +11,17 @@ import {
   type BasketballTeamSettingsV1,
 } from './settings'
 
+export type BasketballTeamSettingsCloudResolution =
+  | {
+      status: 'loaded'
+      record: SportSettingsCloudRecord<BasketballTeamSettingsV1>
+    }
+  | {
+      status: 'missing'
+      settings: BasketballTeamSettingsV1
+    }
+  | { status: 'invalid' }
+
 export function basketballTeamSettingsCacheScope(
   userId: string,
   teamId: string
@@ -39,6 +50,18 @@ export function parseCloudBasketballTeamSettings(
   ) return null
   const parsed = parseBasketballTeamSettings(record.settings)
   return parsed.ok ? { ...record, settings: parsed.value } : null
+}
+
+export function resolveBasketballTeamSettingsCloudRecord(
+  record: SportSettingsCloudRecord | null
+): BasketballTeamSettingsCloudResolution {
+  if (!record) {
+    return { status: 'missing', settings: defaultBasketballTeamSettings() }
+  }
+  const parsed = parseCloudBasketballTeamSettings(record)
+  return parsed
+    ? { status: 'loaded', record: parsed }
+    : { status: 'invalid' }
 }
 
 export function createBasketballTeamSettingsCacheRecord(

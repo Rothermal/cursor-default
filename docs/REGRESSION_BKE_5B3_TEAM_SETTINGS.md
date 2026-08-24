@@ -13,6 +13,7 @@ two-manager conflict checks remain post-merge evidence; upgrades and legacy impo
 - owner/admin profile and personal-foul-limit editing with draft, discard, and save controls
 - scorer/viewer compact read-only rule review
 - resolved built-in versus team-override source labels and profile source links
+- explicit event-model scope guidance with a link to legacy season rule authority
 - shared rules fields reused by personal and team settings to prevent presentation drift
 
 Team defaults never inherit a recorder's personal rules. BKE-5B3 reads and writes only the fixed
@@ -22,17 +23,18 @@ Basketball schema-version-1 contract introduced by migration 062. It does not ad
 
 Recorded 2026-08-24:
 
-- `pnpm test`: 158 files, 1,068 tests passed
-- focused Basketball team settings/parser/cloud suite: 4 files, 17 tests passed
+- `pnpm test`: 158 files, 1,070 tests passed
+- focused Basketball team settings/parser/cloud suite: 4 files, 19 tests passed
 - `pnpm exec tsc -b --pretty false`: passed
 - `pnpm lint`: zero errors; six existing Fast Refresh warnings, duplicated by the separate
   `.worktrees/bke-5-settings-rollout` checkout
 - `pnpm build`: passed; existing Browserslist freshness and bundle-size warnings only
 - `git diff --check`: passed
 
-Coverage includes strict cache/cloud parsing, wrong-sport and unsupported-schema rejection,
-account/team scope separation, stable fingerprints, fixed Basketball team save transport, and
-refresh serialization policy. Existing team-role tests retain owner/admin write versus
+Coverage includes the exact NFHS v1 application default and missing-row resolution, strict
+cache/cloud parsing, wrong-sport and unsupported-schema rejection, account/team scope separation,
+stable fingerprints, fixed Basketball team save transport, and refresh serialization policy.
+Existing team-role tests retain owner/admin write versus
 scorer/viewer read-only boundaries.
 
 ## Live Checks
