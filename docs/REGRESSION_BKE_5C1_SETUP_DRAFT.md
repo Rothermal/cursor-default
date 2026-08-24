@@ -15,7 +15,9 @@ remains behind the internal gate; BKE-5C2 through BKE-5C4 remain before release 
 - best-effort tournament compensation when the local commit fails
 - one rollback-safe context/storage transaction for a complete setup candidate
 - matching committed pre-start setup updates the same local slot instead of creating another
-- unchanged Soccer and other-sport entry behavior
+- preserved Soccer and other-sport setup behavior. Team Info no longer pre-seeds Soccer
+  `cloudSync`: Soccer setup reads the team from the route and replaces that block on submit, so
+  the removed write was inert after `startNewGame` reset the active state.
 
 `src/lib/basketball/setupDraft.ts` already carries the complete version-1 Event review shape so
 reload parsing stays strict. C1 seeds that hidden review from current application defaults only.

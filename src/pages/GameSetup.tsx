@@ -878,6 +878,8 @@ export default function GameSetup() {
       }
     }
 
+    const hasActiveGame = Boolean(state.sport && state.players.length > 0)
+
     if (isBasketballSetup && !matchingCommittedBasketballSetup) {
       let capacity: ReturnType<typeof getParkedGameStorageInfo>
       try {
@@ -894,7 +896,7 @@ export default function GameSetup() {
         return
       }
       if (
-        state.sport &&
+        hasActiveGame &&
         !window.confirm('Park your current game and continue with this Basketball setup?')
       ) {
         return
@@ -903,7 +905,6 @@ export default function GameSetup() {
 
     const nextTeamId = teamMode === 'existing' ? selectedTeamId || null : null
     const teamIdChanging = nextTeamId !== state.cloudSync.teamId
-    const hasActiveGame = Boolean(state.sport && state.players.length > 0)
     // Switching cloud teams must not keep the prior gameId/roster (same-name teams
     // previously slipped past SET_GAME_INFO's teamName-only clear).
     if (!isBasketballSetup && teamIdChanging && (hasActiveGame || state.cloudSync.gameId)) {

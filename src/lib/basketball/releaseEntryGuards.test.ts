@@ -89,6 +89,9 @@ describe('Basketball release entry guards', () => {
     )
     expect(setup).toContain('saveBasketballSetupDraft(currentBasketballDraft)')
     expect(handler).toContain('commitGameSetup(')
+    expect(handler).toContain(
+      "hasActiveGame &&\n        !window.confirm('Park your current game and continue with this Basketball setup?')"
+    )
   })
 
   it('keeps the internal creation gate closed outside development policy', () => {
