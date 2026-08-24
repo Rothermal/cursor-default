@@ -5,7 +5,8 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react'
-import { Check, Cloud, RefreshCw, RotateCcw, Save } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, Check, Cloud, RefreshCw, RotateCcw, Save } from 'lucide-react'
 import { useSettings } from '../../context/SettingsContext'
 import {
   listBasketballRulesProfiles,
@@ -19,6 +20,7 @@ import {
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
   type BasketballPersonalSettingsV1,
 } from '../../lib/basketball/settings'
+import { settingsPath } from '../../lib/settingsNavigation'
 import ConfirmDialog from '../ConfirmDialog'
 
 type BasketballSettingsTab = 'rules' | 'capture' | 'display'
@@ -234,6 +236,22 @@ export default function BasketballSettings() {
       >
         {activeTab === 'rules' && (
           <div className="space-y-5">
+            <div className="space-y-2 border-y border-blue-100 bg-blue-50 px-3 py-3 text-sm">
+              <p className="font-semibold text-blue-900">Which rules apply?</p>
+              <p className="text-blue-800">
+                These personal defaults apply when setting up Basketball event-model games.
+                Current legacy games continue to use the team foul, timeout, and bonus rules
+                configured for their season.
+              </p>
+              <Link
+                to={settingsPath('data')}
+                className="inline-flex min-h-10 items-center gap-2 font-semibold text-blue-700"
+              >
+                Open Seasons
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            </div>
+
             <label className="block text-sm font-medium text-slate-700">
               Tracking profile
               <select

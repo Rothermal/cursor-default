@@ -13,6 +13,8 @@ remain post-merge evidence; team settings remain BKE-5B3.
 - one `SettingsContext` Basketball personal authority consumed by live rebound capture
 - compact Rules, Capture, and Display tabs with draft/discard/save/reset behavior
 - profile selection, personal-foul override, resolved rule summary, and profile provenance
+- Rules guidance distinguishes event-model defaults from legacy season authority and links directly
+  to Data & Sync -> Seasons
 
 The legacy app setting remains read-only bootstrap compatibility. Once a valid Basketball cache or
 cloud row exists, that strict schema-version-1 payload is authoritative. Capture and display values
