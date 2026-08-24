@@ -98,11 +98,18 @@ export function basketballCloudParticipants(
   )
   return Object.values(sportState.projection.participants).map(participant => {
     const origin = setupById.get(participant.participantId)
+    // Only immutable setup participants may claim a lasting team roster link.
+    // Late free-text tracked adds mint local player UUIDs that are not on
+    // team_players; sending them as source_player_id makes every bind/sync fail
+    // with "Participant source player is not on the source team" and permanently
+    // blocks cloud writes once dependent history exists.
     return {
       client_participant_id: participant.participantId,
       client_player_id: participant.playerId,
       source_player_id:
-        sportState.setup.sourceTeamId && participant.teamSide === 'tracked'
+        sportState.setup.sourceTeamId &&
+        participant.teamSide === 'tracked' &&
+        origin !== undefined
           ? participant.playerId
           : null,
       kind: participant.playerId ? 'player' : 'anonymous',
