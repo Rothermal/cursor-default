@@ -37,7 +37,8 @@ item is planned.
 2. Keep `M*` items listed so later season/coach requests do not get lost.
 3. When an item is confirmed, write a focused plan and Q&A the way SOC-4 / F5-F12
    were planned. File lists, acceptance, and regression belong in that plan.
-   Restart capture is planned in [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md).
+   Restart capture has an approved plan in
+   [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md).
 4. After a plan ships, mark the item implemented here and link the plan.
 
 Owner match notes live in [Section 8](#8-owner-match-notes). Confirmed items
@@ -106,6 +107,12 @@ Owner confirmation: first live matches made this the biggest workflow gap.
 **Likely direction:** a Field-tab Sub control that opens the existing
 substitution window. Optional later: tap a Lineup row to start the same window
 (`S8`).
+
+**Planning note:** the current quick row is already full (Goal, Foul, Card,
+Team), and the restart plan renames Team rather than freeing that slot. Plan
+`S2` with `S3` as one Field-shell pass that defines compact primary actions and
+an overflow/review treatment. Do not keep adding one-off fifth and sixth
+buttons to the four-column row.
 
 **Not this item:** changing substitution-window or return-sub rules.
 
@@ -201,8 +208,8 @@ record as unrelated open-play shots.
 kick, the next shot sheet defaults situation and source to that restart.
 The recorder can clear it.
 
-**Not this item:** treating throw-ins or goal kicks as core events. Making
-the existing corner sheet obvious is `S17`.
+**Not this item:** implementing new restart capture. That belongs to `S17` /
+`S20` and the dedicated restart plan.
 
 ### S8 - Lineup as a live board
 
@@ -273,6 +280,14 @@ setup, prefill `initialRole` from it, and keep live Role / `soccer.role_changed`
 as the match override only. Do not write in-game role changes back unless the
 recorder explicitly updates the default.
 
+**Planning note:** `SoccerTeamSettings` cannot accept this today; its local and
+SQL validators require exactly `{ rules }`. A role belongs to a player's team
+roster entry, not the global player identity. The focused plan must choose
+between using the existing team-scoped `team_players.position` text field with
+a strict Soccer mapping or adding explicit sport metadata to the roster. It
+must also define legacy/null fallback to Midfielder and merge behavior before
+`S19` consumes the defaults.
+
 **Not this item:** formation drawings (`S19`), minutes-by-role analysis, or
 treating role as a second player identity.
 
@@ -284,15 +299,22 @@ treating role as a second player identity.
 Field marker tap (`editFieldEvent` → `SoccerShotCaptureDialog`)
 
 Owner confirmation: located shots can be edited by selecting the marker on
-the pitch. The same shots cannot be edited from the event tracker / Timeline.
+the pitch, but the same correction was not available or did not work from the
+event tracker / Timeline during use.
 
-Both paths are supposed to open `SoccerShotCaptureDialog` in `edit` mode.
-Timeline also nests that dialog inside the Timeline `busy` wrapper. The
-visible gap is the Timeline entry, not a missing shot schema.
+Code review found that `SoccerTimeline.editEvent` already routes every
+`soccer.shot` and `soccer.own_goal` (located or unlocated) through
+`SoccerLocatedEventEditor` into `SoccerShotCaptureDialog` edit mode. This is
+therefore a confirmed symptom, not yet a proven missing route. Authority can
+also matter: an owned local source is editable, while canonical, cloud-primary,
+and alternate recordings are intentionally read-only.
 
-**Likely direction:** tapping Correct on a Timeline shot/own-goal must open
-the same attacking editor as a pitch marker, including unlocated Quick Goal
-rows. If save fails, show the reason on the sheet; do not fail silently.
+**Likely direction:** reproduce first and record the exact surface/source:
+live Tracker Timeline versus post-game Summary Timeline, local versus cloud,
+whether the Correct pencil is absent, and whether the sheet opens but save
+fails. Add a focused regression for the failing branch. Only then change the
+route, visibility gate, busy wrapper, or error presentation that is actually
+responsible.
 
 **Not this item:** out-of-order undo (`S4`) or changing revision rules.
 
@@ -347,16 +369,28 @@ finalizing` is raised when the stored primary checkpoint is missing or its
 snapshot. A real primary change uses `refresh finalization readiness`.
 The panel has no Reload control.
 
-This is likely compounded by `S13`: an incomplete local stream cannot
-publish a current checkpoint, then ended-match finalization compares a
-later local/primary snapshot to a stale checkpoint. The Summary badge can
-still say Local while Cloud Finalization is offered.
+`S13` may have prevented a healthy checkpoint on the affected match, but that
+relationship is not proven. The finalization client already reloads the cloud
+primary, rejects an incomplete projection, and confirms a stale checkpoint
+before submitting. The active server implementation now runs through the
+shared `finalize_event_game` core introduced by migrations 055 and 058; the
+public Soccer RPC name remains stable. A mismatch after that preparation is a
+race, stale readiness/checkpoint detail, or fingerprint/revision disagreement
+that needs captured evidence rather than another speculative retry.
 
 **Likely direction:** show the real mismatch (checkpoint stale, stream
 incomplete, or primary changed). Offer Sync / reload readiness before
 submit. Do not offer Finalize when the local or primary projection is
 incomplete. After `S13` is repaired, re-test this match path before
 changing the RPC.
+
+**Investigation evidence to capture:** game id, current user id, selected
+primary id, readiness before/after preparation, recorder checkpoint count and
+timestamp, primary event revisions/fingerprint, and whether any event changed
+between checkpoint confirmation and finalization. Add a deterministic test for
+the prepare-confirm-finalize sequence and a specific UI state for stale
+checkpoint versus changed primary. Do not expose raw fingerprints in ordinary
+user-facing copy.
 
 **Not this item:** changing canonical publication rules or allowing
 finalize from an incomplete stream.
@@ -378,6 +412,11 @@ type.
 core goal/shot totals unchanged. Own goals and non-goal shots can omit it
 until a later `M5` body-part catalog exists. Timeline and Summary should
 show Header when present.
+
+**Planning note:** prefer an optional extensible value such as
+`bodyPart: 'header' | null` over a one-off `isHeader` boolean, even if the first
+UI exposes only Header. Existing schema-version-1 shots must remain valid, and
+reader support must deploy before the capture control writes the new payload.
 
 **Not this item:** foot / left-right / volley / rebound / build-up (`M5`),
 or making header a required field on every goal.
@@ -408,12 +447,18 @@ wait for Saved / Off target / Blocked if first matches still need
 on-pitch end location. Do not infer xG. Do not require placement to save
 the shot (`S1`).
 
+**Planning note:** the focused plan must define normalized goal-mouth axes,
+whose viewpoint left/right uses, field-flip behavior, edit/remove behavior,
+and whether normal goals only or own goals can carry placement. Treat origin
+and placement as two named coordinates; never overload `GameEvent.location`.
+As with Header, merge reader support before enabling the writer.
+
 **Not this item:** expected-goals models, heatmaps as a separate product,
 or treating placement as a second shot event.
 
 ### S17 - Make the existing corner event obvious
 
-**Status:** planned — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)  
+**Status:** approved plan — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)
 **Theme:** restarts  
 **Where:** Field Quick **Team** → Team Event sheet → Corner / Offside;
 Left/Right shortcuts; `soccer.team_event` `kind: 'corner'`
@@ -427,14 +472,16 @@ set a corner-arc pin; they are not presented as “this corner, this side.”
 Save then drops actors, so even if a taker were chosen, it would not
 stick. Timeline/Field just say Team Event / Restart.
 
-**Likely direction:** keep the existing corner event. Put a Corner quick
-action on the Field tab. Open a short sheet: side (left/right), optional
-taker, save. Derive or store left/right so Timeline can say “Tracked
-right corner — #7” instead of “Team event.” Optional taker is the only
-data add; do not invent a second event type. `S7` can still link the next
+**Approved direction:** keep the existing corner event. Replace Quick Team
+with a one-shot Restart mode: tap Restart, tap the corner on the main field,
+then confirm the kind and optional taker. `GameEvent.location` is the placement
+source of truth; do not add a redundant left/right payload. Timeline can say
+`Tracked corner - #7` while Field shows which corner was used. Optional taker
+is the only corner data add; when omitted, store no actor and label it `Taker
+not recorded`. Do not invent a second event type. `S7` can still link the next
 shot to that corner.
 
-**Not this item:** throw-ins (`S20`), goal kicks, or making a taker required.
+**Not this item:** shot-source auto-linking (`S7`) or making a taker required.
 
 ### S18 - Flipped field keeps cluster counts upright
 
@@ -486,7 +533,7 @@ heatmaps.
 
 ### S20 - Throw-ins
 
-**Status:** planned with goal kicks — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)  
+**Status:** approved plan — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)
 **Theme:** restarts  
 **Where:** `SoccerTeamEventKind` is only `'corner' | 'offside'`
 
@@ -497,9 +544,11 @@ find (`S17`).
 
 Owner asked after first matches whether throw-ins can be tracked.
 
-**Likely direction if promoted:** reuse the Team Event / `S17` sheet —
-side, optional taker, optional location — with `kind: 'throw_in'`. Do not
-require one on every restart. Goal kicks stay out until someone asks.
+**Approved direction if promoted:** reuse the one-shot Restart flow from
+`S17`: tap the main field, then confirm side, kind, and optional taker. Add
+`kind: 'throw_in'` and `kind: 'goal_kick'`; the existing event location is
+authoritative. Do not require an event on every restart. Goal kicks are in
+scope by owner decision.
 
 **Not this item:** treating every dead ball as a core event.
 
@@ -601,6 +650,39 @@ shot. `S19` waits until default roles (`S11`) exist so a 4-3-3 slot can
 carry a player and a role. `M*` items stay behind a new phase name if
 promoted.
 
+### 6.1 Evidence state
+
+Use these labels before turning an item into an implementation plan:
+
+| State | Items | Next action |
+|---|---|---|
+| Code-confirmed defect or constraint | `S2`, `S3`, `S13`, `S18`, `S21` | Plan the smallest repair with regression coverage |
+| Confirmed symptom; reproduce the exact branch | `S12`, `S14` | Capture source/authority and failure details before choosing a fix |
+| Confirmed product request with open data/UX choices | `S11`, `S15`, `S16`, `S19` | Short Q&A, then a focused phase plan |
+| Approved implementation plan | `S17`, `S20` | Deliver the reader-first restart slices in `PLAN_SOC_RESTARTS.md` |
+| Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
+
+`S12` must not be implemented as a second editor path: the shared editor route
+already exists. `S14` must not weaken finalization authority to make the error
+go away. Both begin with evidence.
+
+### 6.2 Recommended work packages
+
+- **Correctness recovery:** `S13`, then reproduce and repair `S14`.
+- **Field shell:** `S2` + `S3` + `S18`; reserve a scalable action layout for
+  later `S4`, `S6`, and `S10` without implementing those unconfirmed items.
+- **Timeline correction:** `S12` as a verify-first focused repair.
+- **Roster defaults:** `S11`; `S19` follows only after role storage is stable.
+- **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
+  steps so metadata never blocks the primary save.
+- **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only
+  after restart capture is stable.
+- **General season UX:** `S21` is cross-sport and should not ride in a Soccer
+  event-model PR.
+
+These packages are planning boundaries, not a requirement to combine every
+item into one large PR. Each may still ship in reader/domain/UI slices.
+
 ## 7. Out of scope
 
 Do not use this backlog to:
@@ -611,8 +693,8 @@ Do not use this backlog to:
 - enable Soccer by default or hide historical soccer records
 - migrate basketball inside a soccer PR (see the BKE roadmap)
 - infer possession, ratings, or xG from the current event set
-- treat goal kicks or routine free kicks as core events; throw-ins stay
-  out unless `S20` is promoted
+- treat routine free kicks as separate team events; throw-ins and goal kicks
+  belong only to the dedicated restart plan
 
 Release evidence still belongs in `docs/REGRESSION_SOC_6E_RELEASE.md`.
 Broader Basketball event work continues in
@@ -636,9 +718,10 @@ Broader Basketball event work continues in
 - Need to mark when a goal is a header (`S15`).
 - Want shot/goal placement: shot from the left that landed on the right.
   Either a second field pin, or a goal-mouth view after a goal (`S16`).
-- Track corner kicks with left/right side and who is kicking (`S17`).
-  Owner follow-up: the event already exists; the Field UI is just not
-  clean (Quick Team → Corner/Offside, no taker, weak Timeline label).
+- Track corner kicks by tapping the corner and optionally recording the taker
+  (`S17`). The original left/right wording is superseded by tap-to-place. The
+  event already exists; the Field UI is not clean (Quick Team ->
+  Corner/Offside, no taker, weak Timeline label).
 - Two pins on the same spot correctly counted as 2. Flip reversed
   placement correctly, but the cluster number was upside down (`S18`).
 - Teams page: set a soccer lineup on a pitch (4-3-3, 4-4-2, 3-4-3), stored
