@@ -57,7 +57,11 @@ The additive event change keeps Soccer event schema version 1 so historical
 events remain readable. Old deployed readers still do not understand new
 kinds. Merge and deploy domain plus review-reader support before any live or
 historical UI can write `throw_in`, `goal_kick`, or `taker`. Cached/PWA clients
-are part of this compatibility rule.
+are part of this compatibility rule. If writers deploy first, a stale reader
+does not merely hide the unknown event: registry diagnostics make its stream
+inspection incomplete, which blocks projection-dependent review and
+finalization and can resemble the `S14` failure. R1/R2 deployment and cached
+client validation are therefore hard gates for R3, not advisory sequencing.
 
 ---
 
@@ -198,8 +202,15 @@ Live defaults:
 
 - `src/lib/soccer/types.ts` - kinds and `SoccerSideAttackingTotals`
 - `src/lib/soccer/events.ts` - `validateTeamEvent` and the
-  `soccer.team_event` actor allow-list; today only `offside_player` is allowed
-- `src/lib/soccer/soc4.ts` - `applyTeamEvent` per-kind actor rules
+  `soccer.team_event` actor gates. Today the allow-list accepts only
+  `offside_player`, while `validTeamEventActors` independently requires every
+  non-offside team event to have zero actors. Replace both gates with explicit
+  per-kind role/cardinality validation: restart kinds allow at most one
+  `taker`; Offside allows at most one `offside_player`; cross-kind roles fail
+  registry inspection
+- `src/lib/soccer/soc4.ts` - `applyTeamEvent` owns contextual actor validity
+  after schema inspection (including opponent/tracked participant safety) and
+  retains defensive fail-closed per-kind role checks
 - `src/lib/soccer/state.ts` - `emptySideTotals`
 - `src/lib/soccer/field.ts` - pure location-to-kind suggestion helper
 - `src/lib/soccer/soc4.test.ts`, `field.test.ts` - compatibility, projection,
@@ -244,14 +255,17 @@ payloads. Capability and live Supabase checks remain part of exit regression.
 - [ ] Add failing tests:
   - located `throw_in` with no actor increments `sideTotals.tracked.throwIns`
   - located `goal_kick` increments `goalKicks`
-  - tracked `taker` on a tracked throw-in is accepted
-  - tracked `participantId` taker on an opponent throw-in is rejected
+  - registry and projection accept one tracked `taker` on a tracked throw-in
+  - registry accepts the `taker` shape but projection rejects a tracked
+    `participantId` taker on an opponent throw-in
   - historical unlocated `{ kind: 'corner' }` still increments `corners`
-  - corner with `offside_player` fails schema/projection
+  - registry rejects a corner carrying `offside_player`
+  - registry rejects an offside carrying `taker`
+  - registry rejects duplicate or multiple actor roles for each kind
   - kind suggestions cover attacking corners, touchlines, defending goal area,
     ambiguous interior points, both attacking directions, and flipped display
-- [ ] Confirm new tests fail, then implement kinds, actor validation,
-  projection totals, and the pure suggestion helper.
+- [ ] Confirm new tests fail, then implement kinds, both registry actor gates,
+  defensive projection validation, totals, and the pure suggestion helper.
 - [ ] Run focused Soccer domain/field tests.
 - [ ] Commit `feat(soccer): add restart team events`.
 
@@ -284,6 +298,9 @@ payloads. Capability and live Supabase checks remain part of exit regression.
   armed. Changing capture side or leaving the Field tab also cancels it.
 - [ ] Keep historical Add/Edit location optional and route it through the same
   validated command path.
+- [ ] Remove the live Left/Right corner buttons and their module-private
+  `cornerLocation` helper. Historical Add/Edit retains the generic Set/Clear
+  field editor and does not add a replacement corner shortcut.
 - [ ] Manually verify an opponent throw-in cannot select a tracked roster
   participant as taker.
 - [ ] Commit `feat(soccer): add tap-to-place restart capture`.
