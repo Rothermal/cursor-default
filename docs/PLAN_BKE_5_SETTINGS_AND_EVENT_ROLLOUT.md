@@ -1,7 +1,7 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A and BKE-5B1 through BKE-5B3 are implemented;
-BKE-5B4 through BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
+Status: Product and delivery Q&A approved. BKE-5A and BKE-5B1 through BKE-5B4 are implemented;
+BKE-5C and BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
 user-visible event-model opt-in until the BKE-4 live release matrix and the targeted BKE-5 checks
 are accepted.
 
@@ -525,6 +525,16 @@ resolved read-only review. Missing rows resolve from the application profile, ne
 personal settings. Shared rule fields identify built-in versus team-override sources. No migration
 is added. See [`REGRESSION_BKE_5B3_TEAM_SETTINGS.md`](REGRESSION_BKE_5B3_TEAM_SETTINGS.md).
 
+BKE-5B4 implementation note: profile selection now opens an effective rule-diff review and
+reapplies compatible sparse overrides rather than clearing them. Team Manage owners/admins may
+load the selected season's legacy config, explicitly choose a fallback profile for modern-only
+fields, review defaults and mappings, and apply the result only to the unsaved team draft. The
+import never infers a profile, mutates the season, or saves automatically. The pure settings
+hierarchy proves personal and team authority branches remain isolated with match overrides last.
+No migration is added. See
+[`REGRESSION_BKE_5B4_UPGRADES_IMPORT.md`](REGRESSION_BKE_5B4_UPGRADES_IMPORT.md) and the combined
+[`REGRESSION_BKE_5B_SETTINGS.md`](REGRESSION_BKE_5B_SETTINGS.md).
+
 Deliver BKE-5B as four reviewable implementation slices:
 
 - **BKE-5B1 - settings foundation:** migration 062, exact personal/team parsers, fixed Basketball
@@ -535,7 +545,7 @@ Deliver BKE-5B as four reviewable implementation slices:
   conflict recovery; add Rules/Capture/Display personal tabs.
 - **BKE-5B3 - team lifecycle - implemented:** account/team-scoped online reads, role-aware Team Manage rules,
   manager CAS writes, read-only scorer/viewer presentation, and resolved source diagnostics.
-- **BKE-5B4 - upgrades and import:** profile-version diff/apply flow, reviewed legacy-season import,
+- **BKE-5B4 - upgrades and import - implemented:** profile-version diff/apply flow, reviewed legacy-season import,
   deterministic hierarchy coverage, migration/live checks, and BKE-5B exit documentation.
 
 BKE-5B2 and BKE-5B3 may both consume BKE-5B1 but must not duplicate cache ownership. BKE-5B4 owns

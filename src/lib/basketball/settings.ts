@@ -3,6 +3,7 @@ import {
   getBasketballRulesProfile,
   normalizeBasketballRuleOverridesV2,
   resolveBasketballRules,
+  type BasketballRulesResolutionResult,
   type BasketballRulesProfileRef,
 } from './profiles'
 import type { BasketballRuleOverridesV2 } from './types'
@@ -48,6 +49,43 @@ export const DEFAULT_BASKETBALL_PERSONAL_SETTINGS: BasketballPersonalSettingsV1 
 export const DEFAULT_BASKETBALL_TEAM_SETTINGS: BasketballTeamSettingsV1 = {
   baseProfile: DEFAULT_BASKETBALL_PROFILE,
   ruleOverrides: {},
+}
+
+export type BasketballSettingsAuthority = 'personal' | 'team'
+
+export function resolveBasketballSettingsHierarchy({
+  authority,
+  personalSettings,
+  teamSettings,
+  matchOverrides = {},
+}: {
+  authority: BasketballSettingsAuthority
+  personalSettings?: unknown
+  teamSettings?: unknown
+  matchOverrides?: unknown
+}): BasketballRulesResolutionResult {
+  const authoritative = authority === 'personal'
+    ? parseBasketballPersonalSettings(personalSettings)
+    : parseBasketballTeamSettings(teamSettings)
+  if (!authoritative.ok) {
+    return {
+      ok: false,
+      layer: authority,
+      message: `${authority === 'personal' ? 'Personal' : 'Team'} Basketball settings are invalid: ${authoritative.error}`,
+    }
+  }
+  const normalizedMatchOverrides = normalizeBasketballRuleOverridesV2(matchOverrides)
+  if (!normalizedMatchOverrides) {
+    return {
+      ok: false,
+      layer: 'match',
+      message: 'Basketball match rule overrides contain unsupported fields.',
+    }
+  }
+  return resolveBasketballRules(authoritative.value.baseProfile, [
+    { id: authority, overrides: authoritative.value.ruleOverrides },
+    { id: 'match', overrides: normalizedMatchOverrides },
+  ])
 }
 
 export function parseBasketballPersonalSettings(

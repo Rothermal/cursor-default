@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   listBasketballRulesProfiles,
+  previewBasketballProfileUpgrade,
   resolveBasketballRules,
   type BasketballRuleLayerId,
+  type BasketballProfileUpgradeResult,
   type BasketballRulesProfileRef,
 } from '../../lib/basketball/profiles'
 import type { BasketballTeamSettingsV1 } from '../../lib/basketball/settings'
@@ -28,10 +30,21 @@ export default function BasketballRulesSettingsFields({
     settings.baseProfile,
     [{ id: layerId, overrides: settings.ruleOverrides }]
   ), [layerId, settings.baseProfile, settings.ruleOverrides])
+  const [pendingProfile, setPendingProfile] = useState<BasketballRulesProfileRef | null>(null)
+  const profilePreview = useMemo<BasketballProfileUpgradeResult | null>(() => (
+    pendingProfile
+      ? previewBasketballProfileUpgrade(
+          settings.baseProfile,
+          pendingProfile,
+          settings.ruleOverrides
+        )
+      : null
+  ), [pendingProfile, settings.baseProfile, settings.ruleOverrides])
 
-  const chooseProfile = (profileRef: BasketballRulesProfileRef) => {
-    onChange?.({ baseProfile: profileRef, ruleOverrides: {} })
-  }
+  useEffect(() => setPendingProfile(null), [
+    settings.baseProfile.profileId,
+    settings.baseProfile.profileVersion,
+  ])
 
   const setPersonalFoulLimit = (limit: number) => {
     const profile = profiles.find(item =>
@@ -51,15 +64,22 @@ export default function BasketballRulesSettingsFields({
         <label className="block text-sm font-medium text-slate-700">
           Tracking profile
           <select
-            value={`${settings.baseProfile.profileId}@${settings.baseProfile.profileVersion}`}
+            value={`${pendingProfile?.profileId ?? settings.baseProfile.profileId}@${pendingProfile?.profileVersion ?? settings.baseProfile.profileVersion}`}
             onChange={event => {
               const profile = profiles.find(item =>
                 `${item.profileId}@${item.profileVersion}` === event.target.value
               )
-              if (profile) chooseProfile({
+              if (!profile) return
+              const next = {
                 profileId: profile.profileId,
                 profileVersion: profile.profileVersion,
-              })
+              }
+              setPendingProfile(
+                next.profileId === settings.baseProfile.profileId &&
+                next.profileVersion === settings.baseProfile.profileVersion
+                  ? null
+                  : next
+              )
             }}
             className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-slate-900"
           >
@@ -73,6 +93,21 @@ export default function BasketballRulesSettingsFields({
             ))}
           </select>
         </label>
+      )}
+
+      {!readOnly && pendingProfile && profilePreview && (
+        <ProfileChangeReview
+          preview={profilePreview}
+          onCancel={() => setPendingProfile(null)}
+          onApply={() => {
+            if (!profilePreview.ok) return
+            onChange?.({
+              baseProfile: pendingProfile,
+              ruleOverrides: structuredClone(settings.ruleOverrides),
+            })
+            setPendingProfile(null)
+          }}
+        />
       )}
 
       {resolved.ok ? (
@@ -100,6 +135,117 @@ export default function BasketballRulesSettingsFields({
       )}
     </div>
   )
+}
+
+function ProfileChangeReview({
+  preview,
+  onCancel,
+  onApply,
+}: {
+  preview: BasketballProfileUpgradeResult
+  onCancel: () => void
+  onApply: () => void
+}) {
+  return (
+    <div className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
+      <div>
+        <p className="text-sm font-semibold text-amber-950">Review profile change</p>
+        <p className="mt-1 text-xs text-amber-800">
+          Existing compatible overrides stay applied. The change is blocked when an override is
+          incompatible with the selected profile.
+        </p>
+      </div>
+      {preview.ok ? (
+        <>
+          <p className="text-sm text-slate-800">
+            {preview.current.profile.label} v{preview.current.profile.profileVersion} to{' '}
+            {preview.candidate.profile.label} v{preview.candidate.profile.profileVersion}
+          </p>
+          {preview.differences.length === 0 ? (
+            <p className="text-xs text-slate-600">No effective rule values change.</p>
+          ) : (
+            <div className="divide-y divide-amber-200 border-y border-amber-200">
+              {preview.differences.map(diff => (
+                <div key={diff.field} className="py-2 text-xs text-slate-700">
+                  <p className="font-semibold text-slate-800">{fieldLabel(diff.field)}</p>
+                  <p className="mt-0.5 break-words">
+                    {formatRuleField(diff.field, preview.current.rules[diff.field])} to{' '}
+                    {formatRuleField(diff.field, preview.candidate.rules[diff.field])}
+                  </p>
+                  <p className="mt-0.5 text-amber-800">
+                    {diff.overridden
+                      ? 'Existing override preserved'
+                      : diff.changedByProfile
+                        ? 'Changed by selected profile'
+                        : 'Effective value unchanged by the profile'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <p role="alert" className="text-sm text-red-700">{preview.message}</p>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={!preview.ok}
+          onClick={onApply}
+        >
+          Apply Profile
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function fieldLabel(field: BasketballRulesV2Field): string {
+  switch (field) {
+    case 'regulationSegments': return 'Regulation segments'
+    case 'overtimeTemplate': return 'Overtime'
+    case 'foulWindows': return 'Foul windows'
+    case 'timeoutPools': return 'Timeout pools'
+    case 'personalFoulLimit': return 'Player foul limit'
+    case 'clockModel': return 'Clock model'
+  }
+}
+
+function formatRuleField(field: BasketballRulesV2Field, value: unknown): string {
+  if (field === 'personalFoulLimit' || field === 'clockModel') return String(value)
+  if (field === 'regulationSegments' && Array.isArray(value)) {
+    return value.map(item => {
+      const segment = item as Record<string, unknown>
+      return `${String(segment.label)} ${minutes(segment.durationMs)} min`
+    }).join(', ')
+  }
+  if (field === 'foulWindows' && Array.isArray(value)) {
+    return value.map(item => {
+      const window = item as Record<string, unknown>
+      return `${String(window.label)}: bonus ${limitValue(window.bonusThreshold)}, double ${limitValue(window.doubleBonusThreshold)}, 1-and-1 ${window.hasOneAndOne ? 'yes' : 'no'}`
+    }).join('; ')
+  }
+  if (field === 'timeoutPools' && Array.isArray(value)) {
+    return value.map(item => {
+      const pool = item as Record<string, unknown>
+      return `${String(pool.label)}: total ${limitValue(pool.totalLimit)}, full ${limitValue(pool.fullLimit)}, 30-sec ${limitValue(pool.shortLimit)}`
+    }).join('; ')
+  }
+  if (field === 'overtimeTemplate' && value && typeof value === 'object') {
+    const overtime = value as Record<string, unknown>
+    return `${String(overtime.label)}, ${minutes(overtime.durationMs)} min`
+  }
+  return String(value)
+}
+
+function minutes(value: unknown): number {
+  return typeof value === 'number' ? Math.round(value / 60_000) : 0
+}
+
+function limitValue(value: unknown): string {
+  return value === null ? 'none' : String(value)
 }
 
 export function BasketballRulesSummary({

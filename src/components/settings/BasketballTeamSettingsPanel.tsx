@@ -6,16 +6,21 @@ import { resolveBasketballRules } from '../../lib/basketball/profiles'
 import type { BasketballTeamSettingsV1 } from '../../lib/basketball/settings'
 import { basketballTeamSettingsFingerprint } from '../../lib/basketball/teamSettingsSync'
 import { settingsPath } from '../../lib/settingsNavigation'
+import BasketballLegacySeasonImport from './BasketballLegacySeasonImport'
 import BasketballRulesSettingsFields from './BasketballRulesSettingsFields'
 
 export default function BasketballTeamSettingsPanel({
   teamId,
   teamName,
+  seasonId,
+  seasonName,
   mayEdit,
   onAuditChange,
 }: {
   teamId: string
   teamName: string
+  seasonId: string
+  seasonName: string
   mayEdit: boolean
   onAuditChange: () => void
 }) {
@@ -169,6 +174,14 @@ export default function BasketballTeamSettingsPanel({
             readOnly={!sharedWritable}
             onChange={setDraft}
           />
+          {mayEdit && (
+            <BasketballLegacySeasonImport
+              seasonId={seasonId}
+              seasonName={seasonName}
+              disabled={!sharedWritable}
+              onApply={setDraft}
+            />
+          )}
         </>
       )}
 
