@@ -74,6 +74,8 @@ export type BasketballProfileUpgradeResult =
       ok: true
       current: BasketballResolvedRules
       candidate: BasketballResolvedRules
+      currentBaseRules: BasketballMatchRulesV2
+      targetBaseRules: BasketballMatchRulesV2
       differences: BasketballProfileUpgradeDiff[]
     }
   | { ok: false; message: string }
@@ -321,6 +323,8 @@ export function previewBasketballProfileUpgrade(
     ok: true,
     current: currentResolved.value,
     candidate: candidateResolved.value,
+    currentBaseRules: structuredClone(currentBase.rules),
+    targetBaseRules: structuredClone(targetBase.rules),
     differences: RULE_FIELDS
       .filter(field =>
         !sameJson(currentResolved.value.rules[field], candidateResolved.value.rules[field]) ||

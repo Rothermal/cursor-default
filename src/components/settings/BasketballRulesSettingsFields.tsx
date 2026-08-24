@@ -7,6 +7,7 @@ import {
   type BasketballProfileUpgradeResult,
   type BasketballRulesProfileRef,
 } from '../../lib/basketball/profiles'
+import { formatBasketballRuleField } from '../../lib/basketball/profileDiffPresentation'
 import type { BasketballTeamSettingsV1 } from '../../lib/basketball/settings'
 import type { BasketballRulesV2Field } from '../../lib/basketball/types'
 
@@ -168,17 +169,45 @@ function ProfileChangeReview({
               {preview.differences.map(diff => (
                 <div key={diff.field} className="py-2 text-xs text-slate-700">
                   <p className="font-semibold text-slate-800">{fieldLabel(diff.field)}</p>
-                  <p className="mt-0.5 break-words">
-                    {formatRuleField(diff.field, preview.current.rules[diff.field])} to{' '}
-                    {formatRuleField(diff.field, preview.candidate.rules[diff.field])}
-                  </p>
-                  <p className="mt-0.5 text-amber-800">
-                    {diff.overridden
-                      ? 'Existing override preserved'
-                      : diff.changedByProfile
-                        ? 'Changed by selected profile'
-                        : 'Effective value unchanged by the profile'}
-                  </p>
+                  {diff.overridden ? (
+                    <>
+                      <p className="mt-0.5 break-words">
+                        Profile default:{' '}
+                        {formatBasketballRuleField(
+                          diff.field,
+                          preview.currentBaseRules[diff.field]
+                        )}{' '}
+                        to{' '}
+                        {formatBasketballRuleField(
+                          diff.field,
+                          preview.targetBaseRules[diff.field]
+                        )}
+                      </p>
+                      <p className="mt-0.5 break-words text-amber-800">
+                        Your override stays{' '}
+                        {formatBasketballRuleField(
+                          diff.field,
+                          preview.candidate.rules[diff.field]
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-0.5 break-words">
+                        Current: {formatBasketballRuleField(
+                          diff.field,
+                          preview.current.rules[diff.field]
+                        )}
+                      </p>
+                      <p className="mt-0.5 break-words">
+                        New: {formatBasketballRuleField(
+                          diff.field,
+                          preview.candidate.rules[diff.field]
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-amber-800">Changed by selected profile</p>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -211,41 +240,6 @@ function fieldLabel(field: BasketballRulesV2Field): string {
     case 'personalFoulLimit': return 'Player foul limit'
     case 'clockModel': return 'Clock model'
   }
-}
-
-function formatRuleField(field: BasketballRulesV2Field, value: unknown): string {
-  if (field === 'personalFoulLimit' || field === 'clockModel') return String(value)
-  if (field === 'regulationSegments' && Array.isArray(value)) {
-    return value.map(item => {
-      const segment = item as Record<string, unknown>
-      return `${String(segment.label)} ${minutes(segment.durationMs)} min`
-    }).join(', ')
-  }
-  if (field === 'foulWindows' && Array.isArray(value)) {
-    return value.map(item => {
-      const window = item as Record<string, unknown>
-      return `${String(window.label)}: bonus ${limitValue(window.bonusThreshold)}, double ${limitValue(window.doubleBonusThreshold)}, 1-and-1 ${window.hasOneAndOne ? 'yes' : 'no'}`
-    }).join('; ')
-  }
-  if (field === 'timeoutPools' && Array.isArray(value)) {
-    return value.map(item => {
-      const pool = item as Record<string, unknown>
-      return `${String(pool.label)}: total ${limitValue(pool.totalLimit)}, full ${limitValue(pool.fullLimit)}, 30-sec ${limitValue(pool.shortLimit)}`
-    }).join('; ')
-  }
-  if (field === 'overtimeTemplate' && value && typeof value === 'object') {
-    const overtime = value as Record<string, unknown>
-    return `${String(overtime.label)}, ${minutes(overtime.durationMs)} min`
-  }
-  return String(value)
-}
-
-function minutes(value: unknown): number {
-  return typeof value === 'number' ? Math.round(value / 60_000) : 0
-}
-
-function limitValue(value: unknown): string {
-  return value === null ? 'none' : String(value)
 }
 
 export function BasketballRulesSummary({

@@ -25,7 +25,7 @@ review before the draft can be applied.
 
 Recorded 2026-08-24:
 
-- `pnpm test`: 160 files, 1,080 tests passed
+- `pnpm test`: 161 files, 1,083 tests passed after review hardening
 - focused import/hierarchy suite: 2 files, 10 tests passed
 - `pnpm exec tsc -b --pretty false`: passed
 - `pnpm lint`: zero errors; six existing Fast Refresh warnings, duplicated by the separate
@@ -35,7 +35,8 @@ Recorded 2026-08-24:
 
 Coverage proves four- and eight-period mapping, explicit fallback-profile authority, clone-safe
 previews, invalid legacy rejection, personal/team branch isolation, match-last precedence, exact
-source metadata, and fail-closed active-layer or match corruption.
+source metadata, fail-closed active-layer or match corruption, complete rule-diff presentation
+across every catalog transition, and visible base-profile movement beneath preserved overrides.
 
 ## Live Checks
 

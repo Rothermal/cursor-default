@@ -33,7 +33,7 @@ their original authority.
 - BKE-5B3: [`REGRESSION_BKE_5B3_TEAM_SETTINGS.md`](REGRESSION_BKE_5B3_TEAM_SETTINGS.md)
 - BKE-5B4: [`REGRESSION_BKE_5B4_UPGRADES_IMPORT.md`](REGRESSION_BKE_5B4_UPGRADES_IMPORT.md)
 
-The BKE-5B4 full suite passed 160 files and 1,080 tests on 2026-08-24. Migration 062 had already
+The BKE-5B4 full suite passed 161 files and 1,083 tests on 2026-08-24. Migration 062 had already
 been applied and its contract tests remain green. No BKE-5B4 migration is required.
 
 ## Exit and Next Boundary
