@@ -100,6 +100,11 @@ export interface ImportParkedGamesResult {
   summaries: ParkedGameSummary[]
 }
 
+export interface CommitGameSetupResult {
+  localGameId: string
+  summaries: ParkedGameSummary[]
+}
+
 function gameRecordKey(localGameId: string): string {
   return `${GAME_RECORD_KEY_PREFIX}${localGameId}`
 }
@@ -760,6 +765,41 @@ export function beginNewActiveParkedGame(ownerId: string | null): string {
   return localGameId
 }
 
+/**
+ * Installs one complete setup candidate while preserving the previous active game.
+ * Every localStorage key touched by the transaction is restored if a write fails.
+ */
+export function commitGameSetupState(
+  currentState: GameState,
+  nextState: GameState,
+  ownerId: string | null,
+  expectedLocalGameId: string | null = null
+): CommitGameSetupResult {
+  const manifest = migrateLegacyGameStorage(ownerId)
+  const snapshot = snapshotParkingStorage(manifest)
+
+  try {
+    if (expectedLocalGameId) {
+      if (manifest.activeLocalGameId !== expectedLocalGameId) {
+        throw new Error('This setup draft no longer matches the active local game.')
+      }
+      const summaries = saveActiveGameState(nextState, ownerId)
+      if (getActiveLocalGameId(ownerId) !== expectedLocalGameId) {
+        throw new Error('The active local game changed while setup was being saved.')
+      }
+      return { localGameId: expectedLocalGameId, summaries }
+    }
+
+    saveActiveGameState(currentState, ownerId)
+    const localGameId = beginNewActiveParkedGame(ownerId)
+    const summaries = saveActiveGameState(nextState, ownerId)
+    return { localGameId, summaries }
+  } catch (error) {
+    restoreParkingStorage(snapshot)
+    throw error
+  }
+}
+
 export function parkActiveGame(ownerId: string | null): ParkedGameSummary[] {
   const manifest = migrateLegacyGameStorage(ownerId)
   writeManifest({
@@ -842,6 +882,62 @@ export function clearAllParkedGames(): void {
     removeLegacyMirror()
   } catch {
     // ignore
+  }
+}
+
+interface ParkingStorageSnapshot {
+  manifest: string | null
+  legacyGame: string | null
+  legacyOwner: string | null
+  pendingSync: string | null
+  recordIds: string[]
+  records: Map<string, string | null>
+}
+
+function snapshotParkingStorage(manifest: ParkedGamesManifest): ParkingStorageSnapshot {
+  return {
+    manifest: localStorage.getItem(GAMES_MANIFEST_KEY),
+    legacyGame: localStorage.getItem(GAME_STORAGE_KEY),
+    legacyOwner: localStorage.getItem(GAME_OWNER_KEY),
+    pendingSync: localStorage.getItem(PENDING_SYNC_KEY),
+    recordIds: [...manifest.gameIds],
+    records: new Map(
+      manifest.gameIds.map(id => [id, localStorage.getItem(gameRecordKey(id))])
+    ),
+  }
+}
+
+function restoreParkingStorage(snapshot: ParkingStorageSnapshot): void {
+  try {
+    const currentRaw = localStorage.getItem(GAMES_MANIFEST_KEY)
+    if (currentRaw) {
+      const current = JSON.parse(currentRaw) as unknown
+      if (isManifest(current)) {
+        const originalIds = new Set(snapshot.recordIds)
+        for (const id of current.gameIds) {
+          if (!originalIds.has(id)) localStorage.removeItem(gameRecordKey(id))
+        }
+      }
+    }
+  } catch {
+    // Continue restoring the known snapshot keys.
+  }
+
+  for (const [id, value] of snapshot.records) {
+    restoreStorageItem(gameRecordKey(id), value)
+  }
+  restoreStorageItem(GAME_STORAGE_KEY, snapshot.legacyGame)
+  restoreStorageItem(GAME_OWNER_KEY, snapshot.legacyOwner)
+  restoreStorageItem(PENDING_SYNC_KEY, snapshot.pendingSync)
+  restoreStorageItem(GAMES_MANIFEST_KEY, snapshot.manifest)
+}
+
+function restoreStorageItem(key: string, value: string | null): void {
+  try {
+    if (value === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, value)
+  } catch {
+    // The original transaction error remains the actionable failure.
   }
 }
 

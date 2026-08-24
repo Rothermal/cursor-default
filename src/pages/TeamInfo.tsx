@@ -25,11 +25,14 @@ import {
   type TeamInfoGame,
 } from '../lib/teamInfo'
 import { acceptedTeamRole, canTrackGames } from '../lib/teamPermissions'
+import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import {
-  getSportAvailabilityPolicy,
-  isBasketballEventModelCreationAvailable,
-} from '../lib/sportAvailability'
-import { ensureBasketballReleaseCapabilities } from '../lib/basketball/releaseCapabilities'
+  basketballSetupAccountScope,
+  basketballSetupDraftHasMeaningfulEdits,
+  basketballSetupDraftMatchesRoute,
+  clearBasketballSetupDraft,
+  loadBasketballSetupDraft,
+} from '../lib/basketball/setupDraft'
 import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 
 interface TeamRow {
@@ -67,7 +70,6 @@ export default function TeamInfo() {
   const { isSportEnabled } = useSettings()
   const {
     state: gameState,
-    dispatch: gameDispatch,
     startNewGame,
     parkingError,
   } = useGame()
@@ -185,15 +187,22 @@ export default function TeamInfo() {
         return
       }
     }
-    if (sport.id === 'basketball' && isBasketballEventModelCreationAvailable()) {
-      if (!user) return
-      setStartingGame(true)
-      const capability = await ensureBasketballReleaseCapabilities(user.id)
-      setStartingGame(false)
-      if (capability.status !== 'ready') {
-        setStartGameError(capability.error)
+    if (sport.id === 'basketball') {
+      const scope = basketballSetupAccountScope(user?.id ?? null)
+      const existingDraft = loadBasketballSetupDraft(scope)
+      if (
+        existingDraft &&
+        !basketballSetupDraftMatchesRoute(existingDraft, team.id) &&
+        basketballSetupDraftHasMeaningfulEdits(existingDraft) &&
+        !window.confirm('Discard the unfinished Basketball setup and start this team game?')
+      ) {
         return
       }
+      if (existingDraft && !basketballSetupDraftMatchesRoute(existingDraft, team.id)) {
+        clearBasketballSetupDraft(scope)
+      }
+      navigate(gameSetupPath(team.id, sport.id))
+      return
     }
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
     if (
@@ -206,14 +215,7 @@ export default function TeamInfo() {
     if (!startNewGame(sport)) {
       return
     }
-    gameDispatch({
-      type: 'SET_CLOUD_SYNC_STATE',
-      cloudSync: {
-        seasonId: team.season_id,
-        teamId: team.id,
-      },
-    })
-    navigate(gameSetupPath(team.id))
+    navigate(gameSetupPath(team.id, sport.id))
   }
 
   useEffect(() => {

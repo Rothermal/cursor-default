@@ -13,7 +13,7 @@ function between(value: string, start: string, end: string): string {
   return value.slice(startIndex, endIndex)
 }
 
-describe('BKE-4E5 release entry guards', () => {
+describe('Basketball release entry guards', () => {
   it('preflights internal event-cloud continuation before game mutation', () => {
     const setup = source('src/pages/GameSetup.tsx')
     const handler = between(setup, 'const handleNext = async () => {', '\n  return (')
@@ -27,29 +27,68 @@ describe('BKE-4E5 release entry guards', () => {
     expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_GAME_INFO'"))
   })
 
-  it('preflights Team Info starts before confirmation or game mutation', () => {
+  it('keeps Basketball Team Info entry mutation-free until setup Continue', () => {
     const teamInfo = source('src/pages/TeamInfo.tsx')
     const handler = between(teamInfo, 'const handleStartGame = async () => {', '\n  useEffect(')
-    const capabilityIndex = handler.indexOf('await ensureBasketballReleaseCapabilities')
+    const basketballEntry = between(
+      handler,
+      "if (sport.id === 'basketball') {",
+      '\n    const hasActiveGame'
+    )
 
-    expect(capabilityIndex).toBeGreaterThanOrEqual(0)
-    expect(capabilityIndex).toBeLessThan(handler.indexOf('window.confirm'))
-    expect(capabilityIndex).toBeLessThan(handler.indexOf('startNewGame(sport)'))
-    expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_CLOUD_SYNC_STATE'"))
+    expect(basketballEntry).toContain("navigate(gameSetupPath(team.id, sport.id))")
+    expect(basketballEntry).not.toContain('ensureBasketballReleaseCapabilities')
+    expect(basketballEntry).not.toContain('startNewGame')
+    expect(basketballEntry).not.toContain('SET_CLOUD_SYNC_STATE')
   })
 
-  it('preflights team deep links before active-game confirmation or replacement', () => {
+  it('resolves Basketball team deep links without preflight or active-game replacement', () => {
     const setup = source('src/pages/GameSetup.tsx')
     const loader = between(
       setup,
       'const loadRequestedTeamSport = async () => {',
       '\n    void loadRequestedTeamSport()'
     )
-    const capabilityIndex = loader.indexOf('await ensureBasketballReleaseCapabilities')
+    const basketballEntry = between(
+      loader,
+      "if (requestedSport.id === 'basketball') {",
+      '\n      const hasActiveGame'
+    )
 
-    expect(capabilityIndex).toBeGreaterThanOrEqual(0)
-    expect(capabilityIndex).toBeLessThan(loader.indexOf('window.confirm'))
-    expect(capabilityIndex).toBeLessThan(loader.indexOf('startNewGame(requestedSport)'))
+    expect(basketballEntry).toContain('setLoadingRequestedTeamSport(false)')
+    expect(basketballEntry).not.toContain('ensureBasketballReleaseCapabilities')
+    expect(basketballEntry).not.toContain('window.confirm')
+    expect(basketballEntry).not.toContain('startNewGame')
+  })
+
+  it('keeps Basketball Sport Dashboard entry mutation-free', () => {
+    const dashboard = source('src/pages/SportDashboard.tsx')
+    const handler = between(dashboard, 'const handleStartNew = () => {', '\n  const handleResumeParked')
+    const basketballEntry = between(
+      handler,
+      "if (sport.id === 'basketball') {",
+      '\n    if (\n      hasActiveGame'
+    )
+
+    expect(basketballEntry).toContain("navigate('/setup?sport=basketball')")
+    expect(basketballEntry).not.toContain('startNewGame')
+  })
+
+  it('persists Basketball edits as a draft and commits through one context command', () => {
+    const setup = source('src/pages/GameSetup.tsx')
+    const eventIntent = between(
+      setup,
+      'const updateBasketballEventIntent = (enabled: boolean): boolean => {',
+      '\n  const updateTeamMode'
+    )
+    const handler = between(setup, 'const handleNext = async () => {', '\n  async function compensate')
+
+    expect(eventIntent).toContain('setBasketballAuthority')
+    expect(eventIntent.indexOf('setBasketballAuthority')).toBeLessThan(
+      eventIntent.indexOf("dispatch({ type: 'HYDRATE_STATE'")
+    )
+    expect(setup).toContain('saveBasketballSetupDraft(currentBasketballDraft)')
+    expect(handler).toContain('commitGameSetup(')
   })
 
   it('keeps the internal creation gate closed outside development policy', () => {

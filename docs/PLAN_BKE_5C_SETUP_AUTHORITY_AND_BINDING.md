@@ -1,8 +1,8 @@
 # Plan: BKE-5C Basketball Setup Authority and Binding Policy
 
-Status: Delivery design approved from the parent BKE-5 Q&A. No new product decisions are required.
-Implementation is split into BKE-5C1 through BKE-5C4 and remains behind the internal Basketball
-event-creation gate.
+Status: Delivery design approved from the parent BKE-5 Q&A. BKE-5C1 is implemented; BKE-5C2
+through BKE-5C4 remain. No new product decisions are required, and the phase remains behind the
+internal Basketball event-creation gate.
 
 Parent: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md)
 
@@ -286,7 +286,7 @@ or keep tracking offline, but a bound cloud game does not silently become a dive
 
 ## 9. Delivery Slices
 
-### BKE-5C1: Draft and atomic setup commit
+### BKE-5C1: Draft and atomic setup commit (implemented)
 
 - strict versioned/account-scoped draft storage
 - mutation-free Basketball entry from Sport Dashboard, Team Info, and direct team links
