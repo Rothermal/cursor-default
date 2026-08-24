@@ -308,8 +308,8 @@ begin
   foreach v_segment_id in array v_segment_ids
   loop
     select count(*) into v_count
-    from jsonb_array_elements(p_overrides->'foulWindows') window,
-      jsonb_array_elements_text(window->'segmentIds') segment_id
+    from jsonb_array_elements(p_overrides->'foulWindows') foul_window,
+      jsonb_array_elements_text(foul_window->'segmentIds') segment_id
     where segment_id = v_segment_id;
     if v_count <> 1 then
       raise exception 'SPORT_SETTINGS_INVALID: Basketball foul-window assignment is invalid';
@@ -323,10 +323,10 @@ begin
     end if;
     select count(*) into v_count
     from jsonb_array_elements(p_overrides->'regulationSegments') segment
-    join jsonb_array_elements(p_overrides->'foulWindows') window
-      on window->>'id' = segment->>'foulWindowId'
+    join jsonb_array_elements(p_overrides->'foulWindows') foul_window
+      on foul_window->>'id' = segment->>'foulWindowId'
     where segment->>'id' = v_segment_id
-      and (window->'segmentIds') ? v_segment_id;
+      and (foul_window->'segmentIds') ? v_segment_id;
     if v_count <> 1 then
       raise exception 'SPORT_SETTINGS_INVALID: Basketball segment foul-window reference is invalid';
     end if;
