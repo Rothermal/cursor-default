@@ -18,6 +18,7 @@ import MergePlayerWizard from '../components/MergePlayerWizard'
 import AccountSettings from '../components/settings/AccountSettings'
 import AppAccessPanel from '../components/settings/AppAccessPanel'
 import SoccerSettings from '../components/settings/SoccerSettings'
+import BasketballSettings from '../components/settings/BasketballSettings'
 import AuditTrailPanel from '../components/AuditTrailPanel'
 import { fetchMergePlayerScope, type MergePlayerCandidate } from '../lib/mergePlayerScope'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
@@ -113,7 +114,7 @@ interface MergeAuditListRow {
 export default function Admin() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { settings, isSportEnabled, toggleSport, setReboundPromptAfterMissEnabled } = useSettings()
+  const { isSportEnabled, toggleSport } = useSettings()
   const { appAccess, isConfigured, user } = useAuth()
   const { state: gameState, dispatch: gameDispatch } = useGame()
   const supabaseClient = supabase
@@ -770,60 +771,7 @@ export default function Admin() {
         )}
 
         {settingsSection === 'sport' && selectedSettingsSport?.id === 'basketball' && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-700">Basketball</h2>
-            </div>
-
-            <div className="card flex items-center justify-between gap-3 py-3">
-              <div>
-                <span className="font-medium text-slate-700">Missed-shot rebound prompt</span>
-                <p className="text-xs text-slate-400">
-                  After a court miss, ask whether to add an offensive or defensive rebound.
-                </p>
-              </div>
-
-              <button
-                onClick={() =>
-                  setReboundPromptAfterMissEnabled(
-                    !settings.courtCapture.reboundPromptAfterMiss
-                  )
-                }
-                className={`
-                  relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
-                  ${settings.courtCapture.reboundPromptAfterMiss ? 'bg-blue-600' : 'bg-slate-300'}
-                `}
-                role="switch"
-                aria-checked={settings.courtCapture.reboundPromptAfterMiss}
-                aria-label="Toggle missed-shot rebound prompt"
-              >
-                <span
-                  className={`
-                    absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow
-                    transition-transform duration-200
-                    ${settings.courtCapture.reboundPromptAfterMiss ? 'translate-x-5' : 'translate-x-0'}
-                  `}
-                />
-              </button>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 mt-3">
-              <p className="text-sm font-semibold text-slate-700">Team stat rules</p>
-              <p className="text-sm text-slate-500 mt-1">
-                Basketball team fouls, timeouts, and bonus rules are configured per season.
-              </p>
-              <Link
-                to={settingsPath('data')}
-                className="text-sm font-semibold text-blue-600 underline mt-2 inline-block"
-              >
-                Open Seasons
-              </Link>
-            </div>
-
-            <Link to={settingsPath('sports')} className="btn-secondary inline-block text-center mt-3">
-              Back to Sports
-            </Link>
-          </section>
+          <BasketballSettings />
         )}
 
         {settingsSection === 'data' && (

@@ -106,7 +106,7 @@ export default function ShotChartPanel({
 }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
   const { user } = useAuth()
-  const { settings } = useSettings()
+  const { basketballSettings } = useSettings()
   const { sport, players, activePlayerId, shotChart, actionLog } = state
   const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -504,7 +504,7 @@ export default function ShotChartPanel({
           players={popupPlayers}
           activePlayerId={pendingTap.playerId}
           onSelectPlayer={handlePopupSelectPlayer}
-          reboundPromptAfterMissEnabled={settings.courtCapture.reboundPromptAfterMiss}
+          reboundPromptAfterMissEnabled={basketballSettings.capture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
           errorMessage={captureError}
           onShotTypeChange={shotType => {
