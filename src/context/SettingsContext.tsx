@@ -5,15 +5,27 @@ import {
   type AppSettings,
 } from '../lib/settingsStorage'
 import { useSoccerPersonalSettings } from '../hooks/useSoccerPersonalSettings'
+import { useBasketballPersonalSettings } from '../hooks/useBasketballPersonalSettings'
 import type { SoccerPersonalSettings } from '../lib/soccer/settings'
 import type { SoccerSettingsSyncState } from '../hooks/useSoccerPersonalSettings'
+import type { BasketballPersonalSettingsV1 } from '../lib/basketball/settings'
+import type { BasketballSettingsSyncState } from '../hooks/useBasketballPersonalSettings'
 
 interface SettingsContextType {
   settings: AppSettings
   isSportEnabled: (sportId: string) => boolean
   toggleSport: (sportId: string) => void
   setSportEnabled: (sportId: string, enabled: boolean) => void
-  setReboundPromptAfterMissEnabled: (enabled: boolean) => void
+  basketballSettings: BasketballPersonalSettingsV1
+  basketballSettingsSync: BasketballSettingsSyncState
+  saveBasketballSettings: (
+    settings: BasketballPersonalSettingsV1,
+    expectedRevision?: number | null
+  ) => Promise<boolean>
+  refreshBasketballSettings: () => Promise<void>
+  useCloudBasketballSettings: () => void
+  keepDeviceBasketballSettings: () => Promise<void>
+  setBasketballSettingsPageActive: (active: boolean) => void
   soccerSettings: SoccerPersonalSettings
   soccerSettingsSync: SoccerSettingsSyncState
   saveSoccerSettings: (
@@ -30,7 +42,12 @@ const SettingsContext = createContext<SettingsContextType | null>(null)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(loadSettingsFromStorage)
+  const [basketballSettingsPageActive, setBasketballSettingsPageActive] = useState(false)
   const [soccerSettingsPageActive, setSoccerSettingsPageActive] = useState(false)
+  const basketball = useBasketballPersonalSettings(
+    settings.courtCapture.reboundPromptAfterMiss,
+    Boolean(settings.enabledSports.basketball) || basketballSettingsPageActive
+  )
   const soccer = useSoccerPersonalSettings(
     Boolean(settings.enabledSports.soccer) || soccerSettingsPageActive
   )
@@ -64,16 +81,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const setReboundPromptAfterMissEnabled = useCallback((enabled: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      courtCapture: {
-        ...prev.courtCapture,
-        reboundPromptAfterMiss: enabled,
-      },
-    }))
-  }, [])
-
   return (
     <SettingsContext.Provider
       value={{
@@ -81,7 +88,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         isSportEnabled,
         toggleSport,
         setSportEnabled,
-        setReboundPromptAfterMissEnabled,
+        basketballSettings: basketball.settings,
+        basketballSettingsSync: basketball.sync,
+        saveBasketballSettings: basketball.save,
+        refreshBasketballSettings: basketball.refresh,
+        useCloudBasketballSettings: basketball.useCloud,
+        keepDeviceBasketballSettings: basketball.keepDevice,
+        setBasketballSettingsPageActive,
         soccerSettings: soccer.settings,
         soccerSettingsSync: soccer.sync,
         saveSoccerSettings: soccer.save,

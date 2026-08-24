@@ -1,7 +1,7 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A and BKE-5B1 are implemented; BKE-5B2 through
-BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
+Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1, and BKE-5B2 are implemented; BKE-5B3
+through BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
 user-visible event-model opt-in until the BKE-4 live release matrix and the targeted BKE-5 checks
 are accepted.
 
@@ -490,7 +490,7 @@ window ids, enforce total/full/30-second inventory plus forward unused-pool carr
 pre-BKE-5 sources as Legacy configuration. Event and sport-state envelope versions remain 1, and
 new profile-backed creation remains behind the existing internal gate until BKE-5C/BKE-5D.
 
-### BKE-5B: Persistence and settings surfaces - BKE-5B1 implemented
+### BKE-5B: Persistence and settings surfaces - BKE-5B1/BKE-5B2 implemented
 
 - Add migration 062's fixed Basketball wrappers, validator, audit, and capability contract v2.
 - Add account/device personal caches, CAS/conflict recovery, first-load rebound migration, team
@@ -507,12 +507,22 @@ settings contract 1. `sportSettingsCloud.ts` exposes only fixed Basketball save 
 lifecycle hook consumes the new rows until BKE-5B2/BKE-5B3. See
 [`REGRESSION_BKE_5B1_SETTINGS_FOUNDATION.md`](REGRESSION_BKE_5B1_SETTINGS_FOUNDATION.md).
 
+BKE-5B2 implementation note: `basketball/personalSettingsSync.ts` and
+`useBasketballPersonalSettings.ts` own exact Basketball cache validation, anonymous/user scope
+isolation, legacy rebound bootstrap, missing-row seeding, pending writes, focus/online refresh, and
+explicit Use Cloud / Keep This Device recovery. `SettingsContext` exposes one Basketball personal
+authority, and live rebound capture consumes it instead of the legacy app-settings field.
+`BasketballSettings` provides compact Rules/Capture/Display drafts, profile selection, a validated
+personal-foul override, resolved rule/provenance review, reset/discard/save controls, and cloud
+status/conflict presentation. Team settings remain BKE-5B3. See
+[`REGRESSION_BKE_5B2_PERSONAL_SETTINGS.md`](REGRESSION_BKE_5B2_PERSONAL_SETTINGS.md).
+
 Deliver BKE-5B as four reviewable implementation slices:
 
 - **BKE-5B1 - settings foundation:** migration 062, exact personal/team parsers, fixed Basketball
   save clients, private CAS boundary, metadata-only team audit, and capability contract v2. No UI
   or lifecycle hook consumes the new rows yet.
-- **BKE-5B2 - personal lifecycle:** anonymous/account caches, first-load rebound migration,
+- **BKE-5B2 - personal lifecycle - implemented:** anonymous/account caches, first-load rebound migration,
   authenticated seeding, offline pending writes, focus/online reconciliation, and explicit CAS
   conflict recovery; add Rules/Capture/Display personal tabs.
 - **BKE-5B3 - team lifecycle:** account/team-scoped online reads, role-aware Team Manage rules,

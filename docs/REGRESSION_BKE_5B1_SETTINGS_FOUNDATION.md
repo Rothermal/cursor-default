@@ -1,7 +1,7 @@
 # BKE-5B1 Basketball Settings Foundation Regression
 
-Status: implementation complete. Migration 062 and live authenticated capability verification are
-required after merge; Basketball settings UI/lifecycle consumption remains BKE-5B2 and BKE-5B3.
+Status: implementation complete and migration 062 applied. BKE-5B2 now consumes the personal
+settings foundation; Basketball team settings consumption remains BKE-5B3.
 
 ## Scope
 
@@ -103,9 +103,10 @@ authentication by design.
 }
 ```
 
-## Deferred
+## Follow-On
 
-- personal cache lifecycle, seeding, offline pending writes, and settings tabs: BKE-5B2
+- personal cache lifecycle, seeding, offline pending writes, and settings tabs: implemented in
+  [`REGRESSION_BKE_5B2_PERSONAL_SETTINGS.md`](REGRESSION_BKE_5B2_PERSONAL_SETTINGS.md)
 - role-aware Team Manage settings UI: BKE-5B3
 - profile upgrade and reviewed legacy-season import: BKE-5B4
 - setup authority and event rollout: BKE-5C/BKE-5D
