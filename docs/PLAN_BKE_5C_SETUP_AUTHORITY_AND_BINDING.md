@@ -84,6 +84,9 @@ interface BasketballSetupDraftV1 {
     tournamentUrl: string | null
     date: string
   }
+  display: {
+    defaultCourtFlipped: boolean
+  }
   event: null | {
     settingsAuthority:
       | {
@@ -98,6 +101,7 @@ interface BasketballSetupDraftV1 {
         }
     matchOverrides: BasketballRuleOverridesV2
     reviewedRules: BasketballMatchRulesV2
+    reviewedRulesSource: BasketballRulesSource
     cloudIntent: 'automatic' | 'local_only'
   }
   committedLocalGameId: string | null
@@ -105,8 +109,10 @@ interface BasketballSetupDraftV1 {
 ```
 
 The concrete TypeScript may separate route identity, loaded source data, and persisted user choices,
-but it must preserve these authority facts. Capability responses, transient errors, loading state,
-raw Supabase rows, and roster payloads are not persisted in the draft.
+but it must preserve these authority facts. `display.defaultCourtFlipped` always comes from the
+current personal/device settings, including for a team-sourced game; team rule authority does not
+own personal presentation. Capability responses, transient errors, loading state, raw Supabase
+rows, and roster payloads are not persisted in the draft.
 
 ### 4.2 Storage and account isolation
 
@@ -201,6 +207,37 @@ the Event stream; Player Setup still owns roster review and the final start comm
   initializes immutable setup, participants, Period 1, and the event stream.
 - No catalog lookup or current settings row is needed to read the started game afterward.
 
+The frozen `BasketballMatchSetup.rulesSource` is part of this contract, not an implementation
+default. Populate it as follows:
+
+- `profileId` and `profileVersion` come from the reviewed authoritative settings base profile.
+- Personal authority freezes `personalRevision` and sets `teamRevision` to `null`; team authority
+  freezes `teamRevision` and sets `personalRevision` to `null`.
+- `hasExplicitMatchOverrides` is the existing compatibility field used to decide whether a named
+  built-in profile may be claimed. Despite its narrow historical name, set it to `true` when any
+  personal, team, or match override layer contributed to the resolved rules, and `false` only for
+  an unmodified built-in profile.
+- **Keep Reviewed Draft** freezes the reviewed source record and old revision together with its
+  reviewed rules. **Refresh Defaults** rebuilds both records from the refreshed layer and reapplied
+  match overrides.
+
+Do not retain `DEFAULT_BASKETBALL_RULES_SOURCE` in the new C2 start path. A customized personal or
+team layer must display as Custom after start; only an unmodified reviewed catalog profile may
+display its profile name/version. Tests must assert the entire source record as well as the rules
+snapshot.
+
+### 6.1 Display default handoff
+
+`defaultCourtFlipped` is personal presentation, independent of Legacy/Event and personal/team rules
+authority. At the one-time local setup commit, seed the new game's court orientation from the
+reviewed personal/device display setting for both authorities. Event games store the resulting
+`standard | flipped` value in `capturePreferences.courtOrientation`; Legacy uses the equivalent
+per-game presentation state. A later manual flip changes only that game's local orientation.
+
+The orientation is reload-safe but remains outside immutable match rules, event projection,
+canonical output, gameplay fingerprints, and cloud authority. Existing games keep their current
+orientation and are never rewritten from a later settings change.
+
 ## 7. Durable Local-Only Policy
 
 ### 7.1 State contract
@@ -269,10 +306,15 @@ one validated Continue creates exactly one new local game.
 - Event/Legacy segmented choice and resolved match-only editor
 - reviewed rule persistence through Player Setup
 - stale revision Refresh/Keep flow
-- explicit version-2 setup passed to event-stream initialization
+- complete `rulesSource` provenance plus explicit version-2 rules passed to event-stream
+  initialization
+- personal display-default consumption into reload-safe per-game court orientation for Legacy and
+  Event setup
 
 Exit: Event and Legacy use distinct authorities, team games cannot inherit personal rules, and a
-started Event stream contains the exact reviewed immutable snapshot.
+started Event stream contains the exact reviewed immutable rules and source snapshot. New games
+start with the reviewed personal court orientation without turning display state into rules
+authority.
 
 ### BKE-5C3: Capability fallback and local-only policy
 
@@ -305,7 +347,11 @@ Automated coverage must include:
 - rollback on each local commit storage failure and best-effort tournament compensation
 - Legacy default and no Event capability RPC for Legacy/local-only
 - personal versus team hierarchy isolation and source revision metadata
-- compatible/incompatible stale-revision choices and exact frozen snapshot
+- compatible/incompatible stale-revision choices and exact frozen rules plus complete `rulesSource`
+- customized personal/team/match rules display as Custom while an untouched built-in retains its
+  exact profile/version label
+- personal court-orientation default for Legacy, personal Event, and team Event starts; per-game
+  flips survive reload and later settings changes do not rewrite existing games
 - local-only preservation through every local transport and zero binder/upload calls
 - pre-BKE-5C Event compatibility without hydration rewrites
 - guarded Enable Cloud Sync failure/success and duplicate binding rejection
