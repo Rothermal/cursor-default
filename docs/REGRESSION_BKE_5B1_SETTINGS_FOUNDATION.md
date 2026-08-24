@@ -32,8 +32,11 @@ Recorded 2026-08-23:
 Apply `supabase/migrations/062_basketball_settings_foundation.sql` after migration 061.
 
 If the original migration 062 stopped at a syntax error near the `foulWindows` assignment query,
-rerun the corrected migration from the beginning. The failed SQL Editor execution is transactional,
-so it does not require a separate cleanup migration.
+the `_validate_basketball_rule_overrides` function failed while being created. That validator and
+everything after it, including the fixed save RPCs, grants, and capability function, were not
+installed. Rerun the corrected migration from the beginning. The SQL Editor execution is
+transactional, and the migration statements are idempotent if another runner partially committed,
+so neither case requires a separate cleanup migration.
 
 The migration does not redefine the broad Soccer-only validator or either broad Soccer save RPC.
 It grants authenticated callers only these new Basketball write surfaces:
