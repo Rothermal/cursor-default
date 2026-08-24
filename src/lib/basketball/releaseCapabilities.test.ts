@@ -8,14 +8,15 @@ import {
 } from './releaseCapabilities'
 
 const validCapabilities = {
-  contractVersion: 1,
-  migration: 61,
+  contractVersion: 2,
+  migration: 62,
   eventTransportVersion: 4,
   recoveryVersion: 1,
   recorderResolutionVersion: 1,
   canonicalFinalizationVersion: 1,
   summaryAuthorityVersion: 1,
   aggregateSourceVersion: 1,
+  settingsContractVersion: 1,
 }
 
 function clientWith(
@@ -55,7 +56,7 @@ describe('loadBasketballReleaseCapabilities', () => {
       loadBasketballReleaseCapabilities(clientWith({ contractVersion: 0 }))
     ).resolves.toMatchObject({ status: 'backend_update_required' })
     const staleClient = await loadBasketballReleaseCapabilities(
-      clientWith({ contractVersion: 2 })
+      clientWith({ contractVersion: 3 })
     )
     expect(staleClient).toMatchObject({ status: 'client_update_required' })
     if (staleClient.status === 'ready') {
