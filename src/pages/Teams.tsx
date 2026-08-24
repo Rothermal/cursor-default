@@ -13,6 +13,7 @@ import AccessUnavailable from '../components/AccessUnavailable'
 import TeamInviteLinksPanel from '../components/TeamInviteLinksPanel'
 import AuditTrailPanel from '../components/AuditTrailPanel'
 import PlayerGuardiansDialog from '../components/PlayerGuardiansDialog'
+import BasketballTeamSettingsPanel from '../components/settings/BasketballTeamSettingsPanel'
 import SoccerTeamSettingsPanel from '../components/settings/SoccerTeamSettingsPanel'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -1796,6 +1797,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           )}
           </section>
         )}
+
+        {isManagementRoute &&
+          !managementRouteMessage &&
+          selectedTeam?.seasons.sport === 'basketball' && (
+            <section className="card">
+              <BasketballTeamSettingsPanel
+                key={selectedTeam.id}
+                teamId={selectedTeam.id}
+                teamName={teamDisplayName(selectedTeam)}
+                mayEdit={mayManageRoster}
+                onAuditChange={() => setAuditRefresh(value => value + 1)}
+              />
+            </section>
+          )}
 
         {isManagementRoute &&
           !managementRouteMessage &&

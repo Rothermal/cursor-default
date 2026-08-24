@@ -8,11 +8,7 @@ import {
 import { Link } from 'react-router-dom'
 import { ArrowRight, Check, Cloud, RefreshCw, RotateCcw, Save } from 'lucide-react'
 import { useSettings } from '../../context/SettingsContext'
-import {
-  listBasketballRulesProfiles,
-  resolveBasketballRules,
-  type BasketballRulesProfileRef,
-} from '../../lib/basketball/profiles'
+import { resolveBasketballRules } from '../../lib/basketball/profiles'
 import {
   basketballSettingsFingerprint,
 } from '../../lib/basketball/personalSettingsSync'
@@ -22,6 +18,7 @@ import {
 } from '../../lib/basketball/settings'
 import { settingsPath } from '../../lib/settingsNavigation'
 import ConfirmDialog from '../ConfirmDialog'
+import BasketballRulesSettingsFields from './BasketballRulesSettingsFields'
 
 type BasketballSettingsTab = 'rules' | 'capture' | 'display'
 
@@ -41,7 +38,6 @@ export default function BasketballSettings() {
     keepDeviceBasketballSettings,
     setBasketballSettingsPageActive,
   } = useSettings()
-  const profiles = useMemo(listBasketballRulesProfiles, [])
   const [draft, setDraft] = useState<BasketballPersonalSettingsV1>(() =>
     structuredClone(basketballSettings)
   )
@@ -78,28 +74,6 @@ export default function BasketballSettings() {
     }
     previousSavedFingerprint.current = next
   }, [basketballSettings, basketballSettingsSync.revision, draft])
-
-  const chooseProfile = (profileRef: BasketballRulesProfileRef) => {
-    setDraft(current => ({
-      ...current,
-      baseProfile: profileRef,
-      ruleOverrides: {},
-    }))
-  }
-
-  const setPersonalFoulLimit = (limit: number) => {
-    const profile = profiles.find(item =>
-      item.profileId === draft.baseProfile.profileId &&
-      item.profileVersion === draft.baseProfile.profileVersion
-    )
-    if (!profile) return
-    setDraft(current => {
-      const overrides = { ...current.ruleOverrides }
-      if (limit === profile.rules.personalFoulLimit) delete overrides.personalFoulLimit
-      else overrides.personalFoulLimit = limit
-      return { ...current, ruleOverrides: overrides }
-    })
-  }
 
   const handleTabKeyDown = (
     event: KeyboardEvent<HTMLButtonElement>,
@@ -252,48 +226,13 @@ export default function BasketballSettings() {
               </Link>
             </div>
 
-            <label className="block text-sm font-medium text-slate-700">
-              Tracking profile
-              <select
-                value={`${draft.baseProfile.profileId}@${draft.baseProfile.profileVersion}`}
-                onChange={event => {
-                  const profile = profiles.find(item =>
-                    `${item.profileId}@${item.profileVersion}` === event.target.value
-                  )
-                  if (profile) chooseProfile({
-                    profileId: profile.profileId,
-                    profileVersion: profile.profileVersion,
-                  })
-                }}
-                className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-slate-900"
-              >
-                {profiles.map(profile => (
-                  <option
-                    key={`${profile.profileId}@${profile.profileVersion}`}
-                    value={`${profile.profileId}@${profile.profileVersion}`}
-                  >
-                    {profile.label} v{profile.profileVersion}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {resolved.ok ? (
-              <>
-                <NumberField
-                  label="Player foul limit"
-                  value={resolved.value.rules.personalFoulLimit}
-                  min={1}
-                  max={20}
-                  onChange={setPersonalFoulLimit}
-                />
-                <RulesSummary resolution={resolved.value} />
-              </>
-            ) : (
-              <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {resolved.message}
-              </p>
-            )}
+            <BasketballRulesSettingsFields
+              settings={draft}
+              layerId="personal"
+              profileSourceLabel="Personal profile"
+              overrideSourceLabel="Personal override"
+              onChange={rules => setDraft(current => ({ ...current, ...rules }))}
+            />
           </div>
         )}
 
@@ -384,69 +323,6 @@ export default function BasketballSettings() {
   )
 }
 
-function RulesSummary({ resolution }: {
-  resolution: Extract<
-    ReturnType<typeof resolveBasketballRules>,
-    { ok: true }
-  >['value']
-}) {
-  const { profile, rules, customized } = resolution
-  return (
-    <div className="divide-y divide-slate-200 border-y border-slate-200">
-      <SummaryRow label="Profile" value={`${profile.label} v${profile.profileVersion}${customized ? ' · Customized' : ''}`} />
-      <SummaryRow
-        label="Regulation"
-        value={rules.regulationSegments.map(segment =>
-          `${segment.label} (${Math.round(segment.durationMs / 60_000)} min)`
-        ).join(', ')}
-      />
-      <SummaryRow
-        label="Overtime"
-        value={`${rules.overtimeTemplate.label}, ${Math.round(rules.overtimeTemplate.durationMs / 60_000)} min`}
-      />
-      <SummaryRow
-        label="Foul windows"
-        value={rules.foulWindows.map(window => {
-          if (window.bonusThreshold === null) return `${window.label}: no bonus`
-          return `${window.label}: bonus at ${window.bonusThreshold}`
-        }).join(' · ')}
-      />
-      <SummaryRow
-        label="Timeout pools"
-        value={rules.timeoutPools.map(pool =>
-          `${pool.label}: ${pool.totalLimit === null ? 'unlimited' : pool.totalLimit}`
-        ).join(' · ')}
-      />
-      <div className="py-3">
-        <p className="text-xs font-semibold uppercase text-slate-500">Sources</p>
-        <p className="mt-1 text-sm text-slate-700">{profile.effectiveRulesLabel}</p>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-          {profile.sourceUrls.map((url, index) => (
-            <a
-              key={url}
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm font-semibold text-blue-700 underline"
-            >
-              Source {index + 1}
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-3 text-sm">
-      <span className="font-semibold text-slate-500">{label}</span>
-      <span className="min-w-0 text-slate-800">{value}</span>
-    </div>
-  )
-}
-
 function SyncStatus({ status }: {
   status: ReturnType<typeof useSettings>['basketballSettingsSync']['status']
 }) {
@@ -489,31 +365,6 @@ function Toggle({ label, checked, onChange }: {
           checked ? 'translate-x-5' : ''
         }`} />
       </button>
-    </label>
-  )
-}
-
-function NumberField({ label, value, min, max, onChange }: {
-  label: string
-  value: number
-  min: number
-  max: number
-  onChange: (value: number) => void
-}) {
-  return (
-    <label className="block text-sm font-medium text-slate-700">
-      {label}
-      <input
-        type="number"
-        min={min}
-        max={max}
-        value={value}
-        onChange={event => {
-          const next = Number(event.target.value)
-          if (Number.isInteger(next)) onChange(Math.max(min, Math.min(max, next)))
-        }}
-        className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
-      />
     </label>
   )
 }

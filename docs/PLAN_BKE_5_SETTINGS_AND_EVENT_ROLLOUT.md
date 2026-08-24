@@ -1,7 +1,7 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1, and BKE-5B2 are implemented; BKE-5B3
-through BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
+Status: Product and delivery Q&A approved. BKE-5A and BKE-5B1 through BKE-5B3 are implemented;
+BKE-5B4 through BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
 user-visible event-model opt-in until the BKE-4 live release matrix and the targeted BKE-5 checks
 are accepted.
 
@@ -490,7 +490,7 @@ window ids, enforce total/full/30-second inventory plus forward unused-pool carr
 pre-BKE-5 sources as Legacy configuration. Event and sport-state envelope versions remain 1, and
 new profile-backed creation remains behind the existing internal gate until BKE-5C/BKE-5D.
 
-### BKE-5B: Persistence and settings surfaces - BKE-5B1/BKE-5B2 implemented
+### BKE-5B: Persistence and settings surfaces - BKE-5B1 through BKE-5B3 implemented
 
 - Add migration 062's fixed Basketball wrappers, validator, audit, and capability contract v2.
 - Add account/device personal caches, CAS/conflict recovery, first-load rebound migration, team
@@ -517,6 +517,14 @@ personal-foul override, resolved rule/provenance review, reset/discard/save cont
 status/conflict presentation. Team settings remain BKE-5B3. See
 [`REGRESSION_BKE_5B2_PERSONAL_SETTINGS.md`](REGRESSION_BKE_5B2_PERSONAL_SETTINGS.md).
 
+BKE-5B3 implementation note: `basketball/teamSettingsSync.ts` and
+`useBasketballTeamSettings.ts` own strict account/team cache isolation, online refresh, fixed
+Basketball manager CAS writes, and reload-only stale-revision recovery. Team Manage exposes shared
+Basketball Rules to every accepted role; owners/admins edit while scorers/viewers receive the same
+resolved read-only review. Missing rows resolve from the application profile, never the recorder's
+personal settings. Shared rule fields identify built-in versus team-override sources. No migration
+is added. See [`REGRESSION_BKE_5B3_TEAM_SETTINGS.md`](REGRESSION_BKE_5B3_TEAM_SETTINGS.md).
+
 Deliver BKE-5B as four reviewable implementation slices:
 
 - **BKE-5B1 - settings foundation:** migration 062, exact personal/team parsers, fixed Basketball
@@ -525,7 +533,7 @@ Deliver BKE-5B as four reviewable implementation slices:
 - **BKE-5B2 - personal lifecycle - implemented:** anonymous/account caches, first-load rebound migration,
   authenticated seeding, offline pending writes, focus/online reconciliation, and explicit CAS
   conflict recovery; add Rules/Capture/Display personal tabs.
-- **BKE-5B3 - team lifecycle:** account/team-scoped online reads, role-aware Team Manage rules,
+- **BKE-5B3 - team lifecycle - implemented:** account/team-scoped online reads, role-aware Team Manage rules,
   manager CAS writes, read-only scorer/viewer presentation, and resolved source diagnostics.
 - **BKE-5B4 - upgrades and import:** profile-version diff/apply flow, reviewed legacy-season import,
   deterministic hierarchy coverage, migration/live checks, and BKE-5B exit documentation.

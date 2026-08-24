@@ -3,11 +3,19 @@ import { getBasketballRulesProfile } from './profiles'
 import {
   BASKETBALL_SETTINGS_SCHEMA_VERSION,
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
+  DEFAULT_BASKETBALL_TEAM_SETTINGS,
   parseBasketballPersonalSettings,
   parseBasketballTeamSettings,
 } from './settings'
 
 describe('Basketball settings schema version 1', () => {
+  it('pins the versioned application team default', () => {
+    expect(DEFAULT_BASKETBALL_TEAM_SETTINGS).toEqual({
+      baseProfile: { profileId: 'nfhs', profileVersion: 1 },
+      ruleOverrides: {},
+    })
+  })
+
   it('accepts exact personal and team layers and clones their values', () => {
     expect(BASKETBALL_SETTINGS_SCHEMA_VERSION).toBe(1)
     const personal = parseBasketballPersonalSettings(DEFAULT_BASKETBALL_PERSONAL_SETTINGS)
