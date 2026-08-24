@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const source = (path: string) =>
-  readFileSync(resolve(process.cwd(), path), 'utf8')
+  readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n')
 
 function between(value: string, start: string, end: string): string {
   const startIndex = value.indexOf(start)
