@@ -20,7 +20,7 @@ remain sparse. Both client and SQL validate this boundary.
 
 Recorded 2026-08-23:
 
-- `pnpm test`: 154 files, 1,052 tests passed
+- `pnpm test`: 154 files, 1,054 tests passed
 - `pnpm lint`: zero errors; six existing Fast Refresh warnings, duplicated by the separate
   `.worktrees/bke-5-settings-rollout` checkout
 - `pnpm build`: passed; existing Browserslist freshness and bundle-size warnings only

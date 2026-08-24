@@ -1,5 +1,5 @@
 -- BKE-5B1: fixed Basketball settings validation and revisioned writes.
--- Existing Soccer validators, public RPC signatures, grants, and audit behavior stay unchanged.
+-- Existing broad sport-settings validators and public RPCs stay unchanged.
 
 create or replace function public._basketball_settings_exact_keys(
   p_value jsonb,
@@ -225,9 +225,11 @@ begin
     )
        or jsonb_typeof(v_item->'id') is distinct from 'string'
        or nullif(trim(v_item->>'id'), '') is null
+       or length(v_item->>'id') > 80
        or (v_item->>'id') = any(v_foul_ids)
        or jsonb_typeof(v_item->'label') is distinct from 'string'
        or nullif(trim(v_item->>'label'), '') is null
+       or length(v_item->>'label') > 120
        or jsonb_typeof(v_item->'segmentIds') is distinct from 'array'
        or jsonb_array_length(v_item->'segmentIds') = 0
        or not public._basketball_settings_valid_bonus_policy(v_item) then
@@ -259,9 +261,11 @@ begin
     )
        or jsonb_typeof(v_item->'id') is distinct from 'string'
        or nullif(trim(v_item->>'id'), '') is null
+       or length(v_item->>'id') > 80
        or (v_item->>'id') = any(v_pool_ids)
        or jsonb_typeof(v_item->'label') is distinct from 'string'
        or nullif(trim(v_item->>'label'), '') is null
+       or length(v_item->>'label') > 120
        or jsonb_typeof(v_item->'segmentIds') is distinct from 'array'
        or jsonb_array_length(v_item->'segmentIds') = 0
        or exists (
@@ -347,8 +351,10 @@ begin
   )
      or jsonb_typeof(v_item->'idPrefix') is distinct from 'string'
      or nullif(trim(v_item->>'idPrefix'), '') is null
+     or length(v_item->>'idPrefix') > 80
      or jsonb_typeof(v_item->'label') is distinct from 'string'
      or nullif(trim(v_item->>'label'), '') is null
+     or length(v_item->>'label') > 120
      or not public._sport_settings_is_integer(v_item->'durationMs')
      or (v_item->>'durationMs')::integer <= 0
      or jsonb_typeof(v_item->'lineupChangeBoundary') is distinct from 'boolean' then
@@ -376,6 +382,7 @@ begin
      )
      or jsonb_typeof(v_policy->'window'->'label') is distinct from 'string'
      or nullif(trim(v_policy->'window'->>'label'), '') is null
+     or length(v_policy->'window'->>'label') > 120
      or not public._basketball_settings_valid_bonus_policy(v_policy->'window') then
     raise exception 'SPORT_SETTINGS_INVALID: Basketball overtime foul window is invalid';
   end if;
@@ -422,6 +429,7 @@ begin
      )
      or jsonb_typeof(v_policy->'pool'->'label') is distinct from 'string'
      or nullif(trim(v_policy->'pool'->>'label'), '') is null
+     or length(v_policy->'pool'->>'label') > 120
      or not public._basketball_settings_valid_timeout_limits(v_policy->'pool') then
     raise exception 'SPORT_SETTINGS_INVALID: Basketball overtime timeout pool is invalid';
   end if;

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { listBasketballRulesProfiles } from './profiles'
 
 const sql = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/062_basketball_settings_foundation.sql'),
@@ -9,6 +10,7 @@ const sql = readFileSync(
 
 describe('migration 062 Basketball settings foundation', () => {
   it('keeps the broad Soccer-only settings surfaces untouched', () => {
+    expect(sql).not.toContain('soccer')
     expect(sql).not.toContain(
       'create or replace function public._validate_sport_settings_payload'
     )
@@ -68,8 +70,31 @@ describe('migration 062 Basketball settings foundation', () => {
 
   it('emits metadata-only Basketball team audit events', () => {
     expect(sql).toContain("'basketball_settings_changed'")
-    expect(sql).toContain("'changed_fields', v_changed_fields")
-    expect(sql).not.toContain("'settings', p_settings")
+    const metadata = sql.match(
+      /p_metadata\s*=>\s*jsonb_build_object\(([\s\S]*?)\)\s*\n\s*\);/
+    )?.[1]
+    expect(metadata).toBeDefined()
+    expect(Array.from(metadata?.matchAll(/'([^']+)'/g) ?? [], match => match[1])).toEqual([
+      'sport_id',
+      'revision',
+      'changed_fields',
+    ])
+  })
+
+  it('keeps SQL profile ids and versions aligned with the immutable catalog', () => {
+    const profileIds = sql.match(/profileid' not in \(([\s\S]*?)\)/)?.[1]
+    const profileVersion = sql.match(/profileversion'\)::integer <> (\d+)/)?.[1]
+    expect(profileIds).toBeDefined()
+    expect(profileVersion).toBeDefined()
+
+    const sqlPairs = Array.from(
+      profileIds?.matchAll(/'([^']+)'/g) ?? [],
+      match => `${match[1]}@${profileVersion}`
+    ).sort()
+    const catalogPairs = listBasketballRulesProfiles()
+      .map(profile => `${profile.profileId}@${profile.profileVersion}`)
+      .sort()
+    expect(sqlPairs).toEqual(catalogPairs)
   })
 
   it('advances the exact release capability contract to settings version 1', () => {
