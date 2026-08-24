@@ -1,8 +1,9 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A is implemented; BKE-5B through BKE-5D remain.
-BKE-5B and BKE-5C remain internal; BKE-5D must not open the user-visible event-model opt-in
-until the BKE-4 live release matrix and the targeted BKE-5 checks are accepted.
+Status: Product and delivery Q&A approved. BKE-5A and BKE-5B1 are implemented; BKE-5B2 through
+BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
+user-visible event-model opt-in until the BKE-4 live release matrix and the targeted BKE-5 checks
+are accepted.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -319,8 +320,12 @@ The row's existing `schema_version` column carries settings schema version 1; it
 inside the JSON payload. Fixed Basketball save RPCs supply that value. Parsers reject unknown keys,
 unsupported profile versions, invalid override combinations, and unsupported row schema versions.
 Arrays and window collections are atomic override fields; layers do not merge array elements by
-index. A corrupt or unsupported layer is ignored as a whole with a visible diagnostic rather than
-partially changing authority.
+index. For the first strict cloud contract, the four cross-referenced structural fields
+(`regulationSegments`, `overtimeTemplate`, `foulWindows`, and `timeoutPools`) are saved together
+whenever any one changes. Scalar overrides remain sparse. This lets both TypeScript and migration
+062 validate the complete reference graph without duplicating built-in profile JSON in SQL. A
+corrupt or unsupported layer is ignored as a whole with a visible diagnostic rather than partially
+changing authority.
 
 Resolution returns complete rules plus field/group source metadata:
 
@@ -485,7 +490,7 @@ window ids, enforce total/full/30-second inventory plus forward unused-pool carr
 pre-BKE-5 sources as Legacy configuration. Event and sport-state envelope versions remain 1, and
 new profile-backed creation remains behind the existing internal gate until BKE-5C/BKE-5D.
 
-### BKE-5B: Persistence and settings surfaces
+### BKE-5B: Persistence and settings surfaces - BKE-5B1 implemented
 
 - Add migration 062's fixed Basketball wrappers, validator, audit, and capability contract v2.
 - Add account/device personal caches, CAS/conflict recovery, first-load rebound migration, team
@@ -493,6 +498,31 @@ new profile-backed creation remains behind the existing internal gate until BKE-
 - Build tabbed Basketball settings, Team Manage role-aware rules, resolved previews, profile
   upgrade diff, and reviewed legacy-season import.
 - Exit: personal/team/match layers resolve deterministically and Soccer settings parity passes.
+
+BKE-5B1 implementation note: `src/lib/basketball/settings.ts` owns the exact schema-version-1
+personal/team parsers and atomic structural override boundary. Migration 062 leaves Soccer's broad
+surfaces untouched, adds fixed Basketball wrappers over a revoked private CAS core, emits
+metadata-only team audit events, and advances the exact capability handshake to contract 2 with
+settings contract 1. `sportSettingsCloud.ts` exposes only fixed Basketball save calls. No UI or
+lifecycle hook consumes the new rows until BKE-5B2/BKE-5B3. See
+[`REGRESSION_BKE_5B1_SETTINGS_FOUNDATION.md`](REGRESSION_BKE_5B1_SETTINGS_FOUNDATION.md).
+
+Deliver BKE-5B as four reviewable implementation slices:
+
+- **BKE-5B1 - settings foundation:** migration 062, exact personal/team parsers, fixed Basketball
+  save clients, private CAS boundary, metadata-only team audit, and capability contract v2. No UI
+  or lifecycle hook consumes the new rows yet.
+- **BKE-5B2 - personal lifecycle:** anonymous/account caches, first-load rebound migration,
+  authenticated seeding, offline pending writes, focus/online reconciliation, and explicit CAS
+  conflict recovery; add Rules/Capture/Display personal tabs.
+- **BKE-5B3 - team lifecycle:** account/team-scoped online reads, role-aware Team Manage rules,
+  manager CAS writes, read-only scorer/viewer presentation, and resolved source diagnostics.
+- **BKE-5B4 - upgrades and import:** profile-version diff/apply flow, reviewed legacy-season import,
+  deterministic hierarchy coverage, migration/live checks, and BKE-5B exit documentation.
+
+BKE-5B2 and BKE-5B3 may both consume BKE-5B1 but must not duplicate cache ownership. BKE-5B4 owns
+the combined persistence/settings exit audit; all four slices remain behind the internal event-game
+creation gate.
 
 ### BKE-5C: Setup authority and binding policy
 

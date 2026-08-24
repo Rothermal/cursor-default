@@ -20,6 +20,10 @@ import type {
 } from './types'
 
 const MINUTE_MS = 60_000
+export const BASKETBALL_RULE_COLLECTION_LIMIT = 20
+export const BASKETBALL_RULE_ID_MAX_LENGTH = 80
+export const BASKETBALL_RULE_LABEL_MAX_LENGTH = 120
+export const BASKETBALL_PERSONAL_FOUL_LIMIT_MAX = 20
 
 export interface ResolvedBasketballFoulWindow {
   id: string
@@ -177,6 +181,9 @@ function validateBasketballMatchRulesV2(value: Record<string, unknown>): string 
   if (!Array.isArray(value.regulationSegments) || value.regulationSegments.length === 0) {
     return 'Version-2 regulation segments are required.'
   }
+  if (value.regulationSegments.length > BASKETBALL_RULE_COLLECTION_LIMIT) {
+    return `Version-2 regulation segments cannot exceed ${BASKETBALL_RULE_COLLECTION_LIMIT}.`
+  }
   if (!value.regulationSegments.every(isBasketballSegmentV2)) {
     return 'Version-2 regulation segments are invalid.'
   }
@@ -196,17 +203,26 @@ function validateBasketballMatchRulesV2(value: Record<string, unknown>): string 
   if (!Array.isArray(value.foulWindows) || value.foulWindows.length === 0) {
     return 'Version-2 foul windows are required.'
   }
+  if (value.foulWindows.length > BASKETBALL_RULE_COLLECTION_LIMIT) {
+    return `Version-2 foul windows cannot exceed ${BASKETBALL_RULE_COLLECTION_LIMIT}.`
+  }
   if (!value.foulWindows.every(isBasketballFoulWindowRule)) {
     return 'Version-2 foul windows are invalid.'
   }
   if (!Array.isArray(value.timeoutPools) || value.timeoutPools.length === 0) {
     return 'Version-2 timeout pools are required.'
   }
+  if (value.timeoutPools.length > BASKETBALL_RULE_COLLECTION_LIMIT) {
+    return `Version-2 timeout pools cannot exceed ${BASKETBALL_RULE_COLLECTION_LIMIT}.`
+  }
   if (!value.timeoutPools.every(isBasketballTimeoutPoolRule)) {
     return 'Version-2 timeout pools are invalid.'
   }
   if (!isPositiveInteger(value.personalFoulLimit)) {
     return 'Version-2 personal foul limit must be positive.'
+  }
+  if (value.personalFoulLimit > BASKETBALL_PERSONAL_FOUL_LIMIT_MAX) {
+    return `Version-2 personal foul limit cannot exceed ${BASKETBALL_PERSONAL_FOUL_LIMIT_MAX}.`
   }
   if (value.clockModel !== 'none') return 'Version-2 Basketball clocks remain deferred.'
 
@@ -629,8 +645,10 @@ function isBasketballSegmentV2(value: unknown): value is BasketballMatchSegmentV
         'lineupChangeBoundary',
       ]) &&
       isBasketballSegment(value) &&
-      isNonEmptyString(value.foulWindowId) &&
-      isNonEmptyString(value.timeoutPoolId) &&
+      isBasketballRuleId(value.id) &&
+      isBasketballRuleLabel(value.label) &&
+      isBasketballRuleId(value.foulWindowId) &&
+      isBasketballRuleId(value.timeoutPoolId) &&
       typeof value.lineupChangeBoundary === 'boolean'
   )
 }
@@ -646,11 +664,11 @@ function isBasketballFoulWindowRule(value: unknown): value is BasketballFoulWind
         'doubleBonusThreshold',
         'hasOneAndOne',
       ]) &&
-      isNonEmptyString(value.id) &&
-      isNonEmptyString(value.label) &&
+      isBasketballRuleId(value.id) &&
+      isBasketballRuleLabel(value.label) &&
       Array.isArray(value.segmentIds) &&
       value.segmentIds.length > 0 &&
-      value.segmentIds.every(isNonEmptyString) &&
+      value.segmentIds.every(isBasketballRuleId) &&
       new Set(value.segmentIds).size === value.segmentIds.length &&
       validateBonusPolicy(value) === null
   )
@@ -668,14 +686,14 @@ function isBasketballTimeoutPoolRule(value: unknown): value is BasketballTimeout
         'shortLimit',
         'carryoverToPoolId',
       ]) &&
-      isNonEmptyString(value.id) &&
-      isNonEmptyString(value.label) &&
+      isBasketballRuleId(value.id) &&
+      isBasketballRuleLabel(value.label) &&
       Array.isArray(value.segmentIds) &&
       value.segmentIds.length > 0 &&
-      value.segmentIds.every(isNonEmptyString) &&
+      value.segmentIds.every(isBasketballRuleId) &&
       new Set(value.segmentIds).size === value.segmentIds.length &&
       validateTimeoutLimits(value) === null &&
-      (value.carryoverToPoolId === null || isNonEmptyString(value.carryoverToPoolId))
+      (value.carryoverToPoolId === null || isBasketballRuleId(value.carryoverToPoolId))
   )
 }
 
@@ -690,8 +708,8 @@ function isBasketballOvertimeTemplateV2(value: unknown): value is BasketballOver
         'timeoutPolicy',
         'lineupChangeBoundary',
       ]) &&
-      isNonEmptyString(value.idPrefix) &&
-      isNonEmptyString(value.label) &&
+      isBasketballRuleId(value.idPrefix) &&
+      isBasketballRuleLabel(value.label) &&
       isPositiveInteger(value.durationMs) &&
       isOvertimeFoulPolicyShape(value.foulPolicy) &&
       isOvertimeTimeoutPolicyShape(value.timeoutPolicy) &&
@@ -704,7 +722,7 @@ function isOvertimeFoulPolicyShape(value: unknown): value is BasketballOvertimeF
     isPlainObject(value) &&
       hasExactKeys(value, ['mode', 'regulationWindowId', 'window']) &&
       isOvertimeWindowMode(value.mode) &&
-      (value.regulationWindowId === null || isNonEmptyString(value.regulationWindowId)) &&
+      (value.regulationWindowId === null || isBasketballRuleId(value.regulationWindowId)) &&
       (value.window === null || validateFoulWindowTemplate(value.window) === null)
   )
 }
@@ -714,7 +732,7 @@ function isOvertimeTimeoutPolicyShape(value: unknown): value is BasketballOverti
     isPlainObject(value) &&
       hasExactKeys(value, ['mode', 'regulationPoolId', 'pool', 'additionsPerOvertime']) &&
       isOvertimeWindowMode(value.mode) &&
-      (value.regulationPoolId === null || isNonEmptyString(value.regulationPoolId)) &&
+      (value.regulationPoolId === null || isBasketballRuleId(value.regulationPoolId)) &&
       (value.pool === null || validateTimeoutPoolTemplate(value.pool) === null) &&
       isTimeoutAddition(value.additionsPerOvertime)
   )
@@ -727,7 +745,7 @@ function validateFoulWindowTemplate(value: unknown): string | null {
     'doubleBonusThreshold',
     'hasOneAndOne',
   ])) return 'Overtime foul window template is invalid.'
-  if (!isNonEmptyString(value.label)) return 'Overtime foul window label is invalid.'
+  if (!isBasketballRuleLabel(value.label)) return 'Overtime foul window label is invalid.'
   return validateBonusPolicy(value)
 }
 
@@ -758,7 +776,7 @@ function validateTimeoutPoolTemplate(value: unknown): string | null {
     'fullLimit',
     'shortLimit',
   ])) return 'Overtime timeout pool template is invalid.'
-  if (!isNonEmptyString(value.label)) return 'Overtime timeout pool label is invalid.'
+  if (!isBasketballRuleLabel(value.label)) return 'Overtime timeout pool label is invalid.'
   return validateTimeoutLimits(value)
 }
 
@@ -805,6 +823,16 @@ function hasExactKeys(value: Record<string, unknown>, keys: string[]): boolean {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function isBasketballRuleId(value: unknown): value is string {
+  return isNonEmptyString(value) &&
+    Array.from(value).length <= BASKETBALL_RULE_ID_MAX_LENGTH
+}
+
+function isBasketballRuleLabel(value: unknown): value is string {
+  return isNonEmptyString(value) &&
+    Array.from(value).length <= BASKETBALL_RULE_LABEL_MAX_LENGTH
 }
 
 function isPositiveInteger(value: unknown): value is number {

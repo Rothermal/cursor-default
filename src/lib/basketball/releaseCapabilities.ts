@@ -1,16 +1,17 @@
 import { supabase } from '../supabase'
 
-export const BASKETBALL_RELEASE_CONTRACT_VERSION = 1
+export const BASKETBALL_RELEASE_CONTRACT_VERSION = 2
 
 export interface BasketballReleaseCapabilities {
-  contractVersion: 1
-  migration: 61
+  contractVersion: 2
+  migration: 62
   eventTransportVersion: 4
   recoveryVersion: 1
   recorderResolutionVersion: 1
   canonicalFinalizationVersion: 1
   summaryAuthorityVersion: 1
   aggregateSourceVersion: 1
+  settingsContractVersion: 1
 }
 
 export type BasketballReleaseCapabilityResult =
@@ -60,14 +61,15 @@ export function requiresBasketballEventCloudPreflight({
 }
 
 const expectedCapabilities: BasketballReleaseCapabilities = {
-  contractVersion: 1,
-  migration: 61,
+  contractVersion: 2,
+  migration: 62,
   eventTransportVersion: 4,
   recoveryVersion: 1,
   recorderResolutionVersion: 1,
   canonicalFinalizationVersion: 1,
   summaryAuthorityVersion: 1,
   aggregateSourceVersion: 1,
+  settingsContractVersion: 1,
 }
 
 let activeUserId: string | null = null

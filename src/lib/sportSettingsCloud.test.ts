@@ -5,6 +5,8 @@ import {
   loadUserSportSettings,
   parseSportSettingsTableRecord,
   parseSportSettingsSaveResult,
+  saveBasketballTeamSettings,
+  saveBasketballUserSettings,
   saveUserSportSettings,
   saveTeamSportSettings,
   sportSettingsBackendMessage,
@@ -197,5 +199,33 @@ describe('sport settings cloud contracts', () => {
       p_schema_version: 1,
       p_expected_revision: 3,
     })
+  })
+
+  it('uses fixed Basketball save surfaces without caller-selected sport or schema', async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const client = {
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        calls.push({ name, args })
+        return { data: { status: 'conflict', record: null }, error: null }
+      },
+    } as unknown as SportSettingsCloudClient
+
+    await saveBasketballUserSettings(2, { marker: 'personal' }, client)
+    await saveBasketballTeamSettings('team-1', 4, { marker: 'team' }, client)
+
+    expect(calls).toEqual([
+      {
+        name: 'save_basketball_user_settings_revisioned',
+        args: { p_expected_revision: 2, p_settings: { marker: 'personal' } },
+      },
+      {
+        name: 'save_basketball_team_settings_revisioned',
+        args: {
+          p_team_id: 'team-1',
+          p_expected_revision: 4,
+          p_settings: { marker: 'team' },
+        },
+      },
+    ])
   })
 })
