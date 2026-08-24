@@ -4,6 +4,7 @@ import type { GameEvent, GameEventStream } from '../gameEvents/types'
 import {
   applyGameEventConflictResolution,
   gameEventSyncBase,
+  gameEventSyncConflictFromRow,
   mergeSameRecorderEventStreams,
 } from './cloudConflicts'
 
@@ -148,5 +149,49 @@ describe('same-recorder cloud event recovery', () => {
       updatedAt: '2026-07-22T12:02:00.000Z',
       payload: { value: 'remote' },
     })
+  })
+})
+
+describe('gameEventSyncConflictFromRow', () => {
+  const eventId = '10000000-0000-4000-8000-000000000001'
+  const conflictId = '20000000-0000-4000-8000-000000000001'
+  const detectedAt = '2026-07-22T12:01:00.000Z'
+
+  function conflictRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: conflictId,
+      event_id: eventId,
+      detected_at: detectedAt,
+      local_event: event(eventId, 2, 'local'),
+      remote_event: event(eventId, 3, 'remote'),
+      ...overrides,
+    }
+  }
+
+  it('parses a strict same-sport conflict row', () => {
+    expect(gameEventSyncConflictFromRow(conflictRow(), 'soccer')).toEqual({
+      conflictId,
+      eventId,
+      localEvent: event(eventId, 2, 'local'),
+      remoteEvent: event(eventId, 3, 'remote'),
+      detectedAt,
+    })
+  })
+
+  it('rejects malformed rows and sport or id mismatches fail closed', () => {
+    expect(gameEventSyncConflictFromRow(null)).toBeNull()
+    expect(gameEventSyncConflictFromRow({ ...conflictRow(), id: 12 })).toBeNull()
+    expect(gameEventSyncConflictFromRow({
+      ...conflictRow(),
+      local_event: event('30000000-0000-4000-8000-000000000001', 2, 'local'),
+    })).toBeNull()
+    expect(gameEventSyncConflictFromRow({
+      ...conflictRow(),
+      remote_event: {
+        ...event(eventId, 3, 'remote'),
+        sportId: 'basketball',
+      },
+    })).toBeNull()
+    expect(gameEventSyncConflictFromRow(conflictRow(), 'basketball')).toBeNull()
   })
 })
