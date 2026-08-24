@@ -20,7 +20,7 @@ remain sparse. Both client and SQL validate this boundary.
 
 Recorded 2026-08-23:
 
-- `pnpm test`: 154 files, 1,054 tests passed
+- `pnpm test`: 154 files, 1,055 tests passed
 - `pnpm lint`: zero errors; six existing Fast Refresh warnings, duplicated by the separate
   `.worktrees/bke-5-settings-rollout` checkout
 - `pnpm build`: passed; existing Browserslist freshness and bundle-size warnings only
@@ -30,6 +30,10 @@ Recorded 2026-08-23:
 ## Migration
 
 Apply `supabase/migrations/062_basketball_settings_foundation.sql` after migration 061.
+
+If the original migration 062 stopped at a syntax error near the `foulWindows` assignment query,
+rerun the corrected migration from the beginning. The failed SQL Editor execution is transactional,
+so it does not require a separate cleanup migration.
 
 The migration does not redefine the broad Soccer-only validator or either broad Soccer save RPC.
 It grants authenticated callers only these new Basketball write surfaces:

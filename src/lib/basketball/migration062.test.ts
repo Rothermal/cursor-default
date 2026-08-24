@@ -6,7 +6,7 @@ import { listBasketballRulesProfiles } from './profiles'
 const sql = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/062_basketball_settings_foundation.sql'),
   'utf8'
-).toLowerCase()
+).replace(/\r\n/g, '\n').toLowerCase()
 
 describe('migration 062 Basketball settings foundation', () => {
   it('keeps the broad Soccer-only settings surfaces untouched', () => {
@@ -66,6 +66,11 @@ describe('migration 062 Basketball settings foundation', () => {
       'grant execute on function public._save_sport_settings_revisioned_core'
     )
     expect(sql).toContain("'status', 'conflict'")
+  })
+
+  it('does not use the reserved window keyword as a relation alias', () => {
+    expect(sql).not.toMatch(/\)\s+window(?=\s|,)/)
+    expect(sql).toContain("jsonb_array_elements(p_overrides->'foulwindows') foul_window")
   })
 
   it('emits metadata-only Basketball team audit events', () => {
