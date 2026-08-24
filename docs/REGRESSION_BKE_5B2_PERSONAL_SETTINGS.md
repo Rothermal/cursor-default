@@ -59,5 +59,5 @@ After deployment:
 
 - role-aware Team Manage settings lifecycle and presentation: BKE-5B3
 - profile-version upgrades and reviewed legacy-season import: BKE-5B4
-- setup hierarchy, immutable snapshot binding, and display-default consumption: BKE-5C
+- setup hierarchy, immutable rules/source binding, and display-default consumption: BKE-5C2
 - production event-model opt-in and combined live evidence: BKE-5D

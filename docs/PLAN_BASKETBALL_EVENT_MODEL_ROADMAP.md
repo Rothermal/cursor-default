@@ -29,7 +29,9 @@ approved in
 BKE-4E1 through BKE-4E5 are implemented through migration 061. The combined BKE-4 live matrix
 remains required before BKE-5 exposes event-model opt-in. BKE-5 product and delivery decisions are
 approved in
-[PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md), split into
+[PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md), with detailed
+setup delivery in
+[PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md](PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md), split into
 BKE-5A profiles/compatibility, BKE-5B persistence/settings (BKE-5B1 through BKE-5B4 complete),
 BKE-5C setup/authority, and BKE-5D release. BKE-5A through BKE-5C remain behind the internal
 creation gate.

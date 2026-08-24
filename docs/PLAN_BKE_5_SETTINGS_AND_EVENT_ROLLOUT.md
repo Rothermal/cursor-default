@@ -490,7 +490,7 @@ window ids, enforce total/full/30-second inventory plus forward unused-pool carr
 pre-BKE-5 sources as Legacy configuration. Event and sport-state envelope versions remain 1, and
 new profile-backed creation remains behind the existing internal gate until BKE-5C/BKE-5D.
 
-### BKE-5B: Persistence and settings surfaces - BKE-5B1 through BKE-5B3 implemented
+### BKE-5B: Persistence and settings surfaces - BKE-5B1 through BKE-5B4 implemented
 
 - Add migration 062's fixed Basketball wrappers, validator, audit, and capability contract v2.
 - Add account/device personal caches, CAS/conflict recovery, first-load rebound migration, team
@@ -554,6 +554,9 @@ creation gate.
 
 ### BKE-5C: Setup authority and binding policy
 
+Detailed delivery plan:
+[`PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md`](PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md).
+
 - Replace early Basketball mutation with the staged setup draft and one atomic commit command.
 - Add explicit Legacy/Event choice, stale-revision handling, capability fallback, and complete
   immutable snapshot freeze.
@@ -561,6 +564,17 @@ creation gate.
 - Remove unconditional internal preflight paths that run before authority is chosen, while retaining
   the shared exact capability parser/cache.
 - Exit: every cancel/failure path is mutation-free and Event/Legacy never dual-write.
+
+Deliver BKE-5C as four reviewable slices:
+
+- **BKE-5C1 - draft and atomic commit:** strict reload-safe draft, mutation-free Basketball entry,
+  deferred setup values, and rollback-safe one-step context commit.
+- **BKE-5C2 - rules authority and freeze:** Event/Legacy choice, source-aware personal/team/match
+  resolution, stale revision handling, and exact immutable event setup.
+- **BKE-5C3 - capability and local-only:** authority-aware recovery choices, explicit persisted
+  event-cloud policy, transport guards, and removal of premature Basketball preflights.
+- **BKE-5C4 - Enable Cloud and exit:** guarded later binding, duplicate/role checks, failure-safe
+  upload/checkpoint, and the BKE-5C regression audit.
 
 ### BKE-5D: Release and exit audit
 
