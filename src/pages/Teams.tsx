@@ -1806,6 +1806,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 key={selectedTeam.id}
                 teamId={selectedTeam.id}
                 teamName={teamDisplayName(selectedTeam)}
+                seasonId={selectedTeam.season_id}
+                seasonName={selectedTeam.seasons.name}
                 mayEdit={mayManageRoster}
                 onAuditChange={() => setAuditRefresh(value => value + 1)}
               />
