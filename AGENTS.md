@@ -16,6 +16,7 @@
 
 See `package.json` scripts. Standard commands:
 - `pnpm dev` — start dev server (binds `0.0.0.0:5173`)
+- `pnpm typecheck` — check both TypeScript project references (`tsc -b`)
 - `pnpm build` — TypeScript check + production build
 - `pnpm lint` — ESLint
 - `pnpm preview` — serve production build
