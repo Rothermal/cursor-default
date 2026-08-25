@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { formatBasketballRuleField } from './profileDiffPresentation'
+import {
+  BASKETBALL_RULE_FIELDS,
+  BASKETBALL_RULE_FIELD_LABELS,
+  formatBasketballRuleField,
+} from './profileDiffPresentation'
 import {
   listBasketballRulesProfiles,
   previewBasketballProfileUpgrade,
 } from './profiles'
 
 describe('Basketball profile diff presentation', () => {
+  it('keeps the exhaustive field catalog and labels coordinated', () => {
+    expect(BASKETBALL_RULE_FIELDS).toEqual(Object.keys(BASKETBALL_RULE_FIELD_LABELS))
+    expect(new Set(BASKETBALL_RULE_FIELDS).size).toBe(BASKETBALL_RULE_FIELDS.length)
+  })
+
   it('distinguishes every changed base field across every catalog transition', () => {
     const profiles = listBasketballRulesProfiles()
     for (const current of profiles) {

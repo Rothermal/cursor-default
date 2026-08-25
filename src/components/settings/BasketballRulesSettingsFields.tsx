@@ -7,7 +7,10 @@ import {
   type BasketballProfileUpgradeResult,
   type BasketballRulesProfileRef,
 } from '../../lib/basketball/profiles'
-import { formatBasketballRuleField } from '../../lib/basketball/profileDiffPresentation'
+import {
+  basketballRuleFieldLabel,
+  formatBasketballRuleField,
+} from '../../lib/basketball/profileDiffPresentation'
 import type { BasketballTeamSettingsV1 } from '../../lib/basketball/settings'
 import type { BasketballRulesV2Field } from '../../lib/basketball/types'
 
@@ -168,7 +171,7 @@ function ProfileChangeReview({
             <div className="divide-y divide-amber-200 border-y border-amber-200">
               {preview.differences.map(diff => (
                 <div key={diff.field} className="py-2 text-xs text-slate-700">
-                  <p className="font-semibold text-slate-800">{fieldLabel(diff.field)}</p>
+                  <p className="font-semibold text-slate-800">{basketballRuleFieldLabel(diff.field)}</p>
                   {diff.overridden ? (
                     <>
                       <p className="mt-0.5 break-words">
@@ -229,17 +232,6 @@ function ProfileChangeReview({
       </div>
     </div>
   )
-}
-
-function fieldLabel(field: BasketballRulesV2Field): string {
-  switch (field) {
-    case 'regulationSegments': return 'Regulation segments'
-    case 'overtimeTemplate': return 'Overtime'
-    case 'foulWindows': return 'Foul windows'
-    case 'timeoutPools': return 'Timeout pools'
-    case 'personalFoulLimit': return 'Player foul limit'
-    case 'clockModel': return 'Clock model'
-  }
 }
 
 export function BasketballRulesSummary({

@@ -29,12 +29,13 @@ describe('zoneForForcedShotType', () => {
 })
 
 describe('orientBasketballCourtPoint', () => {
-  it('round-trips canonical locations through the flipped presentation', () => {
-    const canonical = { x: 8.5, y: 12.3 }
-    const flipped = orientBasketballCourtPoint(canonical, 'flipped')
+  it('round-trips every captured tenth-foot row through the flipped presentation', () => {
+    for (let tenths = 0; tenths <= 440; tenths += 1) {
+      const canonical = { x: 8.5, y: tenths / 10 }
+      const flipped = orientBasketballCourtPoint(canonical, 'flipped')
 
-    expect(flipped).not.toEqual(canonical)
-    expect(orientBasketballCourtPoint(flipped, 'flipped')).toEqual(canonical)
-    expect(orientBasketballCourtPoint(canonical, 'standard')).toEqual(canonical)
+      expect(orientBasketballCourtPoint(flipped, 'flipped')).toEqual(canonical)
+      expect(orientBasketballCourtPoint(canonical, 'standard')).toEqual(canonical)
+    }
   })
 })

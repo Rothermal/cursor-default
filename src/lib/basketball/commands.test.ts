@@ -287,6 +287,37 @@ describe('BKE-1C1 Basketball commands', () => {
     expect(result.state.basketballCourtOrientation).toBe('flipped')
   })
 
+  it('does not infer reviewed personal source identity from cloud binding metadata', () => {
+    const before = setupState()
+    before.cloudSync = {
+      ...before.cloudSync,
+      teamId: 'binding-team',
+      seasonId: 'binding-season',
+    }
+    const profile = getBasketballRulesProfile('nfhs', 1)!
+    const result = prepareBasketballGameStart(before, {
+      recorderUserId: 'recorder-1',
+      reviewedSetup: {
+        rulesSnapshot: profile.rules,
+        rulesSource: {
+          profileId: 'nfhs',
+          profileVersion: 1,
+          personalRevision: 4,
+          teamRevision: null,
+          hasExplicitMatchOverrides: false,
+        },
+        sourceTeamId: null,
+        sourceSeasonId: null,
+        courtOrientation: 'standard',
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.state.sportGameState?.sportId !== 'basketball') return
+    expect(result.state.sportGameState.setup.sourceTeamId).toBeNull()
+    expect(result.state.sportGameState.setup.sourceSeasonId).toBeNull()
+  })
+
   it('changes court orientation without changing immutable setup', () => {
     const started = startedState()
     const setup = structuredClone(started.sportGameState)

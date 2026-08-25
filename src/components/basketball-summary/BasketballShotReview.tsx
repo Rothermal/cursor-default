@@ -20,6 +20,7 @@ import BasketballShotEditor from '../basketball/BasketballShotEditor'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from '../basketball/BasketballTimelineCorrectionDialog'
+import { basketballCourtOrientationForState } from '../../lib/basketball/courtGeometry'
 
 interface Props {
   source: BasketballSummarySource
@@ -229,6 +230,7 @@ export default function BasketballShotReview({ source }: Props) {
         </div>
         <BasketballCourt
           shots={markers}
+          flipped={basketballCourtOrientationForState(source.state) === 'flipped'}
           onMarkerActivate={activateMarker}
           markerTone={marker => shotById.get(marker.id)?.teamSide ?? null}
           markerLabel={marker => {

@@ -2,6 +2,7 @@ import type { GameState, SportConfig } from '../../types'
 import { gameReducer, createInitialState } from '../gameReducer'
 import { stableJson } from '../gameEvents/stream'
 import { setBasketballEventCreationIntent } from './commands'
+import { BASKETBALL_RULE_FIELDS } from './profileDiffPresentation'
 import {
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
   DEFAULT_BASKETBALL_TEAM_SETTINGS,
@@ -239,15 +240,9 @@ export function basketballSetupRuleDifferences(
   current: BasketballMatchRulesV2,
   candidate: BasketballMatchRulesV2
 ): BasketballRulesV2Field[] {
-  const fields: BasketballRulesV2Field[] = [
-    'regulationSegments',
-    'overtimeTemplate',
-    'foulWindows',
-    'timeoutPools',
-    'personalFoulLimit',
-    'clockModel',
-  ]
-  return fields.filter(field => stableJson(current[field]) !== stableJson(candidate[field]))
+  return BASKETBALL_RULE_FIELDS.filter(
+    field => stableJson(current[field]) !== stableJson(candidate[field])
+  )
 }
 
 export function parseBasketballSetupDraft(

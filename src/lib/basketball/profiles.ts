@@ -11,6 +11,7 @@ import type {
   BasketballTimeoutPoolRule,
 } from './types'
 import { isBasketballMatchRulesV2, validateBasketballMatchRules } from './rules'
+import { BASKETBALL_RULE_FIELDS } from './profileDiffPresentation'
 
 const MINUTE_MS = 60_000
 
@@ -265,7 +266,7 @@ export function normalizeBasketballRuleOverridesV2(
 ): BasketballRuleOverridesV2 | null {
   if (!isObject(value)) return null
   const keys = Object.keys(value)
-  if (keys.some(key => !RULE_FIELDS.includes(key as BasketballRulesV2Field))) return null
+  if (keys.some(key => !BASKETBALL_RULE_FIELDS.includes(key as BasketballRulesV2Field))) return null
   return structuredClone(value as BasketballRuleOverridesV2)
 }
 
@@ -282,7 +283,7 @@ export function resolveBasketballRules(
   }
   let rules = structuredClone(profileValue.rules)
   const sourceByField = Object.fromEntries(
-    RULE_FIELDS.map(field => [field, 'built_in'])
+    BASKETBALL_RULE_FIELDS.map(field => [field, 'built_in'])
   ) as BasketballResolvedRules['sourceByField']
   for (const layer of layers) {
     const overrides = normalizeBasketballRuleOverridesV2(layer.overrides)
@@ -325,7 +326,7 @@ export function previewBasketballProfileUpgrade(
     candidate: candidateResolved.value,
     currentBaseRules: structuredClone(currentBase.rules),
     targetBaseRules: structuredClone(targetBase.rules),
-    differences: RULE_FIELDS
+    differences: BASKETBALL_RULE_FIELDS
       .filter(field =>
         !sameJson(currentResolved.value.rules[field], candidateResolved.value.rules[field]) ||
         !sameJson(currentBase.rules[field], targetBase.rules[field])
@@ -348,15 +349,6 @@ export function basketballRulesProfileLabel(
   const profile = getBasketballRulesProfile(source.profileId, source.profileVersion)
   return profile ? `${profile.label} v${profile.profileVersion}` : 'Custom'
 }
-
-const RULE_FIELDS: BasketballRulesV2Field[] = [
-  'regulationSegments',
-  'overtimeTemplate',
-  'foulWindows',
-  'timeoutPools',
-  'personalFoulLimit',
-  'clockModel',
-]
 
 type ProfileInput = Omit<
   BasketballRulesProfile,

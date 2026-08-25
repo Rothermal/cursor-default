@@ -23,6 +23,7 @@ import {
   type BasketballSetupDraftV1,
 } from '../lib/basketball/setupDraft'
 import { loadLatestBasketballSetupAuthority } from '../lib/basketball/setupAuthority'
+import { basketballRuleFieldLabel } from '../lib/basketball/profileDiffPresentation'
 import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
 import type { BasketballRulesV2Field } from '../lib/basketball/types'
 
@@ -46,7 +47,7 @@ export default function PlayerSetup() {
   const navigate = useNavigate()
   const { state, dispatch, activeLocalGameId } = useGame()
   const { user, isConfigured } = useAuth()
-  const { basketballSettings } = useSettings()
+  const { basketballSettings, basketballSettingsSync } = useSettings()
   const sport = state.sport
   const cloudTeamId = state.cloudSync.teamId
   const isCloudRoster = Boolean(cloudTeamId && isConfigured && user && supabase)
@@ -346,7 +347,14 @@ export default function PlayerSetup() {
       const latest = await loadLatestBasketballSetupAuthority({
         source: draft.source,
         personalSettings: basketballSettings,
-        cloudEnabled: Boolean(isConfigured && user && supabase && navigator.onLine),
+        personalRevision: basketballSettingsSync.revision,
+        cloudEnabled: Boolean(
+          isConfigured &&
+          user &&
+          supabase &&
+          typeof navigator !== 'undefined' &&
+          navigator.onLine
+        ),
       })
       setStarting(false)
       if (!latest.ok) {
@@ -445,7 +453,7 @@ export default function PlayerSetup() {
               <h3 className="text-sm font-semibold text-amber-950">Basketball defaults changed</h3>
               <p className="mt-1 text-xs text-amber-800">
                 {staleAuthority.differences.length > 0
-                  ? `Changed fields: ${staleAuthority.differences.map(ruleFieldLabel).join(', ')}.`
+                  ? `Changed fields: ${staleAuthority.differences.map(basketballRuleFieldLabel).join(', ')}.`
                   : 'The source revision changed, but the effective game rules are unchanged.'}
               </p>
             </div>
@@ -561,15 +569,4 @@ export default function PlayerSetup() {
       </div>
     </div>
   )
-}
-
-function ruleFieldLabel(field: BasketballRulesV2Field): string {
-  switch (field) {
-    case 'regulationSegments': return 'regulation periods'
-    case 'overtimeTemplate': return 'overtime'
-    case 'foulWindows': return 'foul windows'
-    case 'timeoutPools': return 'timeouts'
-    case 'personalFoulLimit': return 'player foul limit'
-    case 'clockModel': return 'clock model'
-  }
 }

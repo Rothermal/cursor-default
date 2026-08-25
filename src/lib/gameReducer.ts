@@ -229,9 +229,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SET_ACTIVE_PLAYER':
       return { ...state, activePlayerId: action.playerId }
 
-    case 'SET_BASKETBALL_COURT_ORIENTATION':
-      return { ...state, basketballCourtOrientation: action.orientation }
-
     case 'ADD_SHOT': {
       const shot = action.shot
       const player = state.players.find(p => p.id === shot.playerId)

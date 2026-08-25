@@ -7,7 +7,11 @@ import BasketballCourt from './BasketballCourt'
 import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
 import CourtEventPopup, { type CourtEvent } from './CourtEventPopup'
-import { isThreePointer, zoneForForcedShotType } from './courtGeometry'
+import {
+  basketballCourtOrientationForState,
+  isThreePointer,
+  zoneForForcedShotType,
+} from './courtGeometry'
 import { formatCompactGameStatLine } from '../../lib/statDisplay'
 import { isTeamPseudoPlayer, sortTeamPlayersFirst } from '../../lib/teamPlayers'
 import {
@@ -133,9 +137,7 @@ export default function ShotChartPanel({
     state.sportGameState.projection.status === 'in_progress' ||
     state.sportGameState.projection.status === 'period_break'
   )
-  const courtOrientation = state.sportGameState?.sportId === 'basketball'
-    ? state.sportGameState.capturePreferences.courtOrientation
-    : state.basketballCourtOrientation ?? 'standard'
+  const courtOrientation = basketballCourtOrientationForState(state)
   const eventCaptureUnits = useMemo(
     () => isEventBasketball ? basketballLiveCaptureUnits(state) : [],
     [isEventBasketball, state]

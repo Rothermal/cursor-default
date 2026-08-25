@@ -1,4 +1,4 @@
-import type { ShotZone } from '../../types'
+import type { GameState, ShotZone } from '../../types'
 import type { GameEventLocation } from '../gameEvents/types'
 
 export const COURT_WIDTH = 50
@@ -51,8 +51,16 @@ export function orientBasketballCourtPoint(
   const centerY = (BASELINE_Y + HALFCOURT_Y) / 2
   return {
     x: -point.x,
-    y: Math.round((2 * centerY - point.y) * 10) / 10,
+    y: Math.round((2 * centerY - point.y) * 100) / 100,
   }
+}
+
+export function basketballCourtOrientationForState(
+  state: Pick<GameState, 'sportGameState' | 'basketballCourtOrientation'>
+): 'standard' | 'flipped' {
+  return state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.capturePreferences.courtOrientation
+    : state.basketballCourtOrientation ?? 'standard'
 }
 
 export function isThreePointer(x: number, y: number): boolean {

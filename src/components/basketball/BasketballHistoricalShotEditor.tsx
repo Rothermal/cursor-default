@@ -3,7 +3,10 @@ import { Check, LocateFixed, MapPinOff, Plus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
 import type { ShotRecord } from '../../types'
-import { zoneForForcedShotType } from '../../lib/basketball/courtGeometry'
+import {
+  basketballCourtOrientationForState,
+  zoneForForcedShotType,
+} from '../../lib/basketball/courtGeometry'
 import {
   applyBasketballHistoricalShot,
   basketballShotActorOptions,
@@ -147,6 +150,7 @@ export default function BasketballHistoricalShotEditor({
             <BasketballCourt
               shots={marker}
               onCourtTap={(x, y) => update({ location: { x, y } })}
+              flipped={basketballCourtOrientationForState(state) === 'flipped'}
               className="w-full"
               emptyHint="Tap to place"
             />

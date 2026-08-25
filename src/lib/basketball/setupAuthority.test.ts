@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { BASKETBALL_SETTINGS_SCHEMA_VERSION, DEFAULT_BASKETBALL_PERSONAL_SETTINGS } from './settings'
 import { loadLatestBasketballSetupAuthority } from './setupAuthority'
+import {
+  basketballSetupEventMatchesAuthority,
+  createBasketballSetupDraftEvent,
+} from './setupDraft'
 
 const personalSource = {
   kind: 'personal' as const,
@@ -23,6 +27,7 @@ describe('Basketball setup authority loading', () => {
     const result = await loadLatestBasketballSetupAuthority({
       source: personalSource,
       personalSettings: DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
+      personalRevision: 5,
       cloudEnabled: false,
       loaders: {
         personal: async () => { calls += 1; return { status: 'missing' } },
@@ -31,7 +36,17 @@ describe('Basketball setup authority loading', () => {
     })
 
     expect(calls).toBe(0)
-    expect(result).toMatchObject({ ok: true, authority: { kind: 'personal', revision: null } })
+    expect(result).toMatchObject({ ok: true, authority: { kind: 'personal', revision: 5 } })
+    const reviewed = createBasketballSetupDraftEvent({
+      authority: 'personal',
+      revision: 5,
+      settings: DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
+      cloudIntent: 'local_only',
+    })
+    expect(reviewed).not.toBeNull()
+    if (result.ok && reviewed) {
+      expect(basketballSetupEventMatchesAuthority(reviewed, result.authority)).toBe(true)
+    }
   })
 
   it('loads and validates the exact team revision', async () => {

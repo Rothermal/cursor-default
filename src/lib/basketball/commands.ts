@@ -356,9 +356,12 @@ export function buildBasketballMatchSetup(
   if (!reviewedSetup && !resolvedRules) {
     return commandFailure('invalid_setup', 'Basketball team-stat rules are unavailable.')
   }
-  const sourceTeamId = reviewedSetup?.sourceTeamId ?? state.cloudSync.teamId
-  const sourceSeasonId = reviewedSetup?.sourceSeasonId ??
-    (state.cloudSync.teamId ? state.cloudSync.seasonId : null)
+  const sourceTeamId = reviewedSetup
+    ? reviewedSetup.sourceTeamId
+    : state.cloudSync.teamId
+  const sourceSeasonId = reviewedSetup
+    ? reviewedSetup.sourceSeasonId
+    : state.cloudSync.teamId ? state.cloudSync.seasonId : null
   if (sourceTeamId && !sourceSeasonId) {
     return commandFailure('invalid_setup', 'Cloud team Basketball games require a source season.')
   }

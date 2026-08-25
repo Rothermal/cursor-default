@@ -17,6 +17,7 @@ interface GameSummaryShotChartPanelProps {
   shotViewSelection: ShotChartSelection
   onShotViewSelectionChange: (selection: ShotChartSelection) => void
   activeBgClass: string
+  flipped: boolean
 }
 
 /** Read-only shot chart tab for Game Summary — never records or dispatches shots. */
@@ -27,6 +28,7 @@ export default function GameSummaryShotChartPanel({
   shotViewSelection,
   onShotViewSelectionChange,
   activeBgClass,
+  flipped,
 }: GameSummaryShotChartPanelProps) {
   const visibleShots = shotsForSelection(summaryShotChart, players, shotViewSelection)
 
@@ -59,7 +61,7 @@ export default function GameSummaryShotChartPanel({
         </p>
       )}
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <BasketballCourt shots={visibleShots} className="w-full" />
+        <BasketballCourt shots={visibleShots} flipped={flipped} className="w-full" />
       </div>
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <ShootingSummary

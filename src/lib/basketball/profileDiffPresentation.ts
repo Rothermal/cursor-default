@@ -9,6 +9,23 @@ import type {
   BasketballTimeoutPoolRule,
 } from './types'
 
+export const BASKETBALL_RULE_FIELD_LABELS = {
+  regulationSegments: 'Regulation segments',
+  overtimeTemplate: 'Overtime',
+  foulWindows: 'Foul windows',
+  timeoutPools: 'Timeout pools',
+  personalFoulLimit: 'Player foul limit',
+  clockModel: 'Clock model',
+} satisfies Record<BasketballRulesV2Field, string>
+
+export const BASKETBALL_RULE_FIELDS = Object.keys(
+  BASKETBALL_RULE_FIELD_LABELS
+) as BasketballRulesV2Field[]
+
+export function basketballRuleFieldLabel(field: BasketballRulesV2Field): string {
+  return BASKETBALL_RULE_FIELD_LABELS[field]
+}
+
 export function formatBasketballRuleField(
   field: BasketballRulesV2Field,
   value: BasketballMatchRulesV2[BasketballRulesV2Field]

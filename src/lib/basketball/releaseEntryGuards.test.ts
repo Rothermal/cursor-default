@@ -113,6 +113,20 @@ describe('Basketball release entry guards', () => {
     expect(playerSetup).toContain('rulesSource: draft.event.reviewedRulesSource')
   })
 
+  it('applies the per-game orientation to every game-specific Basketball court', () => {
+    const livePanel = source('src/components/shot-chart/ShotChartPanel.tsx')
+    const shotEditor = source('src/components/basketball/BasketballShotEditor.tsx')
+    const historicalEditor = source('src/components/basketball/BasketballHistoricalShotEditor.tsx')
+    const eventReview = source('src/components/basketball-summary/BasketballShotReview.tsx')
+    const legacyReview = source('src/pages/game-summary/GameSummaryShotChartPanel.tsx')
+
+    expect(livePanel).toContain("flipped={courtOrientation === 'flipped'}")
+    expect(shotEditor).toContain('flipped={basketballCourtOrientationForState(state)')
+    expect(historicalEditor).toContain('flipped={basketballCourtOrientationForState(state)')
+    expect(eventReview).toContain('flipped={basketballCourtOrientationForState(source.state)')
+    expect(legacyReview).toContain('flipped={flipped}')
+  })
+
   it('keeps the internal creation gate closed outside development policy', () => {
     const policy = source('src/lib/sportAvailability.ts')
     expect(policy).toContain(

@@ -16,7 +16,10 @@ import {
   type BasketballShotEditPreview,
   type BasketballShotRelationshipKind,
 } from '../../lib/basketball/shotEditCommands'
-import { zoneForForcedShotType } from '../../lib/basketball/courtGeometry'
+import {
+  basketballCourtOrientationForState,
+  zoneForForcedShotType,
+} from '../../lib/basketball/courtGeometry'
 import BasketballCourt from '../shot-chart/BasketballCourt'
 
 interface BasketballShotEditorProps {
@@ -141,6 +144,7 @@ export default function BasketballShotEditor({
             <BasketballCourt
               shots={marker}
               onCourtTap={(x, y) => update({ location: { x, y } })}
+              flipped={basketballCourtOrientationForState(state) === 'flipped'}
               className="w-full"
               emptyHint="Tap to place"
             />

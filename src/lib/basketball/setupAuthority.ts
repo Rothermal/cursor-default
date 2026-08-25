@@ -32,11 +32,13 @@ const defaultLoaders: BasketballSetupAuthorityLoaders = {
 export async function loadLatestBasketballSetupAuthority({
   source,
   personalSettings,
+  personalRevision,
   cloudEnabled,
   loaders = defaultLoaders,
 }: {
   source: BasketballSetupSource
   personalSettings: BasketballPersonalSettingsV1
+  personalRevision?: number | null
   cloudEnabled: boolean
   loaders?: BasketballSetupAuthorityLoaders
 }): Promise<BasketballSetupAuthorityLoadResult> {
@@ -46,7 +48,14 @@ export async function loadLatestBasketballSetupAuthority({
     }
     const parsed = parseBasketballPersonalSettings(personalSettings)
     return parsed.ok
-      ? { ok: true, authority: { kind: 'personal', revision: null, settings: parsed.value } }
+      ? {
+          ok: true,
+          authority: {
+            kind: 'personal',
+            revision: personalRevision ?? null,
+            settings: parsed.value,
+          },
+        }
       : { ok: false, error: parsed.error }
   }
 

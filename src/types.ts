@@ -246,7 +246,6 @@ export type GameAction =
   | { type: 'ADD_PLAYER'; player: Player }
   | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'SET_ACTIVE_PLAYER'; playerId: string }
-  | { type: 'SET_BASKETBALL_COURT_ORIENTATION'; orientation: 'standard' | 'flipped' }
   | { type: 'INCREMENT_STAT'; playerId: string; statId: string; linkedShotId?: string }
   | { type: 'DECREMENT_STAT'; playerId: string; statId: string }
   | { type: 'INCREMENT_OPPONENT_SCORE' }
