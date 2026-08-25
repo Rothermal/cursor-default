@@ -759,6 +759,22 @@ export function saveParkedGameRecordState(
   return listParkedGames(ownerId)
 }
 
+/** Replace one parked record and its manifest/mirror as one rollback-safe local operation. */
+export function saveParkedGameRecordStateAtomically(
+  localGameId: string,
+  state: GameState,
+  ownerId: string | null,
+  syncPatch: Partial<ParkedGameSyncState> = {}
+): ParkedGameSummary[] {
+  const snapshot = snapshotParkingStorage(migrateLegacyGameStorage(ownerId))
+  try {
+    return saveParkedGameRecordState(localGameId, state, ownerId, syncPatch)
+  } catch (error) {
+    restoreParkingStorage(snapshot)
+    throw error
+  }
+}
+
 export function beginNewActiveParkedGame(ownerId: string | null): string {
   const manifest = migrateLegacyGameStorage(ownerId)
   assertCanCreateLocalGameId(manifest)

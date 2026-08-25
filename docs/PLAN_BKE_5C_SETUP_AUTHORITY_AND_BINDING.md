@@ -1,8 +1,7 @@
 # Plan: BKE-5C Basketball Setup Authority and Binding Policy
 
-Status: Delivery design approved from the parent BKE-5 Q&A. BKE-5C1 through BKE-5C3 are implemented;
-BKE-5C4 remains. No new product decisions are required, and the phase remains behind the
-internal Basketball event-creation gate.
+Status: Implemented in BKE-5C1 through BKE-5C4. The phase remains behind the internal Basketball
+event-creation gate; BKE-5D owns production opt-in and live release evidence.
 
 Parent: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md)
 
@@ -326,7 +325,7 @@ authority.
 
 Exit: every preflight failure is mutation-free and a local-only game produces no cloud request.
 
-### BKE-5C4: Enable Cloud Sync and exit hardening
+### BKE-5C4: Enable Cloud Sync and exit hardening (implemented)
 
 - guarded fresh-preflight Enable Cloud Sync command and UI
 - duplicate-binding and recorder/source-role checks

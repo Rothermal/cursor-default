@@ -9,6 +9,7 @@ import { createBasketballSportGameState } from './basketball/state'
 import { prepareBasketballGameStart } from './basketball/commands'
 import { gameReducer } from './gameReducer'
 import {
+  cloudSyncRouteForState,
   isAggregateCloudSyncEligible,
   withLastSyncedGameFingerprint,
 } from './gameSyncFingerprint'
@@ -42,6 +43,7 @@ import {
   parkedGameStorageErrorMessage,
   saveActiveGameState,
   saveParkedGameRecordState,
+  saveParkedGameRecordStateAtomically,
 } from './gameParking'
 
 class MemoryStorage {
@@ -213,6 +215,33 @@ describe('gameParking', () => {
     expect(getParkedGameRecord(previousId!, null)?.gameState).toEqual(current)
   })
 
+  it('restores a parked record, manifest, and active mirror when atomic replacement fails', () => {
+    const storage = new FailNthManifestWriteStorage()
+    vi.stubGlobal('localStorage', storage)
+    const current = gameState(basketball, 'Current', 'One')
+    saveActiveGameState(current, 'user-1')
+    const localGameId = getActiveLocalGameId('user-1')!
+    const before = {
+      manifest: localStorage.getItem(GAMES_MANIFEST_KEY),
+      record: localStorage.getItem(`${GAME_RECORD_KEY_PREFIX}${localGameId}`),
+      mirror: localStorage.getItem(GAME_STORAGE_KEY),
+    }
+    const next = { ...current, notes: 'cloud enabled' }
+
+    storage.failOnManifestWrite(1)
+    expect(() => saveParkedGameRecordStateAtomically(
+      localGameId,
+      next,
+      'user-1',
+      { dirty: false }
+    )).toThrow(ParkedGameStorageError)
+
+    expect(localStorage.getItem(GAMES_MANIFEST_KEY)).toBe(before.manifest)
+    expect(localStorage.getItem(`${GAME_RECORD_KEY_PREFIX}${localGameId}`)).toBe(before.record)
+    expect(localStorage.getItem(GAME_STORAGE_KEY)).toBe(before.mirror)
+    expect(getParkedGameRecord(localGameId, 'user-1')?.gameState.notes).toBe('')
+  })
+
   it('restores the exact prior parking state when the setup transaction fails', () => {
     const storage = new FailNthManifestWriteStorage()
     vi.stubGlobal('localStorage', storage)
@@ -295,6 +324,64 @@ describe('gameParking', () => {
         currentPeriodId: 'regulation-1',
       })
     }
+    expect(isAggregateCloudSyncEligible(restored!)).toBe(false)
+  })
+
+  it('round-trips a confirmed local-only to automatic binding through park and reload', () => {
+    const eventBasketball: SportConfig = {
+      ...basketball,
+      teamCategories: [{ id: 'team', name: 'Team', color: 'blue', actions: [] }],
+    }
+    const before = {
+      ...gameState(eventBasketball, 'Wildcats', 'Tigers'),
+      gameDataAuthority: 'sport_events' as const,
+    }
+    const started = prepareBasketballGameStart(before, {
+      recorderUserId: 'user-1',
+      occurredAt: '2026-08-25T16:00:00.000Z',
+      eventId: '71000000-0000-4000-8000-000000000011',
+      participantIds: ['71000000-0000-4000-8000-000000000111'],
+    })
+    if (!started.ok) throw new Error(started.message)
+    const localOnly: GameState = {
+      ...started.state,
+      cloudSync: {
+        ...started.state.cloudSync,
+        eventCloudPolicy: 'local_only',
+      },
+    }
+    const [summary] = saveActiveGameState(localOnly, 'user-1')
+    const automatic = withLastSyncedGameFingerprint({
+      ...localOnly,
+      cloudSync: {
+        ...localOnly.cloudSync,
+        eventCloudPolicy: 'automatic',
+        gameId: 'cloud-game-1',
+        gameStatus: 'in_progress',
+        playerIdMap: { p1: 'cloud-p1' },
+        status: 'synced',
+        lastSyncedAt: '2026-08-25T16:01:00.000Z',
+      },
+    })
+
+    saveParkedGameRecordStateAtomically(summary.localGameId, automatic, 'user-1', {
+      dirty: false,
+      attempts: 0,
+      lastError: null,
+      nextAttemptAt: null,
+    })
+    parkActiveGame('user-1')
+    const resumed = activateParkedGame(summary.localGameId, 'user-1')
+    const restored = loadActiveParkedGameState('user-1')
+
+    expect(resumed?.cloudSync).toMatchObject({
+      eventCloudPolicy: 'automatic',
+      gameId: 'cloud-game-1',
+      status: 'synced',
+    })
+    expect(restored).toEqual(resumed)
+    expect(getParkedGameRecord(summary.localGameId, 'user-1')?.sync.dirty).toBe(false)
+    expect(cloudSyncRouteForState(restored!)).toBe('basketball_events')
     expect(isAggregateCloudSyncEligible(restored!)).toBe(false)
   })
 

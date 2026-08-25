@@ -270,6 +270,25 @@ describe('Basketball event cloud transport adapter', () => {
     )
   })
 
+  it('validates a new binding before pulling or uploading recorder events', async () => {
+    const validateBinding = vi.fn(() => {
+      throw new Error('duplicate local binding')
+    })
+    await expect(syncBasketballEventGameToCloud({
+      state: startedState(),
+      userId: 'user-1',
+      localGameId: '80000000-0000-4000-8000-000000000001',
+      validateBinding,
+    })).rejects.toThrow('duplicate local binding')
+
+    expect(validateBinding).toHaveBeenCalledWith('cloud-game-1')
+    expect(cloudMock.load).not.toHaveBeenCalled()
+    expect(cloudMock.upsert).not.toHaveBeenCalled()
+    expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
+      'bind_basketball_event_game_v4',
+    ])
+  })
+
   it('binds an authorized team game with immutable team and season sources', async () => {
     await syncBasketballEventGameToCloud({
       state: startedState(true),

@@ -1,7 +1,7 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
 Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, and BKE-5C1 through
-BKE-5C3 are implemented; BKE-5C4 and BKE-5D remain. BKE-5B and BKE-5C remain internal;
+BKE-5C4 are implemented; BKE-5D remains. BKE-5B and BKE-5C remain internal;
 BKE-5D must not open the user-visible event-model opt-in until the BKE-4 live release matrix and
 the targeted BKE-5 checks are accepted.
 
@@ -573,7 +573,7 @@ Deliver BKE-5C as four reviewable slices:
   resolution, stale revision handling, and exact immutable event setup.
 - **BKE-5C3 - capability and local-only (implemented):** authority-aware recovery choices, explicit persisted
   event-cloud policy, transport guards, and removal of premature Basketball preflights.
-- **BKE-5C4 - Enable Cloud and exit:** guarded later binding, duplicate/role checks, failure-safe
+- **BKE-5C4 - Enable Cloud and exit (implemented):** guarded later binding, duplicate/role checks, failure-safe
   upload/checkpoint, and the BKE-5C regression audit.
 
 ### BKE-5D: Release and exit audit

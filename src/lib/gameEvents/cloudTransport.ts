@@ -64,6 +64,7 @@ export interface SyncEventGameInput {
   userId: string
   localGameId: string
   adapter: EventCloudTransportAdapter
+  validateBinding?: (gameId: string) => void | Promise<void>
 }
 
 export interface SyncEventGameResult {
@@ -123,6 +124,7 @@ export async function syncEventGameToCloud({
   userId,
   localGameId,
   adapter,
+  validateBinding,
 }: SyncEventGameInput): Promise<SyncEventGameResult> {
   if (!supabase) throw new Error('Supabase client not configured')
   const prepared = adapter.prepare(state)
@@ -156,6 +158,7 @@ export async function syncEventGameToCloud({
   if (!binding?.game_id || !binding.game_status || !binding.participant_id_map) {
     throw new Error(`${adapter.sportLabel} game binding returned an invalid response`)
   }
+  await validateBinding?.(binding.game_id)
 
   const cloudToLocalParticipantId = Object.fromEntries(
     Object.entries(binding.participant_id_map).map(([localId, cloudId]) => [cloudId, localId])
