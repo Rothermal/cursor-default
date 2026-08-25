@@ -9,6 +9,7 @@ import BasketballSummaryTabs from '../components/basketball-summary/BasketballSu
 import BasketballShotReview from '../components/basketball-summary/BasketballShotReview'
 import BasketballTeamStats from '../components/basketball-summary/BasketballTeamStats'
 import BasketballTimeline from '../components/basketball/BasketballTimeline'
+import BasketballEnableCloudPanel from '../components/basketball/BasketballEnableCloudPanel'
 import { useGame } from '../context/GameContext'
 import {
   basketballMatchLeaders,
@@ -224,6 +225,9 @@ export default function BasketballSummary() {
         onChange={recordingId => navigate(summaryPath(query, recordingId))}
       />
       <div className="mx-auto max-w-5xl px-4">
+        {source.kind === 'local' && healthy && (
+          <BasketballEnableCloudPanel state={state} />
+        )}
         {refreshError && (
           <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <AlertTriangle size={18} className="mt-0.5 shrink-0" />

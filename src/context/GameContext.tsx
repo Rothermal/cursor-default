@@ -31,6 +31,7 @@ import {
   BasketballCloudRecoveryError,
   syncBasketballEventGameToCloud,
 } from '../lib/basketball/cloudSync'
+import { enableBasketballEventCloud } from '../lib/basketball/enableCloudSync'
 import { resolveEventConflictInState } from '../lib/gameEvents/eventConflictResolution'
 import { eventCloudTransportAdapterForSport } from '../lib/eventCloudTransportAdapters'
 import { supabase } from '../lib/supabase'
@@ -84,6 +85,7 @@ import {
   parkedGameStorageErrorMessage,
   saveActiveGameState,
   saveParkedGameRecordState,
+  saveParkedGameRecordStateAtomically,
   type ParkedGameRecord,
   type ParkedGameSummary,
 } from '../lib/gameParking'
@@ -321,6 +323,7 @@ interface GameContextType {
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
   flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
+  enableBasketballCloudSync: () => Promise<FlushCloudSyncResult>
   markEventCloudGameReopened: (gameId: string) => void
   resolveEventConflict: (
     eventId: string,
@@ -1046,6 +1049,96 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }, [isOnline, runCloudSync, userId])
 
+  const enableBasketballCloudSync = useCallback(async (): Promise<FlushCloudSyncResult> => {
+    if (!isConfigured || !supabase) {
+      return { ok: false, reason: 'Basketball cloud sync requires Supabase configuration.' }
+    }
+    if (!userId) {
+      return { ok: false, reason: 'Sign in before enabling Basketball cloud sync.' }
+    }
+    if (!isOnline) {
+      return { ok: false, reason: 'Reconnect before enabling Basketball cloud sync.' }
+    }
+
+    const localGameId = getActiveLocalGameId(userId)
+    const snapshot = stateRef.current
+    const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
+    if (!localGameId || !getParkedGameRecord(localGameId, userId)) {
+      return { ok: false, reason: 'This local Basketball game is unavailable.' }
+    }
+
+    const assertCurrent = () => {
+      const currentRecord = getParkedGameRecord(localGameId, userId)
+      if (
+        getActiveLocalGameId(userId) !== localGameId ||
+        !currentRecord ||
+        buildGameSyncFingerprint(stateRef.current) !== snapshotFingerprint ||
+        buildGameSyncFingerprint(currentRecord.gameState) !== snapshotFingerprint ||
+        stateRef.current.cloudSync.eventCloudPolicy !== 'local_only' ||
+        currentRecord.gameState.cloudSync.eventCloudPolicy !== 'local_only'
+      ) {
+        throw new Error('This game changed while cloud sync was being enabled. Try again.')
+      }
+    }
+    const validateBinding = (gameId: string) => {
+      assertCurrent()
+      const duplicate = listParkedGameRecords(userId).find(record =>
+        record.localGameId !== localGameId && record.gameState.cloudSync.gameId === gameId
+      )
+      if (duplicate) {
+        throw new Error('Another local game already owns this cloud Basketball game.')
+      }
+    }
+
+    let enabled: Awaited<ReturnType<typeof enableBasketballEventCloud>>
+    let summaries: ParkedGameSummary[]
+    try {
+      enabled = await enableBasketballEventCloud({
+        state: snapshot,
+        userId,
+        localGameId,
+        assertCurrent,
+        validateBinding,
+      })
+      assertCurrent()
+      validateBinding(enabled.cloudGameId)
+      summaries = saveParkedGameRecordStateAtomically(
+        localGameId,
+        enabled.state,
+        userId,
+        {
+          dirty: false,
+          attempts: 0,
+          lastError: null,
+          nextAttemptAt: null,
+        }
+      )
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error instanceof Error
+          ? error.message
+          : 'Basketball cloud sync could not be enabled.',
+      }
+    }
+
+    stateRef.current = enabled.state
+    dispatch({ type: 'HYDRATE_STATE', state: enabled.state })
+    try {
+      setResumeTarget(userId, enabled.cloudGameId)
+    } catch {
+      // The resume preference is optional; the confirmed local/cloud binding remains authoritative.
+    }
+    setParkedGames(summaries)
+    setActiveLocalGameId(localGameId)
+    pendingSyncRef.current = summaries.some(
+      game => game.syncDirty && game.eventCloudPolicy !== 'local_only'
+    )
+    setPendingSyncFlag(pendingSyncRef.current)
+    setParkingError(null)
+    return { ok: true }
+  }, [isConfigured, isOnline, userId])
+
   const markEventCloudGameReopened = useCallback((gameId: string) => {
     try {
       setParkedGames(markParkedCloudGameReopened(userId, gameId))
@@ -1172,6 +1265,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         discardParkedGame,
         flushCloudSync,
         flushCloudGameSync,
+        enableBasketballCloudSync,
         markEventCloudGameReopened,
         resolveEventConflict,
       }}

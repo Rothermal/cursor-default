@@ -38,6 +38,7 @@ import BasketballEjectionDialog, {
 import BasketballTimeoutDialog from '../components/basketball/BasketballTimeoutDialog'
 import BasketballTimeline from '../components/basketball/BasketballTimeline'
 import BasketballRecorderStatus from '../components/basketball/BasketballRecorderStatus'
+import BasketballEnableCloudPanel from '../components/basketball/BasketballEnableCloudPanel'
 import EventCloudConflictDialog from '../components/game-events/EventCloudConflictDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
@@ -172,7 +173,13 @@ function countLabel(count: number, singular: string, plural = `${singular}s`): s
 
 export default function GameTracker() {
   const navigate = useNavigate()
-  const { state, dispatch, flushCloudSync, parkingError, resolveEventConflict } = useGame()
+  const {
+    state,
+    dispatch,
+    flushCloudSync,
+    parkingError,
+    resolveEventConflict,
+  } = useGame()
   const { user } = useAuth()
   const teamAccess = useTeamRole(state.cloudSync.teamId)
   const {
@@ -1063,6 +1070,7 @@ export default function GameTracker() {
             {cloudRecoveryError}
           </div>
         )}
+        <BasketballEnableCloudPanel state={state} />
         {cloudConflicts.length > 0 ? (
           <div className="mt-3 flex items-center gap-3 border border-amber-300 bg-amber-50 px-3 py-3 text-amber-900">
             <BadgeAlert size={20} className="shrink-0" />

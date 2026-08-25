@@ -60,6 +60,7 @@ export interface SyncBasketballEventGameInput {
   state: GameState
   userId: string
   localGameId: string
+  validateBinding?: (gameId: string) => void | Promise<void>
 }
 
 export async function loadBasketballCloudDataAuthority(

@@ -171,4 +171,28 @@ describe('Basketball release entry guards', () => {
     const signOut = between(auth, 'const signOut = useCallback(async () => {', '\n  return (')
     expect(signOut).toContain('clearBasketballReleaseCapabilityCache()')
   })
+
+  it('commits later cloud enablement only after the guarded transport succeeds', () => {
+    const panel = source('src/components/basketball/BasketballEnableCloudPanel.tsx')
+    const summary = source('src/pages/BasketballSummary.tsx')
+    const context = source('src/context/GameContext.tsx')
+    const handler = between(
+      context,
+      'const enableBasketballCloudSync = useCallback(',
+      '\n\n  const markEventCloudGameReopened'
+    )
+    const transportIndex = handler.indexOf('await enableBasketballEventCloud')
+    const persistIndex = handler.indexOf('saveParkedGameRecordStateAtomically')
+    const hydrateIndex = handler.indexOf("dispatch({ type: 'HYDRATE_STATE'")
+
+    expect(panel).toContain('canOfferBasketballEventCloudEnable')
+    expect(panel).toContain('Enable Cloud Sync')
+    expect(panel).toContain('Keep Local Only')
+    expect(summary).toContain("source.kind === 'local' && healthy")
+    expect(summary).toContain('<BasketballEnableCloudPanel state={state} />')
+    expect(transportIndex).toBeGreaterThanOrEqual(0)
+    expect(persistIndex).toBeGreaterThan(transportIndex)
+    expect(hydrateIndex).toBeGreaterThan(persistIndex)
+    expect(handler).toContain('Another local game already owns this cloud Basketball game.')
+  })
 })

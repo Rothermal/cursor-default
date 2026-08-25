@@ -1,7 +1,7 @@
 # BKE-5C1 Basketball Setup Draft Regression
 
 Status: implementation complete. No Supabase migration is required. Basketball event creation
-remains behind the internal gate; BKE-5C2 and BKE-5C3 are implemented and BKE-5C4 remains.
+remains behind the internal gate; BKE-5C2 through BKE-5C4 are implemented and BKE-5D remains.
 
 ## Scope
 

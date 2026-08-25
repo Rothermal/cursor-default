@@ -1,7 +1,7 @@
 # BKE-5C2 Basketball Rules Authority and Freeze Regression
 
 Status: implementation complete. No Supabase migration is required. Basketball event creation
-remains behind the internal gate; BKE-5C3 is implemented, while BKE-5C4 and BKE-5D remain before release.
+remains behind the internal gate; BKE-5C3 and BKE-5C4 are implemented, while BKE-5D remains before release.
 
 ## Scope
 

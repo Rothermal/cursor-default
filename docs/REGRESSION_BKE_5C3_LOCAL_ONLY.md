@@ -1,7 +1,7 @@
 # BKE-5C3 Basketball Capability and Local-Only Regression
 
 Status: implementation complete. No Supabase migration is required. Basketball Event creation
-remains behind the internal gate; BKE-5C4 and BKE-5D remain before release.
+remains behind the internal gate; BKE-5C4 is implemented and BKE-5D remains before release.
 
 ## Scope
 
