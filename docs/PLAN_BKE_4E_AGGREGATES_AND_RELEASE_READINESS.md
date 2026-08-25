@@ -1,9 +1,9 @@
 # Plan: BKE-4E Canonical Aggregates and Release Readiness
 
 Status: Product and delivery Q&A approved on 2026-08-20. BKE-4E is implemented in five slices
-through migration 061. The consolidated live matrix remains pre-BKE-5 release evidence.
-Basketball event-game creation remains internal-only, and the user-visible event-model opt-in
-remains BKE-5.
+through migration 061. The consolidated live matrix remains open and mandatory before the rollout
+broadens. `PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2 permits focused post-deployment validation for
+the initial owner-only opt-in without marking pending BKE-4E rows passed.
 
 ## 1. Goal
 
@@ -18,7 +18,8 @@ BKE-4E will:
 - add a strict authenticated Basketball backend-capability handshake;
 - retire legacy aggregate readers only for event-backed games while preserving every historical
   aggregate game; and
-- consolidate the release evidence required before BKE-5 exposes event-model creation to users.
+- consolidate release evidence that remains required before Event access broadens beyond the
+  initial owner-only rollout approved in `PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2.
 
 BKE-4E does not open the user-visible creation gate. It makes that later choice safe.
 
@@ -588,7 +589,8 @@ No migration.
 ### BKE-4E5: Capability handshake and release exit audit
 
 Status: Implemented on 2026-08-23. See `docs/REGRESSION_BKE_4E_RELEASE_READINESS.md`. The live
-multi-device/role matrix remains required before BKE-5 exposes event-model opt-in.
+multi-device/role matrix remains required before Event access broadens; BKE-5D section 2 governs
+the focused initial owner-only exception.
 
 Scope:
 
@@ -603,7 +605,8 @@ Scope:
 - keep production user opt-in closed for BKE-5.
 
 Exit: the backend can safely negotiate the complete BKE-4 contract, automated release gates pass,
-and the remaining live evidence is explicitly recorded as complete or as a named pre-BKE-5 gate.
+and the remaining live evidence is explicitly recorded as complete or as a named broader-release
+gate.
 
 Migration: 061.
 
@@ -665,8 +668,10 @@ pass/fail evidence for:
     recovery; and
 12. representative Soccer and legacy Basketball transport, summaries, aggregates, and settings.
 
-Because creation remains internal, the owner may approve post-merge completion of live rows during
-BKE-4E. Every unresolved row remains a hard gate before BKE-5 exposes the event-model opt-in.
+Because creation remained internal during BKE-4E, the owner could approve post-merge completion of
+live rows. Every unresolved row remains a hard gate before access broadens beyond the initial
+owner-only opt-in permitted by `PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2; no pending row is treated
+as passed.
 
 ## 14. Rollback and Failure Handling
 

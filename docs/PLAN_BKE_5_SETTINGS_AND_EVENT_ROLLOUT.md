@@ -1,9 +1,10 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
 Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, and BKE-5C1 through
-BKE-5C4 are implemented; BKE-5D remains. BKE-5B and BKE-5C remain internal;
-BKE-5D must not open the user-visible event-model opt-in until the BKE-4 live release matrix and
-the targeted BKE-5 checks are accepted.
+BKE-5C4 are implemented. BKE-5D is approved in two slices and remains to be implemented; see
+[PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md). BKE-5B and BKE-5C remain
+internal. The initial owner-only BKE-5D rollout uses a default-off production opt-in with focused
+post-deployment validation; the complete live matrix remains required before access broadens.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -166,8 +167,9 @@ defaults while preserving useful personal defaults outside team authority.
 31. Migration 062 adds fixed Basketball settings validation and compare-and-swap RPCs and advances
     the Basketball capability handshake to advertise the supported settings contract. Soccer's
     existing function signatures, validation, responses, audit behavior, and clients stay exact.
-32. BKE-5A through BKE-5C merge under the internal creation gate. BKE-5D may expose `opt_in` only
-    after the combined BKE-4 live matrix and BKE-5 profile/settings/setup checks are accepted.
+32. BKE-5A through BKE-5C merge under the internal creation gate. BKE-5D delivers policy hardening
+    before a separate `opt_in` activation. The initial owner-only release may validate after
+    deployment; the combined BKE-4/BKE-5 matrix remains the broader-release gate.
 
 ## 4. Profile Catalog
 
@@ -467,9 +469,10 @@ sync/conflict resolution, Summary, Game Info, finalization/reopen, canonical pub
 aggregate destinations. Rolling back from `opt_in` to `internal` therefore stops only new event
 creation. Legacy Basketball creation remains available throughout.
 
-BKE-5D flips to `opt_in` only after the owner accepts the combined BKE-4 live matrix and BKE-5's
-targeted profile/settings/setup evidence. Event remains a deliberate per-game choice defaulting to
-Legacy after the flip.
+BKE-5D uses a separate activation PR after policy hardening. The owner approved an initial
+owner-only, default-off rollout with a focused post-deployment smoke pass. Event remains a
+deliberate per-game choice defaulting to Legacy after the flip; the complete matrix remains open
+until actually run and gates broader access.
 
 ## 9. Delivery Slices
 
@@ -578,10 +581,15 @@ Deliver BKE-5C as four reviewable slices:
 
 ### BKE-5D: Release and exit audit
 
+Detailed delivery plan:
+[`PLAN_BKE_5D_RELEASE_AND_EXIT.md`](PLAN_BKE_5D_RELEASE_AND_EXIT.md).
+
 - Add central `internal | opt_in` creation policy and the default-off device preference.
 - Consolidate automated and manual evidence in `REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md`.
-- Run the live role/device/PWA/local/cloud matrix and record owner signoff.
-- Flip production policy to `opt_in` only after acceptance; document rollback.
+- Deliver policy hardening and production activation as separate BKE-5D1/BKE-5D2 PRs.
+- Record focused owner post-deployment smoke evidence; retain the complete role/device/PWA/local/
+  cloud matrix before broader access.
+- Flip production policy to `opt_in` only in BKE-5D2; document rollback.
 - Exit: production can create deliberate Event games without reducing historical or Legacy access.
 
 ## 10. Verification Matrix
@@ -632,6 +640,7 @@ Each implementation PR updates this plan's slice status, the parent roadmap, `RE
 `AGENTS.md`, and `docs/AGENT_CODEBASE_OVERVIEW.md`. BKE-5D owns the consolidated regression record,
 the accepted live evidence, exact migration order, production activation, and rollback instructions.
 
-BKE-5 is complete only when BKE-5A through BKE-5D are merged, migration 062 is applied, the
-combined BKE-4/BKE-5 release evidence is accepted, and production opt-in is both enabled and
-reversible without hiding any existing game.
+BKE-5 is complete only when BKE-5A through BKE-5D are merged, migration 062 is applied, the focused
+owner rollout has a recorded disposition, and production opt-in is both enabled and reversible
+without hiding any existing game. The complete BKE-4/BKE-5 matrix remains required before the
+rollout broadens beyond the owner.
