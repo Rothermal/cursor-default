@@ -11,7 +11,8 @@ remains behind the internal gate; BKE-5C4 and BKE-5D remain before release.
   authority or replacing the active game
 - new Event games persist exact `automatic | local_only` policy in cloud-sync metadata
 - pre-C3 Event games with no policy retain automatic compatibility without hydration rewrites
-- malformed persisted policy fails closed to local-only; Legacy games discard the Event-only field
+- malformed persisted policy resolves fail-closed while retaining its raw value and any binding as
+  repair evidence; Legacy games discard the Event-only field
 - local-only team games keep source team/season in immutable setup while cloud binding ids stay null
 - local-only survives active storage, parking, reload, export/import, and recovery-state persistence
 - local-only is excluded from dirty queue eligibility and guarded again before Basketball bind, pull,
@@ -22,8 +23,8 @@ remains behind the internal gate; BKE-5C4 and BKE-5D remain before release.
 
 Recorded 2026-08-25:
 
-- focused capability/policy/setup/transport/parking suite: 8 files, 125 tests passed
-- `pnpm test`: 164 files, 1,117 tests passed
+- focused capability/policy/setup/transport/parking suite: 8 files, 130 tests passed
+- `pnpm test`: 164 files, 1,121 tests passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: zero errors; six existing Fast Refresh warnings, including the separate worktree
 - `pnpm build`: passed; existing Browserslist freshness and bundle-size warnings only
@@ -45,9 +46,12 @@ parking/export/import persistence, recovery choices, and preflight ordering befo
    no cloud game/team binding or pending-sync badge.
 5. Repeat the failed preflight and choose Legacy Cloud. Confirm the draft returns to Legacy and follows
    the existing aggregate setup path after review.
-6. Repeat and choose Cancel. Confirm no game, tournament, parking, or authority mutation occurred.
+6. Repeat and choose Cancel. Confirm the setup draft clears, the source route opens, and no game,
+   tournament, parking, or authority mutation occurred.
 7. Start an automatic Event team game while online. Confirm capability success proceeds and ordinary
    Basketball Event cloud sync remains available.
+8. Before starting a team game that was changed to local-only, choose Try Automatic Cloud. Confirm
+   the reviewed match overrides remain unchanged and Next runs the capability check again.
 
 ## Deferred
 

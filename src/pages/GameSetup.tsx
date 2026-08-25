@@ -1302,7 +1302,7 @@ export default function GameSetup() {
                     >
                       Use Event Local-Only
                     </button>
-                    <button type="button" onClick={() => setBasketballCapabilityFailure(null)} className="btn-secondary min-h-10 text-xs">
+                    <button type="button" onClick={handleCancelSetup} className="btn-secondary min-h-10 text-xs">
                       Cancel
                     </button>
                   </div>
@@ -1470,9 +1470,23 @@ export default function GameSetup() {
                 </button>
               </div>
               {isBasketballEventIntent && (
-                <p className="text-xs font-medium text-amber-950">
-                  Cloud policy: {basketballCloudIntent === 'automatic' ? 'Automatic' : 'Local only'}
-                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-medium text-amber-950">
+                    Cloud policy: {basketballCloudIntent === 'automatic' ? 'Automatic' : 'Local only'}
+                  </p>
+                  {basketballCloudIntent === 'local_only' && teamMode === 'existing' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBasketballCloudIntent('automatic')
+                        setSetupError(null)
+                      }}
+                      className="text-xs font-semibold text-amber-950 underline"
+                    >
+                      Try Automatic Cloud
+                    </button>
+                  )}
+                </div>
               )}
               <p className="text-xs text-amber-900">
                 Initial court view: {basketballDisplayFlipped ? 'Flipped' : 'Standard'} · Personal display setting

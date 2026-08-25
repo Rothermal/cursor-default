@@ -46,7 +46,11 @@ export function mergeCloudSyncState(
 
   // Ordinary sync-result patches must not clear the durable Basketball Event policy.
   if (patch.eventCloudPolicy === undefined) {
-    next.eventCloudPolicy = prev.eventCloudPolicy
+    if (prev.eventCloudPolicy === undefined) {
+      delete next.eventCloudPolicy
+    } else {
+      next.eventCloudPolicy = prev.eventCloudPolicy
+    }
   }
 
   if (

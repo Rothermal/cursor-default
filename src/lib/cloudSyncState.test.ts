@@ -143,4 +143,13 @@ describe('mergeCloudSyncState', () => {
 
     expect(next.eventCloudPolicy).toBe('local_only')
   })
+
+  it('does not materialize an undefined policy on a pre-C3 metadata patch', () => {
+    const next = mergeCloudSyncState(base(), {
+      status: 'synced',
+      lastSyncedAt: '2026-08-25T00:00:00.000Z',
+    })
+
+    expect(next).not.toHaveProperty('eventCloudPolicy')
+  })
 })

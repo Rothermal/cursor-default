@@ -29,12 +29,31 @@ describe('Basketball release entry guards', () => {
 
   it('offers the complete capability recovery matrix without committing setup', () => {
     const setup = source('src/pages/GameSetup.tsx')
+    const recovery = between(
+      setup,
+      'basketballCapabilityFailure && (',
+      '\n\n              {teams.length > 0 && ('
+    )
 
-    expect(setup).toContain('Retry Check')
-    expect(setup).toContain('Use Legacy Cloud')
-    expect(setup).toContain('Use Event Local-Only')
-    expect(setup).toContain('Cancel')
-    expect(setup).toContain("setBasketballCloudIntent('local_only')")
+    expect(recovery).toContain('Retry Check')
+    expect(recovery).toContain('Use Legacy Cloud')
+    expect(recovery).toContain('Use Event Local-Only')
+    expect(recovery).toContain('Cancel')
+    expect(recovery).toContain('onClick={handleCancelSetup}')
+    expect(recovery).toContain("setBasketballCloudIntent('local_only')")
+  })
+
+  it('can return a local-only team draft to automatic without resetting rule overrides', () => {
+    const setup = source('src/pages/GameSetup.tsx')
+    const policyControl = between(
+      setup,
+      "basketballCloudIntent === 'local_only' && teamMode === 'existing' && (",
+      '\n                  )}'
+    )
+
+    expect(policyControl).toContain('Try Automatic Cloud')
+    expect(policyControl).toContain("setBasketballCloudIntent('automatic')")
+    expect(policyControl).not.toContain('setBasketballMatchOverrides')
   })
 
   it('keeps Basketball Team Info entry mutation-free until setup Continue', () => {

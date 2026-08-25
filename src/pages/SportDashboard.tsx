@@ -200,7 +200,7 @@ export default function SportDashboard() {
     )
   }
 
-  const activeSyncLabel = isBasketballEventLocalOnly(state)
+  const activeSyncLabel = isBasketballEventLocalOnly(state) && state.cloudSync.status !== 'error'
     ? 'Cloud Sync: local only'
     : activeSyncStatusLabel(state.cloudSync.status, state.cloudSync.lastError)
 

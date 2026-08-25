@@ -27,7 +27,9 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
   const teamScore = getDisplayedHomeScore(sport, rosterPlayers, homeTeamScore, homeScoreAdjustment)
 
   const syncLabel = (() => {
-    if (isBasketballEventLocalOnly(state)) return 'Cloud Sync: local only'
+    if (isBasketballEventLocalOnly(state) && cloudSync.status !== 'error') {
+      return 'Cloud Sync: local only'
+    }
     switch (cloudSync.status) {
       case 'offline':
         return 'Cloud Sync: offline'
