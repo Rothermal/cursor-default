@@ -42,6 +42,11 @@ import { isBasketballSummaryRoute } from './lib/basketball/summary'
 
 function GameSetupRoute() {
   const { state } = useGame()
+  const [searchParams] = useSearchParams()
+  const requestedSport = searchParams.get('sport')
+  if (requestedSport === 'soccer') return <SoccerGameSetup />
+  if (requestedSport) return <GameSetup />
+  if (searchParams.has('teamId') && state.sport?.id !== 'soccer') return <GameSetup />
   if (state.sport?.id !== 'soccer') return <GameSetup />
   return <SoccerGameSetup />
 }

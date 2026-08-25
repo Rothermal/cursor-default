@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useGame } from '../context/GameContext'
@@ -22,6 +22,27 @@ import {
   isBasketballEventSetupIntent,
   setBasketballEventCreationIntent,
 } from '../lib/basketball'
+import {
+  basketballSetupAccountScope,
+  basketballSetupDraftMatchesRoute,
+  buildBasketballSetupGameState,
+  clearBasketballSetupDraft,
+  createBasketballSetupDraft,
+  createBasketballSetupDraftEvent,
+  loadBasketballSetupDraft,
+  parseBasketballSetupDraft,
+  saveBasketballSetupDraft,
+  type BasketballSetupDraftV1,
+  type BasketballSetupSource,
+} from '../lib/basketball/setupDraft'
+import {
+  DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
+  DEFAULT_BASKETBALL_TEAM_SETTINGS,
+} from '../lib/basketball/settings'
+import {
+  getParkedGameStorageInfo,
+  parkedGameStorageErrorMessage,
+} from '../lib/gameParking'
 import {
   acceptedTeamRole,
   canManageTeam,
@@ -58,30 +79,97 @@ export default function GameSetup() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedTeamId = searchParams.get('teamId')
-  const { state, dispatch, startNewGame, parkingError } = useGame()
+  const requestedSportId = searchParams.get('sport')
+  const {
+    state,
+    dispatch,
+    activeLocalGameId,
+    commitGameSetup,
+    startNewGame,
+    parkingError,
+  } = useGame()
   const { isSportEnabled } = useSettings()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
-  const sport = state.sport
+  const accountScope = basketballSetupAccountScope(userId)
+  const explicitSport = requestedSportId
+    ? sports.find(item => item.id === requestedSportId) ?? null
+    : null
+  const [resolvedRequestedSport, setResolvedRequestedSport] = useState<typeof state.sport>(null)
+  const sport = requestedSportId
+    ? explicitSport
+    : resolvedRequestedSport ?? state.sport
+  const initialBasketballRoute = Boolean(
+    requestedSportId === 'basketball' ||
+    (!requestedSportId && !requestedTeamId && state.sport?.id === 'basketball')
+  )
+  const initialBasketballDraft = initialBasketballRoute
+    ? loadBasketballSetupDraft(accountScope)
+    : null
+  const matchingInitialBasketballDraft = initialBasketballDraft &&
+    basketballSetupDraftMatchesRoute(initialBasketballDraft, requestedTeamId)
+      ? initialBasketballDraft
+      : null
+  const basketballDraftRef = useRef<BasketballSetupDraftV1 | null>(matchingInitialBasketballDraft)
+  const isBasketballSetup = sport?.id === 'basketball'
   const sportHomePath = sport ? sportDashboardPath(sport.id) : '/'
   const isCloudFlow = Boolean(isConfigured && user && supabase)
-  const isBasketballEventIntent = isBasketballEventSetupIntent(state)
+  const [basketballAuthority, setBasketballAuthority] = useState<'legacy' | 'sport_events'>(
+    matchingInitialBasketballDraft?.authority ??
+    (initialBasketballRoute && isBasketballEventSetupIntent(state) ? 'sport_events' : 'legacy')
+  )
+  const [basketballDisplayFlipped, setBasketballDisplayFlipped] = useState(
+    matchingInitialBasketballDraft?.display.defaultCourtFlipped ?? false
+  )
+  const [committedLocalGameId, setCommittedLocalGameId] = useState(
+    matchingInitialBasketballDraft?.committedLocalGameId ??
+    (!requestedSportId && !requestedTeamId && state.sport?.id === 'basketball' && state.gameInfo
+      ? activeLocalGameId
+      : null)
+  )
+  const isBasketballEventIntent = isBasketballSetup
+    ? basketballAuthority === 'sport_events'
+    : isBasketballEventSetupIntent(state)
 
   useEffect(() => {
-    if (hasStartedBasketballEventGame(state)) navigate('/game', { replace: true })
-  }, [navigate, state])
+    if (
+      !requestedSportId &&
+      !requestedTeamId &&
+      hasStartedBasketballEventGame(state)
+    ) navigate('/game', { replace: true })
+  }, [navigate, requestedSportId, requestedTeamId, state])
 
-  const [teamName, setTeamName] = useState(state.gameInfo?.teamName || '')
-  const [opponentName, setOpponentName] = useState(state.gameInfo?.opponentName || '')
-  const [tournamentName, setTournamentName] = useState(state.gameInfo?.tournamentName || '')
+  const [teamName, setTeamName] = useState(
+    matchingInitialBasketballDraft?.source.teamName ??
+    (initialBasketballRoute ? '' : state.gameInfo?.teamName || '')
+  )
+  const [opponentName, setOpponentName] = useState(
+    matchingInitialBasketballDraft?.gameInfo.opponentName ??
+    (initialBasketballRoute ? '' : state.gameInfo?.opponentName || '')
+  )
+  const [tournamentName, setTournamentName] = useState(
+    matchingInitialBasketballDraft?.gameInfo.tournamentName ??
+    (initialBasketballRoute ? '' : state.gameInfo?.tournamentName || '')
+  )
   const [date, setDate] = useState(
-    state.gameInfo?.date || new Date().toISOString().split('T')[0]
+    matchingInitialBasketballDraft?.gameInfo.date ??
+    ((initialBasketballRoute ? '' : state.gameInfo?.date) ||
+      new Date().toISOString().split('T')[0])
   )
   const [teamMode, setTeamMode] = useState<'existing' | 'new'>(
-    requestedTeamId || state.cloudSync.teamId ? 'existing' : 'new'
+    matchingInitialBasketballDraft?.source.kind === 'team' ||
+    requestedTeamId || (!initialBasketballRoute && state.cloudSync.teamId)
+      ? 'existing'
+      : 'new'
   )
   const [teams, setTeams] = useState<CloudTeam[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState(requestedTeamId || state.cloudSync.teamId || '')
+  const [selectedTeamId, setSelectedTeamId] = useState(
+    requestedTeamId ||
+    (matchingInitialBasketballDraft?.source.kind === 'team'
+      ? matchingInitialBasketballDraft.source.teamId
+      : '') ||
+    (!initialBasketballRoute ? state.cloudSync.teamId || '' : '')
+  )
   const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [teamsError, setTeamsError] = useState<string | null>(null)
@@ -89,12 +177,27 @@ export default function GameSetup() {
   // Tournament state (cloud + existing-team flow only)
   const [tournaments, setTournaments] = useState<TournamentOption[]>([])
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>(
-    state.gameInfo?.tournamentId ?? ''
+    matchingInitialBasketballDraft?.gameInfo.tournamentMode === 'new'
+      ? '__new__'
+      : matchingInitialBasketballDraft?.gameInfo.tournamentId ??
+        (!initialBasketballRoute ? state.gameInfo?.tournamentId ?? '' : '')
   )
-  const [newTournamentName, setNewTournamentName] = useState('')
-  const [newTournamentUrl, setNewTournamentUrl] = useState('')
+  const [newTournamentName, setNewTournamentName] = useState(
+    matchingInitialBasketballDraft?.gameInfo.tournamentMode === 'new'
+      ? matchingInitialBasketballDraft.gameInfo.tournamentName
+      : ''
+  )
+  const [newTournamentUrl, setNewTournamentUrl] = useState(
+    matchingInitialBasketballDraft?.gameInfo.tournamentMode === 'new'
+      ? matchingInitialBasketballDraft.gameInfo.tournamentUrl ?? ''
+      : ''
+  )
   /** Draft URL when an existing tournament is selected (saved on Next if changed). */
-  const [existingTournamentUrlDraft, setExistingTournamentUrlDraft] = useState('')
+  const [existingTournamentUrlDraft, setExistingTournamentUrlDraft] = useState(
+    matchingInitialBasketballDraft?.gameInfo.tournamentMode === 'existing'
+      ? matchingInitialBasketballDraft.gameInfo.tournamentUrl ?? ''
+      : ''
+  )
   const [loadingTournaments, setLoadingTournaments] = useState(false)
   const [creatingTournament, setCreatingTournament] = useState(false)
   const [confirmDeleteTournament, setConfirmDeleteTournament] = useState<TournamentOption | null>(null)
@@ -105,7 +208,11 @@ export default function GameSetup() {
     Array<{ id: string; name: string; team_stats_config?: unknown }>
   >([])
   const [loadingSeasonsForNewTeam, setLoadingSeasonsForNewTeam] = useState(false)
-  const [selectedNewTeamSeasonId, setSelectedNewTeamSeasonId] = useState('')
+  const [selectedNewTeamSeasonId, setSelectedNewTeamSeasonId] = useState(
+    matchingInitialBasketballDraft?.source.kind === 'personal'
+      ? matchingInitialBasketballDraft.source.seasonId ?? ''
+      : ''
+  )
   const [setupError, setSetupError] = useState<string | null>(null)
   const [checkingBasketballCapabilities, setCheckingBasketballCapabilities] = useState(false)
   const [loadingRequestedTeamSport, setLoadingRequestedTeamSport] = useState(false)
@@ -150,6 +257,12 @@ export default function GameSetup() {
         setLoadingRequestedTeamSport(false)
         return
       }
+      setResolvedRequestedSport(requestedSport)
+      if (requestedSportId && requestedSport.id !== requestedSportId) {
+        setRequestedTeamSportError('This team does not match the requested sport.')
+        setLoadingRequestedTeamSport(false)
+        return
+      }
       const availability = getSportAvailabilityPolicy(
         requestedSport.id,
         isSportEnabled(requestedSport.id)
@@ -178,19 +291,9 @@ export default function GameSetup() {
           return
         }
       }
-      if (requestedSport.id === 'basketball' && isBasketballEventModelCreationAvailable()) {
-        if (!userId) {
-          setRequestedTeamSportError('Sign in before starting a Basketball event cloud game.')
-          setLoadingRequestedTeamSport(false)
-          return
-        }
-        const capability = await ensureBasketballReleaseCapabilities(userId)
-        if (cancelled) return
-        if (capability.status !== 'ready') {
-          setRequestedTeamSportError(capability.error)
-          setLoadingRequestedTeamSport(false)
-          return
-        }
+      if (requestedSport.id === 'basketball') {
+        setLoadingRequestedTeamSport(false)
+        return
       }
 
       const hasActiveGame = Boolean(state.sport && state.players.length > 0)
@@ -224,7 +327,7 @@ export default function GameSetup() {
       cancelled = true
     }
     // Re-run on sport/team/roster identity only — not every local stat tick.
-  }, [dispatch, isCloudFlow, isSportEnabled, navigate, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
+  }, [dispatch, isCloudFlow, isSportEnabled, navigate, requestedSportId, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -289,6 +392,19 @@ export default function GameSetup() {
         return
       }
 
+      const restoredPersonalDraft = isBasketballSetup &&
+        basketballDraftRef.current?.source.kind === 'personal'
+          ? basketballDraftRef.current
+          : null
+      if (restoredPersonalDraft && !requestedTeamId) {
+        setTeamMode('new')
+        setSelectedTeamId('')
+        setTeamName(restoredPersonalDraft.source.teamName)
+        setSelectedNewTeamSeasonId(restoredPersonalDraft.source.seasonId ?? '')
+        setLoadingTeams(false)
+        return
+      }
+
       const matchedById = state.cloudSync.teamId
         ? loadedTeams.find(team => team.id === state.cloudSync.teamId)
         : null
@@ -308,7 +424,7 @@ export default function GameSetup() {
     return () => {
       isCancelled = true
     }
-  }, [isBasketballEventIntent, isCloudFlow, requestedTeamId, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
+  }, [isBasketballEventIntent, isBasketballSetup, isCloudFlow, requestedTeamId, sport, state.cloudSync.teamId, state.gameInfo?.teamName, userId])
 
   useEffect(() => {
     if (!isCloudFlow || !userId || !sport || !supabase) return
@@ -346,8 +462,51 @@ export default function GameSetup() {
     [seasonsForNewTeam, selectedNewTeamSeasonId]
   )
 
+  const restoredBasketballDraftRef = useRef(Boolean(matchingInitialBasketballDraft))
+
+  useEffect(() => {
+    if (!isBasketballSetup || restoredBasketballDraftRef.current) return
+    if (requestedTeamId && !selectedTeam) return
+    const restored = loadBasketballSetupDraft(accountScope)
+    if (!restored || !basketballSetupDraftMatchesRoute(restored, requestedTeamId)) {
+      restoredBasketballDraftRef.current = true
+      return
+    }
+    basketballDraftRef.current = restored
+    restoredBasketballDraftRef.current = true
+    setBasketballAuthority(restored.authority)
+    setBasketballDisplayFlipped(restored.display.defaultCourtFlipped)
+    setCommittedLocalGameId(restored.committedLocalGameId)
+    setTeamName(restored.source.teamName)
+    setOpponentName(restored.gameInfo.opponentName)
+    setTournamentName(restored.gameInfo.tournamentName)
+    setDate(restored.gameInfo.date)
+    setTeamMode(restored.source.kind === 'team' ? 'existing' : 'new')
+    setSelectedTeamId(restored.source.kind === 'team' ? restored.source.teamId : '')
+    setSelectedNewTeamSeasonId(
+      restored.source.kind === 'personal' ? restored.source.seasonId ?? '' : ''
+    )
+    setSelectedTournamentId(
+      restored.gameInfo.tournamentMode === 'new'
+        ? '__new__'
+        : restored.gameInfo.tournamentId ?? ''
+    )
+    setNewTournamentName(
+      restored.gameInfo.tournamentMode === 'new' ? restored.gameInfo.tournamentName : ''
+    )
+    setNewTournamentUrl(
+      restored.gameInfo.tournamentMode === 'new' ? restored.gameInfo.tournamentUrl ?? '' : ''
+    )
+    setExistingTournamentUrlDraft(
+      restored.gameInfo.tournamentMode === 'existing'
+        ? restored.gameInfo.tournamentUrl ?? ''
+        : ''
+    )
+  }, [accountScope, isBasketballSetup, requestedTeamId, selectedTeam])
+
   // Push raw `seasons.team_stats_config` into game state for resolveTeamStatsConfig (e.g. GameTracker).
   useEffect(() => {
+    if (isBasketballSetup) return
     if (!isCloudFlow) {
       dispatch({ type: 'SET_TEAM_STATS_CONFIG', config: null })
       return
@@ -368,10 +527,13 @@ export default function GameSetup() {
     selectedTeam,
     selectedNewTeamSeasonId,
     selectedNewTeamSeasonRow,
+    isBasketballSetup,
   ])
 
   // Stable snapshot of the current tournament selection (avoids effect dep on full gameInfo object)
-  const existingTournamentId = state.gameInfo?.tournamentId ?? null
+  const existingTournamentId = isBasketballSetup
+    ? basketballDraftRef.current?.gameInfo.tournamentId ?? null
+    : state.gameInfo?.tournamentId ?? null
 
   // Load tournaments for the currently selected cloud team
   useEffect(() => {
@@ -412,8 +574,143 @@ export default function GameSetup() {
       return
     }
     const t = tournaments.find(x => x.id === selectedTournamentId)
-    setExistingTournamentUrlDraft(t?.url?.trim() ? t.url : '')
-  }, [selectedTournamentId, tournaments])
+    const restoredUrl = isBasketballSetup &&
+      basketballDraftRef.current?.gameInfo.tournamentId === selectedTournamentId
+        ? basketballDraftRef.current.gameInfo.tournamentUrl
+        : null
+    setExistingTournamentUrlDraft(
+      restoredUrl?.trim() ? restoredUrl : t?.url?.trim() ? t.url : ''
+    )
+  }, [isBasketballSetup, selectedTournamentId, tournaments])
+
+  const currentBasketballDraft = useMemo((): BasketballSetupDraftV1 | null => {
+    if (!isBasketballSetup) return null
+    let source: BasketballSetupSource
+    if (teamMode === 'existing') {
+      if (!selectedTeam ||
+          (selectedTeam.accessRole !== 'owner' &&
+           selectedTeam.accessRole !== 'admin' &&
+           selectedTeam.accessRole !== 'scorer')) return null
+      source = {
+        kind: 'team',
+        teamId: selectedTeam.id,
+        seasonId: selectedTeam.season_id,
+        teamName: selectedTeam.name,
+        seasonName: selectedTeam.seasons.name,
+        accessRole: selectedTeam.accessRole,
+      }
+    } else {
+      source = {
+        kind: 'personal',
+        teamName,
+        seasonId: selectedNewTeamSeasonId || null,
+        seasonName: selectedNewTeamSeasonRow?.name ?? '',
+      }
+    }
+
+    const previous = basketballDraftRef.current
+    const base = previous &&
+      previous.accountScope === accountScope &&
+      basketballSetupDraftMatchesRoute(previous, requestedTeamId)
+      ? previous
+      : createBasketballSetupDraft({ accountScope, source })
+    const tournamentMode = teamMode === 'existing'
+      ? selectedTournamentId === '__new__'
+        ? 'new'
+        : selectedTournamentId
+          ? 'existing'
+          : 'none'
+      : tournamentName.trim()
+        ? 'text'
+        : 'none'
+    const selectedTournament = tournaments.find(item => item.id === selectedTournamentId)
+    const tournamentDraftName = tournamentMode === 'new'
+      ? newTournamentName
+      : tournamentMode === 'existing'
+        ? selectedTournament?.name ?? base.gameInfo.tournamentName
+        : tournamentName
+    const tournamentUrl = tournamentMode === 'new'
+      ? newTournamentUrl.trim() || null
+      : tournamentMode === 'existing'
+        ? existingTournamentUrlDraft.trim() || null
+        : null
+    const rawTeamStatsConfig = teamMode === 'existing'
+      ? selectedTeam?.seasons.team_stats_config
+      : selectedNewTeamSeasonRow?.team_stats_config
+    const legacyTeamStatsConfig = rawTeamStatsConfig != null &&
+      isRecord(rawTeamStatsConfig) &&
+      Object.keys(rawTeamStatsConfig).length > 0
+        ? structuredClone(rawTeamStatsConfig)
+        : null
+
+    let event: BasketballSetupDraftV1['event'] = null
+    if (basketballAuthority === 'sport_events') {
+      const existingEvent = previous?.event
+      const existingMatchesSource = existingEvent?.settingsAuthority.kind === source.kind &&
+        (source.kind !== 'team' || previous?.source.kind !== 'team' ||
+          previous.source.teamId === source.teamId)
+      event = existingMatchesSource
+        ? structuredClone(existingEvent)
+        : createBasketballSetupDraftEvent({
+            authority: source.kind,
+            revision: null,
+            settings: source.kind === 'team'
+              ? DEFAULT_BASKETBALL_TEAM_SETTINGS
+              : DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
+            cloudIntent: source.kind === 'team' ? 'automatic' : 'local_only',
+          })
+      if (!event) return null
+    }
+
+    const next: BasketballSetupDraftV1 = {
+      ...base,
+      accountScope,
+      updatedAt: new Date().toISOString(),
+      source,
+      authority: basketballAuthority,
+      gameInfo: {
+        opponentName,
+        tournamentMode,
+        tournamentId: tournamentMode === 'existing' ? selectedTournamentId : null,
+        tournamentName: tournamentDraftName,
+        tournamentUrl,
+        date,
+      },
+      display: { defaultCourtFlipped: basketballDisplayFlipped },
+      event,
+      legacyTeamStatsConfig,
+      committedLocalGameId,
+    }
+    const parsed = parseBasketballSetupDraft(next, accountScope)
+    return parsed.ok ? parsed.value : null
+  }, [
+    accountScope,
+    basketballAuthority,
+    basketballDisplayFlipped,
+    committedLocalGameId,
+    date,
+    existingTournamentUrlDraft,
+    isBasketballSetup,
+    newTournamentName,
+    newTournamentUrl,
+    opponentName,
+    requestedTeamId,
+    selectedNewTeamSeasonId,
+    selectedNewTeamSeasonRow,
+    selectedTeam,
+    selectedTournamentId,
+    teamMode,
+    teamName,
+    tournamentName,
+    tournaments,
+  ])
+
+  useEffect(() => {
+    if (!currentBasketballDraft) return
+    basketballDraftRef.current = currentBasketballDraft
+    const saved = saveBasketballSetupDraft(currentBasketballDraft)
+    if (!saved.ok) setSetupError(saved.error)
+  }, [currentBasketballDraft])
 
   const handleDeleteTournament = async (tournament: TournamentOption) => {
     if (!supabase || !mayManageSelectedTeam) return
@@ -453,10 +750,16 @@ export default function GameSetup() {
   const showBasketballEventToggle = Boolean(
     isBasketballEventModelCreationAvailable() &&
       sport?.id === 'basketball' &&
-      (isBasketballEventIntent || !state.gameInfo)
+      (isBasketballSetup || isBasketballEventIntent || !state.gameInfo)
   )
 
   const updateBasketballEventIntent = (enabled: boolean): boolean => {
+    if (isBasketballSetup) {
+      setBasketballAuthority(enabled ? 'sport_events' : 'legacy')
+      if (enabled) setSelectedNewTeamSeasonId('')
+      setSetupError(null)
+      return true
+    }
     const result = setBasketballEventCreationIntent(state, enabled)
     if (!result.ok) {
       setSetupError(result.message)
@@ -534,6 +837,28 @@ export default function GameSetup() {
     }
     setSetupError(null)
 
+    const basketballDraft = isBasketballSetup ? currentBasketballDraft : null
+    const matchingCommittedBasketballSetup = Boolean(
+      basketballDraft?.committedLocalGameId &&
+      basketballDraft.committedLocalGameId === activeLocalGameId
+    )
+
+    if (isBasketballSetup) {
+      if (!basketballDraft) {
+        setSetupError('Basketball setup is still loading or contains invalid fields.')
+        return
+      }
+      const validation = buildBasketballSetupGameState({
+        draft: basketballDraft,
+        sport,
+        cloudStatus: state.cloudSync.status === 'offline' ? 'offline' : 'idle',
+      })
+      if (!validation.ok) {
+        setSetupError(validation.error)
+        return
+      }
+    }
+
     if (requiresBasketballEventCloudPreflight({
       eventIntent: isBasketballEventIntent,
       cloudAvailable: isCloudFlow,
@@ -553,12 +878,36 @@ export default function GameSetup() {
       }
     }
 
+    const hasActiveGame = Boolean(state.sport && state.players.length > 0)
+
+    if (isBasketballSetup && !matchingCommittedBasketballSetup) {
+      let capacity: ReturnType<typeof getParkedGameStorageInfo>
+      try {
+        capacity = getParkedGameStorageInfo(userId)
+      } catch (error) {
+        setSetupError(parkedGameStorageErrorMessage(error))
+        return
+      }
+      if (!capacity.canCreateParkedGame) {
+        setSetupError(
+          `This device can park up to ${capacity.maxParkedGames} games. ` +
+          'Resume, export, or discard one before starting another.'
+        )
+        return
+      }
+      if (
+        hasActiveGame &&
+        !window.confirm('Park your current game and continue with this Basketball setup?')
+      ) {
+        return
+      }
+    }
+
     const nextTeamId = teamMode === 'existing' ? selectedTeamId || null : null
     const teamIdChanging = nextTeamId !== state.cloudSync.teamId
-    const hasActiveGame = Boolean(state.sport && state.players.length > 0)
     // Switching cloud teams must not keep the prior gameId/roster (same-name teams
     // previously slipped past SET_GAME_INFO's teamName-only clear).
-    if (teamIdChanging && (hasActiveGame || state.cloudSync.gameId)) {
+    if (!isBasketballSetup && teamIdChanging && (hasActiveGame || state.cloudSync.gameId)) {
       if (
         hasActiveGame &&
         !window.confirm('Park your current game and switch teams?')
@@ -573,10 +922,11 @@ export default function GameSetup() {
     // Resolve tournament: existing selection, create new, or free-text
     let resolvedTournamentId: string | null = null
     let resolvedTournamentName = tournamentName.trim()
+    let insertedTournamentId: string | null = null
+    let updatedTournamentUrl: { id: string; previousUrl: string | null } | null = null
 
     if (isCloudFlow && teamMode === 'existing' && selectedTeamId) {
       if (selectedTournamentId === '__new__') {
-        // Create (or find) tournament in Supabase
         const trimmed = newTournamentName.trim()
         if (!trimmed) {
           setSetupError('Enter a tournament name or choose another option.')
@@ -585,25 +935,66 @@ export default function GameSetup() {
         if (supabase) {
           setCreatingTournament(true)
           const urlTrimmed = newTournamentUrl.trim()
-          const { data, error } = await supabase
-            .from('tournaments')
-            .upsert(
-              {
-                team_id: selectedTeamId,
-                name: trimmed,
-                url: urlTrimmed === '' ? null : urlTrimmed,
-              },
-              { onConflict: 'team_id,name' }
-            )
-            .select('id')
-            .single()
+          let data: { id: string } | null = null
+          let error: { message: string } | null = null
+          if (isBasketballSetup) {
+            const existing = await supabase
+              .from('tournaments')
+              .select('id')
+              .eq('team_id', selectedTeamId)
+              .eq('name', trimmed)
+              .maybeSingle()
+            if (existing.error) {
+              error = existing.error
+            } else if (existing.data) {
+              data = existing.data as { id: string }
+            } else {
+              const inserted = await supabase
+                .from('tournaments')
+                .insert({
+                  team_id: selectedTeamId,
+                  name: trimmed,
+                  url: urlTrimmed === '' ? null : urlTrimmed,
+                })
+                .select('id')
+                .single()
+              if (inserted.error) {
+                const raced = await supabase
+                  .from('tournaments')
+                  .select('id')
+                  .eq('team_id', selectedTeamId)
+                  .eq('name', trimmed)
+                  .maybeSingle()
+                if (raced.error || !raced.data) error = inserted.error
+                else data = raced.data as { id: string }
+              } else if (inserted.data) {
+                data = inserted.data as { id: string }
+                insertedTournamentId = data.id
+              }
+            }
+          } else {
+            const upserted = await supabase
+              .from('tournaments')
+              .upsert(
+                {
+                  team_id: selectedTeamId,
+                  name: trimmed,
+                  url: urlTrimmed === '' ? null : urlTrimmed,
+                },
+                { onConflict: 'team_id,name' }
+              )
+              .select('id')
+              .single()
+            data = upserted.data as { id: string } | null
+            error = upserted.error
+          }
           setCreatingTournament(false)
           if (error) {
             setSetupError(error.message)
             return
           }
           if (data) {
-            resolvedTournamentId = data.id as string
+            resolvedTournamentId = data.id
             resolvedTournamentName = trimmed
           }
         }
@@ -625,6 +1016,12 @@ export default function GameSetup() {
               setSetupError(urlErr.message)
               return
             }
+            if (isBasketballSetup) {
+              updatedTournamentUrl = {
+                id: selectedTournamentId,
+                previousUrl: found?.url ?? null,
+              }
+            }
             setTournaments(prev =>
               prev.map(row =>
                 row.id === selectedTournamentId ? { ...row, url: draft === '' ? null : draft } : row
@@ -642,6 +1039,66 @@ export default function GameSetup() {
         : teamMode === 'new' && selectedNewTeamSeasonId
           ? selectedNewTeamSeasonId
           : null
+
+    if (isBasketballSetup && basketballDraft) {
+      const resolvedDraft: BasketballSetupDraftV1 = {
+        ...basketballDraft,
+        updatedAt: new Date().toISOString(),
+        gameInfo: {
+          ...basketballDraft.gameInfo,
+          tournamentMode: resolvedTournamentId
+            ? 'existing'
+            : resolvedTournamentName
+              ? 'text'
+              : 'none',
+          tournamentId: resolvedTournamentId,
+          tournamentName: resolvedTournamentName,
+        },
+      }
+      const built = buildBasketballSetupGameState({
+        draft: resolvedDraft,
+        sport,
+        cloudStatus: state.cloudSync.status === 'offline' ? 'offline' : 'idle',
+      })
+      if (!built.ok) {
+        const compensationError = await compensateBasketballTournamentChange(
+          insertedTournamentId,
+          updatedTournamentUrl
+        )
+        setSetupError(
+          compensationError ? `${built.error} ${compensationError}` : built.error
+        )
+        return
+      }
+      const committed = commitGameSetup(
+        built.state,
+        matchingCommittedBasketballSetup ? committedLocalGameId : null
+      )
+      if (!committed.ok) {
+        const compensationError = await compensateBasketballTournamentChange(
+          insertedTournamentId,
+          updatedTournamentUrl
+        )
+        setSetupError(
+          compensationError ? `${committed.reason} ${compensationError}` : committed.reason
+        )
+        return
+      }
+      const committedDraft = {
+        ...resolvedDraft,
+        committedLocalGameId: committed.localGameId,
+        updatedAt: new Date().toISOString(),
+      }
+      basketballDraftRef.current = committedDraft
+      setCommittedLocalGameId(committed.localGameId)
+      const saved = saveBasketballSetupDraft(committedDraft)
+      if (!saved.ok) {
+        setSetupError(saved.error)
+        return
+      }
+      navigate('/players')
+      return
+    }
 
     // Only update season/team here. Preserve gameId/playerIdMap/fingerprint when the user
     // returns from player setup for the same game; SET_GAME_INFO clears them on team change.
@@ -665,12 +1122,42 @@ export default function GameSetup() {
     navigate('/players')
   }
 
+  async function compensateBasketballTournamentChange(
+    insertedId: string | null,
+    updatedUrl: { id: string; previousUrl: string | null } | null
+  ): Promise<string | null> {
+    if (!supabase) return null
+    const failures: string[] = []
+    if (insertedId) {
+      const { error } = await supabase.from('tournaments').delete().eq('id', insertedId)
+      if (error) failures.push('The newly created tournament could not be rolled back.')
+    }
+    if (updatedUrl) {
+      const { error } = await supabase
+        .from('tournaments')
+        .update({ url: updatedUrl.previousUrl })
+        .eq('id', updatedUrl.id)
+      if (error) failures.push('The prior tournament URL could not be restored.')
+    }
+    return failures.length > 0 ? failures.join(' ') : null
+  }
+
+  const handleCancelSetup = () => {
+    if (!isBasketballSetup) {
+      navigate(sportHomePath)
+      return
+    }
+    const source = basketballDraftRef.current?.source
+    clearBasketballSetupDraft(accountScope)
+    navigate(source?.kind === 'team' ? teamInfoPath(source.teamId) : sportHomePath)
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-4`}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => navigate(sportHomePath)}
+            onClick={handleCancelSetup}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
                        active:scale-90 transition-transform"
           >

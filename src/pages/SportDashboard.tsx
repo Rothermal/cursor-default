@@ -17,6 +17,13 @@ import {
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import {
+  basketballSetupAccountScope,
+  basketballSetupDraftHasMeaningfulEdits,
+  basketballSetupDraftMatchesRoute,
+  clearBasketballSetupDraft,
+  loadBasketballSetupDraft,
+} from '../lib/basketball/setupDraft'
 
 function activeSyncStatusLabel(status: string, lastError: string | null): string | null {
   switch (status) {
@@ -42,7 +49,7 @@ function activeSyncStatusLabel(status: string, lastError: string | null): string
 export default function SportDashboard() {
   const { sportId } = useParams()
   const navigate = useNavigate()
-  const { isConfigured } = useAuth()
+  const { isConfigured, user } = useAuth()
   const { isSportEnabled } = useSettings()
   const {
     state,
@@ -108,6 +115,23 @@ export default function SportDashboard() {
           ? `${sport.name} is coming soon. Existing matches and cloud history remain available.`
           : `Enable ${sport.name} in Settings before starting a new game.`
       )
+      return
+    }
+    if (sport.id === 'basketball') {
+      const scope = basketballSetupAccountScope(user?.id ?? null)
+      const existingDraft = loadBasketballSetupDraft(scope)
+      if (
+        existingDraft &&
+        !basketballSetupDraftMatchesRoute(existingDraft, null) &&
+        basketballSetupDraftHasMeaningfulEdits(existingDraft) &&
+        !window.confirm('Discard the unfinished Basketball team setup and start a local game?')
+      ) {
+        return
+      }
+      if (existingDraft && !basketballSetupDraftMatchesRoute(existingDraft, null)) {
+        clearBasketballSetupDraft(scope)
+      }
+      navigate('/setup?sport=basketball')
       return
     }
     if (

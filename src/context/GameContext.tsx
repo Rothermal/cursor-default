@@ -69,6 +69,7 @@ import {
 import {
   activateParkedGame,
   beginNewActiveParkedGame,
+  commitGameSetupState,
   discardParkedGame as discardParkedGameStorage,
   getActiveLocalGameId,
   getParkedGameRecord,
@@ -306,6 +307,10 @@ interface GameContextType {
   parkingError: string | null
   clearParkingError: () => void
   startNewGame: (sport: SportConfig) => boolean
+  commitGameSetup: (
+    nextState: GameState,
+    expectedLocalGameId?: string | null
+  ) => CommitGameSetupResult
   openGameSnapshot: (state: GameState) => boolean
   parkCurrentGame: () => boolean
   resumeParkedGame: (localGameId: string) => GameState | null
@@ -322,6 +327,10 @@ interface GameContextType {
 
 export type FlushCloudSyncResult =
   | { ok: true }
+  | { ok: false; reason: string }
+
+export type CommitGameSetupResult =
+  | { ok: true; localGameId: string }
   | { ok: false; reason: string }
 
 const GameContext = createContext<GameContextType | null>(null)
@@ -439,6 +448,35 @@ export function GameProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         setParkingError(parkedGameStorageErrorMessage(error))
         return false
+      }
+    },
+    [userId]
+  )
+
+  const commitGameSetup = useCallback(
+    (
+      nextState: GameState,
+      expectedLocalGameId: string | null = null
+    ): CommitGameSetupResult => {
+      try {
+        const committed = commitGameSetupState(
+          stateRef.current,
+          nextState,
+          userId,
+          expectedLocalGameId
+        )
+        stateRef.current = nextState
+        dispatch({ type: 'HYDRATE_STATE', state: nextState })
+        setActiveLocalGameId(committed.localGameId)
+        setParkedGames(committed.summaries)
+        setParkingError(null)
+        return { ok: true, localGameId: committed.localGameId }
+      } catch (error) {
+        const reason = error instanceof Error
+          ? error.message
+          : parkedGameStorageErrorMessage(error)
+        setParkingError(reason)
+        return { ok: false, reason }
       }
     },
     [userId]
@@ -1124,6 +1162,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         parkingError,
         clearParkingError: () => setParkingError(null),
         startNewGame,
+        commitGameSetup,
         openGameSnapshot,
         parkCurrentGame,
         resumeParkedGame,

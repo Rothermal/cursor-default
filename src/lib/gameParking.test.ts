@@ -21,6 +21,7 @@ import {
   activateParkedGame,
   beginNewActiveParkedGame,
   clearActiveParkedGame,
+  commitGameSetupState,
   discardParkedGame,
   exportParkedGames,
   getActiveLocalGameId,
@@ -98,6 +99,25 @@ class ThrowingImportManifestStorage extends MemoryStorage {
   }
 }
 
+class FailNthManifestWriteStorage extends MemoryStorage {
+  private remaining: number | null = null
+
+  failOnManifestWrite(number: number): void {
+    this.remaining = number
+  }
+
+  setItem(key: string, value: string): void {
+    if (key === GAMES_MANIFEST_KEY && this.remaining !== null) {
+      this.remaining -= 1
+      if (this.remaining === 0) {
+        this.remaining = null
+        throw new DOMException('Quota exceeded', 'QuotaExceededError')
+      }
+    }
+    super.setItem(key, value)
+  }
+}
+
 const basketball: SportConfig = {
   id: 'basketball',
   name: 'Basketball',
@@ -118,6 +138,7 @@ const soccer: SportConfig = {
 
 function gameState(sport: SportConfig, teamName: string, opponentName: string): GameState {
   return {
+    gameDataAuthority: null,
     sport,
     gameInfo: {
       teamName,
@@ -178,6 +199,53 @@ beforeEach(() => {
 })
 
 describe('gameParking', () => {
+  it('commits one complete setup while parking the prior active game', () => {
+    const current = gameState(basketball, 'Current', 'One')
+    const next = gameState(basketball, 'Next', 'Two')
+    saveActiveGameState(current, null)
+    const previousId = getActiveLocalGameId(null)
+
+    const committed = commitGameSetupState(current, next, null)
+
+    expect(committed.localGameId).not.toBe(previousId)
+    expect(getActiveLocalGameId(null)).toBe(committed.localGameId)
+    expect(getParkedGameRecord(committed.localGameId, null)?.gameState).toEqual(next)
+    expect(getParkedGameRecord(previousId!, null)?.gameState).toEqual(current)
+  })
+
+  it('restores the exact prior parking state when the setup transaction fails', () => {
+    const storage = new FailNthManifestWriteStorage()
+    vi.stubGlobal('localStorage', storage)
+    const current = gameState(basketball, 'Current', 'One')
+    const next = gameState(basketball, 'Next', 'Two')
+    saveActiveGameState(current, null)
+    const previousId = getActiveLocalGameId(null)
+    const manifestBefore = storage.getItem(GAMES_MANIFEST_KEY)
+    const recordBefore = storage.getItem(`${GAME_RECORD_KEY_PREFIX}${previousId}`)
+    const mirrorBefore = storage.getItem(GAME_STORAGE_KEY)
+    storage.failOnManifestWrite(3)
+
+    expect(() => commitGameSetupState(current, next, null)).toThrow(ParkedGameStorageError)
+
+    expect(storage.getItem(GAMES_MANIFEST_KEY)).toBe(manifestBefore)
+    expect(storage.getItem(`${GAME_RECORD_KEY_PREFIX}${previousId}`)).toBe(recordBefore)
+    expect(storage.getItem(GAME_STORAGE_KEY)).toBe(mirrorBefore)
+    expect(listParkedGames(null)).toHaveLength(1)
+    expect(getActiveLocalGameId(null)).toBe(previousId)
+  })
+
+  it('updates a matching committed setup without creating another local game', () => {
+    const current = gameState(basketball, 'Current', 'One')
+    const next = gameState(basketball, 'Current', 'Updated')
+    saveActiveGameState(current, null)
+    const localGameId = getActiveLocalGameId(null)!
+
+    const committed = commitGameSetupState(current, next, null, localGameId)
+
+    expect(committed.localGameId).toBe(localGameId)
+    expect(listParkedGames(null)).toHaveLength(1)
+    expect(getParkedGameRecord(localGameId, null)?.gameState).toEqual(next)
+  })
   it('round-trips marked Basketball setup intent without aggregate fallback', () => {
     const marked = {
       ...gameState(basketball, 'Wildcats', 'Tigers'),

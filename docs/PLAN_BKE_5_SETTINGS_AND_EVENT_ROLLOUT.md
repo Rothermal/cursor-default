@@ -1,9 +1,9 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A and BKE-5B1 through BKE-5B4 are implemented;
-BKE-5C and BKE-5D remain. BKE-5B and BKE-5C remain internal; BKE-5D must not open the
-user-visible event-model opt-in until the BKE-4 live release matrix and the targeted BKE-5 checks
-are accepted.
+Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, and BKE-5C1 are
+implemented; BKE-5C2 through BKE-5C4 and BKE-5D remain. BKE-5B and BKE-5C remain internal;
+BKE-5D must not open the user-visible event-model opt-in until the BKE-4 live release matrix and
+the targeted BKE-5 checks are accepted.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
