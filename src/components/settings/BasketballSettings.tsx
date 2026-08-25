@@ -17,15 +17,17 @@ import {
   type BasketballPersonalSettingsV1,
 } from '../../lib/basketball/settings'
 import { settingsPath } from '../../lib/settingsNavigation'
+import { getBasketballEventCreationPolicy } from '../../lib/sportAvailability'
 import ConfirmDialog from '../ConfirmDialog'
 import BasketballRulesSettingsFields from './BasketballRulesSettingsFields'
 
-type BasketballSettingsTab = 'rules' | 'capture' | 'display'
+type BasketballSettingsTab = 'rules' | 'capture' | 'display' | 'tracker'
 
 const tabs: Array<{ id: BasketballSettingsTab; label: string }> = [
   { id: 'rules', label: 'Rules' },
   { id: 'capture', label: 'Capture' },
   { id: 'display', label: 'Display' },
+  { id: 'tracker', label: 'Tracker' },
 ]
 
 export default function BasketballSettings() {
@@ -37,6 +39,8 @@ export default function BasketballSettings() {
     useCloudBasketballSettings,
     keepDeviceBasketballSettings,
     setBasketballSettingsPageActive,
+    basketballEventTrackerPreviewEnabled,
+    setBasketballEventTrackerPreviewEnabled,
   } = useSettings()
   const [draft, setDraft] = useState<BasketballPersonalSettingsV1>(() =>
     structuredClone(basketballSettings)
@@ -58,6 +62,10 @@ export default function BasketballSettings() {
     draft.baseProfile,
     [{ id: 'personal', overrides: draft.ruleOverrides }]
   ), [draft.baseProfile, draft.ruleOverrides])
+  const eventCreationPolicy = getBasketballEventCreationPolicy(
+    basketballEventTrackerPreviewEnabled
+  )
+  const trackerTabActive = activeTab === 'tracker'
 
   useEffect(() => {
     setBasketballSettingsPageActive(true)
@@ -119,28 +127,34 @@ export default function BasketballSettings() {
         <div>
           <h2 className="text-lg font-semibold text-slate-800">Basketball</h2>
           <div className="flex items-center gap-2" aria-live="polite">
-            <SyncStatus status={basketballSettingsSync.status} />
-            {dirty && (
+            {trackerTabActive ? (
+              <span className="text-xs text-slate-500">Saved on this device</span>
+            ) : (
+              <SyncStatus status={basketballSettingsSync.status} />
+            )}
+            {!trackerTabActive && dirty && (
               <span className="text-xs font-semibold text-amber-700">Unsaved changes</span>
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => void refreshBasketballSettings()}
-          disabled={syncBusy}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40"
-          title="Refresh cloud settings"
-          aria-label="Refresh cloud settings"
-        >
-          <RefreshCw
-            size={17}
-            className={basketballSettingsSync.status === 'checking' ? 'animate-spin' : ''}
-          />
-        </button>
+        {!trackerTabActive && (
+          <button
+            type="button"
+            onClick={() => void refreshBasketballSettings()}
+            disabled={syncBusy}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40"
+            title="Refresh cloud settings"
+            aria-label="Refresh cloud settings"
+          >
+            <RefreshCw
+              size={17}
+              className={basketballSettingsSync.status === 'checking' ? 'animate-spin' : ''}
+            />
+          </button>
+        )}
       </div>
 
-      {basketballSettingsSync.error && (
+      {!trackerTabActive && basketballSettingsSync.error && (
         <p role="alert" className={`rounded-md border px-3 py-2 text-sm ${
           basketballSettingsSync.status === 'backend_update_required' ||
           basketballSettingsSync.status === 'local' ||
@@ -152,7 +166,7 @@ export default function BasketballSettings() {
         </p>
       )}
 
-      {basketballSettingsSync.conflict && (
+      {!trackerTabActive && basketballSettingsSync.conflict && (
         <div role="alert" className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
           <p className="text-sm font-semibold text-amber-900">
             Settings changed on another device.
@@ -257,54 +271,74 @@ export default function BasketballSettings() {
             }))}
           />
         )}
+
+        {activeTab === 'tracker' && (
+          <div className="space-y-3 border-y border-blue-100 bg-blue-50 px-3 py-3">
+            <Toggle
+              label="New event tracker (preview)"
+              checked={basketballEventTrackerPreviewEnabled}
+              disabled={!eventCreationPolicy.preferenceAvailable}
+              onChange={setBasketballEventTrackerPreviewEnabled}
+            />
+            {!eventCreationPolicy.preferenceAvailable && (
+              <p role="status" className="text-xs font-medium text-blue-800">
+                Unavailable in this build
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-200 pt-2">
-        <button
-          type="button"
-          onClick={resetActiveTab}
-          className="inline-flex h-10 items-center gap-2 px-2 text-sm font-semibold text-slate-600"
-        >
-          <RotateCcw size={16} />
-          Reset Tab
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirmReset(true)}
-          className="h-10 px-2 text-sm font-semibold text-slate-600"
-        >
-          Reset All
-        </button>
-      </div>
+      {!trackerTabActive && (
+        <>
+          <div className="flex items-center justify-between border-t border-slate-200 pt-2">
+            <button
+              type="button"
+              onClick={resetActiveTab}
+              className="inline-flex h-10 items-center gap-2 px-2 text-sm font-semibold text-slate-600"
+            >
+              <RotateCcw size={16} />
+              Reset Tab
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmReset(true)}
+              className="h-10 px-2 text-sm font-semibold text-slate-600"
+            >
+              Reset All
+            </button>
+          </div>
 
-      <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50/95 p-4 backdrop-blur">
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={!dirty}
-          onClick={() => {
-            setDraft(structuredClone(basketballSettings))
-            setDraftBaseRevision(basketballSettingsSync.revision)
-          }}
-        >
-          Discard
-        </button>
-        <button
-          type="button"
-          className="btn-primary inline-flex items-center justify-center gap-2"
-          disabled={!dirty || basketballSettingsSync.status === 'saving' || !resolved.ok}
-          onClick={() => void saveBasketballSettings(draft, draftBaseRevision)}
-        >
-          {basketballSettingsSync.status === 'saving' ? (
-            <RefreshCw size={17} className="animate-spin" />
-          ) : basketballSettingsSync.status === 'synced' && !dirty ? (
-            <Check size={17} />
-          ) : (
-            <Save size={17} />
-          )}
-          Save
-        </button>
-      </div>
+          <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50/95 p-4 backdrop-blur">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={!dirty}
+              onClick={() => {
+                setDraft(structuredClone(basketballSettings))
+                setDraftBaseRevision(basketballSettingsSync.revision)
+              }}
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              className="btn-primary inline-flex items-center justify-center gap-2"
+              disabled={!dirty || basketballSettingsSync.status === 'saving' || !resolved.ok}
+              onClick={() => void saveBasketballSettings(draft, draftBaseRevision)}
+            >
+              {basketballSettingsSync.status === 'saving' ? (
+                <RefreshCw size={17} className="animate-spin" />
+              ) : basketballSettingsSync.status === 'synced' && !dirty ? (
+                <Check size={17} />
+              ) : (
+                <Save size={17} />
+              )}
+              Save
+            </button>
+          </div>
+        </>
+      )}
 
       <ConfirmDialog
         open={confirmReset}
@@ -344,9 +378,10 @@ function SyncStatus({ status }: {
   )
 }
 
-function Toggle({ label, checked, onChange }: {
+function Toggle({ label, checked, disabled = false, onChange }: {
   label: string
   checked: boolean
+  disabled?: boolean
   onChange: (checked: boolean) => void
 }) {
   return (
@@ -356,8 +391,9 @@ function Toggle({ label, checked, onChange }: {
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
           checked ? 'bg-blue-600' : 'bg-slate-300'
         }`}
       >

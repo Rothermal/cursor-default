@@ -1,10 +1,10 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, and BKE-5C1 through
-BKE-5C4 are implemented. BKE-5D is approved in two slices and remains to be implemented; see
-[PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md). BKE-5B and BKE-5C remain
-internal. The initial owner-only BKE-5D rollout uses a default-off production opt-in with focused
-post-deployment validation; the complete live matrix remains required before access broadens.
+Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, BKE-5C1 through
+BKE-5C4, and BKE-5D1 are implemented. BKE-5D2 production activation and owner signoff remain; see
+[PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md). Event creation remains internal.
+The initial owner-only rollout uses a default-off production opt-in with focused post-deployment
+validation; the complete live matrix remains required before access broadens.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -579,7 +579,7 @@ Deliver BKE-5C as four reviewable slices:
 - **BKE-5C4 - Enable Cloud and exit (implemented):** guarded later binding, duplicate/role checks, failure-safe
   upload/checkpoint, and the BKE-5C regression audit.
 
-### BKE-5D: Release and exit audit
+### BKE-5D: Release and exit audit - BKE-5D1 implemented; BKE-5D2 remains
 
 Detailed delivery plan:
 [`PLAN_BKE_5D_RELEASE_AND_EXIT.md`](PLAN_BKE_5D_RELEASE_AND_EXIT.md).
@@ -591,6 +591,12 @@ Detailed delivery plan:
   cloud matrix before broader access.
 - Flip production policy to `opt_in` only in BKE-5D2; document rollback.
 - Exit: production can create deliberate Event games without reducing historical or Legacy access.
+
+BKE-5D1 implementation note: the centralized policy remains `internal`; strict device-local
+preference storage, a separate Tracker settings tab, setup and atomic commit guards, exact
+committed-pre-start continuation, and focused release-entry tests are implemented. No migration is
+added. See
+[`REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md`](REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md).
 
 ## 10. Verification Matrix
 

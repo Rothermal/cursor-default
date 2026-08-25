@@ -799,12 +799,29 @@ export function commitGameSetupState(
   currentState: GameState,
   nextState: GameState,
   ownerId: string | null,
-  expectedLocalGameId: string | null = null
+  expectedLocalGameId: string | null = null,
+  allowNewBasketballEventGame = false
 ): CommitGameSetupResult {
   const manifest = migrateLegacyGameStorage(ownerId)
   const snapshot = snapshotParkingStorage(manifest)
 
   try {
+    const continuingCommittedBasketballEventSetup = Boolean(
+      expectedLocalGameId &&
+      manifest.activeLocalGameId === expectedLocalGameId &&
+      isBasketballEventSetupState(currentState) &&
+      isBasketballEventSetupState(nextState)
+    )
+    if (
+      isBasketballEventSetupState(nextState) &&
+      !allowNewBasketballEventGame &&
+      !continuingCommittedBasketballEventSetup
+    ) {
+      throw new Error(
+        'Enable New event tracker (preview) in Basketball settings before creating this game.'
+      )
+    }
+
     if (expectedLocalGameId) {
       if (manifest.activeLocalGameId !== expectedLocalGameId) {
         throw new Error('This setup draft no longer matches the active local game.')
@@ -824,6 +841,15 @@ export function commitGameSetupState(
     restoreParkingStorage(snapshot)
     throw error
   }
+}
+
+function isBasketballEventSetupState(state: GameState): boolean {
+  return state.sport?.id === 'basketball' &&
+    state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
+    state.eventStream === null &&
+    state.sportGameState === null &&
+    state.players.length === 0 &&
+    Boolean(state.gameInfo)
 }
 
 export function parkActiveGame(ownerId: string | null): ParkedGameSummary[] {

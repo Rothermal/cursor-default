@@ -1,14 +1,38 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BASKETBALL_EVENT_RELEASE_STAGE,
+  getBasketballEventCreationPolicy,
   getSportAvailabilityPolicy,
-  isBasketballEventModelCreationAvailable,
   SOCCER_RELEASED_IN_PRODUCTION,
 } from './sportAvailability'
 
 describe('getSportAvailabilityPolicy', () => {
-  it('keeps Basketball event-game creation development-only', () => {
-    expect(isBasketballEventModelCreationAvailable(true)).toBe(true)
-    expect(isBasketballEventModelCreationAvailable(false)).toBe(false)
+  it.each([
+    ['internal', true, false, false, true],
+    ['internal', true, true, true, true],
+    ['internal', false, false, false, false],
+    ['internal', false, true, false, false],
+    ['opt_in', true, false, false, true],
+    ['opt_in', true, true, true, true],
+    ['opt_in', false, false, false, true],
+    ['opt_in', false, true, true, true],
+  ] as const)(
+    'resolves Basketball Event %s development=%s enabled=%s',
+    (releaseStage, development, enabled, canCreate, preferenceAvailable) => {
+      expect(getBasketballEventCreationPolicy(enabled, {
+        development,
+        releaseStage,
+      })).toEqual({
+        releaseStage,
+        preferenceAvailable,
+        canCreateNewEventGame: canCreate,
+        canAccessExistingEventGames: true,
+      })
+    }
+  )
+
+  it('keeps the BKE-5D1 production policy internal', () => {
+    expect(BASKETBALL_EVENT_RELEASE_STAGE).toBe('internal')
   })
 
   it('keeps the development Soccer preview behind the user toggle', () => {

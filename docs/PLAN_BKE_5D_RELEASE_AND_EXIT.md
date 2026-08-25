@@ -1,7 +1,7 @@
 # Plan: BKE-5D Basketball Event Release and Exit
 
-Status: Product and delivery Q&A approved. Implementation remains split into BKE-5D1 policy and
-hardening, followed by BKE-5D2 production activation and owner signoff.
+Status: Product and delivery Q&A approved. BKE-5D1 policy and hardening are implemented with the
+production stage still `internal`. BKE-5D2 production activation and owner signoff remain.
 
 Parent: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md)
 
@@ -245,7 +245,7 @@ page adds its own Event creation decision.
 
 ## 8. Delivery Slices
 
-### BKE-5D1: Policy, preference, and release hardening
+### BKE-5D1: Policy, preference, and release hardening - implemented
 
 - Add the centralized `internal | opt_in` Basketball Event policy with production left internal.
 - Add strict default-off device preference storage and `SettingsContext` ownership.
@@ -275,6 +275,17 @@ Primary boundaries:
 Exit: development can exercise the exact default-off preference path, internal production cannot
 create Event games even with stored true, Classic creation remains unchanged, and every existing
 Event record remains reachable.
+
+Implementation note: `src/lib/sportAvailability.ts` owns the injected, pure
+`getBasketballEventCreationPolicy` matrix and keeps production at `internal`.
+`statkeeper_settings.basketball.eventTrackerPreviewEnabled` is strict, device-local, and default
+off; `SettingsContext` owns its runtime setter. The Basketball Tracker settings tab stays outside
+the cloud-backed Rules/Capture/Display save lifecycle. Game Setup uses Classic/New tracker labels,
+preserves unavailable drafts, and checks policy before capability, parking, or deferred tournament
+work. `commitGameSetupState` repeats the check at the atomic storage boundary using a fresh stored
+preference, while allowing only the exact matching committed pre-start Event slot to continue.
+No migration is added; migration 062 remains the ceiling. See
+[`REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md`](REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md).
 
 ### BKE-5D2: Production activation and owner signoff
 

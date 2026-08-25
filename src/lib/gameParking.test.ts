@@ -176,6 +176,15 @@ function gameState(sport: SportConfig, teamName: string, opponentName: string): 
   }
 }
 
+function basketballEventSetupState(teamName: string, opponentName: string): GameState {
+  return {
+    ...gameState(basketball, teamName, opponentName),
+    gameDataAuthority: 'sport_events',
+    players: [],
+    activePlayerId: null,
+  }
+}
+
 function importedRecord(localGameId: string, state: GameState) {
   return {
     localGameId,
@@ -274,6 +283,41 @@ describe('gameParking', () => {
     expect(committed.localGameId).toBe(localGameId)
     expect(listParkedGames(null)).toHaveLength(1)
     expect(getParkedGameRecord(localGameId, null)?.gameState).toEqual(next)
+  })
+
+  it('fails closed before creating an unapproved Basketball Event setup slot', () => {
+    const current = gameState(basketball, 'Current', 'One')
+    const next = basketballEventSetupState('Next', 'Two')
+    saveActiveGameState(current, null)
+    const previousId = getActiveLocalGameId(null)
+
+    expect(() => commitGameSetupState(current, next, null)).toThrow(
+      'Enable New event tracker (preview)'
+    )
+    expect(getActiveLocalGameId(null)).toBe(previousId)
+    expect(listParkedGames(null)).toHaveLength(1)
+
+    const committed = commitGameSetupState(current, next, null, null, true)
+    expect(committed.localGameId).not.toBe(previousId)
+    expect(getParkedGameRecord(committed.localGameId, null)?.gameState).toEqual(next)
+  })
+
+  it('continues only the exact committed pre-start Basketball Event setup', () => {
+    const current = basketballEventSetupState('Aces', 'Bears')
+    saveActiveGameState(current, null)
+    const localGameId = getActiveLocalGameId(null)!
+    const updated = basketballEventSetupState('Aces', 'Cats')
+
+    const committed = commitGameSetupState(current, updated, null, localGameId)
+    expect(committed.localGameId).toBe(localGameId)
+    expect(getParkedGameRecord(localGameId, null)?.gameState.gameInfo?.opponentName).toBe('Cats')
+
+    expect(() => commitGameSetupState(
+      { ...updated, players: [{ id: 'p1', name: 'One', number: '1', stats: {} }] },
+      basketballEventSetupState('Aces', 'Dogs'),
+      null,
+      localGameId
+    )).toThrow('Enable New event tracker (preview)')
   })
   it('round-trips marked Basketball setup intent without aggregate fallback', () => {
     const marked = {

@@ -2,6 +2,9 @@ export const SETTINGS_STORAGE_KEY = 'statkeeper_settings'
 
 export interface AppSettings {
   enabledSports: Record<string, boolean>
+  basketball: {
+    eventTrackerPreviewEnabled: boolean
+  }
   courtCapture: {
     reboundPromptAfterMiss: boolean
   }
@@ -14,6 +17,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     football: false,
     hockey: false,
     soccer: false,
+  },
+  basketball: {
+    eventTrackerPreviewEnabled: false,
   },
   courtCapture: {
     reboundPromptAfterMiss: false,
@@ -39,11 +45,20 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
   const courtCapture = isRecord(stored.courtCapture)
     ? stored.courtCapture
     : {}
+  const basketball = isRecord(stored.basketball)
+    ? stored.basketball
+    : {}
 
   return {
     enabledSports: {
       ...DEFAULT_SETTINGS.enabledSports,
       ...booleanRecord(stored.enabledSports),
+    },
+    basketball: {
+      eventTrackerPreviewEnabled:
+        typeof basketball.eventTrackerPreviewEnabled === 'boolean'
+          ? basketball.eventTrackerPreviewEnabled
+          : DEFAULT_SETTINGS.basketball.eventTrackerPreviewEnabled,
     },
     courtCapture: {
       reboundPromptAfterMiss:

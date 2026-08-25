@@ -13,6 +13,7 @@ describe('mergeStoredSettings', () => {
     })
     expect(merged.enabledSports.basketball).toBe(false)
     expect(merged.enabledSports.baseball).toBe(false)
+    expect(merged.basketball.eventTrackerPreviewEnabled).toBe(false)
     expect(merged.courtCapture.reboundPromptAfterMiss).toBe(false)
   })
 
@@ -33,13 +34,29 @@ describe('mergeStoredSettings', () => {
       },
       courtCapture: {
         reboundPromptAfterMiss: 'yes',
+        eventTrackerPreviewEnabled: true,
       },
+      basketball: { eventTrackerPreviewEnabled: 'true' },
     })
 
     expect(merged.enabledSports.basketball).toBe(true)
     expect(merged.enabledSports.soccer).toBe(false)
     expect(merged.enabledSports.futureSport).toBe(true)
+    expect(merged.basketball.eventTrackerPreviewEnabled).toBe(false)
     expect(merged.courtCapture.reboundPromptAfterMiss).toBe(false)
+  })
+
+  it('keeps the Basketball Event preview in its exact device-only namespace', () => {
+    const merged = mergeStoredSettings({
+      basketball: { eventTrackerPreviewEnabled: true },
+      courtCapture: {
+        reboundPromptAfterMiss: true,
+        eventTrackerPreviewEnabled: false,
+      },
+    })
+
+    expect(merged.basketball.eventTrackerPreviewEnabled).toBe(true)
+    expect(merged.courtCapture).toEqual({ reboundPromptAfterMiss: true })
   })
 
   it.each([null, [], 'settings', 3])(
@@ -84,12 +101,14 @@ describe('loadSettingsFromStorage', () => {
   it('merges saved JSON over defaults', () => {
     const saved = {
       enabledSports: { hockey: true },
+      basketball: { eventTrackerPreviewEnabled: true },
       courtCapture: { reboundPromptAfterMiss: true },
     }
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(saved))
     const loaded = loadSettingsFromStorage()
     expect(loaded.enabledSports.hockey).toBe(true)
     expect(loaded.enabledSports.basketball).toBe(true)
+    expect(loaded.basketball.eventTrackerPreviewEnabled).toBe(true)
     expect(loaded.courtCapture.reboundPromptAfterMiss).toBe(true)
   })
 
