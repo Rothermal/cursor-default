@@ -19,7 +19,10 @@ Plan: [PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md](PLAN_BKE_5C_SETUP_AUTHORITY_A
   policy changes from `local_only` to `automatic` or any binding metadata is installed.
 - A local edit, active-game switch, duplicate binding, authorization/capability failure, transport
   failure, checkpoint failure, or storage failure leaves the local policy, events, parked identity,
-  and active state unchanged. A binder shell created before failure remains idempotently reusable.
+  and active state unchanged. A failure before upload may leave an idempotently reusable binder
+  shell. If a local edit is detected only after upload and checkpoint finish, cloud may contain the
+  complete pre-edit recorder stream while the unchanged local game remains local-only; a deliberate
+  retry reuses that binding and reconciles the latest stream.
 - Confirmed state replacement snapshots and restores the parked record, manifest, active mirror,
   and pending-sync flag together when browser storage fails.
 - Successful conversion persists a clean automatic binding, survives park/resume/reload, and routes
@@ -63,7 +66,9 @@ installed production-like PWA. They do not block the internal BKE-5C implementat
 - [ ] Offline or stale installed PWA: verify the command fails without local mutation; reconnect or
   update, retry, and confirm the idempotent binder does not create a duplicate game.
 - [ ] Edit or switch games while enablement is waiting: verify the stale operation is rejected and a
-  deliberate retry uploads the latest complete stream.
+  deliberate retry uploads the latest complete stream. If rejection occurs after upload/checkpoint,
+  confirm the pre-edit cloud game is visible once and the retry reuses it rather than creating a
+  duplicate.
 - [ ] Park, resume, reload, and restart the installed app after success: verify the same local/cloud
   binding and ordinary automatic sync resume.
 - [ ] Keep a Soccer game, a legacy Basketball game, an automatic Basketball Event game, and a

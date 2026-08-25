@@ -1,5 +1,5 @@
 import { CloudUpload } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { GameState } from '../../types'
 import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
@@ -12,7 +12,11 @@ export default function BasketballEnableCloudPanel({ state }: { state: GameState
   const [busy, setBusy] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const available = canOfferBasketballEventCloudEnable(state, user?.id ?? null)
+  const userId = user?.id ?? null
+  const available = useMemo(
+    () => canOfferBasketballEventCloudEnable(state, userId),
+    [state, userId]
+  )
 
   if (!available) return null
 

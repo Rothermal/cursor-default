@@ -112,6 +112,24 @@ describe('Basketball local-only cloud enable', () => {
     expect(canOfferBasketballEventCloudEnable(state, null)).toBe(false)
   })
 
+  it('hides the command for a missing stream, cloud binding, or non-local-only policy', () => {
+    const missingStream = localOnlyState()
+    missingStream.eventStream = null
+    expect(canOfferBasketballEventCloudEnable(missingStream, 'user-1')).toBe(false)
+
+    const bound = localOnlyState()
+    bound.cloudSync.gameId = 'cloud-game-1'
+    expect(canOfferBasketballEventCloudEnable(bound, 'user-1')).toBe(false)
+
+    const automatic = localOnlyState()
+    automatic.cloudSync.eventCloudPolicy = 'automatic'
+    expect(canOfferBasketballEventCloudEnable(automatic, 'user-1')).toBe(false)
+
+    const malformed = localOnlyState()
+    Object.assign(malformed.cloudSync, { eventCloudPolicy: 'unexpected' })
+    expect(canOfferBasketballEventCloudEnable(malformed, 'user-1')).toBe(false)
+  })
+
   it('fresh-checks access and capability before returning a confirmed automatic binding', async () => {
     const deps = dependencies()
     const assertCurrent = vi.fn()
