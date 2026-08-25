@@ -20,6 +20,7 @@ import {
   CORNER_THREE_ARC_Y,
   LANE_MARKS_FROM_BASELINE,
   BASKET_CENTER_Y,
+  orientBasketballCourtPoint,
 } from './courtGeometry'
 
 const TAP_DEBOUNCE_MS = 120
@@ -46,6 +47,8 @@ interface BasketballCourtProps {
   /** Optional review-only side tone; live capture keeps the existing result colors by default. */
   markerTone?: (shot: ShotRecord) => 'tracked' | 'opponent' | null
   markerLabel?: (shot: ShotRecord) => string
+  /** Rotate presentation while preserving canonical stored shot coordinates. */
+  flipped?: boolean
 }
 
 const LINE_COLOR = '#8B6914'
@@ -133,6 +136,7 @@ export default function BasketballCourt({
   emptyHint,
   markerTone,
   markerLabel,
+  flipped = false,
 }: BasketballCourtProps) {
   const lastTapAtRef = useRef(0)
   /**
@@ -143,6 +147,16 @@ export default function BasketballCourt({
    */
   const pendingTapRef = useRef<PendingTap | null>(null)
   const interactive = Boolean(onCourtTap)
+  const halfW = COURT_WIDTH / 2
+  const padding = 2
+  const halfPaintW = PAINT_WIDTH / 2
+  const svgCourtTop = BASELINE_Y
+  const svgCourtBottom = HALFCOURT_Y
+  const courtH = svgCourtBottom - svgCourtTop
+  const courtCenterY = (svgCourtTop + svgCourtBottom) / 2
+  const viewW = COURT_WIDTH + padding * 2
+  const viewH = courtH + padding * 2
+  const courtTransform = flipped ? `rotate(180 0 ${courtCenterY})` : undefined
 
   const handlePointerDown = (e: React.PointerEvent<SVGRectElement>) => {
     pendingTapRef.current = {
@@ -184,17 +198,9 @@ export default function BasketballCourt({
 
     const court = clientPointToCourt(e.currentTarget, pending.clientX, pending.clientY)
     if (!court) return
-    onCourtTap(court.x, court.y)
+    const canonical = orientBasketballCourtPoint(court, flipped ? 'flipped' : 'standard')
+    onCourtTap(canonical.x, canonical.y)
   }
-  const halfW = COURT_WIDTH / 2
-  const padding = 2
-  const halfPaintW = PAINT_WIDTH / 2
-
-  const svgCourtTop = BASELINE_Y
-  const svgCourtBottom = HALFCOURT_Y
-  const courtH = svgCourtBottom - svgCourtTop
-  const viewW = COURT_WIDTH + padding * 2
-  const viewH = courtH + padding * 2
 
   return (
     <svg
@@ -203,6 +209,7 @@ export default function BasketballCourt({
       className={className}
       style={{ width: '100%', height: 'auto', display: 'block' }}
     >
+      <g transform={courtTransform}>
       <rect
         x={-halfW}
         y={svgCourtTop}
@@ -268,6 +275,7 @@ export default function BasketballCourt({
 
         <line x1={0} y1={BACKBOARD_Y} x2={0} y2={-BASKET_RADIUS} strokeWidth={0.2} />
       </g>
+      </g>
 
       {interactive && onCourtTap && (
         <rect
@@ -284,6 +292,7 @@ export default function BasketballCourt({
         />
       )}
 
+      <g transform={courtTransform}>
       {shots.map(shot => {
         const tone = markerTone?.(shot) ?? null
         const label = markerLabel?.(shot) ?? `View ${shot.made ? 'made' : 'missed'} shot detail`
@@ -310,7 +319,10 @@ export default function BasketballCourt({
               onMarkerActivate(
                 shot,
                 event.currentTarget,
-                clientPointToCourt(event.currentTarget, event.clientX, event.clientY)
+                orientPointOrNull(
+                  clientPointToCourt(event.currentTarget, event.clientX, event.clientY),
+                  flipped
+                )
               )
             } : undefined}
             onKeyDown={onMarkerActivate ? event => {
@@ -346,7 +358,10 @@ export default function BasketballCourt({
               onMarkerActivate(
                 shot,
                 event.currentTarget,
-                clientPointToCourt(event.currentTarget, event.clientX, event.clientY)
+                orientPointOrNull(
+                  clientPointToCourt(event.currentTarget, event.clientX, event.clientY),
+                  flipped
+                )
               )
             } : undefined}
             onKeyDown={onMarkerActivate ? event => {
@@ -381,6 +396,7 @@ export default function BasketballCourt({
           </g>
         )
       })}
+      </g>
 
       {interactive && onCourtTap && shots.length === 0 && emptyHint && (
         <g pointerEvents="none" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
@@ -408,4 +424,13 @@ export default function BasketballCourt({
       )}
     </svg>
   )
+}
+
+function orientPointOrNull(
+  point: { x: number; y: number } | null,
+  flipped: boolean
+): { x: number; y: number } | null {
+  return point
+    ? orientBasketballCourtPoint(point, flipped ? 'flipped' : 'standard')
+    : null
 }

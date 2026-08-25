@@ -94,6 +94,25 @@ describe('Basketball release entry guards', () => {
     )
   })
 
+  it('rechecks reviewed rules before Player Setup freezes an event game', () => {
+    const playerSetup = source('src/pages/PlayerSetup.tsx')
+    const handler = between(
+      playerSetup,
+      'const handleStart = async () => {',
+      '\n  const refreshReviewedDefaults'
+    )
+    const latestIndex = handler.indexOf('await loadLatestBasketballSetupAuthority')
+    const staleIndex = handler.indexOf('basketballSetupEventMatchesAuthority')
+    const startIndex = handler.indexOf('startBasketballEventGame(draft)')
+
+    expect(latestIndex).toBeGreaterThanOrEqual(0)
+    expect(staleIndex).toBeGreaterThan(latestIndex)
+    expect(startIndex).toBeGreaterThan(staleIndex)
+    expect(playerSetup).toContain('reviewedSetup: {')
+    expect(playerSetup).toContain('rulesSnapshot: draft.event.reviewedRules')
+    expect(playerSetup).toContain('rulesSource: draft.event.reviewedRulesSource')
+  })
+
   it('keeps the internal creation gate closed outside development policy', () => {
     const policy = source('src/lib/sportAvailability.ts')
     expect(policy).toContain(

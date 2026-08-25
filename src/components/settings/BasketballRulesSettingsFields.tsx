@@ -247,15 +247,20 @@ export function BasketballRulesSummary({
   layerId,
   profileSourceLabel,
   overrideSourceLabel,
+  sourceLabels,
 }: {
   resolution: Extract<ReturnType<typeof resolveBasketballRules>, { ok: true }>['value']
   layerId: Extract<BasketballRuleLayerId, 'personal' | 'team'>
   profileSourceLabel: string
   overrideSourceLabel: string
+  sourceLabels?: Partial<Record<'built_in' | BasketballRuleLayerId, string>>
 }) {
   const { profile, rules, customized, sourceByField } = resolution
-  const source = (field: BasketballRulesV2Field) =>
-    sourceByField[field] === layerId ? overrideSourceLabel : 'Built-in profile'
+  const source = (field: BasketballRulesV2Field) => {
+    const sourceId = sourceByField[field]
+    return sourceLabels?.[sourceId] ??
+      (sourceId === layerId ? overrideSourceLabel : 'Built-in profile')
+  }
 
   return (
     <div className="divide-y divide-slate-200 border-y border-slate-200">
@@ -267,13 +272,17 @@ export function BasketballRulesSummary({
       <SummaryRow
         label="Regulation"
         value={rules.regulationSegments.map(segment =>
-          `${segment.label} (${Math.round(segment.durationMs / 60_000)} min)`
+          `${segment.label} (${Math.round(segment.durationMs / 60_000)} min, ${
+            segment.lineupChangeBoundary ? 'lineup boundary' : 'continuous lineup'
+          })`
         ).join(', ')}
         source={source('regulationSegments')}
       />
       <SummaryRow
         label="Overtime"
-        value={`${rules.overtimeTemplate.label}, ${Math.round(rules.overtimeTemplate.durationMs / 60_000)} min`}
+        value={`${rules.overtimeTemplate.label}, ${Math.round(rules.overtimeTemplate.durationMs / 60_000)} min, ${
+          rules.overtimeTemplate.lineupChangeBoundary ? 'lineup boundary' : 'continuous lineup'
+        }`}
         source={source('overtimeTemplate')}
       />
       <SummaryRow
@@ -295,6 +304,11 @@ export function BasketballRulesSummary({
           `${pool.label}: ${pool.totalLimit === null ? 'unlimited' : pool.totalLimit}`
         ).join(' - ')}
         source={source('timeoutPools')}
+      />
+      <SummaryRow
+        label="Clock model"
+        value={rules.clockModel === 'none' ? 'No event-model game clock' : rules.clockModel}
+        source={source('clockModel')}
       />
       <div className="py-3">
         <p className="text-xs font-semibold uppercase text-slate-500">Sources</p>

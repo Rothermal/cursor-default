@@ -43,6 +43,18 @@ export interface BasketballCourtPoint {
   y: number
 }
 
+export function orientBasketballCourtPoint(
+  point: BasketballCourtPoint,
+  orientation: 'standard' | 'flipped'
+): BasketballCourtPoint {
+  if (orientation === 'standard') return { ...point }
+  const centerY = (BASELINE_Y + HALFCOURT_Y) / 2
+  return {
+    x: -point.x,
+    y: Math.round((2 * centerY - point.y) * 10) / 10,
+  }
+}
+
 export function isThreePointer(x: number, y: number): boolean {
   if (Math.abs(x) >= CORNER_THREE_X && y <= CORNER_THREE_ARC_Y) return true
   return Math.sqrt(x * x + y * y) > THREE_POINT_RADIUS

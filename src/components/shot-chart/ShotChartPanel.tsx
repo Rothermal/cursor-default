@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../../context/GameContext'
 import { useSettings } from '../../context/SettingsContext'
 import { useAuth } from '../../context/AuthContext'
+import { RotateCcw } from 'lucide-react'
 import BasketballCourt from './BasketballCourt'
 import ShootingSummary from './ShootingSummary'
 import ConfirmDialog from '../ConfirmDialog'
@@ -22,6 +23,7 @@ import {
   basketballPlayerIdForCapturePreferences,
   captureBasketballCourtEvent,
   hasStartedBasketballEventGame,
+  setBasketballCourtOrientation,
 } from '../../lib/basketball/commands'
 import {
   basketballLiveCaptureUnits,
@@ -131,6 +133,9 @@ export default function ShotChartPanel({
     state.sportGameState.projection.status === 'in_progress' ||
     state.sportGameState.projection.status === 'period_break'
   )
+  const courtOrientation = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.capturePreferences.courtOrientation
+    : state.basketballCourtOrientation ?? 'standard'
   const eventCaptureUnits = useMemo(
     () => isEventBasketball ? basketballLiveCaptureUnits(state) : [],
     [isEventBasketball, state]
@@ -414,13 +419,36 @@ export default function ShotChartPanel({
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
+  const flipCourt = () => {
+    const result = setBasketballCourtOrientation(
+      state,
+      courtOrientation === 'standard' ? 'flipped' : 'standard'
+    )
+    if (!result.ok) {
+      setCaptureError(result.message)
+      return
+    }
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2 px-1">
         <p className="text-sm font-semibold text-slate-600 truncate">
           Shot chart — {shotViewLabel(selection, players)}
         </p>
-        <p className="text-sm font-bold text-slate-700 shrink-0">{shootingLine(visibleShots)}</p>
+        <div className="flex shrink-0 items-center gap-2">
+          <p className="text-sm font-bold text-slate-700">{shootingLine(visibleShots)}</p>
+          <button
+            type="button"
+            onClick={flipCourt}
+            className="grid h-8 w-8 place-items-center rounded border border-slate-200 bg-white text-slate-600"
+            title="Flip court"
+            aria-label="Flip court"
+          >
+            <RotateCcw size={16} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
@@ -430,6 +458,7 @@ export default function ShotChartPanel({
           onMarkerActivate={handleMarkerActivate}
           className="w-full"
           newlyPlacedShotId={pulseShotId}
+          flipped={courtOrientation === 'flipped'}
           emptyHint={eventCaptureOpen && !captureDisabled
             ? 'Tap the court to log an event.'
             : captureDisabledMessage ?? 'Court capture is unavailable between periods or after completion.'}

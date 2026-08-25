@@ -1,5 +1,6 @@
 import type { GameState, SportConfig } from '../../types'
 import { gameReducer, createInitialState } from '../gameReducer'
+import { stableJson } from '../gameEvents/stream'
 import { setBasketballEventCreationIntent } from './commands'
 import {
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
@@ -20,6 +21,7 @@ import type {
   BasketballMatchRulesV2,
   BasketballRuleOverridesV2,
   BasketballRulesSource,
+  BasketballRulesV2Field,
 } from './types'
 
 const STORAGE_KEY_PREFIX = 'statkeeper_basketball_setup_draft:'
@@ -61,6 +63,22 @@ export interface BasketballSetupDraftEventV1 {
   reviewedRulesSource: BasketballRulesSource
   cloudIntent: 'automatic' | 'local_only'
 }
+
+export type BasketballSetupAuthoritySnapshot =
+  | {
+      kind: 'personal'
+      revision: number | null
+      settings: BasketballPersonalSettingsV1
+    }
+  | {
+      kind: 'team'
+      revision: number | null
+      settings: BasketballTeamSettingsV1
+    }
+
+export type BasketballSetupEventRefreshResult =
+  | { ok: true; event: BasketballSetupDraftEventV1 }
+  | { ok: false; error: string }
 
 export interface BasketballSetupDraftV1 {
   version: 1
@@ -184,6 +202,52 @@ export function createBasketballSetupDraftEvent({
     },
     cloudIntent,
   }
+}
+
+export function basketballSetupEventMatchesAuthority(
+  event: BasketballSetupDraftEventV1,
+  authority: BasketballSetupAuthoritySnapshot
+): boolean {
+  return event.settingsAuthority.kind === authority.kind &&
+    event.settingsAuthority.revision === authority.revision &&
+    stableJson(event.settingsAuthority.settings) === stableJson(authority.settings)
+}
+
+export function refreshBasketballSetupDraftEvent(
+  event: BasketballSetupDraftEventV1,
+  authority: BasketballSetupAuthoritySnapshot
+): BasketballSetupEventRefreshResult {
+  if (event.settingsAuthority.kind !== authority.kind) {
+    return { ok: false, error: 'Basketball rules authority no longer matches this setup.' }
+  }
+  const refreshed = createBasketballSetupDraftEvent({
+    authority: authority.kind,
+    revision: authority.revision,
+    settings: authority.settings,
+    matchOverrides: event.matchOverrides,
+    cloudIntent: event.cloudIntent,
+  })
+  return refreshed
+    ? { ok: true, event: refreshed }
+    : {
+        ok: false,
+        error: 'Match overrides are incompatible with the refreshed Basketball defaults.',
+      }
+}
+
+export function basketballSetupRuleDifferences(
+  current: BasketballMatchRulesV2,
+  candidate: BasketballMatchRulesV2
+): BasketballRulesV2Field[] {
+  const fields: BasketballRulesV2Field[] = [
+    'regulationSegments',
+    'overtimeTemplate',
+    'foulWindows',
+    'timeoutPools',
+    'personalFoulLimit',
+    'clockModel',
+  ]
+  return fields.filter(field => stableJson(current[field]) !== stableJson(candidate[field]))
 }
 
 export function parseBasketballSetupDraft(
@@ -346,6 +410,10 @@ export function buildBasketballSetupGameState({
     type: 'SET_TEAM_STATS_CONFIG',
     config: current.legacyTeamStatsConfig,
   })
+  state = {
+    ...state,
+    basketballCourtOrientation: current.display.defaultCourtFlipped ? 'flipped' : 'standard',
+  }
   state = gameReducer(state, {
     type: 'SET_CLOUD_SYNC_STATE',
     cloudSync: {

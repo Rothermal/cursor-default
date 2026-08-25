@@ -1,7 +1,7 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, and BKE-5C1 are
-implemented; BKE-5C2 through BKE-5C4 and BKE-5D remain. BKE-5B and BKE-5C remain internal;
+Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, and BKE-5C1 through
+BKE-5C2 are implemented; BKE-5C3 through BKE-5C4 and BKE-5D remain. BKE-5B and BKE-5C remain internal;
 BKE-5D must not open the user-visible event-model opt-in until the BKE-4 live release matrix and
 the targeted BKE-5 checks are accepted.
 
@@ -569,7 +569,7 @@ Deliver BKE-5C as four reviewable slices:
 
 - **BKE-5C1 - draft and atomic commit:** strict reload-safe draft, mutation-free Basketball entry,
   deferred setup values, and rollback-safe one-step context commit.
-- **BKE-5C2 - rules authority and freeze:** Event/Legacy choice, source-aware personal/team/match
+- **BKE-5C2 - rules authority and freeze (implemented):** Event/Legacy choice, source-aware personal/team/match
   resolution, stale revision handling, and exact immutable event setup.
 - **BKE-5C3 - capability and local-only:** authority-aware recovery choices, explicit persisted
   event-cloud policy, transport guards, and removal of premature Basketball preflights.

@@ -60,6 +60,7 @@ export function createInitialState(status: CloudSyncStatus = 'idle'): GameState 
     shotChart: [],
     eventStream: null,
     sportGameState: null,
+    basketballCourtOrientation: 'standard',
   }
 }
 
@@ -182,6 +183,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         gameDataAuthority: normalizeGameDataAuthority(s.gameDataAuthority),
         eventStream: normalizeGameEventStream(s.eventStream),
         sportGameState: normalizeSportGameState(s.sportGameState),
+        basketballCourtOrientation:
+          s.basketballCourtOrientation === 'flipped' ? 'flipped' : 'standard',
         shotChart: shotChartForRoster(s.shotChart, s.players),
         cloudSync: {
           ...cs,
@@ -225,6 +228,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SET_ACTIVE_PLAYER':
       return { ...state, activePlayerId: action.playerId }
+
+    case 'SET_BASKETBALL_COURT_ORIENTATION':
+      return { ...state, basketballCourtOrientation: action.orientation }
 
     case 'ADD_SHOT': {
       const shot = action.shot
