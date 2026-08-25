@@ -21,10 +21,12 @@ import {
   normalizeBasketballCourtLocation,
   prepareBasketballGameStart,
   reopenBasketballMatch,
+  setBasketballCourtOrientation,
   setBasketballEventCreationIntent,
   startNextBasketballPeriod,
   suspendBasketballMatch,
 } from './commands'
+import { getBasketballRulesProfile } from './profiles'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
 const occurredAt = '2026-08-02T15:30:00.000Z'
@@ -239,6 +241,94 @@ describe('BKE-1C1 Basketball commands', () => {
       currentPeriodId: 'regulation-1',
       startedPeriodIds: ['regulation-1'],
     })
+  })
+
+  it('freezes the explicitly reviewed v2 rules, provenance, source, and court orientation', () => {
+    const profile = getBasketballRulesProfile('nba', 1)!
+    const rules = structuredClone(profile.rules)
+    rules.personalFoulLimit = 7
+    const result = prepareBasketballGameStart(setupState(), {
+      recorderUserId: 'recorder-1',
+      occurredAt,
+      participantIds: [
+        '70000000-0000-4000-8000-000000000121',
+        '70000000-0000-4000-8000-000000000122',
+      ],
+      reviewedSetup: {
+        rulesSnapshot: rules,
+        rulesSource: {
+          profileId: 'nba',
+          profileVersion: 1,
+          personalRevision: null,
+          teamRevision: 12,
+          hasExplicitMatchOverrides: true,
+        },
+        sourceTeamId: 'team-reviewed',
+        sourceSeasonId: 'season-reviewed',
+        courtOrientation: 'flipped',
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.state.sportGameState?.sportId !== 'basketball') return
+    expect(result.state.sportGameState.setup).toMatchObject({
+      sourceTeamId: 'team-reviewed',
+      sourceSeasonId: 'season-reviewed',
+      rulesSource: {
+        profileId: 'nba',
+        profileVersion: 1,
+        personalRevision: null,
+        teamRevision: 12,
+        hasExplicitMatchOverrides: true,
+      },
+      rulesSnapshot: { rulesSchemaVersion: 2, personalFoulLimit: 7 },
+    })
+    expect(result.state.sportGameState.capturePreferences.courtOrientation).toBe('flipped')
+    expect(result.state.basketballCourtOrientation).toBe('flipped')
+  })
+
+  it('does not infer reviewed personal source identity from cloud binding metadata', () => {
+    const before = setupState()
+    before.cloudSync = {
+      ...before.cloudSync,
+      teamId: 'binding-team',
+      seasonId: 'binding-season',
+    }
+    const profile = getBasketballRulesProfile('nfhs', 1)!
+    const result = prepareBasketballGameStart(before, {
+      recorderUserId: 'recorder-1',
+      reviewedSetup: {
+        rulesSnapshot: profile.rules,
+        rulesSource: {
+          profileId: 'nfhs',
+          profileVersion: 1,
+          personalRevision: 4,
+          teamRevision: null,
+          hasExplicitMatchOverrides: false,
+        },
+        sourceTeamId: null,
+        sourceSeasonId: null,
+        courtOrientation: 'standard',
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.state.sportGameState?.sportId !== 'basketball') return
+    expect(result.state.sportGameState.setup.sourceTeamId).toBeNull()
+    expect(result.state.sportGameState.setup.sourceSeasonId).toBeNull()
+  })
+
+  it('changes court orientation without changing immutable setup', () => {
+    const started = startedState()
+    const setup = structuredClone(started.sportGameState)
+    const flipped = setBasketballCourtOrientation(started, 'flipped')
+
+    expect(flipped.ok).toBe(true)
+    if (!flipped.ok || flipped.state.sportGameState?.sportId !== 'basketball') return
+    expect(flipped.state.sportGameState.capturePreferences.courtOrientation).toBe('flipped')
+    expect(flipped.state.sportGameState.setup).toEqual(
+      setup?.sportId === 'basketball' ? setup.setup : null
+    )
   })
 
   it('returns the original state when setup, cloud, or projection checks fail', () => {

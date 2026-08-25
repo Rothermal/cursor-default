@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase'
 import { teamInfoPath } from '../lib/teamInfo'
 import { sportDashboardPath, sportTeamsPath } from '../lib/sportNavigation'
 import ConfirmDialog from '../components/ConfirmDialog'
+import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
+import { useBasketballTeamSettings } from '../hooks/useBasketballTeamSettings'
 import {
   getSportAvailabilityPolicy,
   isBasketballEventModelCreationAvailable,
@@ -33,12 +35,9 @@ import {
   parseBasketballSetupDraft,
   saveBasketballSetupDraft,
   type BasketballSetupDraftV1,
+  type BasketballSetupAuthoritySnapshot,
   type BasketballSetupSource,
 } from '../lib/basketball/setupDraft'
-import {
-  DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
-  DEFAULT_BASKETBALL_TEAM_SETTINGS,
-} from '../lib/basketball/settings'
 import {
   getParkedGameStorageInfo,
   parkedGameStorageErrorMessage,
@@ -88,7 +87,12 @@ export default function GameSetup() {
     startNewGame,
     parkingError,
   } = useGame()
-  const { isSportEnabled } = useSettings()
+  const {
+    isSportEnabled,
+    basketballSettings,
+    basketballSettingsSync,
+    setBasketballSettingsPageActive,
+  } = useSettings()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
   const accountScope = basketballSetupAccountScope(userId)
@@ -119,7 +123,11 @@ export default function GameSetup() {
     (initialBasketballRoute && isBasketballEventSetupIntent(state) ? 'sport_events' : 'legacy')
   )
   const [basketballDisplayFlipped, setBasketballDisplayFlipped] = useState(
-    matchingInitialBasketballDraft?.display.defaultCourtFlipped ?? false
+    matchingInitialBasketballDraft?.display.defaultCourtFlipped ??
+      basketballSettings.display.defaultCourtFlipped
+  )
+  const [basketballMatchOverrides, setBasketballMatchOverrides] = useState(
+    matchingInitialBasketballDraft?.event?.matchOverrides ?? {}
   )
   const [committedLocalGameId, setCommittedLocalGameId] = useState(
     matchingInitialBasketballDraft?.committedLocalGameId ??
@@ -173,6 +181,28 @@ export default function GameSetup() {
   const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [teamsError, setTeamsError] = useState<string | null>(null)
+  const basketballTeamSettings = useBasketballTeamSettings(
+    isBasketballSetup && basketballAuthority === 'sport_events' && teamMode === 'existing'
+      ? selectedTeamId || null
+      : null,
+    isBasketballSetup && basketballAuthority === 'sport_events' && teamMode === 'existing'
+  )
+
+  useEffect(() => {
+    if (!isBasketballSetup) return
+    setBasketballSettingsPageActive(true)
+    return () => setBasketballSettingsPageActive(false)
+  }, [isBasketballSetup, setBasketballSettingsPageActive])
+
+  useEffect(() => {
+    if (!isBasketballSetup || matchingInitialBasketballDraft || committedLocalGameId) return
+    setBasketballDisplayFlipped(basketballSettings.display.defaultCourtFlipped)
+  }, [
+    basketballSettings.display.defaultCourtFlipped,
+    committedLocalGameId,
+    isBasketballSetup,
+    matchingInitialBasketballDraft,
+  ])
 
   // Tournament state (cloud + existing-team flow only)
   const [tournaments, setTournaments] = useState<TournamentOption[]>([])
@@ -476,6 +506,7 @@ export default function GameSetup() {
     restoredBasketballDraftRef.current = true
     setBasketballAuthority(restored.authority)
     setBasketballDisplayFlipped(restored.display.defaultCourtFlipped)
+    setBasketballMatchOverrides(restored.event?.matchOverrides ?? {})
     setCommittedLocalGameId(restored.committedLocalGameId)
     setTeamName(restored.source.teamName)
     setOpponentName(restored.gameInfo.opponentName)
@@ -649,16 +680,34 @@ export default function GameSetup() {
       const existingMatchesSource = existingEvent?.settingsAuthority.kind === source.kind &&
         (source.kind !== 'team' || previous?.source.kind !== 'team' ||
           previous.source.teamId === source.teamId)
-      event = existingMatchesSource
-        ? structuredClone(existingEvent)
-        : createBasketballSetupDraftEvent({
-            authority: source.kind,
-            revision: null,
-            settings: source.kind === 'team'
-              ? DEFAULT_BASKETBALL_TEAM_SETTINGS
-              : DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
-            cloudIntent: source.kind === 'team' ? 'automatic' : 'local_only',
-          })
+      let authoritySnapshot: BasketballSetupAuthoritySnapshot | null = null
+      if (existingMatchesSource && existingEvent) {
+        authoritySnapshot = structuredClone(existingEvent.settingsAuthority)
+      } else if (source.kind === 'personal') {
+        authoritySnapshot = {
+          kind: 'personal',
+          revision: basketballSettingsSync.revision,
+          settings: structuredClone(basketballSettings),
+        }
+      } else if (
+        basketballTeamSettings.scopeTeamId === source.teamId &&
+        ['synced', 'cached', 'missing'].includes(basketballTeamSettings.status)
+      ) {
+        authoritySnapshot = {
+          kind: 'team',
+          revision: basketballTeamSettings.revision,
+          settings: structuredClone(basketballTeamSettings.settings),
+        }
+      }
+      if (!authoritySnapshot) return null
+      event = createBasketballSetupDraftEvent({
+        authority: authoritySnapshot.kind,
+        revision: authoritySnapshot.revision,
+        settings: authoritySnapshot.settings,
+        matchOverrides: basketballMatchOverrides,
+        cloudIntent: existingEvent?.cloudIntent ??
+          (source.kind === 'team' ? 'automatic' : 'local_only'),
+      })
       if (!event) return null
     }
 
@@ -687,6 +736,13 @@ export default function GameSetup() {
     accountScope,
     basketballAuthority,
     basketballDisplayFlipped,
+    basketballMatchOverrides,
+    basketballSettings,
+    basketballSettingsSync.revision,
+    basketballTeamSettings.revision,
+    basketballTeamSettings.scopeTeamId,
+    basketballTeamSettings.settings,
+    basketballTeamSettings.status,
     committedLocalGameId,
     date,
     existingTournamentUrlDraft,
@@ -743,7 +799,11 @@ export default function GameSetup() {
   const resolvedTeamName = teamMode === 'existing'
     ? selectedTeam?.name ?? ''
     : teamName.trim()
-  const canProceed = Boolean(resolvedTeamName && opponentName.trim())
+  const canProceed = Boolean(
+    resolvedTeamName &&
+    opponentName.trim() &&
+    (!isBasketballEventIntent || currentBasketballDraft?.event)
+  )
   const requestedTeamUnavailable = Boolean(
     requestedTeamId && !loadingTeams && !selectedTeam
   )
@@ -756,6 +816,7 @@ export default function GameSetup() {
   const updateBasketballEventIntent = (enabled: boolean): boolean => {
     if (isBasketballSetup) {
       setBasketballAuthority(enabled ? 'sport_events' : 'legacy')
+      if (enabled && !basketballDraftRef.current?.event) setBasketballMatchOverrides({})
       if (enabled) setSelectedNewTeamSeasonId('')
       setSetupError(null)
       return true
@@ -1336,21 +1397,50 @@ export default function GameSetup() {
           )}
 
           {showBasketballEventToggle && (
-            <label className="flex items-start justify-between gap-4 border-y border-amber-200 bg-amber-50 px-3 py-3">
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-amber-950">Event Model</span>
-                <span className="block text-xs text-amber-800">
-                  Internal Basketball event tracking preview
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={isBasketballEventIntent}
-                disabled={loadingTeams}
-                onChange={event => updateBasketballEventIntent(event.target.checked)}
-                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-600"
-              />
-            </label>
+            <section className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
+              <div>
+                <p className="text-sm font-semibold text-amber-950">Tracking authority</p>
+                <p className="text-xs text-amber-800">Event tracking remains an internal preview.</p>
+              </div>
+              <div className="grid grid-cols-2 rounded-md bg-amber-100 p-1" role="group" aria-label="Tracking authority">
+                <button
+                  type="button"
+                  onClick={() => updateBasketballEventIntent(false)}
+                  className={`rounded px-3 py-2 text-sm font-semibold ${
+                    !isBasketballEventIntent ? 'bg-white text-slate-900 shadow-sm' : 'text-amber-900'
+                  }`}
+                >
+                  Legacy
+                </button>
+                <button
+                  type="button"
+                  disabled={loadingTeams}
+                  onClick={() => updateBasketballEventIntent(true)}
+                  className={`rounded px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
+                    isBasketballEventIntent ? 'bg-white text-slate-900 shadow-sm' : 'text-amber-900'
+                  }`}
+                >
+                  Event
+                </button>
+              </div>
+              <p className="text-xs text-amber-900">
+                Initial court view: {basketballDisplayFlipped ? 'Flipped' : 'Standard'} · Personal display setting
+              </p>
+            </section>
+          )}
+
+          {isBasketballSetup && isBasketballEventIntent && currentBasketballDraft?.event && (
+            <BasketballSetupRulesReview
+              event={currentBasketballDraft.event}
+              onMatchOverridesChange={setBasketballMatchOverrides}
+            />
+          )}
+          {isBasketballSetup && isBasketballEventIntent && !currentBasketballDraft?.event && (
+            <p role="status" className="border-y border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+              {teamMode === 'existing'
+                ? basketballTeamSettings.error ?? 'Loading shared Basketball defaults...'
+                : 'Loading personal Basketball defaults...'}
+            </p>
           )}
 
           <div>

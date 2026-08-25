@@ -1,7 +1,7 @@
 # Plan: BKE-5C Basketball Setup Authority and Binding Policy
 
-Status: Delivery design approved from the parent BKE-5 Q&A. BKE-5C1 is implemented; BKE-5C2
-through BKE-5C4 remain. No new product decisions are required, and the phase remains behind the
+Status: Delivery design approved from the parent BKE-5 Q&A. BKE-5C1 and BKE-5C2 are implemented;
+BKE-5C3 through BKE-5C4 remain. No new product decisions are required, and the phase remains behind the
 internal Basketball event-creation gate.
 
 Parent: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md)
@@ -300,7 +300,7 @@ or keep tracking offline, but a bound cloud game does not silently become a dive
 Exit: opening, editing, reloading, or cancelling Basketball setup cannot alter active/parked state;
 one validated Continue creates exactly one new local game.
 
-### BKE-5C2: Rules authority and snapshot freeze
+### BKE-5C2: Rules authority and snapshot freeze (implemented)
 
 - personal/team settings source loading and exact source badges
 - Event/Legacy segmented choice and resolved match-only editor

@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { acceptedTeamRole, canCorrectStats } from '../lib/teamPermissions'
+import { basketballCourtOrientationForState } from '../lib/basketball/courtGeometry'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
 type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
@@ -830,6 +831,7 @@ export default function GameSummary() {
             shotViewSelection={shotViewSelection}
             onShotViewSelectionChange={setShotViewSelection}
             activeBgClass={sport?.theme.bg ?? 'bg-orange-500'}
+            flipped={basketballCourtOrientationForState(state) === 'flipped'}
           />
         )}
 

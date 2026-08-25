@@ -174,6 +174,8 @@ export interface GameState {
   eventStream: GameEventStream | null
   /** Sport-owned immutable setup plus rebuildable runtime projection. */
   sportGameState: SportGameState | null
+  /** Local-only Basketball presentation; event games mirror this into capture preferences. */
+  basketballCourtOrientation?: 'standard' | 'flipped'
 }
 
 export type CloudSyncStatus =

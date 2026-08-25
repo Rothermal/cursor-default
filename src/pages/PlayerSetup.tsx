@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
+import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
 import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 import { sportDashboardPath } from '../lib/sportNavigation'
@@ -10,6 +11,21 @@ import {
   isBasketballEventSetupIntent,
   prepareBasketballGameStart,
 } from '../lib/basketball'
+import {
+  basketballSetupAccountScope,
+  basketballSetupEventMatchesAuthority,
+  basketballSetupRuleDifferences,
+  clearBasketballSetupDraft,
+  loadBasketballSetupDraft,
+  refreshBasketballSetupDraftEvent,
+  saveBasketballSetupDraft,
+  type BasketballSetupAuthoritySnapshot,
+  type BasketballSetupDraftV1,
+} from '../lib/basketball/setupDraft'
+import { loadLatestBasketballSetupAuthority } from '../lib/basketball/setupAuthority'
+import { basketballRuleFieldLabel } from '../lib/basketball/profileDiffPresentation'
+import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
+import type { BasketballRulesV2Field } from '../lib/basketball/types'
 
 function generateLocalId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -29,8 +45,9 @@ function splitName(value: string): { firstName: string; lastName: string } {
 
 export default function PlayerSetup() {
   const navigate = useNavigate()
-  const { state, dispatch } = useGame()
+  const { state, dispatch, activeLocalGameId } = useGame()
   const { user, isConfigured } = useAuth()
+  const { basketballSettings, basketballSettingsSync } = useSettings()
   const sport = state.sport
   const cloudTeamId = state.cloudSync.teamId
   const isCloudRoster = Boolean(cloudTeamId && isConfigured && user && supabase)
@@ -45,6 +62,16 @@ export default function PlayerSetup() {
   const [rosterLoading, setRosterLoading] = useState(Boolean(cloudTeamId && state.players.length === 0))
   const [rosterError, setRosterError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const accountScope = basketballSetupAccountScope(user?.id ?? null)
+  const [basketballSetupDraft, setBasketballSetupDraft] = useState<BasketballSetupDraftV1 | null>(
+    () => loadBasketballSetupDraft(accountScope)
+  )
+  const [staleAuthority, setStaleAuthority] = useState<{
+    latest: BasketballSetupAuthoritySnapshot
+    differences: BasketballRulesV2Field[]
+  } | null>(null)
+  const [rulesNotice, setRulesNotice] = useState<string | null>(null)
   const cloudRosterLoadedRef = useRef(false)
   /** Latest roster for merging when a cloud fetch completes (effect deps omit `players` on purpose). */
   const playersRef = useRef(state.players)
@@ -56,6 +83,12 @@ export default function PlayerSetup() {
   useEffect(() => {
     if (hasStartedBasketballEventGame(state)) navigate('/game', { replace: true })
   }, [navigate, state])
+
+  useEffect(() => {
+    setBasketballSetupDraft(loadBasketballSetupDraft(accountScope))
+    setStaleAuthority(null)
+    setRulesNotice(null)
+  }, [accountScope])
 
   useEffect(() => {
     if (!sport?.teamCategories?.length || !state.gameInfo) return
@@ -275,18 +308,74 @@ export default function PlayerSetup() {
     return null
   }
 
-  const handleStart = () => {
+  const startBasketballEventGame = (draft: BasketballSetupDraftV1) => {
+    if (!draft.event) return
+    const result = prepareBasketballGameStart(state, {
+      recorderUserId: user?.id ?? null,
+      reviewedSetup: {
+        rulesSnapshot: draft.event.reviewedRules,
+        rulesSource: draft.event.reviewedRulesSource,
+        sourceTeamId: draft.source.kind === 'team' ? draft.source.teamId : null,
+        sourceSeasonId: draft.source.kind === 'team' ? draft.source.seasonId : null,
+        courtOrientation: draft.display.defaultCourtFlipped ? 'flipped' : 'standard',
+      },
+    })
+    if (!result.ok) {
+      setRosterError(result.message)
+      return
+    }
+    clearBasketballSetupDraft(accountScope)
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+    navigate('/game')
+  }
+
+  const handleStart = async () => {
     if (!canStart) return
     if (isBasketballEventIntent) {
-      const result = prepareBasketballGameStart(state, {
-        recorderUserId: user?.id ?? null,
-      })
-      if (!result.ok) {
-        setRosterError(result.message)
+      const draft = basketballSetupDraft
+      if (
+        !draft?.event ||
+        draft.authority !== 'sport_events' ||
+        draft.committedLocalGameId !== activeLocalGameId
+      ) {
+        setRosterError('The reviewed Basketball setup is missing or belongs to another game.')
         return
       }
-      dispatch({ type: 'HYDRATE_STATE', state: result.state })
-      navigate('/game')
+      setStarting(true)
+      setRosterError(null)
+      setRulesNotice(null)
+      const latest = await loadLatestBasketballSetupAuthority({
+        source: draft.source,
+        personalSettings: basketballSettings,
+        personalRevision: basketballSettingsSync.revision,
+        cloudEnabled: Boolean(
+          isConfigured &&
+          user &&
+          supabase &&
+          typeof navigator !== 'undefined' &&
+          navigator.onLine
+        ),
+      })
+      setStarting(false)
+      if (!latest.ok) {
+        setRosterError(latest.error)
+        return
+      }
+      if (!basketballSetupEventMatchesAuthority(draft.event, latest.authority)) {
+        const refreshed = refreshBasketballSetupDraftEvent(draft.event, latest.authority)
+        setStaleAuthority({
+          latest: latest.authority,
+          differences: refreshed.ok
+            ? basketballSetupRuleDifferences(
+                draft.event.reviewedRules,
+                refreshed.event.reviewedRules
+              )
+            : [],
+        })
+        setRosterError(refreshed.ok ? null : refreshed.error)
+        return
+      }
+      startBasketballEventGame(draft)
       return
     }
     if (!state.activePlayerId && state.players.length > 0) {
@@ -297,6 +386,32 @@ export default function PlayerSetup() {
     } else {
       navigate('/game')
     }
+  }
+
+  const refreshReviewedDefaults = () => {
+    if (!basketballSetupDraft?.event || !staleAuthority) return
+    const refreshed = refreshBasketballSetupDraftEvent(
+      basketballSetupDraft.event,
+      staleAuthority.latest
+    )
+    if (!refreshed.ok) {
+      setRosterError(refreshed.error)
+      return
+    }
+    const next: BasketballSetupDraftV1 = {
+      ...basketballSetupDraft,
+      updatedAt: new Date().toISOString(),
+      event: refreshed.event,
+    }
+    const saved = saveBasketballSetupDraft(next)
+    if (!saved.ok) {
+      setRosterError(saved.error)
+      return
+    }
+    setBasketballSetupDraft(next)
+    setStaleAuthority(null)
+    setRosterError(null)
+    setRulesNotice('Defaults refreshed. Review the rules below, then start the game again.')
   }
 
   return (
@@ -321,6 +436,41 @@ export default function PlayerSetup() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full">
         <h2 className="text-lg font-semibold text-slate-700 mb-4">Add Players</h2>
+
+        {isBasketballEventIntent && basketballSetupDraft?.event && (
+          <div className="mb-5">
+            <BasketballSetupRulesReview event={basketballSetupDraft.event} readOnly />
+          </div>
+        )}
+        {rulesNotice && (
+          <p role="status" className="mb-4 border-y border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            {rulesNotice}
+          </p>
+        )}
+        {staleAuthority && basketballSetupDraft?.event && (
+          <section className="mb-5 space-y-3 border-y border-amber-300 bg-amber-50 px-3 py-3">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-950">Basketball defaults changed</h3>
+              <p className="mt-1 text-xs text-amber-800">
+                {staleAuthority.differences.length > 0
+                  ? `Changed fields: ${staleAuthority.differences.map(basketballRuleFieldLabel).join(', ')}.`
+                  : 'The source revision changed, but the effective game rules are unchanged.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className="btn-secondary" onClick={refreshReviewedDefaults}>
+                Refresh Defaults
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => startBasketballEventGame(basketballSetupDraft)}
+              >
+                Keep Reviewed Draft
+              </button>
+            </div>
+          </section>
+        )}
 
         {isCloudRoster && (
           <div className="card mb-3 bg-blue-50 border-blue-200 text-blue-800 text-xs">
@@ -398,9 +548,14 @@ export default function PlayerSetup() {
         )}
 
         <div className="mt-6 space-y-3">
+          {starting && (
+            <p role="status" className="text-center text-sm font-semibold text-slate-600">
+              Checking the latest Basketball rules...
+            </p>
+          )}
           <button
-            onClick={handleStart}
-            disabled={!canStart || rosterLoading || saving}
+            onClick={() => { void handleStart() }}
+            disabled={!canStart || rosterLoading || saving || starting}
             className="btn-primary w-full"
           >
             Start Game ({displayedPlayers.length} player{displayedPlayers.length !== 1 ? 's' : ''}) →

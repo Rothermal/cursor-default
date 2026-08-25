@@ -4,11 +4,14 @@ import {
   basketballSetupAccountScope,
   basketballSetupDraftHasMeaningfulEdits,
   basketballSetupDraftMatchesRoute,
+  basketballSetupEventMatchesAuthority,
+  basketballSetupRuleDifferences,
   buildBasketballSetupGameState,
   createBasketballSetupDraft,
   createBasketballSetupDraftEvent,
   loadBasketballSetupDraft,
   parseBasketballSetupDraft,
+  refreshBasketballSetupDraftEvent,
   saveBasketballSetupDraft,
 } from './setupDraft'
 import {
@@ -101,6 +104,7 @@ describe('Basketball setup draft', () => {
     })
     draft.gameInfo.opponentName = 'Tigers'
     draft.legacyTeamStatsConfig = { periods: 4 }
+    draft.display.defaultCourtFlipped = true
 
     const built = buildBasketballSetupGameState({
       draft,
@@ -117,6 +121,7 @@ describe('Basketball setup draft', () => {
       cloudSync: { teamId: 'team-1', seasonId: 'season-1' },
       teamStatsConfig: { periods: 4 },
       players: [],
+      basketballCourtOrientation: 'flipped',
     })
   })
 
@@ -144,5 +149,74 @@ describe('Basketball setup draft', () => {
       personalRevision: null,
       teamRevision: 4,
     })
+  })
+
+  it('detects stale source settings and refreshes compatible match overrides exactly', () => {
+    const reviewed = createBasketballSetupDraftEvent({
+      authority: 'personal',
+      revision: 3,
+      settings: DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
+      matchOverrides: { personalFoulLimit: 7 },
+      cloudIntent: 'local_only',
+    })!
+    const latest = {
+      kind: 'personal' as const,
+      revision: 4,
+      settings: {
+        ...structuredClone(DEFAULT_BASKETBALL_PERSONAL_SETTINGS),
+        ruleOverrides: { personalFoulLimit: 6 },
+      },
+    }
+
+    expect(basketballSetupEventMatchesAuthority(reviewed, latest)).toBe(false)
+    const refreshed = refreshBasketballSetupDraftEvent(reviewed, latest)
+    expect(refreshed.ok).toBe(true)
+    if (!refreshed.ok) return
+    expect(refreshed.event.settingsAuthority.revision).toBe(4)
+    expect(refreshed.event.reviewedRules.personalFoulLimit).toBe(7)
+    expect(refreshed.event.reviewedRulesSource).toEqual({
+      profileId: 'nfhs',
+      profileVersion: 1,
+      personalRevision: 4,
+      teamRevision: null,
+      hasExplicitMatchOverrides: true,
+    })
+    expect(basketballSetupRuleDifferences(reviewed.reviewedRules, refreshed.event.reviewedRules))
+      .toEqual([])
+  })
+
+  it('keeps team authority isolated from personal settings during refresh', () => {
+    const reviewed = createBasketballSetupDraftEvent({
+      authority: 'team',
+      revision: 2,
+      settings: DEFAULT_BASKETBALL_TEAM_SETTINGS,
+      cloudIntent: 'automatic',
+    })!
+    const personal = {
+      kind: 'personal' as const,
+      revision: 8,
+      settings: DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
+    }
+
+    expect(refreshBasketballSetupDraftEvent(reviewed, personal)).toEqual({
+      ok: false,
+      error: 'Basketball rules authority no longer matches this setup.',
+    })
+  })
+
+  it('marks authoritative personal customization as Custom without a match override', () => {
+    const event = createBasketballSetupDraftEvent({
+      authority: 'personal',
+      revision: 6,
+      settings: {
+        ...structuredClone(DEFAULT_BASKETBALL_PERSONAL_SETTINGS),
+        ruleOverrides: { personalFoulLimit: 6 },
+      },
+      cloudIntent: 'local_only',
+    })
+
+    expect(event?.matchOverrides).toEqual({})
+    expect(event?.reviewedRulesSource.hasExplicitMatchOverrides).toBe(true)
+    expect(event?.reviewedRules.personalFoulLimit).toBe(6)
   })
 })

@@ -30,6 +30,8 @@ import { createBasketballUuid } from './id'
 import {
   createBasketballMatchRules,
   DEFAULT_BASKETBALL_RULES_SOURCE,
+  normalizeBasketballMatchRules,
+  normalizeBasketballRulesSource,
   resolveBasketballPeriodSegment,
 } from './rules'
 import {
@@ -39,11 +41,13 @@ import {
 import { createBasketballStatEvent } from './statEvents'
 import type {
   BasketballMatchParticipant,
+  BasketballMatchRulesV2,
   BasketballMatchEvent,
   BasketballMatchSetup,
   BasketballMatchSegment,
   BasketballSportGameState,
   BasketballTeamSide,
+  BasketballRulesSource,
 } from './types'
 
 export type BasketballCommandErrorCode =
@@ -83,6 +87,15 @@ export interface BasketballStartOptions {
   occurredAt?: string
   eventId?: string
   participantIds?: string[]
+  reviewedSetup?: BasketballReviewedStartSetup
+}
+
+export interface BasketballReviewedStartSetup {
+  rulesSnapshot: BasketballMatchRulesV2
+  rulesSource: BasketballRulesSource
+  sourceTeamId: string | null
+  sourceSeasonId: string | null
+  courtOrientation: 'standard' | 'flipped'
 }
 
 export interface BasketballLateParticipantOptions {
@@ -249,14 +262,23 @@ export function prepareBasketballGameStart(
     return failure(state, 'already_initialized', 'This Basketball event game has already started.')
   }
 
-  const setupResult = buildBasketballMatchSetup(state, options.participantIds)
+  const setupResult = buildBasketballMatchSetup(
+    state,
+    options.participantIds,
+    options.reviewedSetup
+  )
   if (!setupResult.ok) return { ...setupResult, state }
 
   let configuredState: GameState
   try {
+    const sportGameState = createBasketballSportGameState(setupResult.value)
+    const courtOrientation = options.reviewedSetup?.courtOrientation ??
+      state.basketballCourtOrientation ?? 'standard'
+    sportGameState.capturePreferences.courtOrientation = courtOrientation
     configuredState = {
       ...state,
-      sportGameState: createBasketballSportGameState(setupResult.value),
+      basketballCourtOrientation: courtOrientation,
+      sportGameState,
     }
   } catch (error) {
     return failure(
@@ -313,7 +335,8 @@ export function prepareBasketballGameStart(
 
 export function buildBasketballMatchSetup(
   state: GameState,
-  participantIds?: string[]
+  participantIds?: string[],
+  reviewedSetup?: BasketballReviewedStartSetup
 ): BasketballCommandResult<BasketballMatchSetup> {
   if (state.sport?.id !== 'basketball' || !state.gameInfo) {
     return commandFailure('setup_incomplete', 'Complete Basketball game setup before starting.')
@@ -327,11 +350,19 @@ export function buildBasketballMatchSetup(
     return commandFailure('invalid_setup', 'Participant ids must match the confirmed roster.')
   }
 
-  const resolvedRules = resolveTeamStatsConfig(state.sport, state.teamStatsConfig)
-  if (!resolvedRules) {
+  const resolvedRules = reviewedSetup
+    ? null
+    : resolveTeamStatsConfig(state.sport, state.teamStatsConfig)
+  if (!reviewedSetup && !resolvedRules) {
     return commandFailure('invalid_setup', 'Basketball team-stat rules are unavailable.')
   }
-  if (state.cloudSync.teamId && !state.cloudSync.seasonId) {
+  const sourceTeamId = reviewedSetup
+    ? reviewedSetup.sourceTeamId
+    : state.cloudSync.teamId
+  const sourceSeasonId = reviewedSetup
+    ? reviewedSetup.sourceSeasonId
+    : state.cloudSync.teamId ? state.cloudSync.seasonId : null
+  if (sourceTeamId && !sourceSeasonId) {
     return commandFailure('invalid_setup', 'Cloud team Basketball games require a source season.')
   }
   const participants: BasketballMatchParticipant[] = roster.map((player, index) => ({
@@ -349,10 +380,14 @@ export function buildBasketballMatchSetup(
     setup = {
       version: 1,
       trackedTeamDesignation: 'home',
-      sourceTeamId: state.cloudSync.teamId,
-      sourceSeasonId: state.cloudSync.teamId ? state.cloudSync.seasonId : null,
-      rulesSource: structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE),
-      rulesSnapshot: createBasketballMatchRules(resolvedRules),
+      sourceTeamId,
+      sourceSeasonId: sourceTeamId ? sourceSeasonId : null,
+      rulesSource: reviewedSetup
+        ? normalizeBasketballRulesSource(reviewedSetup.rulesSource)!
+        : structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE),
+      rulesSnapshot: reviewedSetup
+        ? normalizeBasketballMatchRules(reviewedSetup.rulesSnapshot)!
+        : createBasketballMatchRules(resolvedRules!),
       participants,
     }
   } catch (error) {
@@ -365,6 +400,32 @@ export function buildBasketballMatchSetup(
   return setupError
     ? commandFailure('invalid_setup', setupError)
     : { ok: true, value: setup }
+}
+
+export function setBasketballCourtOrientation(
+  state: GameState,
+  orientation: 'standard' | 'flipped'
+): BasketballStateCommandResult {
+  if (state.sport?.id !== 'basketball') {
+    return failure(state, 'wrong_sport', 'Basketball game information is unavailable.')
+  }
+  if (state.sportGameState?.sportId !== 'basketball') {
+    return { ok: true, state: { ...state, basketballCourtOrientation: orientation } }
+  }
+  return {
+    ok: true,
+    state: {
+      ...state,
+      basketballCourtOrientation: orientation,
+      sportGameState: {
+        ...state.sportGameState,
+        capturePreferences: {
+          ...state.sportGameState.capturePreferences,
+          courtOrientation: orientation,
+        },
+      },
+    },
+  }
 }
 
 export function getBasketballCommandContext(

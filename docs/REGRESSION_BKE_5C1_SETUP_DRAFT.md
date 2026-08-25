@@ -1,7 +1,7 @@
 # BKE-5C1 Basketball Setup Draft Regression
 
 Status: implementation complete. No Supabase migration is required. Basketball event creation
-remains behind the internal gate; BKE-5C2 through BKE-5C4 remain before release work.
+remains behind the internal gate; BKE-5C2 is implemented and BKE-5C3 through BKE-5C4 remain.
 
 ## Scope
 
@@ -23,7 +23,8 @@ remains behind the internal gate; BKE-5C2 through BKE-5C4 remain before release 
 reload parsing stays strict. C1 seeds that hidden review from current application defaults only.
 BKE-5C2 replaces that seed with authoritative personal/team revisions, visible rules review,
 match overrides, stale-revision Refresh/Keep, complete `rulesSource`, and display-default
-consumption before event-stream initialization.
+consumption before event-stream initialization. See
+[`REGRESSION_BKE_5C2_RULES_FREEZE.md`](REGRESSION_BKE_5C2_RULES_FREEZE.md).
 
 ## Automated Evidence
 
@@ -59,7 +60,8 @@ After deployment:
 
 ## Deferred
 
-- authoritative settings hierarchy, rule/source freeze, stale revisions, and court default: BKE-5C2
+- authoritative settings hierarchy, rule/source freeze, stale revisions, and court default:
+  implemented in BKE-5C2
 - capability recovery and durable Event local-only transport policy: BKE-5C3
 - guarded Enable Cloud Sync plus BKE-5C exit hardening: BKE-5C4
 - production event-model opt-in and combined live evidence: BKE-5D
