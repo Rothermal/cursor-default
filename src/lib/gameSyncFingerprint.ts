@@ -3,6 +3,7 @@ import { canonicalGameEventStreamForFingerprint } from './gameEvents/stream'
 import { sportSupportsLegacyAggregateCloudSync } from './sportGameState/capabilities'
 import { sportGameStateForFingerprint } from './sportGameState/state'
 import { SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
+import { isBasketballEventLocalOnly } from './basketball/eventCloudPolicy'
 
 /**
  * Canonical snapshot of game fields that are uploaded on cloud sync (excludes sync metadata).
@@ -72,7 +73,9 @@ export type CloudSyncRoute = 'aggregate' | 'soccer_events' | 'basketball_events'
 /** Exhaustive transport selection keeps event games out of legacy aggregate tables. */
 export function cloudSyncRouteForState(state: GameState): CloudSyncRoute {
   if (isSoccerEventCloudSyncEligible(state)) return 'soccer_events'
-  if (isBasketballEventCloudSyncEligible(state)) return 'basketball_events'
+  if (isBasketballEventCloudSyncEligible(state)) {
+    return isBasketballEventLocalOnly(state) ? 'unsupported' : 'basketball_events'
+  }
   if (isAggregateCloudSyncEligible(state)) return 'aggregate'
   return 'unsupported'
 }

@@ -28,6 +28,7 @@ import {
   normalizeBasketballSportGameState,
 } from './state'
 import type { BasketballSportGameState } from './types'
+import { isBasketballEventLocalOnly } from './eventCloudPolicy'
 
 export interface BasketballCloudGameRow {
   id: string
@@ -166,6 +167,9 @@ export const basketballEventCloudTransportAdapter: EventCloudTransportAdapter = 
 export function syncBasketballEventGameToCloud(
   input: SyncBasketballEventGameInput
 ): Promise<SyncBasketballEventGameResult> {
+  if (isBasketballEventLocalOnly(input.state)) {
+    return Promise.reject(new Error('This Basketball game is configured for local-only tracking.'))
+  }
   return syncEventGameToCloud({ ...input, adapter: basketballEventCloudTransportAdapter })
 }
 

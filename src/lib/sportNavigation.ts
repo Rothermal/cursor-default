@@ -68,8 +68,11 @@ export function routeForResumedGame(state: ResumableGameState): string {
 
 export function parkedSyncLabel(game: Pick<
   ParkedGameSummary,
-  'syncDirty' | 'syncStatus' | 'syncLastError'
+  'syncDirty' | 'syncStatus' | 'syncLastError' | 'eventCloudPolicy'
 >): string {
+  if (game.eventCloudPolicy === 'local_only' && game.syncStatus !== 'error') {
+    return 'Cloud Sync: local only'
+  }
   if (game.syncDirty) {
     if (game.syncStatus === 'error') {
       return game.syncLastError ? `Sync: error - ${game.syncLastError}` : 'Sync: error'

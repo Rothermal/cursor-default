@@ -121,10 +121,29 @@ describe('gameSyncFingerprint', () => {
     expect(isEventCloudSyncEligible(eventState)).toBe(true)
     expect(isAggregateCloudSyncEligible(eventState)).toBe(false)
     expect(cloudSyncRouteForState(eventState)).toBe('basketball_events')
+    expect(cloudSyncRouteForState({
+      ...eventState,
+      cloudSync: { ...eventState.cloudSync, eventCloudPolicy: 'local_only' },
+    })).toBe('unsupported')
 
     expect(cloudSyncRouteForState({ ...eventState, eventStream: null })).toBe('unsupported')
     expect(cloudSyncRouteForState({ ...eventState, sportGameState: null })).toBe('unsupported')
     expect(cloudSyncRouteForState({ ...eventState, gameDataAuthority: null })).toBe('unsupported')
+  })
+
+  it('keeps Basketball event cloud policy outside the gameplay fingerprint', () => {
+    const eventState = baseState({
+      gameDataAuthority: 'sport_events',
+      eventStream: { version: 1, events: [] },
+      sportGameState: { sportId: 'basketball' } as GameState['sportGameState'],
+    })
+    expect(buildGameSyncFingerprint({
+      ...eventState,
+      cloudSync: { ...eventState.cloudSync, eventCloudPolicy: 'automatic' },
+    })).toBe(buildGameSyncFingerprint({
+      ...eventState,
+      cloudSync: { ...eventState.cloudSync, eventCloudPolicy: 'local_only' },
+    }))
   })
 
   it('keeps ordinary Basketball snapshots on the aggregate route', () => {

@@ -1,7 +1,7 @@
 # Plan: BKE-5C Basketball Setup Authority and Binding Policy
 
-Status: Delivery design approved from the parent BKE-5 Q&A. BKE-5C1 and BKE-5C2 are implemented;
-BKE-5C3 through BKE-5C4 remain. No new product decisions are required, and the phase remains behind the
+Status: Delivery design approved from the parent BKE-5 Q&A. BKE-5C1 through BKE-5C3 are implemented;
+BKE-5C4 remains. No new product decisions are required, and the phase remains behind the
 internal Basketball event-creation gate.
 
 Parent: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md)
@@ -316,7 +316,7 @@ started Event stream contains the exact reviewed immutable rules and source snap
 start with the reviewed personal court orientation without turning display state into rules
 authority.
 
-### BKE-5C3: Capability fallback and local-only policy
+### BKE-5C3: Capability fallback and local-only policy (implemented)
 
 - authority-aware preflight after choice and before confirmation
 - Retry/Legacy/Event local-only/Cancel recovery matrix

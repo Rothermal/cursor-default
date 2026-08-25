@@ -205,6 +205,11 @@ export interface PendingGameEventConflictResolution {
 }
 
 export interface CloudSyncState {
+  /**
+   * Basketball Event transport policy. Missing on pre-BKE-5C games means automatic
+   * for compatibility; Legacy and other sports do not consume this field.
+   */
+  eventCloudPolicy?: 'automatic' | 'local_only'
   seasonId: string | null
   teamId: string | null
   gameId: string | null

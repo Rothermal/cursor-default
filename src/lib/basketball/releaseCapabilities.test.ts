@@ -111,38 +111,24 @@ describe('loadBasketballReleaseCapabilities', () => {
 })
 
 describe('requiresBasketballEventCloudPreflight', () => {
-  it('gates signed-in Personal and existing-team event cloud creation', () => {
+  it('gates only automatic Event cloud creation', () => {
     expect(requiresBasketballEventCloudPreflight({
       eventIntent: true,
-      cloudAvailable: true,
-      teamMode: 'existing',
-      selectedTeamId: 'team-1',
-    })).toBe(true)
-    expect(requiresBasketballEventCloudPreflight({
-      eventIntent: true,
-      cloudAvailable: true,
-      teamMode: 'new',
-      selectedTeamId: '',
+      cloudIntent: 'automatic',
     })).toBe(true)
 
     for (const input of [
       {
         eventIntent: false,
-        cloudAvailable: true,
-        teamMode: 'existing' as const,
-        selectedTeamId: 'team-1',
+        cloudIntent: 'automatic' as const,
       },
       {
         eventIntent: true,
-        cloudAvailable: false,
-        teamMode: 'existing' as const,
-        selectedTeamId: 'team-1',
+        cloudIntent: 'local_only' as const,
       },
       {
         eventIntent: true,
-        cloudAvailable: true,
-        teamMode: 'existing' as const,
-        selectedTeamId: '',
+        cloudIntent: null,
       },
     ]) {
       expect(requiresBasketballEventCloudPreflight(input)).toBe(false)

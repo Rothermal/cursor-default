@@ -1,7 +1,7 @@
 # BKE-5C2 Basketball Rules Authority and Freeze Regression
 
 Status: implementation complete. No Supabase migration is required. Basketball event creation
-remains behind the internal gate; BKE-5C3, BKE-5C4, and BKE-5D remain before release.
+remains behind the internal gate; BKE-5C3 is implemented, while BKE-5C4 and BKE-5D remain before release.
 
 ## Scope
 
@@ -69,6 +69,6 @@ unchanged parking transactions, and source ordering that checks freshness before
 ## Deferred
 
 - capability recovery choices and durable Event local-only sync policy, including offline team
-  starts: BKE-5C3
+  starts: delivered in BKE-5C3
 - guarded Enable Cloud Sync and the combined BKE-5C exit audit: BKE-5C4
 - production event-model opt-in and accepted live evidence: BKE-5D

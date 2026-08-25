@@ -134,4 +134,22 @@ describe('mergeCloudSyncState', () => {
     expect(next.teamId).toBe('team-a')
     expect(next.status).toBe('error')
   })
+
+  it('does not clear durable event cloud policy from an ordinary metadata patch', () => {
+    const next = mergeCloudSyncState(base({ eventCloudPolicy: 'local_only' }), {
+      status: 'idle',
+      eventCloudPolicy: undefined,
+    })
+
+    expect(next.eventCloudPolicy).toBe('local_only')
+  })
+
+  it('does not materialize an undefined policy on a pre-C3 metadata patch', () => {
+    const next = mergeCloudSyncState(base(), {
+      status: 'synced',
+      lastSyncedAt: '2026-08-25T00:00:00.000Z',
+    })
+
+    expect(next).not.toHaveProperty('eventCloudPolicy')
+  })
 })

@@ -151,6 +151,78 @@ describe('Basketball setup draft', () => {
     })
   })
 
+  it('separates a team source from local-only cloud binding metadata', () => {
+    const draft = createBasketballSetupDraft({
+      accountScope: 'user:user-1',
+      source: {
+        kind: 'team',
+        teamId: 'team-1',
+        seasonId: 'season-1',
+        teamName: 'Falcons',
+        seasonName: 'Fall',
+        accessRole: 'scorer',
+      },
+    })
+    draft.authority = 'sport_events'
+    draft.gameInfo.opponentName = 'Tigers'
+    draft.event = createBasketballSetupDraftEvent({
+      authority: 'team',
+      revision: 4,
+      settings: DEFAULT_BASKETBALL_TEAM_SETTINGS,
+      cloudIntent: 'local_only',
+    })
+
+    const built = buildBasketballSetupGameState({
+      draft,
+      sport: basketball,
+      cloudStatus: 'idle',
+    })
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    expect(built.state.cloudSync).toMatchObject({
+      eventCloudPolicy: 'local_only',
+      teamId: null,
+      seasonId: null,
+      gameId: null,
+    })
+    expect(draft.source).toMatchObject({ teamId: 'team-1', seasonId: 'season-1' })
+  })
+
+  it('keeps team binding metadata for automatic Event cloud setup', () => {
+    const draft = createBasketballSetupDraft({
+      accountScope: 'user:user-1',
+      source: {
+        kind: 'team',
+        teamId: 'team-1',
+        seasonId: 'season-1',
+        teamName: 'Falcons',
+        seasonName: 'Fall',
+        accessRole: 'owner',
+      },
+    })
+    draft.authority = 'sport_events'
+    draft.gameInfo.opponentName = 'Tigers'
+    draft.event = createBasketballSetupDraftEvent({
+      authority: 'team',
+      revision: 4,
+      settings: DEFAULT_BASKETBALL_TEAM_SETTINGS,
+      cloudIntent: 'automatic',
+    })
+
+    const built = buildBasketballSetupGameState({
+      draft,
+      sport: basketball,
+      cloudStatus: 'idle',
+    })
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    expect(built.state.cloudSync).toMatchObject({
+      eventCloudPolicy: 'automatic',
+      teamId: 'team-1',
+      seasonId: 'season-1',
+    })
+  })
+
   it('detects stale source settings and refreshes compatible match overrides exactly', () => {
     const reviewed = createBasketballSetupDraftEvent({
       authority: 'personal',
