@@ -51,4 +51,5 @@ Coverage verifies:
 
 None for BKE-4E1. The slice exposes no runtime UI or network path. BKE-4E3 and BKE-4E4 own route
 validation after BKE-4E2 supplies authenticated source pages. The combined live Supabase and
-multi-device evidence remains a BKE-4E5 release gate before BKE-5 exposes event-game creation.
+multi-device evidence remains mandatory before Event access broadens beyond the initial owner-only
+opt-in permitted by `PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2.

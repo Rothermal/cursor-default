@@ -38,7 +38,8 @@ The BKE-5D Q&A approved the recommended option for all sixteen decisions:
 7. keep the preference device-local and independent of account identity;
 8. retain signed-out, offline, and capability-failure Event local-only creation;
 9. preserve full existing Event-game access when release or preference is off;
-10. preserve an Event setup draft but block Event commit until re-enabled or deliberately changed;
+10. preserve an uncommitted Event setup draft but block new Event-game commit until re-enabled or
+    deliberately changed;
 11. keep unavailable direct setup links usable for Legacy without mutating active/parked state;
 12. treat malformed stored preference values as disabled;
 13. use one source-controlled `internal | opt_in` policy instead of a remote flag service;
@@ -63,12 +64,16 @@ they remain mandatory before the rollout broadens.
 - Release policy and preference gate only **new Event-game creation**.
 - Existing local, parked, imported, recovery, and cloud Event records remain reachable regardless
   of release policy or preference.
+- A committed pre-start Event record (`sport_events` authority with no initialized event stream) is
+  an existing local game. Its matching Game Setup update, Player Setup review, and Start command
+  remain available when release policy or preference later turns off.
 - Sync, conflict recovery, Summary, Game Info, Timeline correction, finalization, reopen, canonical
   publication, and aggregate review never consult the creation gate.
 - Turning the preference off or rolling policy back cannot rewrite a setup draft or game, clear a
   binding, stop an existing queue entry, or convert Event authority to Legacy.
-- An Event draft may remain stored while unavailable, but commit must fail before local game
-  creation or active/parked replacement.
+- An uncommitted Event draft may remain stored while unavailable, but a new Event commit must fail
+  before local game creation or active/parked replacement. Updating the exact matching committed
+  pre-start local record is existing-game continuation, not new creation.
 - Local-only Event creation stays available when the user deliberately opts in but is signed out,
   offline, Supabase-unconfigured, or unable to complete cloud capability preflight.
 - Event and Legacy paths never dual-write.
@@ -78,7 +83,8 @@ they remain mandatory before the rollout broadens.
 
 ### 4.1 Stages
 
-`src/lib/sportAvailability.ts` owns a Basketball Event stage with exactly two values:
+`src/lib/sportAvailability.ts` owns a distinct `BasketballEventReleaseStage` with exactly two
+values:
 
 - `internal`: development preview may create Event games when the device preference is on;
   production cannot create them.
@@ -96,6 +102,12 @@ callers need to distinguish:
 
 Tests must inject development and release-stage inputs rather than depend on the test runner's
 environment.
+
+This type is separate from the existing Soccer-oriented
+`SportReleaseStage = 'unreleased' | 'preview' | 'released'`. Do not add Basketball Event rollout to
+`SportAvailabilityPolicy` or reuse Soccer's vocabulary. Add a separate pure export such as
+`getBasketballEventCreationPolicy`; keep `getSportAvailabilityPolicy` focused on whole-sport
+discovery and new-game availability.
 
 ### 4.2 Expected matrix
 
@@ -116,9 +128,10 @@ existing navigation contract.
 
 ## 5. Device Preference
 
-Add one exact boolean to the local `statkeeper_settings` contract. Use a Basketball-specific nested
-field rather than overloading `enabledSports.basketball` or the Supabase-backed personal settings.
-The final field name should clearly represent Event preview creation, for example:
+Add one exact boolean to the local `statkeeper_settings` contract. Use a new Basketball-specific
+nested field rather than overloading `enabledSports.basketball`, the legacy `courtCapture` seed, or
+the Supabase-backed personal settings. The final field name should clearly represent Event preview
+creation, for example:
 
 ```ts
 basketball: {
@@ -134,10 +147,15 @@ Requirements:
 - merge old settings without losing `enabledSports`, court capture, or future-sport values;
 - no migration into `user_sport_settings`;
 - no automatic enablement based on an existing Event game or setup draft;
-- disabling affects only later Event commits.
+- disabling blocks only commits that would create a new Event local slot.
 
 `SettingsContext` remains the single runtime owner. It should expose a narrow getter/setter or
 explicit preference fields rather than letting pages write localStorage directly.
+
+`courtCapture` is explicitly not an eligible home. Its rebound field bootstraps
+`BasketballPersonalSettingsV1.capture`, which is exact-key parsed and later cloud-synced. Adding a
+rollout field there could invalidate the personal-settings payload or accidentally cross the
+device/cloud boundary.
 
 ## 6. User Experience
 
@@ -157,22 +175,48 @@ changing rollout cannot produce a settings CAS write.
 
 When creation is available, expose the two authority choices using user-facing labels such as
 `Classic tracker` and `New tracker`, while retaining `legacy` and `sport_events` internally.
-Classic remains selected on every fresh setup; do not remember the previous authority choice.
+Classic remains selected on every **genuinely fresh** setup: no restored draft and no matching
+committed pre-start record. A restored uncommitted draft retains its explicit authority, and a
+matching committed pre-start Event record reopens as Event. Neither case remembers the authority
+from an unrelated prior game.
 
 When Event creation is unavailable:
 
 - fresh Basketball setup remains fully usable in Classic mode;
-- an existing Event draft remains stored but cannot commit;
+- an uncommitted Event draft remains stored but cannot create a game;
 - setup explains that the device preference must be enabled, or that the build is internal;
-- the user may re-enable preview or deliberately choose Classic;
+- an uncommitted draft may re-enable preview or deliberately choose Classic, while a committed
+  pre-start record remains Event and follows section 6.3;
 - no automatic authority conversion occurs;
 - no active or parked game changes before a valid commit.
 
-The setup commit boundary must recheck the policy. Hiding or disabling the segmented control is not
+The setup commit boundary must perform a net-new policy check before creating an Event local slot or
+replacing a different active/parked game. Hiding or disabling the segmented control is not
 sufficient because a stale tab, restored draft, imported storage value, or direct helper call could
-otherwise bypass the UI gate.
+otherwise bypass the UI gate. The current `isBasketballEventModelCreationAvailable` call is only a
+visibility check and does not satisfy this requirement.
 
-### 6.3 Local and cloud choices
+### 6.3 Committed pre-start Event records
+
+BKE-5C intentionally commits Game Setup before Player Setup initializes the event stream. A durable
+intermediate record therefore has `gameDataAuthority: 'sport_events'`, `eventStream === null`, and
+`sportGameState === null`.
+
+Once that exact local record exists:
+
+- it is covered by the existing-record invariant, not the new-creation gate;
+- reopening its matching Game Setup preserves Event authority and may update the same pre-start slot;
+- Player Setup remains reachable and may call `prepareBasketballGameStart` after roster review;
+- Start continues to enforce Basketball setup/participant/event validity, but does not recheck
+  release stage or device preference;
+- turning the preference off cannot strand, convert, discard, or silently restart it;
+- a different or uncommitted Event draft cannot claim this exception.
+
+Tests must distinguish a restored uncommitted draft from an exact committed pre-start local record.
+The exception is identity-bound continuation, not a general bypass for any state shaped like Event
+intent.
+
+### 6.4 Local and cloud choices
 
 After Event creation is allowed, BKE-5C remains authoritative:
 
@@ -186,6 +230,7 @@ After Event creation is allowed, BKE-5C remains authoritative:
 
 Audit every Event-aware route and helper to prove the new gate is creation-only. It must not gate:
 
+- matching committed pre-start Game Setup, Player Setup, or `prepareBasketballGameStart`;
 - active or parked Tracker and terminal Summary routing;
 - import/export and recovery-state restoration;
 - the dirty sync queue or conflict resolution;
@@ -206,7 +251,8 @@ page adds its own Event creation decision.
 - Add strict default-off device preference storage and `SettingsContext` ownership.
 - Add the Basketball settings rollout tab and unavailable-build state.
 - Route Game Setup authority visibility and the final commit guard through the central policy.
-- Preserve stored Event drafts without silently converting them.
+- Preserve uncommitted Event drafts without silently converting them, while allowing exact
+  committed pre-start records to update and start as existing games.
 - Replace the internal-preview copy with approved user-facing terminology.
 - Audit entry points so existing records never consult the new creation policy.
 - Add availability, storage, settings, setup, stale-draft, local-only, historical-access, and
@@ -254,7 +300,8 @@ BKE-5D1 should add focused coverage for:
 - sign-in/account changes preserving one device-local preference;
 - settings control availability, keyboard tab behavior, and independent save boundaries;
 - fresh setup defaulting to Classic even after a prior Event game;
-- unavailable Event draft preservation and fail-before-mutation commit rejection;
+- restored uncommitted Event draft preservation and fail-before-mutation new-game rejection;
+- matching committed pre-start Event Game Setup update and Player Setup Start with preference off;
 - preference changes between setup render and final commit;
 - internal production with malicious/stale stored true remaining blocked;
 - signed-out/offline/unconfigured Event local-only creation when opted in;
@@ -291,8 +338,9 @@ after deployment and record `Pass`, `Fail`, `Blocked`, or `Not run` with concise
    reopen, correct, and republish as time permits.
 6. Park the Event game alongside Legacy Basketball and Soccer; resume each and verify the correct
    tracker, transport, and history authority.
-7. Turn the preference off and verify existing Event local/cloud games still resume, sync, review,
-   and finalize while new setup offers only Classic.
+7. Turn the preference off after one Event Game Setup commit but before Player Setup Start; verify
+   that exact pre-start record can finish starting. Also verify existing Event local/cloud games
+   still resume, sync, review, and finalize while genuinely new setup offers only Classic.
 8. Re-enable and verify a new setup again defaults to Classic rather than remembering Event.
 9. Install or refresh the PWA and verify the same preference and existing-game behavior survives
    close/reopen.

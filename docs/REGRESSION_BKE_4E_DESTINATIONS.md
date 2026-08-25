@@ -49,5 +49,5 @@ final games and canonical event publications:
    failed refresh is labeled instead of replacing totals.
 
 BKE-4E4 owns Player Profile, Career, and permanent compatibility-reader boundaries. The combined
-role, live Supabase, and multi-device matrix remains BKE-4E5 release evidence before BKE-5 exposes
-event-game creation.
+role, live Supabase, and multi-device matrix remains mandatory before Event access broadens beyond
+the initial owner-only opt-in permitted by `PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2.

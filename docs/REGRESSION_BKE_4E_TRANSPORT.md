@@ -54,4 +54,5 @@ private. Existing Soccer aggregate pages should still load unchanged.
 
 There is no user-facing Basketball aggregate route in this slice. BKE-4E3 provides the first route
 consumer and its authorized owner/admin/scorer/viewer matrix. The complete live Supabase and
-multi-device matrix remains BKE-4E5 release evidence before BKE-5 exposes event-game creation.
+multi-device matrix remains mandatory before Event access broadens beyond the initial owner-only
+opt-in permitted by `PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2.

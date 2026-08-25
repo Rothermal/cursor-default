@@ -1,8 +1,9 @@
 # Regression: BKE-4E5 Basketball Release Readiness
 
 Status: BKE-4E5 implementation is complete. Migration 061 is required for internal Basketball
-event-cloud creation. The user-visible event-model opt-in remains closed until BKE-5, and every
-live row marked Pending below remains pre-BKE-5 release evidence.
+event-cloud creation. Every live row marked Pending below remains open broader-release evidence.
+`PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2 permits focused post-deployment validation for the
+initial owner-only opt-in without representing any pending row as passed.
 
 ## Contract Boundary
 
@@ -106,9 +107,10 @@ game id, team id, and publication id with each result.
 | E5-13 | Representative Soccer and legacy Basketball workflows | Existing capability, settings, sync, Summary, and aggregates remain unchanged | Pending |
 | E5-14 | Largest available Personal career Profile load | Page count/time recorded; accepted extra drain is usable or promoted to BKE-5 fix | Pending |
 
-The owner may complete these rows after merging because event creation remains internal. They must
-not be represented as passed, and user-visible BKE-5 opt-in must not ship, until required evidence
-is recorded or deliberately resolved.
+The owner may complete these rows after merging. They must not be represented as passed, and Event
+access must not broaden beyond the initial owner-only opt-in, until required evidence is recorded
+or deliberately resolved. The initial exception and focused smoke pass are governed by
+`PLAN_BKE_5D_RELEASE_AND_EXIT.md` section 2.
 
 ## Rollback
 
