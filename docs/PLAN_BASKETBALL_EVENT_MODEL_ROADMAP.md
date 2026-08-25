@@ -27,14 +27,16 @@ Timeline, Shot Chart, and explicit entry/return routing. BKE-4E product and deli
 approved in
 [PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md](PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md);
 BKE-4E1 through BKE-4E5 are implemented through migration 061. The combined BKE-4 live matrix
-remains required before BKE-5 exposes event-model opt-in. BKE-5 product and delivery decisions are
-approved in
+remains required before the rollout broadens; the initial owner-only opt-in may use focused
+post-deployment validation under BKE-5D. BKE-5 product and delivery decisions are approved in
 [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md), with detailed
 setup delivery in
 [PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md](PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md), split into
 BKE-5A profiles/compatibility, BKE-5B persistence/settings (BKE-5B1 through BKE-5B4 complete),
-BKE-5C setup/authority (BKE-5C1 through BKE-5C4 complete), and BKE-5D
-release. Basketball event creation remains behind the internal gate.
+BKE-5C setup/authority (BKE-5C1 through BKE-5C4 complete), and BKE-5D release. BKE-5D is approved
+as separate policy-hardening and production-activation slices in
+[PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md). Basketball event creation
+remains behind the internal gate.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -259,8 +261,9 @@ surfaces, 5C mutation-free authority setup and binding policy, and 5D release ac
 **Gating:** because the reducer disables every legacy aggregate action the moment a stream exists,
 event-game creation stays behind an internal gate through BKE-5C and the user-visible per-game opt-in
 ships with BKE-5D, once capture, cloud lifecycle, Summary, aggregates, backend capability preflight,
-layered settings, mutation-free setup, and the combined release evidence are complete (BKE-0 §3.3,
-§10).
+layered settings, and mutation-free setup are complete. The initial owner-only rollout may use
+focused post-deployment validation; combined release evidence remains required before access
+broadens (BKE-0 §3.3, §10).
 
 BKE-6 is the proposed clock/lineup fast follower. Basketball stoppage rules vary sharply by age
 level and competition, and the shared transport is payload-agnostic, so BKE-0 reserves the clock,
