@@ -24,6 +24,7 @@ import {
   clearBasketballSetupDraft,
   loadBasketballSetupDraft,
 } from '../lib/basketball/setupDraft'
+import { isBasketballEventLocalOnly } from '../lib/basketball/eventCloudPolicy'
 
 function activeSyncStatusLabel(status: string, lastError: string | null): string | null {
   switch (status) {
@@ -199,7 +200,9 @@ export default function SportDashboard() {
     )
   }
 
-  const activeSyncLabel = activeSyncStatusLabel(state.cloudSync.status, state.cloudSync.lastError)
+  const activeSyncLabel = isBasketballEventLocalOnly(state)
+    ? 'Cloud Sync: local only'
+    : activeSyncStatusLabel(state.cloudSync.status, state.cloudSync.lastError)
 
   return (
     <div className="min-h-screen flex flex-col">

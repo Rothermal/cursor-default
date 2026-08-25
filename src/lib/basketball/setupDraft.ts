@@ -412,8 +412,19 @@ export function buildBasketballSetupGameState({
   state = gameReducer(state, {
     type: 'SET_CLOUD_SYNC_STATE',
     cloudSync: {
-      seasonId: current.source.seasonId,
-      teamId: current.source.kind === 'team' ? current.source.teamId : null,
+      ...(current.authority === 'sport_events'
+        ? { eventCloudPolicy: current.event!.cloudIntent }
+        : {}),
+      seasonId:
+        current.authority === 'sport_events' && current.event!.cloudIntent === 'local_only'
+          ? null
+          : current.source.seasonId,
+      teamId:
+        current.authority === 'sport_events' && current.event!.cloudIntent === 'local_only'
+          ? null
+          : current.source.kind === 'team'
+            ? current.source.teamId
+            : null,
     },
   })
   state = gameReducer(state, {

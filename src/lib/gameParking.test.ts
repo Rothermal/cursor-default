@@ -658,6 +658,38 @@ describe('gameParking', () => {
     ])
   })
 
+  it('round-trips local-only policy without restoring cloud binding or queue work', () => {
+    const localOnly = {
+      ...gameState(basketball, 'Local Event', 'Bears'),
+      gameDataAuthority: 'sport_events' as const,
+      eventStream: { version: 1, events: [] },
+      sportGameState: { sportId: 'basketball', version: 1 } as never,
+      cloudSync: {
+        ...gameState(basketball, 'Local Event', 'Bears').cloudSync,
+        eventCloudPolicy: 'local_only' as const,
+        teamId: 'must-be-removed',
+        seasonId: 'must-be-removed',
+        gameId: 'must-be-removed',
+      },
+    }
+    const [saved] = saveActiveGameState(localOnly, 'user-1')
+    const exported = exportParkedGames('user-1')
+    localStorage.clear()
+
+    const result = importParkedGames(exported, 'user-1')
+    const imported = getParkedGameRecord(saved.localGameId, 'user-1')
+
+    expect(result.imported).toBe(1)
+    expect(imported?.gameState.cloudSync).toMatchObject({
+      eventCloudPolicy: 'local_only',
+      teamId: null,
+      seasonId: null,
+      gameId: null,
+    })
+    expect(imported?.sync.dirty).toBe(false)
+    expect(imported?.summary.eventCloudPolicy).toBe('local_only')
+  })
+
   it('normalizes missing legacy event streams during import', () => {
     const legacy = gameState(basketball, 'Legacy', 'Bears') as Partial<GameState>
     delete legacy.eventStream

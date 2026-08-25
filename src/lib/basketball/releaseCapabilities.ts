@@ -44,20 +44,14 @@ export interface BasketballReleaseCapabilityClient {
 
 interface BasketballEventCloudPreflightInput {
   eventIntent: boolean
-  cloudAvailable: boolean
-  teamMode: 'existing' | 'new'
-  selectedTeamId: string
+  cloudIntent: 'automatic' | 'local_only' | null
 }
 
 export function requiresBasketballEventCloudPreflight({
   eventIntent,
-  cloudAvailable,
-  teamMode,
-  selectedTeamId,
+  cloudIntent,
 }: BasketballEventCloudPreflightInput): boolean {
-  return eventIntent && cloudAvailable && (
-    teamMode === 'new' || Boolean(selectedTeamId)
-  )
+  return eventIntent && cloudIntent === 'automatic'
 }
 
 const expectedCapabilities: BasketballReleaseCapabilities = {

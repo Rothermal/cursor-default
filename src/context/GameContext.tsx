@@ -39,6 +39,7 @@ import { sanitizePlayerIdMapForCloud } from '../lib/uuidValidation'
 import { playerIdMapForRoster, shotChartForRoster } from '../lib/rosterAlignment'
 import { normalizeGameEventStream } from '../lib/gameEvents/stream'
 import { normalizeSportGameState } from '../lib/sportGameState/state'
+import { normalizeBasketballEventCloudPolicyState } from '../lib/basketball/eventCloudPolicy'
 import { normalizeGameDataAuthority } from '../lib/gameEvents/authority'
 import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../lib/gameEvents/runtime'
@@ -241,7 +242,7 @@ function loadState(userId: string | null): GameState {
       const restoredPlayers = Array.isArray(parsed.players) ? parsed.players : []
       const sanitizedMap = sanitizePlayerIdMapForCloud(parsed.cloudSync?.playerIdMap ?? {})
 
-      const restoredState: GameState = {
+      const restoredState = normalizeBasketballEventCloudPolicyState({
         ...createInitialState(restoredStatus),
         ...parsed,
         gameDataAuthority: normalizeGameDataAuthority(parsed.gameDataAuthority),
@@ -287,7 +288,7 @@ function loadState(userId: string | null): GameState {
             ? parsed.cloudSync.pendingEventConflictResolutions
             : [],
         },
-      }
+      })
       return rebuildGameEventProjection(
         restoredState,
         gameEventRegistry,
@@ -1093,7 +1094,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const queueFingerprint = parkedGames
     .map(
       game =>
-        `${game.localGameId}:${game.updatedAt}:${game.syncStatus}:${game.syncDirty}:${game.syncLastError ?? ''}`
+        `${game.localGameId}:${game.updatedAt}:${game.syncStatus}:${game.syncDirty}:${game.eventCloudPolicy ?? ''}:${game.syncLastError ?? ''}`
     )
     .join('|')
   const shouldSync = Boolean(

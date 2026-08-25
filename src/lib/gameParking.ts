@@ -14,6 +14,10 @@ import {
 import { normalizeGameEventStream } from './gameEvents/stream'
 import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
+import {
+  basketballEventCloudPolicyForState,
+  normalizeBasketballEventCloudPolicyState,
+} from './basketball/eventCloudPolicy'
 
 const MANIFEST_VERSION = 1
 const EXPORT_VERSION = 1
@@ -55,6 +59,7 @@ export interface ParkedGameSummary {
   syncStatus: CloudSyncStatus
   syncDirty: boolean
   syncLastError: string | null
+  eventCloudPolicy?: 'automatic' | 'local_only'
 }
 
 export interface ParkedGamesManifest {
@@ -245,12 +250,12 @@ function readRecord(localGameId: string): ParkedGameRecord | null {
 }
 
 function normalizePersistedGameState(state: GameState): GameState {
-  return {
+  return normalizeBasketballEventCloudPolicyState({
     ...state,
     gameDataAuthority: normalizeGameDataAuthority(state.gameDataAuthority),
     eventStream: normalizeGameEventStream(state.eventStream),
     sportGameState: normalizeSportGameState(state.sportGameState),
-  }
+  })
 }
 
 function hasSyncablePayload(state: GameState): boolean {
@@ -386,6 +391,7 @@ function buildSummary(
     syncStatus,
     syncDirty: sync.dirty,
     syncLastError: sync.lastError,
+    eventCloudPolicy: basketballEventCloudPolicyForState(state) ?? undefined,
   }
 }
 
@@ -678,7 +684,10 @@ export function hasUnsyncedParkedBindingForCloudSeason(
 }
 
 export function hasDirtyParkedGames(ownerId: string | null): boolean {
-  return listParkedGameRecords(ownerId).some(record => record.sync.dirty)
+  return listParkedGameRecords(ownerId).some(
+    record => record.sync.dirty &&
+      basketballEventCloudPolicyForState(record.gameState) !== 'local_only'
+  )
 }
 
 export function listDirtyParkedGameRecords(
@@ -691,6 +700,7 @@ export function listDirtyParkedGameRecords(
   return listParkedGameRecords(ownerId)
     .filter(record => {
       if (!record.sync.dirty) return false
+      if (basketballEventCloudPolicyForState(record.gameState) === 'local_only') return false
       if ((record.gameState.cloudSync.eventConflicts?.length ?? 0) > 0) return false
       if (!record.sync.nextAttemptAt) return true
       const nextMs = Date.parse(record.sync.nextAttemptAt)

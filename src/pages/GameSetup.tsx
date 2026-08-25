@@ -129,6 +129,12 @@ export default function GameSetup() {
   const [basketballMatchOverrides, setBasketballMatchOverrides] = useState(
     matchingInitialBasketballDraft?.event?.matchOverrides ?? {}
   )
+  const [basketballCloudIntent, setBasketballCloudIntent] = useState<'automatic' | 'local_only'>(
+    matchingInitialBasketballDraft?.event?.cloudIntent ??
+      (matchingInitialBasketballDraft?.source.kind === 'team' || requestedTeamId
+        ? 'automatic'
+        : 'local_only')
+  )
   const [committedLocalGameId, setCommittedLocalGameId] = useState(
     matchingInitialBasketballDraft?.committedLocalGameId ??
     (!requestedSportId && !requestedTeamId && state.sport?.id === 'basketball' && state.gameInfo
@@ -244,6 +250,7 @@ export default function GameSetup() {
       : ''
   )
   const [setupError, setSetupError] = useState<string | null>(null)
+  const [basketballCapabilityFailure, setBasketballCapabilityFailure] = useState<string | null>(null)
   const [checkingBasketballCapabilities, setCheckingBasketballCapabilities] = useState(false)
   const [loadingRequestedTeamSport, setLoadingRequestedTeamSport] = useState(false)
   const [requestedTeamSportError, setRequestedTeamSportError] = useState<string | null>(null)
@@ -705,8 +712,7 @@ export default function GameSetup() {
         revision: authoritySnapshot.revision,
         settings: authoritySnapshot.settings,
         matchOverrides: basketballMatchOverrides,
-        cloudIntent: existingEvent?.cloudIntent ??
-          (source.kind === 'team' ? 'automatic' : 'local_only'),
+        cloudIntent: basketballCloudIntent,
       })
       if (!event) return null
     }
@@ -735,6 +741,7 @@ export default function GameSetup() {
   }, [
     accountScope,
     basketballAuthority,
+    basketballCloudIntent,
     basketballDisplayFlipped,
     basketballMatchOverrides,
     basketballSettings,
@@ -816,8 +823,12 @@ export default function GameSetup() {
   const updateBasketballEventIntent = (enabled: boolean): boolean => {
     if (isBasketballSetup) {
       setBasketballAuthority(enabled ? 'sport_events' : 'legacy')
-      if (enabled && !basketballDraftRef.current?.event) setBasketballMatchOverrides({})
+      if (enabled && !basketballDraftRef.current?.event) {
+        setBasketballMatchOverrides({})
+        setBasketballCloudIntent(teamMode === 'existing' ? 'automatic' : 'local_only')
+      }
       if (enabled) setSelectedNewTeamSeasonId('')
+      setBasketballCapabilityFailure(null)
       setSetupError(null)
       return true
     }
@@ -834,6 +845,10 @@ export default function GameSetup() {
 
   const updateTeamMode = (nextMode: 'existing' | 'new') => {
     setTeamMode(nextMode)
+    if (isBasketballEventIntent) {
+      setBasketballCloudIntent(nextMode === 'existing' ? 'automatic' : 'local_only')
+      setBasketballCapabilityFailure(null)
+    }
   }
 
   const startRequestedTeamLocally = () => {
@@ -890,13 +905,14 @@ export default function GameSetup() {
     return null
   }
 
-  const handleNext = async () => {
+  const handleNext = async (forceCapabilityCheck = false) => {
     if (!canProceed) return
     if (isCloudFlow && teamMode === 'existing' && !canTrackGames(selectedTeam?.accessRole ?? null)) {
       setSetupError('Viewer access is read-only. Choose a team you can track.')
       return
     }
     setSetupError(null)
+    setBasketballCapabilityFailure(null)
 
     const basketballDraft = isBasketballSetup ? currentBasketballDraft : null
     const matchingCommittedBasketballSetup = Boolean(
@@ -922,19 +938,19 @@ export default function GameSetup() {
 
     if (requiresBasketballEventCloudPreflight({
       eventIntent: isBasketballEventIntent,
-      cloudAvailable: isCloudFlow,
-      teamMode,
-      selectedTeamId,
+      cloudIntent: basketballDraft?.event?.cloudIntent ?? null,
     })) {
       if (!userId) {
-        setSetupError('Sign in before starting a Basketball event cloud game.')
+        setBasketballCapabilityFailure('Sign in before starting a Basketball event cloud game.')
         return
       }
       setCheckingBasketballCapabilities(true)
-      const capability = await ensureBasketballReleaseCapabilities(userId)
+      const capability = await ensureBasketballReleaseCapabilities(userId, {
+        force: forceCapabilityCheck,
+      })
       setCheckingBasketballCapabilities(false)
       if (capability.status !== 'ready') {
-        setSetupError(capability.error)
+        setBasketballCapabilityFailure(capability.error)
         return
       }
     }
@@ -1262,6 +1278,36 @@ export default function GameSetup() {
                   {setupError ?? parkingError}
                 </p>
               )}
+              {basketballCapabilityFailure && (
+                <div role="alert" className="space-y-3 border border-amber-300 bg-amber-50 p-3 text-amber-950">
+                  <div>
+                    <p className="text-sm font-semibold">Basketball cloud check failed</p>
+                    <p className="mt-1 text-xs">{basketballCapabilityFailure}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => { void handleNext(true) }} disabled={checkingBasketballCapabilities} className="btn-secondary min-h-10 text-xs disabled:opacity-50">
+                      Retry Check
+                    </button>
+                    <button type="button" onClick={() => updateBasketballEventIntent(false)} className="btn-secondary min-h-10 text-xs">
+                      Use Legacy Cloud
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBasketballCloudIntent('local_only')
+                        setBasketballCapabilityFailure(null)
+                        setSetupError(null)
+                      }}
+                      className="btn-secondary min-h-10 text-xs"
+                    >
+                      Use Event Local-Only
+                    </button>
+                    <button type="button" onClick={() => setBasketballCapabilityFailure(null)} className="btn-secondary min-h-10 text-xs">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {teams.length > 0 && (
                 <div className="flex rounded-xl bg-slate-100 p-1">
@@ -1423,6 +1469,11 @@ export default function GameSetup() {
                   Event
                 </button>
               </div>
+              {isBasketballEventIntent && (
+                <p className="text-xs font-medium text-amber-950">
+                  Cloud policy: {basketballCloudIntent === 'automatic' ? 'Automatic' : 'Local only'}
+                </p>
+              )}
               <p className="text-xs text-amber-900">
                 Initial court view: {basketballDisplayFlipped ? 'Flipped' : 'Standard'} · Personal display setting
               </p>

@@ -1,7 +1,7 @@
 # BKE-5C1 Basketball Setup Draft Regression
 
 Status: implementation complete. No Supabase migration is required. Basketball event creation
-remains behind the internal gate; BKE-5C2 is implemented and BKE-5C3 through BKE-5C4 remain.
+remains behind the internal gate; BKE-5C2 and BKE-5C3 are implemented and BKE-5C4 remains.
 
 ## Scope
 
@@ -62,6 +62,6 @@ After deployment:
 
 - authoritative settings hierarchy, rule/source freeze, stale revisions, and court default:
   implemented in BKE-5C2
-- capability recovery and durable Event local-only transport policy: BKE-5C3
+- capability recovery and durable Event local-only transport policy: delivered in BKE-5C3
 - guarded Enable Cloud Sync plus BKE-5C exit hardening: BKE-5C4
 - production event-model opt-in and combined live evidence: BKE-5D

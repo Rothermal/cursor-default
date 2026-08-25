@@ -191,6 +191,20 @@ describe('Basketball event cloud transport adapter', () => {
     expect(basketballEventCloudTransportAdapter.remoteConflictRevisionPolicy).toBe('advance')
   })
 
+  it('rejects local-only games before making a cloud request', async () => {
+    const state = startedState()
+    state.cloudSync.eventCloudPolicy = 'local_only'
+
+    await expect(syncBasketballEventGameToCloud({
+      state,
+      userId: 'user-1',
+      localGameId: 'local-1',
+    })).rejects.toThrow('local-only tracking')
+    expect(cloudMock.rpc).not.toHaveBeenCalled()
+    expect(cloudMock.upsert).not.toHaveBeenCalled()
+    expect(cloudMock.load).not.toHaveBeenCalled()
+  })
+
   it('links only tracked participants to the selected source team', () => {
     const state = startedState()
     if (state.sportGameState?.sportId !== 'basketball') throw new Error('missing Basketball state')

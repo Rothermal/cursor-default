@@ -16,7 +16,7 @@ function between(value: string, start: string, end: string): string {
 describe('Basketball release entry guards', () => {
   it('preflights internal event-cloud continuation before game mutation', () => {
     const setup = source('src/pages/GameSetup.tsx')
-    const handler = between(setup, 'const handleNext = async () => {', '\n  return (')
+    const handler = between(setup, 'const handleNext = async (', '\n  return (')
     const capabilityIndex = handler.indexOf('await ensureBasketballReleaseCapabilities')
 
     expect(capabilityIndex).toBeGreaterThanOrEqual(0)
@@ -25,6 +25,16 @@ describe('Basketball release entry guards', () => {
     expect(capabilityIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
     expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_CLOUD_SYNC_STATE'"))
     expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_GAME_INFO'"))
+  })
+
+  it('offers the complete capability recovery matrix without committing setup', () => {
+    const setup = source('src/pages/GameSetup.tsx')
+
+    expect(setup).toContain('Retry Check')
+    expect(setup).toContain('Use Legacy Cloud')
+    expect(setup).toContain('Use Event Local-Only')
+    expect(setup).toContain('Cancel')
+    expect(setup).toContain("setBasketballCloudIntent('local_only')")
   })
 
   it('keeps Basketball Team Info entry mutation-free until setup Continue', () => {
@@ -81,7 +91,7 @@ describe('Basketball release entry guards', () => {
       'const updateBasketballEventIntent = (enabled: boolean): boolean => {',
       '\n  const updateTeamMode'
     )
-    const handler = between(setup, 'const handleNext = async () => {', '\n  async function compensate')
+    const handler = between(setup, 'const handleNext = async (', '\n  async function compensate')
 
     expect(eventIntent).toContain('setBasketballAuthority')
     expect(eventIntent.indexOf('setBasketballAuthority')).toBeLessThan(
