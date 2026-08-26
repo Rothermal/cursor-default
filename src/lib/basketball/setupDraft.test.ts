@@ -151,6 +151,29 @@ describe('Basketball setup draft', () => {
     })
   })
 
+  it('rejects version-3 authority before a setup draft can be committed', () => {
+    expect(createBasketballSetupDraftEvent({
+      authority: 'team',
+      revision: 5,
+      settings: {
+        ...structuredClone(DEFAULT_BASKETBALL_TEAM_SETTINGS),
+        ruleOverrides: {
+          clockModel: 'anchored',
+          clockDisplayDirection: 'count_down',
+          clockExpiration: 'stop_at_zero',
+          stoppageMode: 'explicit',
+          equalPlayPolicy: {
+            mode: 'off',
+            minimumPeriods: null,
+            maximumConsecutivePeriods: null,
+            maximumPeriodImbalance: null,
+          },
+        },
+      },
+      cloudIntent: 'local_only',
+    })).toBeNull()
+  })
+
   it('separates a team source from local-only cloud binding metadata', () => {
     const draft = createBasketballSetupDraft({
       accountScope: 'user:user-1',

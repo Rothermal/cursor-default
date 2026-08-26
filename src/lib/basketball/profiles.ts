@@ -7,9 +7,7 @@ import type {
   BasketballOvertimeFoulPolicy,
   BasketballOvertimeTimeoutPolicy,
   BasketballRuleOverrides,
-  BasketballRuleOverridesV2,
   BasketballRulesField,
-  BasketballRulesV2Field,
   BasketballRulesSource,
   BasketballTimeoutPoolRule,
 } from './types'
@@ -265,23 +263,6 @@ export function getBasketballRulesProfile(
     profile.profileId === profileId && profile.profileVersion === profileVersion
   )
   return found ? structuredClone(found) : null
-}
-
-export function normalizeBasketballRuleOverridesV2(
-  value: unknown
-): BasketballRuleOverridesV2 | null {
-  if (!isObject(value)) return null
-  const keys = Object.keys(value)
-  const v2Fields: BasketballRulesV2Field[] = [
-    'regulationSegments',
-    'overtimeTemplate',
-    'foulWindows',
-    'timeoutPools',
-    'personalFoulLimit',
-    'clockModel',
-  ]
-  if (keys.some(key => !v2Fields.includes(key as BasketballRulesV2Field))) return null
-  return structuredClone(value as BasketballRuleOverridesV2)
 }
 
 const BASKETBALL_CLOCK_LINEUP_FIELDS = [

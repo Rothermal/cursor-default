@@ -14,6 +14,7 @@ import {
 } from './settings'
 import {
   isBasketballStructuredMatchRules,
+  isBasketballMatchRulesV2,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
 } from './rules'
@@ -180,6 +181,7 @@ export function createBasketballSetupDraftEvent({
     matchOverrides,
   })
   if (!resolution.ok) return null
+  if (!isBasketballMatchRulesV2(resolution.value.rules)) return null
   const baseProfile = settings.baseProfile
   return {
     settingsAuthority: authority === 'personal'

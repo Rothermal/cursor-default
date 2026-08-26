@@ -71,6 +71,32 @@ describe('Basketball settings schema version 1', () => {
       ok: false,
       error: 'Basketball structural rule overrides must be saved together.',
     })
+    for (const ruleOverrides of [
+      {
+        clockModel: 'anchored',
+        clockDisplayDirection: 'count_down',
+        clockExpiration: 'stop_at_zero',
+      },
+      {
+        clockDisplayDirection: 'count_down',
+        clockExpiration: 'stop_at_zero',
+        stoppageMode: 'explicit',
+        equalPlayPolicy: {
+          mode: 'off',
+          minimumPeriods: null,
+          maximumConsecutivePeriods: null,
+          maximumPeriodImbalance: null,
+        },
+      },
+    ]) {
+      expect(parseBasketballTeamSettings({
+        baseProfile: { profileId: 'nfhs', profileVersion: 1 },
+        ruleOverrides,
+      })).toEqual({
+        ok: false,
+        error: 'Basketball clock and lineup rule overrides must be saved together.',
+      })
+    }
   })
 
   it('matches migration 062 bounds before attempting a cloud save', () => {

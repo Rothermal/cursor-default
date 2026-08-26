@@ -6,7 +6,8 @@ import {
   type BasketballRulesResolutionResult,
   type BasketballRulesProfileRef,
 } from './profiles'
-import type { BasketballRuleOverrides } from './types'
+import { BASKETBALL_RULE_FIELDS } from './profileDiffPresentation'
+import type { BasketballRuleOverrides, BasketballRulesField } from './types'
 
 export const BASKETBALL_SETTINGS_SCHEMA_VERSION = 1
 
@@ -143,6 +144,9 @@ function parseRuleLayer(
   const profile = getBasketballRulesProfile(baseProfile.profileId, Number(baseProfile.profileVersion))
   if (!profile) return invalid('Basketball rules profile is unavailable.')
 
+  if (hasIncompleteClockLineupBundle(ruleOverrides)) {
+    return invalid('Basketball clock and lineup rule overrides must be saved together.')
+  }
   const overrides = normalizeBasketballRuleOverrides(ruleOverrides)
   if (!overrides) return invalid('Basketball rule overrides contain unsupported fields.')
   const structuralFields = [
@@ -154,20 +158,6 @@ function parseRuleLayer(
   const structuralCount = structuralFields.filter(field => field in overrides).length
   if (structuralCount !== 0 && structuralCount !== structuralFields.length) {
     return invalid('Basketball structural rule overrides must be saved together.')
-  }
-  const clockLineupFields = [
-    'clockModel',
-    'clockDisplayDirection',
-    'clockExpiration',
-    'stoppageMode',
-    'equalPlayPolicy',
-  ] as const
-  const v3OnlyFields = clockLineupFields.filter(field => field !== 'clockModel')
-  const v3OnlyCount = v3OnlyFields.filter(field => field in overrides).length
-  if (v3OnlyCount !== 0 && (
-    v3OnlyCount !== v3OnlyFields.length || !('clockModel' in overrides)
-  )) {
-    return invalid('Basketball clock and lineup rule overrides must be saved together.')
   }
   const resolution = resolveBasketballRules(
     { profileId: profile.profileId, profileVersion: profile.profileVersion },
@@ -185,6 +175,20 @@ function parseRuleLayer(
       ruleOverrides: structuredClone(overrides),
     },
   }
+}
+
+function hasIncompleteClockLineupBundle(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  const keys = Object.keys(value)
+  if (keys.some(key => !BASKETBALL_RULE_FIELDS.includes(key as BasketballRulesField))) return false
+  const v3OnlyFields = [
+    'clockDisplayDirection',
+    'clockExpiration',
+    'stoppageMode',
+    'equalPlayPolicy',
+  ] as const
+  const v3OnlyCount = v3OnlyFields.filter(field => field in value).length
+  return v3OnlyCount !== 0 && (v3OnlyCount !== v3OnlyFields.length || !('clockModel' in value))
 }
 
 function hasExactKeys<T extends string>(
