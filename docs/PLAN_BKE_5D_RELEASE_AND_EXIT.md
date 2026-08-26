@@ -303,11 +303,14 @@ Exit: production defaults to Classic-only creation, a deliberate device opt-in e
 tracker, rollback disables only new Event creation, and the owner smoke record has a clear status.
 
 Implementation note: `BASKETBALL_EVENT_RELEASE_STAGE` is `opt_in`. The default production policy
-test proves an exact false preference blocks Event creation and an exact true preference enables it,
-while existing Event access remains unconditional. No setup, transport, authorization, migration,
-or historical route changed. The owner approved an initial single-user deployment with validation
-after deployment. The focused smoke disposition is currently `Not run - pending deployment`; CI,
-deployed commit, and smoke evidence must be recorded after this candidate merges and deploys.
+test derives its expectations from that centralized stage, proves an exact false preference always
+blocks Event creation, and preserves unconditional existing-Event access. The injected policy matrix
+proves the `opt_in` true-preference row enables creation. This keeps the documented rollback to
+`internal` a one-line source change that passes normal CI. No setup, transport, authorization,
+migration, or historical route changed. The owner approved an initial single-user deployment with
+validation after deployment. The focused smoke dispositions are currently
+`Not run - pending deployment`; CI, deployed commit, and smoke evidence must be recorded after this
+candidate merges and deploys.
 
 ## 9. Automated Verification
 

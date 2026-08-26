@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BASKETBALL_EVENT_RELEASE_STAGE,
+  type BasketballEventReleaseStage,
   getBasketballEventCreationPolicy,
   getSportAvailabilityPolicy,
   SOCCER_RELEASED_IN_PRODUCTION,
@@ -31,18 +32,20 @@ describe('getSportAvailabilityPolicy', () => {
     }
   )
 
-  it('activates BKE-5D2 production only through the default-off device preference', () => {
-    expect(BASKETBALL_EVENT_RELEASE_STAGE).toBe('opt_in')
+  it('keeps the shipped Basketball stage rollback-safe and default-off', () => {
+    const releaseStage = BASKETBALL_EVENT_RELEASE_STAGE as BasketballEventReleaseStage
+
+    expect(['internal', 'opt_in']).toContain(releaseStage)
     expect(getBasketballEventCreationPolicy(false, { development: false })).toEqual({
-      releaseStage: 'opt_in',
-      preferenceAvailable: true,
+      releaseStage,
+      preferenceAvailable: releaseStage === 'opt_in',
       canCreateNewEventGame: false,
       canAccessExistingEventGames: true,
     })
     expect(getBasketballEventCreationPolicy(true, { development: false })).toEqual({
-      releaseStage: 'opt_in',
-      preferenceAvailable: true,
-      canCreateNewEventGame: true,
+      releaseStage,
+      preferenceAvailable: releaseStage === 'opt_in',
+      canCreateNewEventGame: releaseStage === 'opt_in',
       canAccessExistingEventGames: true,
     })
   })
