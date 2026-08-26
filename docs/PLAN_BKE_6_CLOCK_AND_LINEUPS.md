@@ -1,10 +1,12 @@
 # Plan: BKE-6 Basketball Clock and Lineups
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
-decisions are approved. The five-slice delivery plan is ready for review; implementation has not
-started.
+decisions are approved. The BKE-6A detailed foundation plan is ready for review; implementation has
+not started.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
+
+BKE-6A detail: [PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md)
 
 ---
 
@@ -257,6 +259,9 @@ match override -> team default -> personal default -> built-in profile
 - Existing built-in versions and saved defaults remain clockless.
 - Selecting Anchored upgrades only the editable draft after a complete source-aware diff.
 - Saving personal/team version 3 continues through the existing revision-CAS contracts.
+- Before saving version 3, warn that un-updated clients will fail the whole strict settings parse
+  and cannot start any new Basketball Event game using that personal/team authority, including
+  clockless Event intent, until they update. Existing snapshots and Legacy setup remain available.
 - Team owners/admins edit; scorers/viewers review read-only.
 - Game Setup snapshots the complete resolved version-3 value and source revisions.
 - Disabling Anchored in a draft never converts or rewrites an existing game.
@@ -400,10 +405,13 @@ local-only anchored creation may proceed without a reachable server, retaining t
 local-only policy until both preflights succeed.
 
 The existing exact-shape `get_basketball_release_capabilities` RPC must remain byte-for-byte
-compatible so unrefreshed clients can continue clockless Event cloud setup and Enable Cloud Sync.
-The new fixed RPC is additive and called only by anchored-aware clients. Missing/stale feature
-capability produces backend-update guidance; malformed responses fail closed. Unregistered anchored
-event families continue using the existing stream quarantine boundary rather than misprojecting.
+compatible so unrefreshed clients with version-2 settings can continue clockless Event cloud setup
+and Enable Cloud Sync. Persisting a version-3 personal/team bundle intentionally requires every
+client starting a new Event game through that authority to update, even for clockless Event intent;
+the settings upgrade UI must disclose that scope. The new fixed RPC is additive and called only by
+anchored-aware clients. Missing/stale feature capability produces backend-update guidance; malformed
+responses fail closed. Unregistered anchored event families continue using the existing stream
+quarantine boundary rather than misprojecting.
 
 Finalization requires:
 
@@ -425,7 +433,7 @@ Each slice receives a detailed implementation plan and review before code begins
 
 | Phase | Scope | Exit condition |
 |---|---|---|
-| BKE-6A | Strict rules v3, one exhaustive rules-diff catalog, settings/profile parsing, registered clock/lineup events, deterministic projection, checked commands, additive fixed feature-capability migration, and compatibility fixtures; no production UI | Clock/lineup streams project and quarantine deterministically, versions 1-2 and the release-capability v2 RPC remain unchanged, and capability/local-only boundaries are proven |
+| BKE-6A | Strict rules v3, setup v2, one exhaustive rules-diff catalog, settings/profile parsing, registered clock/lineup events, deterministic projection, checked commands, additive fixed feature-capability migration, and compatibility fixtures; no production UI. Detailed as BKE-6A1 through BKE-6A3 in [PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md) | Clock/lineup streams project and quarantine deterministically, versions 1-2 and the release-capability v2 RPC remain unchanged, and capability/local-only boundaries are proven |
 | BKE-6B | Personal/team/match controls, immutable setup review, opening lineup, sticky live clock, timestamps, expiration/recovery, Set Clock, and parking guards | A new local anchored game can setup, run, pause, adjust, expire, park/reload, and complete periods without affecting clockless games |
 | BKE-6C | Multi-player substitutions, boundary confirmations, roles/captain, short-handed/replacement flows, equal-play enforcement/override, Recent Events, Timeline correction, and Set Current Lineup | Complete and incomplete lineup histories are accurately captured, corrected, diagnosed, and converted to exact intervals/minutes |
 | BKE-6D | Players/Overview/Timeline detail, exact-second aggregates, plus-minus quality, cloud capability/bind/sync, recorder readiness, finalization, correction/resume reopen, and republication | One coherent recorder can sync and publish anchored authority; remote/canonical review is read-only and aggregate output is quality-gated |
