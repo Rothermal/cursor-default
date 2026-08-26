@@ -132,8 +132,10 @@ export default function BasketballSettings() {
             ) : (
               <SyncStatus status={basketballSettingsSync.status} />
             )}
-            {!trackerTabActive && dirty && (
-              <span className="text-xs font-semibold text-amber-700">Unsaved changes</span>
+            {dirty && (
+              <span className="text-xs font-semibold text-amber-700">
+                Unsaved cloud settings
+              </span>
             )}
           </div>
         </div>

@@ -20,8 +20,9 @@ Plans: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_
   Event draft is preserved but cannot commit; choosing Classic remains possible.
 - The atomic parking transaction re-reads the persisted preference and rejects an unauthorized
   net-new Event slot before any durable replacement. UI state alone is not trusted.
-- Only the exact matching committed pre-start Event slot may update with policy or preference off.
-  Started, mismatched, imported-shaped, or merely uncommitted drafts cannot claim that exception.
+- Only the exact matching committed pre-start Event slot may update with policy or preference off,
+  including after Player Setup seeds team placeholders or the user reviews a real roster. Started,
+  mismatched, or merely uncommitted drafts cannot claim that exception.
 - Player Setup/start and all active, parked, imported, recovery, sync, Summary, Game Info,
   Timeline, finalization, reopen, publication, and aggregate paths remain outside the creation gate.
 - Legacy Basketball and Soccer behavior are unchanged. Event and Legacy paths never dual-write.
@@ -51,8 +52,8 @@ read, rollback-safe parking behavior, and static release-entry boundaries.
 Verification at implementation head:
 
 - `pnpm typecheck` - passed
-- focused BKE-5D1 suite - 5 files / 91 tests passed
-- `pnpm test` - 166 files / 1,151 tests passed
+- focused BKE-5D1 suite - 5 files / 92 tests passed
+- `pnpm test` - 166 files / 1,152 tests passed
 - `pnpm lint` - 0 errors; 6 existing Fast Refresh warnings, including duplicate worktree paths
 - `pnpm build` - passed; existing Browserslist-age and chunk-size warnings only
 - `git diff --check` - passed

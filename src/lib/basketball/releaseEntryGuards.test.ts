@@ -158,10 +158,16 @@ describe('Basketball release entry guards', () => {
 
   it('centralizes the internal Event release policy separately from sport availability', () => {
     const policy = source('src/lib/sportAvailability.ts')
+    const wholeSportPolicy = between(
+      policy,
+      'export interface SportAvailabilityPolicy {',
+      '\n}'
+    )
     expect(policy).toContain("export const BASKETBALL_EVENT_RELEASE_STAGE = 'internal'")
     expect(policy).toContain('export type BasketballEventReleaseStage')
     expect(policy).toContain('export function getBasketballEventCreationPolicy(')
-    expect(policy).not.toContain('SportAvailabilityPolicy &')
+    expect(wholeSportPolicy).not.toContain('Basketball')
+    expect(wholeSportPolicy).not.toContain('releaseStage?:')
   })
 
   it('rechecks Event creation before capability, parking, tournament, or commit mutation', () => {
@@ -177,9 +183,11 @@ describe('Basketball release entry guards', () => {
     expect(guardIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
     expect(guardIndex).toBeLessThan(handler.indexOf('commitGameSetup('))
     expect(context).toContain('loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled')
+    expect(context).toContain('Persisted state is authoritative here')
     expect(context).toContain(').canCreateNewEventGame')
     expect(parking).toContain('allowNewBasketballEventGame = false')
     expect(parking).toContain('continuingCommittedBasketballEventSetup')
+    expect(parking).toContain('isUninitializedBasketballEventState(nextState)')
   })
 
   it('keeps the rollout preference outside cloud-backed Basketball settings saves', () => {

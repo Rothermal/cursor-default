@@ -809,11 +809,11 @@ export function commitGameSetupState(
     const continuingCommittedBasketballEventSetup = Boolean(
       expectedLocalGameId &&
       manifest.activeLocalGameId === expectedLocalGameId &&
-      isBasketballEventSetupState(currentState) &&
-      isBasketballEventSetupState(nextState)
+      isUninitializedBasketballEventState(currentState) &&
+      isUninitializedBasketballEventState(nextState)
     )
     if (
-      isBasketballEventSetupState(nextState) &&
+      isUninitializedBasketballEventState(nextState) &&
       !allowNewBasketballEventGame &&
       !continuingCommittedBasketballEventSetup
     ) {
@@ -843,13 +843,11 @@ export function commitGameSetupState(
   }
 }
 
-function isBasketballEventSetupState(state: GameState): boolean {
+function isUninitializedBasketballEventState(state: GameState): boolean {
   return state.sport?.id === 'basketball' &&
     state.gameDataAuthority === SPORT_EVENTS_AUTHORITY &&
     state.eventStream === null &&
-    state.sportGameState === null &&
-    state.players.length === 0 &&
-    Boolean(state.gameInfo)
+    state.sportGameState === null
 }
 
 export function parkActiveGame(ownerId: string | null): ParkedGameSummary[] {

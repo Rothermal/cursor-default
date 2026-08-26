@@ -472,6 +472,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           nextState,
           userId,
           expectedLocalGameId,
+          // Persisted state is authoritative here so stale tabs and failed preference writes refuse.
           getBasketballEventCreationPolicy(
             loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled
           ).canCreateNewEventGame

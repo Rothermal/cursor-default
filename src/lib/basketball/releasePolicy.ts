@@ -20,7 +20,6 @@ export function canCommitBasketballSetup(
     input.draftCommittedLocalGameId &&
     input.draftCommittedLocalGameId === input.activeLocalGameId &&
     isBasketballEventSetupIntent(input.activeState) &&
-    Boolean(input.activeState.gameInfo) &&
-    input.activeState.players.length === 0
+    Boolean(input.activeState.gameInfo)
   )
 }

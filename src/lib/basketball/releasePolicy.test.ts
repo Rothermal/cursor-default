@@ -70,7 +70,7 @@ describe('Basketball Event setup release policy', () => {
     })).toBe(false)
   })
 
-  it('allows only the exact committed pre-start Event record to continue', () => {
+  it('allows the exact committed pre-start Event record throughout roster review', () => {
     const committed = committedEventSetupState()
     expect(canCommitBasketballSetup({
       authority: 'sport_events',
@@ -78,6 +78,35 @@ describe('Basketball Event setup release policy', () => {
       draftCommittedLocalGameId: 'local-1',
       activeLocalGameId: 'local-1',
       activeState: committed,
+    })).toBe(true)
+
+    const afterPlayerSetupMount = {
+      ...committed,
+      players: [
+        { id: '__team_home__', name: 'Aces', number: '*', stats: {}, isTeamPlayer: true },
+        { id: '__team_opp__', name: 'Bears', number: '*', stats: {}, isTeamPlayer: true },
+      ],
+    }
+    expect(canCommitBasketballSetup({
+      authority: 'sport_events',
+      policy: internalProduction,
+      draftCommittedLocalGameId: 'local-1',
+      activeLocalGameId: 'local-1',
+      activeState: afterPlayerSetupMount,
+    })).toBe(true)
+
+    expect(canCommitBasketballSetup({
+      authority: 'sport_events',
+      policy: internalProduction,
+      draftCommittedLocalGameId: 'local-1',
+      activeLocalGameId: 'local-1',
+      activeState: {
+        ...afterPlayerSetupMount,
+        players: [
+          ...afterPlayerSetupMount.players,
+          { id: 'player-1', name: 'One', number: '1', stats: {} },
+        ],
+      },
     })).toBe(true)
 
     expect(canCommitBasketballSetup({

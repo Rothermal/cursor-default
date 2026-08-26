@@ -302,7 +302,24 @@ describe('gameParking', () => {
     expect(getParkedGameRecord(committed.localGameId, null)?.gameState).toEqual(next)
   })
 
-  it('continues only the exact committed pre-start Basketball Event setup', () => {
+  it('recognizes every uninitialized Basketball Event candidate before permitting storage', () => {
+    const current = gameState(basketball, 'Current', 'One')
+    const next = {
+      ...basketballEventSetupState('Next', 'Two'),
+      gameInfo: null,
+      players: [{ id: 'seeded', name: 'Seeded', number: '1', stats: {} }],
+    }
+    saveActiveGameState(current, null)
+    const previousId = getActiveLocalGameId(null)
+
+    expect(() => commitGameSetupState(current, next, null)).toThrow(
+      'Enable New event tracker (preview)'
+    )
+    expect(getActiveLocalGameId(null)).toBe(previousId)
+    expect(listParkedGames(null)).toHaveLength(1)
+  })
+
+  it('continues the exact committed pre-start Basketball Event setup after roster review', () => {
     const current = basketballEventSetupState('Aces', 'Bears')
     saveActiveGameState(current, null)
     const localGameId = getActiveLocalGameId(null)!
@@ -312,11 +329,24 @@ describe('gameParking', () => {
     expect(committed.localGameId).toBe(localGameId)
     expect(getParkedGameRecord(localGameId, null)?.gameState.gameInfo?.opponentName).toBe('Cats')
 
-    expect(() => commitGameSetupState(
-      { ...updated, players: [{ id: 'p1', name: 'One', number: '1', stats: {} }] },
+    const afterRosterReview = {
+      ...updated,
+      players: [{ id: 'p1', name: 'One', number: '1', stats: {} }],
+    }
+    saveActiveGameState(afterRosterReview, null)
+    const rosteredCommit = commitGameSetupState(
+      afterRosterReview,
       basketballEventSetupState('Aces', 'Dogs'),
       null,
       localGameId
+    )
+    expect(rosteredCommit.localGameId).toBe(localGameId)
+
+    expect(() => commitGameSetupState(
+      basketballEventSetupState('Aces', 'Dogs'),
+      basketballEventSetupState('Aces', 'Eagles'),
+      null,
+      'different-local-id'
     )).toThrow('Enable New event tracker (preview)')
   })
   it('round-trips marked Basketball setup intent without aggregate fallback', () => {
