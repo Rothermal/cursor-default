@@ -1,10 +1,12 @@
 # Plan: BKE-6 Basketball Clock and Lineups
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
-decisions are approved. The five-slice delivery plan is ready for review; implementation has not
-started.
+decisions are approved. The BKE-6A detailed foundation plan is ready for review; implementation has
+not started.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
+
+BKE-6A detail: [PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md)
 
 ---
 
@@ -425,7 +427,7 @@ Each slice receives a detailed implementation plan and review before code begins
 
 | Phase | Scope | Exit condition |
 |---|---|---|
-| BKE-6A | Strict rules v3, one exhaustive rules-diff catalog, settings/profile parsing, registered clock/lineup events, deterministic projection, checked commands, additive fixed feature-capability migration, and compatibility fixtures; no production UI | Clock/lineup streams project and quarantine deterministically, versions 1-2 and the release-capability v2 RPC remain unchanged, and capability/local-only boundaries are proven |
+| BKE-6A | Strict rules v3, setup v2, one exhaustive rules-diff catalog, settings/profile parsing, registered clock/lineup events, deterministic projection, checked commands, additive fixed feature-capability migration, and compatibility fixtures; no production UI. Detailed as BKE-6A1 through BKE-6A3 in [PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md) | Clock/lineup streams project and quarantine deterministically, versions 1-2 and the release-capability v2 RPC remain unchanged, and capability/local-only boundaries are proven |
 | BKE-6B | Personal/team/match controls, immutable setup review, opening lineup, sticky live clock, timestamps, expiration/recovery, Set Clock, and parking guards | A new local anchored game can setup, run, pause, adjust, expire, park/reload, and complete periods without affecting clockless games |
 | BKE-6C | Multi-player substitutions, boundary confirmations, roles/captain, short-handed/replacement flows, equal-play enforcement/override, Recent Events, Timeline correction, and Set Current Lineup | Complete and incomplete lineup histories are accurately captured, corrected, diagnosed, and converted to exact intervals/minutes |
 | BKE-6D | Players/Overview/Timeline detail, exact-second aggregates, plus-minus quality, cloud capability/bind/sync, recorder readiness, finalization, correction/resume reopen, and republication | One coherent recorder can sync and publish anchored authority; remote/canonical review is read-only and aggregate output is quality-gated |

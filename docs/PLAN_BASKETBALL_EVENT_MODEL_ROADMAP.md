@@ -37,7 +37,10 @@ BKE-5C setup/authority (BKE-5C1 through BKE-5C4 complete), and BKE-5D release. B
 hardening and BKE-5D2's default-off production `opt_in` activation are implemented; deployment and
 owner smoke evidence remain in [PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md).
 BKE-6 product decisions and the five-slice clock/lineup delivery roadmap are approved in
-[PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md); implementation has not started.
+[PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md). The BKE-6A foundation is detailed
+into three implementation PRs in
+[PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md); implementation has
+not started.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -293,6 +296,7 @@ docs/PLAN_BKE_4D_SUMMARY_AUTHORITY.md
 docs/PLAN_BKE_4E_AGGREGATES_AND_RELEASE_READINESS.md
 docs/PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md
 docs/PLAN_BKE_6_CLOCK_AND_LINEUPS.md
+docs/PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md
 ```
 
 ---
