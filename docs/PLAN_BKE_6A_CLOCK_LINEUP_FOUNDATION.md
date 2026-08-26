@@ -1,6 +1,6 @@
 # Plan: BKE-6A Clock and Lineup Foundation
 
-Status: Approved. BKE-6A1 is implemented; BKE-6A2 and BKE-6A3 remain. No production UI or
+Status: Approved. BKE-6A1 and BKE-6A2 are implemented; BKE-6A3 remains. No production UI or
 anchored-game creation is enabled by this phase.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
@@ -52,7 +52,7 @@ remain derived/fingerprint-inert; immutable setup and event history remain autho
 | Slice | Scope | Exit condition |
 |---|---|---|
 | BKE-6A1 | Rules v3, setup v2, current-version diff/settings resolution, migration 063 settings validation, fixed capability RPC/client, and compatibility tests | Version 1-2 rules/settings/setup still round-trip exactly; deliberate v3 drafts resolve and persist; the old release RPC remains exact |
-| BKE-6A2 | Clock/stoppage event envelopes, pure anchored-clock projection, checked Start/Pause/Adjust commands, and clockless guards | Deterministic replay proves valid clock histories and fails closed on stale, impossible, or clockless use without any wall-clock UI loop |
+| BKE-6A2 | **Implemented.** Clock/stoppage event envelopes, pure anchored-clock projection, checked Start/Pause/Adjust commands, and clockless guards | Deterministic replay proves valid clock histories and fails closed on stale, impossible, or clockless use without any wall-clock UI loop |
 | BKE-6A3 | Opening/live lineup state, confirmations, substitutions, roles, equal-play evaluation/override, intervals, checked commands, and full parity audit | Valid lineups and exact running intersections project deterministically; incomplete histories are diagnosed; all prior Basketball/Soccer behavior remains green |
 
 Each slice receives its own implementation branch and PR. Migration 063 belongs only to A1 and is

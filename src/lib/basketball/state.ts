@@ -47,6 +47,22 @@ export function createBasketballMatchProjection(
     neutralTimeouts: 0,
     ejections: [],
     score: { tracked: 0, opponent: 0 },
+    clock: setup.version === 2 && setup.rulesSnapshot.clockModel === 'anchored'
+      ? {
+          periodId: null,
+          running: false,
+          elapsedMs: 0,
+          anchorElapsedMs: null,
+          anchorOccurredAt: null,
+          expired: false,
+          lastStartEventId: null,
+          lastPauseEventId: null,
+          lastAdjustmentEventId: null,
+          lastStoppageEventId: null,
+          pendingStoppagePauseEventId: null,
+          pendingStoppageCaptureCommandId: null,
+        }
+      : null,
     relationshipWarnings: [],
     endedAt: null,
     endReason: null,

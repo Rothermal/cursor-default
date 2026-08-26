@@ -32,6 +32,7 @@ export interface CreateBasketballAdministrativeEventInput<
   recorderUserId: string | null
   sequence: number
   period: GameEventPeriod
+  elapsedMs?: number | null
   occurredAt: string
   teamSide: GameEventTeamSide
   actors?: GameEventActor[]
@@ -50,7 +51,7 @@ export function createBasketballAdministrativeEvent<
     recorderUserId: input.recorderUserId,
     sequence: input.sequence,
     period: input.period,
-    elapsedMs: null,
+    elapsedMs: input.elapsedMs ?? null,
     occurredAt: input.occurredAt,
     teamSide: input.teamSide,
     location: null,
@@ -85,7 +86,6 @@ function definition(
         event.sportId !== 'basketball' ||
         event.eventType !== eventType ||
         event.schemaVersion !== BASKETBALL_EVENT_SCHEMA_VERSION ||
-        event.elapsedMs !== null ||
         event.location !== null ||
         !validateEvent(event)
       ) {

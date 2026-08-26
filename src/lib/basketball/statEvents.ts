@@ -34,6 +34,7 @@ export interface CreateBasketballStatEventInput<
   recorderUserId: string | null
   sequence: number
   period: GameEventPeriod
+  elapsedMs?: number | null
   occurredAt: string
   teamSide: BasketballTeamSide
   location?: GameEventLocation | null
@@ -53,7 +54,7 @@ export function createBasketballStatEvent<
     recorderUserId: input.recorderUserId,
     sequence: input.sequence,
     period: input.period,
-    elapsedMs: null,
+    elapsedMs: input.elapsedMs ?? null,
     occurredAt: input.occurredAt,
     teamSide: input.teamSide,
     location: input.location ?? null,
@@ -93,7 +94,6 @@ function statDefinition(
         event.sportId !== 'basketball' ||
         event.eventType !== eventType ||
         event.schemaVersion !== BASKETBALL_EVENT_SCHEMA_VERSION ||
-        event.elapsedMs !== null ||
         (!allowLocation && event.location !== null) ||
         !actorsHaveRoles(event.actors, allowedRoles, requiredRoles) ||
         !actorsMatchEventFamily(eventType, event) ||
