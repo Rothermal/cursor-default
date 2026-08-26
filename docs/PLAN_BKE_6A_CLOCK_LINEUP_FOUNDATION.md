@@ -202,9 +202,17 @@ non-negative integer `elapsedMs`. Projection remains the authority:
 This keeps new clockless events readable by deployed clients while old clients fail closed on
 unknown anchored event families or non-null anchored gameplay timestamps.
 
-An older client also continues to resolve unchanged version-2 saved settings. If an account has
-deliberately persisted a version-3 override bundle, that older client fails its strict settings
-parse and requires an update; it must not discard the bundle or silently create a clockless game.
+An older client continues to resolve unchanged version-2 saved settings. Persisting any version-3
+bundle has a wider deliberate compatibility cost: an un-updated client fails the whole strict
+settings parse and cannot start any new Basketball Event game that resolves through that authority,
+including a clockless Event game. A personal bundle affects that account's stale devices; a team
+bundle affects every stale client attempting team-sourced Event setup for that team. Legacy setup
+and continuation/review of existing Event snapshots do not resolve fresh settings and remain
+available. The parser must never discard the bundle or silently create a clockless game.
+
+BKE-6B must show this multi-device/team-member consequence before confirming a personal or team
+version-3 save. The confirmation is required even when the v3 bundle selects `clockModel: 'none'`,
+because the compatibility boundary is the settings schema rather than the selected clock mode.
 
 ## 6. Clock Projection and Commands
 
@@ -217,10 +225,16 @@ Pure replay rules:
 1. A started anchored period opens paused at elapsed zero.
 2. Start requires the current paused elapsed, a valid active period, and satisfied lineup-start
    guards. It records the event `occurredAt` as the wall anchor.
-3. Canonical running time at another event is
-   `anchorElapsedMs + max(0, eventOccurredAt - anchorOccurredAt)`, capped at segment duration.
-4. Pause must match that deterministic value. Expiration uses exactly the segment duration and may
-   occur only once for one running interval.
+3. Replay first requires `eventOccurredAt >= anchorOccurredAt`; a negative wall delta is invalid and
+   stops at the last coherent projection. For a valid timestamp, unbounded running elapsed is
+   `anchorElapsedMs + (eventOccurredAt - anchorOccurredAt)`, and canonical elapsed is that value
+   capped at the segment duration.
+4. Pause `source` is authoritative, not descriptive. If unbounded elapsed is below the duration,
+   `manual` or `period_end` must store that exact uncapped value. If unbounded elapsed reaches or
+   exceeds the duration, only `expiration` is valid and it stores exactly the duration. The first
+   valid Pause closes that running interval, so a later Pause of any source is stale rather than a
+   second expiration materialization. An adjustment below the duration may later create a new
+   running interval with its own single closing Pause.
 5. Adjustment is paused-only in the persisted result. A checked command first appends Pause when
    necessary, then a reasoned replacement in one atomic command group.
 6. Period End requires a paused clock and atomically materializes a Pause first when invoked through
@@ -230,8 +244,11 @@ Pure replay rules:
    targeted diagnostic.
 
 A pure display helper may derive current visible time from an injected `now`; it never dispatches or
-writes. BKE-6A tests use explicit ISO instants and fake timers. The browser scheduler, expiration
-materialization on wake/reload, alerts, and sticky controls remain BKE-6B.
+writes. Unlike replay, it clamps an injected time earlier than the anchor to the anchor elapsed and
+returns a backward-clock warning for presentation/recovery. It may display the capped period end,
+but it never infers or appends the authoritative expiration Pause. BKE-6A tests use explicit ISO
+instants and fake timers. The browser scheduler, single expiration materialization on wake/reload,
+alerts, and sticky controls remain BKE-6B.
 
 Checked command helpers append through the shared atomic mutation engine and return existing-style
 `BasketballCommandResult` failures. A2 provides Start, Pause with optional stoppage, and Set Clock.
@@ -327,6 +344,9 @@ finalization.
   fields or changed fingerprints.
 - Built-in profiles and profile version numbers remain byte-compatible.
 - Clockless Basketball continues producing null elapsed values and accepting manual minutes.
+- An un-updated client remains compatible with v2 defaults and existing clockless snapshots, but a
+  persisted personal/team v3 bundle intentionally blocks every new Event setup that resolves that
+  authority until the client updates; BKE-6B must warn before that save.
 - Anchored events in a clockless setup fail projection rather than silently becoming clockless.
 - Unsupported rules/setup/event versions remain quarantined through existing diagnostics.
 - Projection remains last-coherent; checked commands require a complete rebuilt stream.
@@ -345,6 +365,9 @@ finalization.
 - one exhaustive field label/formatter/source-diff catalog;
 - personal/team/match resolution, saved-default non-upgrade, CAS payload compatibility, and role
   permission parity;
+- stale-client strict parsing and setup-authority tests proving a personal/team v3 bundle blocks all
+  new Event starts using that authority, including clockless Event intent, without affecting Legacy
+  setup or existing Event snapshots;
 - setup-v2 opening-lineup validation and setup-v1 fingerprint parity;
 - migration 063 exact SQL contract, grants, validator compatibility, and proof that the release RPC
   is not replaced; and
@@ -352,11 +375,12 @@ finalization.
 
 ### BKE-6A2
 
-- Start/Pause, duplicate/stale commands, optional atomic stoppage, expiration, and Set Clock;
+- Start/Pause, duplicate/stale commands, optional atomic stoppage, source-authoritative expiration,
+  overdue manual/period-end rejection, one closing Pause per running interval, and Set Clock;
 - countdown/count-up display helpers over the same canonical elapsed value;
 - fake-time replay across multiple running intervals without real sleeps or per-second events;
-- negative wall deltas, invalid ISO timestamps, segment bounds, period transitions, and last-coherent
-  diagnostics; and
+- replay rejection versus display-only clamp/warning for negative wall deltas, invalid ISO
+  timestamps, segment bounds, period transitions, and last-coherent diagnostics; and
 - clock events rejected for every clockless rules/setup fixture.
 
 ### BKE-6A3

@@ -277,7 +277,11 @@ substitutions, equal-play policy, exact participation intervals, independent rec
 and a separate additive fixed cloud feature-capability RPC while the exact-shape release-capability
 v2 surface remains unchanged. `PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md` details three foundation
 PRs: A1 rules v3/setup v2/settings/capability, A2 clock/stoppage projection, and A3 lineup/equal-play
-projection, all without production UI. Mutation-free setup entry stays read-only; running clocks are
+projection, all without production UI. Replay rejects backward wall timestamps while display-only
+derivation clamps and warns; an overdue interval closes exactly once with authoritative Pause source
+`expiration`. Persisting a v3 personal/team setting blocks all new Event setup using that authority
+on un-updated clients, including clockless intent, so BKE-6B must warn before save; Legacy setup and
+existing snapshots remain available. Mutation-free setup entry stays read-only; running clocks are
 intercepted only when Park, setup commit, or game replacement would mutate active state.
 Implementation has not started; rules versions 1-2, setup version 1, and existing games remain
 clockless, and shot-clock/possession work stays out.

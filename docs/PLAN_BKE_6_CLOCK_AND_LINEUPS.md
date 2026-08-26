@@ -259,6 +259,9 @@ match override -> team default -> personal default -> built-in profile
 - Existing built-in versions and saved defaults remain clockless.
 - Selecting Anchored upgrades only the editable draft after a complete source-aware diff.
 - Saving personal/team version 3 continues through the existing revision-CAS contracts.
+- Before saving version 3, warn that un-updated clients will fail the whole strict settings parse
+  and cannot start any new Basketball Event game using that personal/team authority, including
+  clockless Event intent, until they update. Existing snapshots and Legacy setup remain available.
 - Team owners/admins edit; scorers/viewers review read-only.
 - Game Setup snapshots the complete resolved version-3 value and source revisions.
 - Disabling Anchored in a draft never converts or rewrites an existing game.
@@ -402,10 +405,13 @@ local-only anchored creation may proceed without a reachable server, retaining t
 local-only policy until both preflights succeed.
 
 The existing exact-shape `get_basketball_release_capabilities` RPC must remain byte-for-byte
-compatible so unrefreshed clients can continue clockless Event cloud setup and Enable Cloud Sync.
-The new fixed RPC is additive and called only by anchored-aware clients. Missing/stale feature
-capability produces backend-update guidance; malformed responses fail closed. Unregistered anchored
-event families continue using the existing stream quarantine boundary rather than misprojecting.
+compatible so unrefreshed clients with version-2 settings can continue clockless Event cloud setup
+and Enable Cloud Sync. Persisting a version-3 personal/team bundle intentionally requires every
+client starting a new Event game through that authority to update, even for clockless Event intent;
+the settings upgrade UI must disclose that scope. The new fixed RPC is additive and called only by
+anchored-aware clients. Missing/stale feature capability produces backend-update guidance; malformed
+responses fail closed. Unregistered anchored event families continue using the existing stream
+quarantine boundary rather than misprojecting.
 
 Finalization requires:
 
