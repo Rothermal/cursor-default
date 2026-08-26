@@ -1,7 +1,7 @@
 # BKE-5 Basketball Settings and Rollout Regression Record
 
-Status: BKE-5D1 implementation complete with production policy `internal`. BKE-5D2 activation,
-deployment evidence, and owner smoke signoff remain pending. The broader live matrix remains open.
+Status: BKE-5D1 hardening and BKE-5D2 production `opt_in` activation are implementation-complete.
+Deployment evidence and owner smoke remain pending. The broader live matrix remains open.
 
 Plans: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md) and
 [PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md)
@@ -14,8 +14,8 @@ Plans: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_
 - `statkeeper_settings.basketball.eventTrackerPreviewEnabled` defaults false, accepts only a
   boolean, and remains device-local across account changes. It is separate from whole-sport
   discovery, rebound capture, and Supabase-backed Basketball settings.
-- Settings -> Sports -> Basketball -> Tracker owns the preview switch. Internal production shows
-  it disabled. Tracker changes never enter cloud CAS, save, discard, reset, or conflict flows.
+- Settings -> Sports -> Basketball -> Tracker owns the preview switch. Opt-in production exposes it
+  default-off. Tracker changes never enter cloud CAS, save, discard, reset, or conflict flows.
 - Game Setup keeps Classic as the fresh default and uses Classic/New tracker labels. An unavailable
   Event draft is preserved but cannot commit; choosing Classic remains possible.
 - The atomic parking transaction re-reads the persisted preference and rejects an unauthorized
@@ -45,7 +45,7 @@ permission to create an Event game.
 
 ## 3. Automated Evidence
 
-BKE-5D1 focused coverage proves the full injected policy matrix, strict storage compatibility,
+BKE-5D coverage proves the full injected policy matrix, strict storage compatibility,
 namespace isolation, setup lifecycle distinctions, guard ordering, fresh commit-time preference
 read, rollback-safe parking behavior, and static release-entry boundaries.
 
@@ -76,9 +76,15 @@ These checks validate hardening without exposing production creation:
 
 ## 5. D2 Owner Release Signoff
 
-BKE-5D2 must start from merged D1, rerun all automated checks, and change only the centralized
-production stage from `internal` to `opt_in` plus expected tests/evidence. Record the deployed commit,
-CI/build result, migration ceiling, and each focused owner smoke result from the D plan.
+BKE-5D2 starts from merged D1 and changes only the centralized production stage from `internal` to
+`opt_in` plus expected tests and evidence. The exact false/true production tests preserve the
+default-off contract. No migration is added; migration 062 remains the ceiling.
+
+- Owner approval: approved for initial single-user deployment with post-deployment validation.
+- Candidate base: `8b07c51` (merged BKE-5D1).
+- Candidate branch: `feature/bke-5d2-production-activation`.
+- Deployment commit and CI: pending PR merge/deployment.
+- Focused owner smoke: **Not run - pending deployment**.
 
 Initial owner-only deployment may precede manual validation. Any failure receives an explicit
 Pass, Fail, Blocked, or Not run disposition; it is not silently accepted. Migration 062 must already

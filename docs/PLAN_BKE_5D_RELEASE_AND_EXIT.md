@@ -1,7 +1,7 @@
 # Plan: BKE-5D Basketball Event Release and Exit
 
-Status: Product and delivery Q&A approved. BKE-5D1 policy and hardening are implemented with the
-production stage still `internal`. BKE-5D2 production activation and owner signoff remain.
+Status: Product and delivery Q&A approved. BKE-5D1 hardening and the BKE-5D2 `opt_in` production
+activation are implemented. Deployment evidence and the focused owner smoke disposition remain.
 
 Parent: [PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md](PLAN_BKE_5_SETTINGS_AND_EVENT_ROLLOUT.md)
 
@@ -90,8 +90,9 @@ values:
   production cannot create them.
 - `opt_in`: development and production may create Event games when the device preference is on.
 
-BKE-5D1 introduces and tests the policy while leaving the production stage effectively internal.
-BKE-5D2 changes only the centralized production stage to `opt_in` after BKE-5D1 merges.
+BKE-5D1 introduced and tested the policy while leaving production internal. BKE-5D2 changes only
+the centralized production stage to `opt_in`; the strict default-off device preference remains the
+required production gate.
 
 The policy should expose a pure result rather than leaking environment checks to pages. At minimum,
 callers need to distinguish:
@@ -287,7 +288,7 @@ preference, while allowing only the exact matching committed pre-start Event slo
 No migration is added; migration 062 remains the ceiling. See
 [`REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md`](REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md).
 
-### BKE-5D2: Production activation and owner signoff
+### BKE-5D2: Production activation and owner signoff - activation implemented
 
 - Start from merged BKE-5D1 and re-run the complete automated suite.
 - Flip only the centralized production policy from `internal` to `opt_in`.
@@ -300,6 +301,13 @@ No migration is added; migration 062 remains the ceiling. See
 
 Exit: production defaults to Classic-only creation, a deliberate device opt-in exposes the New
 tracker, rollback disables only new Event creation, and the owner smoke record has a clear status.
+
+Implementation note: `BASKETBALL_EVENT_RELEASE_STAGE` is `opt_in`. The default production policy
+test proves an exact false preference blocks Event creation and an exact true preference enables it,
+while existing Event access remains unconditional. No setup, transport, authorization, migration,
+or historical route changed. The owner approved an initial single-user deployment with validation
+after deployment. The focused smoke disposition is currently `Not run - pending deployment`; CI,
+deployed commit, and smoke evidence must be recorded after this candidate merges and deploys.
 
 ## 9. Automated Verification
 

@@ -163,7 +163,7 @@ describe('Basketball release entry guards', () => {
       'export interface SportAvailabilityPolicy {',
       '\n}'
     )
-    expect(policy).toContain("export const BASKETBALL_EVENT_RELEASE_STAGE = 'internal'")
+    expect(policy).toContain("export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in'")
     expect(policy).toContain('export type BasketballEventReleaseStage')
     expect(policy).toContain('export function getBasketballEventCreationPolicy(')
     expect(wholeSportPolicy).not.toContain('Basketball')

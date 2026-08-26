@@ -31,8 +31,20 @@ describe('getSportAvailabilityPolicy', () => {
     }
   )
 
-  it('keeps the BKE-5D1 production policy internal', () => {
-    expect(BASKETBALL_EVENT_RELEASE_STAGE).toBe('internal')
+  it('activates BKE-5D2 production only through the default-off device preference', () => {
+    expect(BASKETBALL_EVENT_RELEASE_STAGE).toBe('opt_in')
+    expect(getBasketballEventCreationPolicy(false, { development: false })).toEqual({
+      releaseStage: 'opt_in',
+      preferenceAvailable: true,
+      canCreateNewEventGame: false,
+      canAccessExistingEventGames: true,
+    })
+    expect(getBasketballEventCreationPolicy(true, { development: false })).toEqual({
+      releaseStage: 'opt_in',
+      preferenceAvailable: true,
+      canCreateNewEventGame: true,
+      canAccessExistingEventGames: true,
+    })
   })
 
   it('keeps the development Soccer preview behind the user toggle', () => {
