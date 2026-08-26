@@ -9,8 +9,9 @@ Status: Implemented and automated. BKE-6A3 remains before the no-UI foundation i
 - Added nullable anchored clock projection for rules-v3 anchored setup. Existing version-1/version-2
   and rules-v3 clockless histories retain a null clock and require null event elapsed values.
 - Derived running elapsed from the persisted start event `occurredAt`, capped canonical elapsed at
-  period duration, and rejected backward timestamps, stale values, period mismatches, duplicate
-  transitions, and unmaterialized expiration at the last coherent event.
+  period duration, and rejected backward timestamps, non-monotonic elapsed within one running
+  interval, stale values, period mismatches, duplicate transitions, and unmaterialized expiration
+  at the last coherent event. Intentional backward changes remain explicit reasoned adjustments.
 - Made Pause source authoritative: manual and period-end pauses apply only below duration;
   expiration applies only at or beyond duration and stores the exact duration.
 - Added atomic checked Start, Pause with optional linked stoppage, and Set Clock commands. Set Clock
@@ -30,7 +31,7 @@ directions, exact payload validation, and clockless rejection.
 Repository verification at implementation:
 
 ```text
-pnpm test       170 files, 1170 tests passed
+pnpm test       170 files, 1171 tests passed
 pnpm typecheck  passed
 ```
 

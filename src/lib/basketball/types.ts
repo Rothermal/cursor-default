@@ -322,6 +322,7 @@ export interface BasketballAnchoredClockProjection {
   elapsedMs: number
   anchorElapsedMs: number | null
   anchorOccurredAt: string | null
+  lastRunningElapsedMs: number | null
   expired: boolean
   lastStartEventId: string | null
   lastPauseEventId: string | null

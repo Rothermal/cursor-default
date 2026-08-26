@@ -89,6 +89,7 @@ export function applyBasketballClockEvent(
       clock.running = true
       clock.anchorElapsedMs = clock.elapsedMs
       clock.anchorOccurredAt = event.occurredAt
+      clock.lastRunningElapsedMs = clock.elapsedMs
       clock.lastStartEventId = event.id
       clearPendingStoppage(clock)
       return null
@@ -111,6 +112,7 @@ export function applyBasketballClockEvent(
       clock.elapsedMs = moment.elapsedMs
       clock.anchorElapsedMs = null
       clock.anchorOccurredAt = null
+      clock.lastRunningElapsedMs = null
       clock.expired = event.payload.source === 'expiration'
       clock.lastPauseEventId = event.id
       clock.pendingStoppagePauseEventId = event.id
@@ -128,6 +130,7 @@ export function applyBasketballClockEvent(
         return 'Basketball clock adjustment exceeds the period duration.'
       }
       clock.elapsedMs = event.payload.toElapsedMs
+      clock.lastRunningElapsedMs = null
       clock.expired = event.payload.toElapsedMs === segment.durationMs
       clock.lastAdjustmentEventId = event.id
       clearPendingStoppage(clock)
@@ -156,6 +159,7 @@ export function startBasketballClockPeriod(
     elapsedMs: 0,
     anchorElapsedMs: null,
     anchorOccurredAt: null,
+    lastRunningElapsedMs: null,
     expired: false,
     lastStartEventId: null,
     lastPauseEventId: null,
@@ -177,6 +181,15 @@ export function clearPendingBasketballStoppageAfterEvent(
   clearPendingStoppage(projection.clock)
 }
 
+export function recordBasketballRunningClockMomentAfterEvent(
+  projection: BasketballMatchProjection,
+  event: GameEvent
+): void {
+  const clock = projection.clock
+  if (!clock?.running || event.elapsedMs === null) return
+  clock.lastRunningElapsedMs = event.elapsedMs
+}
+
 export function basketballClockMomentAt(
   clock: BasketballAnchoredClockProjection,
   occurredAt: string,
@@ -195,10 +208,17 @@ export function basketballClockMomentAt(
     return { ok: false, message: 'Basketball clock timestamp precedes the running anchor.' }
   }
   const unboundedElapsedMs = clock.anchorElapsedMs + deltaMs
+  const elapsedMs = Math.min(durationMs, unboundedElapsedMs)
+  if (clock.lastRunningElapsedMs !== null && elapsedMs < clock.lastRunningElapsedMs) {
+    return {
+      ok: false,
+      message: 'Basketball clock elapsed value moved backward within the running interval.',
+    }
+  }
   return {
     ok: true,
     unboundedElapsedMs,
-    elapsedMs: Math.min(durationMs, unboundedElapsedMs),
+    elapsedMs,
   }
 }
 

@@ -12,6 +12,7 @@ import { resolveBasketballPeriodSegment } from './rules'
 import {
   applyBasketballClockEvent,
   clearPendingBasketballStoppageAfterEvent,
+  recordBasketballRunningClockMomentAfterEvent,
   startBasketballClockPeriod,
   validateBasketballEventClockMoment,
 } from './clockProjection'
@@ -102,6 +103,7 @@ export function projectBasketballEvents(
       break
     }
     clearPendingBasketballStoppageAfterEvent(next, event)
+    recordBasketballRunningClockMomentAfterEvent(next, event)
     projection = next
     registerProjectedBasketballEvent(statContext, event)
   }

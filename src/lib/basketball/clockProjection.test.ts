@@ -15,6 +15,7 @@ import { deriveBasketballClockDisplay } from './clockProjection'
 import { createBasketballLifecycleEvent } from './events'
 import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
 import { createBasketballSportGameState } from './state'
+import { createBasketballStatEvent } from './statEvents'
 import type {
   BasketballMatchParticipant,
   BasketballMatchSetupV1,
@@ -230,6 +231,65 @@ describe('BKE-6A2 Basketball anchored clock projection', () => {
       reachedExpiration: false,
       backwardClockWarning: true,
     })
+  })
+
+  it('rejects canonical elapsed moving backward within one running interval', () => {
+    const started = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(42),
+    }))
+    const firstEvent = createBasketballStatEvent({
+      id: uuid(43),
+      eventType: 'basketball.score_adjustment',
+      payload: {
+        delta: 1,
+        reason: 'scoreboard_control',
+        note: null,
+        captureCommandId: null,
+      },
+      recorderUserId,
+      sequence: 3,
+      period: currentPeriod(started),
+      elapsedMs: 60_000,
+      occurredAt: isoAfter(periodStart, 60_000),
+      teamSide: 'tracked',
+      actors: [{ role: 'team', kind: 'team', label: 'Aces' }],
+    })
+    const forward = addGameEvent(
+      started,
+      firstEvent,
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    expect(forward.ok).toBe(true)
+    if (!forward.ok) return
+
+    const secondEvent = createBasketballStatEvent({
+      id: uuid(44),
+      eventType: 'basketball.score_adjustment',
+      payload: {
+        delta: 1,
+        reason: 'scoreboard_control',
+        note: null,
+        captureCommandId: null,
+      },
+      recorderUserId,
+      sequence: 4,
+      period: currentPeriod(forward.state),
+      elapsedMs: 35_000,
+      occurredAt: isoAfter(periodStart, 35_000),
+      teamSide: 'tracked',
+      actors: [{ role: 'team', kind: 'team', label: 'Aces' }],
+    })
+    const backward = addGameEvent(
+      forward.state,
+      secondEvent,
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    expect(backward).toMatchObject({ ok: false, state: forward.state })
+    expect(clockOf(forward.state).lastRunningElapsedMs).toBe(60_000)
   })
 
   it('uses one canonical elapsed value for count-up and count-down displays', () => {

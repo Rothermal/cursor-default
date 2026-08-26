@@ -54,6 +54,7 @@ export function createBasketballMatchProjection(
           elapsedMs: 0,
           anchorElapsedMs: null,
           anchorOccurredAt: null,
+          lastRunningElapsedMs: null,
           expired: false,
           lastStartEventId: null,
           lastPauseEventId: null,
