@@ -36,6 +36,8 @@ BKE-5A profiles/compatibility, BKE-5B persistence/settings (BKE-5B1 through BKE-
 BKE-5C setup/authority (BKE-5C1 through BKE-5C4 complete), and BKE-5D release. BKE-5D1 policy
 hardening and BKE-5D2's default-off production `opt_in` activation are implemented; deployment and
 owner smoke evidence remain in [PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md).
+BKE-6 product decisions and the five-slice clock/lineup delivery roadmap are approved in
+[PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md); implementation has not started.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
@@ -236,7 +238,7 @@ F13 is not discarded; its implementation path moves under the basketball event p
 
 ---
 
-## 7. Proposed Phase Roadmap
+## 7. Phase Roadmap
 
 Each phase requires a separate implementation plan and one-question-at-a-time Q&A.
 
@@ -248,7 +250,7 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 | BKE-3 | Editable Basketball Timeline/detail experience and F13 delivery. **Splits into BKE-3A-3D** | BKE-2 | Users can review, revise, remove, restore, and re-link supported local events |
 | BKE-4 | Generalized cloud lifecycle, authority-aware Summary, canonical aggregates, capability negotiation, and release readiness. **Splits into BKE-4A-4E** — see BKE-0 §9 | BKE-3 stable | New Basketball games sync and publish canonically behind the internal gate; Soccer remains unchanged; legacy games remain readable |
 | BKE-5 | Built-in/personal/team/match Basketball settings, versioned rule profiles, mutation-free authority setup, and event-model rollout. **BKE-5A through BKE-5D2 are implemented through migration 062; deployment and owner smoke evidence remain** | BKE-4E | Defaults resolve with source metadata, setup fixes a complete immutable rules snapshot, local-only intent is durable, and the user opt-in ships after accepted evidence |
-| BKE-6 | Basketball clock, stoppage profiles, substitutions, and on-court intervals | BKE-5 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |
+| BKE-6 | Basketball clock, stoppage context, substitutions, equal-play enforcement, and on-court intervals. **Splits into BKE-6A-6E** | BKE-5 | Default-off anchored games derive exact minutes and quality-gated lineup metrics while clockless games remain unchanged |
 
 BKE-1 is split so the generic state/mutation refactor, deterministic Basketball foundation, and
 visible court cutover each receive an independent proof. BKE-4 is split into 4A neutral RPC
@@ -257,6 +259,8 @@ explicit Summary authority, and 4E canonical aggregates plus capability-backed r
 BKE-5 is split into implemented 5A source-audited profiles and version compatibility, 5B settings
 persistence and surfaces, 5C mutation-free authority setup and binding policy, 5D1 release
 hardening, and 5D2 default-off production activation. Deployment evidence remains pending.
+BKE-6 is split into 6A rules/events/capability, 6B setup/live clock, 6C substitutions/equal
+play/corrections, 6D Summary/aggregates/cloud lifecycle, and 6E release hardening/evidence.
 
 **Gating:** because the reducer disables every legacy aggregate action the moment a stream exists,
 event-game creation stayed behind an internal gate through BKE-5C; the user-visible, default-off
@@ -265,9 +269,10 @@ layered settings, and mutation-free setup are complete. The initial owner-only r
 focused post-deployment validation; combined release evidence remains required before access
 broadens (BKE-0 §3.3, §10).
 
-BKE-6 is the proposed clock/lineup fast follower. Basketball stoppage rules vary sharply by age
-level and competition, and the shared transport is payload-agnostic, so BKE-0 reserves the clock,
-stoppage, and substitution event types while BKE-5 first establishes the rule profiles they consume.
+BKE-6 is the approved clock/lineup fast follower. Its 48-question product pass preserves explicit
+manual clock authority, exact anchored intervals, atomic multi-player substitutions, configurable
+equal-play enforcement, independent recorder histories, and a separate feature capability. Rules
+versions 1-2 and all existing games stay clockless; shot-clock and possession work remain separate.
 
 Recommended detailed plan names:
 
