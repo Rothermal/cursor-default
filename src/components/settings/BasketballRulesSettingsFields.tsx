@@ -250,7 +250,7 @@ export function BasketballRulesSummary({
   const { profile, rules, customized, sourceByField } = resolution
   const source = (field: BasketballRulesV2Field) => {
     const sourceId = sourceByField[field]
-    return sourceLabels?.[sourceId] ??
+    return (sourceId ? sourceLabels?.[sourceId] : undefined) ??
       (sourceId === layerId ? overrideSourceLabel : 'Built-in profile')
   }
 

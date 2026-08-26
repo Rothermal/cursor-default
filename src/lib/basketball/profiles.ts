@@ -2,15 +2,19 @@ import type {
   BasketballFoulWindowRule,
   BasketballMatchRules,
   BasketballMatchRulesV2,
+  BasketballMatchRulesV3,
   BasketballMatchSegmentV2,
   BasketballOvertimeFoulPolicy,
   BasketballOvertimeTimeoutPolicy,
-  BasketballRuleOverridesV2,
-  BasketballRulesV2Field,
+  BasketballRuleOverrides,
+  BasketballRulesField,
   BasketballRulesSource,
   BasketballTimeoutPoolRule,
 } from './types'
-import { isBasketballMatchRulesV2, validateBasketballMatchRules } from './rules'
+import {
+  isBasketballStructuredMatchRules,
+  validateBasketballMatchRules,
+} from './rules'
 import { BASKETBALL_RULE_FIELDS } from './profileDiffPresentation'
 
 const MINUTE_MS = 60_000
@@ -50,13 +54,13 @@ export type BasketballRuleLayerId = 'personal' | 'team' | 'match'
 
 export interface BasketballRuleLayer {
   id: BasketballRuleLayerId
-  overrides: BasketballRuleOverridesV2
+  overrides: BasketballRuleOverrides
 }
 
 export interface BasketballResolvedRules {
   profile: BasketballRulesProfile
-  rules: BasketballMatchRulesV2
-  sourceByField: Record<BasketballRulesV2Field, 'built_in' | BasketballRuleLayerId>
+  rules: BasketballMatchRulesV2 | BasketballMatchRulesV3
+  sourceByField: Partial<Record<BasketballRulesField, 'built_in' | BasketballRuleLayerId>>
   customized: boolean
 }
 
@@ -65,7 +69,7 @@ export type BasketballRulesResolutionResult =
   | { ok: false; layer: 'built_in' | BasketballRuleLayerId; message: string }
 
 export interface BasketballProfileUpgradeDiff {
-  field: BasketballRulesV2Field
+  field: BasketballRulesField
   changedByProfile: boolean
   overridden: boolean
 }
@@ -261,13 +265,57 @@ export function getBasketballRulesProfile(
   return found ? structuredClone(found) : null
 }
 
-export function normalizeBasketballRuleOverridesV2(
+const BASKETBALL_CLOCK_LINEUP_FIELDS = [
+  'clockModel',
+  'clockDisplayDirection',
+  'clockExpiration',
+  'stoppageMode',
+  'equalPlayPolicy',
+] as const satisfies readonly BasketballRulesField[]
+
+export function normalizeBasketballRuleOverrides(
   value: unknown
-): BasketballRuleOverridesV2 | null {
+): BasketballRuleOverrides | null {
   if (!isObject(value)) return null
   const keys = Object.keys(value)
-  if (keys.some(key => !BASKETBALL_RULE_FIELDS.includes(key as BasketballRulesV2Field))) return null
-  return structuredClone(value as BasketballRuleOverridesV2)
+  if (keys.some(key => !BASKETBALL_RULE_FIELDS.includes(key as BasketballRulesField))) return null
+  const v3OnlyFields = BASKETBALL_CLOCK_LINEUP_FIELDS.filter(field => field !== 'clockModel')
+  const v3OnlyCount = v3OnlyFields.filter(field => field in value).length
+  if (v3OnlyCount !== 0 && (
+    v3OnlyCount !== v3OnlyFields.length || !('clockModel' in value)
+  )) return null
+  return structuredClone(value as BasketballRuleOverrides)
+}
+
+export function upgradeBasketballRulesDraftToV3(
+  rules: BasketballMatchRulesV2,
+  profileId: BasketballRulesProfileId
+): BasketballMatchRulesV3 {
+  const equalPlay = profileId === 'youth_equal_play'
+  const upgraded: BasketballMatchRulesV3 = {
+    ...structuredClone(rules),
+    rulesSchemaVersion: 3,
+    clockModel: 'anchored',
+    clockDisplayDirection: 'count_down',
+    clockExpiration: 'stop_at_zero',
+    stoppageMode: 'explicit',
+    equalPlayPolicy: equalPlay
+      ? {
+          mode: 'enforced',
+          minimumPeriods: null,
+          maximumConsecutivePeriods: 2,
+          maximumPeriodImbalance: 1,
+        }
+      : {
+          mode: 'off',
+          minimumPeriods: null,
+          maximumConsecutivePeriods: null,
+          maximumPeriodImbalance: null,
+        },
+  }
+  const error = validateBasketballMatchRules(upgraded)
+  if (error) throw new Error(error)
+  return upgraded
 }
 
 export function resolveBasketballRules(
@@ -281,20 +329,27 @@ export function resolveBasketballRules(
   if (!profileValue) {
     return { ok: false, layer: 'built_in', message: 'Basketball rules profile is unavailable.' }
   }
-  let rules = structuredClone(profileValue.rules)
+  let rules: BasketballMatchRulesV2 | BasketballMatchRulesV3 = structuredClone(profileValue.rules)
   const sourceByField = Object.fromEntries(
-    BASKETBALL_RULE_FIELDS.map(field => [field, 'built_in'])
+    BASKETBALL_RULE_FIELDS
+      .filter(field => field in profileValue.rules)
+      .map(field => [field, 'built_in'])
   ) as BasketballResolvedRules['sourceByField']
   for (const layer of layers) {
-    const overrides = normalizeBasketballRuleOverridesV2(layer.overrides)
+    const overrides = normalizeBasketballRuleOverrides(layer.overrides)
     if (!overrides) {
       return { ok: false, layer: layer.id, message: 'Basketball rule overrides are invalid.' }
     }
-    const candidate = { ...rules, ...structuredClone(overrides), rulesSchemaVersion: 2 as const }
+    const introducesV3 = BASKETBALL_CLOCK_LINEUP_FIELDS.every(field => field in overrides)
+    const candidate = {
+      ...rules,
+      ...structuredClone(overrides),
+      rulesSchemaVersion: rules.rulesSchemaVersion === 3 || introducesV3 ? 3 as const : 2 as const,
+    } as BasketballMatchRulesV2 | BasketballMatchRulesV3
     const error = validateBasketballMatchRules(candidate)
     if (error) return { ok: false, layer: layer.id, message: error }
     rules = candidate
-    for (const field of Object.keys(overrides) as BasketballRulesV2Field[]) {
+    for (const field of Object.keys(overrides) as BasketballRulesField[]) {
       sourceByField[field] = layer.id
     }
   }
@@ -312,7 +367,7 @@ export function resolveBasketballRules(
 export function previewBasketballProfileUpgrade(
   current: BasketballRulesProfileRef,
   target: BasketballRulesProfileRef,
-  overrides: BasketballRuleOverridesV2 = {}
+  overrides: BasketballRuleOverrides = {}
 ): BasketballProfileUpgradeResult {
   const currentResolved = resolveBasketballRules(current, [{ id: 'personal', overrides }])
   if (!currentResolved.ok) return { ok: false, message: currentResolved.message }
@@ -328,12 +383,12 @@ export function previewBasketballProfileUpgrade(
     targetBaseRules: structuredClone(targetBase.rules),
     differences: BASKETBALL_RULE_FIELDS
       .filter(field =>
-        !sameJson(currentResolved.value.rules[field], candidateResolved.value.rules[field]) ||
-        !sameJson(currentBase.rules[field], targetBase.rules[field])
+        !sameJson(ruleFieldValue(currentResolved.value.rules, field), ruleFieldValue(candidateResolved.value.rules, field)) ||
+        !sameJson(ruleFieldValue(currentBase.rules, field), ruleFieldValue(targetBase.rules, field))
       )
       .map(field => ({
         field,
-        changedByProfile: !sameJson(currentBase.rules[field], targetBase.rules[field]),
+        changedByProfile: !sameJson(ruleFieldValue(currentBase.rules, field), ruleFieldValue(targetBase.rules, field)),
         overridden: Object.prototype.hasOwnProperty.call(overrides, field),
       })),
   }
@@ -344,7 +399,7 @@ export function basketballRulesProfileLabel(
   source: BasketballRulesSource | null | undefined
 ): string {
   if (!rules) return 'Not available'
-  if (!isBasketballMatchRulesV2(rules)) return 'Legacy configuration'
+  if (!isBasketballStructuredMatchRules(rules)) return 'Legacy configuration'
   if (!source || source.hasExplicitMatchOverrides) return 'Custom'
   const profile = getBasketballRulesProfile(source.profileId, source.profileVersion)
   return profile ? `${profile.label} v${profile.profileVersion}` : 'Custom'
@@ -559,6 +614,13 @@ function newOvertimeTimeouts(
 
 function sameJson(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function ruleFieldValue(
+  rules: BasketballMatchRulesV2 | BasketballMatchRulesV3,
+  field: BasketballRulesField
+): unknown {
+  return (rules as unknown as Record<string, unknown>)[field]
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

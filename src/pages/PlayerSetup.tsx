@@ -8,6 +8,7 @@ import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } 
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
   hasStartedBasketballEventGame,
+  isBasketballMatchRulesV2,
   isBasketballEventSetupIntent,
   prepareBasketballGameStart,
 } from '../lib/basketball'
@@ -25,7 +26,7 @@ import {
 import { loadLatestBasketballSetupAuthority } from '../lib/basketball/setupAuthority'
 import { basketballRuleFieldLabel } from '../lib/basketball/profileDiffPresentation'
 import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
-import type { BasketballRulesV2Field } from '../lib/basketball/types'
+import type { BasketballRulesField } from '../lib/basketball/types'
 
 function generateLocalId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -69,7 +70,7 @@ export default function PlayerSetup() {
   )
   const [staleAuthority, setStaleAuthority] = useState<{
     latest: BasketballSetupAuthoritySnapshot
-    differences: BasketballRulesV2Field[]
+    differences: BasketballRulesField[]
   } | null>(null)
   const [rulesNotice, setRulesNotice] = useState<string | null>(null)
   const cloudRosterLoadedRef = useRef(false)
@@ -310,6 +311,10 @@ export default function PlayerSetup() {
 
   const startBasketballEventGame = (draft: BasketballSetupDraftV1) => {
     if (!draft.event) return
+    if (!isBasketballMatchRulesV2(draft.event.reviewedRules)) {
+      setRosterError('Clock and lineup Basketball games require the upcoming setup workflow.')
+      return
+    }
     const result = prepareBasketballGameStart(state, {
       recorderUserId: user?.id ?? null,
       reviewedSetup: {

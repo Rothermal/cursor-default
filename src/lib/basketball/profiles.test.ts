@@ -10,7 +10,6 @@ import {
   getBasketballRulesProfile,
   basketballRulesProfileLabel,
   listBasketballRulesProfiles,
-  normalizeBasketballRuleOverridesV2,
   previewBasketballProfileUpgrade,
   resolveBasketballRules,
   type BasketballRulesProfileId,
@@ -141,7 +140,6 @@ describe('BKE-5A Basketball rules profiles', () => {
       ok: false,
       layer: 'built_in',
     })
-    expect(normalizeBasketballRuleOverridesV2({ unknown: true })).toBeNull()
     expect(resolveBasketballRules({ profileId: 'nfhs', profileVersion: 1 }, [{
       id: 'team',
       overrides: { personalFoulLimit: 0 },

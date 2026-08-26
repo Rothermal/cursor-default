@@ -1,7 +1,7 @@
 # Plan: BKE-6A Clock and Lineup Foundation
 
-Status: Detailed implementation plan ready for review. No production UI or anchored-game creation
-is enabled by this phase. Delivery is split into BKE-6A1 through BKE-6A3.
+Status: Approved. BKE-6A1 is implemented; BKE-6A2 and BKE-6A3 remain. No production UI or
+anchored-game creation is enabled by this phase.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 

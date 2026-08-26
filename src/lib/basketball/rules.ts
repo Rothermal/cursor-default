@@ -7,6 +7,7 @@ import type {
   BasketballMatchEvent,
   BasketballMatchRulesV1,
   BasketballMatchRulesV2,
+  BasketballMatchRulesV3,
   BasketballMatchSegment,
   BasketballMatchSegmentV2,
   BasketballOvertimeFoulPolicy,
@@ -87,6 +88,18 @@ export function isBasketballMatchRulesV2(
   return rules.rulesSchemaVersion === 2
 }
 
+export function isBasketballMatchRulesV3(
+  rules: BasketballMatchRules
+): rules is BasketballMatchRulesV3 {
+  return rules.rulesSchemaVersion === 3
+}
+
+export function isBasketballStructuredMatchRules(
+  rules: BasketballMatchRules
+): rules is BasketballMatchRulesV2 | BasketballMatchRulesV3 {
+  return isBasketballMatchRulesV2(rules) || isBasketballMatchRulesV3(rules)
+}
+
 export function normalizeBasketballMatchRules(value: unknown): BasketballMatchRules | null {
   if (validateBasketballMatchRules(value) !== null) return null
   return structuredClone(value as BasketballMatchRules)
@@ -105,8 +118,66 @@ export function normalizeBasketballRulesSource(value: unknown): BasketballRulesS
 export function validateBasketballMatchRules(value: unknown): string | null {
   if (!isPlainObject(value)) return 'Basketball rules must be an object.'
   if (value.rulesSchemaVersion === 2) return validateBasketballMatchRulesV2(value)
+  if (value.rulesSchemaVersion === 3) return validateBasketballMatchRulesV3(value)
   if ('rulesSchemaVersion' in value) return 'Basketball rules schema version is unsupported.'
   return validateBasketballMatchRulesV1(value)
+}
+
+function validateBasketballMatchRulesV3(value: Record<string, unknown>): string | null {
+  if (!hasExactKeys(value, [
+    'rulesSchemaVersion',
+    'regulationSegments',
+    'overtimeTemplate',
+    'foulWindows',
+    'timeoutPools',
+    'personalFoulLimit',
+    'clockModel',
+    'clockDisplayDirection',
+    'clockExpiration',
+    'stoppageMode',
+    'equalPlayPolicy',
+  ])) return 'Version-3 Basketball rules contain unsupported fields.'
+
+  const structuralError = validateBasketballMatchRulesV2({
+    rulesSchemaVersion: 2,
+    regulationSegments: value.regulationSegments,
+    overtimeTemplate: value.overtimeTemplate,
+    foulWindows: value.foulWindows,
+    timeoutPools: value.timeoutPools,
+    personalFoulLimit: value.personalFoulLimit,
+    clockModel: 'none',
+  })
+  if (structuralError) return structuralError.split('Version-2').join('Version-3')
+  if (value.clockModel !== 'none' && value.clockModel !== 'anchored') {
+    return 'Version-3 Basketball clock model is invalid.'
+  }
+  if (value.clockDisplayDirection !== 'count_down' && value.clockDisplayDirection !== 'count_up') {
+    return 'Version-3 Basketball clock display direction is invalid.'
+  }
+  if (value.clockExpiration !== 'stop_at_zero') {
+    return 'Version-3 Basketball clock expiration is invalid.'
+  }
+  if (value.stoppageMode !== 'explicit') {
+    return 'Version-3 Basketball stoppage mode is invalid.'
+  }
+  if (!isPlainObject(value.equalPlayPolicy) || !hasExactKeys(value.equalPlayPolicy, [
+    'mode',
+    'minimumPeriods',
+    'maximumConsecutivePeriods',
+    'maximumPeriodImbalance',
+  ])) return 'Version-3 Basketball equal-play policy is invalid.'
+  const policy = value.equalPlayPolicy
+  if (policy.mode !== 'off' && policy.mode !== 'advisory' && policy.mode !== 'enforced') {
+    return 'Version-3 Basketball equal-play mode is invalid.'
+  }
+  if (![policy.minimumPeriods, policy.maximumConsecutivePeriods, policy.maximumPeriodImbalance]
+    .every(isNullablePositiveInteger)) {
+    return 'Version-3 Basketball equal-play limits must be positive integers or null.'
+  }
+  if (value.clockModel === 'none' && policy.mode !== 'off') {
+    return 'Clockless Version-3 Basketball rules require equal play to be off.'
+  }
+  return null
 }
 
 function validateBasketballMatchRulesV1(value: Record<string, unknown>): string | null {
@@ -292,7 +363,7 @@ export function resolveBasketballFoulWindow(
 ): ResolvedBasketballFoulWindow | null {
   const segment = resolveBasketballPeriodSegment(rules, periodId)
   if (!segment) return null
-  if (!isBasketballMatchRulesV2(rules)) {
+  if (!isBasketballStructuredMatchRules(rules)) {
     const sharedOvertime = segment.kind === 'overtime' && !rules.overtimeFoulsReset
     return {
       id: sharedOvertime ? `${rules.overtimeTemplate.idPrefix}-shared` : segment.id,
@@ -328,7 +399,7 @@ export function resolveBasketballTimeoutPool(
 ): ResolvedBasketballTimeoutPool | null {
   const segment = resolveBasketballPeriodSegment(rules, periodId)
   if (!segment) return null
-  if (!isBasketballMatchRulesV2(rules)) {
+  if (!isBasketballStructuredMatchRules(rules)) {
     const cap = basketballTimeoutCap(rules, segment.kind)
     return {
       id: segment.id,
@@ -368,7 +439,7 @@ export function resolveBasketballTimeoutPoolWithCarryover(
   usageByPoolId: ReadonlyMap<string, BasketballTimeoutPoolUsage>
 ): ResolvedBasketballTimeoutPool | null {
   const resolved = resolveBasketballTimeoutPool(rules, periodId)
-  if (!resolved || !isBasketballMatchRulesV2(rules)) return resolved
+  if (!resolved || !isBasketballStructuredMatchRules(rules)) return resolved
   const incomingByTarget = new Map<string, BasketballTimeoutPoolRule[]>()
   for (const pool of rules.timeoutPools) {
     if (!pool.carryoverToPoolId) continue
@@ -443,7 +514,7 @@ export function basketballTimeoutCap(
   rules: BasketballMatchRules,
   segmentKind: BasketballSegmentKind
 ): number | null {
-  if (isBasketballMatchRulesV2(rules)) return null
+  if (isBasketballStructuredMatchRules(rules)) return null
   return segmentKind === 'overtime'
     ? rules.timeoutsPerOvertime ?? rules.timeoutsPerPeriod
     : rules.timeoutsPerPeriod
@@ -459,7 +530,7 @@ export function basketballRulesAllowOneAndOne(
 export function basketballRulesToTeamStatsConfig(
   rules: BasketballMatchRules
 ): BasketballTeamStatsConfig | null {
-  if (isBasketballMatchRulesV2(rules)) return null
+  if (isBasketballStructuredMatchRules(rules)) return null
   return {
     periodsPerGame: rules.periodsPerGame,
     periodLabels: [...rules.periodLabels],
@@ -537,7 +608,7 @@ function addCarriedLimit(
 function addCarryDifference(
   resolvedLimit: number | null,
   effectiveRegulationLimit: number | null,
-  rules: BasketballMatchRulesV2,
+  rules: BasketballMatchRulesV2 | BasketballMatchRulesV3,
   poolId: string,
   field: 'totalLimit' | 'fullLimit' | 'shortLimit'
 ): number | null {
