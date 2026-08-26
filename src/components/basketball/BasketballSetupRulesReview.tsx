@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { BasketballRulesSummary } from '../settings/BasketballRulesSettingsFields'
 import { resolveBasketballSettingsHierarchy } from '../../lib/basketball/settings'
 import type { BasketballSetupDraftEventV1 } from '../../lib/basketball/setupDraft'
-import type { BasketballRuleOverridesV2 } from '../../lib/basketball/types'
+import type { BasketballRuleOverrides } from '../../lib/basketball/types'
 
 export default function BasketballSetupRulesReview({
   event,
@@ -11,7 +11,7 @@ export default function BasketballSetupRulesReview({
 }: {
   event: BasketballSetupDraftEventV1
   readOnly?: boolean
-  onMatchOverridesChange?: (overrides: BasketballRuleOverridesV2) => void
+  onMatchOverridesChange?: (overrides: BasketballRuleOverrides) => void
 }) {
   const authority = event.settingsAuthority
   const resolution = useMemo(() => resolveBasketballSettingsHierarchy({

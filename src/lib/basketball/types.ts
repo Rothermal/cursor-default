@@ -8,6 +8,10 @@ export type BasketballTrackedTeamDesignation = 'home' | 'away' | 'neutral'
 export type BasketballRosterStatus = 'starter' | 'bench' | 'dnp'
 export type BasketballSegmentKind = 'regulation' | 'overtime'
 export type BasketballClockModel = 'none' | 'anchored'
+export type BasketballClockDisplayDirection = 'count_down' | 'count_up'
+export type BasketballClockExpiration = 'stop_at_zero'
+export type BasketballStoppageMode = 'explicit'
+export type BasketballEqualPlayMode = 'off' | 'advisory' | 'enforced'
 export type BasketballMatchStatus =
   | 'not_started'
   | 'in_progress'
@@ -129,7 +133,31 @@ export interface BasketballMatchRulesV2 extends JsonObject {
   clockModel: 'none'
 }
 
-export type BasketballMatchRules = BasketballMatchRulesV1 | BasketballMatchRulesV2
+export interface BasketballEqualPlayPolicy extends JsonObject {
+  mode: BasketballEqualPlayMode
+  minimumPeriods: number | null
+  maximumConsecutivePeriods: number | null
+  maximumPeriodImbalance: number | null
+}
+
+export interface BasketballMatchRulesV3 extends JsonObject {
+  rulesSchemaVersion: 3
+  regulationSegments: BasketballMatchSegmentV2[]
+  overtimeTemplate: BasketballOvertimeTemplateV2
+  foulWindows: BasketballFoulWindowRule[]
+  timeoutPools: BasketballTimeoutPoolRule[]
+  personalFoulLimit: number
+  clockModel: BasketballClockModel
+  clockDisplayDirection: BasketballClockDisplayDirection
+  clockExpiration: BasketballClockExpiration
+  stoppageMode: BasketballStoppageMode
+  equalPlayPolicy: BasketballEqualPlayPolicy
+}
+
+export type BasketballMatchRules =
+  | BasketballMatchRulesV1
+  | BasketballMatchRulesV2
+  | BasketballMatchRulesV3
 
 export type BasketballRulesV2Field =
   | 'regulationSegments'
@@ -139,6 +167,13 @@ export type BasketballRulesV2Field =
   | 'personalFoulLimit'
   | 'clockModel'
 
+export type BasketballRulesField =
+  | BasketballRulesV2Field
+  | 'clockDisplayDirection'
+  | 'clockExpiration'
+  | 'stoppageMode'
+  | 'equalPlayPolicy'
+
 export interface BasketballRuleOverridesV2 {
   regulationSegments?: BasketballMatchSegmentV2[]
   overtimeTemplate?: BasketballOvertimeTemplateV2
@@ -146,6 +181,19 @@ export interface BasketballRuleOverridesV2 {
   timeoutPools?: BasketballTimeoutPoolRule[]
   personalFoulLimit?: number
   clockModel?: 'none'
+}
+
+export interface BasketballRuleOverrides {
+  regulationSegments?: BasketballMatchSegmentV2[]
+  overtimeTemplate?: BasketballOvertimeTemplateV2
+  foulWindows?: BasketballFoulWindowRule[]
+  timeoutPools?: BasketballTimeoutPoolRule[]
+  personalFoulLimit?: number
+  clockModel?: BasketballClockModel
+  clockDisplayDirection?: BasketballClockDisplayDirection
+  clockExpiration?: BasketballClockExpiration
+  stoppageMode?: BasketballStoppageMode
+  equalPlayPolicy?: BasketballEqualPlayPolicy
 }
 
 export interface BasketballRulesSource extends JsonObject {
@@ -167,15 +215,38 @@ export interface BasketballMatchParticipant extends JsonObject {
   captain: boolean
 }
 
-export interface BasketballMatchSetup {
+export interface BasketballMatchSetupV1 {
   version: 1
   trackedTeamDesignation: BasketballTrackedTeamDesignation
   sourceTeamId: string | null
   sourceSeasonId: string | null
   rulesSource: BasketballRulesSource
-  rulesSnapshot: BasketballMatchRules
+  rulesSnapshot: BasketballMatchRulesV1 | BasketballMatchRulesV2
   participants: BasketballMatchParticipant[]
 }
+
+export interface BasketballOpeningLineupSide extends JsonObject {
+  participantIds: string[]
+  shortHandedReason: string | null
+}
+
+export interface BasketballOpeningLineups extends JsonObject {
+  tracked: BasketballOpeningLineupSide
+  opponent: BasketballOpeningLineupSide | null
+}
+
+export interface BasketballMatchSetupV2 {
+  version: 2
+  trackedTeamDesignation: BasketballTrackedTeamDesignation
+  sourceTeamId: string | null
+  sourceSeasonId: string | null
+  rulesSource: BasketballRulesSource
+  rulesSnapshot: BasketballMatchRulesV3
+  participants: BasketballMatchParticipant[]
+  openingLineups: BasketballOpeningLineups | null
+}
+
+export type BasketballMatchSetup = BasketballMatchSetupV1 | BasketballMatchSetupV2
 
 export interface BasketballProjectedParticipant {
   participantId: string

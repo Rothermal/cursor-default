@@ -320,6 +320,9 @@ function withProfile(state: GameState, profileId: 'fiba'): GameState {
   if (state.sportGameState?.sportId !== 'basketball') {
     throw new Error('Basketball state missing.')
   }
+  if (state.sportGameState.setup.version !== 1) {
+    throw new Error('Expected a version-1 Basketball setup fixture.')
+  }
   const profile = getBasketballRulesProfile(profileId, 1)
   if (!profile) throw new Error('Basketball profile missing.')
   const candidate: GameState = {

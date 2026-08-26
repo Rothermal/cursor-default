@@ -13,16 +13,17 @@ import {
   type BasketballTeamSettingsV1,
 } from './settings'
 import {
-  isBasketballMatchRulesV2,
+  isBasketballStructuredMatchRules,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
 } from './rules'
-import { normalizeBasketballRuleOverridesV2 } from './profiles'
+import { normalizeBasketballRuleOverrides } from './profiles'
 import type {
   BasketballMatchRulesV2,
-  BasketballRuleOverridesV2,
+  BasketballMatchRulesV3,
+  BasketballRuleOverrides,
+  BasketballRulesField,
   BasketballRulesSource,
-  BasketballRulesV2Field,
 } from './types'
 
 const STORAGE_KEY_PREFIX = 'statkeeper_basketball_setup_draft:'
@@ -59,8 +60,8 @@ export interface BasketballSetupDraftEventV1 {
         revision: number | null
         settings: BasketballTeamSettingsV1
       }
-  matchOverrides: BasketballRuleOverridesV2
-  reviewedRules: BasketballMatchRulesV2
+  matchOverrides: BasketballRuleOverrides
+  reviewedRules: BasketballMatchRulesV2 | BasketballMatchRulesV3
   reviewedRulesSource: BasketballRulesSource
   cloudIntent: 'automatic' | 'local_only'
 }
@@ -169,7 +170,7 @@ export function createBasketballSetupDraftEvent({
   revision: number | null
   settings: BasketballPersonalSettingsV1 | BasketballTeamSettingsV1
   cloudIntent: 'automatic' | 'local_only'
-  matchOverrides?: BasketballRuleOverridesV2
+  matchOverrides?: BasketballRuleOverrides
 }): BasketballSetupDraftEventV1 | null {
   const resolution = resolveBasketballSettingsHierarchy({
     authority,
@@ -237,11 +238,11 @@ export function refreshBasketballSetupDraftEvent(
 }
 
 export function basketballSetupRuleDifferences(
-  current: BasketballMatchRulesV2,
-  candidate: BasketballMatchRulesV2
-): BasketballRulesV2Field[] {
+  current: BasketballMatchRulesV2 | BasketballMatchRulesV3,
+  candidate: BasketballMatchRulesV2 | BasketballMatchRulesV3
+): BasketballRulesField[] {
   return BASKETBALL_RULE_FIELDS.filter(
-    field => stableJson(current[field]) !== stableJson(candidate[field])
+    field => stableJson(ruleFieldValue(current, field)) !== stableJson(ruleFieldValue(candidate, field))
   )
 }
 
@@ -513,10 +514,10 @@ function parseEvent(value: unknown): BasketballSetupDraftEventV1 | null {
   } else {
     return null
   }
-  const matchOverrides = normalizeBasketballRuleOverridesV2(value.matchOverrides)
+  const matchOverrides = normalizeBasketballRuleOverrides(value.matchOverrides)
   const reviewedRules = normalizeBasketballMatchRules(value.reviewedRules)
   const reviewedRulesSource = normalizeBasketballRulesSource(value.reviewedRulesSource)
-  if (!matchOverrides || !reviewedRules || !isBasketballMatchRulesV2(reviewedRules) ||
+  if (!matchOverrides || !reviewedRules || !isBasketballStructuredMatchRules(reviewedRules) ||
       !reviewedRulesSource ||
       (value.cloudIntent !== 'automatic' && value.cloudIntent !== 'local_only')) return null
   return {
@@ -526,6 +527,13 @@ function parseEvent(value: unknown): BasketballSetupDraftEventV1 | null {
     reviewedRulesSource,
     cloudIntent: value.cloudIntent,
   }
+}
+
+function ruleFieldValue(
+  rules: BasketballMatchRulesV2 | BasketballMatchRulesV3,
+  field: BasketballRulesField
+): unknown {
+  return (rules as unknown as Record<string, unknown>)[field]
 }
 
 function hasExactKeys(value: unknown, keys: string[]): value is Record<string, unknown> {

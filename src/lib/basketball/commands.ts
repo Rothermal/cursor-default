@@ -30,6 +30,7 @@ import { createBasketballUuid } from './id'
 import {
   createBasketballMatchRules,
   DEFAULT_BASKETBALL_RULES_SOURCE,
+  isBasketballMatchRulesV2,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
   resolveBasketballPeriodSegment,
@@ -356,6 +357,17 @@ export function buildBasketballMatchSetup(
   if (!reviewedSetup && !resolvedRules) {
     return commandFailure('invalid_setup', 'Basketball team-stat rules are unavailable.')
   }
+  let reviewedRules: BasketballMatchRulesV2 | null = null
+  if (reviewedSetup) {
+    const normalized = normalizeBasketballMatchRules(reviewedSetup.rulesSnapshot)
+    if (!normalized || !isBasketballMatchRulesV2(normalized)) {
+      return commandFailure(
+        'invalid_setup',
+        'Clock and lineup Basketball games require the upcoming setup workflow.'
+      )
+    }
+    reviewedRules = normalized
+  }
   const sourceTeamId = reviewedSetup
     ? reviewedSetup.sourceTeamId
     : state.cloudSync.teamId
@@ -386,7 +398,7 @@ export function buildBasketballMatchSetup(
         ? normalizeBasketballRulesSource(reviewedSetup.rulesSource)!
         : structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE),
       rulesSnapshot: reviewedSetup
-        ? normalizeBasketballMatchRules(reviewedSetup.rulesSnapshot)!
+        ? reviewedRules!
         : createBasketballMatchRules(resolvedRules!),
       participants,
     }

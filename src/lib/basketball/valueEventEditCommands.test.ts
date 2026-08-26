@@ -283,6 +283,10 @@ describe('BKE-3D2 score and minutes event editing', () => {
       .toMatchObject({ ok: false, message: expect.stringContaining('Timeline changed') })
 
     const manualState = startedState()
+    if (manualState.sportGameState?.sportId !== 'basketball' ||
+        manualState.sportGameState.setup.version !== 1) {
+      throw new Error('Expected a version-1 Basketball setup fixture.')
+    }
     const legacyRules = manualState.sportGameState?.sportId === 'basketball'
       ? manualState.sportGameState.setup.rulesSnapshot as BasketballMatchRulesV1
       : null

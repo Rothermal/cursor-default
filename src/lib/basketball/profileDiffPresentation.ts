@@ -1,11 +1,11 @@
 import type {
   BasketballFoulWindowRule,
-  BasketballMatchRulesV2,
+  BasketballEqualPlayPolicy,
   BasketballMatchSegmentV2,
   BasketballOvertimeFoulPolicy,
   BasketballOvertimeTemplateV2,
   BasketballOvertimeTimeoutPolicy,
-  BasketballRulesV2Field,
+  BasketballRulesField,
   BasketballTimeoutPoolRule,
 } from './types'
 
@@ -16,20 +16,25 @@ export const BASKETBALL_RULE_FIELD_LABELS = {
   timeoutPools: 'Timeout pools',
   personalFoulLimit: 'Player foul limit',
   clockModel: 'Clock model',
-} satisfies Record<BasketballRulesV2Field, string>
+  clockDisplayDirection: 'Clock display direction',
+  clockExpiration: 'Clock expiration',
+  stoppageMode: 'Stoppage mode',
+  equalPlayPolicy: 'Equal-play policy',
+} satisfies Record<BasketballRulesField, string>
 
 export const BASKETBALL_RULE_FIELDS = Object.keys(
   BASKETBALL_RULE_FIELD_LABELS
-) as BasketballRulesV2Field[]
+) as BasketballRulesField[]
 
-export function basketballRuleFieldLabel(field: BasketballRulesV2Field): string {
+export function basketballRuleFieldLabel(field: BasketballRulesField): string {
   return BASKETBALL_RULE_FIELD_LABELS[field]
 }
 
 export function formatBasketballRuleField(
-  field: BasketballRulesV2Field,
-  value: BasketballMatchRulesV2[BasketballRulesV2Field]
+  field: BasketballRulesField,
+  value: unknown
 ): string {
+  if (value === undefined) return 'Not available'
   switch (field) {
     case 'regulationSegments':
       return (value as BasketballMatchSegmentV2[]).map(segment => [
@@ -62,8 +67,24 @@ export function formatBasketballRuleField(
     case 'personalFoulLimit':
       return String(value)
     case 'clockModel':
+    case 'clockDisplayDirection':
+    case 'clockExpiration':
+    case 'stoppageMode':
       return String(value)
+    case 'equalPlayPolicy': {
+      const policy = value as BasketballEqualPlayPolicy
+      return [
+        policy.mode,
+        `minimum periods ${optionalLimit(policy.minimumPeriods)}`,
+        `maximum consecutive ${optionalLimit(policy.maximumConsecutivePeriods)}`,
+        `maximum imbalance ${optionalLimit(policy.maximumPeriodImbalance)}`,
+      ].join(' | ')
+    }
   }
+}
+
+function optionalLimit(value: number | null): string {
+  return value === null ? 'none' : String(value)
 }
 
 function formatOvertime(overtime: BasketballOvertimeTemplateV2): string {

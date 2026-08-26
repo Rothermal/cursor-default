@@ -1,12 +1,12 @@
 import { isPlainObject } from '../gameEvents/envelope'
 import {
   getBasketballRulesProfile,
-  normalizeBasketballRuleOverridesV2,
+  normalizeBasketballRuleOverrides,
   resolveBasketballRules,
   type BasketballRulesResolutionResult,
   type BasketballRulesProfileRef,
 } from './profiles'
-import type { BasketballRuleOverridesV2 } from './types'
+import type { BasketballRuleOverrides } from './types'
 
 export const BASKETBALL_SETTINGS_SCHEMA_VERSION = 1
 
@@ -20,14 +20,14 @@ export interface BasketballDisplayPreferences {
 
 export interface BasketballPersonalSettingsV1 {
   baseProfile: BasketballRulesProfileRef
-  ruleOverrides: BasketballRuleOverridesV2
+  ruleOverrides: BasketballRuleOverrides
   capture: BasketballCapturePreferences
   display: BasketballDisplayPreferences
 }
 
 export interface BasketballTeamSettingsV1 {
   baseProfile: BasketballRulesProfileRef
-  ruleOverrides: BasketballRuleOverridesV2
+  ruleOverrides: BasketballRuleOverrides
 }
 
 export type BasketballSettingsParseResult<T> =
@@ -74,7 +74,7 @@ export function resolveBasketballSettingsHierarchy({
       message: `${authority === 'personal' ? 'Personal' : 'Team'} Basketball settings are invalid: ${authoritative.error}`,
     }
   }
-  const normalizedMatchOverrides = normalizeBasketballRuleOverridesV2(matchOverrides)
+  const normalizedMatchOverrides = normalizeBasketballRuleOverrides(matchOverrides)
   if (!normalizedMatchOverrides) {
     return {
       ok: false,
@@ -143,7 +143,7 @@ function parseRuleLayer(
   const profile = getBasketballRulesProfile(baseProfile.profileId, Number(baseProfile.profileVersion))
   if (!profile) return invalid('Basketball rules profile is unavailable.')
 
-  const overrides = normalizeBasketballRuleOverridesV2(ruleOverrides)
+  const overrides = normalizeBasketballRuleOverrides(ruleOverrides)
   if (!overrides) return invalid('Basketball rule overrides contain unsupported fields.')
   const structuralFields = [
     'regulationSegments',
@@ -154,6 +154,20 @@ function parseRuleLayer(
   const structuralCount = structuralFields.filter(field => field in overrides).length
   if (structuralCount !== 0 && structuralCount !== structuralFields.length) {
     return invalid('Basketball structural rule overrides must be saved together.')
+  }
+  const clockLineupFields = [
+    'clockModel',
+    'clockDisplayDirection',
+    'clockExpiration',
+    'stoppageMode',
+    'equalPlayPolicy',
+  ] as const
+  const v3OnlyFields = clockLineupFields.filter(field => field !== 'clockModel')
+  const v3OnlyCount = v3OnlyFields.filter(field => field in overrides).length
+  if (v3OnlyCount !== 0 && (
+    v3OnlyCount !== v3OnlyFields.length || !('clockModel' in overrides)
+  )) {
+    return invalid('Basketball clock and lineup rule overrides must be saved together.')
   }
   const resolution = resolveBasketballRules(
     { profileId: profile.profileId, profileVersion: profile.profileVersion },
