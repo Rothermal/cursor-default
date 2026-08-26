@@ -156,12 +156,49 @@ describe('Basketball release entry guards', () => {
     expect(legacyReview).toContain('flipped={flipped}')
   })
 
-  it('keeps the internal creation gate closed outside development policy', () => {
+  it('centralizes the internal Event release policy separately from sport availability', () => {
     const policy = source('src/lib/sportAvailability.ts')
-    expect(policy).toContain(
-      'export function isBasketballEventModelCreationAvailable('
+    const wholeSportPolicy = between(
+      policy,
+      'export interface SportAvailabilityPolicy {',
+      '\n}'
     )
-    expect(policy).toContain('return development')
+    expect(policy).toContain("export const BASKETBALL_EVENT_RELEASE_STAGE = 'internal'")
+    expect(policy).toContain('export type BasketballEventReleaseStage')
+    expect(policy).toContain('export function getBasketballEventCreationPolicy(')
+    expect(wholeSportPolicy).not.toContain('Basketball')
+    expect(wholeSportPolicy).not.toContain('releaseStage?:')
+  })
+
+  it('rechecks Event creation before capability, parking, tournament, or commit mutation', () => {
+    const setup = source('src/pages/GameSetup.tsx')
+    const context = source('src/context/GameContext.tsx')
+    const parking = source('src/lib/gameParking.ts')
+    const handler = between(setup, 'const handleNext = async (', '\n  return (')
+    const guardIndex = handler.indexOf('canCommitBasketballSetup({')
+
+    expect(guardIndex).toBeGreaterThanOrEqual(0)
+    expect(guardIndex).toBeLessThan(handler.indexOf('await ensureBasketballReleaseCapabilities'))
+    expect(guardIndex).toBeLessThan(handler.indexOf('window.confirm'))
+    expect(guardIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
+    expect(guardIndex).toBeLessThan(handler.indexOf('commitGameSetup('))
+    expect(context).toContain('loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled')
+    expect(context).toContain('Persisted state is authoritative here')
+    expect(context).toContain(').canCreateNewEventGame')
+    expect(parking).toContain('allowNewBasketballEventGame = false')
+    expect(parking).toContain('continuingCommittedBasketballEventSetup')
+    expect(parking).toContain('isUninitializedBasketballEventState(nextState)')
+  })
+
+  it('keeps the rollout preference outside cloud-backed Basketball settings saves', () => {
+    const context = source('src/context/SettingsContext.tsx')
+    const settings = source('src/components/settings/BasketballSettings.tsx')
+
+    expect(context).toContain('setBasketballEventTrackerPreviewEnabled')
+    expect(context).toContain('eventTrackerPreviewEnabled: enabled')
+    expect(settings).toContain('New event tracker (preview)')
+    expect(settings).toContain('disabled={!eventCreationPolicy.preferenceAvailable}')
+    expect(settings).toContain('{!trackerTabActive && (')
   })
 
   it('clears Basketball capability success when the auth account changes', () => {

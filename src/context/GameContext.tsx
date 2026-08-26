@@ -42,6 +42,8 @@ import { normalizeGameEventStream } from '../lib/gameEvents/stream'
 import { normalizeSportGameState } from '../lib/sportGameState/state'
 import { normalizeBasketballEventCloudPolicyState } from '../lib/basketball/eventCloudPolicy'
 import { normalizeGameDataAuthority } from '../lib/gameEvents/authority'
+import { getBasketballEventCreationPolicy } from '../lib/sportAvailability'
+import { loadSettingsFromStorage } from '../lib/settingsStorage'
 import { rebuildGameEventProjection } from '../lib/gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../lib/gameEvents/runtime'
 import { sports } from '../config/sports'
@@ -469,7 +471,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           stateRef.current,
           nextState,
           userId,
-          expectedLocalGameId
+          expectedLocalGameId,
+          // Persisted state is authoritative here so stale tabs and failed preference writes refuse.
+          getBasketballEventCreationPolicy(
+            loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled
+          ).canCreateNewEventGame
         )
         stateRef.current = nextState
         dispatch({ type: 'HYDRATE_STATE', state: nextState })

@@ -176,6 +176,15 @@ function gameState(sport: SportConfig, teamName: string, opponentName: string): 
   }
 }
 
+function basketballEventSetupState(teamName: string, opponentName: string): GameState {
+  return {
+    ...gameState(basketball, teamName, opponentName),
+    gameDataAuthority: 'sport_events',
+    players: [],
+    activePlayerId: null,
+  }
+}
+
 function importedRecord(localGameId: string, state: GameState) {
   return {
     localGameId,
@@ -274,6 +283,71 @@ describe('gameParking', () => {
     expect(committed.localGameId).toBe(localGameId)
     expect(listParkedGames(null)).toHaveLength(1)
     expect(getParkedGameRecord(localGameId, null)?.gameState).toEqual(next)
+  })
+
+  it('fails closed before creating an unapproved Basketball Event setup slot', () => {
+    const current = gameState(basketball, 'Current', 'One')
+    const next = basketballEventSetupState('Next', 'Two')
+    saveActiveGameState(current, null)
+    const previousId = getActiveLocalGameId(null)
+
+    expect(() => commitGameSetupState(current, next, null)).toThrow(
+      'Enable New event tracker (preview)'
+    )
+    expect(getActiveLocalGameId(null)).toBe(previousId)
+    expect(listParkedGames(null)).toHaveLength(1)
+
+    const committed = commitGameSetupState(current, next, null, null, true)
+    expect(committed.localGameId).not.toBe(previousId)
+    expect(getParkedGameRecord(committed.localGameId, null)?.gameState).toEqual(next)
+  })
+
+  it('recognizes every uninitialized Basketball Event candidate before permitting storage', () => {
+    const current = gameState(basketball, 'Current', 'One')
+    const next = {
+      ...basketballEventSetupState('Next', 'Two'),
+      gameInfo: null,
+      players: [{ id: 'seeded', name: 'Seeded', number: '1', stats: {} }],
+    }
+    saveActiveGameState(current, null)
+    const previousId = getActiveLocalGameId(null)
+
+    expect(() => commitGameSetupState(current, next, null)).toThrow(
+      'Enable New event tracker (preview)'
+    )
+    expect(getActiveLocalGameId(null)).toBe(previousId)
+    expect(listParkedGames(null)).toHaveLength(1)
+  })
+
+  it('continues the exact committed pre-start Basketball Event setup after roster review', () => {
+    const current = basketballEventSetupState('Aces', 'Bears')
+    saveActiveGameState(current, null)
+    const localGameId = getActiveLocalGameId(null)!
+    const updated = basketballEventSetupState('Aces', 'Cats')
+
+    const committed = commitGameSetupState(current, updated, null, localGameId)
+    expect(committed.localGameId).toBe(localGameId)
+    expect(getParkedGameRecord(localGameId, null)?.gameState.gameInfo?.opponentName).toBe('Cats')
+
+    const afterRosterReview = {
+      ...updated,
+      players: [{ id: 'p1', name: 'One', number: '1', stats: {} }],
+    }
+    saveActiveGameState(afterRosterReview, null)
+    const rosteredCommit = commitGameSetupState(
+      afterRosterReview,
+      basketballEventSetupState('Aces', 'Dogs'),
+      null,
+      localGameId
+    )
+    expect(rosteredCommit.localGameId).toBe(localGameId)
+
+    expect(() => commitGameSetupState(
+      basketballEventSetupState('Aces', 'Dogs'),
+      basketballEventSetupState('Aces', 'Eagles'),
+      null,
+      'different-local-id'
+    )).toThrow('Enable New event tracker (preview)')
   })
   it('round-trips marked Basketball setup intent without aggregate fallback', () => {
     const marked = {

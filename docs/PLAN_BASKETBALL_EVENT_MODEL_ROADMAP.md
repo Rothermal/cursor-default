@@ -33,8 +33,8 @@ post-deployment validation under BKE-5D. BKE-5 product and delivery decisions ar
 setup delivery in
 [PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md](PLAN_BKE_5C_SETUP_AUTHORITY_AND_BINDING.md), split into
 BKE-5A profiles/compatibility, BKE-5B persistence/settings (BKE-5B1 through BKE-5B4 complete),
-BKE-5C setup/authority (BKE-5C1 through BKE-5C4 complete), and BKE-5D release. BKE-5D is approved
-as separate policy-hardening and production-activation slices in
+BKE-5C setup/authority (BKE-5C1 through BKE-5C4 complete), and BKE-5D release. BKE-5D1 policy
+hardening is implemented; BKE-5D2 production activation remains in
 [PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md). Basketball event creation
 remains behind the internal gate.
 
@@ -248,15 +248,16 @@ Each phase requires a separate implementation plan and one-question-at-a-time Q&
 | BKE-2 | Direct stat grid, event-derived score adjustments, team/period stats, fouls/ejections, timeouts, and remaining Basketball actions. **Splits into BKE-2A-2D** | BKE-1C | Every new Basketball live action has one event-backed source of truth |
 | BKE-3 | Editable Basketball Timeline/detail experience and F13 delivery. **Splits into BKE-3A-3D** | BKE-2 | Users can review, revise, remove, restore, and re-link supported local events |
 | BKE-4 | Generalized cloud lifecycle, authority-aware Summary, canonical aggregates, capability negotiation, and release readiness. **Splits into BKE-4A-4E** — see BKE-0 §9 | BKE-3 stable | New Basketball games sync and publish canonically behind the internal gate; Soccer remains unchanged; legacy games remain readable |
-| BKE-5 | Built-in/personal/team/match Basketball settings, versioned rule profiles, mutation-free authority setup, and event-model rollout. **BKE-5A through BKE-5C are implemented through migration 062; BKE-5D remains** | BKE-4E | Defaults resolve with source metadata, setup fixes a complete immutable rules snapshot, local-only intent is durable, and the user opt-in ships after accepted evidence |
+| BKE-5 | Built-in/personal/team/match Basketball settings, versioned rule profiles, mutation-free authority setup, and event-model rollout. **BKE-5A through BKE-5C and BKE-5D1 are implemented through migration 062; BKE-5D2 remains** | BKE-4E | Defaults resolve with source metadata, setup fixes a complete immutable rules snapshot, local-only intent is durable, and the user opt-in ships after accepted evidence |
 | BKE-6 | Basketball clock, stoppage profiles, substitutions, and on-court intervals | BKE-5 | Opt-in clock-anchored games derive real minutes and lineup intervals; clock-less games are unaffected |
 
 BKE-1 is split so the generic state/mutation refactor, deterministic Basketball foundation, and
 visible court cutover each receive an independent proof. BKE-4 is split into 4A neutral RPC
 extraction with Soccer parity, 4B Basketball bind/sync/recovery, 4C recorder/finalization/reopen, 4D
 explicit Summary authority, and 4E canonical aggregates plus capability-backed release readiness.
-BKE-5 is split into implemented 5A source-audited profiles and version compatibility, 5B settings persistence and
-surfaces, 5C mutation-free authority setup and binding policy, and 5D release activation/evidence.
+BKE-5 is split into implemented 5A source-audited profiles and version compatibility, 5B settings
+persistence and surfaces, 5C mutation-free authority setup and binding policy, implemented 5D1
+release hardening, and pending 5D2 activation/evidence.
 
 **Gating:** because the reducer disables every legacy aggregate action the moment a stream exists,
 event-game creation stays behind an internal gate through BKE-5C and the user-visible per-game opt-in

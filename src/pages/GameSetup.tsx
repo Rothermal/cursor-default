@@ -11,8 +11,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
 import { useBasketballTeamSettings } from '../hooks/useBasketballTeamSettings'
 import {
+  getBasketballEventCreationPolicy,
   getSportAvailabilityPolicy,
-  isBasketballEventModelCreationAvailable,
 } from '../lib/sportAvailability'
 import { ensureSoccerReleaseCapabilities } from '../lib/soccer/releaseCapabilities'
 import {
@@ -24,6 +24,7 @@ import {
   isBasketballEventSetupIntent,
   setBasketballEventCreationIntent,
 } from '../lib/basketball'
+import { canCommitBasketballSetup } from '../lib/basketball/releasePolicy'
 import {
   basketballSetupAccountScope,
   basketballSetupDraftMatchesRoute,
@@ -91,6 +92,7 @@ export default function GameSetup() {
     isSportEnabled,
     basketballSettings,
     basketballSettingsSync,
+    basketballEventTrackerPreviewEnabled,
     setBasketballSettingsPageActive,
   } = useSettings()
   const { user, isConfigured } = useAuth()
@@ -144,6 +146,9 @@ export default function GameSetup() {
   const isBasketballEventIntent = isBasketballSetup
     ? basketballAuthority === 'sport_events'
     : isBasketballEventSetupIntent(state)
+  const basketballEventCreationPolicy = getBasketballEventCreationPolicy(
+    basketballEventTrackerPreviewEnabled
+  )
 
   useEffect(() => {
     if (
@@ -806,22 +811,53 @@ export default function GameSetup() {
   const resolvedTeamName = teamMode === 'existing'
     ? selectedTeam?.name ?? ''
     : teamName.trim()
+  const matchingCommittedBasketballSetup = Boolean(
+    currentBasketballDraft?.committedLocalGameId &&
+    currentBasketballDraft.committedLocalGameId === activeLocalGameId &&
+    (currentBasketballDraft.authority !== 'sport_events' ||
+      isBasketballEventSetupIntent(state))
+  )
+  const basketballSetupCommitAllowed = currentBasketballDraft
+    ? canCommitBasketballSetup({
+        authority: currentBasketballDraft.authority,
+        policy: basketballEventCreationPolicy,
+        draftCommittedLocalGameId: currentBasketballDraft.committedLocalGameId,
+        activeLocalGameId,
+        activeState: state,
+      })
+    : !isBasketballEventIntent
+  const committedBasketballEventSetup = Boolean(
+    matchingCommittedBasketballSetup &&
+    currentBasketballDraft?.authority === 'sport_events' &&
+    isBasketballEventSetupIntent(state)
+  )
   const canProceed = Boolean(
     resolvedTeamName &&
     opponentName.trim() &&
-    (!isBasketballEventIntent || currentBasketballDraft?.event)
+    (!isBasketballEventIntent || currentBasketballDraft?.event) &&
+    (!isBasketballSetup || basketballSetupCommitAllowed)
   )
   const requestedTeamUnavailable = Boolean(
     requestedTeamId && !loadingTeams && !selectedTeam
   )
   const showBasketballEventToggle = Boolean(
-    isBasketballEventModelCreationAvailable() &&
-      sport?.id === 'basketball' &&
+    sport?.id === 'basketball' &&
+      (basketballEventCreationPolicy.canCreateNewEventGame || isBasketballEventIntent) &&
       (isBasketballSetup || isBasketballEventIntent || !state.gameInfo)
   )
 
   const updateBasketballEventIntent = (enabled: boolean): boolean => {
     if (isBasketballSetup) {
+      if (committedBasketballEventSetup) {
+        setSetupError('This existing Basketball setup already uses the new tracker.')
+        return false
+      }
+      if (enabled && !basketballEventCreationPolicy.canCreateNewEventGame) {
+        setSetupError(
+          'Enable New event tracker (preview) in Basketball settings before creating this game.'
+        )
+        return false
+      }
       setBasketballAuthority(enabled ? 'sport_events' : 'legacy')
       if (enabled && !basketballDraftRef.current?.event) {
         setBasketballMatchOverrides({})
@@ -915,11 +951,6 @@ export default function GameSetup() {
     setBasketballCapabilityFailure(null)
 
     const basketballDraft = isBasketballSetup ? currentBasketballDraft : null
-    const matchingCommittedBasketballSetup = Boolean(
-      basketballDraft?.committedLocalGameId &&
-      basketballDraft.committedLocalGameId === activeLocalGameId
-    )
-
     if (isBasketballSetup) {
       if (!basketballDraft) {
         setSetupError('Basketball setup is still loading or contains invalid fields.')
@@ -932,6 +963,18 @@ export default function GameSetup() {
       })
       if (!validation.ok) {
         setSetupError(validation.error)
+        return
+      }
+      if (!canCommitBasketballSetup({
+        authority: basketballDraft.authority,
+        policy: basketballEventCreationPolicy,
+        draftCommittedLocalGameId: basketballDraft.committedLocalGameId,
+        activeLocalGameId,
+        activeState: state,
+      })) {
+        setSetupError(
+          'Enable New event tracker (preview) in Basketball settings before creating this game.'
+        )
         return
       }
     }
@@ -1445,28 +1488,39 @@ export default function GameSetup() {
           {showBasketballEventToggle && (
             <section className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
               <div>
-                <p className="text-sm font-semibold text-amber-950">Tracking authority</p>
-                <p className="text-xs text-amber-800">Event tracking remains an internal preview.</p>
+                <p className="text-sm font-semibold text-amber-950">Basketball tracker</p>
+                <p className="text-xs text-amber-800">
+                  {committedBasketballEventSetup
+                    ? 'This existing setup uses the new tracker.'
+                    : basketballEventCreationPolicy.canCreateNewEventGame
+                      ? 'Choose the tracker for this game.'
+                      : 'Enable New event tracker (preview) in Basketball settings to continue.'}
+                </p>
               </div>
-              <div className="grid grid-cols-2 rounded-md bg-amber-100 p-1" role="group" aria-label="Tracking authority">
+              <div className="grid grid-cols-2 rounded-md bg-amber-100 p-1" role="group" aria-label="Basketball tracker">
                 <button
                   type="button"
+                  disabled={committedBasketballEventSetup}
                   onClick={() => updateBasketballEventIntent(false)}
-                  className={`rounded px-3 py-2 text-sm font-semibold ${
+                  className={`rounded px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
                     !isBasketballEventIntent ? 'bg-white text-slate-900 shadow-sm' : 'text-amber-900'
                   }`}
                 >
-                  Legacy
+                  Classic tracker
                 </button>
                 <button
                   type="button"
-                  disabled={loadingTeams}
+                  disabled={
+                    loadingTeams ||
+                    (!basketballEventCreationPolicy.canCreateNewEventGame &&
+                      !committedBasketballEventSetup)
+                  }
                   onClick={() => updateBasketballEventIntent(true)}
                   className={`rounded px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
                     isBasketballEventIntent ? 'bg-white text-slate-900 shadow-sm' : 'text-amber-900'
                   }`}
                 >
-                  Event
+                  New tracker
                 </button>
               </div>
               {isBasketballEventIntent && (

@@ -16,6 +16,8 @@ interface SettingsContextType {
   isSportEnabled: (sportId: string) => boolean
   toggleSport: (sportId: string) => void
   setSportEnabled: (sportId: string, enabled: boolean) => void
+  basketballEventTrackerPreviewEnabled: boolean
+  setBasketballEventTrackerPreviewEnabled: (enabled: boolean) => void
   basketballSettings: BasketballPersonalSettingsV1
   basketballSettingsSync: BasketballSettingsSyncState
   saveBasketballSettings: (
@@ -81,6 +83,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const setBasketballEventTrackerPreviewEnabled = useCallback((enabled: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      basketball: {
+        ...prev.basketball,
+        eventTrackerPreviewEnabled: enabled,
+      },
+    }))
+  }, [])
+
   return (
     <SettingsContext.Provider
       value={{
@@ -88,6 +100,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         isSportEnabled,
         toggleSport,
         setSportEnabled,
+        basketballEventTrackerPreviewEnabled:
+          settings.basketball.eventTrackerPreviewEnabled,
+        setBasketballEventTrackerPreviewEnabled,
         basketballSettings: basketball.settings,
         basketballSettingsSync: basketball.sync,
         saveBasketballSettings: basketball.save,
