@@ -1,5 +1,5 @@
 export const SOCCER_RELEASED_IN_PRODUCTION = true
-export const BASKETBALL_EVENT_RELEASE_STAGE = 'internal' as const
+export const BASKETBALL_EVENT_RELEASE_STAGE = 'opt_in' as const
 const DEVELOPMENT_BUILD = import.meta.env.DEV
 
 export type SportReleaseStage = 'unreleased' | 'preview' | 'released'

@@ -1,10 +1,10 @@
 # Plan: BKE-5 Basketball Settings and Event Rollout
 
-Status: Product and delivery Q&A approved. BKE-5A, BKE-5B1 through BKE-5B4, BKE-5C1 through
-BKE-5C4, and BKE-5D1 are implemented. BKE-5D2 production activation and owner signoff remain; see
-[PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md). Event creation remains internal.
-The initial owner-only rollout uses a default-off production opt-in with focused post-deployment
-validation; the complete live matrix remains required before access broadens.
+Status: Product and delivery Q&A approved. BKE-5A through BKE-5C, BKE-5D1, and the BKE-5D2
+production `opt_in` activation are implemented. Deployment evidence and focused owner smoke remain;
+see [PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_RELEASE_AND_EXIT.md). The initial owner-only
+rollout stays default off on every device. The complete live matrix remains required before access
+broadens.
 
 Parent roadmap: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -579,7 +579,7 @@ Deliver BKE-5C as four reviewable slices:
 - **BKE-5C4 - Enable Cloud and exit (implemented):** guarded later binding, duplicate/role checks, failure-safe
   upload/checkpoint, and the BKE-5C regression audit.
 
-### BKE-5D: Release and exit audit - BKE-5D1 implemented; BKE-5D2 remains
+### BKE-5D: Release and exit audit - activation implemented; deployment smoke remains
 
 Detailed delivery plan:
 [`PLAN_BKE_5D_RELEASE_AND_EXIT.md`](PLAN_BKE_5D_RELEASE_AND_EXIT.md).
@@ -592,11 +592,16 @@ Detailed delivery plan:
 - Flip production policy to `opt_in` only in BKE-5D2; document rollback.
 - Exit: production can create deliberate Event games without reducing historical or Legacy access.
 
-BKE-5D1 implementation note: the centralized policy remains `internal`; strict device-local
+BKE-5D1 implementation note: that slice left the centralized policy `internal`; strict device-local
 preference storage, a separate Tracker settings tab, setup and atomic commit guards, exact
 committed-pre-start continuation, and focused release-entry tests are implemented. No migration is
 added. See
 [`REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md`](REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md).
+
+BKE-5D2 implementation note: the centralized stage is now `opt_in`, while the exact device
+preference still defaults false and Classic remains the fresh per-game default. No migration or
+other runtime path changes. Deployment and owner smoke evidence remain in the combined regression
+record.
 
 ## 10. Verification Matrix
 

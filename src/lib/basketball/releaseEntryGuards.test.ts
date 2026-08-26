@@ -156,14 +156,16 @@ describe('Basketball release entry guards', () => {
     expect(legacyReview).toContain('flipped={flipped}')
   })
 
-  it('centralizes the internal Event release policy separately from sport availability', () => {
+  it('centralizes the Event release stage separately from sport availability', () => {
     const policy = source('src/lib/sportAvailability.ts')
     const wholeSportPolicy = between(
       policy,
       'export interface SportAvailabilityPolicy {',
       '\n}'
     )
-    expect(policy).toContain("export const BASKETBALL_EVENT_RELEASE_STAGE = 'internal'")
+    expect(policy).toMatch(
+      /export const BASKETBALL_EVENT_RELEASE_STAGE = '(internal|opt_in)' as const/
+    )
     expect(policy).toContain('export type BasketballEventReleaseStage')
     expect(policy).toContain('export function getBasketballEventCreationPolicy(')
     expect(wholeSportPolicy).not.toContain('Basketball')
