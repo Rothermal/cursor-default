@@ -132,10 +132,11 @@ BKE-6 product model or block this planning pass.
 
 ### Batch H: Cloud and game lifecycle
 
-29. Cloud-backed anchored creation, sync, and finalization require an explicit
-    `clockAndLineupsVersion: 1` server capability. Explicit local-only creation remains available;
-    older clients continue handling clockless games and fail closed rather than misprojecting an
-    anchored stream.
+29. Cloud-backed anchored creation, sync, and finalization require a separate fixed
+    `get_basketball_clock_lineup_capabilities_v1` surface returning
+    `clockAndLineupsVersion: 1`. The existing exact-shape Basketball release-capability v2 RPC stays
+    unchanged, explicit local-only creation remains available, and older clients retain clockless
+    cloud behavior while unknown anchored events fail closed.
 30. Every recorder stream owns one complete clock and lineup history. Independent streams are never
     blended; existing primary selection and canonical publication choose one coherent source.
 31. Primary finalization requires a terminal paused clock, completed periods, valid lineup history,
@@ -189,8 +190,10 @@ BKE-6 product model or block this planning pass.
 
 45. Explicit local-only anchored creation may proceed without a server capability. Cloud-backed
     creation, later binding, upload, and finalization require `clockAndLineupsVersion: 1`.
-46. Park, sport switch, and new-game navigation intercept a running clock and offer Pause and
-    continue or Cancel. Unexpected close or reload still recovers from the persisted anchor.
+46. Explicit Park, the existing setup Continue confirmation that will park/replace an active game,
+    and other game-replacement commits intercept a running clock and offer Pause and continue or
+    Cancel. Opening, editing, cancelling, or navigating to mutation-free setup never pauses or
+    mutates the active game. Unexpected close or reload still recovers from the persisted anchor.
 47. Delivery splits into five phases: rules/events/capability; setup/live clock;
     substitutions/equal play/corrections; Summary/aggregates/cloud lifecycle; and release hardening.
 48. Anchored mode remains default-off and owner-only initially. Post-deployment owner smoke is
@@ -232,6 +235,12 @@ authorities. Tenths, sound, vibration, and other local presentation choices rema
 preferences. Period duration, display direction, manual stoppage policy, and equal-play constraints
 remain immutable match rules.
 
+BKE-6A must evolve the existing `BasketballRulesV2Field`, `BASKETBALL_RULE_FIELD_LABELS`, and
+`formatBasketballRuleField` mechanism in place into one current-version field catalog. Its
+`satisfies Record<...>` label check and exhaustive formatter switch remain compile-time gates for
+every version-3 field, including structured equal-play policy. A parallel v3-only label/formatter
+catalog is not allowed because it would weaken complete diff coverage.
+
 Version 1 and version 2 snapshots never acquire anchored semantics. Their strict parsers and
 projection fixtures remain unchanged. A version-3 snapshot may use `clockModel: 'none'`, but an
 equal-play mode other than `off` requires `anchored` because no trustworthy participation source
@@ -252,9 +261,11 @@ match override -> team default -> personal default -> built-in profile
 - Game Setup snapshots the complete resolved version-3 value and source revisions.
 - Disabling Anchored in a draft never converts or rewrites an existing game.
 
-The BKE-6A migration audit decides whether strict database settings validation and the cloud
-capability extension require one migration. No speculative table or event-envelope migration is
-allowed.
+BKE-6A requires one additive migration for the separate fixed clock/lineup capability RPC and any
+strict version-3 settings validation needed by the existing private settings core. The migration
+must not change the name, contract version, exact response shape, or grants of
+`get_basketball_release_capabilities`. No table or event-envelope migration is expected unless the
+detailed implementation audit proves a separate constraint.
 
 ---
 
@@ -355,8 +366,10 @@ recovery and explicitly leaves earlier uncertain intervals incomplete rather tha
 - The substitution bottom sheet supports multi-player selection, resulting-lineup review,
   short-handed reasons, optional role/captain changes, and atomic commit.
 - Gameplay capture automatically stamps effective anchored elapsed time whether running or paused.
-- Park, sport switch, New Game, and game replacement intercept a running clock with Pause and
-  continue or Cancel. Unexpected reload recovers from the anchor.
+- Explicit Park, setup Continue when it will park/replace, and other game-replacement commits
+  intercept a running clock with Pause and continue or Cancel. Mutation-free setup entry, editing,
+  cancellation, and ordinary navigation do not alter the active game. Unexpected reload recovers
+  from the anchor.
 - Expiration emits one visual alert and optional local sound/vibration; it never loops.
 
 ### Timeline, Summary, and aggregates
@@ -381,12 +394,16 @@ clock/lineup stream; pull/merge never blends recorder histories. Primary selecti
 canonical publication, reopen, and audit remain the BKE-4 authority model.
 
 Cloud-backed anchored setup, later local-only binding, upload, readiness, and finalization require
-`clockAndLineupsVersion: 1`. Explicit local-only anchored creation may proceed without a reachable
-server, retaining the durable local-only policy until a successful capability-backed enablement.
+both the unchanged Basketball release-capability v2 contract and the new fixed
+`get_basketball_clock_lineup_capabilities_v1` response with `clockAndLineupsVersion: 1`. Explicit
+local-only anchored creation may proceed without a reachable server, retaining the durable
+local-only policy until both preflights succeed.
 
-An unsupported or malformed anchored source fails closed with upgrade/quarantine guidance. Older
-clockless clients and games retain existing capability and transport behavior. BKE-6A must audit
-whether the capability RPC can be extended compatibly or needs a fixed next-version surface.
+The existing exact-shape `get_basketball_release_capabilities` RPC must remain byte-for-byte
+compatible so unrefreshed clients can continue clockless Event cloud setup and Enable Cloud Sync.
+The new fixed RPC is additive and called only by anchored-aware clients. Missing/stale feature
+capability produces backend-update guidance; malformed responses fail closed. Unregistered anchored
+event families continue using the existing stream quarantine boundary rather than misprojecting.
 
 Finalization requires:
 
@@ -408,7 +425,7 @@ Each slice receives a detailed implementation plan and review before code begins
 
 | Phase | Scope | Exit condition |
 |---|---|---|
-| BKE-6A | Strict rules v3, settings/profile parsing, registered clock/lineup events, deterministic projection, checked commands, feature capability, and compatibility fixtures; no production UI | Clock/lineup streams project and quarantine deterministically, versions 1-2 remain unchanged, and capability/local-only boundaries are proven |
+| BKE-6A | Strict rules v3, one exhaustive rules-diff catalog, settings/profile parsing, registered clock/lineup events, deterministic projection, checked commands, additive fixed feature-capability migration, and compatibility fixtures; no production UI | Clock/lineup streams project and quarantine deterministically, versions 1-2 and the release-capability v2 RPC remain unchanged, and capability/local-only boundaries are proven |
 | BKE-6B | Personal/team/match controls, immutable setup review, opening lineup, sticky live clock, timestamps, expiration/recovery, Set Clock, and parking guards | A new local anchored game can setup, run, pause, adjust, expire, park/reload, and complete periods without affecting clockless games |
 | BKE-6C | Multi-player substitutions, boundary confirmations, roles/captain, short-handed/replacement flows, equal-play enforcement/override, Recent Events, Timeline correction, and Set Current Lineup | Complete and incomplete lineup histories are accurately captured, corrected, diagnosed, and converted to exact intervals/minutes |
 | BKE-6D | Players/Overview/Timeline detail, exact-second aggregates, plus-minus quality, cloud capability/bind/sync, recorder readiness, finalization, correction/resume reopen, and republication | One coherent recorder can sync and publish anchored authority; remote/canonical review is read-only and aggregate output is quality-gated |
@@ -426,6 +443,7 @@ slices, not new product scope.
 
 - exact rules-v1/v2 hydration and projection parity plus strict v3 validation/round trips;
 - settings hierarchy, explicit upgrade, CAS conflict, account/team cache isolation, and permissions;
+- single exhaustive current-version rule field labels/formatting, including structured equal-play;
 - Start/Pause/expiration/recovery/adjustment sequences with fake time and no per-second writes;
 - countdown/count-up and tenths presentation over identical canonical elapsed values;
 - background, reload, offline, device-time anomaly, and duplicate-expiration recovery;
@@ -484,8 +502,8 @@ Blocked, or Not run with evidence; no unchecked row is implied to pass.
 | Risk | Mitigation |
 |---|---|
 | Browser sleep or delayed timers distort display | Persist anchors, clamp expiration deterministically, warn on recovery, and test with fake time |
-| Running clock is parked or replaced accidentally | Intercept deliberate navigation and require Pause and continue |
-| Old clients accept schema 1 but do not know BKE-6 events | Add explicit feature capability and fail-closed upgrade/quarantine handling |
+| Running clock is parked or replaced accidentally | Intercept only Park/setup-commit/game-replacement mutation points and require Pause and continue |
+| Old clients accept schema 1 but do not know BKE-6 events | Keep release capability v2 unchanged, add a separate fixed feature RPC, and retain fail-closed event quarantine |
 | Corrections create impossible overlapping lineups | Consequence preview plus atomic final reprojection; no partial mutation |
 | Equal-play UI implies universal legal compliance | Configurable narrow constraints, source labels, and explicit non-compliance disclaimer |
 | Partial opponent or missed substitution history yields false metrics | Separate quality flags and hide dependent minutes/plus-minus rather than estimate |

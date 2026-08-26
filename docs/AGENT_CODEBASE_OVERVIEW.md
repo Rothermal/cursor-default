@@ -274,8 +274,11 @@ periods but half-level foul and timeout windows, proving those concepts must be 
 BKE-6 product planning is approved in `PLAN_BKE_6_CLOCK_AND_LINEUPS.md`: strict rules v3 unlocks a
 default-off anchored clock, explicit stoppage context, opening/live lineups, atomic multi-player
 substitutions, equal-play policy, exact participation intervals, independent recorder authority,
-and a dedicated cloud capability. Implementation is split into BKE-6A through BKE-6E and has not
-started; versions 1-2 and existing games remain clockless, and shot-clock/possession work stays out.
+and a separate additive fixed cloud feature-capability RPC while the exact-shape release-capability
+v2 surface remains unchanged. Mutation-free setup entry stays read-only; running clocks are
+intercepted only when Park, setup commit, or game replacement would mutate active state.
+Implementation is split into BKE-6A through BKE-6E and has not started; versions 1-2 and existing
+games remain clockless, and shot-clock/possession work stays out.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;

@@ -271,8 +271,9 @@ broadens (BKE-0 §3.3, §10).
 
 BKE-6 is the approved clock/lineup fast follower. Its 48-question product pass preserves explicit
 manual clock authority, exact anchored intervals, atomic multi-player substitutions, configurable
-equal-play enforcement, independent recorder histories, and a separate feature capability. Rules
-versions 1-2 and all existing games stay clockless; shot-clock and possession work remain separate.
+equal-play enforcement, independent recorder histories, and a separate additive fixed feature
+capability that leaves the exact-shape release-capability v2 RPC unchanged. Rules versions 1-2 and
+all existing games stay clockless; shot-clock and possession work remain separate.
 
 Recommended detailed plan names:
 
