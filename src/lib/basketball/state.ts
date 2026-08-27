@@ -13,6 +13,7 @@ import type {
   BasketballMatchSetup,
   BasketballMatchSetupV1,
   BasketballMatchSetupV2,
+  BasketballLineupProjection,
   BasketballOpeningLineups,
   BasketballProjectedParticipant,
   BasketballSportGameState,
@@ -24,7 +25,7 @@ import { BASKETBALL_GAME_STATE_VERSION } from './types'
 export function createBasketballMatchProjection(
   setup: BasketballMatchSetup
 ): BasketballMatchProjection {
-  return {
+  const projection: BasketballMatchProjection = {
     status: 'not_started',
     currentPeriodId: null,
     periods: [],
@@ -68,6 +69,61 @@ export function createBasketballMatchProjection(
     endedAt: null,
     endReason: null,
     result: 'unresolved',
+  }
+  const lineup = createBasketballLineupProjection(setup)
+  if (lineup) projection.lineup = lineup
+  return projection
+}
+
+function createBasketballLineupProjection(
+  setup: BasketballMatchSetup
+): BasketballLineupProjection | null {
+  if (setup.version !== 2 || setup.rulesSnapshot.clockModel !== 'anchored' || !setup.openingLineups) {
+    return null
+  }
+  const createSide = (teamSide: 'tracked' | 'opponent') => {
+    const opening = setup.openingLineups?.[teamSide]
+    if (!opening) return null
+    const sideParticipants = setup.participants.filter(value => value.teamSide === teamSide)
+    return {
+      teamSide,
+      currentParticipantIds: [...opening.participantIds],
+      currentShortHandedReason: opening.shortHandedReason,
+      boundaryConfirmationRequired: false,
+      boundaryConfirmedPeriodId: null,
+      clockStartedInPeriod: false,
+      replacementRequiredParticipantIds: [],
+      incompletePeriodIds: [],
+      onCourtIntervals: [],
+      participationByParticipantId: Object.fromEntries(sideParticipants.map(participant => [
+        participant.id,
+        {
+          participantId: participant.id,
+          started: opening.participantIds.includes(participant.id),
+          appeared: false,
+          participationMs: 0,
+          participationSeconds: 0,
+          periodParticipationMs: {},
+          creditedPeriodIds: [],
+          intervals: [],
+          complete: true,
+        },
+      ])),
+      roleHistoryByParticipantId: Object.fromEntries(
+        sideParticipants.map(participant => [participant.id, []])
+      ),
+    }
+  }
+  return {
+    sides: {
+      tracked: createSide('tracked'),
+      opponent: createSide('opponent'),
+    },
+    runningClockIntervals: [],
+    equalPlayReviews: [],
+    equalPlayCompliant: true,
+    enforcedOverridesComplete: true,
+    pendingEqualPlayOverride: null,
   }
 }
 

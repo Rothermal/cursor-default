@@ -1,6 +1,6 @@
 # Regression: BKE-6A2 Anchored Clock Projection
 
-Status: Implemented and automated. BKE-6A3 remains before the no-UI foundation is complete.
+Status: Implemented and automated. BKE-6A3 subsequently completed the no-UI foundation.
 
 ## Delivered
 
@@ -40,8 +40,8 @@ Build and lint are part of the final branch verification.
 ## Deferred Intentionally
 
 - No scheduler, sticky tracker controls, alert behavior, production setup path, or device toggle.
-- No lineup-start guards, substitutions, roles, equal-play projection, or participation intervals;
-  those are BKE-6A3.
+- Lineup-start guards, substitutions, roles, equal-play projection, and participation intervals were
+  intentionally deferred from this slice and subsequently delivered by BKE-6A3.
 - No Timeline correction UI, cloud feature preflight call site, or release-stage change.
 - Period-end command integration may atomically append its `period_end` Pause when BKE-6B wires the
   production clock controls; replay already requires the persisted Pause and never infers one.

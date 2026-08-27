@@ -13,6 +13,7 @@ import {
   createBasketballClockEvent,
 } from './clockEvents'
 import { basketballClockMomentAt } from './clockProjection'
+import { basketballLineupClockStartError } from './lineupProjection'
 import { createBasketballUuid } from './id'
 import { resolveBasketballPeriodSegment } from './rules'
 import type { BasketballStoppageCategory } from './types'
@@ -46,6 +47,8 @@ export function startBasketballClock(
   if (!blocked.ok) return blocked
   const { context, clock } = blocked
   if (clock.running) return failure(state, 'command_failed', 'Basketball clock is already running.')
+  const lineupError = basketballLineupClockStartError(context.sportState.projection)
+  if (lineupError) return failure(state, 'command_failed', lineupError)
 
   const event = createBasketballClockEvent({
     id: options.eventId ?? createBasketballUuid(),

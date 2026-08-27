@@ -1,8 +1,8 @@
 # Plan: BKE-6 Basketball Clock and Lineups
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
-decisions are approved. The BKE-6A detailed foundation plan is ready for review; implementation has
-not started.
+decisions are approved. The no-UI BKE-6A foundation is implemented; BKE-6B production setup and
+live-clock work is next.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
