@@ -39,8 +39,8 @@ owner smoke evidence remain in [PLAN_BKE_5D_RELEASE_AND_EXIT.md](PLAN_BKE_5D_REL
 BKE-6 product decisions and the five-slice clock/lineup delivery roadmap are approved in
 [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md). The BKE-6A foundation is detailed
 into three implementation PRs in
-[PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md); implementation has
-not started.
+[PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md); BKE-6A1 through
+BKE-6A3 are implemented and BKE-6B is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

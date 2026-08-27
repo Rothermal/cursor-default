@@ -531,6 +531,9 @@ export function addBasketballLateParticipant(
   if (!displayName) {
     return failure(state, 'invalid_participant', 'Enter a name for the Basketball participant.')
   }
+  if (context.value.sportState.projection.clock?.running) {
+    return failure(state, 'command_failed', 'Pause the Basketball clock before adding a participant.')
+  }
   const number = options.number?.trim() || null
   const playerId = options.playerId ?? createBasketballUuid()
   const participantId = options.participantId ?? createBasketballUuid()
@@ -565,6 +568,7 @@ export function addBasketballLateParticipant(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,
+    elapsedMs: lifecycleElapsedMs(context.value),
     occurredAt: context.value.occurredAt,
   })
   return appendBasketballLifecycleEvent(
@@ -598,6 +602,7 @@ export function endBasketballPeriod(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,
+    elapsedMs: lifecycleElapsedMs(context.value),
     occurredAt: context.value.occurredAt,
   })
   return appendBasketballLifecycleEvent(
@@ -634,6 +639,7 @@ export function startNextBasketballPeriod(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: { id: nextSegment.value.id, order: nextSegment.value.order },
+    elapsedMs: lifecycleElapsedMs(context.value, true),
     occurredAt: context.value.occurredAt,
   })
   return appendBasketballLifecycleEvent(
@@ -678,6 +684,7 @@ export function completeBasketballMatch(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,
+    elapsedMs: lifecycleElapsedMs(context.value),
     occurredAt: context.value.occurredAt,
   })
   return appendBasketballLifecycleEvent(
@@ -729,6 +736,7 @@ export function reopenBasketballMatch(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,
+    elapsedMs: lifecycleElapsedMs(context.value),
     occurredAt: context.value.occurredAt,
   })
   return appendBasketballLifecycleEvent(
@@ -1038,6 +1046,7 @@ function endBasketballMatchLocally(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,
+    elapsedMs: lifecycleElapsedMs(context.value),
     occurredAt: context.value.occurredAt,
   })
   return appendBasketballLifecycleEvent(
@@ -1072,6 +1081,14 @@ function nextBasketballSegment(
   return overtime
     ? { ok: true, value: overtime }
     : commandFailure('invalid_period', 'The next Basketball overtime is unavailable.')
+}
+
+function lifecycleElapsedMs(
+  context: BasketballCommandContext,
+  startingPeriod = false
+): number | null {
+  if (!context.sportState.projection.clock) return null
+  return startingPeriod ? 0 : context.sportState.projection.clock.elapsedMs
 }
 
 function appendBasketballLifecycleEvent(

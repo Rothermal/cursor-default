@@ -35,6 +35,16 @@ export type BasketballStoppageCategory =
   | 'injury'
   | 'official_review'
   | 'other'
+export type BasketballSubstitutionMode =
+  | 'balanced'
+  | 'exit_only'
+  | 'entry_only'
+  | 'boundary'
+  | 'current_lineup_recovery'
+export type BasketballEqualPlayViolationCode =
+  | 'minimum_periods'
+  | 'maximum_consecutive_periods'
+  | 'maximum_period_imbalance'
 
 export interface BasketballMatchSegment extends JsonObject {
   id: string
@@ -332,6 +342,97 @@ export interface BasketballAnchoredClockProjection {
   pendingStoppageCaptureCommandId: string | null
 }
 
+export interface BasketballOnCourtInterval {
+  periodId: string
+  participantIds: string[]
+  startElapsedMs: number
+  endElapsedMs: number | null
+  startEventId: string
+  endEventId: string | null
+  complete: boolean
+}
+
+export interface BasketballRunningClockInterval {
+  periodId: string
+  startElapsedMs: number
+  endElapsedMs: number | null
+  startEventId: string
+  endEventId: string | null
+}
+
+export interface BasketballParticipationInterval {
+  periodId: string
+  startElapsedMs: number
+  endElapsedMs: number
+  durationMs: number
+  startEventId: string
+  endEventId: string
+}
+
+export interface BasketballParticipantParticipation {
+  participantId: string
+  started: boolean
+  appeared: boolean
+  participationMs: number
+  participationSeconds: number
+  periodParticipationMs: Record<string, number>
+  creditedPeriodIds: string[]
+  intervals: BasketballParticipationInterval[]
+  complete: boolean
+}
+
+export interface BasketballRoleHistoryEntry {
+  eventId: string
+  periodId: string
+  elapsedMs: number
+  position: string | null
+  captain: boolean
+}
+
+export interface BasketballLineupSideProjection {
+  teamSide: BasketballTeamSide
+  currentParticipantIds: string[]
+  currentShortHandedReason: string | null
+  boundaryConfirmationRequired: boolean
+  boundaryConfirmedPeriodId: string | null
+  clockStartedInPeriod: boolean
+  replacementRequiredParticipantIds: string[]
+  incompletePeriodIds: string[]
+  onCourtIntervals: BasketballOnCourtInterval[]
+  participationByParticipantId: Record<string, BasketballParticipantParticipation>
+  roleHistoryByParticipantId: Record<string, BasketballRoleHistoryEntry[]>
+}
+
+export interface BasketballEqualPlayViolation {
+  code: BasketballEqualPlayViolationCode
+  participantIds: string[]
+}
+
+export interface BasketballEqualPlayBoundaryReview {
+  periodId: string
+  candidateParticipantIds: string[]
+  violations: BasketballEqualPlayViolation[]
+  confirmationEventId: string
+  overrideEventId: string | null
+}
+
+export interface BasketballPendingEqualPlayOverride {
+  eventId: string
+  captureCommandId: string
+  boundaryPeriodId: string
+  candidateParticipantIds: string[]
+  violationCodes: BasketballEqualPlayViolationCode[]
+}
+
+export interface BasketballLineupProjection {
+  sides: Record<BasketballTeamSide, BasketballLineupSideProjection | null>
+  runningClockIntervals: BasketballRunningClockInterval[]
+  equalPlayReviews: BasketballEqualPlayBoundaryReview[]
+  equalPlayCompliant: boolean
+  enforcedOverridesComplete: boolean
+  pendingEqualPlayOverride: BasketballPendingEqualPlayOverride | null
+}
+
 export interface BasketballMatchProjection {
   status: BasketballMatchStatus
   currentPeriodId: string | null
@@ -348,6 +449,7 @@ export interface BasketballMatchProjection {
   ejections: BasketballEjectionProjection[]
   score: BasketballScoreProjection
   clock: BasketballAnchoredClockProjection | null
+  lineup?: BasketballLineupProjection
   relationshipWarnings: BasketballRelationshipWarning[]
   endedAt: string | null
   endReason: BasketballMatchEndReason | null
@@ -437,6 +539,38 @@ export interface BasketballStoppagePayload extends BasketballCapturePayload {
   pauseEventId: string
   category: BasketballStoppageCategory
   note: string | null
+}
+
+export interface BasketballLineupConfirmedPayload extends BasketballCapturePayload {
+  captureCommandId: string
+  participantIds: string[]
+  boundaryPeriodId: string
+}
+
+export interface BasketballSubstitutionPayload extends BasketballCapturePayload {
+  captureCommandId: string
+  participantIds: string[]
+  mode: BasketballSubstitutionMode
+  reason: string | null
+}
+
+export interface BasketballRoleChange extends JsonObject {
+  participantId: string
+  position: string | null
+  captain: boolean
+}
+
+export interface BasketballRoleChangedPayload extends BasketballCapturePayload {
+  captureCommandId: string
+  changes: BasketballRoleChange[]
+}
+
+export interface BasketballEqualPlayOverridePayload extends BasketballCapturePayload {
+  captureCommandId: string
+  boundaryPeriodId: string
+  candidateParticipantIds: string[]
+  violationCodes: BasketballEqualPlayViolationCode[]
+  reason: string
 }
 
 export type BasketballShotAttempt = 'field_goal' | 'free_throw'
@@ -596,6 +730,36 @@ export type BasketballClockEvent =
   | BasketballClockAdjustedEvent
   | BasketballStoppageEvent
 
+type BasketballLineupGameEvent<
+  TPayload extends BasketballCapturePayload & { captureCommandId: string },
+  TEventType extends string,
+  TSide extends BasketballTeamSide = BasketballTeamSide,
+> = GameEvent<TPayload, TEventType, 'basketball', TSide>
+
+export type BasketballLineupConfirmedEvent = BasketballLineupGameEvent<
+  BasketballLineupConfirmedPayload,
+  'basketball.lineup_confirmed'
+>
+export type BasketballSubstitutionEvent = BasketballLineupGameEvent<
+  BasketballSubstitutionPayload,
+  'basketball.substitution'
+>
+export type BasketballRoleChangedEvent = BasketballLineupGameEvent<
+  BasketballRoleChangedPayload,
+  'basketball.role_changed'
+>
+export type BasketballEqualPlayOverrideEvent = BasketballLineupGameEvent<
+  BasketballEqualPlayOverridePayload,
+  'basketball.equal_play_override',
+  'tracked'
+>
+
+export type BasketballLineupEvent =
+  | BasketballLineupConfirmedEvent
+  | BasketballSubstitutionEvent
+  | BasketballRoleChangedEvent
+  | BasketballEqualPlayOverrideEvent
+
 type BasketballStatGameEvent<
   TPayload extends BasketballCapturePayload,
   TEventType extends string,
@@ -672,5 +836,6 @@ export type BasketballAdministrativeEvent =
 export type BasketballMatchEvent =
   | BasketballLifecycleEvent
   | BasketballClockEvent
+  | BasketballLineupEvent
   | BasketballStatEvent
   | BasketballAdministrativeEvent

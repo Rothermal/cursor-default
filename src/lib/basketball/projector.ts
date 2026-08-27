@@ -26,6 +26,14 @@ import {
   registerProjectedBasketballEvent,
 } from './statProjection'
 import {
+  applyBasketballLineupEffectsAfterEvent,
+  applyBasketballLineupEvent,
+  basketballLineupClockStartError,
+  basketballLineupProjectionDiagnostics,
+  isBasketballLineupEvent,
+  validatePendingBasketballEqualPlayOverride,
+} from './lineupProjection'
+import {
   createBasketballMatchProjection,
   projectedBasketballParticipant,
 } from './state'
@@ -83,10 +91,26 @@ export function projectBasketballEvents(
       failureMessage = clockMomentError
       break
     }
+    const pendingOverrideError = validatePendingBasketballEqualPlayOverride(projection, event)
+    if (pendingOverrideError) {
+      failedEvent = event
+      failureMessage = pendingOverrideError
+      break
+    }
+    if (event.eventType === 'basketball.clock_started') {
+      const lineupError = basketballLineupClockStartError(projection)
+      if (lineupError) {
+        failedEvent = event
+        failureMessage = lineupError
+        break
+      }
+    }
 
     const next = structuredClone(projection)
-    const error = isBasketballClockEvent(event)
+    let error = isBasketballClockEvent(event)
       ? applyBasketballClockEvent(next, sportState, event)
+      : isBasketballLineupEvent(event)
+        ? applyBasketballLineupEvent(next, sportState, event)
       : isBasketballAdministrativeEvent(event)
       ? applyBasketballAdministrativeEvent(
           next,
@@ -97,6 +121,7 @@ export function projectBasketballEvents(
       : isBasketballStatEvent(event)
         ? applyBasketballStatEvent(next, event, statContext)
         : applyLifecycleEvent(next, sportState, event)
+    if (!error) error = applyBasketballLineupEffectsAfterEvent(next, sportState, event)
     if (error) {
       failedEvent = event
       failureMessage = error
@@ -124,6 +149,8 @@ export function projectBasketballEvents(
         eventId: event.id,
       })
     }
+  } else {
+    diagnostics.push(...basketballLineupProjectionDiagnostics(projection))
   }
 
   const nextSportState: BasketballSportGameState = { ...sportState, projection }
@@ -241,6 +268,7 @@ function applyRosterAdded(
 ): string | null {
   const momentError = validateActiveMoment(projection, sportState, event)
   if (momentError) return momentError
+  if (projection.clock?.running) return 'Pause the Basketball clock before adding a participant.'
   if (projection.participants[event.payload.participant.id]) {
     return 'Basketball participant id already exists.'
   }
