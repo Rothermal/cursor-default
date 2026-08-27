@@ -21,9 +21,10 @@ local Basketball Event games. A recorder must be able to:
 - park, reload, and resume without losing clock authority; and
 - retain exact behavior for clockless Event games, Legacy Basketball, Soccer, and historical games.
 
-BKE-6B does not implement live substitutions, lineup-boundary review, equal-play overrides,
-lineup-history correction, anchored cloud transport, or anchored Summary. Those remain BKE-6C and
-BKE-6D work.
+BKE-6B does not implement live substitutions, lineup-changing boundary review, equal-play
+overrides, lineup-history correction, anchored cloud transport, or anchored Summary. It does add the
+narrow same-current-five confirmation needed to continue an equal-play-off game at a configured
+boundary. The broader workflows remain BKE-6C and BKE-6D work.
 
 ---
 
@@ -82,19 +83,29 @@ BKE-6B owns only immutable opening-lineup capture:
 
 BKE-6B does not add an opponent roster builder merely to populate optional authority.
 
-Rules requiring a later lineup-change boundary or equal-play decision are not silently weakened.
-Until BKE-6C supplies confirmation, substitution, and override controls, production start is limited
-to anchored rules with equal play `off` and no configured regulation lineup-change boundary. The
-settings and setup review may preserve other valid version-3 drafts, but the final start action
-must explain the temporary BKE-6C requirement without mutating the rules. This gate is removed only
-after the BKE-6C workflow is complete.
+Rules requiring equal-play decisions are not silently weakened. Production start is temporarily
+limited to anchored rules with equal play `off`. This admits the six equal-play-off built-in
+profiles after deliberate version-3 upgrade; Youth Equal-Play remains blocked until BKE-6C supplies
+candidate-lineup review and reasoned override controls.
+
+For a configured lineup-change boundary, BKE-6B exposes one narrow `Confirm current five` action for
+each side with lineup authority. It calls the implemented checked confirmation command with the
+unchanged projected participant ids before Clock Start. It cannot change participants, satisfy an
+equal-play violation, infer a substitution, or edit prior history. A recorder who needs a lineup
+change must wait for BKE-6C rather than misrecord the same five. This minimal confirmation makes the
+ordinary built-in profiles exercisable without pulling the substitution workflow into BKE-6B.
 
 ### 3.3 Personal display preferences
 
 Tenths, expiration sound, and expiration vibration are device capabilities and do not belong in the
-strict cloud settings authority. Store them in the existing device-local Basketball preference
-payload alongside other runtime capture/display choices. Keep `defaultCourtFlipped` in the existing
-personal/team settings hierarchy.
+strict cloud settings authority. Store them explicitly under the existing device-local
+`AppSettings.basketball` payload created for `eventTrackerPreviewEnabled`.
+
+`AppSettings.courtCapture` is not an eligible home. Its rebound preference bootstraps the exact,
+CAS-synced `BasketballPersonalSettingsV1.capture` payload; adding local-only fields there risks
+invalidating or accidentally syncing the personal record. Keep `defaultCourtFlipped` in the
+existing personal settings authority only. Team settings continue to own rules, not personal
+presentation.
 
 This avoids widening the exact cloud settings payload for preferences that may differ legitimately
 between a phone, tablet, and desktop. Invalid persisted booleans fail closed to documented defaults;
@@ -126,7 +137,7 @@ Each slice receives its own implementation branch and PR.
 |---|---|---|
 | BKE-6B1 | Device preferences, version-3 compatibility confirmation, restart-safe setup-draft contract, and reusable anchored workflow guards | Rules/settings/setup drafts remain strict and backward compatible; no production anchored game starts yet |
 | BKE-6B2 | Event Setup review, focused Opening Lineup step, immutable setup-v2 commit, and explicit local-only start | A supported local anchored game starts paused with exact opening authority; unsupported cloud and BKE-6C-dependent starts fail before replacement |
-| BKE-6B3 | Shared command-time resolution, sticky clock strip, Start/Pause/Stoppage/Set Clock, display ticking, expiration, and recovery | Every anchored capture has exact canonical elapsed time and the clock runs without per-second state writes across Track and Timeline |
+| BKE-6B3 | Shared command-time resolution, sticky clock strip, same-five boundary confirmation, Start/Pause/Stoppage/Set Clock, display ticking, expiration, and recovery | Every anchored capture has exact canonical elapsed time and the clock runs without per-second state writes across Track and Timeline |
 | BKE-6B4 | Running-clock park/replacement interception, reload/background/offline hardening, period-flow integration, accessibility/responsive polish, and exit audit | A supported local anchored game can run, pause, adjust, expire, park/reload, and complete periods while parity gates remain green |
 
 ---
@@ -135,13 +146,14 @@ Each slice receives its own implementation branch and PR.
 
 ### 5.1 Device preferences
 
-Add exact device-local fields with conservative defaults:
+Extend `AppSettings.basketball` with exact device-local fields and conservative defaults:
 
 - show tenths below one minute: on;
 - expiration sound: off; and
 - expiration vibration: off.
 
-Expose these in Settings -> Sports -> Basketball -> Display. Controls must describe unavailable
+Do not add these fields to `AppSettings.courtCapture`, `BasketballPersonalSettingsV1`, or
+`BasketballTeamSettingsV1`. Expose them in Settings -> Sports -> Basketball -> Display. Controls must describe unavailable
 browser capabilities without promising they will work. A user gesture may prepare sound, but saving
 a preference never requests broad permission or emits an alert.
 
@@ -176,7 +188,7 @@ behavior.
 
 Add pure helpers for:
 
-- whether a rules snapshot can enter the temporary BKE-6B runtime;
+- whether a rules snapshot can enter the temporary equal-play-off BKE-6B runtime;
 - whether a setup target is explicit local-only or cloud-backed;
 - whether the active game has a running anchored clock; and
 - whether a proposed action is a mutation-free visit or a park/replacement commit.
@@ -236,7 +248,7 @@ target or a rules configuration awaiting BKE-6C fails before parking/replacing a
 - five starters, reasoned one-to-four, zero, over-five, DNP, and ineligible participant cases;
 - stable ids and participant-order canonicalization;
 - Period 1 paused initialization and no implicit Clock Start;
-- unsupported equal-play/boundary and cloud-target preflight with no state mutation;
+- unsupported equal-play and cloud-target preflight with no state mutation;
 - setup-draft reload at every step and cancellation behavior;
 - narrow/mobile layout, focus order, validation announcements, and long names/numbers; and
 - complete clockless Event and Legacy setup parity.
@@ -270,6 +282,7 @@ not unmount authority or move primary controls. It contains:
 - large Start or Pause control;
 - Set Clock action;
 - compact current-five chips; and
+- `Confirm current five` when a boundary is pending; and
 - a disabled or explanatory Bench action until BKE-6C.
 
 The display may update with a component timer while running. The timer derives from the persisted
@@ -282,6 +295,14 @@ tenths below one minute. Current five remains projection-derived.
 - Pause is immediate. Optional stoppage context uses the fixed BKE-6 catalog and appends atomically.
 - Set Clock first pauses if necessary, requires a reason, accepts count-direction-aware input, and
   stores only canonical elapsed time.
+- When the caller's wall clock precedes a running anchor, checked Set Clock takes one narrow recovery
+  branch: clamp the persisted command `occurredAt` to the anchor, pause at the last known-good anchor
+  elapsed value, and append the recorder's reasoned adjustment in the same atomic group. Ordinary
+  Pause and gameplay capture remain rejected at a backward timestamp. The UI states that the event
+  time was clamped because the device clock moved backward.
+- At a pending equal-play-off boundary, `Confirm current five` calls
+  `confirmBasketballLineup` separately for every side with lineup authority. Start remains blocked
+  until all required confirmations succeed. The action cannot select a different five.
 - Manual MIN capture is hidden and command-rejected for anchored games; historical manual-minute
   rows remain visible and inert.
 
@@ -297,7 +318,9 @@ On reload, focus, visibility return, and online return:
 - derive the current moment from the persisted anchor;
 - materialize a normal expiration when within the accepted bound;
 - show the BKE-6A recovery warning for backward or implausibly long wall-clock movement; and
-- block new capture until the recorder resolves an unsafe clock with reasoned Set Clock.
+- block new capture until the recorder resolves an unsafe clock with reasoned Set Clock. A backward
+  jump uses the clamped last-known-good recovery branch defined in section 7.3, so the recorder is
+  never trapped waiting for device time to pass the old anchor.
 
 Expiration emits one visual announcement and best-effort sound/vibration according to device
 preferences. Notification failure is presentation-only and cannot retry or duplicate authority.
@@ -308,7 +331,8 @@ preferences. Notification failure is presentation-only and cannot retry or dupli
 - paused versus running event timestamps across every event family;
 - identical timestamps for linked capture groups;
 - expiration during foreground, delayed callback, reload, background return, and duplicate effects;
-- backward time, excessive delta, offline return, and reasoned recovery;
+- backward time, clamped recovery event time, excessive delta, offline return, and reasoned recovery;
+- same-five tracked and optional-opponent boundary confirmation plus Clock Start guards;
 - Track/Timeline switching with stable clock and controls;
 - manual-minute hidden/inert behavior; and
 - no per-second dispatch, fingerprint, dirty revision, or cloud queue churn.
@@ -343,9 +367,9 @@ Integrate existing checked period controls with the sticky strip:
 - Start remains explicit; and
 - terminal local game controls require a paused clock.
 
-For BKE-6B, completing all periods is supported only for the temporary runtime-safe rules subset
-defined in section 3.2. Boundary/equal-play profiles remain setup-blocked until BKE-6C, rather than
-becoming stranded after Period 1.
+For BKE-6B, completing all periods is supported for equal-play-off rules. Configured boundaries use
+the narrow same-five confirmation from section 3.2. Equal-play advisory/enforced profiles remain
+setup-blocked until BKE-6C, rather than becoming stranded at a decision the UI cannot complete.
 
 ### 8.3 Exit regression record
 
@@ -358,7 +382,7 @@ manual matrix. At minimum cover:
 - Set Clock forward/backward and recovery-warning resolution;
 - clockless Event, Legacy Basketball, Soccer, and mixed parked games;
 - phone/tablet/desktop, keyboard, screen reader announcements, reduced motion, and alert preferences;
-- local-only/cloud preflight and BKE-6C-dependent rules gating; and
+- local-only/cloud preflight, same-five boundary continuation, and equal-play gating; and
 - production build, lint, focused suites, and full test suite.
 
 Owner smoke may remain explicitly Not run when time is limited. Automated success and a migration
@@ -405,7 +429,7 @@ Every slice must prove:
 ## 11. Deferred to BKE-6C and Later
 
 - Bench substitution sheet and atomic multi-player changes;
-- between-period lineup confirmation and unchanged-five review;
+- between-period candidate-lineup selection, changed-five review, and equal-play evaluation;
 - role/captain changes, late-player entry workflow, ejection replacement, and short-handed recovery;
 - advisory/enforced equal-play presentation and reasoned overrides;
 - Recent Events/Timeline clock and lineup correction, Undo dependencies, and Set Current Lineup;

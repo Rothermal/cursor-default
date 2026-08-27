@@ -299,9 +299,12 @@ require an exact adjacent override/confirmation capture group. Anchored manual-m
 inert while clockless parity remains unchanged. BKE-6B is detailed in
 `PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md` as four slices: device/settings and setup-draft
 contracts, local-only production setup with opening-lineup authority, a shared canonical capture-time
-path plus sticky live-clock controls, and parking/recovery/exit hardening. BKE-6B deliberately blocks
-cloud-backed anchored creation until BKE-6D and blocks rules requiring later boundary/equal-play
-decisions until BKE-6C supplies those complete controls. BKE-6B through BKE-6E remain; rules versions 1-2,
+path plus sticky live-clock controls, and parking/recovery/exit hardening. BKE-6B includes a narrow
+same-current-five confirmation so equal-play-off built-in profiles can cross configured boundaries,
+plus a reasoned Set Clock recovery that clamps a backward device timestamp to the persisted anchor.
+It deliberately blocks cloud-backed anchored creation until BKE-6D and blocks advisory/enforced
+equal-play until BKE-6C supplies candidate-lineup and override controls. Device-only clock alerts
+belong under `AppSettings.basketball`, never the CAS-seeded `courtCapture` payload. BKE-6B through BKE-6E remain; rules versions 1-2,
 setup version 1, and existing games remain clockless, and shot-clock/possession work stays out.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
