@@ -11,6 +11,9 @@ Status: Implemented and automated. The no-UI BKE-6A foundation is complete; BKE-
   projections omit lineup state to preserve their shape and fingerprints.
 - Derived setup-order current lineups, role/captain history, period-local on-court intervals, global
   running-clock intervals, exact millisecond/second participation, period credit, and completeness.
+- Backward Set Clock corrections clip effective running, on-court, and participation intervals to
+  the replacement elapsed value before future play accrues, preventing overlap and preserving exact
+  participant attribution when the lineup changes at the reset point.
 - Added paused-only checked commands for balanced, entry-only, exit-only, boundary, and current-lineup
   recovery substitutions, role changes, and boundary confirmation. One through four participants
   require a reason; zero, more than five, duplicate, stale, unavailable, and wrong-side inputs fail.
@@ -36,7 +39,7 @@ Implementation verification:
 
 ```text
 pnpm vitest run src/lib/basketball  55 files, 403 tests passed
-pnpm test                          171 files, 1183 tests passed
+pnpm test                          171 files, 1184 tests passed
 pnpm typecheck                      passed
 pnpm lint                           passed with six existing Fast Refresh warnings
 pnpm build                          passed

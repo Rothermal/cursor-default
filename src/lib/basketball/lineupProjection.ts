@@ -252,7 +252,12 @@ function applySubstitution(
     return 'Boundary Basketball substitution requires an unstarted lineup-change boundary.'
   }
 
-  closeOpenLineupInterval(side, event.id, event.elapsedMs!)
+  closeOpenLineupInterval(
+    side,
+    event.id,
+    event.elapsedMs!,
+    event.payload.mode === 'current_lineup_recovery'
+  )
   if (event.payload.mode === 'current_lineup_recovery') {
     addUnique(side.incompletePeriodIds, event.period.id)
     for (const participation of Object.values(side.participationByParticipantId)) {
@@ -334,6 +339,7 @@ function applyEqualPlayOverride(
     candidateParticipantIds: [...event.payload.candidateParticipantIds],
     violationCodes: [...event.payload.violationCodes],
   }
+  projection.lineup!.enforcedOverridesComplete = false
   return null
 }
 
@@ -376,10 +382,11 @@ function applyLineupConfirmation(
     overrideEventId: pending?.eventId ?? null,
   })
   if (violations.length > 0) projection.lineup!.equalPlayCompliant = false
-  if (mode === 'enforced' && violations.length > 0 && !pending) {
-    projection.lineup!.enforcedOverridesComplete = false
-  }
   projection.lineup!.pendingEqualPlayOverride = null
+  projection.lineup!.enforcedOverridesComplete = mode !== 'enforced' ||
+    projection.lineup!.equalPlayReviews.every(review =>
+      review.violations.length === 0 || review.overrideEventId !== null
+    )
   side.boundaryConfirmationRequired = false
   side.boundaryConfirmedPeriodId = event.period.id
   return null
@@ -461,18 +468,8 @@ function closeRunningClockInterval(
         startEventId: interval.startEventId,
         endEventId: eventId,
       })
-      participation.participationMs += durationMs
-      participation.participationSeconds = participation.participationMs / 1_000
-      participation.periodParticipationMs[interval.periodId] =
-        (participation.periodParticipationMs[interval.periodId] ?? 0) + durationMs
-      if (durationMs > 0) {
-        participation.appeared = true
-        addUnique(participation.creditedPeriodIds, interval.periodId)
-      }
-      projection.participants[participantId].stats.min = participation.participationMs / 60_000
     }
-    projection.sideStats[side.teamSide].min = Object.values(side.participationByParticipantId)
-      .reduce((total, value) => total + value.participationMs, 0) / 60_000
+    refreshSideParticipationTotals(projection, side)
   }
   return null
 }
@@ -483,10 +480,91 @@ function splitLineupsAtAdjustment(
   fromElapsedMs: number,
   toElapsedMs: number
 ): void {
-  for (const side of enabledSides(projection)) {
-    closeOpenLineupInterval(side, eventId, fromElapsedMs)
-    openLineupInterval(side, projection.currentPeriodId!, toElapsedMs, eventId, true)
+  const periodId = projection.currentPeriodId!
+  if (toElapsedMs < fromElapsedMs) {
+    projection.lineup!.runningClockIntervals = trimIntervalsAfterElapsed(
+      projection.lineup!.runningClockIntervals,
+      periodId,
+      toElapsedMs,
+      eventId
+    )
   }
+  for (const side of enabledSides(projection)) {
+    if (toElapsedMs < fromElapsedMs) {
+      side.onCourtIntervals = trimIntervalsAfterElapsed(
+        side.onCourtIntervals,
+        periodId,
+        toElapsedMs,
+        eventId
+      )
+      for (const participation of Object.values(side.participationByParticipantId)) {
+        participation.intervals = trimIntervalsAfterElapsed(
+          participation.intervals,
+          periodId,
+          toElapsedMs,
+          eventId
+        )
+      }
+      refreshSideParticipationTotals(projection, side)
+    } else {
+      closeOpenLineupInterval(side, eventId, fromElapsedMs)
+    }
+    openLineupInterval(side, periodId, toElapsedMs, eventId, true)
+  }
+}
+
+function trimIntervalsAfterElapsed<
+  T extends {
+    periodId: string
+    startElapsedMs: number
+    endElapsedMs: number | null
+    endEventId: string | null
+  },
+>(
+  intervals: T[],
+  periodId: string,
+  elapsedMs: number,
+  eventId: string
+): T[] {
+  return intervals.flatMap(interval => {
+    if (interval.periodId !== periodId) return [interval]
+    if (interval.startElapsedMs >= elapsedMs) return []
+    if (interval.endElapsedMs !== null && interval.endElapsedMs <= elapsedMs) return [interval]
+    const endElapsedMs = elapsedMs
+    return [{
+      ...interval,
+      endElapsedMs,
+      endEventId: eventId,
+      ...('durationMs' in interval
+        ? { durationMs: endElapsedMs - interval.startElapsedMs }
+        : {}),
+    }]
+  })
+}
+
+function refreshSideParticipationTotals(
+  projection: BasketballMatchProjection,
+  side: BasketballLineupSideProjection
+): void {
+  for (const participation of Object.values(side.participationByParticipantId)) {
+    const periodParticipationMs: Record<string, number> = {}
+    const creditedPeriodIds: string[] = []
+    let participationMs = 0
+    for (const interval of participation.intervals) {
+      participationMs += interval.durationMs
+      periodParticipationMs[interval.periodId] =
+        (periodParticipationMs[interval.periodId] ?? 0) + interval.durationMs
+      if (interval.durationMs > 0) addUnique(creditedPeriodIds, interval.periodId)
+    }
+    participation.participationMs = participationMs
+    participation.participationSeconds = participationMs / 1_000
+    participation.periodParticipationMs = periodParticipationMs
+    participation.creditedPeriodIds = creditedPeriodIds
+    participation.appeared = participationMs > 0
+    projection.participants[participation.participantId].stats.min = participationMs / 60_000
+  }
+  projection.sideStats[side.teamSide].min = Object.values(side.participationByParticipantId)
+    .reduce((total, value) => total + value.participationMs, 0) / 60_000
 }
 
 function ensureParticipantProjection(
@@ -540,10 +618,15 @@ function openLineupInterval(
 function closeOpenLineupInterval(
   side: BasketballLineupSideProjection,
   eventId: string,
-  elapsedMs: number
+  elapsedMs: number,
+  preserveZeroDuration = false
 ): void {
   const interval = side.onCourtIntervals[side.onCourtIntervals.length - 1]
   if (!interval || interval.endElapsedMs !== null) return
+  if (!preserveZeroDuration && interval.startElapsedMs === elapsedMs) {
+    side.onCourtIntervals.pop()
+    return
+  }
   interval.endElapsedMs = elapsedMs
   interval.endEventId = eventId
 }

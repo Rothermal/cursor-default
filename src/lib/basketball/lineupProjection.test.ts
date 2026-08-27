@@ -3,6 +3,7 @@ import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { addGameEvent } from '../gameEvents/mutations'
+import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createGameEventStream } from '../gameEvents/stream'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
@@ -17,6 +18,7 @@ import {
   startBasketballClock,
 } from './clockCommands'
 import { createBasketballLifecycleEvent } from './events'
+import { createBasketballLineupEvent } from './lineupEvents'
 import {
   changeBasketballParticipantRoles,
   confirmBasketballLineup,
@@ -176,7 +178,7 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     }).ok).toBe(false)
   })
 
-  it('splits on-court evidence at a reasoned backward clock adjustment', () => {
+  it('rolls derived intervals back at a reasoned backward clock adjustment', () => {
     const firstPause = runAndPause(anchoredState(), 0, 10_000, 20)
     const adjusted = requireState(setBasketballClock(firstPause, {
       recorderUserId,
@@ -185,13 +187,32 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       occurredAt: after(11_000),
       eventId: uuid(22),
     }))
-    const secondPause = runAndPause(adjusted, 20_000, 24_000, 23)
+    expect(trackedLineup(adjusted).participationByParticipantId['tracked-1'].participationMs)
+      .toBe(3_000)
+    expect(basketballProjection(adjusted).lineup?.runningClockIntervals).toMatchObject([
+      { startElapsedMs: 0, endElapsedMs: 3_000 },
+    ])
+    const substituted = requireState(substituteBasketballLineup(adjusted, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      mode: 'balanced',
+      occurredAt: after(12_000),
+      eventId: uuid(23),
+    }))
+    const secondPause = runAndPause(substituted, 20_000, 24_000, 24)
     const lineup = trackedLineup(secondPause)
     expect(lineup.onCourtIntervals).toMatchObject([
-      { startElapsedMs: 0, endElapsedMs: 10_000 },
-      { startElapsedMs: 3_000 },
+      { startElapsedMs: 0, endElapsedMs: 3_000 },
+      {
+        participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+        startElapsedMs: 3_000,
+      },
     ])
-    expect(lineup.participationByParticipantId['tracked-1'].participationMs).toBe(14_000)
+    expect(lineup.participationByParticipantId['tracked-1'].participationMs).toBe(3_000)
+    expect(lineup.participationByParticipantId['tracked-2'].participationMs).toBe(7_000)
+    expect(lineup.participationByParticipantId['tracked-6'].participationMs).toBe(4_000)
+    expect(basketballProjection(secondPause).sideStats.tracked.min).toBeCloseTo(35_000 / 60_000)
   })
 
   it('requires boundary confirmation and invalidates it after a pre-start substitution', () => {
@@ -391,6 +412,48 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     expect(basketballProjection(result.state).lineup).toMatchObject({
       enforcedOverridesComplete: true,
       pendingEqualPlayOverride: null,
+    })
+  })
+
+  it('reports an unresolved enforced override as incomplete projection evidence', () => {
+    const secondPeriod = nextPeriodState(anchoredState({
+      boundaries: true,
+      equalPlayPolicy: strictPolicy('enforced'),
+    }))
+    const captureCommandId = uuid(82)
+    const override = createBasketballLineupEvent({
+      id: uuid(83),
+      eventType: 'basketball.equal_play_override',
+      payload: {
+        captureCommandId,
+        boundaryPeriodId: periodId(secondPeriod),
+        candidateParticipantIds: trackedStarterIds(),
+        violationCodes: [
+          'minimum_periods',
+          'maximum_consecutive_periods',
+          'maximum_period_imbalance',
+        ],
+        reason: 'Pending authorization record',
+      },
+      recorderUserId,
+      sequence: secondPeriod.eventStream!.events.length + 1,
+      period: currentPeriod(secondPeriod),
+      elapsedMs: 0,
+      occurredAt: after(32_000),
+      teamSide: 'tracked',
+    })
+    const rebuilt = rebuildGameEventProjection({
+      ...secondPeriod,
+      eventStream: {
+        ...secondPeriod.eventStream!,
+        events: [...secondPeriod.eventStream!.events, override],
+      },
+    }, gameEventRegistry, gameEventProjectors)
+
+    expect(rebuilt.inspection.complete).toBe(false)
+    expect(basketballProjection(rebuilt.state).lineup).toMatchObject({
+      enforcedOverridesComplete: false,
+      pendingEqualPlayOverride: expect.objectContaining({ eventId: override.id }),
     })
   })
 })
