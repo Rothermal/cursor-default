@@ -26,6 +26,15 @@ export type BasketballMatchResult =
   | 'suspended'
   | 'abandoned'
   | 'unresolved'
+export type BasketballClockPauseSource = 'manual' | 'expiration' | 'period_end'
+export type BasketballStoppageCategory =
+  | 'timeout'
+  | 'foul_free_throw'
+  | 'out_of_bounds'
+  | 'substitution'
+  | 'injury'
+  | 'official_review'
+  | 'other'
 
 export interface BasketballMatchSegment extends JsonObject {
   id: string
@@ -307,6 +316,22 @@ export interface BasketballScoreProjection {
   opponent: number
 }
 
+export interface BasketballAnchoredClockProjection {
+  periodId: string | null
+  running: boolean
+  elapsedMs: number
+  anchorElapsedMs: number | null
+  anchorOccurredAt: string | null
+  lastRunningElapsedMs: number | null
+  expired: boolean
+  lastStartEventId: string | null
+  lastPauseEventId: string | null
+  lastAdjustmentEventId: string | null
+  lastStoppageEventId: string | null
+  pendingStoppagePauseEventId: string | null
+  pendingStoppageCaptureCommandId: string | null
+}
+
 export interface BasketballMatchProjection {
   status: BasketballMatchStatus
   currentPeriodId: string | null
@@ -322,6 +347,7 @@ export interface BasketballMatchProjection {
   neutralTimeouts: number
   ejections: BasketballEjectionProjection[]
   score: BasketballScoreProjection
+  clock: BasketballAnchoredClockProjection | null
   relationshipWarnings: BasketballRelationshipWarning[]
   endedAt: string | null
   endReason: BasketballMatchEndReason | null
@@ -390,6 +416,27 @@ export interface BasketballMatchEndedPayload extends BasketballCapturePayload {
 
 export interface BasketballMatchReopenedPayload extends BasketballCapturePayload {
   reason: string | null
+}
+
+export interface BasketballClockStartedPayload extends BasketballCapturePayload {
+  anchorElapsedMs: number
+}
+
+export interface BasketballClockPausedPayload extends BasketballCapturePayload {
+  elapsedMs: number
+  source: BasketballClockPauseSource
+}
+
+export interface BasketballClockAdjustedPayload extends BasketballCapturePayload {
+  fromElapsedMs: number
+  toElapsedMs: number
+  reason: string
+}
+
+export interface BasketballStoppagePayload extends BasketballCapturePayload {
+  pauseEventId: string
+  category: BasketballStoppageCategory
+  note: string | null
 }
 
 export type BasketballShotAttempt = 'field_goal' | 'free_throw'
@@ -521,6 +568,34 @@ export type BasketballLifecycleEvent =
   | BasketballMatchEndedEvent
   | BasketballMatchReopenedEvent
 
+type BasketballClockGameEvent<
+  TPayload extends BasketballCapturePayload,
+  TEventType extends string,
+> = GameEvent<TPayload, TEventType, 'basketball', 'neutral'>
+
+export type BasketballClockStartedEvent = BasketballClockGameEvent<
+  BasketballClockStartedPayload,
+  'basketball.clock_started'
+>
+export type BasketballClockPausedEvent = BasketballClockGameEvent<
+  BasketballClockPausedPayload,
+  'basketball.clock_paused'
+>
+export type BasketballClockAdjustedEvent = BasketballClockGameEvent<
+  BasketballClockAdjustedPayload,
+  'basketball.clock_adjusted'
+>
+export type BasketballStoppageEvent = BasketballClockGameEvent<
+  BasketballStoppagePayload,
+  'basketball.stoppage'
+>
+
+export type BasketballClockEvent =
+  | BasketballClockStartedEvent
+  | BasketballClockPausedEvent
+  | BasketballClockAdjustedEvent
+  | BasketballStoppageEvent
+
 type BasketballStatGameEvent<
   TPayload extends BasketballCapturePayload,
   TEventType extends string,
@@ -596,5 +671,6 @@ export type BasketballAdministrativeEvent =
 
 export type BasketballMatchEvent =
   | BasketballLifecycleEvent
+  | BasketballClockEvent
   | BasketballStatEvent
   | BasketballAdministrativeEvent

@@ -653,7 +653,11 @@ function isRecordedLaterEligible(event: BasketballMatchEvent): boolean {
     event.eventType !== 'basketball.match_roster_added' &&
     event.eventType !== 'basketball.participant_resolved' &&
     event.eventType !== 'basketball.match_ended' &&
-    event.eventType !== 'basketball.match_reopened'
+    event.eventType !== 'basketball.match_reopened' &&
+    event.eventType !== 'basketball.clock_started' &&
+    event.eventType !== 'basketball.clock_paused' &&
+    event.eventType !== 'basketball.clock_adjusted' &&
+    event.eventType !== 'basketball.stoppage'
 }
 
 function groupTitle(
@@ -680,6 +684,12 @@ function eventTitle(
       ? 'Game completed'
       : event.payload.reason === 'suspended' ? 'Game suspended' : 'Game abandoned'
     case 'basketball.match_reopened': return 'Game reopened'
+    case 'basketball.clock_started': return 'Clock started'
+    case 'basketball.clock_paused': return event.payload.source === 'expiration'
+      ? 'Clock expired'
+      : event.payload.source === 'period_end' ? 'Clock paused for period end' : 'Clock paused'
+    case 'basketball.clock_adjusted': return 'Clock adjusted'
+    case 'basketball.stoppage': return `Stoppage - ${titleCase(event.payload.category)}`
     case 'basketball.free_throw_trip': {
       const oneAndOne = event.payload.oneAndOne ? ' (1-and-1)' : ''
       return `${event.payload.maximumAttempts} free throw${event.payload.maximumAttempts === 1 ? '' : 's'} awarded${oneAndOne}`

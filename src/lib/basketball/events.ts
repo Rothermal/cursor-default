@@ -14,6 +14,7 @@ import type {
 import { BASKETBALL_EVENT_SCHEMA_VERSION } from './types'
 import { basketballStatEventDefinitions } from './statEvents'
 import { basketballAdministrativeEventDefinitions } from './administrativeEvents'
+import { basketballClockEventDefinitions } from './clockEvents'
 
 export type BasketballLifecyclePayloadByType = {
   'basketball.period_started': BasketballPeriodPayload
@@ -33,6 +34,7 @@ export interface CreateBasketballLifecycleEventInput<
   recorderUserId: string | null
   sequence: number
   period: GameEventPeriod
+  elapsedMs?: number | null
   occurredAt: string
 }
 
@@ -49,7 +51,7 @@ export function createBasketballLifecycleEvent<
     recorderUserId: input.recorderUserId,
     sequence: input.sequence,
     period: input.period,
-    elapsedMs: null,
+    elapsedMs: input.elapsedMs ?? null,
     occurredAt: input.occurredAt,
     teamSide: 'neutral',
     location: null,
@@ -75,6 +77,7 @@ export const basketballEventDefinitions: GameEventDefinition<GameEvent>[] = [
   ...basketballLifecycleEventDefinitions,
   ...basketballStatEventDefinitions,
   ...basketballAdministrativeEventDefinitions,
+  ...basketballClockEventDefinitions,
 ]
 
 function lifecycleDefinition(
@@ -92,7 +95,6 @@ function lifecycleDefinition(
         event.eventType !== eventType ||
         event.schemaVersion !== BASKETBALL_EVENT_SCHEMA_VERSION ||
         event.teamSide !== 'neutral' ||
-        event.elapsedMs !== null ||
         event.location !== null ||
         event.actors.length !== 0 ||
         !validatePayload(event.payload)

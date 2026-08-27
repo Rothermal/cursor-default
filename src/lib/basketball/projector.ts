@@ -10,6 +10,13 @@ import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
 import { resolveBasketballPeriodSegment } from './rules'
 import {
+  applyBasketballClockEvent,
+  clearPendingBasketballStoppageAfterEvent,
+  recordBasketballRunningClockMomentAfterEvent,
+  startBasketballClockPeriod,
+  validateBasketballEventClockMoment,
+} from './clockProjection'
+import {
   applyBasketballAdministrativeEvent,
   updateBasketballBonusStatus,
 } from './administrativeProjection'
@@ -24,6 +31,7 @@ import {
 } from './state'
 import type {
   BasketballLifecycleEvent,
+  BasketballClockEvent,
   BasketballAdministrativeEvent,
   BasketballMatchEvent,
   BasketballMatchProjection,
@@ -69,8 +77,17 @@ export function projectBasketballEvents(
     }
     seenSequences.add(sequenceKey)
 
+    const clockMomentError = validateBasketballEventClockMoment(projection, sportState, event)
+    if (clockMomentError) {
+      failedEvent = event
+      failureMessage = clockMomentError
+      break
+    }
+
     const next = structuredClone(projection)
-    const error = isBasketballAdministrativeEvent(event)
+    const error = isBasketballClockEvent(event)
+      ? applyBasketballClockEvent(next, sportState, event)
+      : isBasketballAdministrativeEvent(event)
       ? applyBasketballAdministrativeEvent(
           next,
           event,
@@ -85,6 +102,8 @@ export function projectBasketballEvents(
       failureMessage = error
       break
     }
+    clearPendingBasketballStoppageAfterEvent(next, event)
+    recordBasketballRunningClockMomentAfterEvent(next, event)
     projection = next
     registerProjectedBasketballEvent(statContext, event)
   }
@@ -112,6 +131,15 @@ export function projectBasketballEvents(
     projection: buildProjection(state, nextSportState, statContext.shotChart),
     diagnostics,
   }
+}
+
+function isBasketballClockEvent(event: BasketballMatchEvent): event is BasketballClockEvent {
+  return [
+    'basketball.clock_started',
+    'basketball.clock_paused',
+    'basketball.clock_adjusted',
+    'basketball.stoppage',
+  ].includes(event.eventType)
 }
 
 function isBasketballAdministrativeEvent(
@@ -184,6 +212,7 @@ function applyPeriodStarted(
   projection.startedPeriodIds.push(segment.id)
   projection.currentPeriodId = segment.id
   projection.status = 'in_progress'
+  startBasketballClockPeriod(projection, segment.id)
   updateBasketballBonusStatus(projection, segment.id, sportState.setup.rulesSnapshot)
   return null
 }
@@ -196,6 +225,7 @@ function applyPeriodEnded(
   const periodError = validateCurrentPeriod(projection, sportState, event)
   if (periodError) return periodError
   if (projection.status !== 'in_progress') return 'Only an active Basketball period can end.'
+  if (projection.clock?.running) return 'Pause the Basketball clock before ending the period.'
   if (projection.completedPeriodIds.includes(event.payload.periodId)) {
     return 'Basketball period already ended.'
   }
