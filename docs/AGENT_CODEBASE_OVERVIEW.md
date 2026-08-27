@@ -301,7 +301,8 @@ inert while clockless parity remains unchanged. BKE-6B is detailed in
 contracts, local-only production setup with opening-lineup authority, a shared canonical capture-time
 path plus sticky live-clock controls, and parking/recovery/exit hardening. BKE-6B includes a narrow
 same-current-five confirmation so equal-play-off built-in profiles can cross configured boundaries,
-plus a reasoned Set Clock recovery that clamps a backward device timestamp to the persisted anchor.
+plus a reasoned Set Clock recovery that clamps a backward device timestamp to the wall instant
+corresponding to `clock.lastRunningElapsedMs`, preserving the running interval's monotonic watermark.
 It deliberately blocks cloud-backed anchored creation until BKE-6D and blocks advisory/enforced
 equal-play until BKE-6C supplies candidate-lineup and override controls. Device-only clock alerts
 belong under `AppSettings.basketball`, never the CAS-seeded `courtCapture` payload. BKE-6B through BKE-6E remain; rules versions 1-2,

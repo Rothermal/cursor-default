@@ -295,11 +295,16 @@ tenths below one minute. Current five remains projection-derived.
 - Pause is immediate. Optional stoppage context uses the fixed BKE-6 catalog and appends atomically.
 - Set Clock first pauses if necessary, requires a reason, accepts count-direction-aware input, and
   stores only canonical elapsed time.
-- When the caller's wall clock precedes a running anchor, checked Set Clock takes one narrow recovery
-  branch: clamp the persisted command `occurredAt` to the anchor, pause at the last known-good anchor
-  elapsed value, and append the recorder's reasoned adjustment in the same atomic group. Ordinary
-  Pause and gameplay capture remain rejected at a backward timestamp. The UI states that the event
-  time was clamped because the device clock moved backward.
+- When the caller's wall clock maps before the running interval's monotonic elapsed watermark,
+  including when it precedes the anchor, checked Set Clock takes one narrow recovery branch. Require
+  the running clock's non-null `lastRunningElapsedMs`, let that be `recoveryElapsedMs`, and derive the
+  matching persisted instant as
+  `anchorOccurredAt + (recoveryElapsedMs - anchorElapsedMs)`. Pause at that exact
+  last-known-good elapsed/instant pair, then append the recorder's reasoned adjustment at the same
+  instant in one atomic group. Clamping merely to `anchorOccurredAt` is invalid after any later
+  running event because it would move behind the projector's elapsed watermark. Ordinary Pause and
+  gameplay capture remain rejected at a backward timestamp. The UI states that the event time was
+  clamped because the device clock moved backward.
 - At a pending equal-play-off boundary, `Confirm current five` calls
   `confirmBasketballLineup` separately for every side with lineup authority. Start remains blocked
   until all required confirmations succeed. The action cannot select a different five.
@@ -319,8 +324,9 @@ On reload, focus, visibility return, and online return:
 - materialize a normal expiration when within the accepted bound;
 - show the BKE-6A recovery warning for backward or implausibly long wall-clock movement; and
 - block new capture until the recorder resolves an unsafe clock with reasoned Set Clock. A backward
-  jump uses the clamped last-known-good recovery branch defined in section 7.3, so the recorder is
-  never trapped waiting for device time to pass the old anchor.
+  jump uses the exact last-known-good elapsed/instant pair defined in section 7.3, so the recorder is
+  never trapped waiting for device time to pass the old anchor or rejected for moving behind an
+  already captured running event.
 
 Expiration emits one visual announcement and best-effort sound/vibration according to device
 preferences. Notification failure is presentation-only and cannot retry or duplicate authority.
@@ -331,7 +337,8 @@ preferences. Notification failure is presentation-only and cannot retry or dupli
 - paused versus running event timestamps across every event family;
 - identical timestamps for linked capture groups;
 - expiration during foreground, delayed callback, reload, background return, and duplicate effects;
-- backward time, clamped recovery event time, excessive delta, offline return, and reasoned recovery;
+- backward time both before and after an intervening running event, exact watermark-derived recovery
+  time, excessive delta, offline return, and reasoned recovery;
 - same-five tracked and optional-opponent boundary confirmation plus Clock Start guards;
 - Track/Timeline switching with stable clock and controls;
 - manual-minute hidden/inert behavior; and
