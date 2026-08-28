@@ -6,14 +6,19 @@ import {
   basketballSetupDraftMatchesRoute,
   basketballSetupEventMatchesAuthority,
   basketballSetupRuleDifferences,
+  basketballVersion3StartSetupFromDraft,
   buildBasketballSetupGameState,
+  confirmBasketballSetupOpeningLineup,
   createBasketballSetupDraft,
   createBasketballSetupDraftEvent,
   loadBasketballSetupDraft,
   parseBasketballSetupDraft,
+  reconcileBasketballSetupTrackedRoster,
   refreshBasketballSetupDraftEvent,
+  resolveBasketballSetupRosterTeamId,
   saveBasketballSetupDraft,
   upgradeBasketballSetupDraftToV2,
+  updateBasketballSetupTrackedStatus,
   type BasketballSetupDraftV1,
 } from './setupDraft'
 import {
@@ -51,6 +56,70 @@ beforeEach(() => {
 })
 
 describe('Basketball setup draft', () => {
+  it('uses committed local-only team identity as a roster source without binding the game', () => {
+    const draft = createBasketballSetupDraft({
+      accountScope: 'user:user-1',
+      source: {
+        kind: 'team',
+        teamId: 'team-1',
+        seasonId: 'season-1',
+        teamName: 'Falcons',
+        seasonName: '2026',
+        accessRole: 'scorer',
+      },
+    })
+    draft.authority = 'sport_events'
+    draft.event = createBasketballSetupDraftEvent({
+      authority: 'team',
+      revision: 1,
+      settings: {
+        ...structuredClone(DEFAULT_BASKETBALL_TEAM_SETTINGS),
+        ruleOverrides: {
+          clockModel: 'anchored',
+          clockDisplayDirection: 'count_down',
+          clockExpiration: 'stop_at_zero',
+          stoppageMode: 'explicit',
+          equalPlayPolicy: {
+            mode: 'off',
+            minimumPeriods: null,
+            maximumConsecutivePeriods: null,
+            maximumPeriodImbalance: null,
+          },
+        },
+      },
+      cloudIntent: 'local_only',
+    })
+    draft.committedLocalGameId = 'local-game-1'
+
+    expect(resolveBasketballSetupRosterTeamId({
+      cloudTeamId: null,
+      draft,
+      activeLocalGameId: 'local-game-1',
+    })).toBe('team-1')
+    expect(resolveBasketballSetupRosterTeamId({
+      cloudTeamId: null,
+      draft,
+      activeLocalGameId: 'another-game',
+    })).toBeNull()
+    expect(resolveBasketballSetupRosterTeamId({
+      cloudTeamId: 'bound-team',
+      draft: null,
+      activeLocalGameId: null,
+    })).toBe('bound-team')
+
+    draft.event = createBasketballSetupDraftEvent({
+      authority: 'team',
+      revision: 2,
+      settings: DEFAULT_BASKETBALL_TEAM_SETTINGS,
+      cloudIntent: 'local_only',
+    })
+    expect(resolveBasketballSetupRosterTeamId({
+      cloudTeamId: null,
+      draft,
+      activeLocalGameId: 'local-game-1',
+    })).toBeNull()
+  })
+
   it('round-trips a strict account-scoped personal draft', () => {
     const storage = new MemoryStorage()
     const scope = basketballSetupAccountScope('user-1')
@@ -236,7 +305,7 @@ describe('Basketball setup draft', () => {
     })
   })
 
-  it('rejects version-3 authority before a local game can be committed', () => {
+  it('persists a version-3 authority for the guarded production setup workflow', () => {
     const event = createBasketballSetupDraftEvent({
       authority: 'team',
       revision: 5,
@@ -257,7 +326,96 @@ describe('Basketball setup draft', () => {
       },
       cloudIntent: 'local_only',
     })
-    expect(event).toBeNull()
+    expect(event?.reviewedRules).toMatchObject({
+      rulesSchemaVersion: 3,
+      clockModel: 'anchored',
+    })
+    expect(event?.cloudIntent).toBe('local_only')
+  })
+
+  it('keeps stable participant ids while reviewing starter, bench, and DNP status', () => {
+    let sequence = 0
+    vi.stubGlobal('crypto', { randomUUID: () => `draft-${++sequence}` })
+    const draft = createBasketballSetupDraft({
+      accountScope: 'anonymous',
+      source: { kind: 'personal', teamName: 'Aces', seasonId: null, seasonName: '' },
+    })
+    const roster = Array.from({ length: 6 }, (_, index) => ({
+      playerId: `player-${index + 1}`,
+      displayName: `Player ${index + 1}`,
+      number: String(index + 1),
+    }))
+    let reviewed = reconcileBasketballSetupTrackedRoster(draft, roster)
+    const stableId = reviewed.playerSetup.participants[1].participantId
+
+    for (const participant of reviewed.playerSetup.participants.slice(0, 5)) {
+      const result = updateBasketballSetupTrackedStatus(
+        reviewed,
+        participant.participantId,
+        'starter'
+      )
+      expect(result.ok).toBe(true)
+      if (result.ok) reviewed = result.draft
+    }
+    const dnp = updateBasketballSetupTrackedStatus(
+      reviewed,
+      reviewed.playerSetup.participants[5].participantId,
+      'dnp'
+    )
+    expect(dnp.ok).toBe(true)
+    if (dnp.ok) reviewed = dnp.draft
+    expect(updateBasketballSetupTrackedStatus(
+      reviewed,
+      reviewed.playerSetup.participants[5].participantId,
+      'starter'
+    )).toMatchObject({ ok: false })
+
+    const confirmed = confirmBasketballSetupOpeningLineup(reviewed, '')
+    expect(confirmed.ok).toBe(true)
+    if (!confirmed.ok) return
+    expect(confirmed.draft.playerSetup.currentStep).toBe('review')
+    expect(confirmed.draft.playerSetup.openingLineups.tracked.participantIds).toHaveLength(5)
+    expect(basketballVersion3StartSetupFromDraft(confirmed.draft, true)).toMatchObject({
+      openingLineups: { tracked: { shortHandedReason: null } },
+    })
+
+    const reconciled = reconcileBasketballSetupTrackedRoster(confirmed.draft, [
+      roster[1], roster[0], ...roster.slice(2),
+    ])
+    expect(reconciled.playerSetup.participants[0].participantId).toBe(stableId)
+  })
+
+  it('requires a reason for a one-through-four opening lineup', () => {
+    let sequence = 0
+    vi.stubGlobal('crypto', { randomUUID: () => `short-${++sequence}` })
+    const draft = reconcileBasketballSetupTrackedRoster(createBasketballSetupDraft({
+      accountScope: 'anonymous',
+      source: { kind: 'personal', teamName: 'Aces', seasonId: null, seasonName: '' },
+    }), Array.from({ length: 4 }, (_, index) => ({
+      playerId: `player-${index + 1}`,
+      displayName: `Player ${index + 1}`,
+      number: null,
+    })))
+    let selected = draft
+    for (const participant of draft.playerSetup.participants) {
+      const result = updateBasketballSetupTrackedStatus(
+        selected,
+        participant.participantId,
+        'starter'
+      )
+      if (result.ok) selected = result.draft
+    }
+    expect(confirmBasketballSetupOpeningLineup(selected, '')).toMatchObject({ ok: false })
+    expect(confirmBasketballSetupOpeningLineup(selected, 'Only four eligible players')).toMatchObject({
+      ok: true,
+      draft: {
+        playerSetup: {
+          openingLineups: {
+            tracked: { shortHandedReason: 'Only four eligible players' },
+          },
+        },
+      },
+    })
   })
 
   it('separates a team source from local-only cloud binding metadata', () => {

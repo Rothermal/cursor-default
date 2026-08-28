@@ -47,11 +47,11 @@ describe('Basketball release entry guards', () => {
     const setup = source('src/pages/GameSetup.tsx')
     const policyControl = between(
       setup,
-      "basketballCloudIntent === 'local_only' && teamMode === 'existing' && (",
-      '\n                  )}'
+      'aria-label="Basketball cloud policy"',
+      '\n                  {anchoredBasketballSetup'
     )
 
-    expect(policyControl).toContain('Try Automatic Cloud')
+    expect(policyControl).toContain('Automatic Cloud')
     expect(policyControl).toContain("setBasketballCloudIntent('automatic')")
     expect(policyControl).not.toContain('setBasketballMatchOverrides')
   })
@@ -138,8 +138,33 @@ describe('Basketball release entry guards', () => {
     expect(staleIndex).toBeGreaterThan(latestIndex)
     expect(startIndex).toBeGreaterThan(staleIndex)
     expect(playerSetup).toContain('reviewedSetup: {')
-    expect(playerSetup).toContain('rulesSnapshot: draft.event.reviewedRules')
-    expect(playerSetup).toContain('rulesSource: draft.event.reviewedRulesSource')
+    expect(playerSetup).toContain('rulesSnapshot: preparedDraft.event!.reviewedRules')
+    expect(playerSetup).toContain('rulesSource: preparedDraft.event!.reviewedRulesSource')
+    expect(playerSetup).toContain('version3Setup,')
+  })
+
+  it('keeps local-only team roster reads separate from cloud roster writes', () => {
+    const playerSetup = source('src/pages/PlayerSetup.tsx')
+    const addPlayer = between(
+      playerSetup,
+      'const handleAddPlayer = async () => {',
+      '\n\n  const handleRemovePlayer'
+    )
+    const removePlayer = between(
+      playerSetup,
+      'const handleRemovePlayer = async (playerId: string) => {',
+      '\n\n  const handleKeyDown'
+    )
+
+    expect(playerSetup).toContain(
+      'const individualPlayers = state.players.filter(player => !isTeamPseudoPlayer(player))'
+    )
+    expect(playerSetup).toContain('const canReadCloudRoster = Boolean(rosterTeamId')
+    expect(playerSetup).toContain('const canWriteCloudRoster = Boolean(cloudTeamId')
+    expect(addPlayer).toContain('if (canWriteCloudRoster && cloudTeamId && user)')
+    expect(removePlayer).toContain('if (canWriteCloudRoster && cloudTeamId)')
+    expect(addPlayer).not.toContain('team_id: rosterTeamId')
+    expect(removePlayer).not.toContain(".eq('team_id', rosterTeamId)")
   })
 
   it('applies the per-game orientation to every game-specific Basketball court', () => {

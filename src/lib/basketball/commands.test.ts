@@ -26,7 +26,7 @@ import {
   startNextBasketballPeriod,
   suspendBasketballMatch,
 } from './commands'
-import { getBasketballRulesProfile } from './profiles'
+import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
 const occurredAt = '2026-08-02T15:30:00.000Z'
@@ -285,6 +285,177 @@ describe('BKE-1C1 Basketball commands', () => {
     })
     expect(result.state.sportGameState.capturePreferences.courtOrientation).toBe('flipped')
     expect(result.state.basketballCourtOrientation).toBe('flipped')
+  })
+
+  it('starts reviewed setup v2 paused with exact opening authority and no Clock Start', () => {
+    const rules = upgradeBasketballRulesDraftToV3(
+      getBasketballRulesProfile('nfhs', 1)!.rules,
+      'nfhs'
+    )
+    const participants = [
+      {
+        id: '70000000-0000-4000-8000-000000000201',
+        playerId: 'player-1',
+        displayName: 'Alex One',
+        number: '4',
+        teamSide: 'tracked' as const,
+        initialStatus: 'starter' as const,
+        position: null,
+        captain: false,
+      },
+      {
+        id: '70000000-0000-4000-8000-000000000202',
+        playerId: 'player-2',
+        displayName: 'Blake Two',
+        number: '12',
+        teamSide: 'tracked' as const,
+        initialStatus: 'starter' as const,
+        position: null,
+        captain: false,
+      },
+    ]
+    const result = prepareBasketballGameStart(setupState(), {
+      recorderUserId: 'recorder-1',
+      occurredAt,
+      eventId: '70000000-0000-4000-8000-000000000203',
+      reviewedSetup: {
+        rulesSnapshot: rules,
+        rulesSource: {
+          profileId: 'nfhs',
+          profileVersion: 1,
+          personalRevision: 8,
+          teamRevision: null,
+          hasExplicitMatchOverrides: true,
+        },
+        sourceTeamId: null,
+        sourceSeasonId: null,
+        courtOrientation: 'standard',
+        version3Setup: {
+          participants,
+          openingLineups: {
+            tracked: {
+              participantIds: participants.map(participant => participant.id),
+              shortHandedReason: 'Only two eligible players',
+            },
+            opponent: null,
+          },
+        },
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.state.sportGameState?.sportId !== 'basketball') return
+    expect(result.state.sportGameState.setup).toMatchObject({
+      version: 2,
+      participants,
+      openingLineups: {
+        tracked: {
+          participantIds: participants.map(participant => participant.id),
+          shortHandedReason: 'Only two eligible players',
+        },
+      },
+    })
+    expect(result.state.sportGameState.projection).toMatchObject({
+      currentPeriodId: 'regulation-1',
+      clock: { running: false },
+      lineup: {
+        sides: {
+          tracked: { currentParticipantIds: participants.map(participant => participant.id) },
+        },
+      },
+    })
+    expect(result.state.eventStream?.events.map(
+      event => (event as { eventType: string }).eventType
+    )).toEqual([
+      'basketball.period_started',
+    ])
+  })
+
+  it('keeps version-3 clockless setup on the existing no-lineup runtime', () => {
+    const rules = {
+      ...upgradeBasketballRulesDraftToV3(
+        getBasketballRulesProfile('nfhs', 1)!.rules,
+        'nfhs'
+      ),
+      clockModel: 'none' as const,
+    }
+    const result = prepareBasketballGameStart(setupState(), {
+      recorderUserId: 'recorder-1',
+      occurredAt,
+      reviewedSetup: {
+        rulesSnapshot: rules,
+        rulesSource: {
+          profileId: 'nfhs',
+          profileVersion: 1,
+          personalRevision: 9,
+          teamRevision: null,
+          hasExplicitMatchOverrides: true,
+        },
+        sourceTeamId: null,
+        sourceSeasonId: null,
+        courtOrientation: 'standard',
+        version3Setup: {
+          participants: [
+            {
+              id: '70000000-0000-4000-8000-000000000211',
+              playerId: 'player-1',
+              displayName: 'Alex One',
+              number: '4',
+              teamSide: 'tracked',
+              initialStatus: 'bench',
+              position: null,
+              captain: false,
+            },
+            {
+              id: '70000000-0000-4000-8000-000000000212',
+              playerId: 'player-2',
+              displayName: 'Blake Two',
+              number: '12',
+              teamSide: 'tracked',
+              initialStatus: 'bench',
+              position: null,
+              captain: false,
+            },
+          ],
+          openingLineups: null,
+        },
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.state.sportGameState?.sportId !== 'basketball') return
+    expect(result.state.sportGameState.setup).toMatchObject({ version: 2, openingLineups: null })
+    expect(result.state.sportGameState.projection.clock).toBeNull()
+    expect(result.state.sportGameState.projection.lineup).toBeUndefined()
+    expect((result.state.eventStream?.events[0] as { elapsedMs: number | null }).elapsedMs).toBeNull()
+  })
+
+  it('rejects incomplete version-3 setup without mutating the pre-start state', () => {
+    const before = setupState()
+    const rules = upgradeBasketballRulesDraftToV3(
+      getBasketballRulesProfile('nfhs', 1)!.rules,
+      'nfhs'
+    )
+    const result = prepareBasketballGameStart(before, {
+      recorderUserId: 'recorder-1',
+      reviewedSetup: {
+        rulesSnapshot: rules,
+        rulesSource: {
+          profileId: 'nfhs',
+          profileVersion: 1,
+          personalRevision: null,
+          teamRevision: null,
+          hasExplicitMatchOverrides: true,
+        },
+        sourceTeamId: null,
+        sourceSeasonId: null,
+        courtOrientation: 'standard',
+      },
+    })
+
+    expect(result).toMatchObject({ ok: false, state: before, code: 'invalid_setup' })
+    expect(before.eventStream).toBeNull()
+    expect(before.sportGameState).toBeNull()
   })
 
   it('does not infer reviewed personal source identity from cloud binding metadata', () => {

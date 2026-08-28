@@ -31,6 +31,7 @@ import {
   createBasketballMatchRules,
   DEFAULT_BASKETBALL_RULES_SOURCE,
   isBasketballMatchRulesV2,
+  isBasketballMatchRulesV3,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
   resolveBasketballPeriodSegment,
@@ -43,8 +44,10 @@ import { createBasketballStatEvent } from './statEvents'
 import type {
   BasketballMatchParticipant,
   BasketballMatchRulesV2,
+  BasketballMatchRulesV3,
   BasketballMatchEvent,
   BasketballMatchSetup,
+  BasketballOpeningLineups,
   BasketballMatchSegment,
   BasketballSportGameState,
   BasketballTeamSide,
@@ -92,11 +95,15 @@ export interface BasketballStartOptions {
 }
 
 export interface BasketballReviewedStartSetup {
-  rulesSnapshot: BasketballMatchRulesV2
+  rulesSnapshot: BasketballMatchRulesV2 | BasketballMatchRulesV3
   rulesSource: BasketballRulesSource
   sourceTeamId: string | null
   sourceSeasonId: string | null
   courtOrientation: 'standard' | 'flipped'
+  version3Setup?: {
+    participants: BasketballMatchParticipant[]
+    openingLineups: BasketballOpeningLineups | null
+  }
 }
 
 export interface BasketballLateParticipantOptions {
@@ -317,6 +324,10 @@ export function prepareBasketballGameStart(
         options.recorderUserId
       ),
       period: { id: firstPeriod.id, order: firstPeriod.order },
+      elapsedMs: isBasketballMatchRulesV3(setupResult.value.rulesSnapshot) &&
+        setupResult.value.rulesSnapshot.clockModel === 'anchored'
+          ? 0
+          : null,
       occurredAt: occurredAtResult.value,
     }),
     gameEventRegistry,
@@ -357,13 +368,14 @@ export function buildBasketballMatchSetup(
   if (!reviewedSetup && !resolvedRules) {
     return commandFailure('invalid_setup', 'Basketball team-stat rules are unavailable.')
   }
-  let reviewedRules: BasketballMatchRulesV2 | null = null
+  let reviewedRules: BasketballMatchRulesV2 | BasketballMatchRulesV3 | null = null
   if (reviewedSetup) {
     const normalized = normalizeBasketballMatchRules(reviewedSetup.rulesSnapshot)
-    if (!normalized || !isBasketballMatchRulesV2(normalized)) {
+    if (!normalized ||
+        (!isBasketballMatchRulesV2(normalized) && !isBasketballMatchRulesV3(normalized))) {
       return commandFailure(
         'invalid_setup',
-        'Clock and lineup Basketball games require the upcoming setup workflow.'
+        'Reviewed Basketball rules are invalid.'
       )
     }
     reviewedRules = normalized
@@ -377,31 +389,69 @@ export function buildBasketballMatchSetup(
   if (sourceTeamId && !sourceSeasonId) {
     return commandFailure('invalid_setup', 'Cloud team Basketball games require a source season.')
   }
-  const participants: BasketballMatchParticipant[] = roster.map((player, index) => ({
-    id: participantIds?.[index] ?? createBasketballUuid(),
-    playerId: player.id,
-    displayName: player.name.trim(),
-    number: player.number.trim() || null,
-    teamSide: 'tracked',
-    initialStatus: 'bench',
-    position: null,
-    captain: false,
-  }))
+  let participants: BasketballMatchParticipant[]
+  if (reviewedRules && isBasketballMatchRulesV3(reviewedRules)) {
+    if (participantIds || !reviewedSetup?.version3Setup) {
+      return commandFailure(
+        'invalid_setup',
+        'Version-3 Basketball setup requires reviewed participant authority.'
+      )
+    }
+    participants = structuredClone(reviewedSetup.version3Setup.participants)
+    const trackedParticipants = participants.filter(participant => participant.teamSide === 'tracked')
+    if (trackedParticipants.length !== roster.length || trackedParticipants.some(
+      (participant, index) => participant.playerId !== roster[index]?.id
+    )) {
+      return commandFailure(
+        'invalid_setup',
+        'Reviewed Basketball participants no longer match the confirmed roster.'
+      )
+    }
+  } else {
+    if (reviewedSetup?.version3Setup) {
+      return commandFailure(
+        'invalid_setup',
+        'Version-2 Basketball setup cannot include opening-lineup authority.'
+      )
+    }
+    participants = roster.map((player, index) => ({
+      id: participantIds?.[index] ?? createBasketballUuid(),
+      playerId: player.id,
+      displayName: player.name.trim(),
+      number: player.number.trim() || null,
+      teamSide: 'tracked',
+      initialStatus: 'bench',
+      position: null,
+      captain: false,
+    }))
+  }
   let setup: BasketballMatchSetup
   try {
-    setup = {
-      version: 1,
-      trackedTeamDesignation: 'home',
-      sourceTeamId,
-      sourceSeasonId: sourceTeamId ? sourceSeasonId : null,
-      rulesSource: reviewedSetup
-        ? normalizeBasketballRulesSource(reviewedSetup.rulesSource)!
-        : structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE),
-      rulesSnapshot: reviewedSetup
-        ? reviewedRules!
-        : createBasketballMatchRules(resolvedRules!),
-      participants,
-    }
+    const rulesSource = reviewedSetup
+      ? normalizeBasketballRulesSource(reviewedSetup.rulesSource)!
+      : structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE)
+    setup = reviewedRules && isBasketballMatchRulesV3(reviewedRules)
+      ? {
+          version: 2,
+          trackedTeamDesignation: 'home',
+          sourceTeamId,
+          sourceSeasonId: sourceTeamId ? sourceSeasonId : null,
+          rulesSource,
+          rulesSnapshot: reviewedRules,
+          participants,
+          openingLineups: structuredClone(reviewedSetup!.version3Setup!.openingLineups),
+        }
+      : {
+          version: 1,
+          trackedTeamDesignation: 'home',
+          sourceTeamId,
+          sourceSeasonId: sourceTeamId ? sourceSeasonId : null,
+          rulesSource,
+          rulesSnapshot: reviewedSetup
+            ? reviewedRules!
+            : createBasketballMatchRules(resolvedRules!),
+          participants,
+        }
   } catch (error) {
     return commandFailure(
       'invalid_setup',

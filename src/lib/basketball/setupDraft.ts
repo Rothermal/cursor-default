@@ -2,6 +2,7 @@ import type { GameState, SportConfig } from '../../types'
 import { gameReducer, createInitialState } from '../gameReducer'
 import { stableJson } from '../gameEvents/stream'
 import { setBasketballEventCreationIntent } from './commands'
+import { createBasketballUuid } from './id'
 import { BASKETBALL_RULE_FIELDS } from './profileDiffPresentation'
 import {
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
@@ -13,7 +14,7 @@ import {
   type BasketballTeamSettingsV1,
 } from './settings'
 import {
-  isBasketballMatchRulesV2,
+  isBasketballMatchRulesV3,
   isBasketballStructuredMatchRules,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
@@ -22,6 +23,8 @@ import { normalizeBasketballRuleOverrides } from './profiles'
 import type {
   BasketballMatchRulesV2,
   BasketballMatchRulesV3,
+  BasketballMatchParticipant,
+  BasketballOpeningLineups,
   BasketballRuleOverrides,
   BasketballRulesField,
   BasketballRulesSource,
@@ -215,9 +218,7 @@ export function createBasketballSetupDraftEvent({
     matchOverrides,
   })
   if (!resolution.ok) return null
-  // BKE-6B2 owns the first production v3 setup path. Keep the producer fail-closed
-  // so saving v3 defaults cannot commit a game that Player Setup cannot start.
-  if (!isBasketballMatchRulesV2(resolution.value.rules)) return null
+  if (!isBasketballStructuredMatchRules(resolution.value.rules)) return null
   const baseProfile = settings.baseProfile
   return {
     settingsAuthority: authority === 'personal'
@@ -381,6 +382,185 @@ export function upgradeBasketballSetupDraftToV2(
   }
 }
 
+export interface BasketballSetupTrackedRosterPlayer {
+  playerId: string
+  displayName: string
+  number: string | null
+}
+
+export type BasketballSetupProgressResult =
+  | { ok: true; draft: BasketballSetupDraftV2 }
+  | { ok: false; error: string }
+
+export function reconcileBasketballSetupTrackedRoster(
+  draft: BasketballSetupDraft,
+  roster: BasketballSetupTrackedRosterPlayer[],
+  now = new Date()
+): BasketballSetupDraftV2 {
+  const upgraded = upgradeBasketballSetupDraftToV2(draft)
+  const existingTracked = new Map(
+    upgraded.playerSetup.participants
+      .filter(participant => participant.teamSide === 'tracked' && participant.playerId)
+      .map(participant => [participant.playerId!, participant])
+  )
+  const tracked = roster.map(player => {
+    const existing = existingTracked.get(player.playerId)
+    return {
+      participantId: existing?.participantId ?? createBasketballUuid(),
+      playerId: player.playerId,
+      displayName: player.displayName.trim(),
+      number: player.number?.trim() || null,
+      teamSide: 'tracked' as const,
+      initialStatus: existing?.initialStatus ?? 'bench' as const,
+    }
+  })
+  const opponents = upgraded.playerSetup.participants.filter(
+    participant => participant.teamSide === 'opponent'
+  )
+  const starterIds = tracked
+    .filter(participant => participant.initialStatus === 'starter')
+    .map(participant => participant.participantId)
+  const priorReason = upgraded.playerSetup.openingLineups.tracked.shortHandedReason
+  const shortHandedReason = starterIds.length > 0 && starterIds.length < 5
+    ? priorReason
+    : null
+  return {
+    ...upgraded,
+    updatedAt: now.toISOString(),
+    playerSetup: {
+      ...upgraded.playerSetup,
+      participants: [...tracked, ...opponents],
+      openingLineups: {
+        ...upgraded.playerSetup.openingLineups,
+        tracked: { participantIds: starterIds, shortHandedReason },
+      },
+    },
+  }
+}
+
+export function updateBasketballSetupTrackedStatus(
+  draft: BasketballSetupDraft,
+  participantId: string,
+  status: BasketballSetupParticipantStatus,
+  now = new Date()
+): BasketballSetupProgressResult {
+  const upgraded = upgradeBasketballSetupDraftToV2(draft)
+  const target = upgraded.playerSetup.participants.find(
+    participant => participant.participantId === participantId && participant.teamSide === 'tracked'
+  )
+  if (!target) return { ok: false, error: 'The selected Basketball participant is unavailable.' }
+  const starterCount = upgraded.playerSetup.participants.filter(
+    participant => participant.teamSide === 'tracked' && participant.initialStatus === 'starter'
+  ).length
+  if (status === 'starter' && target.initialStatus !== 'starter' && starterCount >= 5) {
+    return { ok: false, error: 'An opening Basketball lineup cannot contain more than five players.' }
+  }
+  const participants = upgraded.playerSetup.participants.map(participant =>
+    participant.participantId === participantId
+      ? { ...participant, initialStatus: status }
+      : participant
+  )
+  const participantIds = participants
+    .filter(participant =>
+      participant.teamSide === 'tracked' && participant.initialStatus === 'starter'
+    )
+    .map(participant => participant.participantId)
+  return {
+    ok: true,
+    draft: {
+      ...upgraded,
+      updatedAt: now.toISOString(),
+      playerSetup: {
+        ...upgraded.playerSetup,
+        participants,
+        openingLineups: {
+          ...upgraded.playerSetup.openingLineups,
+          tracked: {
+            participantIds,
+            shortHandedReason: participantIds.length === 5
+              ? null
+              : upgraded.playerSetup.openingLineups.tracked.shortHandedReason,
+          },
+        },
+      },
+    },
+  }
+}
+
+export function confirmBasketballSetupOpeningLineup(
+  draft: BasketballSetupDraft,
+  shortHandedReason: string,
+  now = new Date()
+): BasketballSetupProgressResult {
+  const upgraded = upgradeBasketballSetupDraftToV2(draft)
+  const participantIds = upgraded.playerSetup.openingLineups.tracked.participantIds
+  if (participantIds.length === 0) {
+    return { ok: false, error: 'Select at least one Basketball starter.' }
+  }
+  if (participantIds.length > 5) {
+    return { ok: false, error: 'An opening Basketball lineup cannot contain more than five players.' }
+  }
+  const reason = shortHandedReason.trim()
+  if (participantIds.length < 5 && !reason) {
+    return { ok: false, error: 'Explain why this Basketball team will start short-handed.' }
+  }
+  const candidate: BasketballSetupDraftV2 = {
+    ...upgraded,
+    updatedAt: now.toISOString(),
+    playerSetup: {
+      ...upgraded.playerSetup,
+      currentStep: 'review',
+      openingLineups: {
+        ...upgraded.playerSetup.openingLineups,
+        tracked: {
+          participantIds: [...participantIds],
+          shortHandedReason: participantIds.length < 5 ? reason : null,
+        },
+      },
+    },
+  }
+  const parsed = parseBasketballSetupDraft(candidate, candidate.accountScope)
+  return parsed.ok && parsed.value.version === 2
+    ? { ok: true, draft: parsed.value }
+    : { ok: false, error: parsed.ok ? 'Basketball lineup review is invalid.' : parsed.error }
+}
+
+export function basketballVersion3StartSetupFromDraft(
+  draft: BasketballSetupDraft,
+  anchored: boolean
+): { participants: BasketballMatchParticipant[]; openingLineups: BasketballOpeningLineups | null } | null {
+  if (draft.version !== 2 || (anchored && draft.playerSetup.currentStep !== 'review')) return null
+  const participants: BasketballMatchParticipant[] = draft.playerSetup.participants.map(
+    participant => ({
+      id: participant.participantId,
+      playerId: participant.playerId,
+      displayName: participant.displayName,
+      number: participant.number,
+      teamSide: participant.teamSide,
+      initialStatus: anchored ? participant.initialStatus : 'bench',
+      position: null,
+      captain: false,
+    })
+  )
+  return {
+    participants,
+    openingLineups: anchored
+      ? {
+          tracked: {
+            participantIds: [...draft.playerSetup.openingLineups.tracked.participantIds],
+            shortHandedReason: draft.playerSetup.openingLineups.tracked.shortHandedReason,
+          },
+          opponent: draft.playerSetup.openingLineups.opponent
+            ? {
+                participantIds: [...draft.playerSetup.openingLineups.opponent.participantIds],
+                shortHandedReason: draft.playerSetup.openingLineups.opponent.shortHandedReason,
+              }
+            : null,
+        }
+      : null,
+  }
+}
+
 export function loadBasketballSetupDraft(
   scope: BasketballSetupAccountScope,
   storage: StorageLike = localStorage
@@ -429,6 +609,30 @@ export function basketballSetupDraftMatchesRoute(
   return requestedTeamId
     ? draft.source.kind === 'team' && draft.source.teamId === requestedTeamId
     : draft.source.kind === 'personal'
+}
+
+export function resolveBasketballSetupRosterTeamId({
+  cloudTeamId,
+  draft,
+  activeLocalGameId,
+}: {
+  cloudTeamId: string | null
+  draft: BasketballSetupDraft | null
+  activeLocalGameId: string | null
+}): string | null {
+  if (cloudTeamId) return cloudTeamId
+  if (
+    !draft?.event ||
+    draft.authority !== 'sport_events' ||
+    draft.event.cloudIntent !== 'local_only' ||
+    !isBasketballMatchRulesV3(draft.event.reviewedRules) ||
+    draft.source.kind !== 'team' ||
+    !activeLocalGameId ||
+    draft.committedLocalGameId !== activeLocalGameId
+  ) {
+    return null
+  }
+  return draft.source.teamId
 }
 
 export function basketballSetupDraftHasMeaningfulEdits(
