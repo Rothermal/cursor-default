@@ -21,6 +21,7 @@ import {
   type BasketballCourtPoint,
 } from './courtGeometry'
 import { createBasketballUuid } from './id'
+import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballStatEvent } from './statEvents'
 import type {
@@ -87,6 +88,7 @@ export interface BasketballHistoricalShotDraft {
   eventId: string
   sourceFingerprint: string
   period: { id: string; order: number }
+  elapsedMs: number | null
   teamSide: BasketballTeamSide
   shooter: BasketballCaptureActorSelection
   made: boolean
@@ -186,6 +188,8 @@ export function buildBasketballHistoricalShotDraft(
     sportState.projection.startedPeriodIds.includes(period.id)
   )
   if (!currentPeriod) return commandFailure('invalid_period', 'Start a Basketball period before adding a shot.')
+  const time = defaultBasketballHistoricalTime(prepared.value, currentPeriod)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
   const shooter = basketballShotActorOptions(prepared.value, 'tracked')[0]
   if (!shooter) return commandFailure('invalid_actor', 'Add a tracked Basketball participant before adding a shot.')
   return {
@@ -194,6 +198,7 @@ export function buildBasketballHistoricalShotDraft(
       eventId: createBasketballUuid(),
       sourceFingerprint: eventStreamFingerprint(prepared.value),
       period: { id: currentPeriod.id, order: currentPeriod.order },
+      elapsedMs: time.elapsedMs,
       teamSide: 'tracked',
       shooter: shooter.selection,
       made: true,
@@ -630,6 +635,8 @@ function buildHistoricalShotEvents(
   ) {
     return commandFailure('invalid_period', 'Select a Basketball period that has already started.')
   }
+  const time = validateBasketballHistoricalTime(state, draft.period, draft.elapsedMs)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
   const shooter = basketballActorForSelection(
     state,
     'shooter',
@@ -663,6 +670,7 @@ function buildHistoricalShotEvents(
     recorderUserId,
     sequence: nextSequence++,
     period: draft.period,
+    elapsedMs: time.elapsedMs,
     occurredAt,
     teamSide: draft.teamSide,
     location: location.value,
@@ -694,6 +702,7 @@ function buildHistoricalShotEvents(
       recorderUserId,
       sequence: nextSequence++,
       period: draft.period,
+      elapsedMs: time.elapsedMs,
       occurredAt,
       teamSide: selection.teamSide,
       actors: [actor.value],

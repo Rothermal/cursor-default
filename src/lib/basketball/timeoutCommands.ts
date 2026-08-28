@@ -134,6 +134,7 @@ export function captureBasketballTimeout(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,
+    elapsedMs: context.value.elapsedMs,
     occurredAt: context.value.occurredAt,
     teamSide,
     actors,

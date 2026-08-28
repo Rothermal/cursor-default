@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { BadgeAlert, Clock3, Link2, List, Minus, ReceiptText, Target, Trash2, UserX } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
+import { useSettings } from '../context/SettingsContext'
 import { computeCategoryTotal } from '../config/sports'
 import { resolveTeamStatsConfig } from '../config/teamStatsDefaults'
 import { buildPeriodSegmentLabels, getBonusFoulCountForPeriod } from '../lib/teamStatsPeriods'
@@ -39,6 +40,7 @@ import BasketballTimeoutDialog from '../components/basketball/BasketballTimeoutD
 import BasketballTimeline from '../components/basketball/BasketballTimeline'
 import BasketballRecorderStatus from '../components/basketball/BasketballRecorderStatus'
 import BasketballEnableCloudPanel from '../components/basketball/BasketballEnableCloudPanel'
+import BasketballClockStrip from '../components/basketball/BasketballClockStrip'
 import EventCloudConflictDialog from '../components/game-events/EventCloudConflictDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
@@ -181,6 +183,7 @@ export default function GameTracker() {
     resolveEventConflict,
   } = useGame()
   const { user } = useAuth()
+  const { basketballDeviceSettings } = useSettings()
   const teamAccess = useTeamRole(state.cloudSync.teamId)
   const {
     sport,
@@ -495,7 +498,10 @@ export default function GameTracker() {
           actions: category.actions.filter(action =>
             showTeamStatGrid
               ? action.id === 'team_turnover' || action.id === 'team_foul' || action.id === 'team_tech'
-              : (isBasketballDirectStatId(action.id) && action.id !== 'team_turnover') || action.id === 'pf'
+              : ((isBasketballDirectStatId(action.id) &&
+                  action.id !== 'team_turnover' &&
+                  !(basketballSportState?.projection.clock && action.id === 'min')) ||
+                action.id === 'pf')
           ),
         }))
         .filter(category => category.actions.length > 0)
@@ -1132,6 +1138,15 @@ export default function GameTracker() {
           />
         )}
       </div>
+
+      {isBasketballEventMode && (
+        <BasketballClockStrip
+          state={state}
+          recorderUserId={user?.id ?? null}
+          settings={basketballDeviceSettings}
+          onState={next => dispatch({ type: 'HYDRATE_STATE', state: next })}
+        />
+      )}
 
       {isBasketballEventMode && (
         <div className="mx-auto w-full max-w-lg px-3 pb-2">

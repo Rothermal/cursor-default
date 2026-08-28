@@ -17,6 +17,7 @@ import {
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballUuid } from './id'
+import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import {
   basketballTimeoutKindLimit,
   basketballTimeoutUsageByPool,
@@ -47,6 +48,7 @@ export interface BasketballAdministrationDraft {
   sourceFingerprint: string
   eventType: BasketballEditableAdministrationEventType
   period: { id: string; order: number }
+  elapsedMs: number | null
   teamSide: BasketballTeamSide | 'neutral'
   subject: BasketballAdministrationSubjectDraft
   reason: string
@@ -171,7 +173,7 @@ export function buildBasketballAdministrationEditDraft(
     candidate.id === eventId && isBasketballEditableAdministrationEvent(candidate)
   ) as BasketballEjectionEvent | BasketballTimeoutEvent | undefined
   if (!event) return commandFailure('command_failed', 'This active Basketball administration event is unavailable for editing.')
-  const base = defaultDraft(prepared.value.state, event.period, event.id)
+  const base = { ...defaultDraft(prepared.value.state, event.period, event.id), elapsedMs: event.elapsedMs }
   if (event.eventType === 'basketball.ejection') {
     const subject = event.actors.find(actor => actor.role === 'subject')
     if (!subject) return commandFailure('invalid_actor', 'The ejection subject is unavailable.')
@@ -212,7 +214,12 @@ export function buildBasketballHistoricalAdministrationDraft(
   const period = projection?.periods.find(candidate => candidate.id === projection.currentPeriodId) ??
     projection?.periods.find(candidate => projection.startedPeriodIds.includes(candidate.id))
   if (!period) return commandFailure('invalid_period', 'Start a Basketball period before adding an event.')
-  const draft = defaultDraft(prepared.value.state, period, createBasketballUuid())
+  const time = defaultBasketballHistoricalTime(prepared.value.state, period)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
+  const draft = {
+    ...defaultDraft(prepared.value.state, period, createBasketballUuid()),
+    elapsedMs: time.elapsedMs,
+  }
   return { ok: true, value: { ...draft, eventType } }
 }
 
@@ -472,11 +479,14 @@ function eventPlan(
       },
     }
   }
+  const time = validateBasketballHistoricalTime(prepared.state, draft.period, draft.elapsedMs)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
   const common = {
     id: draft.eventId,
     recorderUserId,
     sequence: nextBasketballEventSequence(prepared.state.eventStream!.events, recorderUserId),
     period: draft.period,
+    elapsedMs: time.elapsedMs,
     occurredAt,
     teamSide: fields.teamSide,
     actors: fields.actors,
@@ -536,6 +546,7 @@ function defaultDraft(
     sourceFingerprint: eventStreamFingerprint(state),
     eventType: 'basketball.ejection',
     period: { id: period.id, order: period.order },
+    elapsedMs: null,
     teamSide: participant?.teamSide ?? 'tracked',
     subject: participant?.selection.kind === 'participant'
       ? participant.selection

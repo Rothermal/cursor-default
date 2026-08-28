@@ -16,6 +16,7 @@ import {
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballUuid } from './id'
+import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
 import { basketballShotActorOptions, type BasketballShotActorOption } from './shotEditCommands'
 import { createBasketballStatEvent } from './statEvents'
@@ -37,6 +38,7 @@ export interface BasketballValueEventDraft {
   sourceFingerprint: string
   eventType: BasketballEditableValueEventType
   period: { id: string; order: number }
+  elapsedMs: number | null
   teamSide: BasketballTeamSide
   actor: BasketballCaptureActorSelection
   delta: number
@@ -119,6 +121,7 @@ export function buildBasketballValueEventEditDraft(
       sourceFingerprint: eventStreamFingerprint(prepared.value.state),
       eventType: event.eventType,
       period: event.period,
+      elapsedMs: event.elapsedMs,
       teamSide: event.teamSide,
       actor: event.eventType === 'basketball.minutes_adjustment'
         ? actorToSelection(event.actors[0])
@@ -151,6 +154,8 @@ export function buildBasketballHistoricalValueEventDraft(
   const period = projection?.periods.find(candidate => candidate.id === projection.currentPeriodId) ??
     projection?.periods.find(candidate => projection.startedPeriodIds.includes(candidate.id))
   if (!period) return commandFailure('invalid_period', 'Start a Basketball period before adding an event.')
+  const time = defaultBasketballHistoricalTime(prepared.value.state, period)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
   const trackedActor = basketballMinutesActorOptions(prepared.value.state, 'tracked')[0]
   const opponentActor = basketballMinutesActorOptions(prepared.value.state, 'opponent')[0]
   const defaultMinutesActor = trackedActor ?? opponentActor
@@ -165,6 +170,7 @@ export function buildBasketballHistoricalValueEventDraft(
       sourceFingerprint: eventStreamFingerprint(prepared.value.state),
       eventType,
       period: { id: period.id, order: period.order },
+      elapsedMs: time.elapsedMs,
       teamSide: eventType === 'basketball.minutes_adjustment'
         ? defaultMinutesActor?.teamSide ?? 'tracked'
         : 'tracked',
@@ -276,6 +282,10 @@ function buildPlan(
   if (mode === 'add' && prepared.active.some(candidate => candidate.id === draft.eventId)) {
     return commandFailure('command_failed', 'This Basketball event id is already in use.')
   }
+  const historicalTime = mode === 'add'
+    ? validateBasketballHistoricalTime(prepared.state, draft.period, draft.elapsedMs)
+    : { ok: true as const, elapsedMs: draft.elapsedMs }
+  if (!historicalTime.ok) return commandFailure('invalid_timestamp', historicalTime.message)
   const actor = draft.eventType === 'basketball.score_adjustment'
     ? basketballActorForSelection(prepared.state, 'team', draft.teamSide, { kind: 'team' })
     : basketballActorForSelection(prepared.state, 'player', draft.teamSide, draft.actor, { allowUnavailable: true })
@@ -330,6 +340,7 @@ function buildPlan(
     recorderUserId,
     sequence: nextBasketballEventSequence(prepared.state.eventStream?.events ?? [], recorderUserId),
     period: draft.period,
+    elapsedMs: historicalTime.elapsedMs,
     occurredAt,
     teamSide: draft.teamSide,
     actors: [actor.value],

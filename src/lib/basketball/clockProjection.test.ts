@@ -11,11 +11,24 @@ import {
   setBasketballClock,
   startBasketballClock,
 } from './clockCommands'
-import { deriveBasketballClockDisplay } from './clockProjection'
+import {
+  BASKETBALL_CLOCK_MAX_WALL_DELTA_MS,
+  basketballClockRecoveryIssue,
+  deriveBasketballClockDisplay,
+} from './clockProjection'
+import { captureBasketballCourtEvent } from './commands'
+import { captureBasketballDirectStat } from './directCommands'
+import { captureBasketballOfficialEjection } from './ejectionCommands'
 import { createBasketballLifecycleEvent } from './events'
+import { captureBasketballFoul } from './foulFreeThrowCommands'
 import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
 import { createBasketballSportGameState } from './state'
 import { createBasketballStatEvent } from './statEvents'
+import {
+  buildBasketballHistoricalShotDraft,
+  previewBasketballHistoricalShot,
+} from './shotEditCommands'
+import { captureBasketballTimeout } from './timeoutCommands'
 import type {
   BasketballMatchParticipant,
   BasketballMatchSetupV1,
@@ -231,6 +244,172 @@ describe('BKE-6A2 Basketball anchored clock projection', () => {
       reachedExpiration: false,
       backwardClockWarning: true,
     })
+  })
+
+  it('recovers a running clock at its exact last-known event watermark', () => {
+    const started = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(45),
+    }))
+    const captured = captureBasketballCourtEvent(started, {
+      recorderUserId,
+      playerId: 'player-1',
+      point: { x: 0, y: 8 },
+      event: {
+        kind: 'shot',
+        made: true,
+        shotType: '2pt',
+        assistPlayerId: 'player-2',
+      },
+      occurredAt: isoAfter(periodStart, 12_345),
+      eventIds: [uuid(46), uuid(47)],
+      captureCommandId: 'clock-linked-shot',
+    })
+    expect(captured.ok).toBe(true)
+    if (!captured.ok) return
+    expect(captured.state.eventStream?.events.slice(-2)).toMatchObject([
+      { elapsedMs: 12_345, occurredAt: isoAfter(periodStart, 12_345) },
+      { elapsedMs: 12_345, occurredAt: isoAfter(periodStart, 12_345) },
+    ])
+    expect(clockOf(captured.state).lastRunningElapsedMs).toBe(12_345)
+
+    const recovered = setBasketballClock(captured.state, {
+      recorderUserId,
+      occurredAt: isoAfter(periodStart, -1_000),
+      pauseEventId: uuid(48),
+      eventId: uuid(49),
+      captureCommandId: 'clock-recovery',
+      elapsedMs: 20_000,
+      reason: 'Device clock moved backward',
+    })
+    expect(recovered.ok).toBe(true)
+    if (!recovered.ok) return
+    expect(recovered.state.eventStream?.events.slice(-2)).toMatchObject([
+      {
+        eventType: 'basketball.clock_paused',
+        elapsedMs: 12_345,
+        occurredAt: isoAfter(periodStart, 12_345),
+        payload: { elapsedMs: 12_345, source: 'manual' },
+      },
+      {
+        eventType: 'basketball.clock_adjusted',
+        elapsedMs: 20_000,
+        occurredAt: isoAfter(periodStart, 12_345),
+        payload: { fromElapsedMs: 12_345, toElapsedMs: 20_000 },
+      },
+    ])
+    expect(clockOf(recovered.state)).toMatchObject({
+      running: false,
+      elapsedMs: 20_000,
+    })
+  })
+
+  it('routes live stat, foul, timeout, and ejection families through canonical time', () => {
+    let state = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(70),
+    }))
+
+    const direct = captureBasketballDirectStat(state, {
+      recorderUserId,
+      playerId: 'player-1',
+      statId: 'ast',
+      occurredAt: isoAfter(periodStart, 1_250),
+      eventId: uuid(71),
+    })
+    expect(direct.ok).toBe(true)
+    if (!direct.ok) return
+    state = direct.state
+
+    const foul = captureBasketballFoul(state, {
+      recorderUserId,
+      teamSide: 'tracked',
+      offender: { kind: 'player', playerId: 'player-1' },
+      class: 'personal',
+      context: 'common',
+      occurredAt: isoAfter(periodStart, 2_500),
+      eventIds: [uuid(72)],
+      captureCommandId: 'clock-foul',
+    })
+    expect(foul.ok).toBe(true)
+    if (!foul.ok) return
+    state = foul.state
+
+    const timeout = captureBasketballTimeout(state, {
+      recorderUserId,
+      timeout: { mode: 'neutral', kind: 'official' },
+      occurredAt: isoAfter(periodStart, 3_750),
+      eventId: uuid(73),
+    })
+    expect(timeout.ok).toBe(true)
+    if (!timeout.ok) return
+    state = timeout.state
+
+    const ejection = captureBasketballOfficialEjection(state, {
+      recorderUserId,
+      teamSide: 'tracked',
+      subject: { kind: 'staff', label: 'Assistant coach' },
+      reason: 'Second technical foul',
+      occurredAt: isoAfter(periodStart, 5_000),
+      eventId: uuid(74),
+    })
+    expect(ejection.ok).toBe(true)
+    if (!ejection.ok) return
+
+    expect(ejection.state.eventStream?.events.slice(-4)).toMatchObject([
+      { id: uuid(71), elapsedMs: 1_250 },
+      { id: uuid(72), elapsedMs: 2_500 },
+      { id: uuid(73), elapsedMs: 3_750 },
+      { id: uuid(74), elapsedMs: 5_000 },
+    ])
+    expect(clockOf(ejection.state).lastRunningElapsedMs).toBe(5_000)
+  })
+
+  it('accepts an explicit reviewed time for a recorded-later Timeline event', () => {
+    const started = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(80),
+    }))
+    const paused = requireState(pauseBasketballClock(started, {
+      recorderUserId,
+      occurredAt: isoAfter(periodStart, 5_000),
+      eventId: uuid(81),
+    }))
+    const built = buildBasketballHistoricalShotDraft(paused)
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+
+    const preview = previewBasketballHistoricalShot(
+      paused,
+      { ...built.value, elapsedMs: 1_000 },
+      recorderUserId,
+      isoAfter(periodStart, 5_000)
+    )
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    expect(preview.value.draft.elapsedMs).toBe(1_000)
+    expect(preview.value.consequenceLines.some(line => line.includes('Q1'))).toBe(true)
+  })
+
+  it('classifies backward and excessive wall-clock recovery boundaries', () => {
+    const started = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(51),
+    }))
+    const clock = clockOf(started)
+    expect(basketballClockRecoveryIssue(clock, isoAfter(periodStart, -1))).toBe('backward')
+    expect(basketballClockRecoveryIssue(
+      clock,
+      isoAfter(periodStart, BASKETBALL_CLOCK_MAX_WALL_DELTA_MS)
+    )).toBeNull()
+    expect(basketballClockRecoveryIssue(
+      clock,
+      isoAfter(periodStart, BASKETBALL_CLOCK_MAX_WALL_DELTA_MS + 1)
+    )).toBe('excessive_delta')
   })
 
   it('rejects canonical elapsed moving backward within one running interval', () => {

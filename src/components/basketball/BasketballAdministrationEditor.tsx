@@ -15,6 +15,7 @@ import {
   type BasketballEditableAdministrationEventType,
 } from '../../lib/basketball/administrationEditCommands'
 import { basketballShotActorSelectionKey } from '../../lib/basketball/shotEditCommands'
+import BasketballHistoricalTimeField from './BasketballHistoricalTimeField'
 import type { BasketballTeamSide, BasketballTimeoutKind } from '../../lib/basketball/types'
 import {
   BasketballEditorErrorMessage,
@@ -158,6 +159,7 @@ export default function BasketballAdministrationEditor(props: Props) {
                 relatedFoulEventId: null,
               })
             }} />
+            <BasketballHistoricalTimeField key={draft.period.id} state={state} period={draft.period} elapsedMs={draft.elapsedMs} onChange={elapsedMs => update({ elapsedMs })} />
           </BasketballEditorSection>
         )}
 
