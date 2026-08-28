@@ -265,7 +265,7 @@ export function getBasketballRulesProfile(
   return found ? structuredClone(found) : null
 }
 
-const BASKETBALL_CLOCK_LINEUP_FIELDS = [
+export const BASKETBALL_CLOCK_LINEUP_FIELDS = [
   'clockModel',
   'clockDisplayDirection',
   'clockExpiration',
@@ -316,6 +316,30 @@ export function upgradeBasketballRulesDraftToV3(
   const error = validateBasketballMatchRules(upgraded)
   if (error) throw new Error(error)
   return upgraded
+}
+
+export function basketballRuleOverridesWithAnchoredClock(
+  rules: BasketballMatchRulesV2,
+  profileId: BasketballRulesProfileId,
+  current: BasketballRuleOverrides
+): BasketballRuleOverrides {
+  const upgraded = upgradeBasketballRulesDraftToV3(rules, profileId)
+  return {
+    ...structuredClone(current),
+    clockModel: upgraded.clockModel,
+    clockDisplayDirection: upgraded.clockDisplayDirection,
+    clockExpiration: upgraded.clockExpiration,
+    stoppageMode: upgraded.stoppageMode,
+    equalPlayPolicy: structuredClone(upgraded.equalPlayPolicy),
+  }
+}
+
+export function basketballRuleOverridesWithoutClockLineups(
+  current: BasketballRuleOverrides
+): BasketballRuleOverrides {
+  const next = structuredClone(current)
+  for (const field of BASKETBALL_CLOCK_LINEUP_FIELDS) delete next[field]
+  return next
 }
 
 export function resolveBasketballRules(

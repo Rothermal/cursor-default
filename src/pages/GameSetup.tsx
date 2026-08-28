@@ -35,7 +35,7 @@ import {
   loadBasketballSetupDraft,
   parseBasketballSetupDraft,
   saveBasketballSetupDraft,
-  type BasketballSetupDraftV1,
+  type BasketballSetupDraft,
   type BasketballSetupAuthoritySnapshot,
   type BasketballSetupSource,
 } from '../lib/basketball/setupDraft'
@@ -116,7 +116,7 @@ export default function GameSetup() {
     basketballSetupDraftMatchesRoute(initialBasketballDraft, requestedTeamId)
       ? initialBasketballDraft
       : null
-  const basketballDraftRef = useRef<BasketballSetupDraftV1 | null>(matchingInitialBasketballDraft)
+  const basketballDraftRef = useRef<BasketballSetupDraft | null>(matchingInitialBasketballDraft)
   const isBasketballSetup = sport?.id === 'basketball'
   const sportHomePath = sport ? sportDashboardPath(sport.id) : '/'
   const isCloudFlow = Boolean(isConfigured && user && supabase)
@@ -626,7 +626,7 @@ export default function GameSetup() {
     )
   }, [isBasketballSetup, selectedTournamentId, tournaments])
 
-  const currentBasketballDraft = useMemo((): BasketballSetupDraftV1 | null => {
+  const currentBasketballDraft = useMemo((): BasketballSetupDraft | null => {
     if (!isBasketballSetup) return null
     let source: BasketballSetupSource
     if (teamMode === 'existing') {
@@ -686,7 +686,7 @@ export default function GameSetup() {
         ? structuredClone(rawTeamStatsConfig)
         : null
 
-    let event: BasketballSetupDraftV1['event'] = null
+    let event: BasketballSetupDraft['event'] = null
     if (basketballAuthority === 'sport_events') {
       const existingEvent = previous?.event
       const existingMatchesSource = existingEvent?.settingsAuthority.kind === source.kind &&
@@ -722,7 +722,7 @@ export default function GameSetup() {
       if (!event) return null
     }
 
-    const next: BasketballSetupDraftV1 = {
+    const next: BasketballSetupDraft = {
       ...base,
       accountScope,
       updatedAt: new Date().toISOString(),
@@ -1161,7 +1161,7 @@ export default function GameSetup() {
           : null
 
     if (isBasketballSetup && basketballDraft) {
-      const resolvedDraft: BasketballSetupDraftV1 = {
+      const resolvedDraft: BasketballSetupDraft = {
         ...basketballDraft,
         updatedAt: new Date().toISOString(),
         gameInfo: {

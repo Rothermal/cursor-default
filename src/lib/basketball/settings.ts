@@ -7,9 +7,12 @@ import {
   type BasketballRulesProfileRef,
 } from './profiles'
 import { BASKETBALL_RULE_FIELDS } from './profileDiffPresentation'
+import { isBasketballMatchRulesV3 } from './rules'
 import type { BasketballRuleOverrides, BasketballRulesField } from './types'
 
 export const BASKETBALL_SETTINGS_SCHEMA_VERSION = 1
+export const BASKETBALL_V3_COMPATIBILITY_WARNING =
+  'Version-3 clock and lineup defaults require an updated StatKeeper client. Older clients cannot start new Basketball Event games using this authority, including clockless Event games. Existing games and Legacy setup remain available.'
 
 export interface BasketballCapturePreferences {
   reboundPromptAfterMiss: boolean
@@ -50,6 +53,16 @@ export const DEFAULT_BASKETBALL_PERSONAL_SETTINGS: BasketballPersonalSettingsV1 
 export const DEFAULT_BASKETBALL_TEAM_SETTINGS: BasketballTeamSettingsV1 = {
   baseProfile: DEFAULT_BASKETBALL_PROFILE,
   ruleOverrides: {},
+}
+
+export function basketballSettingsRequireVersion3Confirmation(
+  settings: BasketballTeamSettingsV1
+): boolean {
+  const resolved = resolveBasketballRules(
+    settings.baseProfile,
+    [{ id: 'team', overrides: settings.ruleOverrides }]
+  )
+  return resolved.ok && isBasketballMatchRulesV3(resolved.value.rules)
 }
 
 export type BasketballSettingsAuthority = 'personal' | 'team'

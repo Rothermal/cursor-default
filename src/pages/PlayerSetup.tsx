@@ -21,7 +21,7 @@ import {
   refreshBasketballSetupDraftEvent,
   saveBasketballSetupDraft,
   type BasketballSetupAuthoritySnapshot,
-  type BasketballSetupDraftV1,
+  type BasketballSetupDraft,
 } from '../lib/basketball/setupDraft'
 import { loadLatestBasketballSetupAuthority } from '../lib/basketball/setupAuthority'
 import { basketballRuleFieldLabel } from '../lib/basketball/profileDiffPresentation'
@@ -65,7 +65,7 @@ export default function PlayerSetup() {
   const [saving, setSaving] = useState(false)
   const [starting, setStarting] = useState(false)
   const accountScope = basketballSetupAccountScope(user?.id ?? null)
-  const [basketballSetupDraft, setBasketballSetupDraft] = useState<BasketballSetupDraftV1 | null>(
+  const [basketballSetupDraft, setBasketballSetupDraft] = useState<BasketballSetupDraft | null>(
     () => loadBasketballSetupDraft(accountScope)
   )
   const [staleAuthority, setStaleAuthority] = useState<{
@@ -309,7 +309,7 @@ export default function PlayerSetup() {
     return null
   }
 
-  const startBasketballEventGame = (draft: BasketballSetupDraftV1) => {
+  const startBasketballEventGame = (draft: BasketballSetupDraft) => {
     if (!draft.event) return
     if (!isBasketballMatchRulesV2(draft.event.reviewedRules)) {
       setRosterError('Clock and lineup Basketball games require the upcoming setup workflow.')
@@ -403,7 +403,7 @@ export default function PlayerSetup() {
       setRosterError(refreshed.error)
       return
     }
-    const next: BasketballSetupDraftV1 = {
+    const next: BasketballSetupDraft = {
       ...basketballSetupDraft,
       updatedAt: new Date().toISOString(),
       event: refreshed.event,
