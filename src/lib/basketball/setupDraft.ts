@@ -13,6 +13,7 @@ import {
   type BasketballTeamSettingsV1,
 } from './settings'
 import {
+  isBasketballMatchRulesV2,
   isBasketballStructuredMatchRules,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
@@ -214,7 +215,9 @@ export function createBasketballSetupDraftEvent({
     matchOverrides,
   })
   if (!resolution.ok) return null
-  if (!isBasketballStructuredMatchRules(resolution.value.rules)) return null
+  // BKE-6B2 owns the first production v3 setup path. Keep the producer fail-closed
+  // so saving v3 defaults cannot commit a game that Player Setup cannot start.
+  if (!isBasketballMatchRulesV2(resolution.value.rules)) return null
   const baseProfile = settings.baseProfile
   return {
     settingsAuthority: authority === 'personal'

@@ -196,6 +196,11 @@ Add pure helpers for:
 These helpers become the single policy source for B2 setup and B4 parking interception. Do not
 scatter rules-version or clock-running checks across route components.
 
+The anchored setup policy is tri-state: clockless rules are not applicable, supported anchored
+rules are allowed, and anchored rules awaiting a later slice are blocked with a reason. B1 keeps
+the production setup-event producer restricted to rules version 2 so saved version-3 defaults
+cannot commit an unstartable local game before B2 wires this policy into setup.
+
 ### 5.5 Tests
 
 - exact old/new local preference parsing and malformed-value fallback;

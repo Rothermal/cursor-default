@@ -3,13 +3,18 @@ import { isBasketballMatchRulesV3 } from './rules'
 import type { BasketballMatchRulesV2, BasketballMatchRulesV3 } from './types'
 
 export type BasketballAnchoredSetupBlockReason =
-  | 'not_anchored'
   | 'equal_play_requires_bke_6c'
   | 'cloud_requires_bke_6d'
 
 export type BasketballAnchoredSetupPolicy =
-  | { allowed: true }
-  | { allowed: false; reason: BasketballAnchoredSetupBlockReason; message: string }
+  | { applicable: false }
+  | { applicable: true; allowed: true }
+  | {
+      applicable: true
+      allowed: false
+      reason: BasketballAnchoredSetupBlockReason
+      message: string
+    }
 
 export function getBasketballAnchoredSetupPolicy({
   rules,
@@ -21,14 +26,11 @@ export function getBasketballAnchoredSetupPolicy({
   cloudGameId?: string | null
 }): BasketballAnchoredSetupPolicy {
   if (!isBasketballMatchRulesV3(rules) || rules.clockModel !== 'anchored') {
-    return {
-      allowed: false,
-      reason: 'not_anchored',
-      message: 'This Basketball setup does not use an anchored clock.',
-    }
+    return { applicable: false }
   }
   if (rules.equalPlayPolicy.mode !== 'off') {
     return {
+      applicable: true,
       allowed: false,
       reason: 'equal_play_requires_bke_6c',
       message: 'Advisory and enforced equal play require the upcoming lineup workflow.',
@@ -36,12 +38,13 @@ export function getBasketballAnchoredSetupPolicy({
   }
   if (cloudIntent !== 'local_only' || cloudGameId) {
     return {
+      applicable: true,
       allowed: false,
       reason: 'cloud_requires_bke_6d',
       message: 'Anchored Basketball cloud games require the upcoming cloud workflow.',
     }
   }
-  return { allowed: true }
+  return { applicable: true, allowed: true }
 }
 
 export function isRunningAnchoredBasketballGame(state: GameState): boolean {

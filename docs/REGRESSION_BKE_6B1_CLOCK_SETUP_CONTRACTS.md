@@ -14,7 +14,7 @@ Plan: [PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md](PLAN_BKE_6B_PRODUCTION_SETUP_A
 - an explicit older-client warning before normal saves and personal conflict `Keep This Device`;
 - strict setup-draft version 2 participant/status/opening-lineup progress while preserving exact
   version-1 draft reads;
-- version-3 setup review persistence without production anchored startup;
+- a fail-closed version-3 setup producer that rejects before local game commit until BKE-6B2;
 - pure local/cloud/equal-play setup policy, running-clock detection, and mutation classification; and
 - no migration, cloud transport, anchored-game initialization, live clock, or parking interception.
 
@@ -53,5 +53,6 @@ Focused coverage includes:
 ## Exit
 
 BKE-6B1 is complete. The app can save deliberate version-3 defaults and persist strict future
-opening-lineup progress, but production anchored startup remains blocked in `PlayerSetup`. BKE-6B2
-owns the setup review, opening-lineup screen, local-only preflight, and atomic setup-v2 start.
+opening-lineup progress. Production version-3 setup is rejected before local game commit, with the
+existing `PlayerSetup` refusal retained as defense in depth. BKE-6B2 owns the setup review,
+opening-lineup screen, local-only preflight, and atomic setup-v2 start.

@@ -236,7 +236,7 @@ describe('Basketball setup draft', () => {
     })
   })
 
-  it('reviews version-3 authority without starting an anchored game', () => {
+  it('rejects version-3 authority before a local game can be committed', () => {
     const event = createBasketballSetupDraftEvent({
       authority: 'team',
       revision: 5,
@@ -257,10 +257,7 @@ describe('Basketball setup draft', () => {
       },
       cloudIntent: 'local_only',
     })
-    expect(event?.reviewedRules).toMatchObject({
-      rulesSchemaVersion: 3,
-      clockModel: 'anchored',
-    })
+    expect(event).toBeNull()
   })
 
   it('separates a team source from local-only cloud binding metadata', () => {
