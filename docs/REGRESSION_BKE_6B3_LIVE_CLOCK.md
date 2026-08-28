@@ -26,7 +26,7 @@ equal-play override, running-clock parking interception, or complete period-flow
 | Gate | Result |
 |---|---|
 | `pnpm.cmd typecheck` | Pass |
-| `pnpm.cmd test` | Pass: 172 files and 1,204 tests |
+| `pnpm.cmd test` | Pass: 172 files and 1,205 tests |
 | `pnpm.cmd lint` | Pass: 0 errors; 6 existing Fast Refresh warnings, including 3 in an ignored worktree |
 | `pnpm.cmd build` | Pass: production bundle and PWA service worker generated |
 | `git diff --check` | Pass |
@@ -36,6 +36,8 @@ Focused coverage includes:
 - anchored Start/Pause/Set Clock, atomic stoppage, expiration, and display direction;
 - canonical running elapsed across court-linked, direct-stat, foul, timeout, and ejection families;
 - exact last-known watermark recovery after an intervening running event;
+- durable recorded-later payload markers, strict live-time matching, and isolation of historical or
+  non-active-period events from the running watermark;
 - backward, accepted 24-hour boundary, and excessive wall-time classification;
 - one strip mounted above both workspaces with a presentation-only interval;
 - same-five control and disabled BKE-6C Bench affordance; and

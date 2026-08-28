@@ -372,6 +372,9 @@ function buildEjectionPlan(
     source: draft.ejectionSource,
     relatedFoulEventId: draft.relatedFoulEventId,
     captureCommandId: existing?.payload.captureCommandId ?? null,
+    ...(!existing || existing.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   return eventPlan(prepared, draft, existing, recorderUserId, occurredAt, {
     eventType: 'basketball.ejection',
@@ -436,6 +439,9 @@ function buildTimeoutPlan(
     chargedSide,
     label,
     captureCommandId: existing?.payload.captureCommandId ?? null,
+    ...(!existing || existing.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   const owner = neutral ? 'game administration' : sideLabel(chargedSide!)
   return eventPlan(prepared, draft, existing, recorderUserId, occurredAt, {

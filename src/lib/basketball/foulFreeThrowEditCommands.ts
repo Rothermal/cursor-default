@@ -472,6 +472,9 @@ function buildFoulPlan(
     incidentId: draft.incidentId.trim() || null,
     countingOverride: override,
     captureCommandId: existing?.payload.captureCommandId ?? (draft.addLinkedTrip ? draft.captureCommandId : null),
+    ...(mode === 'add' || existing?.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   const actors = drawnBy.value ? [offender.value, drawnBy.value] : [offender.value]
   const appendedEvents: BasketballMatchEvent[] = []
@@ -506,6 +509,7 @@ function buildFoulPlan(
           technical: draft.technical,
           possessionRetained: draft.possessionRetained,
           captureCommandId: draft.captureCommandId,
+          recordedLater: true,
         },
         recorderUserId,
         sequence: nextSequence,
@@ -564,6 +568,9 @@ function buildTripPlan(
     technical: draft.technical,
     possessionRetained: draft.possessionRetained,
     captureCommandId: existing?.payload.captureCommandId ?? null,
+    ...(mode === 'add' || existing?.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   const appendedEvents: BasketballMatchEvent[] = []
   const mutations: GameEventMutation[] = []
@@ -672,6 +679,9 @@ function buildAttemptPlan(
     freeThrowTripId: trip?.id ?? null,
     tripAttemptNumber: trip ? draft.tripAttemptNumber : null,
     captureCommandId: existing?.payload.captureCommandId ?? null,
+    ...(mode === 'add' || existing?.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   const appendedEvents: BasketballMatchEvent[] = []
   const mutations: GameEventMutation[] = []

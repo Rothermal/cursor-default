@@ -97,6 +97,7 @@ function statDefinition(
         (!allowLocation && event.location !== null) ||
         !actorsHaveRoles(event.actors, allowedRoles, requiredRoles) ||
         !actorsMatchEventFamily(eventType, event) ||
+        !validRecordedLaterFlag(event.payload.recordedLater) ||
         !validatePayload(event.payload) ||
         (eventType === 'basketball.shot' && !shotEnvelopeMatchesPayload(event))
       ) {
@@ -211,6 +212,10 @@ function validateScoreAdjustment(payload: JsonObject): boolean {
 
 function validCaptureCommandId(value: unknown): boolean {
   return value === null || isNonEmptyString(value)
+}
+
+function validRecordedLaterFlag(value: unknown): boolean {
+  return value === undefined || value === true
 }
 
 function isNullableId(value: unknown): boolean {

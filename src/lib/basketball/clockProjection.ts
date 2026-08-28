@@ -223,7 +223,12 @@ export function recordBasketballRunningClockMomentAfterEvent(
   event: GameEvent
 ): void {
   const clock = projection.clock
-  if (!clock?.running || event.elapsedMs === null) return
+  if (
+    !clock?.running ||
+    event.elapsedMs === null ||
+    event.period.id !== clock.periodId ||
+    event.payload.recordedLater === true
+  ) return
   clock.lastRunningElapsedMs = Math.max(clock.lastRunningElapsedMs ?? 0, event.elapsedMs)
 }
 
@@ -300,7 +305,11 @@ function isValidHistoricalBasketballClockMoment(
   event: BasketballMatchEvent,
   currentPeriodLimit: number | null
 ): boolean {
-  if (!isBasketballRecordedLaterEventType(event.eventType) || event.elapsedMs === null) return false
+  if (
+    event.payload.recordedLater !== true ||
+    !isBasketballRecordedLaterEventType(event.eventType) ||
+    event.elapsedMs === null
+  ) return false
   if (!projection.startedPeriodIds.includes(event.period.id)) return false
   const segment = resolveBasketballPeriodSegment(sportState.setup.rulesSnapshot, event.period.id)
   if (!segment || segment.order !== event.period.order) return false

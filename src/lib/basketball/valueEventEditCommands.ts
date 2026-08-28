@@ -309,10 +309,16 @@ function buildPlan(
         reason: draft.reason,
         note: draft.note.trim() || null,
         captureCommandId: existing?.payload.captureCommandId ?? null,
+        ...(mode === 'add' || existing?.payload.recordedLater === true
+          ? { recordedLater: true as const }
+          : {}),
       }
     : {
         deltaMinutes: draft.delta,
         captureCommandId: existing?.payload.captureCommandId ?? null,
+        ...(mode === 'add' || existing?.payload.recordedLater === true
+          ? { recordedLater: true as const }
+          : {}),
       }
   if (existing) {
     const changes = { period: draft.period, teamSide: draft.teamSide, actors: [actor.value], payload }

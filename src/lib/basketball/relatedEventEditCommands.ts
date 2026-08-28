@@ -565,7 +565,11 @@ function buildHistoricalPlan(
     appendedEvents.push(createBasketballStatEvent({
       id: draft.pairedEventId,
       eventType: 'basketball.turnover',
-      payload: { kind: draft.pairedTurnoverKind, captureCommandId: draft.captureCommandId },
+      payload: {
+        kind: draft.pairedTurnoverKind,
+        captureCommandId: draft.captureCommandId,
+        recordedLater: true,
+      },
       recorderUserId,
       sequence: nextSequence++,
       period: draft.period,
@@ -577,7 +581,11 @@ function buildHistoricalPlan(
     appendedEvents.push(createBasketballStatEvent({
       id: draft.eventId,
       eventType: 'basketball.steal',
-      payload: { relatedEventId: draft.pairedEventId, captureCommandId: draft.captureCommandId },
+      payload: {
+        relatedEventId: draft.pairedEventId,
+        captureCommandId: draft.captureCommandId,
+        recordedLater: true,
+      },
       recorderUserId,
       sequence: nextSequence++,
       period: draft.period,
@@ -623,19 +631,28 @@ function buildHistoricalPlan(
     appendedEvents.push(createBasketballStatEvent({
       ...common,
       eventType: 'basketball.turnover',
-      payload: { kind: draft.turnoverKind, captureCommandId: null },
+      payload: { kind: draft.turnoverKind, captureCommandId: null, recordedLater: true },
     }))
   } else if (draft.eventType === 'basketball.rebound') {
     appendedEvents.push(createBasketballStatEvent({
       ...common,
       eventType: 'basketball.rebound',
-      payload: { kind: draft.reboundKind, relatedEventId: draft.relatedEventId, captureCommandId: null },
+      payload: {
+        kind: draft.reboundKind,
+        relatedEventId: draft.relatedEventId,
+        captureCommandId: null,
+        recordedLater: true,
+      },
     }))
   } else {
     appendedEvents.push(createBasketballStatEvent({
       ...common,
       eventType: draft.eventType,
-      payload: { relatedEventId: draft.relatedEventId, captureCommandId: null },
+      payload: {
+        relatedEventId: draft.relatedEventId,
+        captureCommandId: null,
+        recordedLater: true,
+      },
     }))
   }
   return {

@@ -15,6 +15,7 @@ import {
   BASKETBALL_CLOCK_MAX_WALL_DELTA_MS,
   basketballClockRecoveryIssue,
   deriveBasketballClockDisplay,
+  recordBasketballRunningClockMomentAfterEvent,
 } from './clockProjection'
 import { captureBasketballCourtEvent } from './commands'
 import { captureBasketballDirectStat } from './directCommands'
@@ -25,6 +26,7 @@ import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './pr
 import { createBasketballSportGameState } from './state'
 import { createBasketballStatEvent } from './statEvents'
 import {
+  applyBasketballHistoricalShot,
   buildBasketballHistoricalShotDraft,
   previewBasketballHistoricalShot,
 } from './shotEditCommands'
@@ -392,6 +394,56 @@ describe('BKE-6A2 Basketball anchored clock projection', () => {
     if (!preview.ok) return
     expect(preview.value.draft.elapsedMs).toBe(1_000)
     expect(preview.value.consequenceLines.some(line => line.includes('Q1'))).toBe(true)
+    const applied = applyBasketballHistoricalShot(paused, preview.value)
+    expect(applied.ok).toBe(true)
+    if (!applied.ok) return
+    expect(applied.state.eventStream?.events).toContainEqual(expect.objectContaining({
+      id: built.value.eventId,
+      payload: expect.objectContaining({ recordedLater: true }),
+    }))
+  })
+
+  it('keeps recorded-later and non-active-period events out of the running watermark', () => {
+    const started = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(82),
+    }))
+    if (started.sportGameState?.sportId !== 'basketball') throw new Error('Basketball state required')
+    const projection = started.sportGameState.projection
+    const recordedLater = createBasketballStatEvent({
+      id: uuid(83),
+      eventType: 'basketball.score_adjustment',
+      payload: {
+        delta: 1,
+        reason: 'scoreboard_control',
+        note: null,
+        captureCommandId: null,
+        recordedLater: true,
+      },
+      recorderUserId,
+      sequence: 3,
+      period: currentPeriod(started),
+      elapsedMs: 45_000,
+      occurredAt: isoAfter(periodStart, 60_000),
+      teamSide: 'tracked',
+      actors: [{ role: 'team', kind: 'team', label: 'Aces' }],
+    })
+    recordBasketballRunningClockMomentAfterEvent(projection, recordedLater)
+    expect(projection.clock?.lastRunningElapsedMs).toBe(0)
+
+    recordBasketballRunningClockMomentAfterEvent(projection, {
+      ...recordedLater,
+      id: uuid(84),
+      period: { id: 'regulation-previous', order: 0 },
+      payload: {
+        delta: 1,
+        reason: 'scoreboard_control',
+        note: null,
+        captureCommandId: null,
+      },
+    })
+    expect(projection.clock?.lastRunningElapsedMs).toBe(0)
   })
 
   it('classifies backward and excessive wall-clock recovery boundaries', () => {

@@ -666,6 +666,7 @@ function buildHistoricalShotEvents(
       freeThrowTripId: null,
       tripAttemptNumber: null,
       captureCommandId: hasRelations ? draft.captureCommandId : null,
+      recordedLater: true,
     },
     recorderUserId,
     sequence: nextSequence++,
@@ -707,7 +708,11 @@ function buildHistoricalShotEvents(
       teamSide: selection.teamSide,
       actors: [actor.value],
     }
-    const payload = { relatedEventId: draft.eventId, captureCommandId: draft.captureCommandId }
+    const payload = {
+      relatedEventId: draft.eventId,
+      captureCommandId: draft.captureCommandId,
+      recordedLater: true as const,
+    }
     events.push(kind === 'rebound'
       ? createBasketballStatEvent({
           ...common,
@@ -878,6 +883,7 @@ function buildShotEditPlan(
         recorderUserId,
         sequence: nextSequence++,
         period: original.period,
+        elapsedMs: original.elapsedMs,
         occurredAt,
         teamSide: selected.newActor.teamSide,
         actors: [actor.value],
@@ -885,6 +891,7 @@ function buildShotEditPlan(
       const payload = {
         relatedEventId: original.id,
         captureCommandId: draft.correctionCaptureCommandId,
+        recordedLater: true as const,
       }
       appendedEvents.push(kind === 'rebound'
         ? createBasketballStatEvent({
