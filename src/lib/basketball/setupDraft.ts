@@ -14,6 +14,7 @@ import {
   type BasketballTeamSettingsV1,
 } from './settings'
 import {
+  isBasketballMatchRulesV3,
   isBasketballStructuredMatchRules,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
@@ -624,6 +625,7 @@ export function resolveBasketballSetupRosterTeamId({
     !draft?.event ||
     draft.authority !== 'sport_events' ||
     draft.event.cloudIntent !== 'local_only' ||
+    !isBasketballMatchRulesV3(draft.event.reviewedRules) ||
     draft.source.kind !== 'team' ||
     !activeLocalGameId ||
     draft.committedLocalGameId !== activeLocalGameId

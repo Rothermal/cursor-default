@@ -4,7 +4,12 @@ import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import { supabase } from '../lib/supabase'
-import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
+import {
+  isTeamPseudoPlayer,
+  playersWithTeamPlaceholders,
+  TEAM_PLAYER_HOME_ID,
+  TEAM_PLAYER_OPP_ID,
+} from '../lib/teamPlayers'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
   getBasketballAnchoredSetupPolicy,
@@ -59,9 +64,7 @@ export default function PlayerSetup() {
   const sport = state.sport
   const cloudTeamId = state.cloudSync.teamId
   const isBasketballEventIntent = isBasketballEventSetupIntent(state)
-  const individualPlayers = state.players.filter(
-    player => player.id !== TEAM_PLAYER_HOME_ID && player.id !== TEAM_PLAYER_OPP_ID
-  )
+  const individualPlayers = state.players.filter(player => !isTeamPseudoPlayer(player))
   const displayedPlayers = isBasketballEventIntent ? individualPlayers : state.players
 
   const [name, setName] = useState('')
@@ -79,7 +82,8 @@ export default function PlayerSetup() {
     draft: basketballSetupDraft,
     activeLocalGameId,
   })
-  const isCloudRoster = Boolean(rosterTeamId && isConfigured && user && supabase)
+  const canReadCloudRoster = Boolean(rosterTeamId && isConfigured && user && supabase)
+  const canWriteCloudRoster = Boolean(cloudTeamId && isConfigured && user && supabase)
   const [staleAuthority, setStaleAuthority] = useState<{
     latest: BasketballSetupAuthoritySnapshot
     differences: BasketballRulesField[]
@@ -115,7 +119,7 @@ export default function PlayerSetup() {
   }, [sport, state.gameInfo, state.players, dispatch])
 
   useEffect(() => {
-    if (!isCloudRoster || !rosterTeamId || cloudRosterLoadedRef.current) return
+    if (!canReadCloudRoster || !rosterTeamId || cloudRosterLoadedRef.current) return
     const hasRosterRows = state.players.some(
       p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
     )
@@ -182,19 +186,20 @@ export default function PlayerSetup() {
         loadedPlayers = [...loadedPlayers, ...extraFromLocal]
       }
 
-      const idMap = loadedPlayers.reduce<Record<string, string>>((map, player) => {
-        map[player.id] = player.id
-        return map
-      }, {})
-
       dispatch({ type: 'SET_PLAYERS', players: loadedPlayers })
-      dispatch({
-        type: 'SET_CLOUD_SYNC_STATE',
-        cloudSync: {
-          playerIdMap: idMap,
-          lastError: null,
-        },
-      })
+      if (cloudTeamId) {
+        const idMap = loadedPlayers.reduce<Record<string, string>>((map, player) => {
+          map[player.id] = player.id
+          return map
+        }, {})
+        dispatch({
+          type: 'SET_CLOUD_SYNC_STATE',
+          cloudSync: {
+            playerIdMap: idMap,
+            lastError: null,
+          },
+        })
+      }
       if (loadedPlayers.length > 0 && !state.activePlayerId) {
         dispatch({ type: 'SET_ACTIVE_PLAYER', playerId: loadedPlayers[0].id })
       }
@@ -210,8 +215,9 @@ export default function PlayerSetup() {
     // Intentionally omit state.players: we only need initial cloud roster fetch when list is empty of roster rows.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [
+    cloudTeamId,
     dispatch,
-    isCloudRoster,
+    canReadCloudRoster,
     rosterTeamId,
     sport?.teamCategories?.length,
     state.activePlayerId,
@@ -223,7 +229,7 @@ export default function PlayerSetup() {
 
     setRosterError(null)
     let playerId = generateLocalId()
-    if (isCloudRoster && rosterTeamId && user) {
+    if (canWriteCloudRoster && cloudTeamId && user) {
       setSaving(true)
       const { firstName, lastName } = splitName(name)
 
@@ -248,7 +254,7 @@ export default function PlayerSetup() {
       const { error: rosterError } = await supabase!
         .from('team_players')
         .upsert(
-          { team_id: rosterTeamId, player_id: playerId, jersey_number: number.trim() || null, is_active: true },
+          { team_id: cloudTeamId, player_id: playerId, jersey_number: number.trim() || null, is_active: true },
           { onConflict: 'team_id,player_id' }
         )
 
@@ -288,13 +294,13 @@ export default function PlayerSetup() {
 
   const handleRemovePlayer = async (playerId: string) => {
     setRosterError(null)
-    if (isCloudRoster && rosterTeamId) {
+    if (canWriteCloudRoster && cloudTeamId) {
       const remotePlayerId = state.cloudSync.playerIdMap[playerId] ?? playerId
       setSaving(true)
       const { error } = await supabase!
         .from('team_players')
         .update({ is_active: false })
-        .eq('team_id', rosterTeamId)
+        .eq('team_id', cloudTeamId)
         .eq('player_id', remotePlayerId)
       setSaving(false)
       if (error) {
@@ -593,9 +599,11 @@ export default function PlayerSetup() {
           />
         ) : (
           <>
-        {isCloudRoster && (
+        {canReadCloudRoster && (
           <div className="card mb-3 bg-blue-50 border-blue-200 text-blue-800 text-xs">
-            Roster is synced with your selected cloud team.
+            {cloudTeamId
+              ? 'Roster is synced with your selected cloud team.'
+              : 'Roster loaded from the selected team. Changes here stay with this local-only game.'}
           </div>
         )}
         {rosterLoading && (

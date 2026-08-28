@@ -9,7 +9,8 @@ Plan: [PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md](PLAN_BKE_6B_PRODUCTION_SETUP_A
 - version-3 Event Setup review through the existing source-aware rules summary;
 - an explicit Automatic Cloud versus Local only control for existing-team Event setup;
 - pre-mutation rejection of anchored cloud targets and advisory/enforced equal-play rules;
-- existing-team local-only roster loading through reviewed source identity without restoring a cloud binding;
+- version-3 existing-team local-only roster loading through reviewed source identity without restoring
+  a cloud binding or permitting shared-roster writes;
 - restart-safe tracked roster reconciliation with stable match participant ids;
 - one focused Starter, Bench, and DNP opening-lineup step with a stable `n / 5` count;
 - a required reason and final preview for one-through-four-player opening lineups;
@@ -25,7 +26,7 @@ editing, equal-play override UI, or release-stage change is included.
 | Gate | Result |
 |---|---|
 | `pnpm.cmd typecheck` | Pass |
-| `pnpm.cmd test` | Pass: 172 files and 1,197 tests |
+| `pnpm.cmd test` | Pass: 172 files and 1,198 tests |
 | `pnpm.cmd lint` | Pass: 0 errors; 6 existing Fast Refresh warnings, including 3 in an ignored worktree |
 | `pnpm.cmd build` | Pass: production bundle and PWA service worker generated |
 | `git diff --check` | Pass |
@@ -33,7 +34,8 @@ editing, equal-play override UI, or release-stage change is included.
 Focused coverage includes:
 
 - v3 review production, tri-state clockless/anchored admission, and local/cloud/equal-play policy;
-- matching committed local-only team roster resolution without cloud game metadata;
+- matching committed v3 local-only team roster resolution without cloud game metadata, shared-roster
+  writes, or clockless-v2 behavior changes;
 - stable participant ids across roster reordering;
 - Starter, Bench, DNP, five-player, over-five, and reasoned short-handed decisions;
 - strict draft parsing and reload-safe review progress;

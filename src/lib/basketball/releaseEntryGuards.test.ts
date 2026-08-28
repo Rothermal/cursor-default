@@ -143,6 +143,30 @@ describe('Basketball release entry guards', () => {
     expect(playerSetup).toContain('version3Setup,')
   })
 
+  it('keeps local-only team roster reads separate from cloud roster writes', () => {
+    const playerSetup = source('src/pages/PlayerSetup.tsx')
+    const addPlayer = between(
+      playerSetup,
+      'const handleAddPlayer = async () => {',
+      '\n\n  const handleRemovePlayer'
+    )
+    const removePlayer = between(
+      playerSetup,
+      'const handleRemovePlayer = async (playerId: string) => {',
+      '\n\n  const handleKeyDown'
+    )
+
+    expect(playerSetup).toContain(
+      'const individualPlayers = state.players.filter(player => !isTeamPseudoPlayer(player))'
+    )
+    expect(playerSetup).toContain('const canReadCloudRoster = Boolean(rosterTeamId')
+    expect(playerSetup).toContain('const canWriteCloudRoster = Boolean(cloudTeamId')
+    expect(addPlayer).toContain('if (canWriteCloudRoster && cloudTeamId && user)')
+    expect(removePlayer).toContain('if (canWriteCloudRoster && cloudTeamId)')
+    expect(addPlayer).not.toContain('team_id: rosterTeamId')
+    expect(removePlayer).not.toContain(".eq('team_id', rosterTeamId)")
+  })
+
   it('applies the per-game orientation to every game-specific Basketball court', () => {
     const livePanel = source('src/components/shot-chart/ShotChartPanel.tsx')
     const shotEditor = source('src/components/basketball/BasketballShotEditor.tsx')

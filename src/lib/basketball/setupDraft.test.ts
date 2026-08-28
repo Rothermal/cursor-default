@@ -72,7 +72,21 @@ describe('Basketball setup draft', () => {
     draft.event = createBasketballSetupDraftEvent({
       authority: 'team',
       revision: 1,
-      settings: DEFAULT_BASKETBALL_TEAM_SETTINGS,
+      settings: {
+        ...structuredClone(DEFAULT_BASKETBALL_TEAM_SETTINGS),
+        ruleOverrides: {
+          clockModel: 'anchored',
+          clockDisplayDirection: 'count_down',
+          clockExpiration: 'stop_at_zero',
+          stoppageMode: 'explicit',
+          equalPlayPolicy: {
+            mode: 'off',
+            minimumPeriods: null,
+            maximumConsecutivePeriods: null,
+            maximumPeriodImbalance: null,
+          },
+        },
+      },
       cloudIntent: 'local_only',
     })
     draft.committedLocalGameId = 'local-game-1'
@@ -92,6 +106,18 @@ describe('Basketball setup draft', () => {
       draft: null,
       activeLocalGameId: null,
     })).toBe('bound-team')
+
+    draft.event = createBasketballSetupDraftEvent({
+      authority: 'team',
+      revision: 2,
+      settings: DEFAULT_BASKETBALL_TEAM_SETTINGS,
+      cloudIntent: 'local_only',
+    })
+    expect(resolveBasketballSetupRosterTeamId({
+      cloudTeamId: null,
+      draft,
+      activeLocalGameId: 'local-game-1',
+    })).toBeNull()
   })
 
   it('round-trips a strict account-scoped personal draft', () => {
