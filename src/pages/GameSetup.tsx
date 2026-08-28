@@ -20,8 +20,10 @@ import {
   requiresBasketballEventCloudPreflight,
 } from '../lib/basketball/releaseCapabilities'
 import {
+  getBasketballAnchoredSetupPolicy,
   hasStartedBasketballEventGame,
   isBasketballEventSetupIntent,
+  isBasketballMatchRulesV3,
   setBasketballEventCreationIntent,
 } from '../lib/basketball'
 import { canCommitBasketballSetup } from '../lib/basketball/releasePolicy'
@@ -35,6 +37,7 @@ import {
   loadBasketballSetupDraft,
   parseBasketballSetupDraft,
   saveBasketballSetupDraft,
+  upgradeBasketballSetupDraftToV2,
   type BasketballSetupDraft,
   type BasketballSetupAuthoritySnapshot,
   type BasketballSetupSource,
@@ -722,8 +725,11 @@ export default function GameSetup() {
       if (!event) return null
     }
 
+    const draftBase = event && isBasketballMatchRulesV3(event.reviewedRules)
+      ? upgradeBasketballSetupDraftToV2(base)
+      : base
     const next: BasketballSetupDraft = {
-      ...base,
+      ...draftBase,
       accountScope,
       updatedAt: new Date().toISOString(),
       source,
@@ -830,6 +836,11 @@ export default function GameSetup() {
     matchingCommittedBasketballSetup &&
     currentBasketballDraft?.authority === 'sport_events' &&
     isBasketballEventSetupIntent(state)
+  )
+  const anchoredBasketballSetup = Boolean(
+    currentBasketballDraft?.event &&
+    isBasketballMatchRulesV3(currentBasketballDraft.event.reviewedRules) &&
+    currentBasketballDraft.event.reviewedRules.clockModel === 'anchored'
   )
   const canProceed = Boolean(
     resolvedTeamName &&
@@ -955,6 +966,16 @@ export default function GameSetup() {
       if (!basketballDraft) {
         setSetupError('Basketball setup is still loading or contains invalid fields.')
         return
+      }
+      if (basketballDraft.event) {
+        const anchoredPolicy = getBasketballAnchoredSetupPolicy({
+          rules: basketballDraft.event.reviewedRules,
+          cloudIntent: basketballDraft.event.cloudIntent,
+        })
+        if (anchoredPolicy.applicable && !anchoredPolicy.allowed) {
+          setSetupError(anchoredPolicy.message)
+          return
+        }
       }
       const validation = buildBasketballSetupGameState({
         draft: basketballDraft,
@@ -1524,21 +1545,52 @@ export default function GameSetup() {
                 </button>
               </div>
               {isBasketballEventIntent && (
-                <div className="flex items-center justify-between gap-3">
+                <div className="space-y-2">
                   <p className="text-xs font-medium text-amber-950">
                     Cloud policy: {basketballCloudIntent === 'automatic' ? 'Automatic' : 'Local only'}
                   </p>
-                  {basketballCloudIntent === 'local_only' && teamMode === 'existing' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBasketballCloudIntent('automatic')
-                        setSetupError(null)
-                      }}
-                      className="text-xs font-semibold text-amber-950 underline"
+                  {teamMode === 'existing' && (
+                    <div
+                      className="grid grid-cols-2 rounded-md bg-amber-100 p-1"
+                      role="group"
+                      aria-label="Basketball cloud policy"
                     >
-                      Try Automatic Cloud
-                    </button>
+                      <button
+                        type="button"
+                        disabled={anchoredBasketballSetup}
+                        onClick={() => {
+                          setBasketballCloudIntent('automatic')
+                          setSetupError(null)
+                        }}
+                        className={`rounded px-2 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                          basketballCloudIntent === 'automatic'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-amber-900'
+                        }`}
+                      >
+                        Automatic Cloud
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBasketballCloudIntent('local_only')
+                          setBasketballCapabilityFailure(null)
+                          setSetupError(null)
+                        }}
+                        className={`rounded px-2 py-1.5 text-xs font-semibold ${
+                          basketballCloudIntent === 'local_only'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-amber-900'
+                        }`}
+                      >
+                        Local only
+                      </button>
+                    </div>
+                  )}
+                  {anchoredBasketballSetup && teamMode === 'existing' && (
+                    <p className="text-xs text-amber-800">
+                      Anchored games remain local-only until the clock cloud workflow is available.
+                    </p>
                   )}
                 </div>
               )}

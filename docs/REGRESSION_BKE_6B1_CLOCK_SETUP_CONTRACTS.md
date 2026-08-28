@@ -56,3 +56,6 @@ BKE-6B1 is complete. The app can save deliberate version-3 defaults and persist 
 opening-lineup progress. Production version-3 setup is rejected before local game commit, with the
 existing `PlayerSetup` refusal retained as defense in depth. BKE-6B2 owns the setup review,
 opening-lineup screen, local-only preflight, and atomic setup-v2 start.
+
+That temporary producer/start refusal was subsequently superseded by BKE-6B2's guarded production
+setup. This record remains the evidence for the BKE-6B1 boundary at its merge point.

@@ -7,8 +7,10 @@ import { supabase } from '../lib/supabase'
 import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
+  getBasketballAnchoredSetupPolicy,
   hasStartedBasketballEventGame,
   isBasketballMatchRulesV2,
+  isBasketballMatchRulesV3,
   isBasketballEventSetupIntent,
   prepareBasketballGameStart,
 } from '../lib/basketball'
@@ -16,16 +18,21 @@ import {
   basketballSetupAccountScope,
   basketballSetupEventMatchesAuthority,
   basketballSetupRuleDifferences,
+  basketballVersion3StartSetupFromDraft,
   clearBasketballSetupDraft,
   loadBasketballSetupDraft,
+  reconcileBasketballSetupTrackedRoster,
   refreshBasketballSetupDraftEvent,
+  resolveBasketballSetupRosterTeamId,
   saveBasketballSetupDraft,
+  upgradeBasketballSetupDraftToV2,
   type BasketballSetupAuthoritySnapshot,
   type BasketballSetupDraft,
 } from '../lib/basketball/setupDraft'
 import { loadLatestBasketballSetupAuthority } from '../lib/basketball/setupAuthority'
 import { basketballRuleFieldLabel } from '../lib/basketball/profileDiffPresentation'
 import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
+import BasketballOpeningLineupSetup from '../components/basketball/BasketballOpeningLineupSetup'
 import type { BasketballRulesField } from '../lib/basketball/types'
 
 function generateLocalId(): string {
@@ -51,7 +58,6 @@ export default function PlayerSetup() {
   const { basketballSettings, basketballSettingsSync } = useSettings()
   const sport = state.sport
   const cloudTeamId = state.cloudSync.teamId
-  const isCloudRoster = Boolean(cloudTeamId && isConfigured && user && supabase)
   const isBasketballEventIntent = isBasketballEventSetupIntent(state)
   const individualPlayers = state.players.filter(
     player => player.id !== TEAM_PLAYER_HOME_ID && player.id !== TEAM_PLAYER_OPP_ID
@@ -68,6 +74,12 @@ export default function PlayerSetup() {
   const [basketballSetupDraft, setBasketballSetupDraft] = useState<BasketballSetupDraft | null>(
     () => loadBasketballSetupDraft(accountScope)
   )
+  const rosterTeamId = resolveBasketballSetupRosterTeamId({
+    cloudTeamId,
+    draft: basketballSetupDraft,
+    activeLocalGameId,
+  })
+  const isCloudRoster = Boolean(rosterTeamId && isConfigured && user && supabase)
   const [staleAuthority, setStaleAuthority] = useState<{
     latest: BasketballSetupAuthoritySnapshot
     differences: BasketballRulesField[]
@@ -103,7 +115,7 @@ export default function PlayerSetup() {
   }, [sport, state.gameInfo, state.players, dispatch])
 
   useEffect(() => {
-    if (!isCloudRoster || !cloudTeamId || cloudRosterLoadedRef.current) return
+    if (!isCloudRoster || !rosterTeamId || cloudRosterLoadedRef.current) return
     const hasRosterRows = state.players.some(
       p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
     )
@@ -120,7 +132,7 @@ export default function PlayerSetup() {
       const { data, error } = await supabase!
         .from('team_players')
         .select('player_id, jersey_number, players!inner(id, first_name, last_name)')
-        .eq('team_id', cloudTeamId)
+        .eq('team_id', rosterTeamId)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
 
@@ -198,9 +210,9 @@ export default function PlayerSetup() {
     // Intentionally omit state.players: we only need initial cloud roster fetch when list is empty of roster rows.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [
-    cloudTeamId,
     dispatch,
     isCloudRoster,
+    rosterTeamId,
     sport?.teamCategories?.length,
     state.activePlayerId,
     state.gameInfo,
@@ -211,7 +223,7 @@ export default function PlayerSetup() {
 
     setRosterError(null)
     let playerId = generateLocalId()
-    if (isCloudRoster && cloudTeamId && user) {
+    if (isCloudRoster && rosterTeamId && user) {
       setSaving(true)
       const { firstName, lastName } = splitName(name)
 
@@ -236,7 +248,7 @@ export default function PlayerSetup() {
       const { error: rosterError } = await supabase!
         .from('team_players')
         .upsert(
-          { team_id: cloudTeamId, player_id: playerId, jersey_number: number.trim() || null, is_active: true },
+          { team_id: rosterTeamId, player_id: playerId, jersey_number: number.trim() || null, is_active: true },
           { onConflict: 'team_id,player_id' }
         )
 
@@ -276,13 +288,13 @@ export default function PlayerSetup() {
 
   const handleRemovePlayer = async (playerId: string) => {
     setRosterError(null)
-    if (isCloudRoster && cloudTeamId) {
+    if (isCloudRoster && rosterTeamId) {
       const remotePlayerId = state.cloudSync.playerIdMap[playerId] ?? playerId
       setSaving(true)
       const { error } = await supabase!
         .from('team_players')
         .update({ is_active: false })
-        .eq('team_id', cloudTeamId)
+        .eq('team_id', rosterTeamId)
         .eq('player_id', remotePlayerId)
       setSaving(false)
       if (error) {
@@ -303,6 +315,14 @@ export default function PlayerSetup() {
   const canStart = isBasketballEventIntent
     ? individualPlayers.length > 0
     : state.players.length > 0
+  const version3Rules = basketballSetupDraft?.event &&
+    isBasketballMatchRulesV3(basketballSetupDraft.event.reviewedRules)
+      ? basketballSetupDraft.event.reviewedRules
+      : null
+  const anchoredSetup = version3Rules?.clockModel === 'anchored'
+  const anchoredSetupStep = basketballSetupDraft?.version === 2
+    ? basketballSetupDraft.playerSetup.currentStep
+    : 'roster'
 
   if (!sport || !state.gameInfo) {
     navigate(sport ? sportDashboardPath(sport.id) : '/')
@@ -311,18 +331,56 @@ export default function PlayerSetup() {
 
   const startBasketballEventGame = (draft: BasketballSetupDraft) => {
     if (!draft.event) return
-    if (!isBasketballMatchRulesV2(draft.event.reviewedRules)) {
-      setRosterError('Clock and lineup Basketball games require the upcoming setup workflow.')
+    let preparedDraft = draft
+    let version3Setup: NonNullable<
+      ReturnType<typeof basketballVersion3StartSetupFromDraft>
+    > | undefined
+    if (isBasketballMatchRulesV3(draft.event.reviewedRules)) {
+      const policy = getBasketballAnchoredSetupPolicy({
+        rules: draft.event.reviewedRules,
+        cloudIntent: draft.event.cloudIntent,
+        cloudGameId: state.cloudSync.gameId,
+      })
+      if (policy.applicable && !policy.allowed) {
+        setRosterError(policy.message)
+        return
+      }
+      preparedDraft = reconcileBasketballSetupTrackedRoster(
+        draft,
+        individualPlayers.map(player => ({
+          playerId: player.id,
+          displayName: player.name,
+          number: player.number || null,
+        }))
+      )
+      const preparedVersion3Setup = basketballVersion3StartSetupFromDraft(
+        preparedDraft,
+        draft.event.reviewedRules.clockModel === 'anchored'
+      )
+      if (!preparedVersion3Setup) {
+        setRosterError('Complete the reviewed Basketball opening lineup before starting.')
+        return
+      }
+      version3Setup = preparedVersion3Setup
+      const saved = saveBasketballSetupDraft(preparedDraft)
+      if (!saved.ok) {
+        setRosterError(saved.error)
+        return
+      }
+      setBasketballSetupDraft(preparedDraft)
+    } else if (!isBasketballMatchRulesV2(draft.event.reviewedRules)) {
+      setRosterError('Reviewed Basketball rules are invalid.')
       return
     }
     const result = prepareBasketballGameStart(state, {
       recorderUserId: user?.id ?? null,
       reviewedSetup: {
-        rulesSnapshot: draft.event.reviewedRules,
-        rulesSource: draft.event.reviewedRulesSource,
-        sourceTeamId: draft.source.kind === 'team' ? draft.source.teamId : null,
-        sourceSeasonId: draft.source.kind === 'team' ? draft.source.seasonId : null,
-        courtOrientation: draft.display.defaultCourtFlipped ? 'flipped' : 'standard',
+        rulesSnapshot: preparedDraft.event!.reviewedRules,
+        rulesSource: preparedDraft.event!.reviewedRulesSource,
+        sourceTeamId: preparedDraft.source.kind === 'team' ? preparedDraft.source.teamId : null,
+        sourceSeasonId: preparedDraft.source.kind === 'team' ? preparedDraft.source.seasonId : null,
+        courtOrientation: preparedDraft.display.defaultCourtFlipped ? 'flipped' : 'standard',
+        version3Setup,
       },
     })
     if (!result.ok) {
@@ -332,6 +390,43 @@ export default function PlayerSetup() {
     clearBasketballSetupDraft(accountScope)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
     navigate('/game')
+  }
+
+  const persistBasketballSetupDraft = (next: BasketballSetupDraft): boolean => {
+    const saved = saveBasketballSetupDraft(next)
+    if (!saved.ok) {
+      setRosterError(saved.error)
+      return false
+    }
+    setBasketballSetupDraft(next)
+    setRosterError(null)
+    return true
+  }
+
+  const continueToOpeningLineup = () => {
+    if (!basketballSetupDraft || !anchoredSetup) return
+    const reconciled = reconcileBasketballSetupTrackedRoster(
+      basketballSetupDraft,
+      individualPlayers.map(player => ({
+        playerId: player.id,
+        displayName: player.name,
+        number: player.number || null,
+      }))
+    )
+    persistBasketballSetupDraft({
+      ...reconciled,
+      updatedAt: new Date().toISOString(),
+      playerSetup: { ...reconciled.playerSetup, currentStep: 'opening_lineup' },
+    })
+  }
+
+  const returnToRoster = () => {
+    if (basketballSetupDraft?.version !== 2) return
+    persistBasketballSetupDraft({
+      ...basketballSetupDraft,
+      updatedAt: new Date().toISOString(),
+      playerSetup: { ...basketballSetupDraft.playerSetup, currentStep: 'roster' },
+    })
   }
 
   const handleStart = async () => {
@@ -403,8 +498,11 @@ export default function PlayerSetup() {
       setRosterError(refreshed.error)
       return
     }
+    const base = isBasketballMatchRulesV3(refreshed.event.reviewedRules)
+      ? upgradeBasketballSetupDraftToV2(basketballSetupDraft)
+      : basketballSetupDraft
     const next: BasketballSetupDraft = {
-      ...basketballSetupDraft,
+      ...base,
       updatedAt: new Date().toISOString(),
       event: refreshed.event,
     }
@@ -440,9 +538,12 @@ export default function PlayerSetup() {
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full">
-        <h2 className="text-lg font-semibold text-slate-700 mb-4">Add Players</h2>
+        {(!anchoredSetup || anchoredSetupStep === 'roster') && (
+          <h2 className="text-lg font-semibold text-slate-700 mb-4">Add Players</h2>
+        )}
 
-        {isBasketballEventIntent && basketballSetupDraft?.event && (
+        {isBasketballEventIntent && basketballSetupDraft?.event &&
+          (!anchoredSetup || anchoredSetupStep !== 'opening_lineup') && (
           <div className="mb-5">
             <BasketballSetupRulesReview event={basketballSetupDraft.event} readOnly />
           </div>
@@ -476,7 +577,22 @@ export default function PlayerSetup() {
             </div>
           </section>
         )}
+        {rosterError && (
+          <div className="card mb-3 bg-red-50 border-red-200 text-red-700 text-sm" role="alert">
+            {rosterError}
+          </div>
+        )}
 
+        {anchoredSetup && anchoredSetupStep !== 'roster' && basketballSetupDraft?.version === 2 ? (
+          <BasketballOpeningLineupSetup
+            draft={basketballSetupDraft}
+            busy={starting}
+            onDraftChange={persistBasketballSetupDraft}
+            onBackToRoster={returnToRoster}
+            onStart={() => { void handleStart() }}
+          />
+        ) : (
+          <>
         {isCloudRoster && (
           <div className="card mb-3 bg-blue-50 border-blue-200 text-blue-800 text-xs">
             Roster is synced with your selected cloud team.
@@ -487,12 +603,6 @@ export default function PlayerSetup() {
             Loading saved roster...
           </div>
         )}
-        {rosterError && (
-          <div className="card mb-3 bg-red-50 border-red-200 text-red-700 text-sm">
-            {rosterError}
-          </div>
-        )}
-
         <div className="card mb-4">
           <div className="flex gap-2">
             <input
@@ -559,11 +669,16 @@ export default function PlayerSetup() {
             </p>
           )}
           <button
-            onClick={() => { void handleStart() }}
+            onClick={() => {
+              if (anchoredSetup) continueToOpeningLineup()
+              else void handleStart()
+            }}
             disabled={!canStart || rosterLoading || saving || starting}
             className="btn-primary w-full"
           >
-            Start Game ({displayedPlayers.length} player{displayedPlayers.length !== 1 ? 's' : ''}) →
+            {anchoredSetup
+              ? `Opening Lineup (${displayedPlayers.length})`
+              : `Start Game (${displayedPlayers.length} player${displayedPlayers.length !== 1 ? 's' : ''})`} →
           </button>
           <p className="text-center text-xs text-slate-400">
             {isBasketballEventIntent
@@ -571,6 +686,8 @@ export default function PlayerSetup() {
               : 'You can add more players during the game'}
           </p>
         </div>
+          </>
+        )}
       </div>
     </div>
   )

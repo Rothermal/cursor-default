@@ -47,11 +47,11 @@ describe('Basketball release entry guards', () => {
     const setup = source('src/pages/GameSetup.tsx')
     const policyControl = between(
       setup,
-      "basketballCloudIntent === 'local_only' && teamMode === 'existing' && (",
-      '\n                  )}'
+      'aria-label="Basketball cloud policy"',
+      '\n                  {anchoredBasketballSetup'
     )
 
-    expect(policyControl).toContain('Try Automatic Cloud')
+    expect(policyControl).toContain('Automatic Cloud')
     expect(policyControl).toContain("setBasketballCloudIntent('automatic')")
     expect(policyControl).not.toContain('setBasketballMatchOverrides')
   })
@@ -138,8 +138,9 @@ describe('Basketball release entry guards', () => {
     expect(staleIndex).toBeGreaterThan(latestIndex)
     expect(startIndex).toBeGreaterThan(staleIndex)
     expect(playerSetup).toContain('reviewedSetup: {')
-    expect(playerSetup).toContain('rulesSnapshot: draft.event.reviewedRules')
-    expect(playerSetup).toContain('rulesSource: draft.event.reviewedRulesSource')
+    expect(playerSetup).toContain('rulesSnapshot: preparedDraft.event!.reviewedRules')
+    expect(playerSetup).toContain('rulesSource: preparedDraft.event!.reviewedRulesSource')
+    expect(playerSetup).toContain('version3Setup,')
   })
 
   it('applies the per-game orientation to every game-specific Basketball court', () => {
