@@ -13,9 +13,12 @@ import {
   basketballSettingsFingerprint,
 } from '../../lib/basketball/personalSettingsSync'
 import {
+  BASKETBALL_V3_COMPATIBILITY_WARNING,
+  basketballSettingsRequireVersion3Confirmation,
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
   type BasketballPersonalSettingsV1,
 } from '../../lib/basketball/settings'
+import { DEFAULT_SETTINGS } from '../../lib/settingsStorage'
 import { settingsPath } from '../../lib/settingsNavigation'
 import { getBasketballEventCreationPolicy } from '../../lib/sportAvailability'
 import ConfirmDialog from '../ConfirmDialog'
@@ -41,6 +44,8 @@ export default function BasketballSettings() {
     setBasketballSettingsPageActive,
     basketballEventTrackerPreviewEnabled,
     setBasketballEventTrackerPreviewEnabled,
+    basketballDeviceSettings,
+    setBasketballDeviceSetting,
   } = useSettings()
   const [draft, setDraft] = useState<BasketballPersonalSettingsV1>(() =>
     structuredClone(basketballSettings)
@@ -50,6 +55,9 @@ export default function BasketballSettings() {
   )
   const [activeTab, setActiveTab] = useState<BasketballSettingsTab>('rules')
   const [confirmReset, setConfirmReset] = useState(false)
+  const [pendingV3SaveAction, setPendingV3SaveAction] = useState<
+    'save' | 'keep_device' | null
+  >(null)
   const previousSavedFingerprint = useRef(
     basketballSettingsFingerprint(basketballSettings)
   )
@@ -66,6 +74,8 @@ export default function BasketballSettings() {
     basketballEventTrackerPreviewEnabled
   )
   const trackerTabActive = activeTab === 'tracker'
+  const soundAvailable = typeof window !== 'undefined' && 'Audio' in window
+  const vibrationAvailable = typeof navigator !== 'undefined' && 'vibrate' in navigator
 
   useEffect(() => {
     setBasketballSettingsPageActive(true)
@@ -116,6 +126,37 @@ export default function BasketballSettings() {
       }
       return next
     })
+    if (activeTab === 'display') {
+      setBasketballDeviceSetting(
+        'showClockTenths',
+        DEFAULT_SETTINGS.basketball.showClockTenths
+      )
+      setBasketballDeviceSetting(
+        'clockExpirationSoundEnabled',
+        DEFAULT_SETTINGS.basketball.clockExpirationSoundEnabled
+      )
+      setBasketballDeviceSetting(
+        'clockExpirationVibrationEnabled',
+        DEFAULT_SETTINGS.basketball.clockExpirationVibrationEnabled
+      )
+    }
+  }
+
+  const saveDraft = () => void saveBasketballSettings(draft, draftBaseRevision)
+  const handleSave = () => {
+    if (basketballSettingsRequireVersion3Confirmation(draft)) {
+      setPendingV3SaveAction('save')
+      return
+    }
+    saveDraft()
+  }
+  const keepDeviceSettings = () => {
+    const device = basketballSettingsSync.conflict?.device
+    if (device && basketballSettingsRequireVersion3Confirmation(device)) {
+      setPendingV3SaveAction('keep_device')
+      return
+    }
+    void keepDeviceBasketballSettings()
   }
 
   const syncBusy = basketballSettingsSync.status === 'checking' ||
@@ -184,7 +225,7 @@ export default function BasketballSettings() {
             <button
               type="button"
               className="btn-primary text-sm px-3"
-              onClick={() => void keepDeviceBasketballSettings()}
+              onClick={keepDeviceSettings}
             >
               Keep This Device
             </button>
@@ -264,14 +305,55 @@ export default function BasketballSettings() {
         )}
 
         {activeTab === 'display' && (
-          <Toggle
-            label="Flip court by default"
-            checked={draft.display.defaultCourtFlipped}
-            onChange={defaultCourtFlipped => setDraft(current => ({
-              ...current,
-              display: { defaultCourtFlipped },
-            }))}
-          />
+          <div className="space-y-5">
+            <Toggle
+              label="Flip court by default"
+              checked={draft.display.defaultCourtFlipped}
+              onChange={defaultCourtFlipped => setDraft(current => ({
+                ...current,
+                display: { defaultCourtFlipped },
+              }))}
+            />
+            <div className="space-y-2 border-y border-slate-200 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-800">Live clock</h3>
+                <span className="text-xs text-slate-500">Saved on this device</span>
+              </div>
+              <Toggle
+                label="Show tenths below one minute"
+                checked={basketballDeviceSettings.showClockTenths}
+                onChange={enabled => setBasketballDeviceSetting('showClockTenths', enabled)}
+              />
+              <Toggle
+                label="Expiration sound"
+                checked={basketballDeviceSettings.clockExpirationSoundEnabled}
+                disabled={!soundAvailable}
+                onChange={enabled => setBasketballDeviceSetting(
+                  'clockExpirationSoundEnabled',
+                  enabled
+                )}
+              />
+              {!soundAvailable && (
+                <p role="status" className="text-xs text-slate-500">
+                  Sound is unavailable in this browser.
+                </p>
+              )}
+              <Toggle
+                label="Expiration vibration"
+                checked={basketballDeviceSettings.clockExpirationVibrationEnabled}
+                disabled={!vibrationAvailable}
+                onChange={enabled => setBasketballDeviceSetting(
+                  'clockExpirationVibrationEnabled',
+                  enabled
+                )}
+              />
+              {!vibrationAvailable && (
+                <p role="status" className="text-xs text-slate-500">
+                  Vibration is unavailable on this device.
+                </p>
+              )}
+            </div>
+          </div>
         )}
 
         {activeTab === 'tracker' && (
@@ -327,7 +409,7 @@ export default function BasketballSettings() {
               type="button"
               className="btn-primary inline-flex items-center justify-center gap-2"
               disabled={!dirty || basketballSettingsSync.status === 'saving' || !resolved.ok}
-              onClick={() => void saveBasketballSettings(draft, draftBaseRevision)}
+              onClick={handleSave}
             >
               {basketballSettingsSync.status === 'saving' ? (
                 <RefreshCw size={17} className="animate-spin" />
@@ -343,6 +425,22 @@ export default function BasketballSettings() {
       )}
 
       <ConfirmDialog
+        open={pendingV3SaveAction !== null}
+        title="Save Version-3 Basketball Defaults?"
+        message={BASKETBALL_V3_COMPATIBILITY_WARNING}
+        confirmLabel="Save Version 3"
+        cancelLabel="Keep Editing"
+        destructive={false}
+        onConfirm={() => {
+          const action = pendingV3SaveAction
+          setPendingV3SaveAction(null)
+          if (action === 'keep_device') void keepDeviceBasketballSettings()
+          else if (action === 'save') saveDraft()
+        }}
+        onCancel={() => setPendingV3SaveAction(null)}
+      />
+
+      <ConfirmDialog
         open={confirmReset}
         title="Reset Basketball Defaults"
         message="Reset all personal Basketball rules, capture, and display preferences? The reset remains unsaved until you choose Save."
@@ -351,6 +449,18 @@ export default function BasketballSettings() {
         destructive={false}
         onConfirm={() => {
           setDraft(structuredClone(DEFAULT_BASKETBALL_PERSONAL_SETTINGS))
+          setBasketballDeviceSetting(
+            'showClockTenths',
+            DEFAULT_SETTINGS.basketball.showClockTenths
+          )
+          setBasketballDeviceSetting(
+            'clockExpirationSoundEnabled',
+            DEFAULT_SETTINGS.basketball.clockExpirationSoundEnabled
+          )
+          setBasketballDeviceSetting(
+            'clockExpirationVibrationEnabled',
+            DEFAULT_SETTINGS.basketball.clockExpirationVibrationEnabled
+          )
           setConfirmReset(false)
         }}
         onCancel={() => setConfirmReset(false)}

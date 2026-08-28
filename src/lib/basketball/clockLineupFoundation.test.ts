@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  basketballRuleOverridesWithAnchoredClock,
+  basketballRuleOverridesWithoutClockLineups,
   getBasketballRulesProfile,
   resolveBasketballRules,
   upgradeBasketballRulesDraftToV3,
@@ -78,6 +80,23 @@ describe('BKE-6A1 clock and lineup foundation', () => {
     })
   })
 
+  it('adds and removes the complete editable clock bundle atomically', () => {
+    const profile = getBasketballRulesProfile('nfhs', 1)!
+    const upgraded = basketballRuleOverridesWithAnchoredClock(
+      profile.rules,
+      profile.profileId,
+      { personalFoulLimit: 6 }
+    )
+    expect(upgraded).toEqual({
+      personalFoulLimit: 6,
+      ...clockBundle(),
+    })
+    expect(parseBasketballTeamSettings(teamSettings(upgraded))).toMatchObject({ ok: true })
+    expect(basketballRuleOverridesWithoutClockLineups(upgraded)).toEqual({
+      personalFoulLimit: 6,
+    })
+  })
+
   it('validates strict setup-v2 opening authority while retaining setup-v1 shape', () => {
     const participants = trackedParticipants(5)
     const rules = upgradeBasketballRulesDraftToV3(
@@ -144,7 +163,7 @@ function clockBundle() {
   }
 }
 
-function teamSettings(ruleOverrides: Record<string, unknown>) {
+function teamSettings(ruleOverrides: unknown) {
   return { baseProfile: { profileId: 'nfhs', profileVersion: 1 }, ruleOverrides }
 }
 

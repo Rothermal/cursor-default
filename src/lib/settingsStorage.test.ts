@@ -14,6 +14,9 @@ describe('mergeStoredSettings', () => {
     expect(merged.enabledSports.basketball).toBe(false)
     expect(merged.enabledSports.baseball).toBe(false)
     expect(merged.basketball.eventTrackerPreviewEnabled).toBe(false)
+    expect(merged.basketball.showClockTenths).toBe(true)
+    expect(merged.basketball.clockExpirationSoundEnabled).toBe(false)
+    expect(merged.basketball.clockExpirationVibrationEnabled).toBe(false)
     expect(merged.courtCapture.reboundPromptAfterMiss).toBe(false)
   })
 
@@ -36,19 +39,32 @@ describe('mergeStoredSettings', () => {
         reboundPromptAfterMiss: 'yes',
         eventTrackerPreviewEnabled: true,
       },
-      basketball: { eventTrackerPreviewEnabled: 'true' },
+      basketball: {
+        eventTrackerPreviewEnabled: 'true',
+        showClockTenths: 'yes',
+        clockExpirationSoundEnabled: 1,
+        clockExpirationVibrationEnabled: null,
+      },
     })
 
     expect(merged.enabledSports.basketball).toBe(true)
     expect(merged.enabledSports.soccer).toBe(false)
     expect(merged.enabledSports.futureSport).toBe(true)
     expect(merged.basketball.eventTrackerPreviewEnabled).toBe(false)
+    expect(merged.basketball.showClockTenths).toBe(true)
+    expect(merged.basketball.clockExpirationSoundEnabled).toBe(false)
+    expect(merged.basketball.clockExpirationVibrationEnabled).toBe(false)
     expect(merged.courtCapture.reboundPromptAfterMiss).toBe(false)
   })
 
   it('keeps the Basketball Event preview in its exact device-only namespace', () => {
     const merged = mergeStoredSettings({
-      basketball: { eventTrackerPreviewEnabled: true },
+      basketball: {
+        eventTrackerPreviewEnabled: true,
+        showClockTenths: false,
+        clockExpirationSoundEnabled: true,
+        clockExpirationVibrationEnabled: true,
+      },
       courtCapture: {
         reboundPromptAfterMiss: true,
         eventTrackerPreviewEnabled: false,
@@ -56,6 +72,11 @@ describe('mergeStoredSettings', () => {
     })
 
     expect(merged.basketball.eventTrackerPreviewEnabled).toBe(true)
+    expect(merged.basketball).toMatchObject({
+      showClockTenths: false,
+      clockExpirationSoundEnabled: true,
+      clockExpirationVibrationEnabled: true,
+    })
     expect(merged.courtCapture).toEqual({ reboundPromptAfterMiss: true })
   })
 
@@ -101,7 +122,12 @@ describe('loadSettingsFromStorage', () => {
   it('merges saved JSON over defaults', () => {
     const saved = {
       enabledSports: { hockey: true },
-      basketball: { eventTrackerPreviewEnabled: true },
+      basketball: {
+        eventTrackerPreviewEnabled: true,
+        showClockTenths: false,
+        clockExpirationSoundEnabled: true,
+        clockExpirationVibrationEnabled: true,
+      },
       courtCapture: { reboundPromptAfterMiss: true },
     }
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(saved))
@@ -109,6 +135,9 @@ describe('loadSettingsFromStorage', () => {
     expect(loaded.enabledSports.hockey).toBe(true)
     expect(loaded.enabledSports.basketball).toBe(true)
     expect(loaded.basketball.eventTrackerPreviewEnabled).toBe(true)
+    expect(loaded.basketball.showClockTenths).toBe(false)
+    expect(loaded.basketball.clockExpirationSoundEnabled).toBe(true)
+    expect(loaded.basketball.clockExpirationVibrationEnabled).toBe(true)
     expect(loaded.courtCapture.reboundPromptAfterMiss).toBe(true)
   })
 

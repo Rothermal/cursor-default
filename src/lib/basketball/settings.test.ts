@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getBasketballRulesProfile } from './profiles'
 import {
   BASKETBALL_SETTINGS_SCHEMA_VERSION,
+  basketballSettingsRequireVersion3Confirmation,
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
   DEFAULT_BASKETBALL_TEAM_SETTINGS,
   parseBasketballPersonalSettings,
@@ -97,6 +98,27 @@ describe('Basketball settings schema version 1', () => {
         error: 'Basketball clock and lineup rule overrides must be saved together.',
       })
     }
+  })
+
+  it('requires compatibility confirmation for every complete version-3 authority', () => {
+    expect(basketballSettingsRequireVersion3Confirmation(
+      DEFAULT_BASKETBALL_PERSONAL_SETTINGS
+    )).toBe(false)
+    expect(basketballSettingsRequireVersion3Confirmation({
+      ...DEFAULT_BASKETBALL_TEAM_SETTINGS,
+      ruleOverrides: {
+        clockModel: 'none',
+        clockDisplayDirection: 'count_down',
+        clockExpiration: 'stop_at_zero',
+        stoppageMode: 'explicit',
+        equalPlayPolicy: {
+          mode: 'off',
+          minimumPeriods: null,
+          maximumConsecutivePeriods: null,
+          maximumPeriodImbalance: null,
+        },
+      },
+    })).toBe(true)
   })
 
   it('matches migration 062 bounds before attempting a cloud save', () => {

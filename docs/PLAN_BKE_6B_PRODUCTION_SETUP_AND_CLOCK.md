@@ -1,7 +1,7 @@
 # Plan: BKE-6B Production Setup and Live Clock
 
-Status: Detailed and ready for implementation. The BKE-6 product Q&A is complete and introduces no
-open product decisions for this phase. BKE-6A1 through BKE-6A3 are implemented prerequisites.
+Status: BKE-6B1 is implemented. BKE-6B2 production anchored setup is next. The BKE-6 product Q&A
+is complete and introduces no open product decisions for this phase.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -135,7 +135,7 @@ Each slice receives its own implementation branch and PR.
 
 | Slice | Scope | Exit condition |
 |---|---|---|
-| BKE-6B1 | Device preferences, version-3 compatibility confirmation, restart-safe setup-draft contract, and reusable anchored workflow guards | Rules/settings/setup drafts remain strict and backward compatible; no production anchored game starts yet |
+| BKE-6B1 | **Implemented.** Device preferences, version-3 compatibility confirmation, restart-safe setup-draft contract, and reusable anchored workflow guards | Rules/settings/setup drafts remain strict and backward compatible; no production anchored game starts yet |
 | BKE-6B2 | Event Setup review, focused Opening Lineup step, immutable setup-v2 commit, and explicit local-only start | A supported local anchored game starts paused with exact opening authority; unsupported cloud and BKE-6C-dependent starts fail before replacement |
 | BKE-6B3 | Shared command-time resolution, sticky clock strip, same-five boundary confirmation, Start/Pause/Stoppage/Set Clock, display ticking, expiration, and recovery | Every anchored capture has exact canonical elapsed time and the clock runs without per-second state writes across Track and Timeline |
 | BKE-6B4 | Running-clock park/replacement interception, reload/background/offline hardening, period-flow integration, accessibility/responsive polish, and exit audit | A supported local anchored game can run, pause, adjust, expire, park/reload, and complete periods while parity gates remain green |

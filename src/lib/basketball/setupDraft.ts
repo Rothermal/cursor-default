@@ -14,7 +14,6 @@ import {
 } from './settings'
 import {
   isBasketballStructuredMatchRules,
-  isBasketballMatchRulesV2,
   normalizeBasketballMatchRules,
   normalizeBasketballRulesSource,
 } from './rules'
@@ -107,6 +106,39 @@ export interface BasketballSetupDraftV1 {
   committedLocalGameId: string | null
 }
 
+export type BasketballSetupPlayerStep = 'roster' | 'opening_lineup' | 'review'
+export type BasketballSetupParticipantStatus = 'starter' | 'bench' | 'dnp'
+
+export interface BasketballSetupDraftParticipantV2 {
+  participantId: string
+  playerId: string | null
+  displayName: string
+  number: string | null
+  teamSide: 'tracked' | 'opponent'
+  initialStatus: BasketballSetupParticipantStatus
+}
+
+export interface BasketballSetupDraftLineupV2 {
+  participantIds: string[]
+  shortHandedReason: string | null
+}
+
+export interface BasketballSetupDraftPlayerProgressV2 {
+  currentStep: BasketballSetupPlayerStep
+  participants: BasketballSetupDraftParticipantV2[]
+  openingLineups: {
+    tracked: BasketballSetupDraftLineupV2
+    opponent: BasketballSetupDraftLineupV2 | null
+  }
+}
+
+export interface BasketballSetupDraftV2 extends Omit<BasketballSetupDraftV1, 'version'> {
+  version: 2
+  playerSetup: BasketballSetupDraftPlayerProgressV2
+}
+
+export type BasketballSetupDraft = BasketballSetupDraftV1 | BasketballSetupDraftV2
+
 interface StorageLike {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
@@ -114,7 +146,7 @@ interface StorageLike {
 }
 
 export type BasketballSetupDraftParseResult =
-  | { ok: true; value: BasketballSetupDraftV1 }
+  | { ok: true; value: BasketballSetupDraft }
   | { ok: false; error: string }
 
 export function basketballSetupAccountScope(
@@ -135,10 +167,10 @@ export function createBasketballSetupDraft({
   accountScope: BasketballSetupAccountScope
   source: BasketballSetupSource
   now?: Date
-}): BasketballSetupDraftV1 {
+}): BasketballSetupDraftV2 {
   const timestamp = now.toISOString()
   return {
-    version: 1,
+    version: 2,
     draftId: createDraftId(),
     accountScope,
     createdAt: timestamp,
@@ -157,6 +189,7 @@ export function createBasketballSetupDraft({
     event: null,
     legacyTeamStatsConfig: null,
     committedLocalGameId: null,
+    playerSetup: emptyBasketballSetupPlayerProgress(),
   }
 }
 
@@ -181,7 +214,7 @@ export function createBasketballSetupDraftEvent({
     matchOverrides,
   })
   if (!resolution.ok) return null
-  if (!isBasketballMatchRulesV2(resolution.value.rules)) return null
+  if (!isBasketballStructuredMatchRules(resolution.value.rules)) return null
   const baseProfile = settings.baseProfile
   return {
     settingsAuthority: authority === 'personal'
@@ -252,7 +285,7 @@ export function parseBasketballSetupDraft(
   value: unknown,
   expectedScope?: BasketballSetupAccountScope
 ): BasketballSetupDraftParseResult {
-  if (!hasExactKeys(value, [
+  const commonKeys = [
     'version',
     'draftId',
     'accountScope',
@@ -265,8 +298,12 @@ export function parseBasketballSetupDraft(
     'event',
     'legacyTeamStatsConfig',
     'committedLocalGameId',
-  ])) return invalid('Basketball setup draft fields are invalid.')
-  if (value.version !== 1) return invalid('Basketball setup draft version is unsupported.')
+  ]
+  if (!isPlainObject(value) ||
+      (value.version !== 1 && value.version !== 2) ||
+      !hasExactKeys(value, value.version === 2 ? [...commonKeys, 'playerSetup'] : commonKeys)) {
+    return invalid('Basketball setup draft fields are invalid.')
+  }
   if (!isNonEmptyString(value.draftId)) return invalid('Basketball setup draft id is invalid.')
   if (!isAccountScope(value.accountScope)) return invalid('Basketball setup account scope is invalid.')
   if (expectedScope && value.accountScope !== expectedScope) {
@@ -305,23 +342,46 @@ export function parseBasketballSetupDraft(
   if (!isNullableNonEmptyString(value.committedLocalGameId)) {
     return invalid('Basketball setup committed game id is invalid.')
   }
+  const playerSetup = value.version === 2 ? parsePlayerSetup(value.playerSetup) : null
+  if (value.version === 2 && !playerSetup) {
+    return invalid('Basketball setup player progress is invalid.')
+  }
+  const common = {
+    draftId: value.draftId,
+    accountScope: value.accountScope,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    source,
+    authority: value.authority,
+    gameInfo,
+    display: { defaultCourtFlipped: value.display.defaultCourtFlipped },
+    event,
+    legacyTeamStatsConfig,
+    committedLocalGameId: value.committedLocalGameId,
+  }
   return {
     ok: true,
-    value: structuredClone({
-      ...value,
-      source,
-      gameInfo,
-      display: { defaultCourtFlipped: value.display.defaultCourtFlipped },
-      event,
-      legacyTeamStatsConfig,
-    } as BasketballSetupDraftV1),
+    value: value.version === 1
+      ? structuredClone({ version: 1, ...common } as BasketballSetupDraftV1)
+      : structuredClone({ version: 2, ...common, playerSetup: playerSetup! } as BasketballSetupDraftV2),
+  }
+}
+
+export function upgradeBasketballSetupDraftToV2(
+  draft: BasketballSetupDraft
+): BasketballSetupDraftV2 {
+  if (draft.version === 2) return structuredClone(draft)
+  return {
+    ...structuredClone(draft),
+    version: 2,
+    playerSetup: emptyBasketballSetupPlayerProgress(),
   }
 }
 
 export function loadBasketballSetupDraft(
   scope: BasketballSetupAccountScope,
   storage: StorageLike = localStorage
-): BasketballSetupDraftV1 | null {
+): BasketballSetupDraft | null {
   const key = basketballSetupDraftKey(scope)
   try {
     const raw = storage.getItem(key)
@@ -336,7 +396,7 @@ export function loadBasketballSetupDraft(
 }
 
 export function saveBasketballSetupDraft(
-  draft: BasketballSetupDraftV1,
+  draft: BasketballSetupDraft,
   storage: StorageLike = localStorage
 ): BasketballSetupDraftParseResult {
   const parsed = parseBasketballSetupDraft(draft, draft.accountScope)
@@ -360,7 +420,7 @@ export function clearBasketballSetupDraft(
 }
 
 export function basketballSetupDraftMatchesRoute(
-  draft: BasketballSetupDraftV1,
+  draft: BasketballSetupDraft,
   requestedTeamId: string | null
 ): boolean {
   return requestedTeamId
@@ -369,7 +429,7 @@ export function basketballSetupDraftMatchesRoute(
 }
 
 export function basketballSetupDraftHasMeaningfulEdits(
-  draft: BasketballSetupDraftV1
+  draft: BasketballSetupDraft
 ): boolean {
   return Boolean(
     draft.committedLocalGameId ||
@@ -385,7 +445,7 @@ export function buildBasketballSetupGameState({
   sport,
   cloudStatus,
 }: {
-  draft: BasketballSetupDraftV1
+  draft: BasketballSetupDraft
   sport: SportConfig
   cloudStatus: GameState['cloudSync']['status']
 }): { ok: true; state: GameState } | { ok: false; error: string } {
@@ -482,6 +542,94 @@ function parseGameInfo(value: unknown): BasketballSetupDraftV1['gameInfo'] | nul
       !/^\d{4}-\d{2}-\d{2}$/.test(value.date) ||
       Number.isNaN(Date.parse(`${value.date}T00:00:00Z`))) return null
   return structuredClone(value as BasketballSetupDraftV1['gameInfo'])
+}
+
+function parsePlayerSetup(value: unknown): BasketballSetupDraftPlayerProgressV2 | null {
+  if (!hasExactKeys(value, ['currentStep', 'participants', 'openingLineups']) ||
+      !['roster', 'opening_lineup', 'review'].includes(String(value.currentStep)) ||
+      !Array.isArray(value.participants) ||
+      !hasExactKeys(value.openingLineups, ['tracked', 'opponent'])) return null
+
+  const participants: BasketballSetupDraftParticipantV2[] = []
+  const participantIds = new Set<string>()
+  const playerIds = new Set<string>()
+  for (const item of value.participants) {
+    if (!hasExactKeys(item, [
+      'participantId', 'playerId', 'displayName', 'number', 'teamSide', 'initialStatus',
+    ]) ||
+        !isNonEmptyString(item.participantId) ||
+        !isNullableNonEmptyString(item.playerId) ||
+        !isNonEmptyString(item.displayName) ||
+        !isNullableNonEmptyString(item.number) ||
+        (item.teamSide !== 'tracked' && item.teamSide !== 'opponent') ||
+        !['starter', 'bench', 'dnp'].includes(String(item.initialStatus)) ||
+        participantIds.has(item.participantId) ||
+        (item.playerId !== null && playerIds.has(item.playerId))) return null
+    participantIds.add(item.participantId)
+    if (item.playerId !== null) playerIds.add(item.playerId)
+    participants.push(structuredClone(item as unknown as BasketballSetupDraftParticipantV2))
+  }
+
+  const tracked = parseDraftLineup(value.openingLineups.tracked)
+  const opponent = value.openingLineups.opponent === null
+    ? null
+    : parseDraftLineup(value.openingLineups.opponent)
+  if (!tracked || (value.openingLineups.opponent !== null && !opponent)) return null
+
+  const lineupBySide = { tracked, opponent }
+  for (const side of ['tracked', 'opponent'] as const) {
+    const lineup = lineupBySide[side]
+    const sideParticipants = participants.filter(item => item.teamSide === side)
+    if (!lineup) {
+      if (sideParticipants.some(item => item.initialStatus === 'starter')) return null
+      continue
+    }
+    const ids = new Set(lineup.participantIds)
+    if (lineup.participantIds.length > 5 ||
+        lineup.participantIds.some(id =>
+          !sideParticipants.some(item => item.participantId === id)
+        ) ||
+        sideParticipants.some(item =>
+          (item.initialStatus === 'starter') !== ids.has(item.participantId)
+        )) return null
+  }
+  if (value.currentStep === 'review') {
+    for (const lineup of [tracked, opponent].filter(
+      (item): item is BasketballSetupDraftLineupV2 => item !== null
+    )) {
+      if (lineup.participantIds.length < 1 ||
+          (lineup.participantIds.length < 5 && !lineup.shortHandedReason)) return null
+    }
+  }
+
+  return {
+    currentStep: value.currentStep as BasketballSetupPlayerStep,
+    participants,
+    openingLineups: { tracked, opponent },
+  }
+}
+
+function parseDraftLineup(value: unknown): BasketballSetupDraftLineupV2 | null {
+  if (!hasExactKeys(value, ['participantIds', 'shortHandedReason']) ||
+      !Array.isArray(value.participantIds) ||
+      !value.participantIds.every(isNonEmptyString) ||
+      new Set(value.participantIds).size !== value.participantIds.length ||
+      !isNullableNonEmptyString(value.shortHandedReason)) return null
+  return {
+    participantIds: [...value.participantIds],
+    shortHandedReason: value.shortHandedReason,
+  }
+}
+
+function emptyBasketballSetupPlayerProgress(): BasketballSetupDraftPlayerProgressV2 {
+  return {
+    currentStep: 'roster',
+    participants: [],
+    openingLineups: {
+      tracked: { participantIds: [], shortHandedReason: null },
+      opponent: null,
+    },
+  }
 }
 
 function parseEvent(value: unknown): BasketballSetupDraftEventV1 | null {

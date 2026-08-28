@@ -3,6 +3,7 @@ import {
   loadSettingsFromStorage,
   SETTINGS_STORAGE_KEY,
   type AppSettings,
+  type BasketballDeviceSettings,
 } from '../lib/settingsStorage'
 import { useSoccerPersonalSettings } from '../hooks/useSoccerPersonalSettings'
 import { useBasketballPersonalSettings } from '../hooks/useBasketballPersonalSettings'
@@ -18,6 +19,11 @@ interface SettingsContextType {
   setSportEnabled: (sportId: string, enabled: boolean) => void
   basketballEventTrackerPreviewEnabled: boolean
   setBasketballEventTrackerPreviewEnabled: (enabled: boolean) => void
+  basketballDeviceSettings: BasketballDeviceSettings
+  setBasketballDeviceSetting: (
+    key: keyof BasketballDeviceSettings,
+    enabled: boolean
+  ) => void
   basketballSettings: BasketballPersonalSettingsV1
   basketballSettingsSync: BasketballSettingsSyncState
   saveBasketballSettings: (
@@ -93,6 +99,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const setBasketballDeviceSetting = useCallback((
+    key: keyof BasketballDeviceSettings,
+    enabled: boolean
+  ) => {
+    setSettings(prev => ({
+      ...prev,
+      basketball: {
+        ...prev.basketball,
+        [key]: enabled,
+      },
+    }))
+  }, [])
+
   return (
     <SettingsContext.Provider
       value={{
@@ -103,6 +122,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         basketballEventTrackerPreviewEnabled:
           settings.basketball.eventTrackerPreviewEnabled,
         setBasketballEventTrackerPreviewEnabled,
+        basketballDeviceSettings: settings.basketball,
+        setBasketballDeviceSetting,
         basketballSettings: basketball.settings,
         basketballSettingsSync: basketball.sync,
         saveBasketballSettings: basketball.save,

@@ -1,18 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  basketballRuleOverridesWithAnchoredClock,
+  basketballRuleOverridesWithoutClockLineups,
   listBasketballRulesProfiles,
   previewBasketballProfileUpgrade,
   resolveBasketballRules,
+  upgradeBasketballRulesDraftToV3,
   type BasketballRuleLayerId,
   type BasketballProfileUpgradeResult,
   type BasketballRulesProfileRef,
 } from '../../lib/basketball/profiles'
+import { isBasketballMatchRulesV2, isBasketballMatchRulesV3 } from '../../lib/basketball/rules'
 import {
   basketballRuleFieldLabel,
   formatBasketballRuleField,
 } from '../../lib/basketball/profileDiffPresentation'
 import type { BasketballTeamSettingsV1 } from '../../lib/basketball/settings'
-import type { BasketballRulesV2Field } from '../../lib/basketball/types'
+import type {
+  BasketballEqualPlayMode,
+  BasketballMatchRulesV3,
+  BasketballRulesField,
+} from '../../lib/basketball/types'
 
 export default function BasketballRulesSettingsFields({
   settings,
@@ -35,6 +43,7 @@ export default function BasketballRulesSettingsFields({
     [{ id: layerId, overrides: settings.ruleOverrides }]
   ), [layerId, settings.baseProfile, settings.ruleOverrides])
   const [pendingProfile, setPendingProfile] = useState<BasketballRulesProfileRef | null>(null)
+  const [pendingClockUpgrade, setPendingClockUpgrade] = useState(false)
   const profilePreview = useMemo<BasketballProfileUpgradeResult | null>(() => (
     pendingProfile
       ? previewBasketballProfileUpgrade(
@@ -60,6 +69,40 @@ export default function BasketballRulesSettingsFields({
     if (limit === profile.rules.personalFoulLimit) delete overrides.personalFoulLimit
     else overrides.personalFoulLimit = limit
     onChange?.({ ...settings, ruleOverrides: overrides })
+  }
+
+  const applyAnchoredClock = () => {
+    if (!resolved.ok || !isBasketballMatchRulesV2(resolved.value.rules)) return
+    onChange?.({
+      ...settings,
+      ruleOverrides: basketballRuleOverridesWithAnchoredClock(
+        resolved.value.rules,
+        settings.baseProfile.profileId,
+        settings.ruleOverrides
+      ),
+    })
+    setPendingClockUpgrade(false)
+  }
+
+  const removeClockLineups = () => {
+    onChange?.({
+      ...settings,
+      ruleOverrides: basketballRuleOverridesWithoutClockLineups(settings.ruleOverrides),
+    })
+  }
+
+  const updateClockRules = (rules: BasketballMatchRulesV3) => {
+    onChange?.({
+      ...settings,
+      ruleOverrides: {
+        ...settings.ruleOverrides,
+        clockModel: rules.clockModel,
+        clockDisplayDirection: rules.clockDisplayDirection,
+        clockExpiration: rules.clockExpiration,
+        stoppageMode: rules.stoppageMode,
+        equalPlayPolicy: structuredClone(rules.equalPlayPolicy),
+      },
+    })
   }
 
   return (
@@ -117,13 +160,47 @@ export default function BasketballRulesSettingsFields({
       {resolved.ok ? (
         <>
           {!readOnly && (
-            <NumberField
-              label="Player foul limit"
-              value={resolved.value.rules.personalFoulLimit}
-              min={1}
-              max={20}
-              onChange={setPersonalFoulLimit}
-            />
+            <>
+              <NumberField
+                label="Player foul limit"
+                value={resolved.value.rules.personalFoulLimit}
+                min={1}
+                max={20}
+                onChange={setPersonalFoulLimit}
+              />
+              {isBasketballMatchRulesV2(resolved.value.rules) ? (
+                <div className="space-y-3 border-y border-slate-200 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Event game clock</p>
+                      <p className="text-xs text-slate-500">Clockless compatibility rules</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary px-3 text-sm"
+                      onClick={() => setPendingClockUpgrade(true)}
+                    >
+                      Use Anchored Clock
+                    </button>
+                  </div>
+                  {pendingClockUpgrade && (
+                    <ClockUpgradeReview
+                      rules={resolved.value.rules}
+                      profileId={settings.baseProfile.profileId}
+                      sourceLabel={overrideSourceLabel}
+                      onCancel={() => setPendingClockUpgrade(false)}
+                      onApply={applyAnchoredClock}
+                    />
+                  )}
+                </div>
+              ) : isBasketballMatchRulesV3(resolved.value.rules) ? (
+                <ClockRulesEditor
+                  rules={resolved.value.rules}
+                  onChange={updateClockRules}
+                  onReturnToClockless={removeClockLineups}
+                />
+              ) : null}
+            </>
           )}
           <BasketballRulesSummary
             resolution={resolved.value}
@@ -137,6 +214,167 @@ export default function BasketballRulesSettingsFields({
           {resolved.message}
         </p>
       )}
+    </div>
+  )
+}
+
+function ClockUpgradeReview({
+  rules,
+  profileId,
+  sourceLabel,
+  onCancel,
+  onApply,
+}: {
+  rules: Parameters<typeof upgradeBasketballRulesDraftToV3>[0]
+  profileId: BasketballRulesProfileRef['profileId']
+  sourceLabel: string
+  onCancel: () => void
+  onApply: () => void
+}) {
+  const upgraded = useMemo(
+    () => upgradeBasketballRulesDraftToV3(rules, profileId),
+    [profileId, rules]
+  )
+  const fields = [
+    'clockModel',
+    'clockDisplayDirection',
+    'clockExpiration',
+    'stoppageMode',
+    'equalPlayPolicy',
+  ] as const
+  return (
+    <div className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
+      <div>
+        <p className="text-sm font-semibold text-amber-950">Review anchored clock rules</p>
+        <p className="mt-1 text-xs text-amber-800">
+          Applying creates one complete version-3 clock and lineup rule bundle in this draft.
+        </p>
+      </div>
+      <div className="divide-y divide-amber-200 border-y border-amber-200">
+        {fields.map(field => (
+          <div key={field} className="py-2 text-xs text-slate-700">
+            <p className="font-semibold text-slate-800">{basketballRuleFieldLabel(field)}</p>
+            <p className="mt-0.5">Current: Not available in version 2</p>
+            <p className="mt-0.5 break-words">
+              New: {formatBasketballRuleField(field, upgraded[field])}
+            </p>
+            <p className="mt-0.5 text-amber-800">Source: {sourceLabel}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn-primary" onClick={onApply}>Apply Anchored</button>
+      </div>
+    </div>
+  )
+}
+
+function ClockRulesEditor({
+  rules,
+  onChange,
+  onReturnToClockless,
+}: {
+  rules: BasketballMatchRulesV3
+  onChange: (rules: BasketballMatchRulesV3) => void
+  onReturnToClockless: () => void
+}) {
+  const updateEqualPlayMode = (mode: BasketballEqualPlayMode) => {
+    onChange({
+      ...rules,
+      clockModel: mode === 'off' ? rules.clockModel : 'anchored',
+      equalPlayPolicy: {
+        ...rules.equalPlayPolicy,
+        mode,
+        ...(mode === 'off'
+          ? {
+              minimumPeriods: null,
+              maximumConsecutivePeriods: null,
+              maximumPeriodImbalance: null,
+            }
+          : {}),
+      },
+    })
+  }
+  const updateLimit = (
+    field: 'minimumPeriods' | 'maximumConsecutivePeriods' | 'maximumPeriodImbalance',
+    value: number | null
+  ) => onChange({
+    ...rules,
+    equalPlayPolicy: { ...rules.equalPlayPolicy, [field]: value },
+  })
+
+  return (
+    <div className="space-y-4 border-y border-slate-200 py-3">
+      <SelectField
+        label="Event game clock"
+        value={rules.clockModel}
+        options={[
+          { value: 'anchored', label: 'Anchored clock' },
+          { value: 'none', label: 'Clockless version 3' },
+        ]}
+        onChange={value => onChange({
+          ...rules,
+          clockModel: value as BasketballMatchRulesV3['clockModel'],
+          equalPlayPolicy: value === 'none'
+            ? {
+                mode: 'off',
+                minimumPeriods: null,
+                maximumConsecutivePeriods: null,
+                maximumPeriodImbalance: null,
+              }
+            : rules.equalPlayPolicy,
+        })}
+      />
+      <SelectField
+        label="Clock display"
+        value={rules.clockDisplayDirection}
+        options={[
+          { value: 'count_down', label: 'Count down' },
+          { value: 'count_up', label: 'Count up' },
+        ]}
+        onChange={value => onChange({
+          ...rules,
+          clockDisplayDirection: value as BasketballMatchRulesV3['clockDisplayDirection'],
+        })}
+      />
+      <SelectField
+        label="Equal-play policy"
+        value={rules.equalPlayPolicy.mode}
+        disabled={rules.clockModel === 'none'}
+        options={[
+          { value: 'off', label: 'Off' },
+          { value: 'advisory', label: 'Advisory' },
+          { value: 'enforced', label: 'Enforced' },
+        ]}
+        onChange={value => updateEqualPlayMode(value as BasketballEqualPlayMode)}
+      />
+      {rules.equalPlayPolicy.mode !== 'off' && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <OptionalNumberField
+            label="Minimum periods"
+            value={rules.equalPlayPolicy.minimumPeriods}
+            onChange={value => updateLimit('minimumPeriods', value)}
+          />
+          <OptionalNumberField
+            label="Max consecutive"
+            value={rules.equalPlayPolicy.maximumConsecutivePeriods}
+            onChange={value => updateLimit('maximumConsecutivePeriods', value)}
+          />
+          <OptionalNumberField
+            label="Max imbalance"
+            value={rules.equalPlayPolicy.maximumPeriodImbalance}
+            onChange={value => updateLimit('maximumPeriodImbalance', value)}
+          />
+        </div>
+      )}
+      <button
+        type="button"
+        className="inline-flex h-10 items-center text-sm font-semibold text-slate-600"
+        onClick={onReturnToClockless}
+      >
+        Return to compatible clockless rules
+      </button>
     </div>
   )
 }
@@ -248,7 +486,7 @@ export function BasketballRulesSummary({
   sourceLabels?: Partial<Record<'built_in' | BasketballRuleLayerId, string>>
 }) {
   const { profile, rules, customized, sourceByField } = resolution
-  const source = (field: BasketballRulesV2Field) => {
+  const source = (field: BasketballRulesField) => {
     const sourceId = sourceByField[field]
     return (sourceId ? sourceLabels?.[sourceId] : undefined) ??
       (sourceId === layerId ? overrideSourceLabel : 'Built-in profile')
@@ -302,6 +540,30 @@ export function BasketballRulesSummary({
         value={rules.clockModel === 'none' ? 'No event-model game clock' : rules.clockModel}
         source={source('clockModel')}
       />
+      {isBasketballMatchRulesV3(rules) && (
+        <>
+          <SummaryRow
+            label="Clock display"
+            value={formatBasketballRuleField('clockDisplayDirection', rules.clockDisplayDirection)}
+            source={source('clockDisplayDirection')}
+          />
+          <SummaryRow
+            label="Clock expiration"
+            value={formatBasketballRuleField('clockExpiration', rules.clockExpiration)}
+            source={source('clockExpiration')}
+          />
+          <SummaryRow
+            label="Stoppages"
+            value={formatBasketballRuleField('stoppageMode', rules.stoppageMode)}
+            source={source('stoppageMode')}
+          />
+          <SummaryRow
+            label="Equal play"
+            value={formatBasketballRuleField('equalPlayPolicy', rules.equalPlayPolicy)}
+            source={source('equalPlayPolicy')}
+          />
+        </>
+      )}
       <div className="py-3">
         <p className="text-xs font-semibold uppercase text-slate-500">Sources</p>
         <p className="mt-1 text-sm text-slate-700">{profile.effectiveRulesLabel}</p>
@@ -364,6 +626,57 @@ function NumberField({ label, value, min, max, onChange }: {
         }}
         className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
       />
+    </label>
+  )
+}
+
+function OptionalNumberField({ label, value, onChange }: {
+  label: string
+  value: number | null
+  onChange: (value: number | null) => void
+}) {
+  return (
+    <label className="block text-sm font-medium text-slate-700">
+      {label}
+      <input
+        type="number"
+        min={1}
+        value={value ?? ''}
+        placeholder="None"
+        onChange={event => {
+          if (event.target.value === '') {
+            onChange(null)
+            return
+          }
+          const next = Number(event.target.value)
+          if (Number.isInteger(next) && next > 0) onChange(next)
+        }}
+        className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
+      />
+    </label>
+  )
+}
+
+function SelectField({ label, value, options, disabled = false, onChange }: {
+  label: string
+  value: string
+  options: Array<{ value: string; label: string }>
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="block text-sm font-medium text-slate-700">
+      {label}
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={event => onChange(event.target.value)}
+        className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 disabled:bg-slate-100 disabled:text-slate-500"
+      >
+        {options.map(option => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
     </label>
   )
 }

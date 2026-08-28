@@ -13,6 +13,8 @@ import {
   parseBasketballSetupDraft,
   refreshBasketballSetupDraftEvent,
   saveBasketballSetupDraft,
+  upgradeBasketballSetupDraftToV2,
+  type BasketballSetupDraftV1,
 } from './setupDraft'
 import {
   DEFAULT_BASKETBALL_PERSONAL_SETTINGS,
@@ -63,6 +65,89 @@ describe('Basketball setup draft', () => {
     expect(saveBasketballSetupDraft(draft, storage).ok).toBe(true)
     expect(loadBasketballSetupDraft(scope, storage)).toEqual(draft)
     expect(loadBasketballSetupDraft(basketballSetupAccountScope('user-2'), storage)).toBeNull()
+  })
+
+  it('preserves a version-1 clockless draft without inventing player progress', () => {
+    const current = createBasketballSetupDraft({
+      accountScope: 'anonymous',
+      source: { kind: 'personal', teamName: '', seasonId: null, seasonName: '' },
+    })
+    const legacyObject = structuredClone(current) as unknown as Record<string, unknown>
+    delete legacyObject.playerSetup
+    legacyObject.version = 1
+    const legacy = legacyObject as unknown as BasketballSetupDraftV1
+
+    const parsed = parseBasketballSetupDraft(legacy)
+    expect(parsed).toEqual({ ok: true, value: legacy })
+    if (!parsed.ok) return
+    expect(parsed.value).not.toHaveProperty('playerSetup')
+
+    const upgraded = upgradeBasketballSetupDraftToV2(parsed.value)
+    expect(upgraded).toMatchObject({
+      version: 2,
+      playerSetup: {
+        currentStep: 'roster',
+        participants: [],
+        openingLineups: {
+          tracked: { participantIds: [], shortHandedReason: null },
+          opponent: null,
+        },
+      },
+    })
+  })
+
+  it('round-trips strict restart-safe participant statuses and opening authority', () => {
+    const draft = createBasketballSetupDraft({
+      accountScope: 'anonymous',
+      source: { kind: 'personal', teamName: '', seasonId: null, seasonName: '' },
+    })
+    draft.playerSetup = {
+      currentStep: 'review',
+      participants: Array.from({ length: 5 }, (_, index) => ({
+        participantId: `participant-${index + 1}`,
+        playerId: `player-${index + 1}`,
+        displayName: `Player ${index + 1}`,
+        number: String(index + 1),
+        teamSide: 'tracked' as const,
+        initialStatus: 'starter' as const,
+      })),
+      openingLineups: {
+        tracked: {
+          participantIds: Array.from({ length: 5 }, (_, index) => `participant-${index + 1}`),
+          shortHandedReason: null,
+        },
+        opponent: null,
+      },
+    }
+
+    expect(parseBasketballSetupDraft(draft)).toEqual({ ok: true, value: draft })
+    expect(parseBasketballSetupDraft({
+      ...draft,
+      playerSetup: {
+        ...draft.playerSetup,
+        openingLineups: {
+          ...draft.playerSetup.openingLineups,
+          tracked: { participantIds: ['missing'], shortHandedReason: null },
+        },
+      },
+    }).ok).toBe(false)
+    expect(parseBasketballSetupDraft({
+      ...draft,
+      playerSetup: {
+        ...draft.playerSetup,
+        participants: draft.playerSetup.participants.map((participant, index) => ({
+          ...participant,
+          initialStatus: index < 4 ? 'starter' as const : 'bench' as const,
+        })),
+        openingLineups: {
+          ...draft.playerSetup.openingLineups,
+          tracked: {
+            participantIds: draft.playerSetup.openingLineups.tracked.participantIds.slice(0, 4),
+            shortHandedReason: null,
+          },
+        },
+      },
+    }).ok).toBe(false)
   })
 
   it('rejects unknown fields, mismatched authority, and corrupt persisted drafts', () => {
@@ -151,8 +236,8 @@ describe('Basketball setup draft', () => {
     })
   })
 
-  it('rejects version-3 authority before a setup draft can be committed', () => {
-    expect(createBasketballSetupDraftEvent({
+  it('reviews version-3 authority without starting an anchored game', () => {
+    const event = createBasketballSetupDraftEvent({
       authority: 'team',
       revision: 5,
       settings: {
@@ -171,7 +256,11 @@ describe('Basketball setup draft', () => {
         },
       },
       cloudIntent: 'local_only',
-    })).toBeNull()
+    })
+    expect(event?.reviewedRules).toMatchObject({
+      rulesSchemaVersion: 3,
+      clockModel: 'anchored',
+    })
   })
 
   it('separates a team source from local-only cloud binding metadata', () => {

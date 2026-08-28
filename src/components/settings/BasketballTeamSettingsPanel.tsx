@@ -3,11 +3,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useBasketballTeamSettings } from '../../hooks/useBasketballTeamSettings'
 import { resolveBasketballRules } from '../../lib/basketball/profiles'
-import type { BasketballTeamSettingsV1 } from '../../lib/basketball/settings'
+import {
+  BASKETBALL_V3_COMPATIBILITY_WARNING,
+  basketballSettingsRequireVersion3Confirmation,
+  type BasketballTeamSettingsV1,
+} from '../../lib/basketball/settings'
 import { basketballTeamSettingsFingerprint } from '../../lib/basketball/teamSettingsSync'
 import { settingsPath } from '../../lib/settingsNavigation'
 import BasketballLegacySeasonImport from './BasketballLegacySeasonImport'
 import BasketballRulesSettingsFields from './BasketballRulesSettingsFields'
+import ConfirmDialog from '../ConfirmDialog'
 
 export default function BasketballTeamSettingsPanel({
   teamId,
@@ -31,6 +36,7 @@ export default function BasketballTeamSettingsPanel({
   )
   const [baseRevision, setBaseRevision] = useState(team.revision)
   const [editorOpen, setEditorOpen] = useState(!mayEdit)
+  const [confirmV3Save, setConfirmV3Save] = useState(false)
   const previousSavedFingerprint = useRef(
     basketballTeamSettingsFingerprint(team.settings)
   )
@@ -57,6 +63,15 @@ export default function BasketballTeamSettingsPanel({
   const handleSave = async () => {
     if (!mayEdit || !resolved.ok) return
     if (await team.save(draft, baseRevision)) onAuditChange()
+  }
+
+  const requestSave = () => {
+    if (!mayEdit || !resolved.ok) return
+    if (basketballSettingsRequireVersion3Confirmation(draft)) {
+      setConfirmV3Save(true)
+      return
+    }
+    void handleSave()
   }
 
   return (
@@ -202,7 +217,7 @@ export default function BasketballTeamSettingsPanel({
             type="button"
             className="btn-primary inline-flex items-center justify-center gap-2"
             disabled={!dirty || !sharedWritable || team.status === 'saving' || !resolved.ok}
-            onClick={() => void handleSave()}
+            onClick={requestSave}
           >
             {team.status === 'saving' ? (
               <RefreshCw size={17} className="animate-spin" />
@@ -215,6 +230,20 @@ export default function BasketballTeamSettingsPanel({
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmV3Save}
+        title="Save Version-3 Team Defaults?"
+        message={BASKETBALL_V3_COMPATIBILITY_WARNING}
+        confirmLabel="Save Version 3"
+        cancelLabel="Keep Editing"
+        destructive={false}
+        onConfirm={() => {
+          setConfirmV3Save(false)
+          void handleSave()
+        }}
+        onCancel={() => setConfirmV3Save(false)}
+      />
     </section>
   )
 }

@@ -1,10 +1,15 @@
 export const SETTINGS_STORAGE_KEY = 'statkeeper_settings'
 
+export interface BasketballDeviceSettings {
+  eventTrackerPreviewEnabled: boolean
+  showClockTenths: boolean
+  clockExpirationSoundEnabled: boolean
+  clockExpirationVibrationEnabled: boolean
+}
+
 export interface AppSettings {
   enabledSports: Record<string, boolean>
-  basketball: {
-    eventTrackerPreviewEnabled: boolean
-  }
+  basketball: BasketballDeviceSettings
   courtCapture: {
     reboundPromptAfterMiss: boolean
   }
@@ -20,6 +25,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   basketball: {
     eventTrackerPreviewEnabled: false,
+    showClockTenths: true,
+    clockExpirationSoundEnabled: false,
+    clockExpirationVibrationEnabled: false,
   },
   courtCapture: {
     reboundPromptAfterMiss: false,
@@ -59,6 +67,18 @@ export function mergeStoredSettings(parsed: unknown): AppSettings {
         typeof basketball.eventTrackerPreviewEnabled === 'boolean'
           ? basketball.eventTrackerPreviewEnabled
           : DEFAULT_SETTINGS.basketball.eventTrackerPreviewEnabled,
+      showClockTenths:
+        typeof basketball.showClockTenths === 'boolean'
+          ? basketball.showClockTenths
+          : DEFAULT_SETTINGS.basketball.showClockTenths,
+      clockExpirationSoundEnabled:
+        typeof basketball.clockExpirationSoundEnabled === 'boolean'
+          ? basketball.clockExpirationSoundEnabled
+          : DEFAULT_SETTINGS.basketball.clockExpirationSoundEnabled,
+      clockExpirationVibrationEnabled:
+        typeof basketball.clockExpirationVibrationEnabled === 'boolean'
+          ? basketball.clockExpirationVibrationEnabled
+          : DEFAULT_SETTINGS.basketball.clockExpirationVibrationEnabled,
     },
     courtCapture: {
       reboundPromptAfterMiss:
