@@ -20,6 +20,23 @@ export interface BasketballClockDisplay {
   backwardClockWarning: boolean
 }
 
+export const BASKETBALL_CLOCK_MAX_WALL_DELTA_MS = 24 * 60 * 60 * 1000
+
+export type BasketballClockRecoveryIssue = 'backward' | 'excessive_delta'
+
+export function basketballClockRecoveryIssue(
+  clock: BasketballAnchoredClockProjection,
+  occurredAt: string
+): BasketballClockRecoveryIssue | null {
+  if (!clock.running || clock.anchorOccurredAt === null) return null
+  const targetMs = Date.parse(occurredAt)
+  const anchorMs = Date.parse(clock.anchorOccurredAt)
+  if (!Number.isFinite(targetMs) || !Number.isFinite(anchorMs)) return null
+  const deltaMs = targetMs - anchorMs
+  if (deltaMs < 0) return 'backward'
+  return deltaMs > BASKETBALL_CLOCK_MAX_WALL_DELTA_MS ? 'excessive_delta' : null
+}
+
 export function validateBasketballEventClockMoment(
   projection: BasketballMatchProjection,
   sportState: BasketballSportGameState,
@@ -36,29 +53,49 @@ export function validateBasketballEventClockMoment(
       ? null
       : 'An anchored Basketball period must start at elapsed zero.'
   }
-  if (!clock.periodId || event.period.id !== clock.periodId) {
-    return 'Anchored Basketball event does not target the active clock period.'
-  }
   if (event.elapsedMs === null) return 'Anchored Basketball events require an elapsed value.'
   if (event.eventType === 'basketball.clock_adjusted') return null
+  let activeMoment: BasketballClockMomentResult | null = null
+  if (clock.running && clock.periodId) {
+    const activeSegment = resolveBasketballPeriodSegment(
+      sportState.setup.rulesSnapshot,
+      clock.periodId
+    )
+    if (!activeSegment) return 'The active Basketball clock period is invalid.'
+    activeMoment = basketballClockMomentAt(clock, event.occurredAt, activeSegment.durationMs)
+    if (!activeMoment.ok) return activeMoment.message
+    if (
+      activeMoment.unboundedElapsedMs >= activeSegment.durationMs &&
+      event.eventType !== 'basketball.clock_paused'
+    ) {
+      return 'Basketball clock expiration must be materialized before later events.'
+    }
+  }
+  if (!clock.periodId || event.period.id !== clock.periodId) {
+    return isValidHistoricalBasketballClockMoment(projection, sportState, event, null)
+      ? null
+      : 'Anchored Basketball event does not target a valid recorded-later clock moment.'
+  }
   if (!clock.running) {
-    return event.elapsedMs === clock.elapsedMs
+    return event.elapsedMs === clock.elapsedMs ||
+      isValidHistoricalBasketballClockMoment(projection, sportState, event, clock.elapsedMs)
       ? null
       : 'Basketball event elapsed value does not match the paused clock.'
   }
 
   const segment = resolveBasketballPeriodSegment(sportState.setup.rulesSnapshot, clock.periodId)
   if (!segment) return 'The active Basketball clock period is invalid.'
-  const moment = basketballClockMomentAt(clock, event.occurredAt, segment.durationMs)
+  const moment = activeMoment ?? basketballClockMomentAt(clock, event.occurredAt, segment.durationMs)
   if (!moment.ok) return moment.message
   if (event.elapsedMs !== moment.elapsedMs) {
-    return 'Basketball event elapsed value does not match the running clock.'
-  }
-  if (
-    moment.unboundedElapsedMs >= segment.durationMs &&
-    event.eventType !== 'basketball.clock_paused'
-  ) {
-    return 'Basketball clock expiration must be materialized before later events.'
+    return isValidHistoricalBasketballClockMoment(
+      projection,
+      sportState,
+      event,
+      moment.elapsedMs
+    )
+      ? null
+      : 'Basketball event elapsed value does not match the running clock.'
   }
   return null
 }
@@ -186,8 +223,13 @@ export function recordBasketballRunningClockMomentAfterEvent(
   event: GameEvent
 ): void {
   const clock = projection.clock
-  if (!clock?.running || event.elapsedMs === null) return
-  clock.lastRunningElapsedMs = event.elapsedMs
+  if (
+    !clock?.running ||
+    event.elapsedMs === null ||
+    event.period.id !== clock.periodId ||
+    event.payload.recordedLater === true
+  ) return
+  clock.lastRunningElapsedMs = Math.max(clock.lastRunningElapsedMs ?? 0, event.elapsedMs)
 }
 
 export function basketballClockMomentAt(
@@ -255,6 +297,41 @@ function displayResult(
     reachedExpiration: elapsedMs >= durationMs,
     backwardClockWarning,
   }
+}
+
+function isValidHistoricalBasketballClockMoment(
+  projection: BasketballMatchProjection,
+  sportState: BasketballSportGameState,
+  event: BasketballMatchEvent,
+  currentPeriodLimit: number | null
+): boolean {
+  if (
+    event.payload.recordedLater !== true ||
+    !isBasketballRecordedLaterEventType(event.eventType) ||
+    event.elapsedMs === null
+  ) return false
+  if (!projection.startedPeriodIds.includes(event.period.id)) return false
+  const segment = resolveBasketballPeriodSegment(sportState.setup.rulesSnapshot, event.period.id)
+  if (!segment || segment.order !== event.period.order) return false
+  if (event.elapsedMs < 0 || event.elapsedMs > segment.durationMs) return false
+  if (event.period.id === projection.clock?.periodId) {
+    return currentPeriodLimit !== null && event.elapsedMs <= currentPeriodLimit
+  }
+  return projection.completedPeriodIds.includes(event.period.id)
+}
+
+function isBasketballRecordedLaterEventType(eventType: string): boolean {
+  return eventType === 'basketball.shot' ||
+    eventType === 'basketball.assist' ||
+    eventType === 'basketball.rebound' ||
+    eventType === 'basketball.steal' ||
+    eventType === 'basketball.block' ||
+    eventType === 'basketball.turnover' ||
+    eventType === 'basketball.score_adjustment' ||
+    eventType === 'basketball.foul' ||
+    eventType === 'basketball.free_throw_trip' ||
+    eventType === 'basketball.ejection' ||
+    eventType === 'basketball.timeout'
 }
 
 function clearPendingStoppage(clock: BasketballAnchoredClockProjection): void {

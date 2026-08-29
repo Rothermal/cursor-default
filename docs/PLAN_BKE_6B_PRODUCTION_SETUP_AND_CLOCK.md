@@ -1,6 +1,6 @@
 # Plan: BKE-6B Production Setup and Live Clock
 
-Status: BKE-6B1 and BKE-6B2 are implemented. BKE-6B3 live anchored clock is next. The BKE-6 product Q&A
+Status: BKE-6B1 through BKE-6B3 are implemented. BKE-6B4 production-clock exit is next. The BKE-6 product Q&A
 is complete and introduces no open product decisions for this phase.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
@@ -137,7 +137,7 @@ Each slice receives its own implementation branch and PR.
 |---|---|---|
 | BKE-6B1 | **Implemented.** Device preferences, version-3 compatibility confirmation, restart-safe setup-draft contract, and reusable anchored workflow guards | Rules/settings/setup drafts remain strict and backward compatible; no production anchored game starts yet |
 | BKE-6B2 | **Implemented.** Event Setup review, focused Opening Lineup step, immutable setup-v2 commit, and explicit local-only start | A supported local anchored game starts paused with exact opening authority; unsupported cloud and BKE-6C-dependent starts fail before replacement |
-| BKE-6B3 | Shared command-time resolution, sticky clock strip, same-five boundary confirmation, Start/Pause/Stoppage/Set Clock, display ticking, expiration, and recovery | Every anchored capture has exact canonical elapsed time and the clock runs without per-second state writes across Track and Timeline |
+| BKE-6B3 | **Implemented.** Shared command-time resolution, sticky clock strip, same-five boundary confirmation, Start/Pause/Stoppage/Set Clock, display ticking, expiration, and recovery | Every anchored capture has exact canonical elapsed time and the clock runs without per-second state writes across Track and Timeline |
 | BKE-6B4 | Running-clock park/replacement interception, reload/background/offline hardening, period-flow integration, accessibility/responsive polish, and exit audit | A supported local anchored game can run, pause, adjust, expire, park/reload, and complete periods while parity gates remain green |
 
 ---
@@ -323,6 +323,9 @@ Use one route-level scheduler keyed by the projected anchor and period duration.
 boundary, append exactly one authoritative expiration Pause through the checked command. Projection,
 not timer identity, prevents duplicates after delayed callbacks, focus changes, or Strict Mode
 remounts.
+
+The accepted automatic wall-time recovery bound is 24 hours from the persisted running anchor.
+Longer running deltas require reasoned Set Clock recovery at the exact last-known-good watermark.
 
 On reload, focus, visibility return, and online return:
 

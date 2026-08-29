@@ -16,6 +16,7 @@ import {
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballUuid } from './id'
+import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import {
   basketballShotActorOptions,
   basketballShotActorSelectionKey,
@@ -63,6 +64,7 @@ export interface BasketballHistoricalRelatedEventDraft {
   sourceFingerprint: string
   eventType: BasketballHistoricalRelatedEventType
   period: { id: string; order: number }
+  elapsedMs: number | null
   teamSide: BasketballTeamSide
   actor: BasketballCaptureActorSelection
   reboundKind: 'offensive' | 'defensive'
@@ -190,6 +192,8 @@ export function buildBasketballHistoricalRelatedEventDraft(
   const period = projection.periods.find(candidate => candidate.id === projection.currentPeriodId) ??
     projection.periods.find(candidate => projection.startedPeriodIds.includes(candidate.id))
   if (!period) return commandFailure('invalid_period', 'Start a Basketball period before adding an event.')
+  const time = defaultBasketballHistoricalTime(prepared.value.state, period)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
   const actor = basketballRelatedEventActorOptions(
     prepared.value.state,
     'tracked',
@@ -212,6 +216,7 @@ export function buildBasketballHistoricalRelatedEventDraft(
       sourceFingerprint: eventStreamFingerprint(prepared.value.state),
       eventType,
       period: { id: period.id, order: period.order },
+      elapsedMs: time.elapsedMs,
       teamSide: 'tracked',
       actor,
       reboundKind: 'offensive',
@@ -538,6 +543,8 @@ function buildHistoricalPlan(
   if (!period || period.order !== draft.period.order || !projection.startedPeriodIds.includes(period.id)) {
     return commandFailure('invalid_period', 'Select a Basketball period that has already started.')
   }
+  const time = validateBasketballHistoricalTime(prepared.state, draft.period, draft.elapsedMs)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
   let nextSequence = nextBasketballEventSequence(prepared.state.eventStream.events, recorderUserId)
   const appendedEvents: BasketballMatchEvent[] = []
   const mutations: GameEventMutation[] = []
@@ -558,10 +565,15 @@ function buildHistoricalPlan(
     appendedEvents.push(createBasketballStatEvent({
       id: draft.pairedEventId,
       eventType: 'basketball.turnover',
-      payload: { kind: draft.pairedTurnoverKind, captureCommandId: draft.captureCommandId },
+      payload: {
+        kind: draft.pairedTurnoverKind,
+        captureCommandId: draft.captureCommandId,
+        recordedLater: true,
+      },
       recorderUserId,
       sequence: nextSequence++,
       period: draft.period,
+      elapsedMs: time.elapsedMs,
       occurredAt,
       teamSide: turnoverSide,
       actors: [turnoverActor.value],
@@ -569,10 +581,15 @@ function buildHistoricalPlan(
     appendedEvents.push(createBasketballStatEvent({
       id: draft.eventId,
       eventType: 'basketball.steal',
-      payload: { relatedEventId: draft.pairedEventId, captureCommandId: draft.captureCommandId },
+      payload: {
+        relatedEventId: draft.pairedEventId,
+        captureCommandId: draft.captureCommandId,
+        recordedLater: true,
+      },
       recorderUserId,
       sequence: nextSequence++,
       period: draft.period,
+      elapsedMs: time.elapsedMs,
       occurredAt,
       teamSide: draft.teamSide,
       actors: [stealer.value],
@@ -605,6 +622,7 @@ function buildHistoricalPlan(
     recorderUserId,
     sequence: nextSequence,
     period: draft.period,
+    elapsedMs: time.elapsedMs,
     occurredAt,
     teamSide: draft.teamSide,
     actors: [actor.value],
@@ -613,19 +631,28 @@ function buildHistoricalPlan(
     appendedEvents.push(createBasketballStatEvent({
       ...common,
       eventType: 'basketball.turnover',
-      payload: { kind: draft.turnoverKind, captureCommandId: null },
+      payload: { kind: draft.turnoverKind, captureCommandId: null, recordedLater: true },
     }))
   } else if (draft.eventType === 'basketball.rebound') {
     appendedEvents.push(createBasketballStatEvent({
       ...common,
       eventType: 'basketball.rebound',
-      payload: { kind: draft.reboundKind, relatedEventId: draft.relatedEventId, captureCommandId: null },
+      payload: {
+        kind: draft.reboundKind,
+        relatedEventId: draft.relatedEventId,
+        captureCommandId: null,
+        recordedLater: true,
+      },
     }))
   } else {
     appendedEvents.push(createBasketballStatEvent({
       ...common,
       eventType: draft.eventType,
-      payload: { relatedEventId: draft.relatedEventId, captureCommandId: null },
+      payload: {
+        relatedEventId: draft.relatedEventId,
+        captureCommandId: null,
+        recordedLater: true,
+      },
     }))
   }
   return {

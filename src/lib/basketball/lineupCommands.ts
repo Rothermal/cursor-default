@@ -205,7 +205,7 @@ function lineupCommandContext(
   }
   const side = projection.lineup.sides[options.teamSide]
   if (!side) return failure(state, 'command_failed', 'Basketball lineup authority is unavailable for this side.')
-  return { ok: true as const, context: context.value, side, elapsedMs: projection.clock.elapsedMs }
+  return { ok: true as const, context: context.value, side, elapsedMs: context.value.elapsedMs! }
 }
 
 function appendLineupEvents(

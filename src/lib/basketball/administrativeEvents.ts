@@ -87,6 +87,7 @@ function definition(
         event.eventType !== eventType ||
         event.schemaVersion !== BASKETBALL_EVENT_SCHEMA_VERSION ||
         event.location !== null ||
+        !validRecordedLaterFlag(event.payload.recordedLater) ||
         !validateEvent(event)
       ) {
         return { ok: false, message: `${eventType} has an invalid Basketball payload.` }
@@ -190,6 +191,10 @@ function actorForRole(actors: GameEventActor[], role: string): GameEventActor | 
 
 function validCaptureCommandId(value: unknown): boolean {
   return value === null || isNonEmptyString(value)
+}
+
+function validRecordedLaterFlag(value: unknown): boolean {
+  return value === undefined || value === true
 }
 
 function isNullableId(value: unknown): boolean {

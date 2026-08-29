@@ -115,6 +115,7 @@ export function captureBasketballOfficialEjection(
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,
+    elapsedMs: context.value.elapsedMs,
     occurredAt: context.value.occurredAt,
     teamSide: options.teamSide,
     actors: [subject.value],

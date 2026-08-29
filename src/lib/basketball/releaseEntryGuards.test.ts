@@ -259,4 +259,33 @@ describe('Basketball release entry guards', () => {
     expect(hydrateIndex).toBeGreaterThan(persistIndex)
     expect(handler).toContain('Another local game already owns this cloud Basketball game.')
   })
+
+  it('keeps one anchored clock strip mounted above both Basketball workspaces', () => {
+    const tracker = source('src/pages/GameTracker.tsx')
+    const clockStrip = source('src/components/basketball/BasketballClockStrip.tsx')
+    const stripIndex = tracker.indexOf('<BasketballClockStrip')
+    const workspaceIndex = tracker.indexOf('aria-label="Basketball game workspace"')
+
+    expect(stripIndex).toBeGreaterThanOrEqual(0)
+    expect(workspaceIndex).toBeGreaterThan(stripIndex)
+    expect(clockStrip).toContain('deriveBasketballClockDisplay')
+    expect(clockStrip).toContain('window.setInterval(() => setNow(')
+    expect(clockStrip).toContain('Confirm current five')
+    expect(clockStrip).toContain('title="Substitutions arrive in BKE-6C"')
+  })
+
+  it('keeps anchored display ticks presentation-only and hides manual-minute capture', () => {
+    const tracker = source('src/pages/GameTracker.tsx')
+    const clockStrip = source('src/components/basketball/BasketballClockStrip.tsx')
+    const displayTimer = between(
+      clockStrip,
+      'useEffect(() => {\n    if (!clock?.running) return',
+      '\n  }, [clock?.running, clock?.lastStartEventId])'
+    )
+
+    expect(displayTimer).toContain('setNow(new Date().toISOString())')
+    expect(displayTimer).not.toContain('onState(')
+    expect(displayTimer).not.toContain('dispatch(')
+    expect(tracker).toContain("basketballSportState?.projection.clock && action.id === 'min'")
+  })
 })

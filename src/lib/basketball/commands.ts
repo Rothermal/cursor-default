@@ -25,6 +25,7 @@ import {
   type BasketballCourtPoint,
 } from './courtGeometry'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
+import { basketballClockMomentAt, basketballClockRecoveryIssue } from './clockProjection'
 import { createBasketballLifecycleEvent } from './events'
 import { createBasketballUuid } from './id'
 import {
@@ -138,6 +139,11 @@ export interface BasketballCommandContext {
   period: GameEventPeriod
   nextSequence: number
   occurredAt: string
+  elapsedMs: number | null
+}
+
+export interface BasketballCommandContextOptions {
+  allowClockRecovery?: boolean
 }
 
 export type BasketballCourtStatId = 'oreb' | 'dreb' | 'stl' | 'blk' | 'ast'
@@ -493,7 +499,8 @@ export function setBasketballCourtOrientation(
 export function getBasketballCommandContext(
   state: GameState,
   recorderUserId: string | null,
-  occurredAt?: string
+  occurredAt?: string,
+  options: BasketballCommandContextOptions = {}
 ): BasketballCommandResult<BasketballCommandContext> {
   if (
     state.sport?.id !== 'basketball' ||
@@ -511,6 +518,12 @@ export function getBasketballCommandContext(
   if (!segment) return commandFailure('invalid_period', 'The active Basketball period is invalid.')
   const timestamp = normalizeBasketballCommandTimestamp(occurredAt)
   if (!timestamp.ok) return timestamp
+  const elapsed = resolveBasketballCommandElapsedMs(
+    state.sportGameState,
+    timestamp.value,
+    options.allowClockRecovery === true
+  )
+  if (!elapsed.ok) return elapsed
   return {
     ok: true,
     value: {
@@ -518,6 +531,7 @@ export function getBasketballCommandContext(
       period: { id: segment.id, order: segment.order },
       nextSequence: nextBasketballEventSequence(state.eventStream.events, recorderUserId),
       occurredAt: timestamp.value,
+      elapsedMs: elapsed.value,
     },
   }
 }
@@ -813,7 +827,7 @@ export function captureBasketballCourtEvent(
   const targetResult = basketballCaptureTargetForPlayerId(state, options.playerId)
   if (!targetResult.ok) return { ...targetResult, state }
 
-  const { nextSequence, occurredAt, period } = contextResult.value
+  const { nextSequence, occurredAt, period, elapsedMs } = contextResult.value
   const target = targetResult.value
   const eventIds = options.eventIds ?? []
   const captureState: GameState = state.sportGameState?.sportId === 'basketball'
@@ -850,6 +864,7 @@ export function captureBasketballCourtEvent(
       recorderUserId: options.recorderUserId,
       sequence: nextSequence,
       period,
+      elapsedMs,
       occurredAt,
       teamSide: target.teamSide,
       actors: [actor.value],
@@ -927,6 +942,7 @@ export function captureBasketballCourtEvent(
     recorderUserId: options.recorderUserId,
     sequence: nextSequence,
     period,
+    elapsedMs,
     occurredAt,
     teamSide: target.teamSide,
     location: location.value,
@@ -948,6 +964,7 @@ export function captureBasketballCourtEvent(
       recorderUserId: options.recorderUserId,
       sequence: nextSequence + 1,
       period,
+      elapsedMs,
       occurredAt,
       teamSide: relatedTarget.value.teamSide,
       actors: [assister.value],
@@ -971,6 +988,7 @@ export function captureBasketballCourtEvent(
       recorderUserId: options.recorderUserId,
       sequence: nextSequence + 1,
       period,
+      elapsedMs,
       occurredAt,
       teamSide: relatedTarget.value.teamSide,
       actors: [rebounder.value],
@@ -1029,6 +1047,8 @@ function getBasketballLifecycleContext(
   if (!segment) return commandFailure('invalid_period', 'The current Basketball period is invalid.')
   const timestamp = normalizeBasketballCommandTimestamp(occurredAt)
   if (!timestamp.ok) return timestamp
+  const elapsed = resolveBasketballCommandElapsedMs(state.sportGameState, timestamp.value)
+  if (!elapsed.ok) return elapsed
   return {
     ok: true,
     value: {
@@ -1036,6 +1056,7 @@ function getBasketballLifecycleContext(
       period: { id: segment.id, order: segment.order },
       nextSequence: nextBasketballEventSequence(state.eventStream.events, recorderUserId),
       occurredAt: timestamp.value,
+      elapsedMs: elapsed.value,
     },
   }
 }
@@ -1064,6 +1085,8 @@ function getBasketballTerminalLifecycleContext(
   if (!segment) return commandFailure('invalid_period', 'The current Basketball period is invalid.')
   const timestamp = normalizeBasketballCommandTimestamp(occurredAt)
   if (!timestamp.ok) return timestamp
+  const elapsed = resolveBasketballCommandElapsedMs(state.sportGameState, timestamp.value)
+  if (!elapsed.ok) return elapsed
   return {
     ok: true,
     value: {
@@ -1071,6 +1094,7 @@ function getBasketballTerminalLifecycleContext(
       period: { id: segment.id, order: segment.order },
       nextSequence: nextBasketballEventSequence(state.eventStream.events, recorderUserId),
       occurredAt: timestamp.value,
+      elapsedMs: elapsed.value,
     },
   }
 }
@@ -1138,7 +1162,36 @@ function lifecycleElapsedMs(
   startingPeriod = false
 ): number | null {
   if (!context.sportState.projection.clock) return null
-  return startingPeriod ? 0 : context.sportState.projection.clock.elapsedMs
+  return startingPeriod ? 0 : context.elapsedMs
+}
+
+function resolveBasketballCommandElapsedMs(
+  sportState: BasketballSportGameState,
+  occurredAt: string,
+  allowClockRecovery = false
+): BasketballCommandResult<number | null> {
+  const clock = sportState.projection.clock
+  if (!clock) return { ok: true, value: null }
+  if (!clock.periodId) {
+    return commandFailure('invalid_period', 'The active Basketball clock period is unavailable.')
+  }
+  const segment = resolveBasketballPeriodSegment(sportState.setup.rulesSnapshot, clock.periodId)
+  if (!segment) {
+    return commandFailure('invalid_period', 'The active Basketball clock period is invalid.')
+  }
+  const recoveryIssue = basketballClockRecoveryIssue(clock, occurredAt)
+  if (recoveryIssue) {
+    if (allowClockRecovery) {
+      return { ok: true, value: clock.lastRunningElapsedMs ?? clock.elapsedMs }
+    }
+    return commandFailure('invalid_timestamp', recoveryIssue === 'backward'
+      ? 'Basketball clock timestamp moved backward. Use Set Clock to recover.'
+      : 'Basketball clock was away too long to recover automatically. Use Set Clock.')
+  }
+  const moment = basketballClockMomentAt(clock, occurredAt, segment.durationMs)
+  return moment.ok
+    ? { ok: true, value: moment.elapsedMs }
+    : commandFailure('invalid_timestamp', moment.message)
 }
 
 function appendBasketballLifecycleEvent(
@@ -1323,6 +1376,7 @@ interface StandaloneBasketballStatEventInput {
   recorderUserId: string | null
   sequence: number
   period: GameEventPeriod
+  elapsedMs: number | null
   occurredAt: string
   teamSide: BasketballTeamSide
   actors: GameEventActor[]

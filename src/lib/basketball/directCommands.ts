@@ -93,13 +93,14 @@ export function captureBasketballDirectStat(
   const target = basketballCaptureTargetForPlayerId(state, options.playerId)
   if (!target.ok) return failure(state, target.code, target.message)
 
-  const { nextSequence, occurredAt, period } = guarded.context
+  const { nextSequence, occurredAt, period, elapsedMs } = guarded.context
   const id = options.eventId ?? createBasketballUuid()
   const common = {
     id,
     recorderUserId: options.recorderUserId,
     sequence: nextSequence,
     period,
+    elapsedMs,
     occurredAt,
     teamSide: target.value.teamSide,
   }
@@ -248,6 +249,7 @@ export function decrementBasketballMinutes(
     recorderUserId: options.recorderUserId,
     sequence: guarded.context.nextSequence,
     period: guarded.context.period,
+    elapsedMs: guarded.context.elapsedMs,
     occurredAt: guarded.context.occurredAt,
     teamSide: target.value.teamSide,
     actors: [actor.value],
@@ -295,6 +297,7 @@ export function adjustBasketballScore(
     recorderUserId: options.recorderUserId,
     sequence: guarded.context.nextSequence,
     period: guarded.context.period,
+    elapsedMs: guarded.context.elapsedMs,
     occurredAt: guarded.context.occurredAt,
     teamSide: options.teamSide,
     actors: [actor.value],
@@ -337,6 +340,7 @@ export function captureBasketballStealTurnover(
   const common = {
     recorderUserId: options.recorderUserId,
     period: guarded.context.period,
+    elapsedMs: guarded.context.elapsedMs,
     occurredAt: guarded.context.occurredAt,
   }
   const turnover = createBasketballStatEvent({
@@ -481,6 +485,7 @@ function createRelatedStatEvent(
     recorderUserId: string | null
     sequence: number
     period: { id: string; order: number }
+    elapsedMs: number | null
     occurredAt: string
     teamSide: BasketballTeamSide
   },

@@ -12,7 +12,10 @@ import {
   BASKETBALL_CLOCK_TEXT_MAX_LENGTH,
   createBasketballClockEvent,
 } from './clockEvents'
-import { basketballClockMomentAt } from './clockProjection'
+import {
+  basketballClockMomentAt,
+  basketballClockRecoveryIssue,
+} from './clockProjection'
 import { basketballLineupClockStartError } from './lineupProjection'
 import { createBasketballUuid } from './id'
 import { resolveBasketballPeriodSegment } from './rules'
@@ -123,7 +126,12 @@ export function setBasketballClock(
   state: GameState,
   options: BasketballSetClockOptions
 ): BasketballStateCommandResult {
-  const checked = clockCommandContext(state, options.recorderUserId, options.occurredAt)
+  const checked = clockCommandContext(
+    state,
+    options.recorderUserId,
+    options.occurredAt,
+    true
+  )
   if (!checked.ok) return checked
   const { context, clock, durationMs } = checked
   if (!Number.isInteger(options.elapsedMs) || options.elapsedMs < 0 || options.elapsedMs > durationMs) {
@@ -137,23 +145,41 @@ export function setBasketballClock(
   const captureCommandId = options.captureCommandId ?? createBasketballCaptureCommandId()
   const events = []
   let currentElapsedMs = clock.elapsedMs
+  let commandOccurredAt = context.occurredAt
+  let pauseSource: 'manual' | 'expiration' = 'manual'
   if (clock.running) {
-    const moment = basketballClockMomentAt(clock, context.occurredAt, durationMs)
-    if (!moment.ok) return failure(state, 'invalid_timestamp', moment.message)
-    currentElapsedMs = moment.elapsedMs
+    const recoveryIssue = basketballClockRecoveryIssue(clock, context.occurredAt)
+    if (recoveryIssue) {
+      const recovery = lastKnownGoodBasketballClockMoment(clock)
+      if (!recovery) {
+        return failure(
+          state,
+          'invalid_timestamp',
+          'Basketball clock recovery requires a valid last-known running moment.'
+        )
+      }
+      currentElapsedMs = recovery.elapsedMs
+      commandOccurredAt = recovery.occurredAt
+      pauseSource = currentElapsedMs >= durationMs ? 'expiration' : 'manual'
+    } else {
+      const moment = basketballClockMomentAt(clock, context.occurredAt, durationMs)
+      if (!moment.ok) return failure(state, 'invalid_timestamp', moment.message)
+      currentElapsedMs = moment.elapsedMs
+      pauseSource = moment.unboundedElapsedMs >= durationMs ? 'expiration' : 'manual'
+    }
     events.push(createBasketballClockEvent({
       id: options.pauseEventId ?? createBasketballUuid(),
       eventType: 'basketball.clock_paused',
       payload: {
         captureCommandId,
         elapsedMs: currentElapsedMs,
-        source: moment.unboundedElapsedMs >= durationMs ? 'expiration' : 'manual',
+        source: pauseSource,
       },
       recorderUserId: options.recorderUserId,
       sequence: context.nextSequence,
       period: context.period,
       elapsedMs: currentElapsedMs,
-      occurredAt: context.occurredAt,
+      occurredAt: commandOccurredAt,
     }))
   }
 
@@ -170,7 +196,7 @@ export function setBasketballClock(
     sequence: context.nextSequence + (clock.running ? 1 : 0),
     period: context.period,
     elapsedMs: options.elapsedMs,
-    occurredAt: context.occurredAt,
+    occurredAt: commandOccurredAt,
   }))
   return appendClockEvents(state, events)
 }
@@ -178,12 +204,18 @@ export function setBasketballClock(
 function clockCommandContext(
   state: GameState,
   recorderUserId: string | null,
-  occurredAt?: string
+  occurredAt?: string,
+  allowClockRecovery = false
 ) {
   if (isFinalBasketballCloudGame(state)) {
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
-  const context = getBasketballCommandContext(state, recorderUserId, occurredAt)
+  const context = getBasketballCommandContext(
+    state,
+    recorderUserId,
+    occurredAt,
+    { allowClockRecovery }
+  )
   if (!context.ok) return { ...context, state }
   const clock = context.value.sportState.projection.clock
   if (!clock || !clock.periodId) {
@@ -195,6 +227,25 @@ function clockCommandContext(
   )
   if (!segment) return failure(state, 'invalid_period', 'The active Basketball period is invalid.')
   return { ok: true as const, context: context.value, clock, durationMs: segment.durationMs }
+}
+
+function lastKnownGoodBasketballClockMoment(
+  clock: Parameters<typeof basketballClockRecoveryIssue>[0]
+): { elapsedMs: number; occurredAt: string } | null {
+  if (
+    clock.anchorElapsedMs === null ||
+    clock.anchorOccurredAt === null ||
+    clock.lastRunningElapsedMs === null ||
+    clock.lastRunningElapsedMs < clock.anchorElapsedMs
+  ) return null
+  const anchorMs = Date.parse(clock.anchorOccurredAt)
+  if (!Number.isFinite(anchorMs)) return null
+  return {
+    elapsedMs: clock.lastRunningElapsedMs,
+    occurredAt: new Date(
+      anchorMs + (clock.lastRunningElapsedMs - clock.anchorElapsedMs)
+    ).toISOString(),
+  }
 }
 
 function appendClockEvents(

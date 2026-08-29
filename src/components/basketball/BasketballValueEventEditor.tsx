@@ -14,6 +14,7 @@ import {
   type BasketballValueEventPreview,
 } from '../../lib/basketball/valueEventEditCommands'
 import { basketballShotActorSelectionKey } from '../../lib/basketball/shotEditCommands'
+import BasketballHistoricalTimeField from './BasketballHistoricalTimeField'
 import {
   BasketballEditorErrorMessage,
   BasketballEditorFrame,
@@ -141,10 +142,13 @@ export default function BasketballValueEventEditor(props: Props) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <BasketballEditorSection title={props.mode === 'add' ? 'Recorded later' : 'Adjustment'}>
           {props.mode === 'add' && (
-            <BasketballEditorSelectField label="Period" value={draft.period.id} options={periodOptions} onChange={periodId => {
-              const period = sportState?.projection.periods.find(candidate => candidate.id === periodId)
-              if (period) update({ period: { id: period.id, order: period.order } })
-            }} />
+            <>
+              <BasketballEditorSelectField label="Period" value={draft.period.id} options={periodOptions} onChange={periodId => {
+                const period = sportState?.projection.periods.find(candidate => candidate.id === periodId)
+                if (period) update({ period: { id: period.id, order: period.order } })
+              }} />
+              <BasketballHistoricalTimeField key={draft.period.id} state={state} period={draft.period} elapsedMs={draft.elapsedMs} onChange={elapsedMs => update({ elapsedMs })} />
+            </>
           )}
           <BasketballEditorSegmentedControl label="Team" value={draft.teamSide} options={[
             { value: 'tracked', label: state.gameInfo?.teamName || 'Tracked' },

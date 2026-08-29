@@ -17,6 +17,7 @@ import {
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { createBasketballUuid } from './id'
+import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { basketballRulesAllowOneAndOne } from './rules'
 import {
   basketballShotActorOptions,
@@ -54,6 +55,7 @@ export interface BasketballFoulFreeThrowDraft {
   sourceFingerprint: string
   eventType: BasketballFoulFreeThrowDraftType
   period: { id: string; order: number }
+  elapsedMs: number | null
   teamSide: BasketballTeamSide
   offender: BasketballFoulOffenderDraft
   foulClass: BasketballFoulClass
@@ -243,7 +245,10 @@ export function buildBasketballFoulFreeThrowEditDraft(
   if (!event || !isBasketballEditableFoulFreeThrowEvent(event)) {
     return commandFailure('command_failed', 'This active Basketball foul or free-throw event is unavailable for editing.')
   }
-  const base = defaultDraft(prepared.value.state, event.period, event.teamSide, event.id)
+  const base = {
+    ...defaultDraft(prepared.value.state, event.period, event.teamSide, event.id),
+    elapsedMs: event.elapsedMs,
+  }
   if (event.eventType === 'basketball.foul') {
     const committed = event.actors.find(actor => actor.role === 'committed_by')!
     const drawn = event.actors.find(actor => actor.role === 'drawn_by')
@@ -303,6 +308,8 @@ export function buildBasketballHistoricalFoulFreeThrowDraft(
   const period = sportState.projection.periods.find(candidate => candidate.id === sportState.projection.currentPeriodId) ??
     sportState.projection.periods.find(candidate => sportState.projection.startedPeriodIds.includes(candidate.id))
   if (!period) return commandFailure('invalid_period', 'Start a Basketball period before adding an event.')
+  const time = defaultBasketballHistoricalTime(prepared.value.state, period)
+  if (!time.ok) return commandFailure('invalid_timestamp', time.message)
   const defaultSide: BasketballTeamSide = 'tracked'
   const participant = basketballFoulParticipantOptions(prepared.value.state, defaultSide)[0]?.selection
   const shooter = basketballResolvedPlayerOptions(prepared.value.state, defaultSide)[0]?.selection
@@ -313,6 +320,7 @@ export function buildBasketballHistoricalFoulFreeThrowDraft(
     ok: true,
     value: {
       ...defaultDraft(prepared.value.state, period, defaultSide, createBasketballUuid()),
+      elapsedMs: time.elapsedMs,
       eventType,
       offender: participant?.kind === 'participant' ? participant : { kind: 'team' },
       shooter: shooter ?? { kind: 'team' },
@@ -417,6 +425,10 @@ function buildPlan(
   if (!period || !prepared.state.sportGameState?.projection.startedPeriodIds.includes(period.id)) {
     return commandFailure('invalid_period', 'Select a Basketball period that has already started.')
   }
+  if (mode === 'add') {
+    const time = validateBasketballHistoricalTime(prepared.state, draft.period, draft.elapsedMs)
+    if (!time.ok) return commandFailure('invalid_timestamp', time.message)
+  }
   const existing = mode === 'edit'
     ? prepared.active.find(event => event.id === draft.eventId)
     : null
@@ -460,6 +472,9 @@ function buildFoulPlan(
     incidentId: draft.incidentId.trim() || null,
     countingOverride: override,
     captureCommandId: existing?.payload.captureCommandId ?? (draft.addLinkedTrip ? draft.captureCommandId : null),
+    ...(mode === 'add' || existing?.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   const actors = drawnBy.value ? [offender.value, drawnBy.value] : [offender.value]
   const appendedEvents: BasketballMatchEvent[] = []
@@ -474,6 +489,7 @@ function buildFoulPlan(
       recorderUserId,
       sequence: nextSequence++,
       period: draft.period,
+      elapsedMs: draft.elapsedMs,
       occurredAt,
       teamSide: draft.teamSide,
       actors,
@@ -493,10 +509,12 @@ function buildFoulPlan(
           technical: draft.technical,
           possessionRetained: draft.possessionRetained,
           captureCommandId: draft.captureCommandId,
+          recordedLater: true,
         },
         recorderUserId,
         sequence: nextSequence,
         period: draft.period,
+        elapsedMs: draft.elapsedMs,
         occurredAt,
         teamSide: oppositeSide(draft.teamSide),
       }))
@@ -550,6 +568,9 @@ function buildTripPlan(
     technical: draft.technical,
     possessionRetained: draft.possessionRetained,
     captureCommandId: existing?.payload.captureCommandId ?? null,
+    ...(mode === 'add' || existing?.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   const appendedEvents: BasketballMatchEvent[] = []
   const mutations: GameEventMutation[] = []
@@ -562,6 +583,7 @@ function buildTripPlan(
       recorderUserId,
       sequence: nextBasketballEventSequence(prepared.state.eventStream!.events, recorderUserId),
       period: draft.period,
+      elapsedMs: draft.elapsedMs,
       occurredAt,
       teamSide: draft.teamSide,
     }))
@@ -657,6 +679,9 @@ function buildAttemptPlan(
     freeThrowTripId: trip?.id ?? null,
     tripAttemptNumber: trip ? draft.tripAttemptNumber : null,
     captureCommandId: existing?.payload.captureCommandId ?? null,
+    ...(mode === 'add' || existing?.payload.recordedLater === true
+      ? { recordedLater: true as const }
+      : {}),
   }
   const appendedEvents: BasketballMatchEvent[] = []
   const mutations: GameEventMutation[] = []
@@ -669,6 +694,7 @@ function buildAttemptPlan(
       recorderUserId,
       sequence: nextBasketballEventSequence(prepared.state.eventStream!.events, recorderUserId),
       period: draft.period,
+      elapsedMs: draft.elapsedMs,
       occurredAt,
       teamSide: draft.teamSide,
       actors: [shooter.value],
@@ -1051,6 +1077,7 @@ function defaultDraft(
     sourceFingerprint: eventStreamFingerprint(state),
     eventType: 'basketball.foul',
     period: { id: period.id, order: period.order },
+    elapsedMs: null,
     teamSide,
     offender: offender?.kind === 'participant' ? offender : { kind: 'team' },
     foulClass: 'personal',

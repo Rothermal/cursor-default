@@ -13,6 +13,7 @@ import {
   type BasketballHistoricalRelatedEventType,
 } from '../../lib/basketball/relatedEventEditCommands'
 import { basketballShotActorSelectionKey } from '../../lib/basketball/shotEditCommands'
+import BasketballHistoricalTimeField from './BasketballHistoricalTimeField'
 import {
   BasketballEditorErrorMessage,
   BasketballEditorFrame,
@@ -114,6 +115,7 @@ export default function BasketballHistoricalRelatedEventEditor({ eventType, onCl
             const period = sportState?.projection.periods.find(candidate => candidate.id === periodId)
             if (period) update({ period: { id: period.id, order: period.order } })
           }} />
+          <BasketballHistoricalTimeField key={draft.period.id} state={state} period={draft.period} elapsedMs={draft.elapsedMs} onChange={elapsedMs => update({ elapsedMs })} />
           <BasketballEditorSegmentedControl label={paired ? 'Steal team' : 'Team'} value={draft.teamSide} options={[
             { value: 'tracked', label: state.gameInfo?.teamName || 'Tracked' },
             { value: 'opponent', label: state.gameInfo?.opponentName || 'Opponent' },

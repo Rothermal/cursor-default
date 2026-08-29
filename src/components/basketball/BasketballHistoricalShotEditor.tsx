@@ -20,6 +20,7 @@ import {
   type BasketballShotRelationshipSelection,
 } from '../../lib/basketball/shotEditCommands'
 import BasketballCourt from '../shot-chart/BasketballCourt'
+import BasketballHistoricalTimeField from './BasketballHistoricalTimeField'
 import {
   BasketballEditorErrorMessage,
   BasketballEditorFrame,
@@ -199,6 +200,13 @@ export default function BasketballHistoricalShotEditor({
               const period = sportState?.projection.periods.find(candidate => candidate.id === periodId)
               if (period) update({ period: { id: period.id, order: period.order } })
             }}
+          />
+          <BasketballHistoricalTimeField
+            key={draft.period.id}
+            state={state}
+            period={draft.period}
+            elapsedMs={draft.elapsedMs}
+            onChange={elapsedMs => update({ elapsedMs })}
           />
           <BasketballEditorSegmentedControl
             label="Team"
