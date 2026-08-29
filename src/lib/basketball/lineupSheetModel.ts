@@ -75,7 +75,7 @@ export function buildBasketballLineupSheetModel(
   const outgoingParticipantIds = currentIds.filter(id => !resulting.has(id))
   const incomingParticipantIds = resultingParticipantIds.filter(id => !current.has(id))
   const changed = outgoingParticipantIds.length > 0 || incomingParticipantIds.length > 0
-  const mode = changed
+  const mode = changed || options.substitutionMode === 'current_lineup_recovery'
     ? options.substitutionMode ?? deriveBasketballLiveSubstitutionMode(
         outgoingParticipantIds.length,
         incomingParticipantIds.length
@@ -106,6 +106,8 @@ export function buildBasketballLineupSheetModel(
     validationMessage = 'Change at least one participant before committing.'
   } else if (changed && !mode) {
     validationMessage = 'A swap must add and remove the same number of participants.'
+  } else if (!reasonRequired && (reasonCode || reasonNote.trim())) {
+    validationMessage = 'This lineup transition does not accept a reason.'
   } else if (reasonRequired && !reasonCode) {
     validationMessage = 'Select a reason for this lineup transition.'
   } else if (!reasonCode && reasonNote.trim()) {

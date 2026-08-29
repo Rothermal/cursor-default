@@ -103,6 +103,8 @@ function detailHeading(review: BasketballTimelineEventReview): string {
   if (review.event.eventType === 'basketball.foul') return 'Foul ruling'
   if (review.event.eventType === 'basketball.free_throw_trip') return 'Award'
   if (review.event.eventType === 'basketball.score_adjustment') return 'Adjustment'
+  if (review.event.eventType === 'basketball.substitution') return 'Lineup transition'
+  if (review.event.eventType === 'basketball.role_changed') return 'Role history'
   if (review.event.eventType === 'basketball.minutes_adjustment') return 'Minutes'
   if (review.event.eventType === 'basketball.ejection') return 'Ejection ruling'
   if (review.event.eventType === 'basketball.timeout') return 'Timeout'
@@ -149,6 +151,18 @@ function detailValue(review: BasketballTimelineEventReview): string {
   if (event.eventType === 'basketball.timeout') {
     const owner = event.teamSide === 'neutral' ? 'game administration' : 'charged timeout'
     return `${event.payload.label || event.payload.kind.replace(/_/g, ' ')} | ${owner}`
+  }
+  if (event.eventType === 'basketball.substitution') {
+    const reason = event.payload.reasonCode
+      ? ` | ${event.payload.reasonCode.replace(/_/g, ' ')}${event.payload.reasonNote ? `: ${event.payload.reasonNote}` : ''}`
+      : ''
+    return `${event.payload.mode.replace(/_/g, ' ')} | ${event.payload.participantIds.length} on court${reason}`
+  }
+  if (event.eventType === 'basketball.role_changed') {
+    return event.payload.changes.map(change => {
+      const position = change.position ?? 'No position'
+      return `${change.participantId}: ${position}${change.captain ? ', Captain' : ''}`
+    }).join(' | ')
   }
   return review.relationshipLabels.length > 0 ? review.relationshipLabels.join(' | ') : 'Standalone event'
 }

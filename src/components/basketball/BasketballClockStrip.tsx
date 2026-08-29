@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Clock3, Pause, Play, Settings2, Users } from 'lucide-react'
 import type { GameState } from '../../types'
 import type { BasketballDeviceSettings } from '../../lib/settingsStorage'
@@ -13,13 +13,11 @@ import {
 } from '../../lib/basketball/clockProjection'
 import {
   confirmBasketballBoundaryLineup,
-  substituteBasketballLineup,
+  updateBasketballLineup,
 } from '../../lib/basketball/lineupCommands'
 import { isBasketballMatchRulesV3, resolveBasketballPeriodSegment } from '../../lib/basketball/rules'
 import type { BasketballStoppageCategory, BasketballTeamSide } from '../../lib/basketball/types'
-import BasketballLineupSheet, {
-  type BasketballLineupSheetCommit,
-} from './BasketballLineupSheet'
+import type { BasketballLineupSheetCommit } from './BasketballLineupSheet'
 import BasketballBoundaryReviewDialog, {
   type BasketballBoundaryReviewCommit,
 } from './BasketballBoundaryReviewDialog'
@@ -34,17 +32,25 @@ const STOPPAGE_OPTIONS: Array<{ value: BasketballStoppageCategory; label: string
   { value: 'other', label: 'Other' },
 ]
 
+const BasketballLineupSheet = lazy(() => import('./BasketballLineupSheet'))
+
 export default function BasketballClockStrip({
   state,
   recorderUserId,
   settings,
   canOverrideEqualPlay,
+  requestedLineupSide = null,
+  onRequestedLineupOpened,
+  onAddParticipant,
   onState,
 }: {
   state: GameState
   recorderUserId: string | null
   settings: BasketballDeviceSettings
   canOverrideEqualPlay: boolean
+  requestedLineupSide?: BasketballTeamSide | null
+  onRequestedLineupOpened?: () => void
+  onAddParticipant?: (teamSide: BasketballTeamSide) => void
   onState: (state: GameState) => void
 }) {
   const stateRef = useRef(state)
@@ -201,6 +207,16 @@ export default function BasketballClockStrip({
     side => lineupSides?.[side]?.boundaryConfirmationRequired
   )
 
+  useEffect(() => {
+    if (!requestedLineupSide || !clock || clock.running || recoveryIssue) return
+    if (!lineupSides?.[requestedLineupSide]) return
+    setShowSetClock(false)
+    setShowStoppage(false)
+    setLineupError(null)
+    setLineupSide(requestedLineupSide)
+    onRequestedLineupOpened?.()
+  }, [clock, lineupSides, onRequestedLineupOpened, recoveryIssue, requestedLineupSide])
+
   if (!anchored || !clock || !segment || !display || !rules || !isBasketballMatchRulesV3(rules)) {
     return null
   }
@@ -293,12 +309,14 @@ export default function BasketballClockStrip({
   }
 
   const handleLineupCommit = (input: BasketballLineupSheetCommit) => {
-    const result = substituteBasketballLineup(stateRef.current, {
+    const result = updateBasketballLineup(stateRef.current, {
       recorderUserId,
       teamSide: input.teamSide,
       participantIds: input.participantIds,
+      mode: input.mode,
       reasonCode: input.reasonCode,
       reasonNote: input.reasonNote,
+      roleChanges: input.roleChanges,
       occurredAt: new Date().toISOString(),
     })
     if (!result.ok) {
@@ -491,13 +509,20 @@ export default function BasketballClockStrip({
         </div>
       </section>
       {lineupSide && (
-        <BasketballLineupSheet
-          state={state}
-          initialSide={lineupSide}
-          errorMessage={lineupError}
-          onCommit={handleLineupCommit}
-          onClose={closeLineup}
-        />
+        <Suspense fallback={null}>
+          <BasketballLineupSheet
+            state={state}
+            initialSide={lineupSide}
+            errorMessage={lineupError}
+            onAddParticipant={onAddParticipant ? side => {
+              setLineupSide(null)
+              setLineupError(null)
+              onAddParticipant(side)
+            } : undefined}
+            onCommit={handleLineupCommit}
+            onClose={closeLineup}
+          />
+        </Suspense>
       )}
       {boundaryReviewOpen && pendingSides.length > 0 && (
         <BasketballBoundaryReviewDialog

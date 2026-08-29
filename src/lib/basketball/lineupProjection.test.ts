@@ -23,11 +23,13 @@ import {
   changeBasketballParticipantRoles,
   confirmBasketballBoundaryLineup,
   substituteBasketballLineup,
+  updateBasketballLineup,
 } from './lineupCommands'
 import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
 import { createBasketballSportGameState } from './state'
 import type {
   BasketballEqualPlayPolicy,
+  BasketballMatchEvent,
   BasketballMatchParticipant,
   BasketballMatchRulesV3,
   BasketballMatchSetupV2,
@@ -112,6 +114,69 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       position: 'Center',
       captain: true,
     })
+  })
+
+  it('commits substitution then role changes in one atomic capture group', () => {
+    const state = anchoredState()
+    const result = updateBasketballLineup(state, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      roleChanges: [
+        { participantId: 'tracked-2', position: 'PG', captain: true },
+        { participantId: 'tracked-6', position: 'Stretch Five', captain: true },
+      ],
+      occurredAt: after(1_000),
+      eventId: uuid(905),
+      captureCommandId: uuid(906),
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const events = result.state.eventStream!.events.slice(-2) as BasketballMatchEvent[]
+    expect(events.map(event => event.eventType)).toEqual([
+      'basketball.substitution',
+      'basketball.role_changed',
+    ])
+    expect(events.map(event => event.payload.captureCommandId)).toEqual([uuid(906), uuid(906)])
+    expect(events.map(event => event.occurredAt)).toEqual([after(1_000), after(1_000)])
+    expect(events[1].sequence).toBe(events[0].sequence + 1)
+    expect(basketballProjection(result.state).participants['tracked-2']).toMatchObject({
+      position: 'PG',
+      captain: true,
+    })
+    expect(basketballProjection(result.state).participants['tracked-6']).toMatchObject({
+      position: 'Stretch Five',
+      captain: true,
+    })
+  })
+
+  it('supports role-only preset, custom, none, and zero or multiple captains', () => {
+    const state = requireState(changeBasketballParticipantRoles(anchoredState(), {
+      recorderUserId,
+      teamSide: 'tracked',
+      changes: [
+        { participantId: 'tracked-1', position: 'PG', captain: true },
+        { participantId: 'tracked-2', position: 'Point Forward', captain: true },
+        { participantId: 'tracked-3', position: null, captain: false },
+      ],
+      occurredAt: after(1_000),
+    }))
+    expect(basketballProjection(state).participants['tracked-1']).toMatchObject({ position: 'PG', captain: true })
+    expect(basketballProjection(state).participants['tracked-2']).toMatchObject({ position: 'Point Forward', captain: true })
+    expect(basketballProjection(state).participants['tracked-3']).toMatchObject({ position: null, captain: false })
+
+    const cleared = requireState(changeBasketballParticipantRoles(state, {
+      recorderUserId,
+      teamSide: 'tracked',
+      changes: [
+        { participantId: 'tracked-1', position: null, captain: false },
+        { participantId: 'tracked-2', position: null, captain: false },
+      ],
+      occurredAt: after(2_000),
+    }))
+    expect(Object.values(basketballProjection(cleared).participants)
+      .filter(participant => participant.teamSide === 'tracked' && participant.captain)).toHaveLength(0)
   })
 
   it('derives the live transition mode, stores one structured event, and clears quick Undo', () => {
@@ -401,6 +466,53 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     expect(trackedLineup(recovered).onCourtIntervals[1].complete).toBe(false)
     expect(Object.values(trackedLineup(recovered).participationByParticipantId)
       .every(value => !value.complete)).toBe(true)
+  })
+
+  it('keeps a late participant on the bench until an ordinary substitution enters them', () => {
+    const state = anchoredState()
+    const beforeCount = state.eventStream!.events.length
+    const added = requireState(addBasketballLateParticipant(state, {
+      recorderUserId,
+      teamSide: 'tracked',
+      displayName: 'Late Bench Player',
+      participantId: 'tracked-late-bench',
+      playerId: 'player-late-bench',
+      occurredAt: after(1_000),
+      eventId: uuid(907),
+    }))
+    expect(added.eventStream!.events).toHaveLength(beforeCount + 1)
+    expect(trackedLineup(added).currentParticipantIds).toEqual(trackedStarterIds())
+    expect(trackedLineup(added).participationByParticipantId['tracked-late-bench'].started).toBe(false)
+
+    const entered = requireState(substituteBasketballLineup(added, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-late-bench'],
+      occurredAt: after(2_000),
+    }))
+    expect(trackedLineup(entered).currentParticipantIds).toContain('tracked-late-bench')
+  })
+
+  it('reasserts the same current five without degrading earlier periods or the other side', () => {
+    const secondPeriod = nextPeriodState(anchoredState({ opponent: true }))
+    const currentId = periodId(secondPeriod)
+    const recovered = requireState(updateBasketballLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: trackedStarterIds(),
+      mode: 'current_lineup_recovery',
+      reasonCode: 'recovery',
+      reasonNote: 'Recorder resumed after an uncertain stoppage',
+      occurredAt: after(21_000),
+      eventId: uuid(908),
+    }))
+    const tracked = trackedLineup(recovered)
+    const opponent = basketballProjection(recovered).lineup!.sides.opponent!
+    expect(tracked.incompletePeriodIds).toEqual([currentId])
+    expect(tracked.onCourtIntervals.filter(interval => interval.periodId !== currentId)
+      .every(interval => interval.complete)).toBe(true)
+    expect(opponent.incompletePeriodIds).toEqual([])
+    expect(opponent.onCourtIntervals.every(interval => interval.complete)).toBe(true)
   })
 
   it('keeps opponent authority optional and derives it independently when supplied', () => {

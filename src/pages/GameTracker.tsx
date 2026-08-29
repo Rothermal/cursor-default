@@ -203,6 +203,8 @@ export default function GameTracker() {
   const [showRecentEvents, setShowRecentEvents] = useState(false)
   const [eventCorrectionError, setEventCorrectionError] = useState<string | null>(null)
   const [lateParticipantError, setLateParticipantError] = useState<string | null>(null)
+  const [lateParticipantReturnSide, setLateParticipantReturnSide] = useState<BasketballTeamSide | null>(null)
+  const [requestedLineupSide, setRequestedLineupSide] = useState<BasketballTeamSide | null>(null)
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [directCaptureError, setDirectCaptureError] = useState<string | null>(null)
   const [showScoreCorrection, setShowScoreCorrection] = useState(false)
@@ -962,6 +964,8 @@ export default function GameTracker() {
     setLifecycleError(null)
     setShowAddPlayer(false)
     setShowAllShots(false)
+    if (lateParticipantReturnSide) setRequestedLineupSide(input.teamSide)
+    setLateParticipantReturnSide(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
@@ -1145,6 +1149,13 @@ export default function GameTracker() {
           recorderUserId={user?.id ?? null}
           settings={basketballDeviceSettings}
           canOverrideEqualPlay={!state.cloudSync.teamId || canTrackGames(teamAccess.role)}
+          requestedLineupSide={requestedLineupSide}
+          onRequestedLineupOpened={() => setRequestedLineupSide(null)}
+          onAddParticipant={teamSide => {
+            setLateParticipantReturnSide(teamSide)
+            setLateParticipantError(null)
+            setShowAddPlayer(true)
+          }}
           onState={next => dispatch({ type: 'HYDRATE_STATE', state: next })}
         />
       )}
@@ -1209,6 +1220,7 @@ export default function GameTracker() {
         onAddPlayer={isBasketballEventMode
           ? basketballMatchOpen
             ? () => {
+                setLateParticipantReturnSide(null)
                 setLateParticipantError(null)
                 setShowAddPlayer(true)
               }
@@ -1718,6 +1730,7 @@ export default function GameTracker() {
           errorMessage={lateParticipantError}
           onAdd={handleAddBasketballParticipant}
           onClose={() => {
+            setLateParticipantReturnSide(null)
             setLateParticipantError(null)
             setShowAddPlayer(false)
           }}
@@ -1836,6 +1849,7 @@ export default function GameTracker() {
             })
             setFreeThrowError(null)
             setActiveFreeThrowTrip(null)
+            setLateParticipantReturnSide(null)
             setLateParticipantError(null)
             setShowAddPlayer(true)
           }}
