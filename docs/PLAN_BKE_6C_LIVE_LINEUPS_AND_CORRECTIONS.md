@@ -121,10 +121,16 @@ lineup events.
 - Reuse `substituteBasketballLineup` as the checked authority and add a command composer only where
   one user commit must append multiple events. One command gets one timestamp, elapsed value,
   capture-command id, candidate rebuild, and undo boundary.
-- Preserve the existing substitution payload as a compatibility form. If structured reason code and
-  note fields are added, accept the exact historical form and the exact new form explicitly, project
-  them to one normalized reason model, and add round-trip fixtures. Do not parse arbitrary display
-  strings to recover authority.
+- Finalize the exact lineup-family payload contracts before the first production substitution,
+  role-change, or equal-play-override emitter. Those three families have no shipped user data, so
+  C1 updates their registered test-only shapes directly instead of retaining the current reason
+  string as a permanent compatibility form. Substitution stores the approved structured reason code
+  and bounded note without parsing display strings back into authority.
+- Add one explicit exact `recordedLater: true` payload form for each lineup family while retaining
+  the ordinary live form without the marker. The already-shipped three-key `lineup_confirmed` form
+  must continue to validate exactly; the other three families may move directly to their final
+  forms. C1 does not emit historical lineup events, but it locks the payload shape once so C4 does
+  not require a second schema transition.
 - Derive `balanced`, `exit_only`, and `entry_only` from the previous and resulting lineup. The UI
   does not choose a contradictory mode. `boundary` and `current_lineup_recovery` remain explicit
   specialized workflows owned by later slices.
@@ -154,7 +160,8 @@ lineup events.
 
 - pure sheet-model tests for tracked/opponent, current/bench/ineligible, balanced, exit-only,
   entry-only, one-through-four, zero, duplicate, wrong-side, and more-than-five candidates;
-- checked command tests for one timestamp/capture group/rebuild and structured reason compatibility;
+- checked command tests for one timestamp/capture group/rebuild, final structured reason payloads,
+  exact live/recorded-later forms, and shipped `lineup_confirmed` compatibility;
 - replacement-required players remaining active until explicit exit;
 - paused-only behavior and no implicit clock event;
 - source-contract tests that the clock strip mounts one shared sheet and clockless/Legacy paths do
@@ -266,6 +273,15 @@ lineup events.
 - Edit may change resulting lineup, mode/reason, effective period time, role values, boundary
   candidate, or override reason within the event family's authority. It may not move events across
   lifecycle boundaries, change sport/side/recorder identity, or rewrite setup.
+- C4 adds all four lineup families to the explicit recorded-later clock contract. A marked
+  historical correction may target a started current period at or before its authoritative
+  watermark or a completed period within segment bounds; an unmarked live lineup event still
+  requires the active paused period.
+- Accepting the marker is not enough: add a deterministic lineup-history replay path that applies
+  marked historical lineup effects at their effective period/elapsed position and then re-derives
+  later lineups, role history, intervals, boundary state, equal-play state, and completeness. The
+  generic event stream and non-lineup projection retain recorder capture order; a late sequence may
+  never cause a backdated substitution to mutate only the present lineup.
 - Removal/restoration includes every event in the user capture group when separating the group would
   leave false authority. Dependency-aware cleanup may repair exact stale links, but it never deletes
   unrelated later events merely to force validity.
@@ -295,6 +311,10 @@ lineup events.
 - edit/remove/restore with stale preview, later valid history, invalid final candidate, and exact
   one-rebuild assertions;
 - count-up/count-down historical time conversion and segment bounds;
+- recorded-later exact-key round trips, current-watermark/completed-period acceptance, unmarked
+  historical rejection, deterministic same-moment ordering, and no present-only lineup mutation;
+- backdated known-time substitutions across later substitutions, period boundaries, role changes,
+  confirmations, and equal-play overrides with exact interval/minute consequences;
 - interval/minute before/after consequences, incomplete recovery, and replacement diagnostics;
 - terminal/local-only mutation policy and quick-Undo receipt clearing;
 - full hydration/reprojection, parking/import/export, and mixed-sport compatibility suites; and
