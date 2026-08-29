@@ -39,8 +39,15 @@ export type BasketballSubstitutionMode =
   | 'balanced'
   | 'exit_only'
   | 'entry_only'
+  | 'mixed'
   | 'boundary'
   | 'current_lineup_recovery'
+export type BasketballSubstitutionReasonCode =
+  | 'injury'
+  | 'eligibility'
+  | 'short_handed'
+  | 'recovery'
+  | 'other'
 export type BasketballEqualPlayViolationCode =
   | 'minimum_periods'
   | 'maximum_consecutive_periods'
@@ -392,7 +399,8 @@ export interface BasketballRoleHistoryEntry {
 export interface BasketballLineupSideProjection {
   teamSide: BasketballTeamSide
   currentParticipantIds: string[]
-  currentShortHandedReason: string | null
+  currentShortHandedReasonCode: BasketballSubstitutionReasonCode | null
+  currentShortHandedReasonNote: string | null
   boundaryConfirmationRequired: boolean
   boundaryConfirmedPeriodId: string | null
   clockStartedInPeriod: boolean
@@ -551,7 +559,8 @@ export interface BasketballSubstitutionPayload extends BasketballCapturePayload 
   captureCommandId: string
   participantIds: string[]
   mode: BasketballSubstitutionMode
-  reason: string | null
+  reasonCode: BasketballSubstitutionReasonCode | null
+  reasonNote: string | null
 }
 
 export interface BasketballRoleChange extends JsonObject {

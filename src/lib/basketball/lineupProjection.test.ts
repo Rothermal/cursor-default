@@ -114,6 +114,48 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     })
   })
 
+  it('derives the live transition mode, stores one structured event, and clears quick Undo', () => {
+    const state = anchoredState()
+    if (state.sportGameState?.sportId !== 'basketball') throw new Error('Expected Basketball state')
+    state.sportGameState.capturePreferences.lastCourtUndo = {
+      kind: 'capture_undo',
+      createdAt: baseTime,
+      entries: [{
+        eventId: uuid(900),
+        expectedRevision: 2,
+        action: 'restore',
+        previousRelatedEventId: null,
+        previousAttemptNumber: null,
+      }],
+    }
+    const beforeCount = state.eventStream!.events.length
+    const result = substituteBasketballLineup(state, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      occurredAt: after(1_000),
+      eventId: uuid(901),
+      captureCommandId: uuid(902),
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.state.sportGameState?.sportId !== 'basketball') return
+    expect(result.state.eventStream!.events).toHaveLength(beforeCount + 1)
+    const appendedEvent = result.state.eventStream!.events[result.state.eventStream!.events.length - 1]
+    expect(appendedEvent).toMatchObject({
+      id: uuid(901),
+      eventType: 'basketball.substitution',
+      occurredAt: after(1_000),
+      payload: {
+        captureCommandId: uuid(902),
+        mode: 'balanced',
+        reasonCode: null,
+        reasonNote: null,
+      },
+    })
+    expect(result.state.sportGameState.capturePreferences.lastCourtUndo).toBeNull()
+  })
+
   it('supports reasoned short-handed exit and entry transitions', () => {
     const state = anchoredState()
     expect(substituteBasketballLineup(state, {
@@ -128,25 +170,59 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       teamSide: 'tracked',
       participantIds: ['tracked-1', 'tracked-2', 'tracked-3', 'tracked-4'],
       mode: 'exit_only',
-      reason: 'Player receiving treatment',
+      reasonCode: 'injury',
+      reasonNote: 'Player receiving treatment',
       occurredAt: after(2_000),
     }))
     expect(trackedLineup(shortHanded)).toMatchObject({
       currentParticipantIds: ['tracked-1', 'tracked-2', 'tracked-3', 'tracked-4'],
-      currentShortHandedReason: 'Player receiving treatment',
+      currentShortHandedReasonCode: 'injury',
+      currentShortHandedReasonNote: 'Player receiving treatment',
     })
     const restored = requireState(substituteBasketballLineup(shortHanded, {
       recorderUserId,
       teamSide: 'tracked',
       participantIds: trackedStarterIds(),
       mode: 'entry_only',
-      reason: 'Player cleared to return',
+      reasonCode: 'recovery',
+      reasonNote: 'Player cleared to return',
       occurredAt: after(3_000),
     }))
     expect(trackedLineup(restored)).toMatchObject({
       currentParticipantIds: trackedStarterIds(),
-      currentShortHandedReason: null,
+      currentShortHandedReasonCode: null,
+      currentShortHandedReasonNote: null,
     })
+  })
+
+  it('captures unequal mixed entries and exits as one truthful substitution', () => {
+    const state = anchoredState()
+    const beforeCount = state.eventStream!.events.length
+    const mixed = requireState(substituteBasketballLineup(state, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-6'],
+      reasonCode: 'injury',
+      reasonNote: 'One ejection and one injury at the same dead ball',
+      occurredAt: after(1_000),
+      eventId: uuid(903),
+      captureCommandId: uuid(904),
+    }))
+
+    expect(mixed.eventStream!.events).toHaveLength(beforeCount + 1)
+    expect(mixed.eventStream!.events[mixed.eventStream!.events.length - 1]).toMatchObject({
+      id: uuid(903),
+      eventType: 'basketball.substitution',
+      payload: {
+        captureCommandId: uuid(904),
+        participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-6'],
+        mode: 'mixed',
+        reasonCode: 'injury',
+        reasonNote: 'One ejection and one injury at the same dead ball',
+      },
+    })
+    expect(trackedLineup(mixed).currentParticipantIds)
+      .toEqual(['tracked-2', 'tracked-3', 'tracked-4', 'tracked-6'])
   })
 
   it('rejects duplicate, wrong-side, and impossible substitution lineups', () => {
@@ -235,7 +311,6 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       teamSide: 'tracked',
       participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
       mode: 'boundary',
-      reason: 'Scheduled rotation',
       occurredAt: after(22_000),
       eventId: uuid(32),
     }))
@@ -322,7 +397,8 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       teamSide: 'tracked',
       participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-late'],
       mode: 'current_lineup_recovery',
-      reason: 'Recovered operator state',
+      reasonCode: 'recovery',
+      reasonNote: 'Recovered operator state',
       occurredAt: after(2_000),
       eventId: uuid(51),
     }))

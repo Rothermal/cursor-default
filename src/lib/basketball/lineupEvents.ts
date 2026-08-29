@@ -3,6 +3,11 @@ import type { GameEvent, GameEventPeriod, JsonObject } from '../gameEvents/types
 import type { GameEventDefinition } from '../gameEvents/registry'
 import { BASKETBALL_CLOCK_TEXT_MAX_LENGTH } from './clockEvents'
 import { createBasketballUuid } from './id'
+import {
+  basketballSubstitutionRequiresReason,
+  isBasketballSubstitutionMode,
+  isBasketballSubstitutionReasonCode,
+} from './lineupTransitions'
 import type {
   BasketballEqualPlayOverridePayload,
   BasketballLineupConfirmedPayload,
@@ -94,24 +99,34 @@ function definition(
 }
 
 function validateLineupConfirmed(payload: JsonObject): boolean {
-  return hasExactKeys(payload, ['captureCommandId', 'participantIds', 'boundaryPeriodId']) &&
+  return hasExactKeysWithRecordedLater(
+    payload,
+    ['captureCommandId', 'participantIds', 'boundaryPeriodId']
+  ) &&
     isNonEmptyString(payload.captureCommandId) &&
     isParticipantIds(payload.participantIds) &&
     isNonEmptyString(payload.boundaryPeriodId)
 }
 
 function validateSubstitution(payload: JsonObject): boolean {
-  if (!hasExactKeys(payload, ['captureCommandId', 'participantIds', 'mode', 'reason']) ||
+  if (!hasExactKeysWithRecordedLater(
+    payload,
+    ['captureCommandId', 'participantIds', 'mode', 'reasonCode', 'reasonNote']
+  ) ||
       !isNonEmptyString(payload.captureCommandId) ||
       !isParticipantIds(payload.participantIds) ||
-      !['balanced', 'exit_only', 'entry_only', 'boundary', 'current_lineup_recovery']
-        .includes(String(payload.mode)) ||
-      !(payload.reason === null || isBoundedText(payload.reason))) return false
-  return payload.mode === 'balanced' || payload.reason !== null
+      !isBasketballSubstitutionMode(payload.mode) ||
+      !(payload.reasonCode === null || isBasketballSubstitutionReasonCode(payload.reasonCode)) ||
+      !(payload.reasonNote === null || isBoundedText(payload.reasonNote))) return false
+  if (payload.reasonCode === null && payload.reasonNote !== null) return false
+  if (payload.reasonCode === 'other' && payload.reasonNote === null) return false
+  return basketballSubstitutionRequiresReason(payload.mode, payload.participantIds.length)
+    ? payload.reasonCode !== null
+    : payload.reasonCode === null && payload.reasonNote === null
 }
 
 function validateRoleChanged(payload: JsonObject): boolean {
-  if (!hasExactKeys(payload, ['captureCommandId', 'changes']) ||
+  if (!hasExactKeysWithRecordedLater(payload, ['captureCommandId', 'changes']) ||
       !isNonEmptyString(payload.captureCommandId) ||
       !Array.isArray(payload.changes) || payload.changes.length === 0) return false
   const ids = new Set<string>()
@@ -127,7 +142,7 @@ function validateRoleChanged(payload: JsonObject): boolean {
 }
 
 function validateEqualPlayOverride(payload: JsonObject): boolean {
-  return hasExactKeys(payload, [
+  return hasExactKeysWithRecordedLater(payload, [
     'captureCommandId',
     'boundaryPeriodId',
     'candidateParticipantIds',
@@ -157,6 +172,15 @@ function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<
   const actual = Object.keys(value).sort()
   const expected = [...keys].sort()
   return actual.length === expected.length && actual.every((key, index) => key === expected[index])
+}
+
+function hasExactKeysWithRecordedLater(
+  value: unknown,
+  keys: readonly string[]
+): value is Record<string, unknown> {
+  if (hasExactKeys(value, keys)) return true
+  return hasExactKeys(value, [...keys, 'recordedLater']) &&
+    value.recordedLater === true
 }
 
 function isBoundedPosition(value: unknown): value is string {
