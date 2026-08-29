@@ -71,7 +71,7 @@ export default function PlayerProfile() {
   const seasonIdFromUrl = searchParams.get('seasonId')
 
   const { user, isConfigured } = useAuth()
-  const { state, openGameSnapshot, parkingError } = useGame()
+  const { state, openGameSnapshot, parkingError, prepareActiveGameMutation } = useGame()
   const supabaseClient = supabase
 
   const [team, setTeam] = useState<TeamRow | null>(null)
@@ -279,10 +279,6 @@ export default function PlayerProfile() {
 
   const handleViewGame = async (gameId: string) => {
     if (!user) return
-    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
-    if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
-      return
-    }
     setError(null)
     setLoadingGameId(gameId)
 
@@ -328,6 +324,10 @@ export default function PlayerProfile() {
       },
     }
 
+    if (!prepareActiveGameMutation('resume_commit')) {
+      setLoadingGameId(null)
+      return
+    }
     if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
       setLoadingGameId(null)
       return

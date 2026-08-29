@@ -58,6 +58,7 @@ export default function SportDashboard() {
     parkedGames,
     parkingError,
     clearParkingError,
+    prepareActiveGameMutation,
     startNewGame,
     resumeParkedGame,
     discardParkedGame,
@@ -135,12 +136,7 @@ export default function SportDashboard() {
       navigate('/setup?sport=basketball')
       return
     }
-    if (
-      hasActiveGame &&
-      !window.confirm(`Park your current game and start a new ${sport.name} game?`)
-    ) {
-      return
-    }
+    if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
     if (!startNewGame(sport)) return
     navigate('/setup')
   }
@@ -148,6 +144,7 @@ export default function SportDashboard() {
   const handleResumeParked = (localGameId: string) => {
     setDashboardError(null)
     clearParkingError()
+    if (!prepareActiveGameMutation('resume_commit')) return
     const resumed = resumeParkedGame(localGameId)
     if (!resumed) {
       setDashboardError('That parked game could not be loaded.')

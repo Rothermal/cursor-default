@@ -29,6 +29,7 @@ export default function BasketballLifecycleControls({
   )
   const tied = projection.score.tracked === projection.score.opponent
   const nextLabel = nextPeriodLabel(sportState)
+  const clockRunning = projection.clock?.running === true
 
   return (
     <section aria-label="Basketball game lifecycle" className="mt-3 border-y border-slate-200 bg-white px-3 py-2.5">
@@ -85,11 +86,23 @@ export default function BasketballLifecycleControls({
 
       {(projection.status === 'in_progress' || projection.status === 'period_break') && (
         <div className="mt-2 flex justify-end gap-2 border-t border-slate-100 pt-2">
-          <button type="button" onClick={onSuspend} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700">
+          <button
+            type="button"
+            onClick={onSuspend}
+            disabled={clockRunning}
+            title={clockRunning ? 'Pause the clock before suspending the game' : undefined}
+            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <Pause size={15} aria-hidden />
             Suspend
           </button>
-          <button type="button" onClick={onAbandon} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700">
+          <button
+            type="button"
+            onClick={onAbandon}
+            disabled={clockRunning}
+            title={clockRunning ? 'Pause the clock before abandoning the game' : undefined}
+            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <Ban size={15} aria-hidden />
             Abandon
           </button>

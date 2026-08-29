@@ -20,7 +20,7 @@ describe('Basketball release entry guards', () => {
     const capabilityIndex = handler.indexOf('await ensureBasketballReleaseCapabilities')
 
     expect(capabilityIndex).toBeGreaterThanOrEqual(0)
-    expect(capabilityIndex).toBeLessThan(handler.indexOf('window.confirm'))
+    expect(capabilityIndex).toBeLessThan(handler.indexOf('prepareActiveGameMutation'))
     expect(capabilityIndex).toBeLessThan(handler.indexOf('startNewGame(sport)'))
     expect(capabilityIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
     expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_CLOUD_SYNC_STATE'"))
@@ -96,7 +96,7 @@ describe('Basketball release entry guards', () => {
     const basketballEntry = between(
       handler,
       "if (sport.id === 'basketball') {",
-      '\n    if (\n      hasActiveGame'
+      '\n    if (hasActiveGame && !prepareActiveGameMutation'
     )
 
     expect(basketballEntry).toContain("navigate('/setup?sport=basketball')")
@@ -119,7 +119,7 @@ describe('Basketball release entry guards', () => {
     expect(setup).toContain('saveBasketballSetupDraft(currentBasketballDraft)')
     expect(handler).toContain('commitGameSetup(')
     expect(handler).toContain(
-      "hasActiveGame &&\n        !window.confirm('Park your current game and continue with this Basketball setup?')"
+      "hasActiveGame && !prepareActiveGameMutation('setup_replace_commit')"
     )
   })
 
@@ -206,7 +206,7 @@ describe('Basketball release entry guards', () => {
 
     expect(guardIndex).toBeGreaterThanOrEqual(0)
     expect(guardIndex).toBeLessThan(handler.indexOf('await ensureBasketballReleaseCapabilities'))
-    expect(guardIndex).toBeLessThan(handler.indexOf('window.confirm'))
+    expect(guardIndex).toBeLessThan(handler.indexOf('prepareActiveGameMutation'))
     expect(guardIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
     expect(guardIndex).toBeLessThan(handler.indexOf('commitGameSetup('))
     expect(context).toContain('loadSettingsFromStorage().basketball.eventTrackerPreviewEnabled')
@@ -287,5 +287,29 @@ describe('Basketball release entry guards', () => {
     expect(displayTimer).not.toContain('onState(')
     expect(displayTimer).not.toContain('dispatch(')
     expect(tracker).toContain("basketballSportState?.projection.clock && action.id === 'min'")
+  })
+
+  it('centralizes park and replacement preparation before active-game mutation', () => {
+    const context = source('src/context/GameContext.tsx')
+    const policy = source('src/lib/basketball/productionClockPolicy.ts')
+    const guardedPages = [
+      'src/pages/BasketballSummary.tsx',
+      'src/pages/CareerStats.tsx',
+      'src/pages/Games.tsx',
+      'src/pages/GameInfo.tsx',
+      'src/pages/GameSetup.tsx',
+      'src/pages/GameSummary.tsx',
+      'src/pages/PlayerProfile.tsx',
+      'src/pages/SoccerSummary.tsx',
+      'src/pages/SportDashboard.tsx',
+      'src/pages/TeamInfo.tsx',
+    ].map(source)
+
+    expect(context).toContain('const prepareActiveGameMutation = useCallback(')
+    expect(context).toContain("'The Basketball clock is running. Pause and continue?'")
+    expect(context).toContain('pauseRunningBasketballClockForWorkflow(current, action')
+    expect(context).toContain('blockUnpreparedRunningClock')
+    expect(policy).toContain("basketballWorkflowActionKind(action) === 'park_or_replace'")
+    expect(guardedPages.every(page => page.includes('prepareActiveGameMutation'))).toBe(true)
   })
 })

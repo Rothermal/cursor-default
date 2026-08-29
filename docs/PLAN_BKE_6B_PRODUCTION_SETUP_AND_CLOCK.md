@@ -1,7 +1,8 @@
 # Plan: BKE-6B Production Setup and Live Clock
 
-Status: BKE-6B1 through BKE-6B3 are implemented. BKE-6B4 production-clock exit is next. The BKE-6 product Q&A
-is complete and introduces no open product decisions for this phase.
+Status: BKE-6B1 through BKE-6B4 are implemented. The production-clock phase is complete; BKE-6C
+owns live lineup workflows. The BKE-6 product Q&A is complete and introduces no open product
+decisions for this phase.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 

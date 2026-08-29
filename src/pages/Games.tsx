@@ -100,6 +100,7 @@ export default function Games() {
     activeLocalGameId,
     parkedGames,
     openGameSnapshot,
+    prepareActiveGameMutation,
     resumeParkedGame,
     parkingError,
   } = useGame()
@@ -413,7 +414,7 @@ export default function Games() {
         if (
           hasActiveGame &&
           activeLocalGameId !== source.localGameId &&
-          !window.confirm('Park your current game and resume this local recorder stream?')
+          !prepareActiveGameMutation('resume_commit')
         ) {
           setLoadingGameId(null)
           return
@@ -450,7 +451,7 @@ export default function Games() {
         setLoadingGameId(null)
         return
       }
-      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+      if (hasActiveGame && !prepareActiveGameMutation('resume_commit')) {
         setLoadingGameId(null)
         return
       }
@@ -525,7 +526,7 @@ export default function Games() {
           if (
             hasActiveGame &&
             activeLocalGameId !== source.localGameId &&
-            !window.confirm('Park your current game and resume this local recorder stream?')
+            !prepareActiveGameMutation('resume_commit')
           ) {
             setLoadingGameId(null)
             return
@@ -560,7 +561,7 @@ export default function Games() {
           setLoadingGameId(null)
           return
         }
-        if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+        if (hasActiveGame && !prepareActiveGameMutation('resume_commit')) {
           setLoadingGameId(null)
           return
         }
@@ -579,10 +580,6 @@ export default function Games() {
       : game.created_by === userId
     if (game.status !== 'final' && !canTrackCurrentGame) {
       if (game.team_id) navigate(gameInfoPath(game.id, game.team_id))
-      return
-    }
-    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
-    if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
       return
     }
     setError(null)
@@ -635,6 +632,10 @@ export default function Games() {
       },
     }
 
+    if (!prepareActiveGameMutation('resume_commit')) {
+      setLoadingGameId(null)
+      return
+    }
     if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
       setLoadingGameId(null)
       return
