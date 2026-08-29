@@ -127,8 +127,6 @@ function workflowConfirmationMessage(action: BasketballWorkflowAction): string {
       return 'Park the current game and start another?'
     case 'resume_commit':
       return 'Park the current game and open the selected game?'
-    case 'import_commit':
-      return 'Park the current game and import another game?'
     case 'setup_visit':
     case 'setup_edit':
     case 'setup_cancel':

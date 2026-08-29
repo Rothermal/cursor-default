@@ -50,7 +50,6 @@ describe('BKE-6B1 production clock policy', () => {
     expect(basketballWorkflowActionKind('route_navigation')).toBe('mutation_free')
     expect(basketballWorkflowActionKind('park_commit')).toBe('park_or_replace')
     expect(basketballWorkflowActionKind('resume_commit')).toBe('park_or_replace')
-    expect(basketballWorkflowActionKind('import_commit')).toBe('park_or_replace')
   })
 
   it('intercepts mutating actions only for a running anchored Basketball clock', () => {

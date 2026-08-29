@@ -16,7 +16,9 @@ Plan: [PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md](PLAN_BKE_6B_PRODUCTION_SETUP_A
 - End Period appends the canonical Pause and Period End in one candidate rebuild and capture group;
 - the next period starts paused at elapsed zero, with Clock Start remaining explicit;
 - Suspend and Abandon are disabled and command-rejected while the anchored clock is running; and
-- unchanged route/tab/setup-draft navigation, browser reload anchor recovery, and parked-only import.
+- unchanged route/tab/setup-draft navigation and browser reload anchor recovery; and
+- audited parked-only import, which preserves `activeLocalGameId` and therefore does not replace or
+  park the running active game.
 
 No Supabase migration, anchored cloud lifecycle, live substitutions, changed-five boundary review,
 equal-play override workflow, Timeline clock correction, or lineup correction is included.
@@ -26,7 +28,7 @@ equal-play override workflow, Timeline clock correction, or lineup correction is
 | Gate | Result |
 |---|---|
 | `pnpm.cmd typecheck` | Pass |
-| `pnpm.cmd test` | Pass: 172 files, 1,208 tests |
+| `pnpm.cmd test` | Pass: 172 files, 1,209 tests |
 | `pnpm.cmd lint` | Pass: 0 errors, 6 existing Fast Refresh warnings |
 | `pnpm.cmd build` | Pass |
 | `git diff --check` | Pass |
@@ -40,6 +42,7 @@ Focused coverage includes:
 - running-clock terminal rejection and disabled terminal buttons;
 - centralized caller coverage across setup, sport/team entry, summaries, cloud game review, player
   history, local resume, and explicit parking; and
+- anchored local-only games cannot offer or invoke the pre-BKE-6D cloud-enable transaction; and
 - compatibility source contracts for the release/capability guards that precede replacement.
 
 ## Manual Matrix

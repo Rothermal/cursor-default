@@ -14,6 +14,12 @@ import {
   ensureBasketballReleaseCapabilities,
   type BasketballReleaseCapabilityResult,
 } from './releaseCapabilities'
+import { isBasketballMatchRulesV3 } from './rules'
+import type {
+  BasketballMatchRulesV1,
+  BasketballMatchRulesV2,
+  BasketballMatchRulesV3,
+} from './types'
 
 export interface EnableBasketballEventCloudInput {
   state: GameState
@@ -58,7 +64,8 @@ export function canOfferBasketballEventCloudEnable(
   ) return false
 
   try {
-    assertHealthyBasketballEventGame(state)
+    const sportState = assertHealthyBasketballEventGame(state)
+    if (isAnchoredCloudEnableBlocked(sportState.setup.rulesSnapshot)) return false
   } catch {
     return false
   }
@@ -85,6 +92,9 @@ export async function enableBasketballEventCloud(
   }
 
   const sportState = assertHealthyBasketballEventGame(state)
+  if (isAnchoredCloudEnableBlocked(sportState.setup.rulesSnapshot)) {
+    throw new Error('Anchored Basketball cloud sync is unavailable until BKE-6D.')
+  }
   if (!state.eventStream?.events.length || state.eventStream.events.some(event =>
     !isGameEventEnvelope(event) ||
     event.sportId !== 'basketball' ||
@@ -149,6 +159,12 @@ export async function enableBasketballEventCloud(
     },
   }
   return { state: nextState, cloudGameId: synced.gameId }
+}
+
+function isAnchoredCloudEnableBlocked(
+  rules: BasketballMatchRulesV1 | BasketballMatchRulesV2 | BasketballMatchRulesV3
+): boolean {
+  return isBasketballMatchRulesV3(rules) && rules.clockModel === 'anchored'
 }
 
 function hasCloudBindingMetadata(state: GameState): boolean {
