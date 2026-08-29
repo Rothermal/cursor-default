@@ -70,6 +70,7 @@ export default function TeamInfo() {
   const { isSportEnabled } = useSettings()
   const {
     state: gameState,
+    prepareActiveGameMutation,
     startNewGame,
     parkingError,
   } = useGame()
@@ -154,12 +155,7 @@ export default function TeamInfo() {
     setStartGameError(null)
     setOfferLocalSoccer(false)
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
-    if (
-      hasActiveGame &&
-      !window.confirm('Park your current game and start a local Soccer match?')
-    ) {
-      return
-    }
+    if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
     if (!startNewGame(sport)) return
     navigate('/setup')
   }
@@ -205,12 +201,7 @@ export default function TeamInfo() {
       return
     }
     const hasActiveGame = Boolean(gameState.sport && gameState.players.length > 0)
-    if (
-      hasActiveGame &&
-      !window.confirm('Park your current game and start this team game?')
-    ) {
-      return
-    }
+    if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
 
     if (!startNewGame(sport)) {
       return

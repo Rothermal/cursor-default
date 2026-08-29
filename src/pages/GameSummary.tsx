@@ -37,7 +37,7 @@ type CheckoutsByPlayerMap = Record<string, CheckoutOption[]>
 
 export default function GameSummary() {
   const navigate = useNavigate()
-  const { state, parkCurrentGame, parkingError } = useGame()
+  const { state, parkCurrentGame, parkingError, prepareActiveGameMutation } = useGame()
   const { user } = useAuth()
   const { sport, gameInfo, players, opponentScore, homeTeamScore, homeScoreAdjustment, shotChart } = state
   const {
@@ -528,9 +528,7 @@ export default function GameSummary() {
 
   const handleNewGame = () => {
     setNewGameError(null)
-    if (!window.confirm('Park this game and start another?')) {
-      return
-    }
+    if (!prepareActiveGameMutation('park_commit')) return
     if (!parkCurrentGame()) {
       return
     }

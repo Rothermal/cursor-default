@@ -9,6 +9,8 @@ import {
   enableBasketballEventCloud,
   type EnableBasketballEventCloudDependencies,
 } from './enableCloudSync'
+import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
+import type { BasketballMatchParticipant } from './types'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
 const readyCapabilities = {
@@ -26,8 +28,17 @@ const readyCapabilities = {
   },
 }
 
-function localOnlyState(sourceTeam = false): GameState {
+function localOnlyState(sourceTeam = false, anchored = false): GameState {
   const base = createInitialState()
+  const trackedPlayers = Array.from({ length: 5 }, (_, index) => ({
+    id: `player-${index + 1}`,
+    name: `Player ${index + 1}`,
+    number: String(index + 1),
+    stats: {},
+  }))
+  const participantIds = trackedPlayers.map((_, index) =>
+    `70000000-0000-4000-8000-${String(index + 101).padStart(12, '0')}`
+  )
   const initial: GameState = {
     ...base,
     gameDataAuthority: 'sport_events',
@@ -42,18 +53,47 @@ function localOnlyState(sourceTeam = false): GameState {
     players: [
       { id: TEAM_PLAYER_HOME_ID, name: 'Aces Team', number: '', stats: {}, isTeamPlayer: true },
       { id: TEAM_PLAYER_OPP_ID, name: 'Bears Team', number: '', stats: {}, isTeamPlayer: true },
-      { id: 'player-1', name: 'Alex One', number: '4', stats: {} },
-      { id: 'player-2', name: 'Blake Two', number: '12', stats: {} },
+      ...trackedPlayers,
     ],
   }
+  const participants: BasketballMatchParticipant[] = trackedPlayers.map((player, index) => ({
+    id: participantIds[index],
+    playerId: player.id,
+    displayName: player.name,
+    number: player.number,
+    teamSide: 'tracked',
+    initialStatus: 'starter',
+    position: null,
+    captain: index === 0,
+  }))
+  const v2Rules = getBasketballRulesProfile('nfhs', 1)!.rules
   const started = prepareBasketballGameStart(initial, {
     recorderUserId: 'user-1',
     occurredAt: '2026-08-25T12:00:00.000Z',
     eventId: '70000000-0000-4000-8000-000000000001',
-    participantIds: [
-      '70000000-0000-4000-8000-000000000101',
-      '70000000-0000-4000-8000-000000000102',
-    ],
+    participantIds: anchored ? undefined : participantIds,
+    reviewedSetup: anchored
+      ? {
+          rulesSnapshot: upgradeBasketballRulesDraftToV3(v2Rules, 'nfhs'),
+          rulesSource: {
+            profileId: 'nfhs',
+            profileVersion: 1,
+            personalRevision: null,
+            teamRevision: null,
+            hasExplicitMatchOverrides: false,
+          },
+          sourceTeamId: null,
+          sourceSeasonId: null,
+          courtOrientation: 'standard',
+          version3Setup: {
+            participants,
+            openingLineups: {
+              tracked: { participantIds, shortHandedReason: null },
+              opponent: null,
+            },
+          },
+        }
+      : undefined,
   })
   if (!started.ok || started.state.sportGameState?.sportId !== 'basketball') {
     throw new Error(started.ok ? 'missing Basketball state' : started.message)
@@ -128,6 +168,21 @@ describe('Basketball local-only cloud enable', () => {
     const malformed = localOnlyState()
     Object.assign(malformed.cloudSync, { eventCloudPolicy: 'unexpected' })
     expect(canOfferBasketballEventCloudEnable(malformed, 'user-1')).toBe(false)
+  })
+
+  it('blocks anchored games at both offer and command layers until BKE-6D', async () => {
+    const state = localOnlyState(false, true)
+    const deps = dependencies()
+
+    expect(canOfferBasketballEventCloudEnable(state, 'user-1')).toBe(false)
+    await expect(enableBasketballEventCloud({
+      state,
+      userId: 'user-1',
+      localGameId: 'local-1',
+    }, deps)).rejects.toThrow('BKE-6D')
+    expect(deps.loadAppAccess).not.toHaveBeenCalled()
+    expect(deps.loadCapabilities).not.toHaveBeenCalled()
+    expect(deps.sync).not.toHaveBeenCalled()
   })
 
   it('fresh-checks access and capability before returning a confirmed automatic binding', async () => {

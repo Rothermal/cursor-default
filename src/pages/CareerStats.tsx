@@ -44,7 +44,7 @@ export default function CareerStats() {
   const isAggregateDestination = isSoccerDestination || isBasketballDestination
 
   const { isConfigured, user } = useAuth()
-  const { state, openGameSnapshot, parkingError } = useGame()
+  const { state, openGameSnapshot, parkingError, prepareActiveGameMutation } = useGame()
   const supabaseClient = supabase
   const userId = user?.id ?? null
 
@@ -315,10 +315,6 @@ export default function CareerStats() {
   const openGameSummary = useCallback(
     async (gameId: string) => {
       if (!userId || !sportConfig || !supabaseClient) return
-      const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
-      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
-        return
-      }
       const cloudGame = await loadCloudGameById(userId, gameId).catch(() => null)
       if (!cloudGame) return
       await touchCloudGameLastOpened(cloudGame.gameId).catch(() => {})
@@ -350,12 +346,13 @@ export default function CareerStats() {
           lastSyncedGameFingerprint: null,
         },
       }
+      if (!prepareActiveGameMutation('resume_commit')) return
       if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
         return
       }
       navigate('/summary')
     },
-    [userId, sportConfig, supabaseClient, state, openGameSnapshot, navigate]
+    [userId, sportConfig, supabaseClient, state, openGameSnapshot, prepareActiveGameMutation, navigate]
   )
 
   if (!playerId) {

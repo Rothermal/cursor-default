@@ -1,6 +1,10 @@
 import type { GameState } from '../../types'
+import { pauseBasketballClock } from './clockCommands'
 import { isBasketballMatchRulesV3 } from './rules'
-import type { BasketballMatchRulesV2, BasketballMatchRulesV3 } from './types'
+import type {
+  BasketballMatchRulesV2,
+  BasketballMatchRulesV3,
+} from './types'
 
 export type BasketballAnchoredSetupBlockReason =
   | 'equal_play_requires_bke_6c'
@@ -64,7 +68,6 @@ export type BasketballWorkflowAction =
   | 'setup_replace_commit'
   | 'new_game_commit'
   | 'resume_commit'
-  | 'import_commit'
 
 export function basketballWorkflowActionKind(
   action: BasketballWorkflowAction
@@ -80,7 +83,6 @@ export function basketballWorkflowActionKind(
     case 'setup_replace_commit':
     case 'new_game_commit':
     case 'resume_commit':
-    case 'import_commit':
       return 'park_or_replace'
   }
 }
@@ -91,4 +93,15 @@ export function shouldInterceptRunningBasketballClock(
 ): boolean {
   return isRunningAnchoredBasketballGame(state) &&
     basketballWorkflowActionKind(action) === 'park_or_replace'
+}
+
+export function pauseRunningBasketballClockForWorkflow(
+  state: GameState,
+  action: BasketballWorkflowAction,
+  options: { recorderUserId: string | null; occurredAt?: string }
+) {
+  if (!shouldInterceptRunningBasketballClock(state, action)) {
+    return { ok: true as const, state }
+  }
+  return pauseBasketballClock(state, options)
 }

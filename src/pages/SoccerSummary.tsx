@@ -50,6 +50,7 @@ export default function SoccerSummary() {
     activeLocalGameId,
     parkedGames,
     openGameSnapshot,
+    prepareActiveGameMutation,
     resumeParkedGame,
     flushCloudGameSync,
     markEventCloudGameReopened,
@@ -359,7 +360,7 @@ export default function SoccerSummary() {
     if (matchingParked) {
       if (
         activeLocalGameId !== matchingParked.localGameId &&
-        !window.confirm('Park the current game and resume this soccer recorder stream?')
+        !prepareActiveGameMutation('resume_commit')
       ) return
       if (!resumeParkedGame(matchingParked.localGameId)) return
       navigate('/game')
@@ -379,13 +380,9 @@ export default function SoccerSummary() {
       setRefreshError('Your recorder stream is not available to resume.')
       return
     }
-    const hasActiveGame = Boolean(
-      state.sport && (state.gameInfo || state.players.length > 0)
-    )
     if (
-      hasActiveGame &&
       state.cloudSync.gameId !== cloudGameId &&
-      !window.confirm('Park the current game and open your soccer recorder stream?')
+      !prepareActiveGameMutation('resume_commit')
     ) return
     if (!openGameSnapshot(recorderState)) return
     navigate('/game')

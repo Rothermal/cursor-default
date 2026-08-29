@@ -37,6 +37,7 @@ export default function BasketballSummary() {
     state,
     activeLocalGameId,
     parkedGames,
+    prepareActiveGameMutation,
     resumeParkedGame,
   } = useGame()
   const [source, setSource] = useState<BasketballSummarySource | null>(null)
@@ -59,15 +60,13 @@ export default function BasketballSummary() {
 
   const openOwnedRecording = useCallback(() => {
     if (!ownedLocalGameId) return
-    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
     if (
       activeLocalGameId !== ownedLocalGameId &&
-      hasActiveGame &&
-      !window.confirm('Park your current game and resume this owned Basketball recording?')
+      !prepareActiveGameMutation('resume_commit')
     ) return
     if (activeLocalGameId !== ownedLocalGameId && !resumeParkedGame(ownedLocalGameId)) return
     navigate('/game')
-  }, [activeLocalGameId, navigate, ownedLocalGameId, resumeParkedGame, state])
+  }, [activeLocalGameId, navigate, ownedLocalGameId, prepareActiveGameMutation, resumeParkedGame])
 
   const refresh = useCallback(async (showLoading = false) => {
     const requestId = ++requestIdRef.current

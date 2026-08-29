@@ -17,12 +17,18 @@ import {
   deriveBasketballClockDisplay,
   recordBasketballRunningClockMomentAfterEvent,
 } from './clockProjection'
-import { captureBasketballCourtEvent } from './commands'
+import {
+  captureBasketballCourtEvent,
+  endBasketballPeriod,
+  startNextBasketballPeriod,
+  suspendBasketballMatch,
+} from './commands'
 import { captureBasketballDirectStat } from './directCommands'
 import { captureBasketballOfficialEjection } from './ejectionCommands'
 import { createBasketballLifecycleEvent } from './events'
 import { captureBasketballFoul } from './foulFreeThrowCommands'
 import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
+import { pauseRunningBasketballClockForWorkflow } from './productionClockPolicy'
 import { createBasketballSportGameState } from './state'
 import { createBasketballStatEvent } from './statEvents'
 import {
@@ -32,6 +38,7 @@ import {
 } from './shotEditCommands'
 import { captureBasketballTimeout } from './timeoutCommands'
 import type {
+  BasketballMatchEvent,
   BasketballMatchParticipant,
   BasketballMatchSetupV1,
   BasketballMatchSetupV2,
@@ -444,6 +451,76 @@ describe('BKE-6A2 Basketball anchored clock projection', () => {
       },
     })
     expect(projection.clock?.lastRunningElapsedMs).toBe(0)
+  })
+
+  it('pauses through the centralized park-or-replace workflow preparation', () => {
+    const started = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(85),
+    }))
+    const prepared = pauseRunningBasketballClockForWorkflow(started, 'park_commit', {
+      recorderUserId,
+      occurredAt: isoAfter(periodStart, 5_000),
+    })
+    expect(prepared.ok).toBe(true)
+    if (!prepared.ok) return
+    expect(clockOf(prepared.state)).toMatchObject({ running: false, elapsedMs: 5_000 })
+    const events = prepared.state.eventStream?.events as BasketballMatchEvent[] | undefined
+    expect(events ? events[events.length - 1] : undefined).toMatchObject({
+      eventType: 'basketball.clock_paused',
+      elapsedMs: 5_000,
+    })
+  })
+
+  it('atomically pauses on period end, opens the next period paused, and blocks running terminal actions', () => {
+    const started = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: periodStart,
+      eventId: uuid(86),
+    }))
+    const suspended = suspendBasketballMatch(started, {
+      recorderUserId,
+      occurredAt: isoAfter(periodStart, 4_000),
+      eventId: uuid(87),
+    })
+    expect(suspended).toMatchObject({
+      ok: false,
+      message: 'Pause the Basketball clock before ending the game.',
+    })
+
+    const ended = endBasketballPeriod(started, {
+      recorderUserId,
+      occurredAt: isoAfter(periodStart, 5_000),
+      eventId: uuid(88),
+    })
+    expect(ended.ok).toBe(true)
+    if (!ended.ok || ended.state.sportGameState?.sportId !== 'basketball') return
+    const [pause, periodEnd] = (
+      ended.state.eventStream!.events as BasketballMatchEvent[]
+    ).slice(-2)
+    expect([pause.eventType, periodEnd.eventType]).toEqual([
+      'basketball.clock_paused',
+      'basketball.period_ended',
+    ])
+    expect(pause.payload.captureCommandId).toBe(periodEnd.payload.captureCommandId)
+    expect(pause.payload.captureCommandId).not.toBeNull()
+    expect(ended.state.sportGameState.projection).toMatchObject({
+      status: 'period_break',
+      clock: { running: false, elapsedMs: 5_000 },
+    })
+
+    const next = startNextBasketballPeriod(ended.state, {
+      recorderUserId,
+      occurredAt: isoAfter(periodStart, 6_000),
+      eventId: uuid(89),
+    })
+    expect(next.ok).toBe(true)
+    if (!next.ok || next.state.sportGameState?.sportId !== 'basketball') return
+    expect(next.state.sportGameState.projection).toMatchObject({
+      status: 'in_progress',
+      clock: { running: false, elapsedMs: 0 },
+    })
   })
 
   it('classifies backward and excessive wall-clock recovery boundaries', () => {

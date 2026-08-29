@@ -32,6 +32,11 @@ import {
   syncBasketballEventGameToCloud,
 } from '../lib/basketball/cloudSync'
 import { enableBasketballEventCloud } from '../lib/basketball/enableCloudSync'
+import {
+  pauseRunningBasketballClockForWorkflow,
+  shouldInterceptRunningBasketballClock,
+  type BasketballWorkflowAction,
+} from '../lib/basketball/productionClockPolicy'
 import { resolveEventConflictInState } from '../lib/gameEvents/eventConflictResolution'
 import { eventCloudTransportAdapterForSport } from '../lib/eventCloudTransportAdapters'
 import { supabase } from '../lib/supabase'
@@ -111,6 +116,25 @@ const CLOUD_SYNC_STATUSES: CloudSyncStatus[] = [
   'synced',
   'error',
 ]
+
+function workflowConfirmationMessage(action: BasketballWorkflowAction): string {
+  switch (action) {
+    case 'park_commit':
+      return 'Park the current game and continue?'
+    case 'setup_replace_commit':
+      return 'Park the current game and continue with this setup?'
+    case 'new_game_commit':
+      return 'Park the current game and start another?'
+    case 'resume_commit':
+      return 'Park the current game and open the selected game?'
+    case 'setup_visit':
+    case 'setup_edit':
+    case 'setup_cancel':
+    case 'route_navigation':
+    case 'workspace_tab':
+      return 'Continue?'
+  }
+}
 
 function normalizeCloudStatus(value: unknown, fallback: CloudSyncStatus): CloudSyncStatus {
   if (typeof value === 'string' && CLOUD_SYNC_STATUSES.includes(value as CloudSyncStatus)) {
@@ -313,6 +337,7 @@ interface GameContextType {
   parkedGames: ParkedGameSummary[]
   parkingError: string | null
   clearParkingError: () => void
+  prepareActiveGameMutation: (action: BasketballWorkflowAction) => boolean
   startNewGame: (sport: SportConfig) => boolean
   commitGameSetup: (
     nextState: GameState,
@@ -443,8 +468,49 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [isConfigured, isOnline, userId])
 
+  const prepareActiveGameMutation = useCallback(
+    (action: BasketballWorkflowAction) => {
+      const current = stateRef.current
+      const hasActiveGame = Boolean(
+        current.sport &&
+        (current.gameInfo || current.players.length > 0 || current.eventStream || current.sportGameState)
+      )
+      if (!hasActiveGame) return true
+
+      const runningClock = shouldInterceptRunningBasketballClock(current, action)
+      const message = runningClock
+        ? 'The Basketball clock is running. Pause and continue?'
+        : workflowConfirmationMessage(action)
+      if (!window.confirm(message)) return false
+      if (!runningClock) return true
+
+      const paused = pauseRunningBasketballClockForWorkflow(current, action, {
+        recorderUserId: userId,
+      })
+      if (!paused.ok) {
+        setParkingError(paused.message)
+        return false
+      }
+      stateRef.current = paused.state
+      dispatch({ type: 'HYDRATE_STATE', state: paused.state })
+      setParkingError(null)
+      return true
+    },
+    [userId]
+  )
+
+  const blockUnpreparedRunningClock = useCallback(
+    (action: BasketballWorkflowAction) => {
+      if (!shouldInterceptRunningBasketballClock(stateRef.current, action)) return false
+      setParkingError('Pause the running Basketball clock before parking or opening another game.')
+      return true
+    },
+    []
+  )
+
   const startNewGame = useCallback(
     (sport: SportConfig) => {
+      if (blockUnpreparedRunningClock('new_game_commit')) return false
       try {
         saveActiveGameState(stateRef.current, userId)
         beginNewActiveParkedGame(userId)
@@ -458,7 +524,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return false
       }
     },
-    [userId]
+    [blockUnpreparedRunningClock, userId]
   )
 
   const commitGameSetup = useCallback(
@@ -466,6 +532,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
       nextState: GameState,
       expectedLocalGameId: string | null = null
     ): CommitGameSetupResult => {
+      if (
+        !expectedLocalGameId &&
+        blockUnpreparedRunningClock('setup_replace_commit')
+      ) {
+        return {
+          ok: false,
+          reason: 'Pause the running Basketball clock before replacing this game.',
+        }
+      }
       try {
         const committed = commitGameSetupState(
           stateRef.current,
@@ -491,11 +566,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return { ok: false, reason }
       }
     },
-    [userId]
+    [blockUnpreparedRunningClock, userId]
   )
 
   const openGameSnapshot = useCallback(
     (nextState: GameState) => {
+      if (blockUnpreparedRunningClock('resume_commit')) return false
       let createdLocalGameId: string | null = null
       let previousActiveLocalGameId: string | null = null
       try {
@@ -534,10 +610,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return false
       }
     },
-    [userId]
+    [blockUnpreparedRunningClock, userId]
   )
 
   const parkCurrentGame = useCallback(() => {
+    if (blockUnpreparedRunningClock('park_commit')) return false
     try {
       saveActiveGameState(stateRef.current, userId)
       setParkedGames(parkActiveGame(userId))
@@ -549,10 +626,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setParkingError(parkedGameStorageErrorMessage(error))
       return false
     }
-  }, [userId])
+  }, [blockUnpreparedRunningClock, userId])
 
   const resumeParkedGame = useCallback(
     (localGameId: string) => {
+      if (
+        getActiveLocalGameId(userId) !== localGameId &&
+        blockUnpreparedRunningClock('resume_commit')
+      ) return null
       try {
         saveActiveGameState(stateRef.current, userId)
         const nextState = activateParkedGame(localGameId, userId)
@@ -568,7 +649,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return null
       }
     },
-    [userId]
+    [blockUnpreparedRunningClock, userId]
   )
 
   const discardParkedGame = useCallback(
@@ -1263,6 +1344,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         parkedGames,
         parkingError,
         clearParkingError: () => setParkingError(null),
+        prepareActiveGameMutation,
         startNewGame,
         commitGameSetup,
         openGameSnapshot,

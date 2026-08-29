@@ -88,6 +88,7 @@ export default function GameSetup() {
     dispatch,
     activeLocalGameId,
     commitGameSetup,
+    prepareActiveGameMutation,
     startNewGame,
     parkingError,
   } = useGame()
@@ -351,10 +352,7 @@ export default function GameSetup() {
           requestedTeamId !== state.cloudSync.teamId
       )
       if (sportMismatch || (teamMismatch && hasActiveGame)) {
-        if (
-          hasActiveGame &&
-          !window.confirm('Park your current game and start this team game?')
-        ) {
+        if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) {
           navigate(sportDashboardPath(requestedSport.id))
           return
         }
@@ -372,7 +370,7 @@ export default function GameSetup() {
       cancelled = true
     }
     // Re-run on sport/team/roster identity only — not every local stat tick.
-  }, [dispatch, isCloudFlow, isSportEnabled, navigate, requestedSportId, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
+  }, [dispatch, isCloudFlow, isSportEnabled, navigate, prepareActiveGameMutation, requestedSportId, requestedTeamId, sport?.id, startNewGame, state.cloudSync.teamId, state.players.length, state.sport, userId])
 
   useEffect(() => {
     if (!sport || !isCloudFlow || !userId) return
@@ -902,12 +900,7 @@ export default function GameSetup() {
     const requestedSport = sports.find(item => item.id === requestedLocalFallbackSportId)
     if (!requestedSport) return
     const hasActiveGame = Boolean(state.sport && state.players.length > 0)
-    if (
-      hasActiveGame &&
-      !window.confirm(`Park your current game and start a local ${requestedSport.name} match?`)
-    ) {
-      return
-    }
+    if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
     if (!startNewGame(requestedSport)) return
     setRequestedLocalFallbackSportId(null)
     navigate('/setup', { replace: true })
@@ -1036,12 +1029,7 @@ export default function GameSetup() {
         )
         return
       }
-      if (
-        hasActiveGame &&
-        !window.confirm('Park your current game and continue with this Basketball setup?')
-      ) {
-        return
-      }
+      if (hasActiveGame && !prepareActiveGameMutation('setup_replace_commit')) return
     }
 
     const nextTeamId = teamMode === 'existing' ? selectedTeamId || null : null
@@ -1049,12 +1037,7 @@ export default function GameSetup() {
     // Switching cloud teams must not keep the prior gameId/roster (same-name teams
     // previously slipped past SET_GAME_INFO's teamName-only clear).
     if (!isBasketballSetup && teamIdChanging && (hasActiveGame || state.cloudSync.gameId)) {
-      if (
-        hasActiveGame &&
-        !window.confirm('Park your current game and switch teams?')
-      ) {
-        return
-      }
+      if (hasActiveGame && !prepareActiveGameMutation('new_game_commit')) return
       if (!startNewGame(sport)) {
         return
       }

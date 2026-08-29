@@ -63,7 +63,7 @@ describe('SOC-6E1 release entry guards', () => {
     const handler = between(teamInfo, 'const handleStartGame = async () => {', '\n  useEffect(')
     const capabilityIndex = handler.indexOf('await ensureSoccerReleaseCapabilities')
     expect(capabilityIndex).toBeGreaterThanOrEqual(0)
-    expect(capabilityIndex).toBeLessThan(handler.indexOf('window.confirm'))
+    expect(capabilityIndex).toBeLessThan(handler.indexOf('prepareActiveGameMutation'))
     expect(capabilityIndex).toBeLessThan(handler.indexOf('startNewGame(sport)'))
   })
 
@@ -76,7 +76,7 @@ describe('SOC-6E1 release entry guards', () => {
     )
     const capabilityIndex = loader.indexOf('await ensureSoccerReleaseCapabilities')
     expect(capabilityIndex).toBeGreaterThanOrEqual(0)
-    expect(capabilityIndex).toBeLessThan(loader.indexOf('window.confirm'))
+    expect(capabilityIndex).toBeLessThan(loader.indexOf('prepareActiveGameMutation'))
     expect(capabilityIndex).toBeLessThan(loader.indexOf('startNewGame(requestedSport)'))
   })
 

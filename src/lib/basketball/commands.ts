@@ -25,6 +25,7 @@ import {
   type BasketballCourtPoint,
 } from './courtGeometry'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
+import { createBasketballClockEvent } from './clockEvents'
 import { basketballClockMomentAt, basketballClockRecoveryIssue } from './clockProjection'
 import { createBasketballLifecycleEvent } from './events'
 import { createBasketballUuid } from './id'
@@ -659,20 +660,52 @@ export function endBasketballPeriod(
   if (context.value.sportState.projection.status !== 'in_progress') {
     return failure(state, 'invalid_period', 'Only an active Basketball period can end.')
   }
-  const event = createBasketballLifecycleEvent({
+  const clock = context.value.sportState.projection.clock
+  const captureCommandId = clock?.running ? createBasketballCaptureCommandId() : null
+  const events: BasketballMatchEvent[] = []
+  if (clock?.running) {
+    const segment = resolveBasketballPeriodSegment(
+      context.value.sportState.setup.rulesSnapshot,
+      context.value.period.id
+    )
+    if (!segment) {
+      return failure(state, 'invalid_period', 'The active Basketball period is invalid.')
+    }
+    const moment = basketballClockMomentAt(
+      clock,
+      context.value.occurredAt,
+      segment.durationMs
+    )
+    if (!moment.ok) return failure(state, 'invalid_timestamp', moment.message)
+    events.push(createBasketballClockEvent({
+      id: createBasketballUuid(),
+      eventType: 'basketball.clock_paused',
+      payload: {
+        captureCommandId,
+        elapsedMs: moment.elapsedMs,
+        source: moment.unboundedElapsedMs >= segment.durationMs ? 'expiration' : 'manual',
+      },
+      recorderUserId: options.recorderUserId,
+      sequence: context.value.nextSequence,
+      period: context.value.period,
+      elapsedMs: moment.elapsedMs,
+      occurredAt: context.value.occurredAt,
+    }))
+  }
+  events.push(createBasketballLifecycleEvent({
     id: options.eventId,
     eventType: 'basketball.period_ended',
-    payload: { periodId: context.value.period.id, captureCommandId: null },
+    payload: { periodId: context.value.period.id, captureCommandId },
     recorderUserId: options.recorderUserId,
-    sequence: context.value.nextSequence,
+    sequence: context.value.nextSequence + (clock?.running ? 1 : 0),
     period: context.value.period,
     elapsedMs: lifecycleElapsedMs(context.value),
     occurredAt: context.value.occurredAt,
-  })
-  return appendBasketballLifecycleEvent(
+  }))
+  return appendBasketballLifecycleEvents(
     state,
     clearBasketballUndoReceipt(state),
-    event,
+    events,
     'Basketball period end did not produce a complete event projection.'
   )
 }
@@ -1113,6 +1146,9 @@ function endBasketballMatchLocally(
     options.occurredAt
   )
   if (!context.ok) return { ...context, state }
+  if (context.value.sportState.projection.clock?.running) {
+    return failure(state, 'command_failed', 'Pause the Basketball clock before ending the game.')
+  }
   const event = createBasketballLifecycleEvent({
     id: options.eventId,
     eventType: 'basketball.match_ended',
@@ -1201,6 +1237,23 @@ function appendBasketballLifecycleEvent(
   incompleteMessage: string
 ): BasketballStateCommandResult {
   const appended = addGameEvent(candidateState, event, gameEventRegistry, gameEventProjectors)
+  if (!appended.ok || !appended.inspection.complete) {
+    return failure(
+      originalState,
+      'command_failed',
+      appended.ok ? incompleteMessage : appended.error.message
+    )
+  }
+  return { ok: true, state: appended.state }
+}
+
+function appendBasketballLifecycleEvents(
+  originalState: GameState,
+  candidateState: GameState,
+  events: BasketballMatchEvent[],
+  incompleteMessage: string
+): BasketballStateCommandResult {
+  const appended = addGameEvents(candidateState, events, gameEventRegistry, gameEventProjectors)
   if (!appended.ok || !appended.inspection.complete) {
     return failure(
       originalState,

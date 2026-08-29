@@ -179,6 +179,7 @@ export default function GameInfo() {
     activeLocalGameId,
     parkedGames,
     openGameSnapshot,
+    prepareActiveGameMutation,
     resumeParkedGame,
     flushCloudGameSync,
     markEventCloudGameReopened,
@@ -407,7 +408,7 @@ export default function GameInfo() {
         if (
           hasActiveGame &&
           activeLocalGameId !== source.localGameId &&
-          !window.confirm('Park your current game and resume this local recorder stream?')
+          !prepareActiveGameMutation('resume_commit')
         ) {
           setOpeningGame(false)
           return
@@ -444,7 +445,7 @@ export default function GameInfo() {
         setOpeningGame(false)
         return
       }
-      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+      if (hasActiveGame && !prepareActiveGameMutation('resume_commit')) {
         setOpeningGame(false)
         return
       }
@@ -488,7 +489,7 @@ export default function GameInfo() {
         if (
           hasActiveGame &&
           activeLocalGameId !== source.localGameId &&
-          !window.confirm('Park your current game and resume this local recorder stream?')
+          !prepareActiveGameMutation('resume_commit')
         ) {
           setOpeningGame(false)
           return
@@ -520,7 +521,7 @@ export default function GameInfo() {
         setOpeningGame(false)
         return
       }
-      if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
+      if (hasActiveGame && !prepareActiveGameMutation('resume_commit')) {
         setOpeningGame(false)
         return
       }
@@ -530,11 +531,6 @@ export default function GameInfo() {
       }
       setOpeningGame(false)
       navigate('/game')
-      return
-    }
-
-    const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
-    if (hasActiveGame && !window.confirm('Park your current game and open this cloud game?')) {
       return
     }
 
@@ -590,6 +586,10 @@ export default function GameInfo() {
       },
     }
 
+    if (!prepareActiveGameMutation('resume_commit')) {
+      setOpeningGame(false)
+      return
+    }
     if (!openGameSnapshot(withLastSyncedGameFingerprint(nextState))) {
       setOpeningGame(false)
       return
