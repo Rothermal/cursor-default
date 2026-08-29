@@ -11,9 +11,15 @@ import {
   basketballClockRecoveryIssue,
   deriveBasketballClockDisplay,
 } from '../../lib/basketball/clockProjection'
-import { confirmBasketballLineup } from '../../lib/basketball/lineupCommands'
+import {
+  confirmBasketballLineup,
+  substituteBasketballLineup,
+} from '../../lib/basketball/lineupCommands'
 import { isBasketballMatchRulesV3, resolveBasketballPeriodSegment } from '../../lib/basketball/rules'
 import type { BasketballStoppageCategory, BasketballTeamSide } from '../../lib/basketball/types'
+import BasketballLineupSheet, {
+  type BasketballLineupSheetCommit,
+} from './BasketballLineupSheet'
 
 const STOPPAGE_OPTIONS: Array<{ value: BasketballStoppageCategory; label: string }> = [
   { value: 'timeout', label: 'Timeout' },
@@ -47,6 +53,9 @@ export default function BasketballClockStrip({
   const [clockReason, setClockReason] = useState('')
   const [stoppageCategory, setStoppageCategory] = useState<BasketballStoppageCategory>('timeout')
   const [stoppageNote, setStoppageNote] = useState('')
+  const [lineupSide, setLineupSide] = useState<BasketballTeamSide | null>(null)
+  const [lineupError, setLineupError] = useState<string | null>(null)
+  const lineupButtonRef = useRef<HTMLButtonElement>(null)
   const expirationAnnouncementRef = useRef<string | null>(null)
 
   const sportState = state.sportGameState?.sportId === 'basketball'
@@ -269,6 +278,41 @@ export default function BasketballClockStrip({
     commitClock(next)
   }
 
+  const closeLineup = () => {
+    setLineupSide(null)
+    setLineupError(null)
+    window.requestAnimationFrame(() => lineupButtonRef.current?.focus())
+  }
+
+  const openLineup = () => {
+    if (clock.running) return
+    setShowSetClock(false)
+    setShowStoppage(false)
+    setLineupError(null)
+    setLineupSide('tracked')
+  }
+
+  const handleLineupCommit = (input: BasketballLineupSheetCommit) => {
+    const result = substituteBasketballLineup(stateRef.current, {
+      recorderUserId,
+      teamSide: input.teamSide,
+      participantIds: input.participantIds,
+      reasonCode: input.reasonCode,
+      reasonNote: input.reasonNote,
+      occurredAt: new Date().toISOString(),
+    })
+    if (!result.ok) {
+      setLineupError(result.message)
+      return
+    }
+    const sideLabel = input.teamSide === 'tracked' ? 'Tracked' : 'Opponent'
+    setLineupSide(null)
+    setLineupError(null)
+    setNotice(`${sideLabel} lineup updated.`)
+    commitClock(result.state)
+    window.requestAnimationFrame(() => lineupButtonRef.current?.focus())
+  }
+
   const showTenths = settings.showClockTenths && display.displayMs < 60_000
   const unsafeMessage = recoveryIssue === 'backward'
     ? 'Device time moved backward. Set the clock before recording more events.'
@@ -277,8 +321,9 @@ export default function BasketballClockStrip({
       : null
 
   return (
-    <section className="sticky top-0 z-30 border-y border-slate-300 bg-white/95 shadow-sm backdrop-blur" aria-label="Basketball game clock">
-      <div className="mx-auto w-full max-w-lg px-3 py-2">
+    <>
+      <section className="sticky top-0 z-30 border-y border-slate-300 bg-white/95 shadow-sm backdrop-blur" aria-label="Basketball game clock">
+        <div className="mx-auto w-full max-w-lg px-3 py-2">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -331,8 +376,15 @@ export default function BasketballClockStrip({
           >
             Stoppage
           </button>
-          <button type="button" className="btn-secondary min-h-10 text-xs" disabled title="Substitutions arrive in BKE-6C">
-            Bench
+          <button
+            ref={lineupButtonRef}
+            type="button"
+            className="btn-secondary flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 text-xs"
+            disabled={clock.running || Boolean(unsafeMessage)}
+            title={clock.running ? 'Pause the clock before changing the lineup' : undefined}
+            onClick={openLineup}
+          >
+            <Users size={15} aria-hidden /> Lineup
           </button>
         </div>
 
@@ -398,8 +450,18 @@ export default function BasketballClockStrip({
 
         {(unsafeMessage || error) && <p role="alert" className="mt-2 text-sm font-semibold text-red-700">{unsafeMessage ?? error}</p>}
         {notice && !unsafeMessage && <p role="status" className="mt-2 text-sm text-emerald-700">{notice}</p>}
-      </div>
-    </section>
+        </div>
+      </section>
+      {lineupSide && (
+        <BasketballLineupSheet
+          state={state}
+          initialSide={lineupSide}
+          errorMessage={lineupError}
+          onCommit={handleLineupCommit}
+          onClose={closeLineup}
+        />
+      )}
+    </>
   )
 }
 

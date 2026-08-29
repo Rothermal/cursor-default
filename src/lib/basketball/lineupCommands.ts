@@ -16,6 +16,7 @@ import { isBasketballMatchRulesV3 } from './rules'
 import type {
   BasketballRoleChange,
   BasketballSubstitutionMode,
+  BasketballSubstitutionReasonCode,
   BasketballTeamSide,
 } from './types'
 
@@ -29,8 +30,9 @@ interface BasketballLineupCommandOptions {
 
 export interface BasketballSubstitutionCommandOptions extends BasketballLineupCommandOptions {
   participantIds: string[]
-  mode: BasketballSubstitutionMode
-  reason?: string | null
+  mode?: BasketballSubstitutionMode
+  reasonCode?: BasketballSubstitutionReasonCode | null
+  reasonNote?: string | null
 }
 
 export interface BasketballRoleChangeCommandOptions extends BasketballLineupCommandOptions {
@@ -56,10 +58,21 @@ export function substituteBasketballLineup(
   ) {
     return failure(state, 'invalid_participant', 'Basketball substitution participants are unavailable.')
   }
-  const reason = options.reason?.trim() || null
-  if ((options.mode !== 'balanced' && !reason) ||
-      (participantIds.length < 5 && !reason) ||
-      (reason && reason.length > BASKETBALL_CLOCK_TEXT_MAX_LENGTH)) {
+  const mode = options.mode ?? substitutionMode(checked.side.currentParticipantIds, participantIds)
+  if (!mode) {
+    return failure(
+      state,
+      'command_failed',
+      'Basketball substitutions must balance entries and exits unless only adding or removing players.'
+    )
+  }
+  const reasonRequired = mode !== 'balanced' || participantIds.length < 5
+  const reasonCode = reasonRequired ? options.reasonCode ?? null : null
+  const reasonNote = reasonRequired ? options.reasonNote?.trim() || null : null
+  if ((reasonRequired && !reasonCode) ||
+      (reasonCode === 'other' && !reasonNote) ||
+      (!reasonCode && reasonNote) ||
+      (reasonNote && reasonNote.length > BASKETBALL_CLOCK_TEXT_MAX_LENGTH)) {
     return failure(state, 'command_failed', 'Enter a valid reason for this Basketball substitution.')
   }
   const event = createBasketballLineupEvent({
@@ -68,8 +81,9 @@ export function substituteBasketballLineup(
     payload: {
       captureCommandId: options.captureCommandId ?? createBasketballCaptureCommandId(),
       participantIds,
-      mode: options.mode,
-      reason,
+      mode,
+      reasonCode,
+      reasonNote,
     },
     recorderUserId: options.recorderUserId,
     sequence: checked.context.nextSequence,
@@ -212,9 +226,10 @@ function appendLineupEvents(
   state: GameState,
   events: Parameters<typeof addGameEvents>[1]
 ): BasketballStateCommandResult {
+  const baseline = clearQuickUndoReceipt(state)
   const appended = events.length === 1
-    ? addGameEvent(state, events[0], gameEventRegistry, gameEventProjectors)
-    : addGameEvents(state, events, gameEventRegistry, gameEventProjectors)
+    ? addGameEvent(baseline, events[0], gameEventRegistry, gameEventProjectors)
+    : addGameEvents(baseline, events, gameEventRegistry, gameEventProjectors)
   if (!appended.ok || !appended.inspection.complete) {
     return failure(
       state,
@@ -225,6 +240,35 @@ function appendLineupEvents(
     )
   }
   return { ok: true, state: appended.state }
+}
+
+function substitutionMode(
+  currentParticipantIds: readonly string[],
+  nextParticipantIds: readonly string[]
+): BasketballSubstitutionMode | null {
+  const current = new Set(currentParticipantIds)
+  const next = new Set(nextParticipantIds)
+  const exits = currentParticipantIds.filter(id => !next.has(id)).length
+  const entries = nextParticipantIds.filter(id => !current.has(id)).length
+  if (exits > 0 && entries > 0) return exits === entries ? 'balanced' : null
+  if (exits > 0) return 'exit_only'
+  if (entries > 0) return 'entry_only'
+  return null
+}
+
+function clearQuickUndoReceipt(state: GameState): GameState {
+  if (state.sportGameState?.sportId !== 'basketball' ||
+      state.sportGameState.capturePreferences.lastCourtUndo === null) return state
+  return {
+    ...state,
+    sportGameState: {
+      ...state.sportGameState,
+      capturePreferences: {
+        ...state.sportGameState.capturePreferences,
+        lastCourtUndo: null,
+      },
+    },
+  }
 }
 
 function canonicalParticipantIds(

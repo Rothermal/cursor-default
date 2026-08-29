@@ -1,7 +1,7 @@
 # Plan: BKE-6C Live Lineups and Corrections
 
-Status: Product and delivery Q&A complete. All 16 implementation decisions are approved. The work
-is split into four sequential implementation slices; BKE-6C1 is next.
+Status: Product and delivery Q&A complete. All 16 implementation decisions are approved. BKE-6C1
+is implemented; BKE-6C2 is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -82,7 +82,7 @@ incomplete intervals and exact derived playing time without changing clockless o
 
 | Slice | Scope | Exit condition |
 |---|---|---|
-| BKE-6C1 | Side-aware multi-player substitution sheet, balanced/unbalanced checked commands, resulting-lineup review, and replacement-required entry | Paused tracked and optional opponent lineups can transition atomically without inventing eligibility changes |
+| BKE-6C1 (complete) | Side-aware multi-player substitution sheet, balanced/unbalanced checked commands, resulting-lineup review, and replacement-required entry | Paused tracked and optional opponent lineups can transition atomically without inventing eligibility changes |
 | BKE-6C2 | Configured-boundary review, lineup-changing confirmations, equal-play evaluation, enforced override authorization, and Clock Start gating | Every required boundary has explicit lineup evidence and no unresolved enforced decision can start the clock |
 | BKE-6C3 | Position/captain history, late-player entry integration, short-handed/replacement recovery, and reasoned Set Current Lineup | Present lineup authority can recover truthfully while uncertain prior time remains explicitly incomplete |
 | BKE-6C4 | Grouped Recent Events behavior, consequence-aware Timeline correction, stale preview rejection, diagnostics, accessibility/responsive hardening, and exit audit | Complete and incomplete histories correct atomically and derive trustworthy intervals/minutes without compatibility regressions |
@@ -167,6 +167,13 @@ lineup events.
 - source-contract tests that the clock strip mounts one shared sheet and clockless/Legacy paths do
   not expose it; and
 - keyboard focus, Escape/cancel no-mutation, narrow width/height, and live-region smoke.
+
+Implementation record: BKE-6C1 is complete. `lineupSheetModel.ts` derives one stable candidate
+model, `BasketballLineupSheet` supplies the shared tracked/opponent surface, and
+`substituteBasketballLineup` derives the transition mode and appends one final structured event.
+The final lineup-family validators accept exact ordinary and `recordedLater: true` forms while
+retaining the shipped three-key confirmation payload. See
+[REGRESSION_BKE_6C1_LIVE_SUBSTITUTIONS.md](REGRESSION_BKE_6C1_LIVE_SUBSTITUTIONS.md).
 
 ## 7. BKE-6C2: Boundary and Equal-Play Workflow
 

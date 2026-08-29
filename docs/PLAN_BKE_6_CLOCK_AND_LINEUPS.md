@@ -1,8 +1,7 @@
 # Plan: BKE-6 Basketball Clock and Lineups
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
-decisions are approved. BKE-6A and BKE-6B are implemented. BKE-6C live-lineup and correction
-delivery is approved in four slices; BKE-6C1 is next.
+decisions are approved. BKE-6A, BKE-6B, and BKE-6C1 are implemented. BKE-6C2 is next.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -443,8 +442,8 @@ Each slice receives a detailed implementation plan and review before code begins
 | BKE-6D | Players/Overview/Timeline detail, exact-second aggregates, plus-minus quality, cloud capability/bind/sync, recorder readiness, finalization, correction/resume reopen, and republication | One coherent recorder can sync and publish anchored authority; remote/canonical review is read-only and aggregate output is quality-gated |
 | BKE-6E | Release-entry audit, older-client/clockless parity, responsive/accessibility/PWA hardening, rollback record, owner smoke, and broader matrix disposition | Anchored remains default-off, owner evidence is recorded honestly, and broader enablement is blocked until its matrix passes |
 
-BKE-6B is complete across four implementation PRs. BKE-6C is split into four implementation PRs
-for live substitutions, boundary/equal-play review, roles/recovery, and correction/exit. Those are
+BKE-6B is complete across four implementation PRs. BKE-6C1 adds live substitutions; BKE-6C2
+through BKE-6C4 continue boundary/equal-play review, roles/recovery, and correction/exit. Those are
 delivery slices, not new product scope.
 
 ---

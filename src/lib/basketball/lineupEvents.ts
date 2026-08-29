@@ -8,6 +8,7 @@ import type {
   BasketballLineupConfirmedPayload,
   BasketballLineupEvent,
   BasketballRoleChangedPayload,
+  BasketballSubstitutionReasonCode,
   BasketballSubstitutionPayload,
   BasketballTeamSide,
 } from './types'
@@ -94,24 +95,35 @@ function definition(
 }
 
 function validateLineupConfirmed(payload: JsonObject): boolean {
-  return hasExactKeys(payload, ['captureCommandId', 'participantIds', 'boundaryPeriodId']) &&
+  return hasExactKeysWithRecordedLater(
+    payload,
+    ['captureCommandId', 'participantIds', 'boundaryPeriodId']
+  ) &&
     isNonEmptyString(payload.captureCommandId) &&
     isParticipantIds(payload.participantIds) &&
     isNonEmptyString(payload.boundaryPeriodId)
 }
 
 function validateSubstitution(payload: JsonObject): boolean {
-  if (!hasExactKeys(payload, ['captureCommandId', 'participantIds', 'mode', 'reason']) ||
+  if (!hasExactKeysWithRecordedLater(
+    payload,
+    ['captureCommandId', 'participantIds', 'mode', 'reasonCode', 'reasonNote']
+  ) ||
       !isNonEmptyString(payload.captureCommandId) ||
       !isParticipantIds(payload.participantIds) ||
       !['balanced', 'exit_only', 'entry_only', 'boundary', 'current_lineup_recovery']
         .includes(String(payload.mode)) ||
-      !(payload.reason === null || isBoundedText(payload.reason))) return false
-  return payload.mode === 'balanced' || payload.reason !== null
+      !(payload.reasonCode === null || isBasketballSubstitutionReasonCode(payload.reasonCode)) ||
+      !(payload.reasonNote === null || isBoundedText(payload.reasonNote))) return false
+  if (payload.reasonCode === null && payload.reasonNote !== null) return false
+  if (payload.reasonCode === 'other' && payload.reasonNote === null) return false
+  return payload.mode === 'balanced' && payload.participantIds.length === 5
+    ? payload.reasonCode === null && payload.reasonNote === null
+    : payload.reasonCode !== null
 }
 
 function validateRoleChanged(payload: JsonObject): boolean {
-  if (!hasExactKeys(payload, ['captureCommandId', 'changes']) ||
+  if (!hasExactKeysWithRecordedLater(payload, ['captureCommandId', 'changes']) ||
       !isNonEmptyString(payload.captureCommandId) ||
       !Array.isArray(payload.changes) || payload.changes.length === 0) return false
   const ids = new Set<string>()
@@ -127,7 +139,7 @@ function validateRoleChanged(payload: JsonObject): boolean {
 }
 
 function validateEqualPlayOverride(payload: JsonObject): boolean {
-  return hasExactKeys(payload, [
+  return hasExactKeysWithRecordedLater(payload, [
     'captureCommandId',
     'boundaryPeriodId',
     'candidateParticipantIds',
@@ -159,6 +171,27 @@ function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<
   return actual.length === expected.length && actual.every((key, index) => key === expected[index])
 }
 
+function hasExactKeysWithRecordedLater(
+  value: unknown,
+  keys: readonly string[]
+): value is Record<string, unknown> {
+  if (hasExactKeys(value, keys)) return true
+  return hasExactKeys(value, [...keys, 'recordedLater']) &&
+    value.recordedLater === true
+}
+
+function isBasketballSubstitutionReasonCode(
+  value: unknown
+): value is BasketballSubstitutionReasonCode {
+  return [
+    'injury',
+    'eligibility',
+    'short_handed',
+    'recovery',
+    'other',
+  ].includes(String(value))
+}
+
 function isBoundedPosition(value: unknown): value is string {
   return isNonEmptyString(value) && value.length <= 80
 }
@@ -173,4 +206,14 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0
+}
+
+export function formatBasketballSubstitutionReason(
+  reasonCode: BasketballSubstitutionReasonCode,
+  reasonNote: string | null
+): string {
+  const label = reasonCode === 'short_handed'
+    ? 'Short-handed'
+    : reasonCode.charAt(0).toUpperCase() + reasonCode.slice(1)
+  return reasonNote ? `${label}: ${reasonNote}` : label
 }

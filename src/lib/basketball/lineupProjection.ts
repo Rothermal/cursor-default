@@ -10,6 +10,7 @@ import type {
   BasketballSportGameState,
   BasketballTeamSide,
 } from './types'
+import { formatBasketballSubstitutionReason } from './lineupEvents'
 
 export function isBasketballLineupEvent(
   event: BasketballMatchEvent
@@ -224,7 +225,7 @@ function applySubstitution(
   if (canonical.length === 0 || canonical.length > 5) {
     return 'Basketball substitution must leave one through five participants on court.'
   }
-  if (canonical.length < 5 && !event.payload.reason) {
+  if (canonical.length < 5 && !event.payload.reasonCode) {
     return 'Basketball short-handed substitution requires a reason.'
   }
   if (sameIds(canonical, side.currentParticipantIds)) {
@@ -265,7 +266,9 @@ function applySubstitution(
     }
   }
   side.currentParticipantIds = canonical
-  side.currentShortHandedReason = canonical.length < 5 ? event.payload.reason : null
+  side.currentShortHandedReason = canonical.length < 5 && event.payload.reasonCode
+    ? formatBasketballSubstitutionReason(event.payload.reasonCode, event.payload.reasonNote)
+    : null
   openLineupInterval(side, event.period.id, event.elapsedMs!, event.id,
     event.payload.mode !== 'current_lineup_recovery')
   if (side.boundaryConfirmedPeriodId === event.period.id && !side.clockStartedInPeriod) {

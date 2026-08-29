@@ -263,6 +263,7 @@ describe('Basketball release entry guards', () => {
   it('keeps one anchored clock strip mounted above both Basketball workspaces', () => {
     const tracker = source('src/pages/GameTracker.tsx')
     const clockStrip = source('src/components/basketball/BasketballClockStrip.tsx')
+    const lineupSheet = source('src/components/basketball/BasketballLineupSheet.tsx')
     const stripIndex = tracker.indexOf('<BasketballClockStrip')
     const workspaceIndex = tracker.indexOf('aria-label="Basketball game workspace"')
 
@@ -271,7 +272,13 @@ describe('Basketball release entry guards', () => {
     expect(clockStrip).toContain('deriveBasketballClockDisplay')
     expect(clockStrip).toContain('window.setInterval(() => setNow(')
     expect(clockStrip).toContain('Confirm current five')
-    expect(clockStrip).toContain('title="Substitutions arrive in BKE-6C"')
+    expect(clockStrip).toContain('<BasketballLineupSheet')
+    expect(clockStrip).toContain('substituteBasketballLineup(stateRef.current')
+    expect(clockStrip).toContain('disabled={clock.running || Boolean(unsafeMessage)}')
+    expect(clockStrip).not.toContain('Substitutions arrive in BKE-6C')
+    expect(lineupSheet).toContain('buildBasketballLineupSheetModel')
+    expect(lineupSheet).toContain('role="dialog"')
+    expect(lineupSheet).toContain("event.key === 'Escape'")
   })
 
   it('keeps anchored display ticks presentation-only and hides manual-minute capture', () => {
