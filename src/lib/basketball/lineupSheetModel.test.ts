@@ -104,6 +104,21 @@ describe('BKE-6C1 lineup sheet model', () => {
       projectedGame(), 'opponent', ids, 'injury', ''
     ).validationMessage).toContain('unavailable')
   })
+
+  it('allows an unchanged candidate only for boundary confirmation', () => {
+    const projection = projectedGame()
+    expect(buildBasketballLineupSheetModel(
+      projection, 'tracked', starters('tracked'), null, ''
+    )).toMatchObject({ changed: false, canCommit: false })
+    expect(buildBasketballLineupSheetModel(
+      projection,
+      'tracked',
+      starters('tracked'),
+      null,
+      '',
+      { allowUnchanged: true }
+    )).toMatchObject({ changed: false, canCommit: true, validationMessage: null })
+  })
 })
 
 function projectedGame({ opponent = false }: { opponent?: boolean } = {}): BasketballMatchProjection {

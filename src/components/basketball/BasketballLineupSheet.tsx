@@ -6,6 +6,10 @@ import {
   buildBasketballLineupSheetModel,
   type BasketballLineupSheetRow,
 } from '../../lib/basketball/lineupSheetModel'
+import {
+  basketballEqualPlayViolationLabel,
+  buildBasketballBoundarySideReview,
+} from '../../lib/basketball/boundaryReviewModel'
 import { BASKETBALL_SUBSTITUTION_REASON_OPTIONS } from '../../lib/basketball/lineupTransitions'
 import type {
   BasketballSubstitutionReasonCode,
@@ -17,18 +21,25 @@ export interface BasketballLineupSheetCommit {
   participantIds: string[]
   reasonCode: BasketballSubstitutionReasonCode | null
   reasonNote: string | null
+  overrideReason: string | null
 }
 
 export default function BasketballLineupSheet({
   state,
   initialSide,
   errorMessage,
+  purpose = 'substitution',
+  canOverrideEqualPlay = false,
+  allowedSides,
   onCommit,
   onClose,
 }: {
   state: GameState
   initialSide: BasketballTeamSide
   errorMessage: string | null
+  purpose?: 'substitution' | 'boundary'
+  canOverrideEqualPlay?: boolean
+  allowedSides?: BasketballTeamSide[]
   onCommit: (input: BasketballLineupSheetCommit) => void
   onClose: () => void
 }) {
@@ -36,7 +47,8 @@ export default function BasketballLineupSheet({
     ? state.sportGameState.projection
     : null
   const availableSides = (['tracked', 'opponent'] as BasketballTeamSide[]).filter(
-    side => Boolean(projection?.lineup?.sides[side])
+    side => Boolean(projection?.lineup?.sides[side]) &&
+      (!allowedSides || allowedSides.includes(side))
   )
   const startingSide = availableSides.includes(initialSide)
     ? initialSide
@@ -47,6 +59,7 @@ export default function BasketballLineupSheet({
   )
   const [reasonCode, setReasonCode] = useState<BasketballSubstitutionReasonCode | null>(null)
   const [reasonNote, setReasonNote] = useState('')
+  const [overrideReason, setOverrideReason] = useState('')
   const dialogRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const onCloseRef = useRef(onClose)
@@ -58,9 +71,20 @@ export default function BasketballLineupSheet({
         teamSide,
         participantIds,
         reasonCode,
-        reasonNote
+        reasonNote,
+        { allowUnchanged: purpose === 'boundary' }
       )
-    : null, [participantIds, projection, reasonCode, reasonNote, teamSide])
+    : null, [participantIds, projection, purpose, reasonCode, reasonNote, teamSide])
+  const boundaryReview = useMemo(() => (
+    purpose === 'boundary' && state.sportGameState?.sportId === 'basketball'
+      ? buildBasketballBoundarySideReview(state.sportGameState, teamSide, participantIds)
+      : null
+  ), [participantIds, purpose, state.sportGameState, teamSide])
+  const enforcedOverrideRequired = boundaryReview?.equalPlayMode === 'enforced' &&
+    boundaryReview.violations.length > 0
+  const validOverride = !enforcedOverrideRequired || (
+    canOverrideEqualPlay && overrideReason.trim().length > 0 && overrideReason.trim().length <= 240
+  )
 
   useEffect(() => {
     closeRef.current?.focus()
@@ -105,6 +129,7 @@ export default function BasketballLineupSheet({
     setParticipantIds(basketballLineupInitialSelection(projection, side))
     setReasonCode(null)
     setReasonNote('')
+    setOverrideReason('')
   }
 
   const toggleParticipant = (row: BasketballLineupSheetRow) => {
@@ -116,12 +141,13 @@ export default function BasketballLineupSheet({
   }
 
   const submit = () => {
-    if (!model.canCommit) return
+    if (!model.canCommit || !validOverride) return
     onCommit({
       teamSide,
       participantIds: model.resultingParticipantIds,
       reasonCode,
       reasonNote: reasonNote.trim() || null,
+      overrideReason: overrideReason.trim() || null,
     })
   }
 
@@ -140,7 +166,7 @@ export default function BasketballLineupSheet({
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div className="min-w-0">
             <h2 id="basketball-lineup-sheet-title" className="truncate text-base font-bold text-slate-900">
-              Lineup change
+              {purpose === 'boundary' ? 'Boundary lineup review' : 'Lineup change'}
             </h2>
             <p className="truncate text-xs font-medium text-slate-500">{sideName(teamSide)}</p>
           </div>
@@ -264,6 +290,46 @@ export default function BasketballLineupSheet({
             </div>
           )}
 
+          {boundaryReview && boundaryReview.violations.length > 0 && (
+            <div className={`mt-4 border-l-4 px-3 py-3 ${
+              boundaryReview.equalPlayMode === 'enforced'
+                ? 'border-rose-500 bg-rose-50'
+                : 'border-amber-500 bg-amber-50'
+            }`}>
+              <p className="text-sm font-bold text-slate-900">
+                {boundaryReview.equalPlayMode === 'enforced'
+                  ? 'Equal-play override required'
+                  : 'Equal-play advisory'}
+              </p>
+              <ul className="mt-1 space-y-1 text-sm text-slate-700">
+                {boundaryReview.violations.map(violation => (
+                  <li key={violation.code}>
+                    {basketballEqualPlayViolationLabel(violation.code)} ({violation.participantIds.length})
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-slate-600">
+                This review follows the match's snapshotted policy; it is not a universal league ruling.
+              </p>
+              {enforcedOverrideRequired && canOverrideEqualPlay && (
+                <label className="mt-3 block text-sm font-semibold text-slate-700">
+                  Override reason
+                  <input
+                    value={overrideReason}
+                    onChange={event => setOverrideReason(event.target.value)}
+                    maxLength={240}
+                    className="input-field mt-1"
+                  />
+                </label>
+              )}
+              {enforcedOverrideRequired && !canOverrideEqualPlay && (
+                <p className="mt-2 text-sm font-semibold text-rose-700">
+                  Your current role cannot record this override.
+                </p>
+              )}
+            </div>
+          )}
+
           {(model.validationMessage || errorMessage) && (
             <p
               role={errorMessage ? 'alert' : 'status'}
@@ -284,10 +350,10 @@ export default function BasketballLineupSheet({
           <button
             type="button"
             className="btn-primary flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm"
-            disabled={!model.canCommit}
+            disabled={!model.canCommit || !validOverride}
             onClick={submit}
           >
-            <Check size={17} aria-hidden /> Commit lineup
+            <Check size={17} aria-hidden /> {purpose === 'boundary' ? 'Confirm lineup' : 'Commit lineup'}
           </button>
         </footer>
       </section>

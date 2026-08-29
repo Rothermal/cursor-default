@@ -47,6 +47,15 @@ export interface BasketballLineupConfirmationCommandOptions extends BasketballLi
   participantIds?: string[]
   overrideReason?: string
   overrideEventId?: string
+  overrideAuthorized?: boolean
+}
+
+export interface BasketballBoundaryConfirmationCommandOptions extends BasketballLineupConfirmationCommandOptions {
+  participantIds: string[]
+  expectedCurrentParticipantIds: string[]
+  reasonCode?: BasketballSubstitutionReasonCode | null
+  reasonNote?: string | null
+  substitutionEventId?: string
 }
 
 export function substituteBasketballLineup(
@@ -165,6 +174,9 @@ export function confirmBasketballLineup(
   const captureCommandId = options.captureCommandId ?? createBasketballCaptureCommandId()
   const events = []
   if (enforced && violations.length > 0) {
+    if (!options.overrideAuthorized) {
+      return failure(state, 'command_failed', 'You are not authorized to override enforced Basketball equal-play rules.')
+    }
     const reason = options.overrideReason?.trim() ?? ''
     if (!reason || reason.length > BASKETBALL_CLOCK_TEXT_MAX_LENGTH) {
       return failure(
@@ -185,6 +197,128 @@ export function confirmBasketballLineup(
       },
       recorderUserId: options.recorderUserId,
       sequence: checked.context.nextSequence,
+      period: checked.context.period,
+      elapsedMs: checked.elapsedMs,
+      occurredAt: checked.context.occurredAt,
+      teamSide: 'tracked',
+    }))
+  }
+  events.push(createBasketballLineupEvent({
+    id: options.eventId ?? createBasketballUuid(),
+    eventType: 'basketball.lineup_confirmed',
+    payload: {
+      captureCommandId,
+      participantIds,
+      boundaryPeriodId: checked.context.period.id,
+    },
+    recorderUserId: options.recorderUserId,
+    sequence: checked.context.nextSequence + events.length,
+    period: checked.context.period,
+    elapsedMs: checked.elapsedMs,
+    occurredAt: checked.context.occurredAt,
+    teamSide: options.teamSide,
+  }))
+  return appendLineupEvents(state, events)
+}
+
+export function confirmBasketballBoundaryLineup(
+  state: GameState,
+  options: BasketballBoundaryConfirmationCommandOptions
+): BasketballStateCommandResult {
+  const checked = lineupCommandContext(state, options)
+  if (!checked.ok) return checked
+  if (!checked.side.boundaryConfirmationRequired) {
+    return failure(state, 'command_failed', 'This Basketball lineup boundary no longer needs review.')
+  }
+  const expected = canonicalParticipantIds(state, options.teamSide, options.expectedCurrentParticipantIds)
+  if (
+    expected.length !== options.expectedCurrentParticipantIds.length ||
+    !sameIds(expected, checked.side.currentParticipantIds)
+  ) {
+    return failure(state, 'command_failed', 'The Basketball lineup changed while it was being reviewed. Review the current five again.')
+  }
+  const participantIds = canonicalParticipantIds(state, options.teamSide, options.participantIds)
+  if (
+    options.participantIds.length !== new Set(options.participantIds).size ||
+    participantIds.length !== options.participantIds.length ||
+    participantIds.length === 0 ||
+    participantIds.length > 5
+  ) {
+    return failure(state, 'invalid_participant', 'Basketball boundary participants are unavailable.')
+  }
+  const unavailable = participantIds.some(id => {
+    const participant = checked.context.sportState.projection.participants[id]
+    return !participant || participant.openingStatus === 'dnp' || participant.ejected || participant.disqualified
+  })
+  if (unavailable) {
+    return failure(state, 'invalid_participant', 'Basketball boundary participants are unavailable.')
+  }
+
+  const changed = !sameIds(participantIds, checked.side.currentParticipantIds)
+  const reasonRequired = changed && basketballSubstitutionRequiresReason('boundary', participantIds.length)
+  const reasonCode = reasonRequired ? options.reasonCode ?? null : null
+  const reasonNote = reasonRequired ? options.reasonNote?.trim() || null : null
+  if ((reasonRequired && !reasonCode) ||
+      (reasonCode === 'other' && !reasonNote) ||
+      (!reasonCode && reasonNote) ||
+      (reasonNote && reasonNote.length > BASKETBALL_CLOCK_TEXT_MAX_LENGTH)) {
+    return failure(state, 'command_failed', 'Enter a valid reason for this Basketball boundary lineup.')
+  }
+
+  const violations = options.teamSide === 'tracked'
+    ? evaluateBasketballEqualPlayCandidate(
+        checked.context.sportState.projection,
+        checked.context.sportState,
+        checked.context.period.id,
+        participantIds
+      )
+    : []
+  const rules = checked.context.sportState.setup.rulesSnapshot
+  const enforced = isBasketballMatchRulesV3(rules) && rules.equalPlayPolicy.mode === 'enforced'
+  const overrideReason = options.overrideReason?.trim() ?? ''
+  if (enforced && violations.length > 0) {
+    if (!options.overrideAuthorized) {
+      return failure(state, 'command_failed', 'You are not authorized to override enforced Basketball equal-play rules.')
+    }
+    if (!overrideReason || overrideReason.length > BASKETBALL_CLOCK_TEXT_MAX_LENGTH) {
+      return failure(state, 'command_failed', 'Enter a valid reason to override the enforced Basketball equal-play warning.')
+    }
+  }
+
+  const captureCommandId = options.captureCommandId ?? createBasketballCaptureCommandId()
+  const events = []
+  if (changed) {
+    events.push(createBasketballLineupEvent({
+      id: options.substitutionEventId ?? createBasketballUuid(),
+      eventType: 'basketball.substitution',
+      payload: {
+        captureCommandId,
+        participantIds,
+        mode: 'boundary',
+        reasonCode,
+        reasonNote,
+      },
+      recorderUserId: options.recorderUserId,
+      sequence: checked.context.nextSequence,
+      period: checked.context.period,
+      elapsedMs: checked.elapsedMs,
+      occurredAt: checked.context.occurredAt,
+      teamSide: options.teamSide,
+    }))
+  }
+  if (enforced && violations.length > 0) {
+    events.push(createBasketballLineupEvent({
+      id: options.overrideEventId ?? createBasketballUuid(),
+      eventType: 'basketball.equal_play_override',
+      payload: {
+        captureCommandId,
+        boundaryPeriodId: checked.context.period.id,
+        candidateParticipantIds: participantIds,
+        violationCodes: violations.map(value => value.code),
+        reason: overrideReason,
+      },
+      recorderUserId: options.recorderUserId,
+      sequence: checked.context.nextSequence + events.length,
       period: checked.context.period,
       elapsedMs: checked.elapsedMs,
       occurredAt: checked.context.occurredAt,
