@@ -147,6 +147,31 @@ describe('BKE-6C1 exact lineup payload contracts', () => {
       ...base,
       payload: { ...base.payload, reasonCode: 'other', reasonNote: null },
     }).ok).toBe(false)
+
+    const boundary = {
+      ...base,
+      payload: {
+        ...base.payload,
+        participantIds: participantIds(),
+        mode: 'boundary',
+        reasonCode: null,
+        reasonNote: null,
+      },
+    } as GameEvent
+    expect(gameEventRegistry.inspect(boundary).ok).toBe(true)
+
+    const mixed = {
+      ...base,
+      payload: {
+        ...base.payload,
+        mode: 'mixed',
+      },
+    } as GameEvent
+    expect(gameEventRegistry.inspect(mixed).ok).toBe(true)
+    expect(gameEventRegistry.inspect({
+      ...mixed,
+      payload: { ...mixed.payload, reasonCode: null },
+    } as GameEvent).ok).toBe(false)
   })
 })
 

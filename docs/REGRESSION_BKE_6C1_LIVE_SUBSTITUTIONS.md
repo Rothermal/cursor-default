@@ -9,8 +9,11 @@ Plan: [PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md](PLAN_BKE_6C_LIVE_LINEUPS_AND
 - one pure side-aware lineup-sheet model using stable `participantId` authority;
 - a shared mobile sheet/desktop dialog for tracked and optional opponent lineups;
 - Current, Bench, Unavailable, and resulting-lineup views with explicit entering and leaving states;
-- paused-only atomic balanced, exit-only, and entry-only substitutions without implicit clock writes;
+- paused-only atomic balanced, exit-only, entry-only, and unequal mixed substitutions without
+  implicit clock writes or fabricated intermediate lineups;
 - structured Injury, Eligibility, Short-handed, Recovery, and Other reasons with bounded notes;
+- reason-free full-five boundary rotations, structured short-handed projection authority, and one
+  exhaustive mode/reason catalog shared by validator, command, model, and presentation;
 - exact ordinary and `recordedLater: true` lineup-family payload forms while preserving the shipped
   three-key `basketball.lineup_confirmed` payload;
 - replacement-required participants kept visibly current until an explicit transition removes them;
@@ -26,7 +29,7 @@ recovery, historical correction, or cloud anchored transport is included.
 | Gate | Result |
 |---|---|
 | `pnpm.cmd typecheck` | Pass |
-| `pnpm.cmd test` | Pass: 174 files and 1,218 tests |
+| `pnpm.cmd test` | Pass: 175 files and 1,222 tests |
 | `pnpm.cmd lint` | Pass: 0 errors; 6 existing Fast Refresh warnings, including 3 in an ignored worktree |
 | `pnpm.cmd build` | Pass: production bundle and PWA service worker generated |
 | `git diff --check` | Pass |
@@ -38,7 +41,8 @@ Focused coverage includes:
   payloads;
 - tracked/opponent grouping, unavailable participants, replacement-required presentation, and
   one-through-five lineup constraints;
-- balanced, exit-only, and entry-only derivation plus structured reason validation;
+- balanced, exit-only, entry-only, and unequal mixed derivation plus structured reason validation;
+- full-five boundary rotations without false Other authority and separate projected reason code/note;
 - one appended event with one command timestamp/capture id and quick-Undo receipt clearing; and
 - one shared sheet mounted from the clock strip, paused-only controls, dialog semantics, Escape,
   focus return, and live-result announcement source contracts.

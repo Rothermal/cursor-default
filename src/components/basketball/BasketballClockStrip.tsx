@@ -285,7 +285,7 @@ export default function BasketballClockStrip({
   }
 
   const openLineup = () => {
-    if (clock.running) return
+    if (clock.running || recoveryIssue) return
     setShowSetClock(false)
     setShowStoppage(false)
     setLineupError(null)
@@ -318,6 +318,11 @@ export default function BasketballClockStrip({
     ? 'Device time moved backward. Set the clock before recording more events.'
     : recoveryIssue === 'excessive_delta'
       ? 'The clock was away too long to recover automatically. Set the clock before recording more events.'
+      : null
+  const lineupDisabledReason = clock.running
+    ? 'Pause the clock before changing the lineup.'
+    : unsafeMessage
+      ? 'Set the clock before changing the lineup.'
       : null
 
   return (
@@ -380,8 +385,9 @@ export default function BasketballClockStrip({
             ref={lineupButtonRef}
             type="button"
             className="btn-secondary flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 text-xs"
-            disabled={clock.running || Boolean(unsafeMessage)}
-            title={clock.running ? 'Pause the clock before changing the lineup' : undefined}
+            disabled={Boolean(lineupDisabledReason)}
+            title={lineupDisabledReason ?? undefined}
+            aria-label={lineupDisabledReason ? `Lineup unavailable. ${lineupDisabledReason}` : 'Lineup'}
             onClick={openLineup}
           >
             <Users size={15} aria-hidden /> Lineup

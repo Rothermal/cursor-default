@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowRightLeft, Check, UserMinus, UserPlus, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import {
-  BASKETBALL_SUBSTITUTION_REASON_OPTIONS,
   basketballLineupInitialSelection,
   buildBasketballLineupSheetModel,
   type BasketballLineupSheetRow,
 } from '../../lib/basketball/lineupSheetModel'
+import { BASKETBALL_SUBSTITUTION_REASON_OPTIONS } from '../../lib/basketball/lineupTransitions'
 import type {
   BasketballSubstitutionReasonCode,
   BasketballTeamSide,

@@ -39,6 +39,7 @@ export type BasketballSubstitutionMode =
   | 'balanced'
   | 'exit_only'
   | 'entry_only'
+  | 'mixed'
   | 'boundary'
   | 'current_lineup_recovery'
 export type BasketballSubstitutionReasonCode =
@@ -398,7 +399,8 @@ export interface BasketballRoleHistoryEntry {
 export interface BasketballLineupSideProjection {
   teamSide: BasketballTeamSide
   currentParticipantIds: string[]
-  currentShortHandedReason: string | null
+  currentShortHandedReasonCode: BasketballSubstitutionReasonCode | null
+  currentShortHandedReasonNote: string | null
   boundaryConfirmationRequired: boolean
   boundaryConfirmedPeriodId: string | null
   clockStartedInPeriod: boolean

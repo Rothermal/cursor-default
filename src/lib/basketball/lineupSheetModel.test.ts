@@ -35,7 +35,7 @@ describe('BKE-6C1 lineup sheet model', () => {
     expect(model).toMatchObject({ mode: 'balanced', reasonRequired: false, canCommit: true })
   })
 
-  it('derives exit-only and entry-only transitions and requires a reason below five', () => {
+  it('derives exit-only, entry-only, and mixed transitions with required reasons', () => {
     const projection = projectedGame()
     const exit = buildBasketballLineupSheetModel(
       projection,
@@ -57,9 +57,20 @@ describe('BKE-6C1 lineup sheet model', () => {
       ''
     )
     expect(entry).toMatchObject({ mode: 'entry_only', reasonRequired: true, canCommit: true })
+
+    const mixed = buildBasketballLineupSheetModel(
+      projection,
+      'tracked',
+      ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-6'],
+      'injury',
+      'Two exits and one entry'
+    )
+    expect(mixed).toMatchObject({ mode: 'mixed', reasonRequired: true, canCommit: true })
+    expect(mixed.outgoingParticipantIds).toEqual(['tracked-1', 'tracked-5'])
+    expect(mixed.incomingParticipantIds).toEqual(['tracked-6'])
   })
 
-  it('rejects zero, duplicate, wrong-side, unavailable, oversized, and unequal swaps', () => {
+  it('rejects zero, duplicate, wrong-side, unavailable, and oversized lineups', () => {
     const projection = projectedGame({ opponent: true })
     projection.participants['tracked-6'].ejected = true
     const cases: Array<[string[], string]> = [
@@ -68,7 +79,6 @@ describe('BKE-6C1 lineup sheet model', () => {
       [['tracked-1', 'tracked-2', 'tracked-3', 'tracked-4', 'opponent-1'], 'unavailable'],
       [['tracked-1', 'tracked-2', 'tracked-3', 'tracked-4', 'tracked-6'], 'DNP, ejected'],
       [[...starters('tracked'), 'tracked-7'], 'at most five'],
-      [['tracked-2', 'tracked-3', 'tracked-4', 'tracked-7'], 'same number'],
     ]
 
     for (const [ids, message] of cases) {
@@ -163,7 +173,8 @@ function sideProjection(teamSide: BasketballTeamSide): BasketballLineupSideProje
   return {
     teamSide,
     currentParticipantIds: starters(teamSide),
-    currentShortHandedReason: null,
+    currentShortHandedReasonCode: null,
+    currentShortHandedReasonNote: null,
     boundaryConfirmationRequired: false,
     boundaryConfirmedPeriodId: null,
     clockStartedInPeriod: false,

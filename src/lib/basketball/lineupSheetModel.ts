@@ -1,4 +1,8 @@
 import { BASKETBALL_CLOCK_TEXT_MAX_LENGTH } from './clockEvents'
+import {
+  basketballSubstitutionRequiresReason,
+  deriveBasketballLiveSubstitutionMode,
+} from './lineupTransitions'
 import type {
   BasketballMatchProjection,
   BasketballProjectedParticipant,
@@ -6,17 +10,6 @@ import type {
   BasketballSubstitutionReasonCode,
   BasketballTeamSide,
 } from './types'
-
-export const BASKETBALL_SUBSTITUTION_REASON_OPTIONS: ReadonlyArray<{
-  value: BasketballSubstitutionReasonCode
-  label: string
-}> = [
-  { value: 'injury', label: 'Injury' },
-  { value: 'eligibility', label: 'Eligibility' },
-  { value: 'short_handed', label: 'Short-handed' },
-  { value: 'recovery', label: 'Recovery' },
-  { value: 'other', label: 'Other' },
-]
 
 export interface BasketballLineupSheetRow {
   participantId: string
@@ -81,7 +74,9 @@ export function buildBasketballLineupSheetModel(
   const mode = changed
     ? deriveBasketballLiveSubstitutionMode(outgoingParticipantIds.length, incomingParticipantIds.length)
     : null
-  const reasonRequired = Boolean(mode && (mode !== 'balanced' || resultingParticipantIds.length < 5))
+  const reasonRequired = Boolean(
+    mode && basketballSubstitutionRequiresReason(mode, resultingParticipantIds.length)
+  )
   const noteRequired = reasonCode === 'other'
   const unavailableSelected = resultingParticipantIds.find(id => {
     const participant = participantById.get(id)
@@ -151,16 +146,6 @@ export function buildBasketballLineupSheetModel(
     canCommit: validationMessage === null,
     validationMessage,
   }
-}
-
-export function deriveBasketballLiveSubstitutionMode(
-  exitCount: number,
-  entryCount: number
-): BasketballSubstitutionMode | null {
-  if (exitCount > 0 && entryCount > 0) return exitCount === entryCount ? 'balanced' : null
-  if (exitCount > 0) return 'exit_only'
-  if (entryCount > 0) return 'entry_only'
-  return null
 }
 
 function unavailableReason(participant: BasketballProjectedParticipant): string | null {

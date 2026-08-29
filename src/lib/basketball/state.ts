@@ -88,7 +88,8 @@ function createBasketballLineupProjection(
     return {
       teamSide,
       currentParticipantIds: [...opening.participantIds],
-      currentShortHandedReason: opening.shortHandedReason,
+      currentShortHandedReasonCode: null,
+      currentShortHandedReasonNote: opening.shortHandedReason,
       boundaryConfirmationRequired: false,
       boundaryConfirmedPeriodId: null,
       clockStartedInPeriod: false,

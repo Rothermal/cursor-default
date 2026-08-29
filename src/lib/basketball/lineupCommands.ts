@@ -13,6 +13,10 @@ import { createBasketballUuid } from './id'
 import { createBasketballLineupEvent } from './lineupEvents'
 import { evaluateBasketballEqualPlayCandidate } from './lineupProjection'
 import { isBasketballMatchRulesV3 } from './rules'
+import {
+  basketballSubstitutionRequiresReason,
+  deriveBasketballLiveSubstitutionMode,
+} from './lineupTransitions'
 import type {
   BasketballRoleChange,
   BasketballSubstitutionMode,
@@ -58,15 +62,19 @@ export function substituteBasketballLineup(
   ) {
     return failure(state, 'invalid_participant', 'Basketball substitution participants are unavailable.')
   }
-  const mode = options.mode ?? substitutionMode(checked.side.currentParticipantIds, participantIds)
+  const current = new Set(checked.side.currentParticipantIds)
+  const next = new Set(participantIds)
+  const exitCount = checked.side.currentParticipantIds.filter(id => !next.has(id)).length
+  const entryCount = participantIds.filter(id => !current.has(id)).length
+  const mode = options.mode ?? deriveBasketballLiveSubstitutionMode(exitCount, entryCount)
   if (!mode) {
     return failure(
       state,
       'command_failed',
-      'Basketball substitutions must balance entries and exits unless only adding or removing players.'
+      'Basketball substitution must change the current lineup.'
     )
   }
-  const reasonRequired = mode !== 'balanced' || participantIds.length < 5
+  const reasonRequired = basketballSubstitutionRequiresReason(mode, participantIds.length)
   const reasonCode = reasonRequired ? options.reasonCode ?? null : null
   const reasonNote = reasonRequired ? options.reasonNote?.trim() || null : null
   if ((reasonRequired && !reasonCode) ||
@@ -240,20 +248,6 @@ function appendLineupEvents(
     )
   }
   return { ok: true, state: appended.state }
-}
-
-function substitutionMode(
-  currentParticipantIds: readonly string[],
-  nextParticipantIds: readonly string[]
-): BasketballSubstitutionMode | null {
-  const current = new Set(currentParticipantIds)
-  const next = new Set(nextParticipantIds)
-  const exits = currentParticipantIds.filter(id => !next.has(id)).length
-  const entries = nextParticipantIds.filter(id => !current.has(id)).length
-  if (exits > 0 && entries > 0) return exits === entries ? 'balanced' : null
-  if (exits > 0) return 'exit_only'
-  if (entries > 0) return 'entry_only'
-  return null
 }
 
 function clearQuickUndoReceipt(state: GameState): GameState {

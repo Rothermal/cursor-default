@@ -3,12 +3,16 @@ import type { GameEvent, GameEventPeriod, JsonObject } from '../gameEvents/types
 import type { GameEventDefinition } from '../gameEvents/registry'
 import { BASKETBALL_CLOCK_TEXT_MAX_LENGTH } from './clockEvents'
 import { createBasketballUuid } from './id'
+import {
+  basketballSubstitutionRequiresReason,
+  isBasketballSubstitutionMode,
+  isBasketballSubstitutionReasonCode,
+} from './lineupTransitions'
 import type {
   BasketballEqualPlayOverridePayload,
   BasketballLineupConfirmedPayload,
   BasketballLineupEvent,
   BasketballRoleChangedPayload,
-  BasketballSubstitutionReasonCode,
   BasketballSubstitutionPayload,
   BasketballTeamSide,
 } from './types'
@@ -111,15 +115,14 @@ function validateSubstitution(payload: JsonObject): boolean {
   ) ||
       !isNonEmptyString(payload.captureCommandId) ||
       !isParticipantIds(payload.participantIds) ||
-      !['balanced', 'exit_only', 'entry_only', 'boundary', 'current_lineup_recovery']
-        .includes(String(payload.mode)) ||
+      !isBasketballSubstitutionMode(payload.mode) ||
       !(payload.reasonCode === null || isBasketballSubstitutionReasonCode(payload.reasonCode)) ||
       !(payload.reasonNote === null || isBoundedText(payload.reasonNote))) return false
   if (payload.reasonCode === null && payload.reasonNote !== null) return false
   if (payload.reasonCode === 'other' && payload.reasonNote === null) return false
-  return payload.mode === 'balanced' && payload.participantIds.length === 5
-    ? payload.reasonCode === null && payload.reasonNote === null
-    : payload.reasonCode !== null
+  return basketballSubstitutionRequiresReason(payload.mode, payload.participantIds.length)
+    ? payload.reasonCode !== null
+    : payload.reasonCode === null && payload.reasonNote === null
 }
 
 function validateRoleChanged(payload: JsonObject): boolean {
@@ -180,18 +183,6 @@ function hasExactKeysWithRecordedLater(
     value.recordedLater === true
 }
 
-function isBasketballSubstitutionReasonCode(
-  value: unknown
-): value is BasketballSubstitutionReasonCode {
-  return [
-    'injury',
-    'eligibility',
-    'short_handed',
-    'recovery',
-    'other',
-  ].includes(String(value))
-}
-
 function isBoundedPosition(value: unknown): value is string {
   return isNonEmptyString(value) && value.length <= 80
 }
@@ -206,14 +197,4 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0
-}
-
-export function formatBasketballSubstitutionReason(
-  reasonCode: BasketballSubstitutionReasonCode,
-  reasonNote: string | null
-): string {
-  const label = reasonCode === 'short_handed'
-    ? 'Short-handed'
-    : reasonCode.charAt(0).toUpperCase() + reasonCode.slice(1)
-  return reasonNote ? `${label}: ${reasonNote}` : label
 }

@@ -321,10 +321,12 @@ and exact-watermark recovery without per-tick state writes. See `REGRESSION_BKE_
 BKE-6B4 completes centralized checked Pause before active-game storage replacement and atomic
 Pause-plus-End Period behavior. BKE-6C is approved in
 `PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md` as four slices. BKE-6C1 implements one paused
-side-aware substitution sheet, pure candidate model, derived balanced/unbalanced modes, structured
-reasons, atomic capture, optional opponent authority, and final exact lineup-family payload forms;
-see `REGRESSION_BKE_6C1_LIVE_SUBSTITUTIONS.md`. BKE-6C2 next owns boundary/equal-play review, then
-roles/current-lineup recovery and grouped correction/exit follow. BKE-6D and BKE-6E remain; rules versions 1-2, setup version 1, and existing games remain
+side-aware substitution sheet, pure candidate model, derived balanced/exit-only/entry-only/unequal-
+mixed modes, exhaustive structured reasons, atomic capture, optional opponent authority, and final
+exact lineup-family payload forms. Full-five boundary rotations need no false reason, and projection
+keeps short-handed reason code/note structured; see `REGRESSION_BKE_6C1_LIVE_SUBSTITUTIONS.md`.
+BKE-6C2 next owns boundary/equal-play review, then roles/current-lineup recovery and grouped
+correction/exit follow. BKE-6D and BKE-6E remain; rules versions 1-2, setup version 1, and existing games remain
 clockless, and shot-clock/possession work stays out.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper

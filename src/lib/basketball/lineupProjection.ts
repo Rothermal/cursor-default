@@ -10,7 +10,7 @@ import type {
   BasketballSportGameState,
   BasketballTeamSide,
 } from './types'
-import { formatBasketballSubstitutionReason } from './lineupEvents'
+import { basketballSubstitutionRequiresReason } from './lineupTransitions'
 
 export function isBasketballLineupEvent(
   event: BasketballMatchEvent
@@ -46,7 +46,9 @@ export function basketballLineupClockStartError(
     if (side.currentParticipantIds.length === 0 || side.currentParticipantIds.length > 5) {
       return `${sideLabel(side.teamSide)} lineup must contain one through five participants.`
     }
-    if (side.currentParticipantIds.length < 5 && !side.currentShortHandedReason) {
+    if (side.currentParticipantIds.length < 5 &&
+        !side.currentShortHandedReasonCode &&
+        !side.currentShortHandedReasonNote) {
       return `${sideLabel(side.teamSide)} short-handed lineup requires a reason before the clock starts.`
     }
   }
@@ -225,9 +227,6 @@ function applySubstitution(
   if (canonical.length === 0 || canonical.length > 5) {
     return 'Basketball substitution must leave one through five participants on court.'
   }
-  if (canonical.length < 5 && !event.payload.reasonCode) {
-    return 'Basketball short-handed substitution requires a reason.'
-  }
   if (sameIds(canonical, side.currentParticipantIds)) {
     return 'Basketball substitution must change the current lineup.'
   }
@@ -235,6 +234,10 @@ function applySubstitution(
   const next = new Set(canonical)
   const exits = side.currentParticipantIds.filter(id => !next.has(id))
   const entries = canonical.filter(id => !prior.has(id))
+  if (basketballSubstitutionRequiresReason(event.payload.mode, canonical.length) &&
+      !event.payload.reasonCode) {
+    return 'Basketball unbalanced or recovery substitution requires a reason.'
+  }
   if (event.payload.mode === 'balanced' && (exits.length === 0 || exits.length !== entries.length)) {
     return 'Balanced Basketball substitution requires the same number of entries and exits.'
   }
@@ -243,6 +246,10 @@ function applySubstitution(
   }
   if (event.payload.mode === 'entry_only' && (exits.length > 0 || entries.length === 0)) {
     return 'Entry-only Basketball substitution cannot remove participants.'
+  }
+  if (event.payload.mode === 'mixed' &&
+      (exits.length === 0 || entries.length === 0 || exits.length === entries.length)) {
+    return 'Mixed Basketball substitution requires unequal nonzero entries and exits.'
   }
   const currentSegment = resolveBasketballPeriodSegment(
     sportState.setup.rulesSnapshot,
@@ -266,9 +273,8 @@ function applySubstitution(
     }
   }
   side.currentParticipantIds = canonical
-  side.currentShortHandedReason = canonical.length < 5 && event.payload.reasonCode
-    ? formatBasketballSubstitutionReason(event.payload.reasonCode, event.payload.reasonNote)
-    : null
+  side.currentShortHandedReasonCode = canonical.length < 5 ? event.payload.reasonCode : null
+  side.currentShortHandedReasonNote = canonical.length < 5 ? event.payload.reasonNote : null
   openLineupInterval(side, event.period.id, event.elapsedMs!, event.id,
     event.payload.mode !== 'current_lineup_recovery')
   if (side.boundaryConfirmedPeriodId === event.period.id && !side.clockStartedInPeriod) {
@@ -410,7 +416,10 @@ function openPeriodLineups(
         const participant = projection.participants[id]
         return participant && !participant.ejected && !participant.disqualified
       })
-      if (!sameIds(previousIds, side.currentParticipantIds)) side.currentShortHandedReason = null
+      if (!sameIds(previousIds, side.currentParticipantIds)) {
+        side.currentShortHandedReasonCode = null
+        side.currentShortHandedReasonNote = null
+      }
     }
     side.clockStartedInPeriod = false
     side.boundaryConfirmationRequired = projection.startedPeriodIds.length > 1 &&
