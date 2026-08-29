@@ -1,7 +1,7 @@
 # Plan: BKE-6C Live Lineups and Corrections
 
 Status: Product and delivery Q&A complete. All 16 implementation decisions are approved. BKE-6C1
-is implemented; BKE-6C2 is next.
+and BKE-6C2 are implemented; BKE-6C3 is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -83,7 +83,7 @@ incomplete intervals and exact derived playing time without changing clockless o
 | Slice | Scope | Exit condition |
 |---|---|---|
 | BKE-6C1 (complete) | Side-aware multi-player substitution sheet, balanced/unbalanced checked commands, resulting-lineup review, and replacement-required entry | Paused tracked and optional opponent lineups can transition atomically without inventing eligibility changes |
-| BKE-6C2 | Configured-boundary review, lineup-changing confirmations, equal-play evaluation, enforced override authorization, and Clock Start gating | Every required boundary has explicit lineup evidence and no unresolved enforced decision can start the clock |
+| BKE-6C2 (complete) | Configured-boundary review, lineup-changing confirmations, equal-play evaluation, enforced override authorization, and Clock Start gating | Every required boundary has explicit lineup evidence and no unresolved enforced decision can start the clock |
 | BKE-6C3 | Position/captain history, late-player entry integration, short-handed/replacement recovery, and reasoned Set Current Lineup | Present lineup authority can recover truthfully while uncertain prior time remains explicitly incomplete |
 | BKE-6C4 | Grouped Recent Events behavior, consequence-aware Timeline correction, stale preview rejection, diagnostics, accessibility/responsive hardening, and exit audit | Complete and incomplete histories correct atomically and derive trustworthy intervals/minutes without compatibility regressions |
 
@@ -97,8 +97,8 @@ BKE-6A and BKE-6B already provide:
 - strict version-3 anchored rules and setup-version-2 opening lineup authority;
 - `basketball.substitution`, `basketball.role_changed`, `basketball.lineup_confirmed`, and
   `basketball.equal_play_override` definitions;
-- `substituteBasketballLineup`, `changeBasketballParticipantRoles`, and
-  `confirmBasketballLineup` checked commands;
+- `substituteBasketballLineup`, `changeBasketballParticipantRoles`, and the original checked
+  same-current-five confirmation contract replaced by BKE-6C2;
 - side-aware lineup projection, running-clock intersections, exact participation milliseconds,
   boundary state, replacement requirements, equal-play evaluation, and incomplete-period evidence;
 - paused-only lineup commands, current-lineup recovery mode, and late participant support;
@@ -225,6 +225,16 @@ retaining the shipped three-key confirmation payload. See
   override-plus-confirmation behavior;
 - substitution after confirmation reopens review before first Start; and
 - clockless, Legacy, equal-play-off BKE-6B, and optional-opponent compatibility fixtures.
+
+Implementation record: BKE-6C2 is complete. `BasketballBoundaryReviewDialog` coordinates only the
+tracked and optional-opponent sides whose projection requires review, while changed candidates reuse
+the C1 lineup sheet. `confirmBasketballBoundaryLineup` rejects stale current-five evidence and appends
+boundary substitution, authorized enforced override when required, and confirmation in one timestamp,
+elapsed value, capture-command group, and final rebuild. Start opens review before calling the clock
+command, advisory policy remains nonblocking, and the UI labels snapshotted-policy results without
+prescribing a replacement five. The replaced same-five command was removed so override authority and
+reason validation have one production command path. See
+[REGRESSION_BKE_6C2_BOUNDARY_EQUAL_PLAY.md](REGRESSION_BKE_6C2_BOUNDARY_EQUAL_PLAY.md).
 
 ## 8. BKE-6C3: Roles and Current-Lineup Recovery
 

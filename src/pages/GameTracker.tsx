@@ -1144,6 +1144,7 @@ export default function GameTracker() {
           state={state}
           recorderUserId={user?.id ?? null}
           settings={basketballDeviceSettings}
+          canOverrideEqualPlay={!state.cloudSync.teamId || canTrackGames(teamAccess.role)}
           onState={next => dispatch({ type: 'HYDRATE_STATE', state: next })}
         />
       )}

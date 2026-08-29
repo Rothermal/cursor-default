@@ -21,7 +21,7 @@ import { createBasketballLifecycleEvent } from './events'
 import { createBasketballLineupEvent } from './lineupEvents'
 import {
   changeBasketballParticipantRoles,
-  confirmBasketballLineup,
+  confirmBasketballBoundaryLineup,
   substituteBasketballLineup,
 } from './lineupCommands'
 import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
@@ -299,9 +299,7 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       occurredAt: after(20_000),
     })).toMatchObject({ ok: false, state: secondPeriod })
 
-    const confirmed = requireState(confirmBasketballLineup(secondPeriod, {
-      recorderUserId,
-      teamSide: 'tracked',
+    const confirmed = requireState(confirmTrackedBoundary(secondPeriod, {
       occurredAt: after(21_000),
       eventId: uuid(31),
     }))
@@ -315,9 +313,7 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       eventId: uuid(32),
     }))
     expect(trackedLineup(changed).boundaryConfirmationRequired).toBe(true)
-    const reconfirmed = requireState(confirmBasketballLineup(changed, {
-      recorderUserId,
-      teamSide: 'tracked',
+    const reconfirmed = requireState(confirmTrackedBoundary(changed, {
       occurredAt: after(23_000),
       eventId: uuid(33),
     }))
@@ -366,9 +362,7 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       recorderUserId,
       occurredAt: after(4_000),
     }).ok).toBe(false)
-    const confirmed = requireState(confirmBasketballLineup(replaced, {
-      recorderUserId,
-      teamSide: 'tracked',
+    const confirmed = requireState(confirmTrackedBoundary(replaced, {
       occurredAt: after(5_000),
     }))
     expect(startBasketballClock(confirmed, {
@@ -424,9 +418,7 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       boundaries: true,
       equalPlayPolicy: strictPolicy('advisory'),
     }))
-    const result = confirmBasketballLineup(secondPeriod, {
-      recorderUserId,
-      teamSide: 'tracked',
+    const result = confirmTrackedBoundary(secondPeriod, {
       occurredAt: after(30_000),
       eventId: uuid(70),
     })
@@ -444,9 +436,7 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
 
   it('records a clean boundary review when equal play is off', () => {
     const secondPeriod = nextPeriodState(anchoredState({ boundaries: true }))
-    const result = confirmBasketballLineup(secondPeriod, {
-      recorderUserId,
-      teamSide: 'tracked',
+    const result = confirmTrackedBoundary(secondPeriod, {
       occurredAt: after(30_000),
     })
     expect(result.ok).toBe(true)
@@ -463,16 +453,14 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       boundaries: true,
       equalPlayPolicy: strictPolicy('enforced'),
     }))
-    expect(confirmBasketballLineup(secondPeriod, {
-      recorderUserId,
-      teamSide: 'tracked',
+    expect(confirmTrackedBoundary(secondPeriod, {
+      overrideAuthorized: true,
       occurredAt: after(30_000),
     })).toMatchObject({ ok: false, state: secondPeriod })
 
-    const result = confirmBasketballLineup(secondPeriod, {
-      recorderUserId,
-      teamSide: 'tracked',
+    const result = confirmTrackedBoundary(secondPeriod, {
       overrideReason: 'Approved rotation exception',
+      overrideAuthorized: true,
       occurredAt: after(31_000),
       overrideEventId: uuid(80),
       eventId: uuid(81),
@@ -488,6 +476,170 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     expect(basketballProjection(result.state).lineup).toMatchObject({
       enforcedOverridesComplete: true,
       pendingEqualPlayOverride: null,
+    })
+  })
+
+  it('atomically changes and confirms a reviewed boundary lineup', () => {
+    const secondPeriod = nextPeriodState(anchoredState({ boundaries: true }))
+    expect(confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: trackedStarterIds(),
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      reasonCode: 'recovery',
+      occurredAt: after(34_000),
+    })).toMatchObject({ ok: false, state: secondPeriod })
+    const result = confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: trackedStarterIds(),
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      occurredAt: after(35_000),
+      substitutionEventId: uuid(84),
+      eventId: uuid(85),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const events = result.state.eventStream!.events.slice(-2) as Array<{
+      eventType: string
+      occurredAt: string
+      elapsedMs: number
+      payload: { captureCommandId: string }
+    }>
+    expect(events.map(event => event.eventType)).toEqual([
+      'basketball.substitution',
+      'basketball.lineup_confirmed',
+    ])
+    expect(events.map(event => event.occurredAt)).toEqual([after(35_000), after(35_000)])
+    expect(events.map(event => event.elapsedMs)).toEqual([0, 0])
+    expect(events.map(event => event.payload.captureCommandId)).toEqual([
+      events[0].payload.captureCommandId,
+      events[0].payload.captureCommandId,
+    ])
+    expect(trackedLineup(result.state)).toMatchObject({
+      currentParticipantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      boundaryConfirmationRequired: false,
+    })
+
+    const shortResult = confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: trackedStarterIds(),
+      participantIds: ['tracked-1', 'tracked-2', 'tracked-3', 'tracked-4'],
+      reasonCode: 'injury',
+      reasonNote: 'Player unavailable at the boundary',
+      occurredAt: after(35_500),
+    })
+    expect(shortResult.ok).toBe(true)
+    if (!shortResult.ok) return
+    expect(shortResult.state.eventStream?.events.slice(-2)[0]).toMatchObject({
+      eventType: 'basketball.substitution',
+      payload: {
+        mode: 'boundary',
+        reasonCode: 'injury',
+        reasonNote: 'Player unavailable at the boundary',
+      },
+    })
+  })
+
+  it('rejects stale boundary candidates and unauthorized enforced overrides', () => {
+    const secondPeriod = nextPeriodState(anchoredState({
+      boundaries: true,
+      equalPlayPolicy: strictPolicy('enforced'),
+    }))
+    expect(confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: [
+        'tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6',
+      ],
+      participantIds: trackedStarterIds(),
+      overrideAuthorized: true,
+      overrideReason: 'Approved exception',
+      occurredAt: after(36_000),
+    })).toMatchObject({ ok: false, state: secondPeriod })
+    expect(confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: trackedStarterIds(),
+      participantIds: trackedStarterIds(),
+      overrideAuthorized: false,
+      overrideReason: 'Approved exception',
+      occurredAt: after(37_000),
+    })).toMatchObject({ ok: false, state: secondPeriod })
+    expect(confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: trackedStarterIds(),
+      participantIds: trackedStarterIds(),
+      overrideAuthorized: true,
+      overrideReason: ' '.repeat(2),
+      occurredAt: after(38_000),
+    })).toMatchObject({ ok: false, state: secondPeriod })
+    expect(confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: trackedStarterIds(),
+      participantIds: trackedStarterIds(),
+      overrideAuthorized: true,
+      overrideReason: 'x'.repeat(241),
+      occurredAt: after(39_000),
+    })).toMatchObject({ ok: false, state: secondPeriod })
+  })
+
+  it('groups an enforced changed boundary with its override and confirmation', () => {
+    const secondPeriod = nextPeriodState(anchoredState({
+      boundaries: true,
+      equalPlayPolicy: strictPolicy('enforced'),
+    }))
+    const result = confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'tracked',
+      expectedCurrentParticipantIds: trackedStarterIds(),
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      overrideAuthorized: true,
+      overrideReason: 'Approved rotation exception',
+      occurredAt: after(38_000),
+      substitutionEventId: uuid(86),
+      overrideEventId: uuid(87),
+      eventId: uuid(88),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const events = result.state.eventStream!.events.slice(-3) as Array<{
+      eventType: string
+      occurredAt: string
+      payload: { captureCommandId: string }
+    }>
+    expect(events.map(event => event.eventType)).toEqual([
+      'basketball.substitution',
+      'basketball.equal_play_override',
+      'basketball.lineup_confirmed',
+    ])
+    expect(new Set(events.map(event => event.payload.captureCommandId)).size).toBe(1)
+    expect(new Set(events.map(event => event.occurredAt)).size).toBe(1)
+  })
+
+  it('confirms optional opponent boundary authority independently', () => {
+    const secondPeriod = nextPeriodState(anchoredState({ boundaries: true, opponent: true }))
+    const result = confirmBasketballBoundaryLineup(secondPeriod, {
+      recorderUserId,
+      teamSide: 'opponent',
+      expectedCurrentParticipantIds: opponentStarterIds(),
+      participantIds: opponentStarterIds(),
+      occurredAt: after(40_000),
+      eventId: uuid(89),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(basketballProjection(result.state).lineup?.sides).toMatchObject({
+      tracked: { boundaryConfirmationRequired: true },
+      opponent: { boundaryConfirmationRequired: false },
+    })
+    const events = result.state.eventStream?.events ?? []
+    expect(events[events.length - 1]).toMatchObject({
+      eventType: 'basketball.lineup_confirmed',
+      teamSide: 'opponent',
     })
   })
 
@@ -722,6 +874,26 @@ function playerActor(state: GameState, participantId: string, role: string) {
 function requireState(result: { ok: true; state: GameState } | { ok: false; message: string }): GameState {
   if (!result.ok) throw new Error(result.message)
   return result.state
+}
+
+function confirmTrackedBoundary(
+  state: GameState,
+  options: {
+    occurredAt: string
+    eventId?: string
+    overrideReason?: string
+    overrideAuthorized?: boolean
+    overrideEventId?: string
+  }
+) {
+  const participantIds = trackedLineup(state).currentParticipantIds
+  return confirmBasketballBoundaryLineup(state, {
+    recorderUserId,
+    teamSide: 'tracked',
+    expectedCurrentParticipantIds: participantIds,
+    participantIds,
+    ...options,
+  })
 }
 
 function after(deltaMs: number): string {

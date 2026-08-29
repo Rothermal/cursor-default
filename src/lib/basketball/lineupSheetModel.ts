@@ -52,7 +52,11 @@ export function buildBasketballLineupSheetModel(
   teamSide: BasketballTeamSide,
   participantIds: readonly string[],
   reasonCode: BasketballSubstitutionReasonCode | null,
-  reasonNote: string
+  reasonNote: string,
+  options: {
+    allowUnchanged?: boolean
+    substitutionMode?: BasketballSubstitutionMode
+  } = {}
 ): BasketballLineupSheetModel {
   const side = projection.lineup?.sides[teamSide] ?? null
   const participants = Object.values(projection.participants)
@@ -72,7 +76,10 @@ export function buildBasketballLineupSheetModel(
   const incomingParticipantIds = resultingParticipantIds.filter(id => !current.has(id))
   const changed = outgoingParticipantIds.length > 0 || incomingParticipantIds.length > 0
   const mode = changed
-    ? deriveBasketballLiveSubstitutionMode(outgoingParticipantIds.length, incomingParticipantIds.length)
+    ? options.substitutionMode ?? deriveBasketballLiveSubstitutionMode(
+        outgoingParticipantIds.length,
+        incomingParticipantIds.length
+      )
     : null
   const reasonRequired = Boolean(
     mode && basketballSubstitutionRequiresReason(mode, resultingParticipantIds.length)
@@ -95,9 +102,9 @@ export function buildBasketballLineupSheetModel(
     validationMessage = 'A lineup may contain at most five participants.'
   } else if (unavailableSelected) {
     validationMessage = 'Remove every DNP, ejected, or disqualified participant from the result.'
-  } else if (!changed) {
+  } else if (!changed && !options.allowUnchanged) {
     validationMessage = 'Change at least one participant before committing.'
-  } else if (!mode) {
+  } else if (changed && !mode) {
     validationMessage = 'A swap must add and remove the same number of participants.'
   } else if (reasonRequired && !reasonCode) {
     validationMessage = 'Select a reason for this lineup transition.'
