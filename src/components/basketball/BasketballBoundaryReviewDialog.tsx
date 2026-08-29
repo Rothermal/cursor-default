@@ -147,6 +147,11 @@ export default function BasketballBoundaryReviewDialog({
               const canConfirm = !enforced || (
                 canOverrideEqualPlay && reason.length > 0 && reason.length <= 240
               )
+              const confirmDisabledReason = enforced && !canOverrideEqualPlay
+                ? 'Your current role cannot record this equal-play override.'
+                : enforced && !reason
+                  ? 'Enter an override reason before confirming.'
+                  : null
               return (
                 <section key={side} className="border border-slate-200 p-3">
                   <div className="flex items-center gap-2">
@@ -196,6 +201,11 @@ export default function BasketballBoundaryReviewDialog({
                       />
                     </label>
                   )}
+                  {enforced && !canOverrideEqualPlay && (
+                    <p className="mt-3 text-xs font-semibold text-rose-700">
+                      Your current role cannot record this equal-play override.
+                    </p>
+                  )}
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <button
@@ -209,6 +219,10 @@ export default function BasketballBoundaryReviewDialog({
                       type="button"
                       className="btn-primary flex min-h-10 items-center justify-center gap-1.5 text-xs"
                       disabled={!canConfirm}
+                      title={confirmDisabledReason ?? undefined}
+                      aria-label={confirmDisabledReason
+                        ? `Confirm current five unavailable. ${confirmDisabledReason}`
+                        : 'Confirm current five'}
                       onClick={() => onCommit({
                         teamSide: side,
                         participantIds: sideProjection.currentParticipantIds,

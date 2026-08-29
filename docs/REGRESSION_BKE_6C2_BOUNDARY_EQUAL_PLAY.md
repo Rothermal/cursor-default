@@ -1,5 +1,9 @@
 # Regression: BKE-6C2 Boundary and Equal-Play Review
 
+Status: Automated gates pass. Manual browser review remains owner smoke, not implied evidence.
+
+Plan: [PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md](PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md)
+
 ## Scope
 
 BKE-6C2 replaces the same-five shortcut with explicit boundary review for anchored Basketball
@@ -7,7 +11,18 @@ games. It adds changed-five confirmation, optional-opponent coordination, adviso
 presentation, authorized enforced overrides, and stale-safe atomic command composition. It adds no
 Supabase migration and does not change clockless, Legacy, or historical-game authority.
 
-## Automated Coverage
+## Automated Evidence
+
+| Gate | Result |
+|---|---|
+| `pnpm.cmd typecheck` | Pass |
+| `pnpm.cmd test` | Pass: 175 files and 1,228 tests |
+| `pnpm.cmd lint` | Pass: 0 errors; 6 existing Fast Refresh warnings, including 3 in an ignored worktree |
+| `pnpm.cmd build` | Pass: production bundle and PWA service worker generated |
+| GitHub CI | Pass |
+| `git diff --check` | Pass |
+
+Focused coverage includes:
 
 - Start checks pending sides before invoking `startBasketballClock` and the explicit Review Lineup
   action remains visible while review is pending.
@@ -20,18 +35,28 @@ Supabase migration and does not change clockless, Legacy, or historical-game aut
   review do not invent tracked-policy decisions.
 - A pre-Start substitution after confirmation returns projection to review-required.
 
-## Manual Smoke
+## Manual Matrix
 
-1. Start an anchored event game whose second regulation segment is a lineup-change boundary.
-2. End the first period and start the next period. Press Start and verify the review opens while the
-   clock remains paused and no Clock Start appears in Timeline.
-3. Confirm the current five for one side. With opponent lineup authority enabled, verify the other
-   side remains pending until separately confirmed.
-4. Reopen the flow, change one player, and confirm. Verify the current five changes once and Start is
-   enabled only after every required side is complete.
-5. With advisory equal play, verify warnings appear but confirmation remains available. With enforced
-   equal play, verify a bounded reason is required and the current tracking role can record it.
-6. Cancel each review/editor surface and verify no event is appended.
+| Check | Status |
+|---|---|
+| Start on a configured boundary opens review with no Clock Start event | Covered by command/source contracts; browser smoke not run |
+| Tracked and optional-opponent cards resolve independently | Covered automatically; browser smoke not run |
+| Changed-five review reuses the C1 sheet and commits once | Not run |
+| Four-to-five boundary recovery does not request or discard a reason | Covered automatically; browser smoke not run |
+| Below-five boundary transition requires and stores its reason | Covered automatically; browser smoke not run |
+| Advisory warning remains nonblocking and prescribes no five | Not run |
+| Enforced warning requires an authorized bounded reason | Covered automatically; browser smoke not run |
+| Disabled override control explains missing role authority | Covered by source contract; browser smoke not run |
+| Cancel coordinator and nested editor without mutation | Not run |
+| Narrow phone and desktop two-side coordinator layout | Not run |
+
+## Authority Note
+
+Anchored games remain local-only in BKE-6C2, so Personal ownership is the only production override
+path and `canOverrideEqualPlay` is true there. Team owner/admin/scorer resolution is wired and tested
+as a source contract but cannot receive live anchored traffic until BKE-6D. BKE-6D must revalidate
+that role path when anchored cloud lifecycle is enabled rather than treating this slice as live-team
+evidence.
 
 ## Exit
 

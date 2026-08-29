@@ -72,7 +72,10 @@ export default function BasketballLineupSheet({
         participantIds,
         reasonCode,
         reasonNote,
-        { allowUnchanged: purpose === 'boundary' }
+        {
+          allowUnchanged: purpose === 'boundary',
+          substitutionMode: purpose === 'boundary' ? 'boundary' : undefined,
+        }
       )
     : null, [participantIds, projection, purpose, reasonCode, reasonNote, teamSide])
   const boundaryReview = useMemo(() => (

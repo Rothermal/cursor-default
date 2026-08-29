@@ -119,6 +119,28 @@ describe('BKE-6C1 lineup sheet model', () => {
       { allowUnchanged: true }
     )).toMatchObject({ changed: false, canCommit: true, validationMessage: null })
   })
+
+  it('uses boundary reason semantics instead of live transition semantics', () => {
+    const shortProjection = projectedGame()
+    shortProjection.lineup!.sides.tracked!.currentParticipantIds = starters('tracked').slice(0, 4)
+    expect(buildBasketballLineupSheetModel(
+      shortProjection,
+      'tracked',
+      starters('tracked'),
+      null,
+      '',
+      { allowUnchanged: true, substitutionMode: 'boundary' }
+    )).toMatchObject({ mode: 'boundary', reasonRequired: false, canCommit: true })
+
+    expect(buildBasketballLineupSheetModel(
+      projectedGame(),
+      'tracked',
+      starters('tracked').slice(0, 4),
+      null,
+      '',
+      { allowUnchanged: true, substitutionMode: 'boundary' }
+    )).toMatchObject({ mode: 'boundary', reasonRequired: true, canCommit: false })
+  })
 })
 
 function projectedGame({ opponent = false }: { opponent?: boolean } = {}): BasketballMatchProjection {

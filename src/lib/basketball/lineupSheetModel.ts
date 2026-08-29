@@ -53,7 +53,10 @@ export function buildBasketballLineupSheetModel(
   participantIds: readonly string[],
   reasonCode: BasketballSubstitutionReasonCode | null,
   reasonNote: string,
-  options: { allowUnchanged?: boolean } = {}
+  options: {
+    allowUnchanged?: boolean
+    substitutionMode?: BasketballSubstitutionMode
+  } = {}
 ): BasketballLineupSheetModel {
   const side = projection.lineup?.sides[teamSide] ?? null
   const participants = Object.values(projection.participants)
@@ -73,7 +76,10 @@ export function buildBasketballLineupSheetModel(
   const incomingParticipantIds = resultingParticipantIds.filter(id => !current.has(id))
   const changed = outgoingParticipantIds.length > 0 || incomingParticipantIds.length > 0
   const mode = changed
-    ? deriveBasketballLiveSubstitutionMode(outgoingParticipantIds.length, incomingParticipantIds.length)
+    ? options.substitutionMode ?? deriveBasketballLiveSubstitutionMode(
+        outgoingParticipantIds.length,
+        incomingParticipantIds.length
+      )
     : null
   const reasonRequired = Boolean(
     mode && basketballSubstitutionRequiresReason(mode, resultingParticipantIds.length)
