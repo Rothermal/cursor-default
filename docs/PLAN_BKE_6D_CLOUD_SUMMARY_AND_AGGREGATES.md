@@ -184,6 +184,17 @@ lineup proves an appearance even if the interval contributes zero milliseconds. 
 participant never entered a valid lineup. Manual-minute events stay visible but inert for anchored
 games and remain the displayed source for clockless games.
 
+BKE-6D1 owns the one foundational projector change required by that rule. `lineupProjection.ts`
+must preserve zero-duration valid-lineup entry evidence and derive `appeared` from lineup entry,
+not from `participationMs > 0`. The projection change happens once; Summary and BKE-6D2 aggregates
+consume it rather than re-deriving appearance or DNP independently. Existing positive-duration
+interval, credited-period, equal-play, and minutes semantics remain unchanged.
+
+All canonical elapsed and participation duration labels use one shared truncate-to-whole-seconds
+formatter. A player's `MM:SS` floors the already-summed `participationMs` once, matching
+`bk_min_sec`; it never uses `Math.round` or sums independently rounded stint labels. Individual
+stint labels use the same truncating convention for their own interval values.
+
 Players defaults to stable setup/late-roster order within separate tracked and opponent sections.
 Explicit controls may sort by name, `MM:SS`, or an available statistic. Each compact row shows time
 and stint count; interval and role history expand in place without nesting cards or forcing all
@@ -208,6 +219,8 @@ history into the initial page.
 - stable tracked/opponent order, sort controls, keyboard expansion, and compact responsive rows;
 - exact `MM:SS` and stint rendering across period boundaries, zero-duration appearances, late
   participants, short-handed intervals, and count-up/countdown display;
+- one zero-duration lineup-entry projection fixture proving appearance/DNP changes without adding
+  playing time or a credited period, plus cross-surface total-duration parity with `bk_min_sec`;
 - complete versus incomplete tracked/opponent quality and metric-specific suppression;
 - player and five-person plus-minus eligibility without requiring opponent participants for tracked
   metrics;
@@ -293,6 +306,12 @@ upload disclosed quality gaps for recovery; their readiness remains false. Unkno
 malformed setup/events, mixed ownership, or non-projectable streams stay quarantined and dirty with
 recovery export available.
 
+This is the first live team-bound anchored path, so it must revalidate the BKE-6C2 equal-play
+authority handoff rather than treating its source-contract tests as production evidence. Accepted
+team owners, admins, and scorers may record a reasoned enforced override; viewers, removed members,
+and stale/denied roles may not. The checked command and UI must agree after cloud load, adoption,
+account change, and membership refresh.
+
 Presentation may use account-isolated capability caches, but creation, bind/adoption, checkpoint
 activation, finalization, and reopen call both capabilities freshly before mutation. Clockless
 Event and Legacy routes never call the clock/lineup capability. Sync-start and post-await stale
@@ -306,6 +325,10 @@ parked-game rollback remain unchanged.
   active-game replacement or cloud mutation;
 - paused/running/terminal upload, remote live review, recoverable incomplete lineup upload, and
   corrupt-stream quarantine;
+- team owner/admin/scorer equal-play override authorization versus viewer/removed-member denial on
+  the first cloud-bound anchored traffic, including refreshed membership and account isolation;
+- remote recorded-later lineup watermark validation for paused, running, and Set Clock histories,
+  with an explicit `basketball.clock_adjusted` branch fixture and no second clock authority;
 - same-recorder matching parked resume, strict adoption, capacity failure, duplicate binding, and
   another-recorder rejection;
 - offline queue replay, revision conflict, checkpoint mismatch, stale async result, rollback, and
