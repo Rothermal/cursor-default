@@ -5,6 +5,7 @@ import {
   formatBasketballRatio,
   type BasketballPlayerReviewRow,
 } from '../../lib/basketball/summaryDetails'
+import { formatBasketballDurationMs } from '../../lib/basketball/duration'
 
 interface Props {
   player: BasketballPlayerReviewRow
@@ -60,6 +61,59 @@ export default function BasketballPlayerDetail({ player, onClose }: Props) {
           </button>
         </header>
 
+        <StatSection title="Participation" rows={[
+          ['Opening assignment', player.participation.started ? 'Starter' : player.rosterStatus === 'dnp' ? 'DNP' : 'Bench'],
+          ['Final appearance', appearanceLabel(player)],
+          [player.participation.basis === 'interval_derived' ? 'Playing time' : 'Recorded manual time', player.participation.displayTime],
+          ['Stints', player.participation.basis === 'interval_derived' ? player.participation.stintCount : 'Not available'],
+          ['Plus-minus', formatPlusMinus(player.participation.plusMinus)],
+        ]} />
+        {player.participation.qualityReason && (
+          <p className="mx-4 mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            {player.participation.qualityReason}
+          </p>
+        )}
+        {player.participation.plusMinus === null && player.participation.plusMinusUnavailableReason && (
+          <p className="mx-4 mt-3 text-xs text-slate-500">
+            Plus-minus unavailable: {player.participation.plusMinusUnavailableReason}
+          </p>
+        )}
+        {player.participation.intervals.length > 0 && (
+          <section className="border-b border-slate-200 px-4 py-4">
+            <h3 className="text-xs font-bold uppercase text-slate-500">Stints</h3>
+            <div className="mt-2 divide-y divide-slate-100">
+              {player.participation.intervals.map((interval, index) => (
+                <div key={`${interval.periodId}:${index}`} className="flex items-start justify-between gap-4 py-2 text-sm">
+                  <div>
+                    <p className="font-semibold text-slate-800">{interval.periodLabel}</p>
+                    <p className="text-xs tabular-nums text-slate-500">
+                      {formatBasketballDurationMs(interval.startElapsedMs)} to {formatBasketballDurationMs(interval.endElapsedMs)} elapsed
+                    </p>
+                  </div>
+                  <strong className="tabular-nums text-slate-900">{interval.displayDuration}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {player.roleHistory.length > 0 && (
+          <section className="border-b border-slate-200 px-4 py-4">
+            <h3 className="text-xs font-bold uppercase text-slate-500">Role history</h3>
+            <div className="mt-2 divide-y divide-slate-100">
+              {player.roleHistory.map(role => (
+                <div key={role.eventId} className="flex items-center justify-between gap-4 py-2 text-sm">
+                  <span className="text-slate-600">
+                    {role.periodLabel} at {formatBasketballDurationMs(role.elapsedMs)}
+                  </span>
+                  <strong className="text-right text-slate-900">
+                    {role.position ?? 'No position'}{role.captain ? ' / Captain' : ''}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <StatSection title="Scoring" rows={[
           ['Points', line.points],
           ['Field goals', `${line.fieldGoalsMade}-${line.fieldGoalsAttempted}`],
@@ -80,7 +134,7 @@ export default function BasketballPlayerDetail({ player, onClose }: Props) {
           ['Blocks', line.blocks],
           ['Turnovers', line.turnovers],
           ['Personal fouls', line.personalFouls],
-          ['Manual minutes', line.manualMinutes],
+          [player.participation.basis === 'interval_derived' ? 'Legacy manual-minute events' : 'Manual minutes', line.manualMinutes],
         ]} />
         <StatSection title="Derived rates" rows={[
           ['Effective FG%', formatBasketballPercentage(line.effectiveFieldGoalPercentage)],
@@ -98,6 +152,17 @@ export default function BasketballPlayerDetail({ player, onClose }: Props) {
       </div>
     </div>
   )
+}
+
+function appearanceLabel(player: BasketballPlayerReviewRow): string {
+  if (player.participation.appeared === true) return 'Played'
+  if (player.participation.dnp === true) return 'DNP'
+  return 'Not derivable from clockless history'
+}
+
+function formatPlusMinus(value: number | null): string {
+  if (value === null) return 'Not available'
+  return value > 0 ? `+${value}` : String(value)
 }
 
 function StatSection({

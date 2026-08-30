@@ -19,6 +19,7 @@ import {
   setBasketballClock,
   startBasketballClock,
 } from './clockCommands'
+import { captureBasketballDirectStat } from './directCommands'
 import { createBasketballLifecycleEvent } from './events'
 import {
   basketballHistoricalDisplayMs,
@@ -106,6 +107,94 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       expect(trackedLineup(appended.state).participationByParticipantId['tracked-1'].participationMs)
         .toBe(12_345)
     }
+  })
+
+  it('counts a valid zero-duration lineup entry as an appearance', () => {
+    const substituted = requireState(substituteBasketballLineup(anchoredState(), {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      occurredAt: after(1_000),
+      eventId: uuid(5),
+    }))
+
+    expect(trackedLineup(substituted).participationByParticipantId['tracked-6']).toMatchObject({
+      appeared: true,
+      participationMs: 0,
+      participationSeconds: 0,
+      plusMinus: 0,
+    })
+
+    const scored = captureBasketballDirectStat(substituted, {
+      recorderUserId,
+      playerId: 'tracked-player-6',
+      statId: '2pt',
+      occurredAt: after(2_000),
+      eventId: uuid(6),
+    })
+    expect(scored.ok).toBe(true)
+    if (!scored.ok) return
+    expect(trackedLineup(scored.state).lineupCombinations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ participationMs: 0, plusMinus: 2, complete: true }),
+    ]))
+  })
+
+  it('keeps successive same-elapsed substitutions as distinct appearance authority', () => {
+    const entered = requireState(substituteBasketballLineup(anchoredState(), {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      occurredAt: after(1_000),
+      eventId: uuid(60),
+    }))
+    const restored = requireState(substituteBasketballLineup(entered, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: trackedStarterIds(),
+      occurredAt: after(2_000),
+      eventId: uuid(61),
+    }))
+
+    const lineup = trackedLineup(restored)
+    expect(lineup.participationByParticipantId['tracked-6']).toMatchObject({
+      appeared: true,
+      participationMs: 0,
+      creditedPeriodIds: [],
+    })
+    expect(lineup.onCourtIntervals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+        startElapsedMs: 0,
+        endElapsedMs: 0,
+      }),
+    ]))
+    expect(lineup.lineupCombinations).toHaveLength(2)
+  })
+
+  it('derives player and five-person plus-minus from scoring lineup coverage', () => {
+    const paused = runAndPause(anchoredState({ opponent: true }), 0, 12_345, 6)
+    const scored = captureBasketballDirectStat(paused, {
+      recorderUserId,
+      playerId: 'tracked-player-1',
+      statId: '2pt',
+      occurredAt: after(13_000),
+      eventId: uuid(8),
+    })
+    expect(scored.ok).toBe(true)
+    if (!scored.ok) return
+
+    const projection = basketballProjection(scored.state)
+    const tracked = projection.lineup?.sides.tracked
+    const opponent = projection.lineup?.sides.opponent
+    expect(tracked?.plusMinusComplete).toBe(true)
+    expect(tracked?.participationByParticipantId['tracked-1'].plusMinus).toBe(2)
+    expect(opponent?.participationByParticipantId['opponent-1'].plusMinus).toBe(-2)
+    expect(tracked?.lineupCombinations).toEqual([
+      expect.objectContaining({ participationMs: 12_345, plusMinus: 2, complete: true }),
+    ])
+    expect(opponent?.lineupCombinations).toEqual([
+      expect.objectContaining({ participationMs: 12_345, plusMinus: -2, complete: true }),
+    ])
   })
 
   it('attributes multi-player substitutions and role changes to stable participants', () => {
@@ -370,6 +459,11 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     const lineup = trackedLineup(secondPause)
     expect(lineup.onCourtIntervals).toMatchObject([
       { startElapsedMs: 0, endElapsedMs: 3_000 },
+      {
+        participantIds: trackedStarterIds(),
+        startElapsedMs: 3_000,
+        endElapsedMs: 3_000,
+      },
       {
         participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
         startElapsedMs: 3_000,
@@ -882,8 +976,8 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     if (!preview.ok) return
     expect(preview.value.consequenceLines).toEqual(expect.arrayContaining([
       expect.stringContaining('2 grouped lineup events'),
-      expect.stringContaining('Tracked 1 time: 0:10 to 0:05'),
-      expect.stringContaining('Tracked 6 time: 0:10 to 0:15'),
+      expect.stringContaining('Tracked 1 time: 00:10 to 00:05'),
+      expect.stringContaining('Tracked 6 time: 00:10 to 00:15'),
     ]))
 
     const finalizedCloud = {

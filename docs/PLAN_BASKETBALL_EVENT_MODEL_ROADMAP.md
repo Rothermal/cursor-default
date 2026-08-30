@@ -46,7 +46,7 @@ approved as four slices in
 BKE-6C1 through BKE-6C4 are implemented. BKE-6D's 32 detailed decisions are approved as four
 slices in
 [PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md](PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md).
-BKE-6D1 is next.
+BKE-6D1 is complete. BKE-6D2 exact-second aggregates are next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

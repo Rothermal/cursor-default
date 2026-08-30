@@ -5,6 +5,7 @@ import BasketballOverview from '../components/basketball-summary/BasketballOverv
 import BasketballPlayers from '../components/basketball-summary/BasketballPlayers'
 import BasketballRecordingSelector from '../components/basketball-summary/BasketballRecordingSelector'
 import BasketballSummaryHeader from '../components/basketball-summary/BasketballSummaryHeader'
+import BasketballSummaryClockStatus from '../components/basketball-summary/BasketballSummaryClockStatus'
 import BasketballSummaryTabs from '../components/basketball-summary/BasketballSummaryTabs'
 import BasketballShotReview from '../components/basketball-summary/BasketballShotReview'
 import BasketballTeamStats from '../components/basketball-summary/BasketballTeamStats'
@@ -28,6 +29,7 @@ import {
   type BasketballSummarySource,
 } from '../lib/basketball/summarySource'
 import type { BasketballMatchEvent } from '../lib/basketball/types'
+import { basketballSummaryQualityReview } from '../lib/basketball/summaryDetails'
 
 export default function BasketballSummary() {
   const navigate = useNavigate()
@@ -197,6 +199,7 @@ export default function BasketballSummary() {
     (event): event is BasketballMatchEvent => event.sportId === 'basketball'
   )
   const result = basketballSummaryResult(sportState.projection)
+  const quality = healthy ? basketballSummaryQualityReview(source.state) : null
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -251,7 +254,24 @@ export default function BasketballSummary() {
             </div>
           </section>
         )}
+        {healthy && quality && quality.warnings.length > 0 && (
+          <section className="my-4 flex items-start gap-3 border-y border-amber-300 bg-amber-50 px-3 py-3">
+            <AlertTriangle size={19} className="mt-0.5 shrink-0 text-amber-700" />
+            <div>
+              <h2 className="font-bold text-amber-950">Lineup detail is incomplete</h2>
+              <ul className="mt-1 space-y-1 text-sm text-amber-900">
+                {quality.warnings.map(warning => <li key={warning}>{warning}</li>)}
+              </ul>
+              <p className="mt-2 text-xs text-amber-800">
+                Valid scores and recorded facts remain visible; affected minutes and plus-minus are labeled separately.
+              </p>
+            </div>
+          </section>
+        )}
       </div>
+      {healthy && (query.tab === 'timeline' || query.tab === 'overview') && (
+        <BasketballSummaryClockStatus source={source} />
+      )}
       {healthy && query.tab === 'players' ? (
         <BasketballPlayers key={sourceKey(source)} source={source} />
       ) : healthy && query.tab === 'timeline' ? (

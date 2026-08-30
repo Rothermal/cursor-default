@@ -12,6 +12,7 @@ import type {
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
 import { validateBasketballHistoricalTime } from './historicalTime'
+import { formatBasketballDurationMs } from './duration'
 import { isBasketballLineupEvent } from './lineupProjection'
 import type {
   BasketballEqualPlayViolationCode,
@@ -415,8 +416,7 @@ function lineupEventLabel(event: BasketballLineupEvent): string {
 }
 
 function formatClock(valueMs: number): string {
-  const seconds = Math.round(valueMs / 1_000)
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  return formatBasketballDurationMs(valueMs)
 }
 
 function isBasketballMatchEvent(event: { sportId: string }): event is BasketballMatchEvent {

@@ -143,7 +143,8 @@ export function basketballLineupProjectionDiagnostics(
 }
 
 export function finalizeBasketballLineupParticipation(
-  projection: BasketballMatchProjection
+  projection: BasketballMatchProjection,
+  events: BasketballMatchEvent[] = []
 ): void {
   const lineup = projection.lineup
   if (!lineup) return
@@ -183,6 +184,7 @@ export function finalizeBasketballLineupParticipation(
       }
     }
     refreshSideParticipationTotals(projection, side)
+    finalizeSideLineupReview(side, closedClockIntervals, events)
   }
 }
 
@@ -323,8 +325,7 @@ function applySubstitution(
   closeOpenLineupInterval(
     side,
     event.id,
-    event.elapsedMs!,
-    event.payload.mode === 'current_lineup_recovery'
+    event.elapsedMs!
   )
   if (event.payload.mode === 'current_lineup_recovery') {
     addUnique(side.incompletePeriodIds, event.period.id)
@@ -632,11 +633,165 @@ function refreshSideParticipationTotals(
     participation.participationSeconds = participationMs / 1_000
     participation.periodParticipationMs = periodParticipationMs
     participation.creditedPeriodIds = creditedPeriodIds
-    participation.appeared = participationMs > 0
+    participation.appeared = side.onCourtIntervals.some(interval =>
+      interval.participantIds.includes(participation.participantId)
+    )
     projection.participants[participation.participantId].stats.min = participationMs / 60_000
   }
   projection.sideStats[side.teamSide].min = Object.values(side.participationByParticipantId)
     .reduce((total, value) => total + value.participationMs, 0) / 60_000
+}
+
+function finalizeSideLineupReview(
+  side: BasketballLineupSideProjection,
+  clockIntervals: Array<{
+    periodId: string
+    startElapsedMs: number
+    endElapsedMs: number | null
+  }>,
+  events: BasketballMatchEvent[]
+): void {
+  const combinations = new Map<string, {
+    participantIds: string[]
+    participationMs: number
+    plusMinus: number
+    complete: boolean
+  }>()
+  for (const interval of side.onCourtIntervals) {
+    if (interval.participantIds.length !== 5) continue
+    const key = lineupKey(interval.participantIds)
+    const current = combinations.get(key) ?? {
+      participantIds: [...interval.participantIds],
+      participationMs: 0,
+      plusMinus: 0,
+      complete: true,
+    }
+    current.participationMs += runningIntersectionMs(interval, clockIntervals)
+    current.complete &&= interval.complete
+    combinations.set(key, current)
+  }
+
+  let unavailableReason = side.incompletePeriodIds.length > 0
+    ? `${sideLabel(side.teamSide)} lineup history is incomplete.`
+    : null
+  const positions = new Map(events.map((event, index) => [event.id, index]))
+  const scoring = events.filter(event => scoringDelta(event) !== 0)
+  const scoringLineups = new Map<string, BasketballOnCourtMoment>()
+  if (!unavailableReason) {
+    for (const event of scoring) {
+      const lineup = lineupAtEvent(side, event, positions)
+      if (!lineup) {
+        unavailableReason = `${sideLabel(side.teamSide)} lineup coverage is missing for a scoring event.`
+        break
+      }
+      scoringLineups.set(event.id, lineup)
+    }
+  }
+
+  side.plusMinusComplete = unavailableReason === null
+  side.plusMinusUnavailableReason = unavailableReason
+  for (const participation of Object.values(side.participationByParticipantId)) {
+    participation.plusMinus = side.plusMinusComplete && participation.appeared ? 0 : null
+  }
+
+  if (side.plusMinusComplete) {
+    for (const event of scoring) {
+      const lineup = scoringLineups.get(event.id)!
+      const delta = scoringDelta(event) * (event.teamSide === side.teamSide ? 1 : -1)
+      for (const participantId of lineup.participantIds) {
+        const participation = side.participationByParticipantId[participantId]
+        if (participation?.plusMinus !== null && participation?.plusMinus !== undefined) {
+          participation.plusMinus += delta
+        }
+      }
+      if (lineup.participantIds.length === 5) {
+        const key = lineupKey(lineup.participantIds)
+        const combination = combinations.get(key) ?? {
+          participantIds: [...lineup.participantIds],
+          participationMs: 0,
+          plusMinus: 0,
+          complete: true,
+        }
+        combination.plusMinus += delta
+        combinations.set(key, combination)
+      }
+    }
+  }
+
+  side.lineupCombinations = [...combinations.values()]
+    .map(combination => ({
+      participantIds: combination.participantIds,
+      participationMs: combination.participationMs,
+      plusMinus: side.plusMinusComplete && combination.complete
+        ? combination.plusMinus
+        : null,
+      complete: side.plusMinusComplete && combination.complete,
+    }))
+    .sort((left, right) =>
+      right.participationMs - left.participationMs ||
+      lineupKey(left.participantIds).localeCompare(lineupKey(right.participantIds))
+    )
+}
+
+interface BasketballOnCourtMoment {
+  participantIds: string[]
+}
+
+function lineupAtEvent(
+  side: BasketballLineupSideProjection,
+  event: BasketballMatchEvent,
+  positions: Map<string, number>
+): BasketballOnCourtMoment | null {
+  if (event.elapsedMs === null) return null
+  const eventPosition = positions.get(event.id) ?? Number.MAX_SAFE_INTEGER
+  const recordedLater = event.payload.recordedLater === true
+  const candidates = side.onCourtIntervals.filter(interval => {
+    if (interval.periodId !== event.period.id) return false
+    const endElapsedMs = interval.endElapsedMs ?? Number.MAX_SAFE_INTEGER
+    if (event.elapsedMs! < interval.startElapsedMs || event.elapsedMs! > endElapsedMs) return false
+    if (recordedLater) return true
+    const startPosition = positions.get(interval.startEventId) ?? -1
+    const endPosition = interval.endEventId
+      ? positions.get(interval.endEventId) ?? Number.MAX_SAFE_INTEGER
+      : Number.MAX_SAFE_INTEGER
+    if (event.elapsedMs === interval.startElapsedMs && eventPosition < startPosition) return false
+    if (event.elapsedMs === interval.endElapsedMs && eventPosition > endPosition) return false
+    return true
+  })
+  if (candidates.length === 0) return null
+  const selected = candidates.sort((left, right) =>
+    right.startElapsedMs - left.startElapsedMs ||
+    (positions.get(right.startEventId) ?? -1) - (positions.get(left.startEventId) ?? -1)
+  )[0]
+  return { participantIds: selected.participantIds }
+}
+
+function runningIntersectionMs(
+  interval: BasketballLineupSideProjection['onCourtIntervals'][number],
+  clockIntervals: Array<{
+    periodId: string
+    startElapsedMs: number
+    endElapsedMs: number | null
+  }>
+): number {
+  const intervalEnd = interval.endElapsedMs ?? Number.MAX_SAFE_INTEGER
+  return clockIntervals.reduce((total, clock) => {
+    if (clock.periodId !== interval.periodId || clock.endElapsedMs === null) return total
+    const start = Math.max(interval.startElapsedMs, clock.startElapsedMs)
+    const end = Math.min(intervalEnd, clock.endElapsedMs)
+    return total + Math.max(0, end - start)
+  }, 0)
+}
+
+function scoringDelta(event: BasketballMatchEvent): number {
+  if (event.eventType === 'basketball.shot') {
+    return event.payload.made ? event.payload.value : 0
+  }
+  return event.eventType === 'basketball.score_adjustment' ? event.payload.delta : 0
+}
+
+function lineupKey(participantIds: readonly string[]): string {
+  return [...participantIds].sort().join('\u0000')
 }
 
 function ensureParticipantProjection(
@@ -652,6 +807,7 @@ function ensureParticipantProjection(
     appeared: false,
     participationMs: 0,
     participationSeconds: 0,
+    plusMinus: null,
     periodParticipationMs: {},
     creditedPeriodIds: [],
     intervals: [],
@@ -690,15 +846,10 @@ function openLineupInterval(
 function closeOpenLineupInterval(
   side: BasketballLineupSideProjection,
   eventId: string,
-  elapsedMs: number,
-  preserveZeroDuration = false
+  elapsedMs: number
 ): void {
   const interval = side.onCourtIntervals[side.onCourtIntervals.length - 1]
   if (!interval || interval.endElapsedMs !== null) return
-  if (!preserveZeroDuration && interval.startElapsedMs === elapsedMs) {
-    side.onCourtIntervals.pop()
-    return
-  }
   interval.endElapsedMs = elapsedMs
   interval.endEventId = eventId
 }

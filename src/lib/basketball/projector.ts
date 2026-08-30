@@ -158,7 +158,7 @@ export function projectBasketballEvents(
       })
     }
   } else {
-    finalizeBasketballLineupParticipation(projection)
+    finalizeBasketballLineupParticipation(projection, basketballEvents)
     diagnostics.push(...basketballLineupProjectionDiagnostics(projection))
   }
 
