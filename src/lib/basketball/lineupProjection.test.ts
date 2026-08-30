@@ -139,6 +139,38 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     ]))
   })
 
+  it('keeps successive same-elapsed substitutions as distinct appearance authority', () => {
+    const entered = requireState(substituteBasketballLineup(anchoredState(), {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      occurredAt: after(1_000),
+      eventId: uuid(60),
+    }))
+    const restored = requireState(substituteBasketballLineup(entered, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: trackedStarterIds(),
+      occurredAt: after(2_000),
+      eventId: uuid(61),
+    }))
+
+    const lineup = trackedLineup(restored)
+    expect(lineup.participationByParticipantId['tracked-6']).toMatchObject({
+      appeared: true,
+      participationMs: 0,
+      creditedPeriodIds: [],
+    })
+    expect(lineup.onCourtIntervals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+        startElapsedMs: 0,
+        endElapsedMs: 0,
+      }),
+    ]))
+    expect(lineup.lineupCombinations).toHaveLength(2)
+  })
+
   it('derives player and five-person plus-minus from scoring lineup coverage', () => {
     const paused = runAndPause(anchoredState({ opponent: true }), 0, 12_345, 6)
     const scored = captureBasketballDirectStat(paused, {

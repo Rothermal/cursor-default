@@ -18,9 +18,9 @@ Status: Automated checks pass. Browser smoke is not run in this implementation e
 | Gate | Result |
 |---|---|
 | `pnpm typecheck` | Pass |
-| Focused BKE-6D1 tests | Pass: 3 files / 34 tests |
-| Basketball test directory | Pass: 60 files / 463 tests |
-| Full Vitest suite | Pass: 176 files / 1,243 tests |
+| Focused BKE-6D1 and source-contract tests | Pass: 4 files / 56 tests |
+| Basketball test directory | Pass: 60 files / 465 tests |
+| Full Vitest suite | Pass: 176 files / 1,245 tests |
 | `pnpm build` | Pass; 12-entry PWA precache is about 2.1 MiB |
 | `pnpm lint` | Pass: 0 errors / 6 existing Fast Refresh warnings |
 | `git diff --check` | Pass |

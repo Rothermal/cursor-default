@@ -322,6 +322,27 @@ describe('Basketball release entry guards', () => {
     expect(projector).toContain('orderBasketballEventsForProjection(captureOrderedEvents)')
   })
 
+  it('keeps BKE-6D1 Summary review isolated and duration formatting centralized', () => {
+    const summary = source('src/pages/BasketballSummary.tsx')
+    const clockStatus = source(
+      'src/components/basketball-summary/BasketballSummaryClockStatus.tsx'
+    )
+    const teamStats = source('src/components/basketball-summary/BasketballTeamStats.tsx')
+    const aggregate = source('src/lib/basketball/aggregateStats.ts')
+    const correction = source('src/lib/basketball/lineupCorrectionCommands.ts')
+
+    expect(summary).toContain('<BasketballSummaryClockStatus source={source} />')
+    expect(clockStatus).toContain('deriveBasketballClockDisplay')
+    expect(clockStatus).toContain('remote display')
+    expect(clockStatus).not.toContain('useGame(')
+    expect(clockStatus).not.toContain('dispatch(')
+    expect(teamStats).toContain("quality.clockModel === 'anchored'")
+    expect(teamStats).toContain('<LineupRows name={trackedName}')
+    expect(aggregate).toContain('formatBasketballDurationSeconds')
+    expect(correction).toContain('formatBasketballDurationMs')
+    expect(correction).not.toContain('Math.round(valueMs / 1_000)')
+  })
+
   it('keeps the courtside production shell under an explicit offline precache budget', () => {
     const viteConfig = source('vite.config.ts')
 
