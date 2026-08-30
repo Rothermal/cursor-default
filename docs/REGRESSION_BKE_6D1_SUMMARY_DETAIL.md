@@ -52,5 +52,6 @@ under preserved zero-duration intervals.
 
 ## Exit
 
-BKE-6D1 is complete. BKE-6D2 next extends the pure canonical aggregate path with exact seconds,
-appearances, DNP, and coverage-aware plus-minus without changing historical manual-minute authority.
+BKE-6D1 is complete. BKE-6D2 now extends the pure canonical aggregate path with exact seconds,
+appearances, DNP, and coverage-aware plus-minus without changing historical manual-minute authority;
+BKE-6D3 anchored cloud transport is next.

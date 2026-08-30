@@ -1,7 +1,7 @@
 # Plan: BKE-6C Live Lineups and Corrections
 
 Status: Complete. All 16 implementation decisions and BKE-6C1 through BKE-6C4 are implemented.
-BKE-6D's detailed four-slice plan is approved; BKE-6D1 is complete and BKE-6D2 is next.
+BKE-6D's detailed four-slice plan is approved; BKE-6D1 and BKE-6D2 are complete and BKE-6D3 is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 

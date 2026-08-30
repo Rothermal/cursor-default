@@ -5,6 +5,7 @@ import {
   basketballAggregateCategoryHasValues,
   basketballAggregateMetricAvailable,
   basketballAggregateMetricLabel,
+  basketballPlayerAggregateMetricAvailable,
   basketballAggregateRankingMetrics,
   basketballAggregateVisibleColumns,
   formatBasketballAggregateMetric,
@@ -13,6 +14,8 @@ import {
 } from './aggregateDestinations'
 import {
   AGGREGATE_PLAYERS,
+  ANCHORED_AGGREGATE_PLAYERS,
+  makeAnchoredCanonicalAggregateSource,
   makeCanonicalAggregateSource,
   makeLegacyAggregateSource,
 } from './aggregateTestFixtures'
@@ -91,5 +94,20 @@ describe('Basketball aggregate destination adapter', () => {
     expect(shouldAutoRefreshBasketballAggregates({
       loading: false, visible: true, now: 100, lastRefreshAt: 0,
     })).toBe(false)
+  })
+
+  it('suppresses partial plus-minus rankings while retaining individual review', () => {
+    const aggregate = aggregateBasketballSources(
+      { type: 'career', id: ANCHORED_AGGREGATE_PLAYERS.starter },
+      [makeAnchoredCanonicalAggregateSource()],
+      [makeLegacyAggregateSource({ playerId: ANCHORED_AGGREGATE_PLAYERS.starter })]
+    )
+    const participation = BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES.find(
+      category => category.id === 'participation'
+    )!
+    const player = aggregate.players[0]
+    expect(basketballAggregateRankingMetrics(aggregate, participation)).not.toContain('bk_pm')
+    expect(basketballPlayerAggregateMetricAvailable(aggregate, player, 'bk_pm')).toBe(true)
+    expect(formatBasketballAggregateMetric(player, 'bk_pm')).toBe('+2')
   })
 })

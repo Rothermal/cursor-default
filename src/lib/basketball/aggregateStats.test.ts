@@ -8,6 +8,7 @@ import {
   basketballCanonicalStatsFromTotals,
   emptyBasketballAggregateStats,
   formatBasketballAggregateDuration,
+  formatBasketballAggregateStat,
   formatBasketballAggregateRate,
   mergeBasketballMatchStats,
 } from './aggregateStats'
@@ -15,8 +16,8 @@ import { emptyBasketballStatTotals } from './state'
 
 describe('Basketball canonical aggregate stat contract', () => {
   it('keeps the exact unique bk catalog isolated from live SportConfig actions', () => {
-    expect(BASKETBALL_CANONICAL_STAT_IDS).toHaveLength(22)
-    expect(new Set(BASKETBALL_CANONICAL_STAT_IDS).size).toBe(22)
+    expect(BASKETBALL_CANONICAL_STAT_IDS).toHaveLength(24)
+    expect(new Set(BASKETBALL_CANONICAL_STAT_IDS).size).toBe(24)
     expect(BASKETBALL_AGGREGATE_STAT_DEFINITIONS.map(definition => definition.id).sort())
       .toEqual([...BASKETBALL_CANONICAL_STAT_IDS].sort())
     expect(basketballAggregateSportCategories().map(category => category.id))
@@ -32,7 +33,7 @@ describe('Basketball canonical aggregate stat contract', () => {
     })
 
     expect(stats).toEqual({
-      bk_app: 1, bk_start: 1, bk_min_sec: 1_020,
+      bk_app: 1, bk_start: 1, bk_dnp: 0, bk_min_sec: 1_020, bk_pm: 0,
       bk_pts: 17,
       bk_fgm: 6, bk_fga: 10,
       bk_2pm: 4, bk_2pa: 7,
@@ -77,6 +78,8 @@ describe('Basketball canonical aggregate stat contract', () => {
       bk_app: 1, bk_start: 1, bk_min_sec: 600, bk_pts: 5, bk_dq: 1, bk_eject: 1,
     })
     expect(formatBasketballAggregateDuration(600)).toBe('10:00')
+    expect(formatBasketballAggregateStat('bk_pm', 4)).toBe('+4')
+    expect(formatBasketballAggregateStat('bk_pm', -2)).toBe('-2')
     expect(formatBasketballAggregateRate({ numerator: 3, denominator: 4, value: 0.75 }, true))
       .toBe('75% (3/4)')
     expect(formatBasketballAggregateRate(
@@ -85,5 +88,21 @@ describe('Basketball canonical aggregate stat contract', () => {
       false
     )).toBe('58%')
     expect(formatBasketballAggregateRate(null, false)).toBe('-')
+
+    const dnp = basketballCanonicalStatsFromTotals(
+      emptyBasketballStatTotals(),
+      {
+        appeared: false,
+        started: false,
+        dnp: true,
+        participationMs: 999,
+        plusMinus: 0,
+        disqualified: false,
+        ejected: false,
+      }
+    )
+    expect(dnp).toMatchObject({ bk_dnp: 1, bk_min_sec: 0, bk_pm: 0 })
+    mergeBasketballMatchStats(dnp, first)
+    expect(dnp).toMatchObject({ bk_app: 1, bk_dnp: 0 })
   })
 })

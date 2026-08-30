@@ -1,5 +1,8 @@
 import type { StatCategory, StatColor } from '../../types'
-import { formatBasketballDurationSeconds } from './duration'
+import {
+  basketballWholeSecondsFromMs,
+  formatBasketballDurationSeconds,
+} from './duration'
 import type { BasketballStatTotals } from './types'
 
 export const BASKETBALL_AGGREGATE_CATEGORY_IDS = [
@@ -18,7 +21,9 @@ export type BasketballAggregateCategoryId =
 export const BASKETBALL_CANONICAL_STAT_IDS = [
   'bk_app',
   'bk_start',
+  'bk_dnp',
   'bk_min_sec',
+  'bk_pm',
   'bk_pts',
   'bk_fgm',
   'bk_fga',
@@ -42,7 +47,7 @@ export const BASKETBALL_CANONICAL_STAT_IDS = [
 
 export type BasketballCanonicalStatId = typeof BASKETBALL_CANONICAL_STAT_IDS[number]
 export type BasketballAggregateStats = Record<BasketballCanonicalStatId, number>
-export type BasketballAggregateStatFormat = 'integer' | 'duration'
+export type BasketballAggregateStatFormat = 'integer' | 'duration' | 'signed'
 
 export interface BasketballAggregateStatDefinition {
   id: BasketballCanonicalStatId
@@ -92,7 +97,9 @@ readonly BasketballAggregateStatDefinition[] = [
   stat('bk_eject', 'discipline', 'Ejections', 'EJ'),
   stat('bk_app', 'participation', 'Appearances', 'APP'),
   stat('bk_start', 'participation', 'Starts', 'ST'),
-  stat('bk_min_sec', 'participation', 'Recorded Minutes', 'MIN', 'duration'),
+  stat('bk_dnp', 'participation', 'Did Not Play', 'DNP'),
+  stat('bk_min_sec', 'participation', 'Minutes', 'MIN', 'duration'),
+  stat('bk_pm', 'participation', 'Plus-Minus', '+/-', 'signed'),
 ]
 
 export type BasketballAggregateRateId =
@@ -121,6 +128,9 @@ export interface BasketballAggregateParticipation {
   started: boolean
   disqualified: boolean
   ejected: boolean
+  dnp?: boolean
+  participationMs?: number
+  plusMinus?: number | null
 }
 
 const DEFINITION_BY_ID = new Map(
@@ -161,7 +171,11 @@ export function basketballCanonicalStatsFromTotals(
   return {
     bk_app: participation.appeared ? 1 : 0,
     bk_start: participation.appeared && participation.started ? 1 : 0,
-    bk_min_sec: Math.max(0, finiteNumber(totals.min) * 60),
+    bk_dnp: participation.dnp && !participation.appeared ? 1 : 0,
+    bk_min_sec: participation.participationMs === undefined
+      ? Math.max(0, finiteNumber(totals.min) * 60)
+      : basketballWholeSecondsFromMs(participation.participationMs),
+    bk_pm: finiteNumber(participation.plusMinus ?? 0),
     bk_pts: totals.ft + totals['2pt'] * 2 + totals['3pt'] * 3,
     bk_fgm: fieldGoalsMade,
     bk_fga: fieldGoalAttempts,
@@ -198,11 +212,13 @@ export function mergeBasketballMatchStats(
 ): BasketballAggregateStats {
   const appearances = Math.max(target.bk_app, source.bk_app)
   const starts = Math.max(target.bk_start, source.bk_start)
+  const didNotPlay = Math.max(target.bk_dnp, source.bk_dnp)
   const disqualifications = Math.max(target.bk_dq, source.bk_dq)
   const ejections = Math.max(target.bk_eject, source.bk_eject)
   addBasketballAggregateStatsInPlace(target, source)
   target.bk_app = appearances
   target.bk_start = starts
+  target.bk_dnp = appearances > 0 ? 0 : didNotPlay
   target.bk_dq = disqualifications
   target.bk_eject = ejections
   return target
@@ -237,9 +253,10 @@ export function formatBasketballAggregateStat(
   id: BasketballCanonicalStatId,
   value: number
 ): string {
-  return DEFINITION_BY_ID.get(id)?.format === 'duration'
-    ? formatBasketballAggregateDuration(value)
-    : String(value)
+  const format = DEFINITION_BY_ID.get(id)?.format
+  if (format === 'duration') return formatBasketballAggregateDuration(value)
+  if (format === 'signed' && value > 0) return `+${value}`
+  return String(value)
 }
 
 export function formatBasketballAggregateRate(

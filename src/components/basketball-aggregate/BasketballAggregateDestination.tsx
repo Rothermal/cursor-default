@@ -397,6 +397,7 @@ function Players({
     ? category.defaultMetricId
     : availableRankingMetrics[0] ?? category.defaultMetricId
   const [metricId, setMetricId] = useState<BasketballAggregateMetricId>(defaultMetric)
+  const plusMinusCoverage = aggregate.metricCoverage.bk_pm
 
   useEffect(() => setMetricId(defaultMetric), [category, defaultMetric])
 
@@ -419,6 +420,12 @@ function Players({
             {availableRankingMetrics.map(id => <option key={id} value={id}>{basketballAggregateMetricLabel(id).label}</option>)}
           </select>
         </label>
+      )}
+      {category.id === 'participation' && plusMinusCoverage && !plusMinusCoverage.complete && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Plus-minus comparison is unavailable: {plusMinusCoverage.includedGameCount} of{' '}
+          {plusMinusCoverage.totalGameCount} games have complete lineup and scoring coverage.
+        </div>
       )}
       {basketballAggregateCategoryHasValues(aggregate.players, category, aggregate) && availableRankingMetrics.length > 0 ? (
         <PlayerTable

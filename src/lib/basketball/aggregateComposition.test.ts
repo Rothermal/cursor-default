@@ -7,6 +7,8 @@ import {
 } from './aggregateComposition'
 import {
   AGGREGATE_PLAYERS,
+  ANCHORED_AGGREGATE_PLAYERS,
+  makeAnchoredCanonicalAggregateSource,
   makeCanonicalAggregateSource,
   makeLegacyAggregateSource,
 } from './aggregateTestFixtures'
@@ -76,6 +78,56 @@ describe('Basketball mixed-authority aggregate composition', () => {
         pointsFor: 16, pointsAgainst: 19, pointDifference: -3,
       },
     })
+  })
+
+  it('keeps partial plus-minus numeric totals separate from eligibility coverage', () => {
+    const anchored = makeAnchoredCanonicalAggregateSource()
+    const legacy = makeLegacyAggregateSource({
+      playerId: ANCHORED_AGGREGATE_PLAYERS.starter,
+    })
+    const aggregate = aggregateBasketballSources(
+      { type: 'career', id: ANCHORED_AGGREGATE_PLAYERS.starter },
+      [anchored],
+      [legacy]
+    )
+    const player = aggregate.players[0]
+    expect(aggregate).toMatchObject({
+      participationBasis: 'mixed',
+      metricCoverage: {
+        bk_pm: { includedGameCount: 1, totalGameCount: 2, complete: false },
+      },
+    })
+    expect(aggregate.availableMetricIds).not.toContain('bk_pm')
+    expect(player).toMatchObject({
+      participationBasis: 'mixed',
+      stats: { bk_pm: 2 },
+      metricCoverage: {
+        bk_pm: { includedGameCount: 1, totalGameCount: 2, complete: false },
+      },
+    })
+    expect(player.metricCoverage.bk_pm?.reasons).toContain(
+      'Plus-minus requires anchored lineup authority.'
+    )
+  })
+
+  it('keeps optional opponent match values out of tracked-roster destinations', () => {
+    const source = makeAnchoredCanonicalAggregateSource()
+    const team = aggregateBasketballSources(
+      { type: 'team', id: 'team-1' },
+      [source],
+      []
+    )
+    expect(team.players.some(
+      player => player.playerId === ANCHORED_AGGREGATE_PLAYERS.opponent
+    )).toBe(false)
+
+    const opponentCareer = aggregateBasketballSources(
+      { type: 'career', id: ANCHORED_AGGREGATE_PLAYERS.opponent },
+      [source],
+      []
+    )
+    expect(opponentCareer.includedGameCount).toBe(0)
+    expect(opponentCareer.players).toEqual([])
   })
 
   it('keeps personal games in player/career only and labels their game authority', () => {

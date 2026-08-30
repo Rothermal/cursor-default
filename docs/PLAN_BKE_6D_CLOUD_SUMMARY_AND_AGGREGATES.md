@@ -1,7 +1,7 @@
 # Plan: BKE-6D Cloud Summary, Aggregates, and Lifecycle
 
-Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 is
-implemented; BKE-6D2 exact-second aggregates are next.
+Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 and BKE-6D2
+are implemented; BKE-6D3 anchored cloud transport is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -236,6 +236,14 @@ No migration is expected in BKE-6D1.
 ---
 
 ## 6. BKE-6D2: Exact-Second Aggregates
+
+Status: Implemented. The canonical catalog adds `bk_dnp` and signed `bk_pm`; anchored match
+projection consumes projector-owned participation milliseconds, lineup-entry evidence, and
+side-specific plus-minus eligibility. Aggregate and player records carry participation basis plus
+structured included/total-game coverage and reasons. Profile/Career may display a partial eligible
+sum, while comparative destinations continue to require complete scope coverage. Existing exact
+RPC envelopes derive the new fields from their canonical snapshots, so no migration was added. See
+[REGRESSION_BKE_6D2_EXACT_AGGREGATES.md](REGRESSION_BKE_6D2_EXACT_AGGREGATES.md).
 
 Extend the pure BKE-4E aggregate engine. Canonical snapshots continue rebuilding through the shared
 registry/projector and produce one match contribution; no aggregate table or denormalized lineup

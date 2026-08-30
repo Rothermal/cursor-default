@@ -107,7 +107,7 @@ const DEFAULT_COLUMNS: Record<
   playmaking: ['bk_ast', 'bk_to', 'assist_to_turnover_ratio', 'bk_app'],
   defense: ['bk_stl', 'bk_blk', 'bk_app'],
   discipline: ['bk_pf', 'bk_dq', 'bk_eject', 'bk_app'],
-  participation: ['bk_app', 'bk_start', 'bk_min_sec'],
+  participation: ['bk_app', 'bk_start', 'bk_dnp', 'bk_min_sec', 'bk_pm'],
 }
 
 const RANKING_METRICS: Record<
@@ -124,7 +124,7 @@ const RANKING_METRICS: Record<
   playmaking: ['bk_ast', 'bk_to', 'assist_to_turnover_ratio', 'bk_app'],
   defense: ['bk_stl', 'bk_blk', 'bk_app'],
   discipline: ['bk_pf', 'bk_dq', 'bk_eject', 'bk_app'],
-  participation: ['bk_app', 'bk_start', 'bk_min_sec'],
+  participation: ['bk_app', 'bk_start', 'bk_dnp', 'bk_min_sec', 'bk_pm'],
 }
 
 export const BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES:
@@ -200,6 +200,18 @@ export function basketballAggregateMetricAvailable(
 ): boolean {
   const available = new Set(aggregate.availableMetricIds)
   return metricDependencies(metricId).every(id => available.has(id))
+}
+
+export function basketballPlayerAggregateMetricAvailable(
+  aggregate: BasketballAggregateResult,
+  player: BasketballAggregatePlayer,
+  metricId: BasketballAggregateMetricId
+): boolean {
+  if (metricId === 'bk_dnp' || metricId === 'bk_pm') {
+    const coverage = player.metricCoverage[metricId]
+    if (coverage) return coverage.includedGameCount > 0
+  }
+  return basketballAggregateMetricAvailable(aggregate, metricId)
 }
 
 export function basketballAggregateRankingMetrics(
