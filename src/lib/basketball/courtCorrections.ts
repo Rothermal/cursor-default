@@ -555,6 +555,18 @@ function captureUnitLabel(
     case 'basketball.minutes_adjustment': return 'Minutes adjustment'
     case 'basketball.score_adjustment': return 'Score adjustment'
     case 'basketball.free_throw_trip': return 'Free throw trip'
+    case 'basketball.substitution':
+      return events[0].payload.mode === 'current_lineup_recovery'
+        ? 'Current lineup recovered'
+        : events.some(event => event.eventType === 'basketball.role_changed')
+          ? 'Lineup and roles updated'
+          : 'Lineup updated'
+    case 'basketball.role_changed': return 'Player roles updated'
+    case 'basketball.equal_play_override':
+      return events.some(event => event.eventType === 'basketball.lineup_confirmed')
+        ? 'Lineup confirmed with override'
+        : 'Equal-play override'
+    case 'basketball.lineup_confirmed': return 'Lineup confirmed'
     default: return 'Basketball event'
   }
 }

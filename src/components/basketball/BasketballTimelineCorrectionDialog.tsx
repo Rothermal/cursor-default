@@ -11,7 +11,7 @@ import {
 
 export type BasketballTimelineCorrectionIntent =
   | { kind: 'remove'; eventId: string; scope: BasketballTimelineRemovalScope }
-  | { kind: 'restore'; eventId: string }
+  | { kind: 'restore'; eventId: string; scope?: BasketballTimelineRemovalScope }
 
 interface BasketballTimelineCorrectionDialogProps {
   intent: BasketballTimelineCorrectionIntent
@@ -64,7 +64,7 @@ export default function BasketballTimelineCorrectionDialog({
   }, [onClose])
 
   const baseRestoreResult = useMemo(() => intent.kind === 'restore'
-    ? previewBasketballTimelineRestore(state, intent.eventId)
+    ? previewBasketballTimelineRestore(state, intent.eventId, [], undefined, intent.scope ?? 'event')
     : null, [intent, state])
 
   const previewResult = useMemo(() => {
@@ -82,7 +82,8 @@ export default function BasketballTimelineCorrectionDialog({
             restoreOptions: baseRestoreResult.value.restoreOptions,
             streamFingerprint: baseRestoreResult.value.streamFingerprint,
           }
-        : undefined
+        : undefined,
+      intent.scope ?? 'event'
     )
   }, [
     baseRestoreResult,
@@ -98,7 +99,7 @@ export default function BasketballTimelineCorrectionDialog({
   const previewError = previewResult.ok ? null : previewResult.message
   const title = intent.kind === 'remove'
     ? intent.scope === 'capture_group' ? 'Remove capture?' : 'Remove event?'
-    : 'Restore event?'
+    : intent.scope === 'capture_group' ? 'Restore capture?' : 'Restore event?'
 
   const apply = () => {
     if (!preview) return

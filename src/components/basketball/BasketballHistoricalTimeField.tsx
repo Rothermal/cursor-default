@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import type { GameState } from '../../types'
 import type { GameEventPeriod } from '../../lib/gameEvents/types'
-import { defaultBasketballHistoricalTime } from '../../lib/basketball/historicalTime'
+import {
+  basketballHistoricalDisplayMs,
+  basketballHistoricalElapsedMs,
+  defaultBasketballHistoricalTime,
+} from '../../lib/basketball/historicalTime'
 
 export default function BasketballHistoricalTimeField({
   state,
@@ -19,7 +23,7 @@ export default function BasketballHistoricalTimeField({
   const countDown = resolved.ok && resolved.countDown
   const displayMs = durationMs === null || elapsedMs === null
     ? null
-    : countDown ? durationMs - elapsedMs : elapsedMs
+    : basketballHistoricalDisplayMs(durationMs, elapsedMs, countDown)
   const [value, setValue] = useState(() => formatTime(displayMs))
 
   if (durationMs === null) return null
@@ -35,7 +39,9 @@ export default function BasketballHistoricalTimeField({
           const next = event.target.value
           setValue(next)
           const parsed = parseTime(next)
-          if (parsed !== null) onChange(countDown ? durationMs - parsed : parsed)
+          if (parsed !== null) {
+            onChange(basketballHistoricalElapsedMs(durationMs, parsed, countDown))
+          }
         }}
         onBlur={() => {
           if (parseTime(value) === null) onChange(null)

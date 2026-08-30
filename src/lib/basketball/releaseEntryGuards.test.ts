@@ -305,6 +305,22 @@ describe('Basketball release entry guards', () => {
     expect(timeline).toContain("state.sportGameState.projection.participants[participantId]")
   })
 
+  it('keeps lineup correction in Timeline and older Recent Events routed there', () => {
+    const timeline = source('src/components/basketball/BasketballTimeline.tsx')
+    const editor = source('src/components/basketball/BasketballLineupCorrectionEditor.tsx')
+    const recent = source('src/components/basketball/BasketballRecentEventsPopup.tsx')
+    const tracker = source('src/pages/GameTracker.tsx')
+    const projector = source('src/lib/basketball/projector.ts')
+
+    expect(timeline).toContain('<BasketballLineupCorrectionEditor')
+    expect(timeline).toContain("scope: 'capture_group'")
+    expect(editor).toContain('previewBasketballLineupCorrection(state, draft)')
+    expect(editor).toContain('applyBasketballLineupCorrection(state, preview)')
+    expect(recent).toContain("openTimeline ? 'Timeline' : 'Undo'")
+    expect(tracker).toContain("setBasketballWorkspace('timeline')")
+    expect(projector).toContain('orderBasketballEventsForProjection(captureOrderedEvents)')
+  })
+
   it('keeps the courtside production shell under an explicit offline precache budget', () => {
     const viteConfig = source('vite.config.ts')
 

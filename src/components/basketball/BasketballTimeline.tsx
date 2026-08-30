@@ -46,6 +46,10 @@ import {
   type BasketballEditableAdministrationEventType,
 } from '../../lib/basketball/administrationEditCommands'
 import BasketballAdministrationEditor from './BasketballAdministrationEditor'
+import {
+  isBasketballEditableLineupEvent,
+} from '../../lib/basketball/lineupCorrectionCommands'
+import BasketballLineupCorrectionEditor from './BasketballLineupCorrectionEditor'
 
 interface Props {
   reviewState?: GameState
@@ -84,6 +88,7 @@ export default function BasketballTimeline({
   const [editingValueEventId, setEditingValueEventId] = useState<string | null>(null)
   const [editingFoulFreeThrowEventId, setEditingFoulFreeThrowEventId] = useState<string | null>(null)
   const [editingAdministrationEventId, setEditingAdministrationEventId] = useState<string | null>(null)
+  const [editingLineupEventId, setEditingLineupEventId] = useState<string | null>(null)
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null)
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [addingShot, setAddingShot] = useState(false)
@@ -397,13 +402,15 @@ export default function BasketballTimeline({
               isBasketballEditableFoulFreeThrowEvent(eventDetail.event) ||
               isBasketballEditableValueEvent(eventDetail.event) ||
               isBasketballEditableRelatedEvent(eventDetail.event) ||
-              isBasketballEditableAdministrationEvent(eventDetail.event)
+              isBasketballEditableAdministrationEvent(eventDetail.event) ||
+              isBasketballEditableLineupEvent(eventDetail.event)
             )
             ? () => {
                 if (isBasketballEditableFoulFreeThrowEvent(eventDetail.event)) setEditingFoulFreeThrowEventId(eventDetail.id)
                 else if (isBasketballEditableValueEvent(eventDetail.event)) setEditingValueEventId(eventDetail.id)
                 else if (isBasketballEditableRelatedEvent(eventDetail.event)) setEditingRelatedEventId(eventDetail.id)
-                else setEditingAdministrationEventId(eventDetail.id)
+                else if (isBasketballEditableAdministrationEvent(eventDetail.event)) setEditingAdministrationEventId(eventDetail.id)
+                else setEditingLineupEventId(eventDetail.id)
                 setEventDetail(null)
               }
             : undefined}
@@ -500,6 +507,21 @@ export default function BasketballTimeline({
           }}
           onApplied={eventId => {
             setEditingAdministrationEventId(null)
+            setHighlightEventId(eventId)
+            restoreFocus()
+          }}
+        />
+      )}
+
+      {editingLineupEventId && (
+        <BasketballLineupCorrectionEditor
+          eventId={editingLineupEventId}
+          onClose={() => {
+            setEditingLineupEventId(null)
+            restoreFocus()
+          }}
+          onApplied={eventId => {
+            setEditingLineupEventId(null)
             setHighlightEventId(eventId)
             restoreFocus()
           }}
@@ -701,6 +723,20 @@ function TimelineGroup({
           >
             <Trash2 size={16} aria-hidden />
             Remove capture
+          </button>
+        )}
+        {correctionsEnabled && removed && !group.boundary && (
+          <button
+            type="button"
+            onClick={() => onCorrect({
+              kind: 'restore',
+              eventId: group.events[0].id,
+              scope: 'capture_group',
+            })}
+            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-blue-200 bg-white text-sm font-bold text-blue-800"
+          >
+            <RotateCcw size={16} aria-hidden />
+            Restore capture
           </button>
         )}
       </div>

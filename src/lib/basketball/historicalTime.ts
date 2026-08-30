@@ -7,6 +7,22 @@ export type BasketballHistoricalTimeResult =
   | { ok: true; elapsedMs: number | null; durationMs: number | null; countDown: boolean }
   | { ok: false; message: string }
 
+export function basketballHistoricalDisplayMs(
+  durationMs: number,
+  elapsedMs: number,
+  countDown: boolean
+): number {
+  return countDown ? durationMs - elapsedMs : elapsedMs
+}
+
+export function basketballHistoricalElapsedMs(
+  durationMs: number,
+  displayMs: number,
+  countDown: boolean
+): number {
+  return countDown ? durationMs - displayMs : displayMs
+}
+
 export function defaultBasketballHistoricalTime(
   state: GameState,
   period: GameEventPeriod,
@@ -71,6 +87,14 @@ export function validateBasketballHistoricalTime(
     elapsedMs > resolved.durationMs
   ) {
     return { ok: false, message: 'Enter a game time within the selected Basketball period.' }
+  }
+  if (
+    state.sportGameState?.sportId === 'basketball' &&
+    state.sportGameState.projection.clock?.periodId === period.id &&
+    resolved.elapsedMs !== null &&
+    elapsedMs > resolved.elapsedMs
+  ) {
+    return { ok: false, message: 'Historical Basketball time cannot exceed the current clock watermark.' }
   }
   return { ...resolved, elapsedMs }
 }

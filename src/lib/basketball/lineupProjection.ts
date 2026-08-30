@@ -63,7 +63,10 @@ export function applyBasketballLineupEvent(
   if (!projection.lineup || !projection.clock) {
     return 'Basketball lineup events require anchored lineup authority.'
   }
-  if (projection.clock.running) return 'Pause the Basketball clock before changing the lineup.'
+  const recordedLater = event.payload.recordedLater === true
+  if (projection.clock.running && !recordedLater) {
+    return 'Pause the Basketball clock before changing the lineup.'
+  }
   if (projection.status !== 'in_progress' || event.period.id !== projection.currentPeriodId) {
     return 'Basketball lineup event requires the active period.'
   }
@@ -137,6 +140,50 @@ export function basketballLineupProjectionDiagnostics(
         message: 'Basketball equal-play override is dangling without its lineup confirmation.',
       }]
     : []
+}
+
+export function finalizeBasketballLineupParticipation(
+  projection: BasketballMatchProjection
+): void {
+  const lineup = projection.lineup
+  if (!lineup) return
+  const closedClockIntervals = lineup.runningClockIntervals.filter(interval =>
+    interval.endElapsedMs !== null && interval.endEventId !== null
+  )
+
+  for (const side of enabledSides(projection)) {
+    for (const participation of Object.values(side.participationByParticipantId)) {
+      participation.intervals = []
+      participation.complete = side.incompletePeriodIds.length === 0
+    }
+    for (const courtInterval of side.onCourtIntervals) {
+      const courtEnd = courtInterval.endElapsedMs ?? Number.MAX_SAFE_INTEGER
+      for (const clockInterval of closedClockIntervals) {
+        if (clockInterval.periodId !== courtInterval.periodId) continue
+        const clockEnd = clockInterval.endElapsedMs!
+        const startElapsedMs = Math.max(courtInterval.startElapsedMs, clockInterval.startElapsedMs)
+        const endElapsedMs = Math.min(courtEnd, clockEnd)
+        if (endElapsedMs <= startElapsedMs) continue
+        for (const participantId of courtInterval.participantIds) {
+          const participation = side.participationByParticipantId[participantId]
+          if (!participation) continue
+          participation.intervals.push({
+            periodId: courtInterval.periodId,
+            startElapsedMs,
+            endElapsedMs,
+            durationMs: endElapsedMs - startElapsedMs,
+            startEventId: courtInterval.startElapsedMs >= clockInterval.startElapsedMs
+              ? courtInterval.startEventId
+              : clockInterval.startEventId,
+            endEventId: courtInterval.endElapsedMs !== null && courtEnd <= clockEnd
+              ? courtInterval.endEventId!
+              : clockInterval.endEventId!,
+          })
+        }
+      }
+    }
+    refreshSideParticipationTotals(projection, side)
+  }
 }
 
 export function evaluateBasketballEqualPlayCandidate(
@@ -259,6 +306,18 @@ function applySubstitution(
   if (event.payload.mode === 'boundary' &&
       (!currentSegment || !lineupChangeBoundary(sportState, currentSegment.id) || side.clockStartedInPeriod)) {
     return 'Boundary Basketball substitution requires an unstarted lineup-change boundary.'
+  }
+
+  if (event.payload.recordedLater === true && projection.clock?.running) {
+    const splitError = closeRunningClockInterval(projection, event.id, event.elapsedMs!)
+    if (splitError) return splitError
+    projection.lineup!.runningClockIntervals.push({
+      periodId: event.period.id,
+      startElapsedMs: event.elapsedMs!,
+      endElapsedMs: null,
+      startEventId: event.id,
+      endEventId: null,
+    })
   }
 
   closeOpenLineupInterval(

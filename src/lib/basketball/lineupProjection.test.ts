@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { sports } from '../../config/sports'
 import type { GameState, Player } from '../../types'
 import { createInitialState } from '../gameReducer'
+import { isGameEventEnvelope } from '../gameEvents/envelope'
 import { addGameEvent } from '../gameEvents/mutations'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
@@ -11,6 +12,7 @@ import {
   addBasketballLateParticipant,
   endBasketballPeriod,
   startNextBasketballPeriod,
+  suspendBasketballMatch,
 } from './commands'
 import {
   pauseBasketballClock,
@@ -18,6 +20,10 @@ import {
   startBasketballClock,
 } from './clockCommands'
 import { createBasketballLifecycleEvent } from './events'
+import {
+  basketballHistoricalDisplayMs,
+  basketballHistoricalElapsedMs,
+} from './historicalTime'
 import { createBasketballLineupEvent } from './lineupEvents'
 import {
   changeBasketballParticipantRoles,
@@ -25,6 +31,18 @@ import {
   substituteBasketballLineup,
   updateBasketballLineup,
 } from './lineupCommands'
+import {
+  applyBasketballLineupCorrection,
+  basketballLineupCorrectionDraft,
+  previewBasketballLineupCorrection,
+} from './lineupCorrectionCommands'
+import {
+  previewBasketballTimelineRemoval,
+  previewBasketballTimelineRestore,
+  removeBasketballTimelineEvents,
+  restoreBasketballTimelineEvent,
+} from './timelineCorrections'
+import { buildBasketballTimelineReview, filterBasketballTimelineGroups } from './timeline'
 import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
 import { createBasketballSportGameState } from './state'
 import type {
@@ -40,6 +58,13 @@ const recorderUserId = 'recorder-1'
 const baseTime = '2026-08-27T14:00:00.000Z'
 
 describe('BKE-6A3 Basketball lineup and participation projection', () => {
+  it('converts count-up and count-down historical clock values without changing authority', () => {
+    expect(basketballHistoricalDisplayMs(8 * 60_000, 5_000, false)).toBe(5_000)
+    expect(basketballHistoricalElapsedMs(8 * 60_000, 5_000, false)).toBe(5_000)
+    expect(basketballHistoricalDisplayMs(8 * 60_000, 5_000, true)).toBe(7 * 60_000 + 55_000)
+    expect(basketballHistoricalElapsedMs(8 * 60_000, 7 * 60_000 + 55_000, true)).toBe(5_000)
+  })
+
   it('derives exact participation from running intervals and leaves manual minutes inert', () => {
     const state = anchoredState()
     const started = requireState(startBasketballClock(state, {
@@ -412,6 +437,9 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     expect(appended.ok).toBe(true)
     if (!appended.ok) return
     expect(trackedLineup(appended.state).replacementRequiredParticipantIds).toEqual(['tracked-1'])
+    expect(buildBasketballTimelineReview(appended.state).globalWarnings).toContain(
+      'Tracked lineup has an ejected or disqualified player awaiting replacement.'
+    )
     expect(startBasketballClock(appended.state, {
       recorderUserId,
       occurredAt: after(2_000),
@@ -466,6 +494,9 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     expect(trackedLineup(recovered).onCourtIntervals[1].complete).toBe(false)
     expect(Object.values(trackedLineup(recovered).participationByParticipantId)
       .every(value => !value.complete)).toBe(true)
+    expect(buildBasketballTimelineReview(recovered).globalWarnings).toContain(
+      'Tracked lineup history is deliberately incomplete after Set Current Lineup; uncertain minutes remain unestimated.'
+    )
   })
 
   it('keeps a late participant on the bench until an ordinary substitution enters them', () => {
@@ -795,6 +826,147 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
       enforcedOverridesComplete: false,
       pendingEqualPlayOverride: expect.objectContaining({ eventId: override.id }),
     })
+  })
+
+  it('replays a backdated substitution through later clock intervals and rejects stale apply', () => {
+    const firstPause = runAndPause(anchoredState(), 0, 10_000, 920)
+    const substituted = requireState(updateBasketballLineup(firstPause, {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      roleChanges: [{ participantId: 'tracked-6', position: 'C', captain: true }],
+      occurredAt: after(11_000),
+      eventId: uuid(922),
+      captureCommandId: uuid(923),
+    }))
+    const throughTwenty = runAndPause(substituted, 12_000, 22_000, 924)
+    const built = basketballLineupCorrectionDraft(throughTwenty, uuid(922))
+    expect(built.ok).toBe(true)
+    if (!built.ok || built.value.eventType !== 'basketball.substitution') return
+    const preview = previewBasketballLineupCorrection(throughTwenty, {
+      ...built.value,
+      elapsedMs: 5_000,
+    }, after(23_000))
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    expect(preview.value.consequenceLines).toEqual(expect.arrayContaining([
+      expect.stringContaining('2 grouped lineup events'),
+      expect.stringContaining('Tracked 1 time: 0:10 to 0:05'),
+      expect.stringContaining('Tracked 6 time: 0:10 to 0:15'),
+    ]))
+
+    const finalizedCloud = {
+      ...throughTwenty,
+      cloudSync: { ...throughTwenty.cloudSync, gameId: 'cloud-game', gameStatus: 'final' as const },
+    }
+    expect(applyBasketballLineupCorrection(finalizedCloud, preview.value, after(24_000)))
+      .toMatchObject({ ok: false, code: 'cloud_flow_unsupported' })
+    const running = requireState(startBasketballClock(throughTwenty, {
+      recorderUserId,
+      occurredAt: after(24_000),
+      eventId: uuid(928),
+    }))
+    expect(basketballLineupCorrectionDraft(running, uuid(922)))
+      .toMatchObject({ ok: false, code: 'command_failed' })
+
+    const changed = requireState(changeBasketballParticipantRoles(throughTwenty, {
+      recorderUserId,
+      teamSide: 'tracked',
+      changes: [{ participantId: 'tracked-1', position: 'PG', captain: true }],
+      occurredAt: after(24_000),
+    }))
+    expect(applyBasketballLineupCorrection(changed, preview.value, after(25_000)))
+      .toMatchObject({ ok: false, code: 'command_failed' })
+
+    const applied = applyBasketballLineupCorrection(throughTwenty, preview.value, after(25_000))
+    expect(applied.ok).toBe(true)
+    if (!applied.ok || applied.state.sportGameState?.sportId !== 'basketball') return
+    expect(trackedLineup(applied.state).participationByParticipantId['tracked-1'].participationMs)
+      .toBe(5_000)
+    expect(trackedLineup(applied.state).participationByParticipantId['tracked-6'].participationMs)
+      .toBe(15_000)
+    expect(applied.state.eventStream?.events.find(event =>
+      isGameEventEnvelope(event) && event.id === uuid(922)
+    )).toMatchObject({
+      revision: 2,
+      elapsedMs: 5_000,
+      payload: { recordedLater: true },
+    })
+    expect(applied.state.sportGameState.capturePreferences.lastCourtUndo).toBeNull()
+    const roleHistory = trackedLineup(applied.state).roleHistoryByParticipantId['tracked-6']
+    expect(roleHistory[roleHistory.length - 1]).toMatchObject({
+      elapsedMs: 5_000,
+      position: 'C',
+      captain: true,
+    })
+    const review = buildBasketballTimelineReview(applied.state)
+    expect(review.eventById.get(uuid(922))).toMatchObject({
+      recordedLater: true,
+      displayClockLabel: '7:55',
+      canonicalElapsedLabel: '0:05',
+      lineupOutgoingParticipantIds: ['tracked-1'],
+      lineupIncomingParticipantIds: ['tracked-6'],
+    })
+    expect(filterBasketballTimelineGroups(review.activeGroups, {
+      family: 'lineups',
+      periodId: 'all',
+      teamSide: 'tracked',
+      participantId: 'tracked-6',
+    }).some(group => group.events.some(event => event.id === uuid(922)))).toBe(true)
+
+    const suspended = requireState(suspendBasketballMatch(applied.state, {
+      recorderUserId,
+      occurredAt: after(26_000),
+      eventId: uuid(929),
+    }))
+    expect(basketballLineupCorrectionDraft(suspended, uuid(922)))
+      .toMatchObject({ ok: false, code: 'invalid_period' })
+  })
+
+  it('removes and restores a substitution plus roles as one capture group', () => {
+    const state = requireState(updateBasketballLineup(anchoredState(), {
+      recorderUserId,
+      teamSide: 'tracked',
+      participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      roleChanges: [{ participantId: 'tracked-6', position: 'C', captain: true }],
+      occurredAt: after(1_000),
+      eventId: uuid(930),
+      captureCommandId: uuid(931),
+    }))
+    const removal = previewBasketballTimelineRemoval(state, uuid(930), 'capture_group')
+    expect(removal.ok).toBe(true)
+    if (!removal.ok) return
+    const removed = removeBasketballTimelineEvents(state, removal.value, after(2_000))
+    expect(removed.ok).toBe(true)
+    if (!removed.ok) return
+    expect(removed.state.eventStream?.events.filter(event =>
+      isGameEventEnvelope(event) && event.payload.captureCommandId === uuid(931)
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ deletedAt: after(2_000) }),
+      expect.objectContaining({ deletedAt: after(2_000) }),
+    ]))
+    expect(buildBasketballTimelineReview(removed.state).eventById.get(uuid(930))).toMatchObject({
+      lineupOutgoingParticipantIds: ['tracked-1'],
+      lineupIncomingParticipantIds: ['tracked-6'],
+      lineupCurrentParticipantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+    })
+
+    const restoration = previewBasketballTimelineRestore(
+      removed.state,
+      uuid(930),
+      [],
+      undefined,
+      'capture_group'
+    )
+    expect(restoration.ok).toBe(true)
+    if (!restoration.ok) return
+    const restored = restoreBasketballTimelineEvent(removed.state, restoration.value, after(3_000))
+    expect(restored.ok).toBe(true)
+    if (!restored.ok) return
+    expect(trackedLineup(restored.state).currentParticipantIds)
+      .toEqual(['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'])
+    expect(basketballProjection(restored.state).participants['tracked-6'])
+      .toMatchObject({ position: 'C', captain: true })
   })
 })
 

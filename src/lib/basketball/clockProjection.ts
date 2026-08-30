@@ -331,7 +331,11 @@ function isBasketballRecordedLaterEventType(eventType: string): boolean {
     eventType === 'basketball.foul' ||
     eventType === 'basketball.free_throw_trip' ||
     eventType === 'basketball.ejection' ||
-    eventType === 'basketball.timeout'
+    eventType === 'basketball.timeout' ||
+    eventType === 'basketball.lineup_confirmed' ||
+    eventType === 'basketball.substitution' ||
+    eventType === 'basketball.role_changed' ||
+    eventType === 'basketball.equal_play_override'
 }
 
 function clearPendingStoppage(clock: BasketballAnchoredClockProjection): void {

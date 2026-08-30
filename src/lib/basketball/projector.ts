@@ -30,9 +30,14 @@ import {
   applyBasketballLineupEvent,
   basketballLineupClockStartError,
   basketballLineupProjectionDiagnostics,
+  finalizeBasketballLineupParticipation,
   isBasketballLineupEvent,
   validatePendingBasketballEqualPlayOverride,
 } from './lineupProjection'
+import {
+  isRecordedLaterBasketballLineupEvent,
+  orderBasketballEventsForProjection,
+} from './lineupReplay'
 import {
   createBasketballMatchProjection,
   projectedBasketballParticipant,
@@ -67,9 +72,10 @@ export function projectBasketballEvents(
     }
   }
 
-  const basketballEvents = [...events]
+  const captureOrderedEvents = [...events]
     .filter((event): event is BasketballMatchEvent => event.sportId === 'basketball')
     .sort(compareGameEventCaptureOrder)
+  const basketballEvents = orderBasketballEventsForProjection(captureOrderedEvents)
   let projection = createBasketballMatchProjection(sportState.setup)
   const statContext = createBasketballStatProjectionContext()
   const seenSequences = new Set<string>()
@@ -85,7 +91,9 @@ export function projectBasketballEvents(
     }
     seenSequences.add(sequenceKey)
 
-    const clockMomentError = validateBasketballEventClockMoment(projection, sportState, event)
+    const clockMomentError = isRecordedLaterBasketballLineupEvent(event)
+      ? validateRecordedLaterLineupMoment(captureOrderedEvents, sportState, event)
+      : validateBasketballEventClockMoment(projection, sportState, event)
     if (clockMomentError) {
       failedEvent = event
       failureMessage = clockMomentError
@@ -150,6 +158,7 @@ export function projectBasketballEvents(
       })
     }
   } else {
+    finalizeBasketballLineupParticipation(projection)
     diagnostics.push(...basketballLineupProjectionDiagnostics(projection))
   }
 
@@ -158,6 +167,48 @@ export function projectBasketballEvents(
     projection: buildProjection(state, nextSportState, statContext.shotChart),
     diagnostics,
   }
+}
+
+function validateRecordedLaterLineupMoment(
+  events: BasketballMatchEvent[],
+  sportState: BasketballSportGameState,
+  event: BasketballMatchEvent
+): string | null {
+  if (event.elapsedMs === null) return 'Recorded-later Basketball lineup events require a clock time.'
+  const segment = resolveBasketballPeriodSegment(
+    sportState.setup.rulesSnapshot,
+    event.period.id
+  )
+  if (!segment || event.elapsedMs < 0 || event.elapsedMs > segment.durationMs) {
+    return 'Recorded-later Basketball lineup event is outside the selected period.'
+  }
+  const started = events.some(candidate =>
+    candidate.eventType === 'basketball.period_started' &&
+    candidate.payload.periodId === event.period.id &&
+    candidate.deletedAt === null
+  )
+  const completed = events.some(candidate =>
+    candidate.eventType === 'basketball.period_ended' &&
+    candidate.payload.periodId === event.period.id &&
+    candidate.deletedAt === null
+  )
+  const terminated = events.some(candidate =>
+    candidate.eventType === 'basketball.match_ended' &&
+    candidate.period.id === event.period.id &&
+    candidate.deletedAt === null
+  )
+  const activePeriodId = [...events]
+    .filter(candidate => candidate.deletedAt === null)
+    .reduce<string | null>((current, candidate) => {
+      if (candidate.eventType === 'basketball.period_started') return candidate.payload.periodId
+      if (candidate.eventType === 'basketball.period_ended' && current === candidate.payload.periodId) return null
+      if (candidate.eventType === 'basketball.match_ended') return null
+      if (candidate.eventType === 'basketball.match_reopened') return candidate.period.id
+      return current
+    }, null)
+  return started && (completed || terminated || activePeriodId === event.period.id)
+    ? null
+    : 'Recorded-later Basketball lineup event does not target a started period.'
 }
 
 function isBasketballClockEvent(event: BasketballMatchEvent): event is BasketballClockEvent {

@@ -59,6 +59,10 @@ export default function BasketballEventDetailDialog({
             <DetailCell label="Recorded for" value={review.actorLabel} />
             <DetailCell label="Team" value={teamLabel} />
           </div>
+          <div className="grid grid-cols-2 border-b border-slate-200">
+            <DetailCell label="Game clock" value={review.displayClockLabel} />
+            <DetailCell label="Canonical elapsed" value={review.canonicalElapsedLabel} />
+          </div>
           <section className="border-b border-slate-200 px-4 py-4">
             <h3 className="text-xs font-semibold uppercase text-slate-500">{detailHeading(review)}</h3>
             <p className="mt-1 text-sm font-semibold text-slate-800">
@@ -79,6 +83,7 @@ export default function BasketballEventDetailDialog({
             <DetailRow label="Event id" value={review.id} />
             <DetailRow label="Event type" value={review.event.eventType} />
             <DetailRow label="Revision" value={String(review.event.revision)} />
+            <DetailRow label="Capture group" value={typeof review.event.payload.captureCommandId === 'string' ? review.event.payload.captureCommandId : 'Independent event'} />
             <DetailRow label="Recorder" value={review.event.recorderUserId ?? 'Local'} />
             <DetailRow label="Captured" value={formatRecordedAt(review.event.createdAt)} />
             <DetailRow label="Updated" value={formatRecordedAt(review.event.updatedAt)} />
@@ -161,13 +166,26 @@ function detailValue(
     const reason = event.payload.reasonCode
       ? ` | ${event.payload.reasonCode.replace(/_/g, ' ')}${event.payload.reasonNote ? `: ${event.payload.reasonNote}` : ''}`
       : ''
-    return `${event.payload.mode.replace(/_/g, ' ')} | ${event.payload.participantIds.length} on court${reason}`
+    const outgoing = review.lineupOutgoingParticipantIds.length > 0
+      ? ` | Out: ${review.lineupOutgoingParticipantIds.map(participantLabel).join(', ')}`
+      : ''
+    const incoming = review.lineupIncomingParticipantIds.length > 0
+      ? ` | In: ${review.lineupIncomingParticipantIds.map(participantLabel).join(', ')}`
+      : ''
+    const current = ` | Current: ${review.lineupCurrentParticipantIds.map(participantLabel).join(', ')}`
+    return `${event.payload.mode.replace(/_/g, ' ')}${outgoing}${incoming}${current}${reason}`
   }
   if (event.eventType === 'basketball.role_changed') {
     return event.payload.changes.map(change => {
       const position = change.position ?? 'No position'
       return `${participantLabel(change.participantId)}: ${position}${change.captain ? ', Captain' : ''}`
     }).join(' | ')
+  }
+  if (event.eventType === 'basketball.lineup_confirmed') {
+    return `Confirmed: ${event.payload.participantIds.map(participantLabel).join(', ')}`
+  }
+  if (event.eventType === 'basketball.equal_play_override') {
+    return `${event.payload.violationCodes.map(value => value.replace(/_/g, ' ')).join(', ')} | ${event.payload.reason}`
   }
   return review.relationshipLabels.length > 0 ? review.relationshipLabels.join(' | ') : 'Standalone event'
 }
