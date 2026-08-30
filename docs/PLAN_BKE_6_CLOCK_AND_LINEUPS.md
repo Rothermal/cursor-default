@@ -1,8 +1,8 @@
 # Plan: BKE-6 Basketball Clock and Lineups
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
-decisions are approved. BKE-6A, BKE-6B, and BKE-6C are implemented. BKE-6D's 32 detailed
-decisions and four-slice delivery plan are approved; BKE-6D1 is next.
+decisions are approved. BKE-6A, BKE-6B, BKE-6C, and BKE-6D1 are implemented. BKE-6D's 32
+detailed decisions and four-slice delivery plan are approved; BKE-6D2 is next.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -445,9 +445,9 @@ Each slice receives a detailed implementation plan and review before code begins
 | BKE-6D | Players/Overview/Timeline detail, exact-second aggregates, plus-minus quality, cloud capability/bind/sync, recorder readiness, finalization, correction/resume reopen, and republication. Detailed as BKE-6D1 through BKE-6D4 in [PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md](PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md) | One coherent recorder can sync and publish anchored authority; remote/canonical review is read-only and aggregate output is quality-gated |
 | BKE-6E | Release-entry audit, older-client/clockless parity, responsive/accessibility/PWA hardening, rollback record, owner smoke, and broader matrix disposition | Anchored remains default-off, owner evidence is recorded honestly, and broader enablement is blocked until its matrix passes |
 
-BKE-6B and BKE-6C are complete across four implementation PRs each. BKE-6D's four detailed slices
-are approved; BKE-6D1 next owns anchored destination detail before aggregate, transport, and
-publication work. These remain delivery slices, not new product scope.
+BKE-6B and BKE-6C are complete across four implementation PRs each. BKE-6D1 completes anchored
+destination detail; BKE-6D2 next owns exact-second aggregates before transport and publication
+work. These remain delivery slices, not new product scope.
 
 ---
 

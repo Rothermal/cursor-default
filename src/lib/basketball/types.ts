@@ -382,9 +382,17 @@ export interface BasketballParticipantParticipation {
   appeared: boolean
   participationMs: number
   participationSeconds: number
+  plusMinus: number | null
   periodParticipationMs: Record<string, number>
   creditedPeriodIds: string[]
   intervals: BasketballParticipationInterval[]
+  complete: boolean
+}
+
+export interface BasketballLineupCombinationProjection {
+  participantIds: string[]
+  participationMs: number
+  plusMinus: number | null
   complete: boolean
 }
 
@@ -409,6 +417,9 @@ export interface BasketballLineupSideProjection {
   onCourtIntervals: BasketballOnCourtInterval[]
   participationByParticipantId: Record<string, BasketballParticipantParticipation>
   roleHistoryByParticipantId: Record<string, BasketballRoleHistoryEntry[]>
+  plusMinusComplete: boolean
+  plusMinusUnavailableReason: string | null
+  lineupCombinations: BasketballLineupCombinationProjection[]
 }
 
 export interface BasketballEqualPlayViolation {

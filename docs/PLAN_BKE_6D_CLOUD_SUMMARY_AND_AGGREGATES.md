@@ -1,7 +1,7 @@
 # Plan: BKE-6D Cloud Summary, Aggregates, and Lifecycle
 
-Status: Approved. All 32 product and implementation decisions are complete. Delivery is split into
-BKE-6D1 through BKE-6D4; implementation has not started. BKE-6D1 is next.
+Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 is
+implemented; BKE-6D2 exact-second aggregates are next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -165,6 +165,9 @@ No route may fall back from an anchored event game to Legacy snapshots or aggreg
 ---
 
 ## 5. BKE-6D1: Summary Detail and Quality
+
+Implementation status: Complete. See
+[REGRESSION_BKE_6D1_SUMMARY_DETAIL.md](REGRESSION_BKE_6D1_SUMMARY_DETAIL.md).
 
 Extend the existing authority-aware `BasketballSummary` rather than adding an anchored Summary.
 `summarySource.ts` continues selecting exactly one local, primary, alternate, or canonical source.

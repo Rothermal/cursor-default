@@ -99,6 +99,13 @@ describe('Basketball detailed summary models', () => {
     expect(review.tracked.map(row => row.displayName)).toEqual(['Alex One', 'Blake Two'])
     expect(review.opponent.map(row => row.displayName)).toEqual(['Opponent Seven'])
     expect(review.opponent[0]).toMatchObject({ lateAdded: true, rosterStatus: 'bench' })
+    expect(review.tracked[0].participation).toMatchObject({
+      basis: 'recorded_manual',
+      appeared: null,
+      dnp: null,
+      displayTime: '00:00',
+      plusMinus: null,
+    })
 
     const withoutOpponent = basketballPlayerReview(base, inspection(base))
     expect(withoutOpponent.opponent).toEqual([])

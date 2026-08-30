@@ -104,6 +104,7 @@ function createBasketballLineupProjection(
           appeared: false,
           participationMs: 0,
           participationSeconds: 0,
+          plusMinus: null,
           periodParticipationMs: {},
           creditedPeriodIds: [],
           intervals: [],
@@ -113,6 +114,9 @@ function createBasketballLineupProjection(
       roleHistoryByParticipantId: Object.fromEntries(
         sideParticipants.map(participant => [participant.id, []])
       ),
+      plusMinusComplete: true,
+      plusMinusUnavailableReason: null,
+      lineupCombinations: [],
     }
   }
   return {

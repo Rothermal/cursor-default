@@ -1,10 +1,14 @@
 import type { GameState } from '../../types'
 import type { GameEvent, GameEventInspection } from '../gameEvents/types'
 import { basketballPeriodScoring } from './summary'
+import { formatBasketballDurationMs } from './duration'
+import { isBasketballMatchRulesV3 } from './rules'
 import type {
   BasketballBonusStatus,
   BasketballMatchEvent,
+  BasketballMatchProjection,
   BasketballProjectedParticipant,
+  BasketballRoleHistoryEntry,
   BasketballStatTotals,
   BasketballTeamSide,
 } from './types'
@@ -57,6 +61,41 @@ export interface BasketballPlayerReviewRow {
   ejected: boolean
   stats: BasketballStatTotals
   line: BasketballReviewStatLine
+  participation: BasketballParticipationReview
+  roleHistory: BasketballRoleHistoryReview[]
+}
+
+export interface BasketballParticipationReview {
+  basis: 'interval_derived' | 'recorded_manual'
+  started: boolean
+  appeared: boolean | null
+  dnp: boolean | null
+  participationMs: number
+  displayTime: string
+  complete: boolean
+  stintCount: number
+  intervals: BasketballParticipationIntervalReview[]
+  plusMinus: number | null
+  plusMinusUnavailableReason: string | null
+  qualityReason: string | null
+}
+
+export interface BasketballParticipationIntervalReview {
+  periodId: string
+  periodLabel: string
+  startElapsedMs: number
+  endElapsedMs: number
+  durationMs: number
+  displayDuration: string
+}
+
+export interface BasketballRoleHistoryReview {
+  eventId: string
+  periodId: string
+  periodLabel: string
+  elapsedMs: number
+  position: string | null
+  captain: boolean
 }
 
 export interface BasketballPlayerReview {
@@ -94,6 +133,39 @@ export interface BasketballTeamReview {
   attribution: BasketballTeamAttributionReview
   neutralTimeouts: number
   ejections: BasketballEjectionReview[]
+  lineups: Record<BasketballTeamSide, BasketballLineupReviewRow[]>
+}
+
+export interface BasketballLineupReviewRow {
+  key: string
+  teamSide: BasketballTeamSide
+  participantIds: string[]
+  participantLabels: string[]
+  participationMs: number
+  displayTime: string
+  plusMinus: number | null
+  plusMinusUnavailableReason: string | null
+  complete: boolean
+}
+
+export interface BasketballSummaryQualityReview {
+  clockModel: 'clockless' | 'anchored'
+  clockRunning: boolean
+  currentPeriodLabel: string | null
+  tracked: BasketballLineupQualitySide | null
+  opponent: BasketballLineupQualitySide | null
+  equalPlayCompliant: boolean | null
+  enforcedOverridesComplete: boolean | null
+  warnings: string[]
+}
+
+export interface BasketballLineupQualitySide {
+  complete: boolean
+  incompletePeriodLabels: string[]
+  replacementParticipantLabels: string[]
+  boundaryConfirmationRequired: boolean
+  plusMinusComplete: boolean
+  plusMinusUnavailableReason: string | null
 }
 
 const STAT_IDS: Array<keyof BasketballStatTotals> = [
@@ -117,7 +189,7 @@ export function basketballPlayerReview(
     }
   }
   const rows = Object.values(sportState.projection.participants)
-    .map(playerReviewRow)
+    .map(participant => playerReviewRow(participant, sportState.projection))
     .sort((left, right) => comparePlayers(left, right, setupOrder, lateOrder))
   return {
     tracked: rows.filter(row => row.teamSide === 'tracked'),
@@ -195,6 +267,58 @@ export function basketballTeamReview(
       reason: ejection.reason,
       source: ejection.source,
     })),
+    lineups: {
+      tracked: lineupReviewRows(projection, 'tracked'),
+      opponent: lineupReviewRows(projection, 'opponent'),
+    },
+  }
+}
+
+export function basketballSummaryQualityReview(
+  state: GameState
+): BasketballSummaryQualityReview {
+  const sportState = requireBasketballState(state)
+  const projection = sportState.projection
+  const anchored = Boolean(
+    isBasketballMatchRulesV3(sportState.setup.rulesSnapshot) &&
+    sportState.setup.rulesSnapshot.clockModel === 'anchored' &&
+    projection.clock &&
+    projection.lineup
+  )
+  if (!anchored || !projection.lineup) {
+    return {
+      clockModel: 'clockless',
+      clockRunning: false,
+      currentPeriodLabel: projection.periods.find(period =>
+        period.id === projection.currentPeriodId
+      )?.label ?? null,
+      tracked: null,
+      opponent: null,
+      equalPlayCompliant: null,
+      enforcedOverridesComplete: null,
+      warnings: [],
+    }
+  }
+  const tracked = lineupQualitySide(projection, 'tracked')
+  const opponent = lineupQualitySide(projection, 'opponent')
+  const warnings = [
+    ...lineupQualityWarnings('Tracked', tracked),
+    ...lineupQualityWarnings('Opponent', opponent),
+  ]
+  if (!projection.lineup.enforcedOverridesComplete) {
+    warnings.push('An enforced equal-play override is incomplete.')
+  }
+  return {
+    clockModel: 'anchored',
+    clockRunning: projection.clock?.running === true,
+    currentPeriodLabel: projection.periods.find(period =>
+      period.id === projection.currentPeriodId
+    )?.label ?? null,
+    tracked,
+    opponent,
+    equalPlayCompliant: projection.lineup.equalPlayCompliant,
+    enforcedOverridesComplete: projection.lineup.enforcedOverridesComplete,
+    warnings: [...new Set(warnings)],
   }
 }
 
@@ -251,8 +375,12 @@ export function formatBasketballRatio(rate: BasketballReviewRate | null): string
 }
 
 function playerReviewRow(
-  participant: BasketballProjectedParticipant
+  participant: BasketballProjectedParticipant,
+  projection: BasketballMatchProjection
 ): BasketballPlayerReviewRow {
+  const side = projection.lineup?.sides[participant.teamSide] ?? null
+  const participation = side?.participationByParticipantId[participant.participantId] ?? null
+  const periods = new Map(projection.periods.map(period => [period.id, period.label]))
   return {
     participantId: participant.participantId,
     playerId: participant.playerId,
@@ -267,7 +395,131 @@ function playerReviewRow(
     ejected: participant.ejected,
     stats: structuredClone(participant.stats),
     line: basketballReviewStatLine(participant.stats),
+    participation: participation
+      ? {
+          basis: 'interval_derived',
+          started: participation.started,
+          appeared: participation.appeared,
+          dnp: !participation.appeared,
+          participationMs: participation.participationMs,
+          displayTime: formatBasketballDurationMs(participation.participationMs),
+          complete: participation.complete,
+          stintCount: participation.intervals.length,
+          intervals: participation.intervals.map(interval => ({
+            periodId: interval.periodId,
+            periodLabel: periods.get(interval.periodId) ?? interval.periodId,
+            startElapsedMs: interval.startElapsedMs,
+            endElapsedMs: interval.endElapsedMs,
+            durationMs: interval.durationMs,
+            displayDuration: formatBasketballDurationMs(interval.durationMs),
+          })),
+          plusMinus: participation.plusMinus,
+          plusMinusUnavailableReason: participation.plusMinus === null
+            ? participation.appeared
+              ? side?.plusMinusUnavailableReason ?? 'Plus-minus authority is incomplete.'
+              : 'Player did not appear.'
+            : null,
+          qualityReason: participation.complete
+            ? null
+            : 'Playing time is incomplete because lineup history has a recovery gap.',
+        }
+      : {
+          basis: 'recorded_manual',
+          started: participant.openingStatus === 'starter',
+          appeared: null,
+          dnp: null,
+          participationMs: Math.max(0, participant.stats.min) * 60_000,
+          displayTime: formatBasketballDurationMs(Math.max(0, participant.stats.min) * 60_000),
+          complete: true,
+          stintCount: 0,
+          intervals: [],
+          plusMinus: null,
+          plusMinusUnavailableReason: 'Plus-minus requires anchored lineup authority.',
+          qualityReason: null,
+        },
+    roleHistory: (side?.roleHistoryByParticipantId[participant.participantId] ?? [])
+      .map(entry => roleHistoryReview(entry, periods)),
   }
+}
+
+function roleHistoryReview(
+  entry: BasketballRoleHistoryEntry,
+  periods: Map<string, string>
+): BasketballRoleHistoryReview {
+  return {
+    eventId: entry.eventId,
+    periodId: entry.periodId,
+    periodLabel: periods.get(entry.periodId) ?? entry.periodId,
+    elapsedMs: entry.elapsedMs,
+    position: entry.position,
+    captain: entry.captain,
+  }
+}
+
+function lineupReviewRows(
+  projection: BasketballMatchProjection,
+  teamSide: BasketballTeamSide
+): BasketballLineupReviewRow[] {
+  const side = projection.lineup?.sides[teamSide]
+  if (!side) return []
+  return side.lineupCombinations.map(combination => ({
+    key: [...combination.participantIds].sort().join(':'),
+    teamSide,
+    participantIds: [...combination.participantIds],
+    participantLabels: combination.participantIds.map(participantId => {
+      const participant = projection.participants[participantId]
+      return participant
+        ? `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`
+        : 'Unknown participant'
+    }),
+    participationMs: combination.participationMs,
+    displayTime: formatBasketballDurationMs(combination.participationMs),
+    plusMinus: combination.plusMinus,
+    plusMinusUnavailableReason: combination.plusMinus === null
+      ? side.plusMinusUnavailableReason ?? 'Lineup plus-minus authority is incomplete.'
+      : null,
+    complete: combination.complete,
+  }))
+}
+
+function lineupQualitySide(
+  projection: BasketballMatchProjection,
+  teamSide: BasketballTeamSide
+): BasketballLineupQualitySide | null {
+  const side = projection.lineup?.sides[teamSide]
+  if (!side) return null
+  return {
+    complete: side.incompletePeriodIds.length === 0 &&
+      side.replacementRequiredParticipantIds.length === 0,
+    incompletePeriodLabels: side.incompletePeriodIds.map(periodId =>
+      projection.periods.find(period => period.id === periodId)?.label ?? periodId
+    ),
+    replacementParticipantLabels: side.replacementRequiredParticipantIds.map(participantId =>
+      projection.participants[participantId]?.displayName ?? 'Unknown participant'
+    ),
+    boundaryConfirmationRequired: side.boundaryConfirmationRequired,
+    plusMinusComplete: side.plusMinusComplete,
+    plusMinusUnavailableReason: side.plusMinusUnavailableReason,
+  }
+}
+
+function lineupQualityWarnings(
+  label: string,
+  side: BasketballLineupQualitySide | null
+): string[] {
+  if (!side) return []
+  const warnings: string[] = []
+  if (side.incompletePeriodLabels.length > 0) {
+    warnings.push(`${label} lineup history is incomplete in ${side.incompletePeriodLabels.join(', ')}.`)
+  }
+  if (side.replacementParticipantLabels.length > 0) {
+    warnings.push(`${label} lineup still requires a replacement for ${side.replacementParticipantLabels.join(', ')}.`)
+  }
+  if (side.boundaryConfirmationRequired) warnings.push(`${label} lineup requires boundary review.`)
+  if (!side.plusMinusComplete && side.plusMinusUnavailableReason) {
+    warnings.push(side.plusMinusUnavailableReason)
+  }
+  return warnings
 }
 
 function comparePlayers(

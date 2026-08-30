@@ -237,5 +237,8 @@ function sideProjection(teamSide: BasketballTeamSide): BasketballLineupSideProje
     onCourtIntervals: [],
     participationByParticipantId: {},
     roleHistoryByParticipantId: {},
+    plusMinusComplete: true,
+    plusMinusUnavailableReason: null,
+    lineupCombinations: [],
   }
 }

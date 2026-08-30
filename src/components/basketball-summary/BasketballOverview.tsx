@@ -7,8 +7,10 @@ import type {
 import type { BasketballSummarySource } from '../../lib/basketball/summarySource'
 import {
   basketballRegulationPeriodCount,
+  isBasketballMatchRulesV3,
 } from '../../lib/basketball/rules'
 import { basketballRulesProfileLabel } from '../../lib/basketball/profiles'
+import { basketballSummaryQualityReview } from '../../lib/basketball/summaryDetails'
 
 interface Props {
   source: BasketballSummarySource
@@ -31,8 +33,12 @@ export default function BasketballOverview({
     : null
   const rules = basketballState?.setup.rulesSnapshot
   const rulesSource = basketballState?.setup.rulesSource
+  const quality = basketballSummaryQualityReview(source.state)
   const regulationMinutes = rules?.regulationSegments[0]
     ? Math.round(rules.regulationSegments[0].durationMs / 60_000)
+    : null
+  const anchoredRules = rules && isBasketballMatchRulesV3(rules) && rules.clockModel === 'anchored'
+    ? rules
     : null
   return (
     <div className="space-y-8 py-5">
@@ -67,6 +73,34 @@ export default function BasketballOverview({
               ? `#${source.publication.publicationNumber} by ${source.publication.finalizedByDisplayName}`
               : source.state.cloudSync.gameStatus || 'Local only'}
           />
+          <Metadata
+            label="Time authority"
+            value={quality.clockModel === 'anchored' ? 'Clock and lineup intervals' : 'Recorded manual minutes'}
+          />
+          {anchoredRules && (
+            <Metadata
+              label="Clock display"
+              value={`${anchoredRules.clockDisplayDirection === 'count_down' ? 'Count down' : 'Count up'} / ${quality.clockRunning ? 'live' : 'paused or terminal'}`}
+            />
+          )}
+          {quality.clockModel === 'anchored' && (
+            <Metadata
+              label="Lineup review"
+              value={quality.warnings.length === 0 ? 'Complete' : `${quality.warnings.length} review item${quality.warnings.length === 1 ? '' : 's'}`}
+            />
+          )}
+          {quality.clockModel === 'anchored' && (
+            <Metadata label="Tracked lineup" value={lineupCoverageLabel(quality.tracked)} />
+          )}
+          {quality.clockModel === 'anchored' && (
+            <Metadata label="Opponent lineup" value={lineupCoverageLabel(quality.opponent)} />
+          )}
+          {quality.equalPlayCompliant !== null && (
+            <Metadata
+              label="Equal play"
+              value={quality.equalPlayCompliant ? 'Compliant' : 'Review required'}
+            />
+          )}
         </dl>
       </section>
 
@@ -147,6 +181,20 @@ export default function BasketballOverview({
       </section>
     </div>
   )
+}
+
+function lineupCoverageLabel(
+  side: ReturnType<typeof basketballSummaryQualityReview>['tracked']
+): string {
+  if (!side) return 'Not tracked'
+  if (side.complete && !side.boundaryConfirmationRequired && side.plusMinusComplete) return 'Complete'
+  const issues = [
+    side.incompletePeriodLabels.length > 0 ? 'history gap' : null,
+    side.replacementParticipantLabels.length > 0 ? 'replacement required' : null,
+    side.boundaryConfirmationRequired ? 'boundary review' : null,
+    !side.plusMinusComplete ? 'plus-minus unavailable' : null,
+  ].filter((value): value is string => value !== null)
+  return issues.join(', ') || 'Review required'
 }
 
 function SectionHeading({ id, title }: { id: string; title: string }) {
