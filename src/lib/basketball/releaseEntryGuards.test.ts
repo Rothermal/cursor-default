@@ -327,7 +327,7 @@ describe('Basketball release entry guards', () => {
     expect(tracker).toContain('basketballEqualPlayAuthorityTeamId(state)')
     expect(tracker).toContain('useTeamRole(\n    equalPlayAuthorityTeamId === state.cloudSync.teamId')
     expect(tracker).toContain(
-      'canAuthorizeBasketballEqualPlayOverride(state, equalPlayRole)'
+      'canAuthorizeBasketballEqualPlayOverride(state, equalPlayAccess)'
     )
     expect(teamRoleHook).toContain('}, [isConfigured, teamId, userId])')
     expect(boundaryReview).not.toContain('fallback={null}')

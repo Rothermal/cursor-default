@@ -51,11 +51,24 @@ export function basketballEqualPlayAuthorityTeamId(state: GameState): string | n
   return state.cloudSync.teamId
 }
 
+export interface BasketballEqualPlayTeamAccess {
+  role: TeamRole | null
+  loading: boolean
+  error: string | null
+}
+
 export function canAuthorizeBasketballEqualPlayOverride(
   state: GameState,
-  role: TeamRole | null
+  access: BasketballEqualPlayTeamAccess
 ): boolean {
-  return !basketballEqualPlayAuthorityTeamId(state) || canTrackGames(role)
+  const teamId = basketballEqualPlayAuthorityTeamId(state)
+  if (!teamId) return true
+  if (
+    state.cloudSync.eventCloudPolicy === 'local_only' &&
+    !state.cloudSync.teamId &&
+    (access.loading || Boolean(access.error))
+  ) return true
+  return canTrackGames(access.role)
 }
 
 export async function authorizeBasketballAnchoredCloudMutation(

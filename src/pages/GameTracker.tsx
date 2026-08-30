@@ -193,9 +193,9 @@ export default function GameTracker() {
   const equalPlaySourceAccess = useTeamRole(
     equalPlayAuthorityTeamId === state.cloudSync.teamId ? null : equalPlayAuthorityTeamId
   )
-  const equalPlayRole = equalPlayAuthorityTeamId === state.cloudSync.teamId
-    ? teamAccess.role
-    : equalPlaySourceAccess.role
+  const equalPlayAccess = equalPlayAuthorityTeamId === state.cloudSync.teamId
+    ? teamAccess
+    : equalPlaySourceAccess
   const {
     sport,
     players,
@@ -1159,7 +1159,7 @@ export default function GameTracker() {
           state={state}
           recorderUserId={user?.id ?? null}
           settings={basketballDeviceSettings}
-          canOverrideEqualPlay={canAuthorizeBasketballEqualPlayOverride(state, equalPlayRole)}
+          canOverrideEqualPlay={canAuthorizeBasketballEqualPlayOverride(state, equalPlayAccess)}
           requestedLineupSide={requestedLineupSide}
           onRequestedLineupOpened={() => setRequestedLineupSide(null)}
           onAddParticipant={teamSide => {

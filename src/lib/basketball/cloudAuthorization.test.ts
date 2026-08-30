@@ -85,17 +85,52 @@ describe('Basketball anchored cloud authorization', () => {
 
   it('uses immutable anchored team authority for every equal-play override role', () => {
     const teamState = state('team-1')
+    const resolved = (role: 'owner' | 'admin' | 'scorer' | 'viewer' | null) => ({
+      role,
+      loading: false,
+      error: null,
+    })
     expect(teamState.cloudSync.teamId).toBeNull()
     expect(basketballEqualPlayAuthorityTeamId(teamState)).toBe('team-1')
-    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'owner')).toBe(true)
-    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'admin')).toBe(true)
-    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'scorer')).toBe(true)
-    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'viewer')).toBe(false)
-    expect(canAuthorizeBasketballEqualPlayOverride(teamState, null)).toBe(false)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, resolved('owner'))).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, resolved('admin'))).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, resolved('scorer'))).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, resolved('viewer'))).toBe(false)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, resolved(null))).toBe(false)
 
     const personalState = state()
     expect(basketballEqualPlayAuthorityTeamId(personalState)).toBeNull()
-    expect(canAuthorizeBasketballEqualPlayOverride(personalState, null)).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(personalState, resolved(null))).toBe(true)
+  })
+
+  it('keeps an unresolved local-only team role playable without weakening cloud authority', () => {
+    const localOnly = state('team-1')
+    localOnly.cloudSync.eventCloudPolicy = 'local_only'
+
+    expect(canAuthorizeBasketballEqualPlayOverride(localOnly, {
+      role: null,
+      loading: true,
+      error: null,
+    })).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(localOnly, {
+      role: null,
+      loading: false,
+      error: 'Network unavailable',
+    })).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(localOnly, {
+      role: null,
+      loading: false,
+      error: null,
+    })).toBe(false)
+
+    const cloudBound = structuredClone(localOnly)
+    cloudBound.cloudSync.eventCloudPolicy = 'automatic'
+    cloudBound.cloudSync.teamId = 'team-1'
+    expect(canAuthorizeBasketballEqualPlayOverride(cloudBound, {
+      role: null,
+      loading: true,
+      error: null,
+    })).toBe(false)
   })
 
   it('fresh-checks app, team, release, and clock authority before mutation', async () => {

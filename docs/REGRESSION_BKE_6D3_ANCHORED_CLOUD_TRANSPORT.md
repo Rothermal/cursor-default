@@ -18,10 +18,10 @@ environment.
 
 | Gate | Result |
 |---|---|
-| Focused BKE-6D3 authorization, transport, enablement, policy, capability, and source-guard tests | Pass: 6 files / 64 tests |
+| Focused BKE-6D3 authorization, transport, enablement, policy, capability, and source-guard tests | Pass: 6 files / 65 tests |
 | `pnpm typecheck` | Pass |
-| Basketball test directory | Pass: 61 files / 487 tests |
-| Full Vitest suite | Pass: 177 files / 1,267 tests |
+| Basketball test directory | Pass: 61 files / 488 tests |
+| Full Vitest suite | Pass: 177 files / 1,268 tests |
 | `pnpm build` | Pass; 12-entry PWA precache is about 2.1 MiB |
 | `pnpm lint` | Pass: 0 errors / 6 existing Fast Refresh warnings |
 | `git diff --check` | Pass |
@@ -36,8 +36,10 @@ successful transport/checkpoint and leaves the caller's local state unchanged on
 
 Anchored equal-play controls resolve authority from immutable `setup.sourceTeamId`, including
 local-only team-sourced games with no cloud binding. The role matrix permits owner, admin, and
-scorer while denying viewer and missing/removed membership; the role hook reloads when either the
-source team or signed-in account changes.
+scorer while denying a resolved viewer or missing/removed membership. An explicitly local-only game
+may continue while that role lookup is loading or unavailable, avoiding an offline live-play
+deadlock; cloud-bound games fail closed, and every later cloud mutation freshly rechecks the source
+team role. The role hook reloads when either the source team or signed-in account changes.
 
 Source guards enforce both setup preflights before active-game replacement, tournament writes, or
 commit. Capability caches are account-isolated and cleared on account change/sign-out; in-flight
