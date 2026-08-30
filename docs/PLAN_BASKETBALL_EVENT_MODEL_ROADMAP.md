@@ -42,8 +42,11 @@ into three implementation PRs in
 [PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md](PLAN_BKE_6A_CLOCK_LINEUP_FOUNDATION.md); BKE-6A1 through
 BKE-6A3 and BKE-6B1 through BKE-6B4 are implemented. BKE-6C product and delivery decisions are
 approved as four slices in
-  [PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md](PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md);
-  BKE-6C1 through BKE-6C4 are implemented. BKE-6D is next.
+[PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md](PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md);
+BKE-6C1 through BKE-6C4 are implemented. BKE-6D's 32 detailed decisions are approved as four
+slices in
+[PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md](PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md).
+BKE-6D1 is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 
