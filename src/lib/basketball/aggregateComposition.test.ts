@@ -130,6 +130,35 @@ describe('Basketball mixed-authority aggregate composition', () => {
     expect(opponentCareer.players).toEqual([])
   })
 
+  it('uses tracked provenance when the same stable player id appears on both sides', () => {
+    const projected = projectBasketballCanonicalAggregateSource(
+      makeAnchoredCanonicalAggregateSource()
+    )
+    if (!projected.ok) throw new Error(projected.exclusion.message)
+    const tracked = projected.match.players.find(player => player.teamSide === 'tracked')
+    const opponent = projected.match.players.find(player => player.teamSide === 'opponent')
+    if (!tracked || !opponent) throw new Error('Anchored fixture did not project both sides.')
+    opponent.playerId = tracked.playerId
+    opponent.participationBasis = 'recorded_manual'
+    opponent.metricEligibility = {
+      bk_pm: { eligible: false, reason: 'Opponent-only test provenance.' },
+    }
+
+    const career = aggregateBasketballMatches(
+      { type: 'career', id: tracked.playerId },
+      [projected.match]
+    )
+
+    expect(career.games[0]).toMatchObject({
+      participationBasis: 'interval_derived',
+      playerMetricEligibility: {
+        [tracked.playerId]: {
+          bk_pm: { eligible: true, reason: null },
+        },
+      },
+    })
+  })
+
   it('keeps personal games in player/career only and labels their game authority', () => {
     const personalCanonical = makeCanonicalAggregateSource({
       gameId: 'personal-canonical', cloudScope: 'personal', teamId: null,

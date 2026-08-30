@@ -587,7 +587,9 @@ function gameRow(
 ): BasketballAggregateGame {
   const playerId = scope.type === 'player' || scope.type === 'career' ? scope.id : null
   const player = playerId
-    ? match.players.find(candidate => candidate.playerId === playerId)
+    ? match.players.find(candidate => (
+        candidate.teamSide === 'tracked' && candidate.playerId === playerId
+      ))
     : null
   return {
     authority: match.authority,

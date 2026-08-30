@@ -17,9 +17,9 @@ Status: Automated checks pass. Browser smoke is not run in this implementation e
 | Gate | Result |
 |---|---|
 | `pnpm typecheck` | Pass |
-| Focused BKE-6D2 aggregate, transport, hook, and route tests | Pass: 8 files / 57 tests |
-| Basketball test directory | Pass: 60 files / 473 tests |
-| Full Vitest suite | Pass: 176 files / 1,253 tests |
+| Focused BKE-6D2 aggregate, transport, hook, and route tests | Pass: 8 files / 58 tests |
+| Basketball test directory | Pass: 60 files / 474 tests |
+| Full Vitest suite | Pass: 176 files / 1,254 tests |
 | `pnpm build` | Pass; 12-entry PWA precache is about 2.1 MiB |
 | `pnpm lint` | Pass: 0 errors / 6 existing Fast Refresh warnings |
 | `git diff --check` | Pass |
@@ -28,7 +28,13 @@ Focused coverage rebuilds a real anchored canonical stream with two 1,234 ms run
 proving each player total is summed before one whole-second truncation. It covers starters, a bench
 entry, DNP, tracked and optional opponent plus-minus, revised/deleted scoring, stable-player merge,
 unmapped-DNP isolation, mixed manual/interval history, partial `N of M` coverage, comparative
-suppression, unchanged exact canonical paging, and legacy/manual compatibility.
+suppression, same-player-id tracked/opponent isolation, unchanged exact canonical paging, and
+legacy/manual compatibility.
+
+`bk_app` follows recorded lineup-entry authority rather than inferred recorder intent. A player
+entered and immediately removed at the same paused elapsed value still records an appearance with
+zero participation seconds. An accidental entry must be retracted through Undo or Timeline
+correction; aggregate projection does not silently supersede it.
 
 ## Manual Matrix
 

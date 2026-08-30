@@ -257,6 +257,9 @@ window becomes a second authority.
   ids. Existing `bk_app`, `bk_start`, and `bk_min_sec` retain their identities.
 - Anchored appearance comes from valid lineup entry, start from opening-lineup authority, and DNP
   from match-roster presence without an appearance.
+- Appearance follows recorded lineup authority without guessing recorder intent. Entering and then
+  leaving at the same paused elapsed value still counts as one appearance; Undo or Timeline
+  correction must retract an accidental entry before `bk_app` changes.
 - Player plus-minus requires complete tracked lineup and scoring history. Opponent participant
   lineups are not required for tracked-player values.
 - Five-person lineup combinations use sorted stable participant/player identities and remain
@@ -275,6 +278,11 @@ unless the selected scope has complete coverage.
 Unresolved stable-player mappings remain isolated by the existing contribution policy. A rostered
 DNP with no contribution does not become a harmful unresolved exclusion. Authority collision,
 duplicate source, abandoned game, and malformed-source behavior remain unchanged.
+
+Optional opponent participant rows remain match-local projection evidence for symmetric review and
+future consumers. Every tracked roster, player, career, coverage, and per-game provenance lookup
+filters `teamSide === 'tracked'`; opponent rows never enter tracked cross-game destinations, even
+when the same stable player id appears on both sides of one match.
 
 ### BKE-6D2 exit tests
 
