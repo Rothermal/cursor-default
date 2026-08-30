@@ -761,6 +761,37 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     ])
     expect(new Set(events.map(event => event.payload.captureCommandId)).size).toBe(1)
     expect(new Set(events.map(event => event.occurredAt)).size).toBe(1)
+
+    const draft = basketballLineupCorrectionDraft(result.state, uuid(87))
+    expect(draft.ok).toBe(true)
+    if (!draft.ok || draft.value.eventType !== 'basketball.equal_play_override') return
+    const preview = previewBasketballLineupCorrection(result.state, {
+      ...draft.value,
+      reason: 'Updated approved rotation exception',
+    }, after(39_000))
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    const equalPlayLine = preview.value.consequenceLines.find(line =>
+      line.startsWith(`Equal-play review for ${periodId(result.state)}:`)
+    )
+    const projectedReviews = basketballProjection(result.state).lineup?.equalPlayReviews ?? []
+    const projectedReview = projectedReviews[projectedReviews.length - 1]
+    expect(projectedReview?.violations.length).toBeGreaterThan(0)
+    for (const violation of projectedReview?.violations ?? []) {
+      expect(equalPlayLine).toContain(violation.code.replace(/_/g, ' '))
+    }
+    expect(equalPlayLine).toContain('authorized override')
+
+    const substitutionDraft = basketballLineupCorrectionDraft(result.state, uuid(86))
+    expect(substitutionDraft.ok).toBe(true)
+    if (!substitutionDraft.ok || substitutionDraft.value.eventType !== 'basketball.substitution') return
+    expect(previewBasketballLineupCorrection(result.state, {
+      ...substitutionDraft.value,
+      participantIds: trackedStarterIds(),
+    }, after(39_500))).toMatchObject({
+      ok: false,
+      message: 'The edited boundary candidate no longer matches its projector-derived equal-play review.',
+    })
   })
 
   it('confirms optional opponent boundary authority independently', () => {
@@ -921,6 +952,50 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     }))
     expect(basketballLineupCorrectionDraft(suspended, uuid(922)))
       .toMatchObject({ ok: false, code: 'invalid_period' })
+  })
+
+  it('rejects recorded-later lineup events beyond paused and running current clock watermarks', () => {
+    const paused = runAndPause(anchoredState(), 0, 60_000, 940)
+    const running = requireState(startBasketballClock(anchoredState(), {
+      recorderUserId,
+      occurredAt: baseTime,
+      eventId: uuid(943),
+    }))
+
+    for (const [index, state] of [paused, running].entries()) {
+      const event = createBasketballLineupEvent({
+        id: uuid(944 + index),
+        eventType: 'basketball.substitution',
+        payload: {
+          captureCommandId: uuid(946 + index),
+          participantIds: ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+          mode: 'balanced',
+          reasonCode: null,
+          reasonNote: null,
+          recordedLater: true,
+        },
+        recorderUserId,
+        sequence: state.eventStream!.events.length + 1,
+        period: currentPeriod(state),
+        elapsedMs: 70_000,
+        occurredAt: after(60_000),
+        teamSide: 'tracked',
+      })
+      const rebuilt = rebuildGameEventProjection({
+        ...state,
+        eventStream: {
+          ...state.eventStream!,
+          events: [...state.eventStream!.events, event],
+        },
+      }, gameEventRegistry, gameEventProjectors)
+
+      expect(rebuilt.inspection.complete).toBe(false)
+      expect(rebuilt.inspection.diagnostics).toContainEqual(expect.objectContaining({
+        eventId: event.id,
+        message: 'Recorded-later Basketball lineup event exceeds the current clock watermark.',
+      }))
+      expect(trackedLineup(rebuilt.state).currentParticipantIds).toEqual(trackedStarterIds())
+    }
   })
 
   it('removes and restores a substitution plus roles as one capture group', () => {

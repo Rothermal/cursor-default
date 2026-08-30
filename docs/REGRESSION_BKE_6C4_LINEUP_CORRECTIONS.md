@@ -16,8 +16,8 @@ Status: Automated checks pass. Browser smoke is not run in this implementation e
 | Gate | Result |
 |---|---|
 | `pnpm typecheck` | Pass |
-| Focused lineup and Timeline tests | Pass: 4 files / 53 tests |
-| Full Vitest suite | Pass: 175 files / 1,238 tests |
+| Focused lineup and Timeline tests | Pass: 4 files / 54 tests |
+| Full Vitest suite | Pass: 175 files / 1,239 tests |
 | `pnpm build` | Pass; 12-entry PWA precache is about 2.1 MiB and remains below the 3 MiB per-asset budget |
 | `pnpm lint` | Pass: 0 errors / 6 existing Fast Refresh warnings |
 | `git diff --check` | Pass |
@@ -26,7 +26,9 @@ Focused tests prove deterministic backdated substitution replay through later cl
 exact participation consequences, grouped substitution-plus-role remove/restore, stale correction
 rejection, terminal correction denial, quick-Undo clearing, Timeline filters/detail, and replacement
 plus incomplete-recovery diagnostics. They also preserve corrected history when the match later enters
-a local terminal state.
+a local terminal state. Current-period imports fail closed beyond paused and running clock watermarks;
+equal-play previews disclose projector-derived constraints and Recent Events routes every
+non-undoable capture to Timeline.
 
 ## Manual Matrix
 

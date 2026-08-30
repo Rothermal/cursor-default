@@ -260,25 +260,17 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
             <fieldset>
               <legend className="mb-2 text-sm font-semibold text-slate-700">Violation codes</legend>
               <div className="space-y-2">
-                {VIOLATION_OPTIONS.map(option => {
-                  const values = draft.violationCodes ?? []
-                  return (
-                    <label key={option.value} className="flex min-h-11 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800">
-                      <input
-                        type="checkbox"
-                        checked={values.includes(option.value)}
-                        onChange={() => update({
-                          violationCodes: values.includes(option.value)
-                            ? values.filter(value => value !== option.value)
-                            : [...values, option.value],
-                        })}
-                        className="h-5 w-5"
-                      />
-                      {option.label}
-                    </label>
-                  )
-                })}
+                {VIOLATION_OPTIONS.filter(option =>
+                  (draft.violationCodes ?? []).includes(option.value)
+                ).map(option => (
+                  <div key={option.value} className="flex min-h-11 items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                    {option.label}
+                  </div>
+                ))}
               </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Derived from the game&apos;s snapshotted equal-play policy.
+              </p>
             </fieldset>
             {draft.eventType === 'basketball.equal_play_override' && (
               <label className="block">

@@ -192,11 +192,12 @@ function validateRecordedLaterLineupMoment(
     candidate.payload.periodId === event.period.id &&
     candidate.deletedAt === null
   )
-  const terminated = events.some(candidate =>
-    candidate.eventType === 'basketball.match_ended' &&
-    candidate.period.id === event.period.id &&
-    candidate.deletedAt === null
-  )
+  let terminalPeriodId: string | null = null
+  for (const candidate of events) {
+    if (candidate.deletedAt !== null) continue
+    if (candidate.eventType === 'basketball.match_ended') terminalPeriodId = candidate.period.id
+    if (candidate.eventType === 'basketball.match_reopened') terminalPeriodId = null
+  }
   const activePeriodId = [...events]
     .filter(candidate => candidate.deletedAt === null)
     .reduce<string | null>((current, candidate) => {
@@ -206,9 +207,85 @@ function validateRecordedLaterLineupMoment(
       if (candidate.eventType === 'basketball.match_reopened') return candidate.period.id
       return current
     }, null)
-  return started && (completed || terminated || activePeriodId === event.period.id)
-    ? null
-    : 'Recorded-later Basketball lineup event does not target a started period.'
+  if (!started || (!completed && terminalPeriodId !== event.period.id && activePeriodId !== event.period.id)) {
+    return 'Recorded-later Basketball lineup event does not target a started period.'
+  }
+  if (!completed && terminalPeriodId !== event.period.id && activePeriodId === event.period.id) {
+    const watermark = recordedLaterLineupCurrentWatermark(events, event, segment.durationMs)
+    if (watermark === null || event.elapsedMs > watermark) {
+      return 'Recorded-later Basketball lineup event exceeds the current clock watermark.'
+    }
+  }
+  return null
+}
+
+function recordedLaterLineupCurrentWatermark(
+  events: BasketballMatchEvent[],
+  event: BasketballMatchEvent,
+  durationMs: number
+): number | null {
+  let periodId: string | null = null
+  let running = false
+  let elapsedMs = 0
+  let anchorElapsedMs: number | null = null
+  let anchorOccurredAt: string | null = null
+  let lastRunningElapsedMs: number | null = null
+
+  for (const candidate of events) {
+    if (candidate.deletedAt !== null) continue
+    if (candidate.eventType === 'basketball.period_started') {
+      periodId = candidate.payload.periodId
+      running = false
+      elapsedMs = 0
+      anchorElapsedMs = null
+      anchorOccurredAt = null
+      lastRunningElapsedMs = null
+      continue
+    }
+    if (candidate.period.id !== periodId) continue
+    if (candidate.eventType === 'basketball.clock_started') {
+      running = true
+      elapsedMs = candidate.elapsedMs ?? candidate.payload.anchorElapsedMs
+      anchorElapsedMs = candidate.payload.anchorElapsedMs
+      anchorOccurredAt = candidate.occurredAt
+      lastRunningElapsedMs = elapsedMs
+      continue
+    }
+    if (candidate.eventType === 'basketball.clock_paused') {
+      running = false
+      elapsedMs = candidate.payload.elapsedMs
+      anchorElapsedMs = null
+      anchorOccurredAt = null
+      lastRunningElapsedMs = null
+      continue
+    }
+    if (candidate.eventType === 'basketball.clock_adjusted') {
+      running = false
+      elapsedMs = candidate.payload.toElapsedMs
+      anchorElapsedMs = null
+      anchorOccurredAt = null
+      lastRunningElapsedMs = null
+      continue
+    }
+    if (
+      running &&
+      candidate.payload.recordedLater !== true &&
+      candidate.elapsedMs !== null
+    ) {
+      lastRunningElapsedMs = Math.max(lastRunningElapsedMs ?? 0, candidate.elapsedMs)
+    }
+  }
+
+  if (periodId !== event.period.id) return null
+  if (!running) return elapsedMs
+  if (anchorElapsedMs === null || anchorOccurredAt === null) return null
+  const targetMs = Date.parse(event.occurredAt)
+  const anchorMs = Date.parse(anchorOccurredAt)
+  if (!Number.isFinite(targetMs) || !Number.isFinite(anchorMs) || targetMs < anchorMs) {
+    return lastRunningElapsedMs
+  }
+  const runningMoment = Math.min(durationMs, anchorElapsedMs + targetMs - anchorMs)
+  return Math.max(runningMoment, lastRunningElapsedMs ?? 0)
 }
 
 function isBasketballClockEvent(event: BasketballMatchEvent): event is BasketballClockEvent {

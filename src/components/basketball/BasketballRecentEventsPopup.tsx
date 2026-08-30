@@ -92,7 +92,7 @@ export default function BasketballRecentEventsPopup({
               {recent.map((unit, index) => {
                 const isTop = index === 0
                 const canUndo = isTop && unit.undoable
-                const openTimeline = !isTop && unit.kind !== 'boundary'
+                const openTimeline = !canUndo && unit.kind !== 'boundary'
                 return (
                   <li
                     key={unit.id}

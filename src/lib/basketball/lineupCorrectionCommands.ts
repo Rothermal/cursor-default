@@ -154,11 +154,19 @@ export function previewBasketballLineupCorrection(
     gameEventProjectors
   )
   if (!candidate.ok || !candidate.inspection.complete || candidate.state.sportGameState?.sportId !== 'basketball') {
+    const equalPlayConflict = !candidate.ok &&
+      candidate.error.code === 'incomplete_projection' &&
+      group.some(candidate =>
+        candidate.eventType === 'basketball.equal_play_override' ||
+        candidate.eventType === 'basketball.lineup_confirmed'
+      )
     return commandFailure(
       'command_failed',
       candidate.ok
         ? 'The lineup correction did not produce a complete Basketball projection.'
-        : candidate.error.message
+        : equalPlayConflict
+          ? 'The edited boundary candidate no longer matches its projector-derived equal-play review.'
+          : candidate.error.message
     )
   }
   return {
@@ -172,7 +180,7 @@ export function previewBasketballLineupCorrection(
       consequenceLines: lineupConsequenceLines(
         beforeProjection,
         candidate.state.sportGameState.projection,
-        group.length
+        group
       ),
       affectedEventIds: mutations.map(mutation => mutation.eventId),
       requiresConfirmation: true,
@@ -326,8 +334,9 @@ function captureGroup(events: BasketballMatchEvent[], source: BasketballMatchEve
 function lineupConsequenceLines(
   before: BasketballMatchProjection,
   after: BasketballMatchProjection,
-  eventCount: number
+  group: BasketballMatchEvent[]
 ): string[] {
+  const eventCount = group.length
   const lines = [`${eventCount} grouped lineup event${eventCount === 1 ? '' : 's'} will be revised atomically.`]
   for (const side of ['tracked', 'opponent'] as const) {
     const previous = before.lineup?.sides[side]
@@ -346,7 +355,30 @@ function lineupConsequenceLines(
       lines.push(`${participant?.displayName ?? 'Participant'} time: ${formatClock(prior.participationMs)} to ${formatClock(participation.participationMs)}.`)
     }
   }
+  if (before.lineup?.equalPlayCompliant !== after.lineup?.equalPlayCompliant) {
+    lines.push(`Equal-play compliance will change to ${after.lineup?.equalPlayCompliant ? 'compliant' : 'not compliant'}.`)
+  }
+  if (before.lineup?.enforcedOverridesComplete !== after.lineup?.enforcedOverridesComplete) {
+    lines.push(`Equal-play override evidence will become ${after.lineup?.enforcedOverridesComplete ? 'complete' : 'incomplete'}.`)
+  }
+  const groupIds = new Set(group.map(event => event.id))
+  for (const review of after.lineup?.equalPlayReviews ?? []) {
+    if (!groupIds.has(review.confirmationEventId) && !groupIds.has(review.overrideEventId ?? '')) continue
+    const violations = [...new Set(review.violations.map(value => equalPlayViolationLabel(value.code)))]
+    lines.push(
+      `Equal-play review for ${review.periodId}: ${violations.length > 0 ? violations.join(', ') : 'no violations'}` +
+      `${review.overrideEventId ? ' with an authorized override' : ''}.`
+    )
+  }
   return [...new Set(lines)]
+}
+
+function equalPlayViolationLabel(code: BasketballEqualPlayViolationCode): string {
+  switch (code) {
+    case 'minimum_periods': return 'minimum periods'
+    case 'maximum_consecutive_periods': return 'maximum consecutive periods'
+    case 'maximum_period_imbalance': return 'maximum period imbalance'
+  }
 }
 
 function clearQuickUndoReceipt(state: GameState): GameState {

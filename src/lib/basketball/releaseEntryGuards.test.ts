@@ -316,6 +316,7 @@ describe('Basketball release entry guards', () => {
     expect(timeline).toContain("scope: 'capture_group'")
     expect(editor).toContain('previewBasketballLineupCorrection(state, draft)')
     expect(editor).toContain('applyBasketballLineupCorrection(state, preview)')
+    expect(recent).toContain("const openTimeline = !canUndo && unit.kind !== 'boundary'")
     expect(recent).toContain("openTimeline ? 'Timeline' : 'Undo'")
     expect(tracker).toContain("setBasketballWorkspace('timeline')")
     expect(projector).toContain('orderBasketballEventsForProjection(captureOrderedEvents)')
