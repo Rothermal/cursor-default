@@ -183,8 +183,8 @@ export default function BasketballLineupSheet({
     onCommit({
       teamSide,
       participantIds: model.resultingParticipantIds,
-      reasonCode,
-      reasonNote: reasonNote.trim() || null,
+      reasonCode: model.reasonRequired ? reasonCode : null,
+      reasonNote: model.reasonRequired ? reasonNote.trim() || null : null,
       overrideReason: overrideReason.trim() || null,
       mode: recoveryMode ? 'current_lineup_recovery' : undefined,
       roleChanges,

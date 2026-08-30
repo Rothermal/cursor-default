@@ -1,0 +1,1 @@
+export const PWA_MAX_PRECACHE_ASSET_BYTES = 3 * 1024 * 1024

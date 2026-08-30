@@ -106,8 +106,6 @@ export function buildBasketballLineupSheetModel(
     validationMessage = 'Change at least one participant before committing.'
   } else if (changed && !mode) {
     validationMessage = 'A swap must add and remove the same number of participants.'
-  } else if (!reasonRequired && (reasonCode || reasonNote.trim())) {
-    validationMessage = 'This lineup transition does not accept a reason.'
   } else if (reasonRequired && !reasonCode) {
     validationMessage = 'Select a reason for this lineup transition.'
   } else if (!reasonCode && reasonNote.trim()) {

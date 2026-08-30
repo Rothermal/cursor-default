@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Clock3, Pause, Play, Settings2, Users } from 'lucide-react'
 import type { GameState } from '../../types'
 import type { BasketballDeviceSettings } from '../../lib/settingsStorage'
@@ -17,7 +17,7 @@ import {
 } from '../../lib/basketball/lineupCommands'
 import { isBasketballMatchRulesV3, resolveBasketballPeriodSegment } from '../../lib/basketball/rules'
 import type { BasketballStoppageCategory, BasketballTeamSide } from '../../lib/basketball/types'
-import type { BasketballLineupSheetCommit } from './BasketballLineupSheet'
+import BasketballLineupSheet, { type BasketballLineupSheetCommit } from './BasketballLineupSheet'
 import BasketballBoundaryReviewDialog, {
   type BasketballBoundaryReviewCommit,
 } from './BasketballBoundaryReviewDialog'
@@ -31,8 +31,6 @@ const STOPPAGE_OPTIONS: Array<{ value: BasketballStoppageCategory; label: string
   { value: 'official_review', label: 'Official review' },
   { value: 'other', label: 'Other' },
 ]
-
-const BasketballLineupSheet = lazy(() => import('./BasketballLineupSheet'))
 
 export default function BasketballClockStrip({
   state,
@@ -509,20 +507,18 @@ export default function BasketballClockStrip({
         </div>
       </section>
       {lineupSide && (
-        <Suspense fallback={null}>
-          <BasketballLineupSheet
-            state={state}
-            initialSide={lineupSide}
-            errorMessage={lineupError}
-            onAddParticipant={onAddParticipant ? side => {
-              setLineupSide(null)
-              setLineupError(null)
-              onAddParticipant(side)
-            } : undefined}
-            onCommit={handleLineupCommit}
-            onClose={closeLineup}
-          />
-        </Suspense>
+        <BasketballLineupSheet
+          state={state}
+          initialSide={lineupSide}
+          errorMessage={lineupError}
+          onAddParticipant={onAddParticipant ? side => {
+            setLineupSide(null)
+            setLineupError(null)
+            onAddParticipant(side)
+          } : undefined}
+          onCommit={handleLineupCommit}
+          onClose={closeLineup}
+        />
       )}
       {boundaryReviewOpen && pendingSides.length > 0 && (
         <BasketballBoundaryReviewDialog

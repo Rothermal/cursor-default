@@ -9,15 +9,16 @@ Status: Automated checks pass. Browser smoke is not run in this implementation e
 - explicit replacement guidance and ordinary late-player bench entry;
 - acknowledged, reasoned Set Current Lineup recovery; and
 - Timeline detail and durable event authority for role and recovery metadata.
+- an explicit build-enforced offline precache asset budget.
 
 ## Automated Evidence
 
 | Gate | Result |
 |---|---|
 | `pnpm typecheck` | Pass |
-| Focused lineup, sheet-model, and release-guard tests | Pass: 3 files / 47 tests |
-| Full Vitest suite | Pass: 175 files / 1,232 tests |
-| `pnpm build` | Pass; lineup sheet is a lazy-loaded precached chunk |
+| Focused lineup, sheet-model, and release-guard tests | Pass: 3 files / 49 tests |
+| Full Vitest suite | Pass: 175 files / 1,234 tests |
+| `pnpm build` | Pass; complete shell precached under the explicit 3 MiB per-asset budget |
 | `pnpm lint` | Pass: 0 errors / 6 existing Fast Refresh warnings |
 | `git diff --check` | Pass |
 

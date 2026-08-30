@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Pencil, Users, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import {
@@ -6,9 +6,7 @@ import {
   buildBasketballBoundarySideReview,
 } from '../../lib/basketball/boundaryReviewModel'
 import type { BasketballTeamSide } from '../../lib/basketball/types'
-import type { BasketballLineupSheetCommit } from './BasketballLineupSheet'
-
-const BasketballLineupSheet = lazy(() => import('./BasketballLineupSheet'))
+import BasketballLineupSheet, { type BasketballLineupSheetCommit } from './BasketballLineupSheet'
 
 export interface BasketballBoundaryReviewCommit extends BasketballLineupSheetCommit {
   expectedCurrentParticipantIds: string[]
@@ -87,24 +85,22 @@ export default function BasketballBoundaryReviewDialog({
     const currentParticipantIds = sportState.projection.lineup?.sides[editingSide]
       ?.currentParticipantIds ?? []
     return (
-      <Suspense fallback={null}>
-        <BasketballLineupSheet
-          state={state}
-          initialSide={editingSide}
-          errorMessage={errorMessage}
-          purpose="boundary"
-          canOverrideEqualPlay={canOverrideEqualPlay}
-          allowedSides={[editingSide]}
-          onCommit={input => {
-            setEditingSide(null)
-            onCommit({
-              ...input,
-              expectedCurrentParticipantIds: currentParticipantIds,
-            })
-          }}
-          onClose={() => setEditingSide(null)}
-        />
-      </Suspense>
+      <BasketballLineupSheet
+        state={state}
+        initialSide={editingSide}
+        errorMessage={errorMessage}
+        purpose="boundary"
+        canOverrideEqualPlay={canOverrideEqualPlay}
+        allowedSides={[editingSide]}
+        onCommit={input => {
+          setEditingSide(null)
+          onCommit({
+            ...input,
+            expectedCurrentParticipantIds: currentParticipantIds,
+          })
+        }}
+        onClose={() => setEditingSide(null)}
+      />
     )
   }
 
