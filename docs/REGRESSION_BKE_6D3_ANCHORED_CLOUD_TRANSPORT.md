@@ -10,6 +10,7 @@ environment.
 - automatic Personal/team creation and confirmation-driven later cloud enablement;
 - existing v4 one-recorder bind, pull/merge, upload, conflict, and exact-checkpoint transport;
 - strict recorder ownership, duplicate-binding, stale-account, and malformed-stream guards;
+- immutable source-team equal-play authority with owner/admin/scorer allow and viewer/removed deny;
 - running clock, Set Clock, and recorded-later lineup replay through the shared projector; and
 - unchanged Legacy Basketball, clockless Event Basketball, Soccer, and aggregate routing.
 
@@ -28,9 +29,15 @@ environment.
 Focused coverage proves that an exact anchored recorder can sync while running, that clockless event
 games never call the clock capability, and that stale team roles fail before bind, pull, or upload.
 Cloud adoption rebuilds an adjusted clock plus recorded-later lineup history without inventing a
-second clock watermark. Independent anchored recorders begin paused at elapsed zero. Later Enable
-Cloud installs automatic policy only after successful transport/checkpoint and leaves the caller's
-local state unchanged on failure.
+second clock watermark; the marked lineup time sits after the pre-adjustment pause and before the
+adjusted value so the fixture requires the explicit `clock_adjusted` branch. Independent anchored
+recorders begin paused at elapsed zero. Later Enable Cloud installs automatic policy only after
+successful transport/checkpoint and leaves the caller's local state unchanged on failure.
+
+Anchored equal-play controls resolve authority from immutable `setup.sourceTeamId`, including
+local-only team-sourced games with no cloud binding. The role matrix permits owner, admin, and
+scorer while denying viewer and missing/removed membership; the role hook reloads when either the
+source team or signed-in account changes.
 
 Source guards enforce both setup preflights before active-game replacement, tournament writes, or
 commit. Capability caches are account-isolated and cleared on account change/sign-out; in-flight

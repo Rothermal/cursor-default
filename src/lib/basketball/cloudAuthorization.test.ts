@@ -3,6 +3,8 @@ import type { GameState } from '../../types'
 import { createInitialState } from '../gameReducer'
 import {
   authorizeBasketballAnchoredCloudMutation,
+  basketballEqualPlayAuthorityTeamId,
+  canAuthorizeBasketballEqualPlayOverride,
   isBasketballAnchoredCloudAuthority,
   type BasketballAnchoredCloudAuthorizationDependencies,
 } from './cloudAuthorization'
@@ -79,6 +81,21 @@ describe('Basketball anchored cloud authorization', () => {
     if (oldSetup.sportGameState?.sportId !== 'basketball') throw new Error('missing state')
     Object.assign(oldSetup.sportGameState.setup, { version: 1 })
     expect(isBasketballAnchoredCloudAuthority(oldSetup)).toBe(false)
+  })
+
+  it('uses immutable anchored team authority for every equal-play override role', () => {
+    const teamState = state('team-1')
+    expect(teamState.cloudSync.teamId).toBeNull()
+    expect(basketballEqualPlayAuthorityTeamId(teamState)).toBe('team-1')
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'owner')).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'admin')).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'scorer')).toBe(true)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, 'viewer')).toBe(false)
+    expect(canAuthorizeBasketballEqualPlayOverride(teamState, null)).toBe(false)
+
+    const personalState = state()
+    expect(basketballEqualPlayAuthorityTeamId(personalState)).toBeNull()
+    expect(canAuthorizeBasketballEqualPlayOverride(personalState, null)).toBe(true)
   })
 
   it('fresh-checks app, team, release, and clock authority before mutation', async () => {

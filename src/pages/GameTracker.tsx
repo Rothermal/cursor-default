@@ -51,6 +51,10 @@ import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameInfoPath } from '../lib/teamInfo'
 import { basketballSummaryPath } from '../lib/basketball/summary'
+import {
+  basketballEqualPlayAuthorityTeamId,
+  canAuthorizeBasketballEqualPlayOverride,
+} from '../lib/basketball/cloudAuthorization'
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
@@ -185,6 +189,13 @@ export default function GameTracker() {
   const { user } = useAuth()
   const { basketballDeviceSettings } = useSettings()
   const teamAccess = useTeamRole(state.cloudSync.teamId)
+  const equalPlayAuthorityTeamId = basketballEqualPlayAuthorityTeamId(state)
+  const equalPlaySourceAccess = useTeamRole(
+    equalPlayAuthorityTeamId === state.cloudSync.teamId ? null : equalPlayAuthorityTeamId
+  )
+  const equalPlayRole = equalPlayAuthorityTeamId === state.cloudSync.teamId
+    ? teamAccess.role
+    : equalPlaySourceAccess.role
   const {
     sport,
     players,
@@ -1148,7 +1159,7 @@ export default function GameTracker() {
           state={state}
           recorderUserId={user?.id ?? null}
           settings={basketballDeviceSettings}
-          canOverrideEqualPlay={!state.cloudSync.teamId || canTrackGames(teamAccess.role)}
+          canOverrideEqualPlay={canAuthorizeBasketballEqualPlayOverride(state, equalPlayRole)}
           requestedLineupSide={requestedLineupSide}
           onRequestedLineupOpened={() => setRequestedLineupSide(null)}
           onAddParticipant={teamSide => {

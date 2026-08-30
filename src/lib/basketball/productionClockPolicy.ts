@@ -1,31 +1,5 @@
 import type { GameState } from '../../types'
 import { pauseBasketballClock } from './clockCommands'
-import { isBasketballMatchRulesV3 } from './rules'
-import type {
-  BasketballMatchRulesV2,
-  BasketballMatchRulesV3,
-} from './types'
-
-export type BasketballAnchoredSetupPolicy =
-  | { applicable: false }
-  | { applicable: true; allowed: true }
-
-export function getBasketballAnchoredSetupPolicy({
-  rules,
-  cloudIntent,
-  cloudGameId = null,
-}: {
-  rules: BasketballMatchRulesV2 | BasketballMatchRulesV3
-  cloudIntent: 'automatic' | 'local_only'
-  cloudGameId?: string | null
-}): BasketballAnchoredSetupPolicy {
-  if (!isBasketballMatchRulesV3(rules) || rules.clockModel !== 'anchored') {
-    return { applicable: false }
-  }
-  void cloudIntent
-  void cloudGameId
-  return { applicable: true, allowed: true }
-}
 
 export function isRunningAnchoredBasketballGame(state: GameState): boolean {
   return state.sport?.id === 'basketball' &&

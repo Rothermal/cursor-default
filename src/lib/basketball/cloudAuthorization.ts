@@ -44,6 +44,20 @@ export function isBasketballAnchoredCloudAuthority(state: GameState): boolean {
     rules.clockModel === 'anchored'
 }
 
+export function basketballEqualPlayAuthorityTeamId(state: GameState): string | null {
+  if (isBasketballAnchoredCloudAuthority(state) && state.sportGameState?.sportId === 'basketball') {
+    return state.sportGameState.setup.sourceTeamId
+  }
+  return state.cloudSync.teamId
+}
+
+export function canAuthorizeBasketballEqualPlayOverride(
+  state: GameState,
+  role: TeamRole | null
+): boolean {
+  return !basketballEqualPlayAuthorityTeamId(state) || canTrackGames(role)
+}
+
 export async function authorizeBasketballAnchoredCloudMutation(
   input: AuthorizeBasketballAnchoredCloudInput,
   dependencies: BasketballAnchoredCloudAuthorizationDependencies = defaultDependencies

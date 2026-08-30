@@ -287,6 +287,7 @@ describe('Basketball release entry guards', () => {
 
   it('keeps one anchored clock strip mounted above both Basketball workspaces', () => {
     const tracker = source('src/pages/GameTracker.tsx')
+    const teamRoleHook = source('src/hooks/useTeamRole.ts')
     const clockStrip = source('src/components/basketball/BasketballClockStrip.tsx')
     const lineupSheet = source('src/components/basketball/BasketballLineupSheet.tsx')
     const boundaryReview = source('src/components/basketball/BasketballBoundaryReviewDialog.tsx')
@@ -323,6 +324,12 @@ describe('Basketball release entry guards', () => {
     expect(lineupSheet).toContain('role="dialog"')
     expect(lineupSheet).toContain("event.key === 'Escape'")
     expect(clockStrip).not.toContain('lazy(() => import(')
+    expect(tracker).toContain('basketballEqualPlayAuthorityTeamId(state)')
+    expect(tracker).toContain('useTeamRole(\n    equalPlayAuthorityTeamId === state.cloudSync.teamId')
+    expect(tracker).toContain(
+      'canAuthorizeBasketballEqualPlayOverride(state, equalPlayRole)'
+    )
+    expect(teamRoleHook).toContain('}, [isConfigured, teamId, userId])')
     expect(boundaryReview).not.toContain('fallback={null}')
     expect(eventDetail).toContain('participantLabel(change.participantId)')
     expect(eventDetail).not.toContain('`${change.participantId}:')

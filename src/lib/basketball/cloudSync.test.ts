@@ -581,7 +581,7 @@ describe('Basketball event cloud transport adapter', () => {
       recorderUserId: 'user-1',
       sequence: adjusted.state.eventStream!.events.length + 1,
       period: { id: period.id, order: period.order },
-      elapsedMs: 4_000,
+      elapsedMs: 12_000,
       occurredAt: '2026-08-15T12:00:07.000Z',
       teamSide: 'tracked',
     })
@@ -626,7 +626,7 @@ describe('Basketball event cloud transport adapter', () => {
     const roleHistory = trackedLineup.roleHistoryByParticipantId[participant.id]
     expect(roleHistory?.[roleHistory.length - 1]).toMatchObject({
       eventId: '70000000-0000-4000-8000-000000000064',
-      elapsedMs: 4_000,
+      elapsedMs: 12_000,
       position: 'G',
     })
   })
