@@ -4,6 +4,8 @@ import {
 } from './aggregateComposition'
 import {
   AGGREGATE_PLAYERS,
+  ANCHORED_AGGREGATE_PLAYERS,
+  makeAnchoredCanonicalAggregateSource,
   makeCanonicalAggregateSource,
   makeLegacyAggregateSource,
 } from './aggregateTestFixtures'
@@ -120,6 +122,26 @@ describe('Basketball aggregate transport', () => {
     expect(loaded.aggregate.scope).toEqual({
       type: 'player', id: AGGREGATE_PLAYERS.starter,
     })
+  })
+
+  it('projects anchored metrics from the unchanged canonical page envelope', async () => {
+    const source = makeAnchoredCanonicalAggregateSource()
+    const client = rpcClient(name => name.includes('publications')
+      ? success({ items: [canonicalItem(source)], nextCursor: null })
+      : success({ items: [], nextCursor: null }))
+
+    const loaded = await loadBasketballAggregates(
+      { type: 'team', id: 'team-1' },
+      { client }
+    )
+
+    expect(loaded.aggregate).toMatchObject({
+      participationBasis: 'interval_derived',
+      availableMetricIds: expect.arrayContaining(['bk_dnp', 'bk_pm']),
+    })
+    expect(loaded.aggregate.players.find(
+      player => player.playerId === ANCHORED_AGGREGATE_PLAYERS.starter
+    )).toMatchObject({ stats: { bk_min_sec: 1, bk_pm: 2 } })
   })
 
   it('rejects malformed pages but isolates malformed source items', async () => {

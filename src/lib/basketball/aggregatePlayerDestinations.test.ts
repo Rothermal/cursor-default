@@ -10,6 +10,8 @@ import {
 } from './aggregatePlayerDestinations'
 import {
   AGGREGATE_PLAYERS,
+  ANCHORED_AGGREGATE_PLAYERS,
+  makeAnchoredCanonicalAggregateSource,
   makeCanonicalAggregateSource,
   makeLegacyAggregateSource,
 } from './aggregateTestFixtures'
@@ -159,5 +161,28 @@ describe('Basketball player and career aggregate destinations', () => {
 
     expect(basketballPlayerGameMetricAvailability(personal.games)).toContain('bk_start')
     expect(basketballPlayerGameMetricAvailability(team.games)).not.toContain('bk_start')
+  })
+
+  it('recomposes partial plus-minus coverage within a career segment', () => {
+    const playerId = ANCHORED_AGGREGATE_PLAYERS.starter
+    const aggregate = aggregateBasketballSources(
+      { type: 'career', id: playerId },
+      [makeAnchoredCanonicalAggregateSource()],
+      [makeLegacyAggregateSource({ playerId })]
+    )
+    const segment = basketballPlayerCareerSegments(aggregate, {
+      playerId,
+      displayName: 'Anchored starter',
+      number: null,
+    })[0]
+    expect(segment.player).toMatchObject({
+      participationBasis: 'mixed',
+      stats: { bk_pm: 2 },
+      metricCoverage: {
+        bk_pm: { includedGameCount: 1, totalGameCount: 2, complete: false },
+      },
+    })
+    expect(basketballPlayerGameMetricAvailability(segment.games, playerId))
+      .not.toContain('bk_pm')
   })
 })

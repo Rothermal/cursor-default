@@ -7,6 +7,8 @@ import {
 } from './aggregateComposition'
 import {
   AGGREGATE_PLAYERS,
+  ANCHORED_AGGREGATE_PLAYERS,
+  makeAnchoredCanonicalAggregateSource,
   makeCanonicalAggregateSource,
   makeLegacyAggregateSource,
 } from './aggregateTestFixtures'
@@ -74,6 +76,85 @@ describe('Basketball mixed-authority aggregate composition', () => {
       record: {
         games: 2, wins: 1, draws: 0, losses: 1,
         pointsFor: 16, pointsAgainst: 19, pointDifference: -3,
+      },
+    })
+  })
+
+  it('keeps partial plus-minus numeric totals separate from eligibility coverage', () => {
+    const anchored = makeAnchoredCanonicalAggregateSource()
+    const legacy = makeLegacyAggregateSource({
+      playerId: ANCHORED_AGGREGATE_PLAYERS.starter,
+    })
+    const aggregate = aggregateBasketballSources(
+      { type: 'career', id: ANCHORED_AGGREGATE_PLAYERS.starter },
+      [anchored],
+      [legacy]
+    )
+    const player = aggregate.players[0]
+    expect(aggregate).toMatchObject({
+      participationBasis: 'mixed',
+      metricCoverage: {
+        bk_pm: { includedGameCount: 1, totalGameCount: 2, complete: false },
+      },
+    })
+    expect(aggregate.availableMetricIds).not.toContain('bk_pm')
+    expect(player).toMatchObject({
+      participationBasis: 'mixed',
+      stats: { bk_pm: 2 },
+      metricCoverage: {
+        bk_pm: { includedGameCount: 1, totalGameCount: 2, complete: false },
+      },
+    })
+    expect(player.metricCoverage.bk_pm?.reasons).toContain(
+      'Plus-minus requires anchored lineup authority.'
+    )
+  })
+
+  it('keeps optional opponent match values out of tracked-roster destinations', () => {
+    const source = makeAnchoredCanonicalAggregateSource()
+    const team = aggregateBasketballSources(
+      { type: 'team', id: 'team-1' },
+      [source],
+      []
+    )
+    expect(team.players.some(
+      player => player.playerId === ANCHORED_AGGREGATE_PLAYERS.opponent
+    )).toBe(false)
+
+    const opponentCareer = aggregateBasketballSources(
+      { type: 'career', id: ANCHORED_AGGREGATE_PLAYERS.opponent },
+      [source],
+      []
+    )
+    expect(opponentCareer.includedGameCount).toBe(0)
+    expect(opponentCareer.players).toEqual([])
+  })
+
+  it('uses tracked provenance when the same stable player id appears on both sides', () => {
+    const projected = projectBasketballCanonicalAggregateSource(
+      makeAnchoredCanonicalAggregateSource()
+    )
+    if (!projected.ok) throw new Error(projected.exclusion.message)
+    const tracked = projected.match.players.find(player => player.teamSide === 'tracked')
+    const opponent = projected.match.players.find(player => player.teamSide === 'opponent')
+    if (!tracked || !opponent) throw new Error('Anchored fixture did not project both sides.')
+    opponent.playerId = tracked.playerId
+    opponent.participationBasis = 'recorded_manual'
+    opponent.metricEligibility = {
+      bk_pm: { eligible: false, reason: 'Opponent-only test provenance.' },
+    }
+
+    const career = aggregateBasketballMatches(
+      { type: 'career', id: tracked.playerId },
+      [projected.match]
+    )
+
+    expect(career.games[0]).toMatchObject({
+      participationBasis: 'interval_derived',
+      playerMetricEligibility: {
+        [tracked.playerId]: {
+          bk_pm: { eligible: true, reason: null },
+        },
       },
     })
   })

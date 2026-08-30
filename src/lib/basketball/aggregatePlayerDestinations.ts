@@ -1,11 +1,13 @@
 import type {
   BasketballAggregateGame,
+  BasketballAggregateMetricCoverage,
   BasketballAggregatePlayer,
   BasketballAggregateResult,
 } from './aggregateComposition'
 import {
   BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES,
-  basketballAggregateCategoryHasValues,
+  basketballAggregateMetricValue,
+  basketballPlayerAggregateMetricAvailable,
   type BasketballAggregateCategoryDestination,
 } from './aggregateDestinations'
 import {
@@ -61,6 +63,8 @@ export function selectBasketballAggregatePlayer(
     number: identity.number,
     teamIds: [...new Set(identity.teamIds ?? [])].sort(),
     matchIds: [],
+    participationBasis: null,
+    metricCoverage: {},
     stats,
     rates: basketballAggregateRates(stats),
   }
@@ -70,9 +74,14 @@ export function visibleBasketballPlayerAggregateCategories(
   aggregate: BasketballAggregateResult,
   player: BasketballAggregatePlayer
 ): BasketballAggregateCategoryDestination[] {
-  return BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES.filter(category =>
-    basketballAggregateCategoryHasValues([player], category, aggregate)
-  )
+  return BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES.filter(category => {
+    if (category.id === 'participation') return true
+    return category.metricIds.some(metricId => (
+      basketballPlayerAggregateMetricAvailable(aggregate, player, metricId) &&
+      basketballAggregateMetricValue(player, metricId) !== 0 &&
+      basketballAggregateMetricValue(player, metricId) !== null
+    ))
+  })
 }
 
 export function basketballPlayerAggregateGames(
@@ -126,6 +135,8 @@ export function basketballPlayerCareerSegments(
         number: identity.number,
         teamIds: first.teamId ? [first.teamId] : [],
         matchIds: orderedGames.map(game => game.gameId),
+        participationBasis: playerGameParticipationBasis(orderedGames),
+        metricCoverage: playerGameMetricCoverage(orderedGames, identity.playerId),
         stats,
         rates: basketballAggregateRates(stats),
       },
@@ -152,11 +163,46 @@ export function basketballPlayerProfileBreakdown(
   }
 }
 
-export function basketballPlayerGameMetricAvailability(
+function playerGameParticipationBasis(
   games: BasketballAggregateGame[]
+): BasketballAggregatePlayer['participationBasis'] {
+  if (games.length === 0) return null
+  const values = new Set(games.map(game => game.participationBasis))
+  return values.size === 1 ? [...values][0] : 'mixed'
+}
+
+function playerGameMetricCoverage(
+  games: BasketballAggregateGame[],
+  playerId: string
+): BasketballAggregateMetricCoverage {
+  const coverage: BasketballAggregateMetricCoverage = {}
+  for (const metricId of ['bk_dnp', 'bk_pm'] as const) {
+    const entries = games.flatMap(game => {
+      const entry = game.playerMetricEligibility?.[playerId]?.[metricId]
+      return entry ? [entry] : []
+    })
+    if (entries.length === 0) continue
+    coverage[metricId] = {
+      includedGameCount: entries.filter(entry => entry.eligible).length,
+      totalGameCount: entries.length,
+      complete: entries.every(entry => entry.eligible),
+      reasons: [...new Set(entries.flatMap(entry => entry.reason ? [entry.reason] : []))],
+    }
+  }
+  return coverage
+}
+
+export function basketballPlayerGameMetricAvailability(
+  games: BasketballAggregateGame[],
+  playerId?: string
 ): BasketballCanonicalStatId[] {
   if (games.length === 0) return [...BASKETBALL_CANONICAL_STAT_IDS]
   return BASKETBALL_CANONICAL_STAT_IDS.filter(metricId =>
-    games.every(game => game.availableMetricIds.includes(metricId))
+    games.every(game => {
+      if (playerId && (metricId === 'bk_dnp' || metricId === 'bk_pm')) {
+        return game.playerMetricEligibility?.[playerId]?.[metricId]?.eligible === true
+      }
+      return game.availableMetricIds.includes(metricId)
+    })
   )
 }

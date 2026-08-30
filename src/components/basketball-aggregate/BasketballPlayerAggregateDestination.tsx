@@ -3,8 +3,8 @@ import { RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useBasketballAggregateDestination } from '../../hooks/useBasketballAggregateDestination'
 import {
-  basketballAggregateMetricAvailable,
   basketballAggregateMetricLabel,
+  basketballPlayerAggregateMetricAvailable,
   formatBasketballAggregateMetric,
 } from '../../lib/basketball/aggregateDestinations'
 import {
@@ -232,7 +232,7 @@ function PlayerCategorySections({
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {categories.map(category => {
         const metricIds = category.metricIds.filter(metricId =>
-          basketballAggregateMetricAvailable(scopedAggregate, metricId)
+          basketballPlayerAggregateMetricAvailable(scopedAggregate, player, metricId)
         )
         if (metricIds.length === 0) return null
         return (
@@ -255,6 +255,21 @@ function PlayerCategorySections({
                   <p className="font-bold text-slate-900 tabular-nums mt-0.5">
                     {formatBasketballAggregateMetric(player, metricId)}
                   </p>
+                  {(metricId === 'bk_pm' || metricId === 'bk_dnp') &&
+                    player.metricCoverage[metricId] && (
+                    <>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {player.metricCoverage[metricId]!.includedGameCount} of{' '}
+                        {player.metricCoverage[metricId]!.totalGameCount} games
+                      </p>
+                      {!player.metricCoverage[metricId]!.complete &&
+                        player.metricCoverage[metricId]!.reasons[0] && (
+                        <p className="text-[11px] leading-4 text-amber-700 mt-1">
+                          {player.metricCoverage[metricId]!.reasons[0]}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -285,7 +300,7 @@ function PersonalHistory({
       <PlayerCategorySections
         aggregate={aggregate}
         player={segment.player}
-        availableMetricIds={basketballPlayerGameMetricAvailability(segment.games)}
+        availableMetricIds={basketballPlayerGameMetricAvailability(segment.games, playerId)}
         compact
       />
       <PlayerGameHistory title="Personal game history" games={segment.games} playerId={playerId} />
@@ -346,7 +361,7 @@ function CareerHistory({
               <PlayerCategorySections
                 aggregate={aggregate}
                 player={segment.player}
-                availableMetricIds={basketballPlayerGameMetricAvailability(segment.games)}
+                availableMetricIds={basketballPlayerGameMetricAvailability(segment.games, playerId)}
                 compact
               />
               <PlayerGameHistory title="Games" games={segment.games} playerId={playerId} />

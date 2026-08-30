@@ -1,7 +1,7 @@
 # Plan: BKE-6D Cloud Summary, Aggregates, and Lifecycle
 
-Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 is
-implemented; BKE-6D2 exact-second aggregates are next.
+Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 and BKE-6D2
+are implemented; BKE-6D3 anchored cloud transport is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -237,6 +237,14 @@ No migration is expected in BKE-6D1.
 
 ## 6. BKE-6D2: Exact-Second Aggregates
 
+Status: Implemented. The canonical catalog adds `bk_dnp` and signed `bk_pm`; anchored match
+projection consumes projector-owned participation milliseconds, lineup-entry evidence, and
+side-specific plus-minus eligibility. Aggregate and player records carry participation basis plus
+structured included/total-game coverage and reasons. Profile/Career may display a partial eligible
+sum, while comparative destinations continue to require complete scope coverage. Existing exact
+RPC envelopes derive the new fields from their canonical snapshots, so no migration was added. See
+[REGRESSION_BKE_6D2_EXACT_AGGREGATES.md](REGRESSION_BKE_6D2_EXACT_AGGREGATES.md).
+
 Extend the pure BKE-4E aggregate engine. Canonical snapshots continue rebuilding through the shared
 registry/projector and produce one match contribution; no aggregate table or denormalized lineup
 window becomes a second authority.
@@ -249,6 +257,9 @@ window becomes a second authority.
   ids. Existing `bk_app`, `bk_start`, and `bk_min_sec` retain their identities.
 - Anchored appearance comes from valid lineup entry, start from opening-lineup authority, and DNP
   from match-roster presence without an appearance.
+- Appearance follows recorded lineup authority without guessing recorder intent. Entering and then
+  leaving at the same paused elapsed value still counts as one appearance; Undo or Timeline
+  correction must retract an accidental entry before `bk_app` changes.
 - Player plus-minus requires complete tracked lineup and scoring history. Opponent participant
   lineups are not required for tracked-player values.
 - Five-person lineup combinations use sorted stable participant/player identities and remain
@@ -267,6 +278,11 @@ unless the selected scope has complete coverage.
 Unresolved stable-player mappings remain isolated by the existing contribution policy. A rostered
 DNP with no contribution does not become a harmful unresolved exclusion. Authority collision,
 duplicate source, abandoned game, and malformed-source behavior remain unchanged.
+
+Optional opponent participant rows remain match-local projection evidence for symmetric review and
+future consumers. Every tracked roster, player, career, coverage, and per-game provenance lookup
+filters `teamSide === 'tracked'`; opponent rows never enter tracked cross-game destinations, even
+when the same stable player id appears on both sides of one match.
 
 ### BKE-6D2 exit tests
 

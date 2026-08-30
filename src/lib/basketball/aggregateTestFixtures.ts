@@ -1,5 +1,6 @@
 import type { GameEventActor, GameEventPeriod } from '../gameEvents/types'
 import { createBasketballAdministrativeEvent } from './administrativeEvents'
+import { createBasketballClockEvent } from './clockEvents'
 import { createBasketballLifecycleEvent } from './events'
 import {
   type BasketballCanonicalAggregateSource,
@@ -10,6 +11,8 @@ import {
   createBasketballMatchRules,
   DEFAULT_BASKETBALL_RULES_SOURCE,
 } from './rules'
+import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
+import { createBasketballLineupEvent } from './lineupEvents'
 import { createBasketballStatEvent } from './statEvents'
 import { emptyBasketballStatTotals } from './state'
 import type {
@@ -39,6 +42,24 @@ export const AGGREGATE_PLAYERS = {
   dnp: 'cloud-player-dnp',
   late: 'cloud-player-late',
 } as const
+
+export const ANCHORED_AGGREGATE_PARTICIPANTS = {
+  starter: 'b4e20000-0000-4000-8000-000000000101',
+  second: 'b4e20000-0000-4000-8000-000000000102',
+  third: 'b4e20000-0000-4000-8000-000000000103',
+  fourth: 'b4e20000-0000-4000-8000-000000000104',
+  fifth: 'b4e20000-0000-4000-8000-000000000105',
+  bench: 'b4e20000-0000-4000-8000-000000000106',
+  dnp: 'b4e20000-0000-4000-8000-000000000107',
+  opponent: 'b4e20000-0000-4000-8000-000000000201',
+} as const
+
+export const ANCHORED_AGGREGATE_PLAYERS = Object.fromEntries(
+  Object.entries(ANCHORED_AGGREGATE_PARTICIPANTS).map(([key]) => [
+    key,
+    `cloud-anchored-${key}`,
+  ])
+) as Record<keyof typeof ANCHORED_AGGREGATE_PARTICIPANTS, string>
 
 export function makeCanonicalAggregateSource({
   gameId = 'canonical-game-1',
@@ -140,6 +161,178 @@ export function makeLegacyAggregateSource({
     }],
     canManage: true,
   }
+}
+
+export function makeAnchoredCanonicalAggregateSource({
+  gameId = 'anchored-game-1',
+  date = '2026-08-27',
+  teamId = 'team-1',
+  includeOpponentLineup = true,
+}: {
+  gameId?: string
+  date?: string
+  teamId?: string | null
+  includeOpponentLineup?: boolean
+} = {}): BasketballCanonicalAggregateSource {
+  const setup = anchoredAggregateSetup(teamId, includeOpponentLineup)
+  const events = anchoredAggregateEvents(includeOpponentLineup)
+  return {
+    authority: 'canonical',
+    publicationId: `publication-${gameId}`,
+    publicationNumber: 1,
+    snapshotFingerprint: `fingerprint-${gameId}`,
+    finalizedAt: '2026-08-27T15:00:00.000Z',
+    active: true,
+    game: aggregateGame(gameId, date, teamId ? 'team' : 'personal', teamId),
+    canonicalSnapshot: {
+      version: 2,
+      canonicalSchemaVersion: 1,
+      sportId: 'basketball',
+      gameId,
+      primaryRecorderId: RECORDER_ID,
+      eventStream: { version: 1, events },
+      sportGameState: { sportId: 'basketball', version: 1, setup },
+    },
+    participantSourceMap: Object.fromEntries(
+      Object.entries(ANCHORED_AGGREGATE_PARTICIPANTS).map(([key, participantId]) => [
+        participantId,
+        ANCHORED_AGGREGATE_PLAYERS[key as keyof typeof ANCHORED_AGGREGATE_PLAYERS],
+      ])
+    ),
+    canManage: true,
+  }
+}
+
+function anchoredAggregateSetup(
+  teamId: string | null,
+  includeOpponentLineup: boolean
+): BasketballMatchSetup {
+  const baseRules = getBasketballRulesProfile('nfhs', 1)?.rules
+  if (!baseRules) throw new Error('NFHS Basketball fixture rules are unavailable.')
+  const rules = upgradeBasketballRulesDraftToV3(baseRules, 'nfhs')
+  const tracked = Object.entries(ANCHORED_AGGREGATE_PARTICIPANTS)
+    .filter(([key]) => key !== 'opponent')
+    .map(([key, id], index) => participant(
+      id,
+      `local-anchored-${key}`,
+      `Anchored ${key}`,
+      index < 5 ? 'starter' : key === 'dnp' ? 'dnp' : 'bench'
+    ))
+  const opponent = [{
+    ...participant(
+      ANCHORED_AGGREGATE_PARTICIPANTS.opponent,
+      'local-anchored-opponent',
+      'Anchored opponent',
+      'starter'
+    ),
+    teamSide: 'opponent' as const,
+  }]
+  return {
+    version: 2,
+    trackedTeamDesignation: 'home',
+    sourceTeamId: teamId,
+    sourceSeasonId: teamId ? 'season-1' : null,
+    rulesSource: structuredClone(DEFAULT_BASKETBALL_RULES_SOURCE),
+    rulesSnapshot: rules,
+    participants: [...tracked, ...opponent],
+    openingLineups: {
+      tracked: {
+        participantIds: Object.values(ANCHORED_AGGREGATE_PARTICIPANTS).slice(0, 5),
+        shortHandedReason: null,
+      },
+      opponent: includeOpponentLineup
+        ? {
+            participantIds: [ANCHORED_AGGREGATE_PARTICIPANTS.opponent],
+            shortHandedReason: 'Only one opponent participant is tracked.',
+          }
+        : null,
+    },
+  }
+}
+
+function anchoredAggregateEvents(includeOpponentLineup: boolean): BasketballMatchEvent[] {
+  const period = { id: 'regulation-1', order: 1 }
+  const startAt = '2026-08-27T14:00:00.000Z'
+  const eventAt = (offsetMs: number) => new Date(Date.parse(startAt) + offsetMs).toISOString()
+  const trackedOpening = Object.values(ANCHORED_AGGREGATE_PARTICIPANTS).slice(0, 5)
+  const substituted = [...trackedOpening.slice(1), ANCHORED_AGGREGATE_PARTICIPANTS.bench]
+  return [
+    createBasketballLifecycleEvent({
+      id: anchoredId(0), eventType: 'basketball.period_started',
+      payload: { periodId: period.id, captureCommandId: null }, recorderUserId: RECORDER_ID,
+      sequence: 0, period, elapsedMs: 0, occurredAt: eventAt(0),
+    }),
+    createBasketballClockEvent({
+      id: anchoredId(1), eventType: 'basketball.clock_started',
+      payload: { anchorElapsedMs: 0, captureCommandId: null }, recorderUserId: RECORDER_ID,
+      sequence: 1, period, elapsedMs: 0, occurredAt: eventAt(0),
+    }),
+    createBasketballStatEvent({
+      id: anchoredId(2), eventType: 'basketball.shot',
+      payload: {
+        value: 2, made: true, attempt: 'field_goal', valueSource: 'quick_entry',
+        freeThrowTripId: null, tripAttemptNumber: null, captureCommandId: null,
+      },
+      recorderUserId: RECORDER_ID, sequence: 2, period, elapsedMs: 1_234,
+      occurredAt: eventAt(1_234), teamSide: 'tracked',
+      actors: [{
+        role: 'shooter', kind: 'player',
+        participantId: ANCHORED_AGGREGATE_PARTICIPANTS.starter,
+        playerId: 'local-anchored-starter',
+      }],
+    }),
+    createBasketballClockEvent({
+      id: anchoredId(3), eventType: 'basketball.clock_paused',
+      payload: { elapsedMs: 1_234, source: 'manual', captureCommandId: null },
+      recorderUserId: RECORDER_ID, sequence: 3, period, elapsedMs: 1_234,
+      occurredAt: eventAt(1_234),
+    }),
+    createBasketballLineupEvent({
+      id: anchoredId(4), eventType: 'basketball.substitution',
+      payload: {
+        participantIds: substituted, mode: 'balanced', reasonCode: null,
+        reasonNote: null, captureCommandId: anchoredId(40),
+      },
+      recorderUserId: RECORDER_ID, sequence: 4, period, elapsedMs: 1_234,
+      occurredAt: eventAt(1_500), teamSide: 'tracked',
+    }),
+    createBasketballClockEvent({
+      id: anchoredId(5), eventType: 'basketball.clock_started',
+      payload: { anchorElapsedMs: 1_234, captureCommandId: null }, recorderUserId: RECORDER_ID,
+      sequence: 5, period, elapsedMs: 1_234, occurredAt: eventAt(2_000),
+    }),
+    createBasketballStatEvent({
+      id: anchoredId(6), eventType: 'basketball.shot',
+      payload: {
+        value: 2, made: true, attempt: 'field_goal', valueSource: 'quick_entry',
+        freeThrowTripId: null, tripAttemptNumber: null, captureCommandId: null,
+      },
+      recorderUserId: RECORDER_ID, sequence: 6, period, elapsedMs: 2_234,
+      occurredAt: eventAt(3_000), teamSide: 'opponent',
+      actors: includeOpponentLineup
+        ? [{
+            role: 'shooter', kind: 'player',
+            participantId: ANCHORED_AGGREGATE_PARTICIPANTS.opponent,
+            playerId: 'local-anchored-opponent',
+          }]
+        : [{ role: 'shooter', kind: 'unknown', label: 'Opponent' }],
+    }),
+    createBasketballClockEvent({
+      id: anchoredId(7), eventType: 'basketball.clock_paused',
+      payload: { elapsedMs: 2_468, source: 'manual', captureCommandId: null },
+      recorderUserId: RECORDER_ID, sequence: 7, period, elapsedMs: 2_468,
+      occurredAt: eventAt(3_234),
+    }),
+    createBasketballLifecycleEvent({
+      id: anchoredId(8), eventType: 'basketball.match_ended',
+      payload: { reason: 'completed', captureCommandId: null }, recorderUserId: RECORDER_ID,
+      sequence: 8, period, elapsedMs: 2_468, occurredAt: eventAt(4_000),
+    }),
+  ] as BasketballMatchEvent[]
+}
+
+function anchoredId(sequence: number): string {
+  return `b4e20000-0000-4000-8000-${String(sequence + 1).padStart(12, '0')}`
 }
 
 function aggregateGame(

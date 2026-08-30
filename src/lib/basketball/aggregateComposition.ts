@@ -15,6 +15,8 @@ import {
   type BasketballAggregateMatch,
   type BasketballAggregateMatchPlayer,
   type BasketballAggregatePeriodScore,
+  type BasketballAggregateMetricEligibility,
+  type BasketballAggregateParticipationBasis,
   type BasketballAggregateScope,
   type BasketballAggregateSourceGame,
   type BasketballAggregateUnresolvedParticipant,
@@ -59,9 +61,23 @@ export interface BasketballAggregatePlayer {
   number: string | null
   teamIds: string[]
   matchIds: string[]
+  participationBasis: BasketballAggregateParticipationBasis | 'mixed' | null
+  metricCoverage: BasketballAggregateMetricCoverage
   stats: BasketballAggregateStats
   rates: BasketballAggregateRates
 }
+
+export interface BasketballAggregateMetricCoverageEntry {
+  includedGameCount: number
+  totalGameCount: number
+  complete: boolean
+  reasons: string[]
+}
+
+export type BasketballAggregateMetricCoverage = Partial<Record<
+  BasketballCanonicalStatId,
+  BasketballAggregateMetricCoverageEntry
+>>
 
 export interface BasketballAggregateTeamRecord {
   games: number
@@ -97,6 +113,8 @@ export interface BasketballAggregateGame {
   result: 'win' | 'draw' | 'loss'
   periods: BasketballAggregatePeriodScore[]
   availableMetricIds: BasketballCanonicalStatId[]
+  participationBasis: BasketballAggregateParticipationBasis
+  playerMetricEligibility?: Record<string, BasketballAggregateMetricEligibility>
   playerStats?: Record<string, BasketballAggregateStats>
 }
 
@@ -116,6 +134,8 @@ export interface BasketballAggregateResult {
   quality: 'complete' | 'partial'
   provenance: 'canonical' | 'legacy' | 'mixed' | null
   minutesBasis: 'recorded'
+  participationBasis: BasketballAggregateParticipationBasis | 'mixed' | null
+  metricCoverage: BasketballAggregateMetricCoverage
   includedGameCount: number
   newestGameDate: string | null
   oldestGameDate: string | null
@@ -200,6 +220,12 @@ export function projectBasketballLegacyAggregateSource(
       participantIds: [],
       displayName: row.displayName,
       number: row.number,
+      teamSide: 'tracked',
+      participationBasis: 'recorded_manual',
+      metricEligibility: {
+        bk_dnp: { eligible: false, reason: 'DNP requires anchored lineup authority.' },
+        bk_pm: { eligible: false, reason: 'Plus-minus requires anchored lineup authority.' },
+      },
       stats,
     })
   })
@@ -214,6 +240,7 @@ export function projectBasketballLegacyAggregateSource(
       canManage: source.canManage,
       game: structuredClone(source.game),
       eventCount: 0,
+      participationBasis: 'recorded_manual',
       players: mergeLegacyPlayers(players),
       unresolvedParticipants,
       teamStats: {
@@ -228,7 +255,8 @@ export function projectBasketballLegacyAggregateSource(
           : 'draw',
       periods: structuredClone(source.periods),
       availableMetricIds: BASKETBALL_CANONICAL_STAT_IDS.filter(
-        id => id !== 'bk_start' && id !== 'bk_dq' && id !== 'bk_eject'
+        id => id !== 'bk_start' && id !== 'bk_dnp' && id !== 'bk_pm' &&
+          id !== 'bk_dq' && id !== 'bk_eject'
       ),
     },
   }
@@ -324,6 +352,11 @@ export function aggregateBasketballMatches(
       })
     }
     for (const row of match.players) {
+      if (row.teamSide !== 'tracked') continue
+      if (
+        (scope.type === 'player' || scope.type === 'career') &&
+        row.playerId !== scope.id
+      ) continue
       const existing = players.get(row.playerId)
       if (existing) {
         addBasketballAggregateStatsInPlace(existing.stats, row.stats)
@@ -332,6 +365,11 @@ export function aggregateBasketballMatches(
         if (match.game.teamId) existing.teamIds.push(match.game.teamId)
         existing.matchIds = [...new Set(existing.matchIds)]
         existing.teamIds = [...new Set(existing.teamIds)].sort()
+        existing.participationBasis = mergeParticipationBasis(
+          existing.participationBasis,
+          row.participationBasis
+        )
+        addMetricCoverage(existing.metricCoverage, row.metricEligibility)
       } else {
         const stats = structuredClone(row.stats)
         players.set(row.playerId, {
@@ -340,6 +378,8 @@ export function aggregateBasketballMatches(
           number: row.number,
           teamIds: match.game.teamId ? [match.game.teamId] : [],
           matchIds: [match.game.id],
+          participationBasis: row.participationBasis,
+          metricCoverage: metricCoverageFromEligibility(row.metricEligibility),
           stats,
           rates: basketballAggregateRates(stats),
         })
@@ -371,6 +411,8 @@ export function aggregateBasketballMatches(
       number: rosterPlayer.number,
       teamIds: [rosterPlayer.teamId],
       matchIds: [],
+      participationBasis: null,
+      metricCoverage: {},
       stats,
       rates: basketballAggregateRates(stats),
     })
@@ -380,6 +422,10 @@ export function aggregateBasketballMatches(
     (available, match) => intersection(available, matchAvailability(match)),
     new Set(BASKETBALL_CANONICAL_STAT_IDS)
   )
+  if (included.length === 0) {
+    unavailableFromAnyMatch.delete('bk_dnp')
+    unavailableFromAnyMatch.delete('bk_pm')
+  }
   const harmfulExclusions = exclusions.filter(exclusion => [
     'malformed_source',
     'unresolved_participant',
@@ -395,6 +441,8 @@ export function aggregateBasketballMatches(
       ? 'mixed'
       : canonicalCount > 0 ? 'canonical' : legacyCount > 0 ? 'legacy' : null,
     minutesBasis: 'recorded',
+    participationBasis: aggregateParticipationBasis(included),
+    metricCoverage: aggregateMetricCoverage(included),
     includedGameCount: included.length,
     newestGameDate: dates.length ? dates.reduce((latest, date) => date > latest ? date : latest) : null,
     oldestGameDate: dates.length ? dates.reduce((earliest, date) => date < earliest ? date : earliest) : null,
@@ -437,7 +485,9 @@ function matchesScope(match: BasketballAggregateMatch, scope: BasketballAggregat
     return match.game.cloudScope === 'team' && match.game.tournamentId === scope.id
   }
   if (!scope.id) return false
-  return match.players.some(player => player.playerId === scope.id)
+  return match.players.some(player => (
+    player.teamSide === 'tracked' && player.playerId === scope.id
+  ))
 }
 
 function rosterBelongsToScope(
@@ -537,7 +587,9 @@ function gameRow(
 ): BasketballAggregateGame {
   const playerId = scope.type === 'player' || scope.type === 'career' ? scope.id : null
   const player = playerId
-    ? match.players.find(candidate => candidate.playerId === playerId)
+    ? match.players.find(candidate => (
+        candidate.teamSide === 'tracked' && candidate.playerId === playerId
+      ))
     : null
   return {
     authority: match.authority,
@@ -555,10 +607,87 @@ function gameRow(
     result: match.result,
     periods: structuredClone(match.periods),
     availableMetricIds: [...match.availableMetricIds],
+    participationBasis: player?.participationBasis ?? matchParticipationBasis(match),
+    ...(playerId && player
+      ? { playerMetricEligibility: { [playerId]: structuredClone(player.metricEligibility) } }
+      : {}),
     ...(playerId && player
       ? { playerStats: { [playerId]: structuredClone(player.stats) } }
       : {}),
   }
+}
+
+function matchParticipationBasis(match: BasketballAggregateMatch): BasketballAggregateParticipationBasis {
+  return match.participationBasis
+}
+
+function aggregateParticipationBasis(
+  matches: BasketballAggregateMatch[]
+): BasketballAggregateParticipationBasis | 'mixed' | null {
+  if (matches.length === 0) return null
+  const values = new Set(matches.map(matchParticipationBasis))
+  return values.size === 1 ? [...values][0] : 'mixed'
+}
+
+function mergeParticipationBasis(
+  left: BasketballAggregateParticipationBasis | 'mixed' | null,
+  right: BasketballAggregateParticipationBasis
+): BasketballAggregateParticipationBasis | 'mixed' {
+  if (left === null) return right
+  return left === right ? left : 'mixed'
+}
+
+function metricCoverageFromEligibility(
+  eligibility: BasketballAggregateMetricEligibility
+): BasketballAggregateMetricCoverage {
+  const coverage: BasketballAggregateMetricCoverage = {}
+  addMetricCoverage(coverage, eligibility)
+  return coverage
+}
+
+function addMetricCoverage(
+  coverage: BasketballAggregateMetricCoverage,
+  eligibility: BasketballAggregateMetricEligibility
+): void {
+  for (const id of BASKETBALL_CANONICAL_STAT_IDS) {
+    const entry = eligibility[id]
+    if (!entry) continue
+    const current = coverage[id] ?? {
+      includedGameCount: 0,
+      totalGameCount: 0,
+      complete: true,
+      reasons: [],
+    }
+    current.totalGameCount += 1
+    if (entry.eligible) current.includedGameCount += 1
+    else if (entry.reason) current.reasons.push(entry.reason)
+    current.complete = current.includedGameCount === current.totalGameCount
+    current.reasons = [...new Set(current.reasons)]
+    coverage[id] = current
+  }
+}
+
+function aggregateMetricCoverage(
+  matches: BasketballAggregateMatch[]
+): BasketballAggregateMetricCoverage {
+  const coverage: BasketballAggregateMetricCoverage = {}
+  for (const match of matches) {
+    for (const id of ['bk_dnp', 'bk_pm'] as const) {
+      const eligible = match.availableMetricIds.includes(id)
+      const reasons = match.players
+        .filter(player => player.teamSide === 'tracked')
+        .map(player => player.metricEligibility[id])
+        .filter(entry => entry && !entry.eligible && entry.reason)
+        .map(entry => entry!.reason!)
+      addMetricCoverage(coverage, {
+        [id]: {
+          eligible,
+          reason: eligible ? null : reasons[0] ?? `${id} is unavailable for this game.`,
+        },
+      })
+    }
+  }
+  return coverage
 }
 
 function matchExclusion(
@@ -608,7 +737,7 @@ function comparePlayers(left: BasketballAggregatePlayer, right: BasketballAggreg
 }
 
 function nonZeroContributionCount(stats: BasketballAggregateStats): number {
-  return Object.values(stats).filter(value => value !== 0).length
+  return BASKETBALL_CANONICAL_STAT_IDS.filter(id => id !== 'bk_dnp' && stats[id] !== 0).length
 }
 
 function nonNegativeScore(value: number): boolean {

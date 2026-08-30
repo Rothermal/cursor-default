@@ -73,6 +73,8 @@ function emptyLoadResult(): BasketballAggregateLoadResult {
       quality: 'complete',
       provenance: null,
       minutesBasis: 'recorded',
+      participationBasis: null,
+      metricCoverage: {},
       includedGameCount: 0,
       newestGameDate: null,
       oldestGameDate: null,
