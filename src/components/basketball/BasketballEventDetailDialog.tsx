@@ -9,6 +9,7 @@ interface Props {
   onEdit?: () => void
   onRemove?: () => void
   captureLabel?: string
+  participantLabel: (participantId: string) => string
 }
 
 export default function BasketballEventDetailDialog({
@@ -18,6 +19,7 @@ export default function BasketballEventDetailDialog({
   onEdit,
   onRemove,
   captureLabel,
+  participantLabel,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -60,7 +62,7 @@ export default function BasketballEventDetailDialog({
           <section className="border-b border-slate-200 px-4 py-4">
             <h3 className="text-xs font-semibold uppercase text-slate-500">{detailHeading(review)}</h3>
             <p className="mt-1 text-sm font-semibold text-slate-800">
-              {detailValue(review)}
+              {detailValue(review, participantLabel)}
             </p>
           </section>
           {review.warnings.length > 0 && (
@@ -103,13 +105,18 @@ function detailHeading(review: BasketballTimelineEventReview): string {
   if (review.event.eventType === 'basketball.foul') return 'Foul ruling'
   if (review.event.eventType === 'basketball.free_throw_trip') return 'Award'
   if (review.event.eventType === 'basketball.score_adjustment') return 'Adjustment'
+  if (review.event.eventType === 'basketball.substitution') return 'Lineup transition'
+  if (review.event.eventType === 'basketball.role_changed') return 'Role history'
   if (review.event.eventType === 'basketball.minutes_adjustment') return 'Minutes'
   if (review.event.eventType === 'basketball.ejection') return 'Ejection ruling'
   if (review.event.eventType === 'basketball.timeout') return 'Timeout'
   return review.relationshipLabels.length > 0 ? 'Relationship' : 'Event context'
 }
 
-function detailValue(review: BasketballTimelineEventReview): string {
+function detailValue(
+  review: BasketballTimelineEventReview,
+  participantLabel: (participantId: string) => string
+): string {
   const event = review.event
   if (event.eventType === 'basketball.period_started') return `${review.periodLabel} opened for capture`
   if (event.eventType === 'basketball.period_ended') return `${review.periodLabel} closed for capture`
@@ -149,6 +156,18 @@ function detailValue(review: BasketballTimelineEventReview): string {
   if (event.eventType === 'basketball.timeout') {
     const owner = event.teamSide === 'neutral' ? 'game administration' : 'charged timeout'
     return `${event.payload.label || event.payload.kind.replace(/_/g, ' ')} | ${owner}`
+  }
+  if (event.eventType === 'basketball.substitution') {
+    const reason = event.payload.reasonCode
+      ? ` | ${event.payload.reasonCode.replace(/_/g, ' ')}${event.payload.reasonNote ? `: ${event.payload.reasonNote}` : ''}`
+      : ''
+    return `${event.payload.mode.replace(/_/g, ' ')} | ${event.payload.participantIds.length} on court${reason}`
+  }
+  if (event.eventType === 'basketball.role_changed') {
+    return event.payload.changes.map(change => {
+      const position = change.position ?? 'No position'
+      return `${participantLabel(change.participantId)}: ${position}${change.captain ? ', Captain' : ''}`
+    }).join(' | ')
   }
   return review.relationshipLabels.length > 0 ? review.relationshipLabels.join(' | ') : 'Standalone event'
 }

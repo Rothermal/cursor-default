@@ -1,7 +1,7 @@
 # Plan: BKE-6C Live Lineups and Corrections
 
 Status: Product and delivery Q&A complete. All 16 implementation decisions are approved. BKE-6C1
-and BKE-6C2 are implemented; BKE-6C3 is next.
+through BKE-6C3 are implemented; BKE-6C4 is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -84,7 +84,7 @@ incomplete intervals and exact derived playing time without changing clockless o
 |---|---|---|
 | BKE-6C1 (complete) | Side-aware multi-player substitution sheet, balanced/unbalanced checked commands, resulting-lineup review, and replacement-required entry | Paused tracked and optional opponent lineups can transition atomically without inventing eligibility changes |
 | BKE-6C2 (complete) | Configured-boundary review, lineup-changing confirmations, equal-play evaluation, enforced override authorization, and Clock Start gating | Every required boundary has explicit lineup evidence and no unresolved enforced decision can start the clock |
-| BKE-6C3 | Position/captain history, late-player entry integration, short-handed/replacement recovery, and reasoned Set Current Lineup | Present lineup authority can recover truthfully while uncertain prior time remains explicitly incomplete |
+| BKE-6C3 (complete) | Position/captain history, late-player entry integration, short-handed/replacement recovery, and reasoned Set Current Lineup | Present lineup authority can recover truthfully while uncertain prior time remains explicitly incomplete |
 | BKE-6C4 | Grouped Recent Events behavior, consequence-aware Timeline correction, stale preview rejection, diagnostics, accessibility/responsive hardening, and exit audit | Complete and incomplete histories correct atomically and derive trustworthy intervals/minutes without compatibility regressions |
 
 The slices are intentionally sequential. Each receives its own feature branch, implementation PR,
@@ -277,6 +277,16 @@ reason validation have one production command path. See
 - current-lineup recovery marks only the current period incomplete at the command time;
 - complete opponent/earlier-period evidence remains complete; and
 - refresh, park/resume, Timeline display, and fingerprint behavior preserve all metadata.
+
+Implementation note: `updateBasketballLineup` is the one checked ordinary lineup composer. It appends
+an optional substitution before the role event with one command time, elapsed value, capture id,
+and final rebuild; role-only changes use the same normalized metadata contract. The shared sheet
+offers PG/SG/SF/PF/C/None/Custom plus independent captain toggles for every participant on the side.
+Recover Current Lineup is a separate acknowledged mode that may reassert the same five, records a
+structured reason, and starts incomplete current-period evidence at the exact command time without
+degrading prior periods or the other side. Late additions remain Bench and the add flow returns to
+the originating side's lineup sheet. See
+[REGRESSION_BKE_6C3_ROLES_AND_RECOVERY.md](REGRESSION_BKE_6C3_ROLES_AND_RECOVERY.md).
 
 ## 9. BKE-6C4: Undo, Timeline Correction, and Exit
 

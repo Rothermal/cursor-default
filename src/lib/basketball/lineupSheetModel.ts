@@ -75,7 +75,7 @@ export function buildBasketballLineupSheetModel(
   const outgoingParticipantIds = currentIds.filter(id => !resulting.has(id))
   const incomingParticipantIds = resultingParticipantIds.filter(id => !current.has(id))
   const changed = outgoingParticipantIds.length > 0 || incomingParticipantIds.length > 0
-  const mode = changed
+  const mode = changed || options.substitutionMode === 'current_lineup_recovery'
     ? options.substitutionMode ?? deriveBasketballLiveSubstitutionMode(
         outgoingParticipantIds.length,
         incomingParticipantIds.length

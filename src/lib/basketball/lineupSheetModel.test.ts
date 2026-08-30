@@ -141,6 +141,23 @@ describe('BKE-6C1 lineup sheet model', () => {
       { allowUnchanged: true, substitutionMode: 'boundary' }
     )).toMatchObject({ mode: 'boundary', reasonRequired: true, canCommit: false })
   })
+
+  it('does not block a reason-free result after the recorder changes their selection', () => {
+    const model = buildBasketballLineupSheetModel(
+      projectedGame(),
+      'tracked',
+      ['tracked-2', 'tracked-3', 'tracked-4', 'tracked-5', 'tracked-6'],
+      'injury',
+      'Stale staged reason'
+    )
+
+    expect(model).toMatchObject({
+      mode: 'balanced',
+      reasonRequired: false,
+      canCommit: true,
+      validationMessage: null,
+    })
+  })
 })
 
 function projectedGame({ opponent = false }: { opponent?: boolean } = {}): BasketballMatchProjection {

@@ -227,7 +227,8 @@ function applySubstitution(
   if (canonical.length === 0 || canonical.length > 5) {
     return 'Basketball substitution must leave one through five participants on court.'
   }
-  if (sameIds(canonical, side.currentParticipantIds)) {
+  if (sameIds(canonical, side.currentParticipantIds) &&
+      event.payload.mode !== 'current_lineup_recovery') {
     return 'Basketball substitution must change the current lineup.'
   }
   const prior = new Set(side.currentParticipantIds)

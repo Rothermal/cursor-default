@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowRightLeft, Check, UserMinus, UserPlus, X } from 'lucide-react'
+import { AlertTriangle, ArrowRightLeft, Check, ChevronDown, UserMinus, UserPlus, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import {
   basketballLineupInitialSelection,
@@ -12,9 +12,20 @@ import {
 } from '../../lib/basketball/boundaryReviewModel'
 import { BASKETBALL_SUBSTITUTION_REASON_OPTIONS } from '../../lib/basketball/lineupTransitions'
 import type {
+  BasketballMatchProjection,
+  BasketballRoleChange,
+  BasketballSubstitutionMode,
   BasketballSubstitutionReasonCode,
   BasketballTeamSide,
 } from '../../lib/basketball/types'
+
+const POSITION_OPTIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const
+
+interface BasketballRoleDraft {
+  choice: '' | typeof POSITION_OPTIONS[number] | 'custom'
+  custom: string
+  captain: boolean
+}
 
 export interface BasketballLineupSheetCommit {
   teamSide: BasketballTeamSide
@@ -22,6 +33,8 @@ export interface BasketballLineupSheetCommit {
   reasonCode: BasketballSubstitutionReasonCode | null
   reasonNote: string | null
   overrideReason: string | null
+  mode?: BasketballSubstitutionMode
+  roleChanges?: BasketballRoleChange[]
 }
 
 export default function BasketballLineupSheet({
@@ -31,6 +44,7 @@ export default function BasketballLineupSheet({
   purpose = 'substitution',
   canOverrideEqualPlay = false,
   allowedSides,
+  onAddParticipant,
   onCommit,
   onClose,
 }: {
@@ -40,6 +54,7 @@ export default function BasketballLineupSheet({
   purpose?: 'substitution' | 'boundary'
   canOverrideEqualPlay?: boolean
   allowedSides?: BasketballTeamSide[]
+  onAddParticipant?: (teamSide: BasketballTeamSide) => void
   onCommit: (input: BasketballLineupSheetCommit) => void
   onClose: () => void
 }) {
@@ -60,11 +75,20 @@ export default function BasketballLineupSheet({
   const [reasonCode, setReasonCode] = useState<BasketballSubstitutionReasonCode | null>(null)
   const [reasonNote, setReasonNote] = useState('')
   const [overrideReason, setOverrideReason] = useState('')
+  const [rolesOpen, setRolesOpen] = useState(false)
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, BasketballRoleDraft>>(() =>
+    projection ? initialRoleDrafts(projection, startingSide) : {}
+  )
+  const [recoveryMode, setRecoveryMode] = useState(false)
+  const [recoveryConfirmed, setRecoveryConfirmed] = useState(false)
   const dialogRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
+  const roleChanges = useMemo(() => projection
+    ? basketballRoleChanges(projection, teamSide, roleDrafts)
+    : [], [projection, roleDrafts, teamSide])
   const model = useMemo(() => projection
     ? buildBasketballLineupSheetModel(
         projection,
@@ -73,11 +97,15 @@ export default function BasketballLineupSheet({
         reasonCode,
         reasonNote,
         {
-          allowUnchanged: purpose === 'boundary',
-          substitutionMode: purpose === 'boundary' ? 'boundary' : undefined,
+          allowUnchanged: purpose === 'boundary' || recoveryMode || roleChanges.length > 0,
+          substitutionMode: purpose === 'boundary'
+            ? 'boundary'
+            : recoveryMode
+              ? 'current_lineup_recovery'
+              : undefined,
         }
       )
-    : null, [participantIds, projection, purpose, reasonCode, reasonNote, teamSide])
+    : null, [participantIds, projection, purpose, reasonCode, reasonNote, recoveryMode, roleChanges.length, teamSide])
   const boundaryReview = useMemo(() => (
     purpose === 'boundary' && state.sportGameState?.sportId === 'basketball'
       ? buildBasketballBoundarySideReview(state.sportGameState, teamSide, participantIds)
@@ -87,6 +115,9 @@ export default function BasketballLineupSheet({
     boundaryReview.violations.length > 0
   const validOverride = !enforcedOverrideRequired || (
     canOverrideEqualPlay && overrideReason.trim().length > 0 && overrideReason.trim().length <= 240
+  )
+  const rolesValid = Object.values(roleDrafts).every(draft =>
+    draft.choice !== 'custom' || (draft.custom.trim().length > 0 && draft.custom.trim().length <= 80)
   )
 
   useEffect(() => {
@@ -133,6 +164,10 @@ export default function BasketballLineupSheet({
     setReasonCode(null)
     setReasonNote('')
     setOverrideReason('')
+    setRolesOpen(false)
+    setRoleDrafts(initialRoleDrafts(projection, side))
+    setRecoveryMode(false)
+    setRecoveryConfirmed(false)
   }
 
   const toggleParticipant = (row: BasketballLineupSheetRow) => {
@@ -144,15 +179,23 @@ export default function BasketballLineupSheet({
   }
 
   const submit = () => {
-    if (!model.canCommit || !validOverride) return
+    if (!model.canCommit || !validOverride || !rolesValid || (recoveryMode && !recoveryConfirmed)) return
     onCommit({
       teamSide,
       participantIds: model.resultingParticipantIds,
-      reasonCode,
-      reasonNote: reasonNote.trim() || null,
+      reasonCode: model.reasonRequired ? reasonCode : null,
+      reasonNote: model.reasonRequired ? reasonNote.trim() || null : null,
       overrideReason: overrideReason.trim() || null,
+      mode: recoveryMode ? 'current_lineup_recovery' : undefined,
+      roleChanges,
     })
   }
+
+  const canSubmit = model.canCommit && validOverride && rolesValid && (!recoveryMode || recoveryConfirmed)
+  const replacementCount = model.current.filter(row => row.replacementRequired).length
+  const currentPeriodLabel = projection.periods.find(period => period.id === projection.currentPeriodId)?.label
+    ?? projection.currentPeriodId
+    ?? 'current period'
 
   return (
     <div
@@ -210,6 +253,23 @@ export default function BasketballLineupSheet({
             emptyLabel="No current lineup"
             onToggle={toggleParticipant}
           />
+
+          {replacementCount > 0 && (
+            <p role="alert" className="mb-4 flex items-start gap-2 border-l-4 border-rose-500 bg-rose-50 px-3 py-3 text-sm font-semibold text-rose-800">
+              <AlertTriangle size={17} className="mt-0.5 shrink-0" aria-hidden />
+              Replace {replacementCount === 1 ? 'the unavailable player' : 'all unavailable players'} before starting the clock.
+            </p>
+          )}
+
+          {purpose !== 'boundary' && onAddParticipant && (
+            <button
+              type="button"
+              className="btn-secondary mb-4 flex min-h-10 w-full items-center justify-center gap-2 text-sm"
+              onClick={() => onAddParticipant(teamSide)}
+            >
+              <UserPlus size={16} aria-hidden /> Add participant to bench
+            </button>
+          )}
           <LineupGroup
             title="Bench"
             rows={model.bench}
@@ -262,6 +322,89 @@ export default function BasketballLineupSheet({
               </div>
             )}
           </div>
+
+          {purpose !== 'boundary' && (
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              <button
+                type="button"
+                className="flex min-h-10 w-full items-center justify-between gap-3 text-left text-sm font-bold text-slate-800"
+                aria-expanded={rolesOpen}
+                onClick={() => setRolesOpen(value => !value)}
+              >
+                Roles and captain
+                <ChevronDown size={18} className={`transition-transform ${rolesOpen ? 'rotate-180' : ''}`} aria-hidden />
+              </button>
+              {rolesOpen && (
+                <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200">
+                  {Object.values(projection.participants)
+                    .filter(participant => participant.teamSide === teamSide)
+                    .map(participant => (
+                      <RoleRow
+                        key={participant.participantId}
+                        displayName={participant.displayName}
+                        number={participant.number}
+                        draft={roleDrafts[participant.participantId] ?? roleDraft(participant.position, participant.captain)}
+                        onChange={draft => setRoleDrafts(current => ({
+                          ...current,
+                          [participant.participantId]: draft,
+                        }))}
+                      />
+                    ))}
+                </div>
+              )}
+              {!rolesValid && (
+                <p role="alert" className="mt-2 text-sm font-semibold text-rose-700">
+                  Enter a custom position within 80 characters, or choose None.
+                </p>
+              )}
+            </div>
+          )}
+
+          {purpose !== 'boundary' && (
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              {!recoveryMode ? (
+                <button
+                  type="button"
+                  className="min-h-10 text-sm font-semibold text-slate-600 underline underline-offset-4"
+                  onClick={() => {
+                    setRecoveryMode(true)
+                    setReasonCode(null)
+                    setReasonNote('')
+                  }}
+                >
+                  Recover current lineup
+                </button>
+              ) : (
+                <div className="border-l-4 border-amber-500 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                  <p className="font-bold">Set current lineup from this clock time?</p>
+                  <p className="mt-1">
+                    Earlier lineup timing in {currentPeriodLabel} will become incomplete. The app will not estimate unknown intervals or minutes.
+                  </p>
+                  <label className="mt-3 flex min-h-10 items-start gap-3 font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={recoveryConfirmed}
+                      onChange={event => setRecoveryConfirmed(event.target.checked)}
+                      className="mt-0.5 h-5 w-5 accent-amber-700"
+                    />
+                    I understand this marks the current period incomplete.
+                  </label>
+                  <button
+                    type="button"
+                    className="mt-2 min-h-9 text-sm font-semibold underline underline-offset-4"
+                    onClick={() => {
+                      setRecoveryMode(false)
+                      setRecoveryConfirmed(false)
+                      setReasonCode(null)
+                      setReasonNote('')
+                    }}
+                  >
+                    Use ordinary lineup change
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {model.reasonRequired && (
             <div className="mt-4 grid gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2">
@@ -353,15 +496,113 @@ export default function BasketballLineupSheet({
           <button
             type="button"
             className="btn-primary flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm"
-            disabled={!model.canCommit || !validOverride}
+            disabled={!canSubmit}
             onClick={submit}
           >
-            <Check size={17} aria-hidden /> {purpose === 'boundary' ? 'Confirm lineup' : 'Commit lineup'}
+            <Check size={17} aria-hidden /> {purpose === 'boundary'
+              ? 'Confirm lineup'
+              : recoveryMode
+                ? 'Set current lineup'
+                : roleChanges.length > 0 && !model.changed
+                  ? 'Save roles'
+                  : 'Commit lineup'}
           </button>
         </footer>
       </section>
     </div>
   )
+}
+
+function RoleRow({
+  displayName,
+  number,
+  draft,
+  onChange,
+}: {
+  displayName: string
+  number: string | null
+  draft: BasketballRoleDraft
+  onChange: (draft: BasketballRoleDraft) => void
+}) {
+  return (
+    <div className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_7rem] sm:items-end">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-800">
+          {number ? `#${number} ` : ''}{displayName}
+        </p>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <label className="text-xs font-semibold text-slate-600">
+            Position
+            <select
+              value={draft.choice}
+              onChange={event => onChange({
+                ...draft,
+                choice: event.target.value as BasketballRoleDraft['choice'],
+              })}
+              className="input-field mt-1 py-2 text-sm"
+            >
+              <option value="">None</option>
+              {POSITION_OPTIONS.map(position => <option key={position} value={position}>{position}</option>)}
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          {draft.choice === 'custom' ? (
+            <label className="text-xs font-semibold text-slate-600">
+              Custom
+              <input
+                value={draft.custom}
+                onChange={event => onChange({ ...draft, custom: event.target.value })}
+                maxLength={80}
+                className="input-field mt-1 py-2 text-sm"
+              />
+            </label>
+          ) : <span />}
+        </div>
+      </div>
+      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-700">
+        <input
+          type="checkbox"
+          checked={draft.captain}
+          onChange={event => onChange({ ...draft, captain: event.target.checked })}
+          className="h-5 w-5 accent-slate-800"
+        />
+        Captain
+      </label>
+    </div>
+  )
+}
+
+function initialRoleDrafts(
+  projection: BasketballMatchProjection,
+  teamSide: BasketballTeamSide
+): Record<string, BasketballRoleDraft> {
+  return Object.fromEntries(Object.values(projection.participants)
+    .filter(participant => participant.teamSide === teamSide)
+    .map(participant => [participant.participantId, roleDraft(participant.position, participant.captain)]))
+}
+
+function roleDraft(position: string | null, captain: boolean): BasketballRoleDraft {
+  if (position && POSITION_OPTIONS.some(option => option === position)) {
+    return { choice: position as BasketballRoleDraft['choice'], custom: '', captain }
+  }
+  return { choice: position ? 'custom' : '', custom: position ?? '', captain }
+}
+
+function basketballRoleChanges(
+  projection: BasketballMatchProjection,
+  teamSide: BasketballTeamSide,
+  drafts: Record<string, BasketballRoleDraft>
+): BasketballRoleChange[] {
+  return Object.values(projection.participants)
+    .filter(participant => participant.teamSide === teamSide)
+    .flatMap(participant => {
+      const draft = drafts[participant.participantId]
+      if (!draft) return []
+      const position = draft.choice === 'custom' ? draft.custom.trim() || null : draft.choice || null
+      return participant.position === position && participant.captain === draft.captain
+        ? []
+        : [{ participantId: participant.participantId, position, captain: draft.captain }]
+    })
 }
 
 function LineupGroup({

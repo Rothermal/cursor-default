@@ -13,13 +13,11 @@ import {
 } from '../../lib/basketball/clockProjection'
 import {
   confirmBasketballBoundaryLineup,
-  substituteBasketballLineup,
+  updateBasketballLineup,
 } from '../../lib/basketball/lineupCommands'
 import { isBasketballMatchRulesV3, resolveBasketballPeriodSegment } from '../../lib/basketball/rules'
 import type { BasketballStoppageCategory, BasketballTeamSide } from '../../lib/basketball/types'
-import BasketballLineupSheet, {
-  type BasketballLineupSheetCommit,
-} from './BasketballLineupSheet'
+import BasketballLineupSheet, { type BasketballLineupSheetCommit } from './BasketballLineupSheet'
 import BasketballBoundaryReviewDialog, {
   type BasketballBoundaryReviewCommit,
 } from './BasketballBoundaryReviewDialog'
@@ -39,12 +37,18 @@ export default function BasketballClockStrip({
   recorderUserId,
   settings,
   canOverrideEqualPlay,
+  requestedLineupSide = null,
+  onRequestedLineupOpened,
+  onAddParticipant,
   onState,
 }: {
   state: GameState
   recorderUserId: string | null
   settings: BasketballDeviceSettings
   canOverrideEqualPlay: boolean
+  requestedLineupSide?: BasketballTeamSide | null
+  onRequestedLineupOpened?: () => void
+  onAddParticipant?: (teamSide: BasketballTeamSide) => void
   onState: (state: GameState) => void
 }) {
   const stateRef = useRef(state)
@@ -201,6 +205,16 @@ export default function BasketballClockStrip({
     side => lineupSides?.[side]?.boundaryConfirmationRequired
   )
 
+  useEffect(() => {
+    if (!requestedLineupSide || !clock || clock.running || recoveryIssue) return
+    if (!lineupSides?.[requestedLineupSide]) return
+    setShowSetClock(false)
+    setShowStoppage(false)
+    setLineupError(null)
+    setLineupSide(requestedLineupSide)
+    onRequestedLineupOpened?.()
+  }, [clock, lineupSides, onRequestedLineupOpened, recoveryIssue, requestedLineupSide])
+
   if (!anchored || !clock || !segment || !display || !rules || !isBasketballMatchRulesV3(rules)) {
     return null
   }
@@ -293,12 +307,14 @@ export default function BasketballClockStrip({
   }
 
   const handleLineupCommit = (input: BasketballLineupSheetCommit) => {
-    const result = substituteBasketballLineup(stateRef.current, {
+    const result = updateBasketballLineup(stateRef.current, {
       recorderUserId,
       teamSide: input.teamSide,
       participantIds: input.participantIds,
+      mode: input.mode,
       reasonCode: input.reasonCode,
       reasonNote: input.reasonNote,
+      roleChanges: input.roleChanges,
       occurredAt: new Date().toISOString(),
     })
     if (!result.ok) {
@@ -495,6 +511,11 @@ export default function BasketballClockStrip({
           state={state}
           initialSide={lineupSide}
           errorMessage={lineupError}
+          onAddParticipant={onAddParticipant ? side => {
+            setLineupSide(null)
+            setLineupError(null)
+            onAddParticipant(side)
+          } : undefined}
           onCommit={handleLineupCommit}
           onClose={closeLineup}
         />

@@ -375,6 +375,14 @@ export default function BasketballTimeline({
       {eventDetail && (
         <BasketballEventDetailDialog
           review={eventDetail}
+          participantLabel={participantId => {
+            const participant = state.sportGameState?.sportId === 'basketball'
+              ? state.sportGameState.projection.participants[participantId]
+              : null
+            return participant
+              ? `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`
+              : 'Unknown participant'
+          }}
           teamLabel={eventDetail.teamSide === 'tracked'
             ? state.gameInfo?.teamName || 'Tracked team'
             : eventDetail.teamSide === 'opponent'

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { PWA_MAX_PRECACHE_ASSET_BYTES } from './src/lib/pwaBuildPolicy'
 
 export default defineConfig(({ command }) => ({
   test: {
@@ -45,6 +46,8 @@ export default defineConfig(({ command }) => ({
         ],
       },
       workbox: {
+        // Courtside use requires the complete production shell to remain available offline.
+        maximumFileSizeToCacheInBytes: PWA_MAX_PRECACHE_ASSET_BYTES,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {

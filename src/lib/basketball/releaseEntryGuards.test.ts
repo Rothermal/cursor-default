@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { PWA_MAX_PRECACHE_ASSET_BYTES } from '../pwaBuildPolicy'
 
 const source = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n')
@@ -265,6 +266,8 @@ describe('Basketball release entry guards', () => {
     const clockStrip = source('src/components/basketball/BasketballClockStrip.tsx')
     const lineupSheet = source('src/components/basketball/BasketballLineupSheet.tsx')
     const boundaryReview = source('src/components/basketball/BasketballBoundaryReviewDialog.tsx')
+    const eventDetail = source('src/components/basketball/BasketballEventDetailDialog.tsx')
+    const timeline = source('src/components/basketball/BasketballTimeline.tsx')
     const stripIndex = tracker.indexOf('<BasketballClockStrip')
     const workspaceIndex = tracker.indexOf('aria-label="Basketball game workspace"')
 
@@ -283,15 +286,31 @@ describe('Basketball release entry guards', () => {
     expect(boundaryReview).toContain('Confirm current five unavailable.')
     expect(boundaryReview).toContain('<BasketballLineupSheet')
     expect(clockStrip).toContain('<BasketballLineupSheet')
-    expect(clockStrip).toContain('substituteBasketballLineup(stateRef.current')
+    expect(clockStrip).toContain('updateBasketballLineup(stateRef.current')
     expect(clockStrip).toContain('disabled={Boolean(lineupDisabledReason)}')
     expect(clockStrip).toContain('Set the clock before changing the lineup.')
     expect(clockStrip).toContain('aria-label={lineupDisabledReason')
     expect(clockStrip).not.toContain('Substitutions arrive in BKE-6C')
     expect(lineupSheet).toContain('buildBasketballLineupSheetModel')
-    expect(lineupSheet).toContain("substitutionMode: purpose === 'boundary' ? 'boundary' : undefined")
+    expect(lineupSheet).toContain("substitutionMode: purpose === 'boundary'")
+    expect(lineupSheet).toContain("'current_lineup_recovery'")
+    expect(lineupSheet).toContain('Roles and captain')
+    expect(lineupSheet).toContain('reasonCode: model.reasonRequired ? reasonCode : null')
     expect(lineupSheet).toContain('role="dialog"')
     expect(lineupSheet).toContain("event.key === 'Escape'")
+    expect(clockStrip).not.toContain('lazy(() => import(')
+    expect(boundaryReview).not.toContain('fallback={null}')
+    expect(eventDetail).toContain('participantLabel(change.participantId)')
+    expect(eventDetail).not.toContain('`${change.participantId}:')
+    expect(timeline).toContain("state.sportGameState.projection.participants[participantId]")
+  })
+
+  it('keeps the courtside production shell under an explicit offline precache budget', () => {
+    const viteConfig = source('vite.config.ts')
+
+    expect(PWA_MAX_PRECACHE_ASSET_BYTES).toBe(3 * 1024 * 1024)
+    expect(viteConfig).toContain('maximumFileSizeToCacheInBytes: PWA_MAX_PRECACHE_ASSET_BYTES')
+    expect(viteConfig).toContain("globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']")
   })
 
   it('keeps anchored display ticks presentation-only and hides manual-minute capture', () => {

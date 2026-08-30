@@ -43,6 +43,10 @@ export interface BasketballRoleChangeCommandOptions extends BasketballLineupComm
   changes: BasketballRoleChange[]
 }
 
+export interface BasketballLineupUpdateCommandOptions extends BasketballSubstitutionCommandOptions {
+  roleChanges?: BasketballRoleChange[]
+}
+
 export interface BasketballBoundaryConfirmationCommandOptions extends BasketballLineupCommandOptions {
   participantIds: string[]
   expectedCurrentParticipantIds: string[]
@@ -58,6 +62,13 @@ export function substituteBasketballLineup(
   state: GameState,
   options: BasketballSubstitutionCommandOptions
 ): BasketballStateCommandResult {
+  return updateBasketballLineup(state, options)
+}
+
+export function updateBasketballLineup(
+  state: GameState,
+  options: BasketballLineupUpdateCommandOptions
+): BasketballStateCommandResult {
   const checked = lineupCommandContext(state, options)
   if (!checked.ok) return checked
   const participantIds = canonicalParticipantIds(state, options.teamSide, options.participantIds)
@@ -71,15 +82,26 @@ export function substituteBasketballLineup(
   const next = new Set(participantIds)
   const exitCount = checked.side.currentParticipantIds.filter(id => !next.has(id)).length
   const entryCount = participantIds.filter(id => !current.has(id)).length
-  const mode = options.mode ?? deriveBasketballLiveSubstitutionMode(exitCount, entryCount)
-  if (!mode) {
+  const lineupChanged = exitCount > 0 || entryCount > 0
+  const recovery = options.mode === 'current_lineup_recovery'
+  const mode = recovery
+    ? 'current_lineup_recovery'
+    : options.mode ?? deriveBasketballLiveSubstitutionMode(exitCount, entryCount)
+  const roleChanges = normalizeRoleChanges(state, options.teamSide, options.roleChanges ?? [])
+  if (!roleChanges.ok) return failure(state, 'invalid_participant', roleChanges.message)
+  if (!lineupChanged && !recovery && roleChanges.changes.length === 0) {
     return failure(
       state,
       'command_failed',
-      'Basketball substitution must change the current lineup.'
+      'Change the Basketball lineup or at least one participant role before committing.'
     )
   }
-  const reasonRequired = basketballSubstitutionRequiresReason(mode, participantIds.length)
+  if (!mode && lineupChanged) {
+    return failure(state, 'command_failed', 'Basketball substitution must have a valid transition mode.')
+  }
+  const reasonRequired = Boolean(
+    mode && basketballSubstitutionRequiresReason(mode, participantIds.length)
+  )
   const reasonCode = reasonRequired ? options.reasonCode ?? null : null
   const reasonNote = reasonRequired ? options.reasonNote?.trim() || null : null
   if ((reasonRequired && !reasonCode) ||
@@ -88,24 +110,40 @@ export function substituteBasketballLineup(
       (reasonNote && reasonNote.length > BASKETBALL_CLOCK_TEXT_MAX_LENGTH)) {
     return failure(state, 'command_failed', 'Enter a valid reason for this Basketball substitution.')
   }
-  const event = createBasketballLineupEvent({
-    id: options.eventId ?? createBasketballUuid(),
-    eventType: 'basketball.substitution',
-    payload: {
-      captureCommandId: options.captureCommandId ?? createBasketballCaptureCommandId(),
-      participantIds,
-      mode,
-      reasonCode,
-      reasonNote,
-    },
-    recorderUserId: options.recorderUserId,
-    sequence: checked.context.nextSequence,
-    period: checked.context.period,
-    elapsedMs: checked.elapsedMs,
-    occurredAt: checked.context.occurredAt,
-    teamSide: options.teamSide,
-  })
-  return appendLineupEvents(state, [event])
+  const captureCommandId = options.captureCommandId ?? createBasketballCaptureCommandId()
+  const events = []
+  if (lineupChanged || recovery) {
+    events.push(createBasketballLineupEvent({
+      id: options.eventId ?? createBasketballUuid(),
+      eventType: 'basketball.substitution',
+      payload: {
+        captureCommandId,
+        participantIds,
+        mode: mode!,
+        reasonCode,
+        reasonNote,
+      },
+      recorderUserId: options.recorderUserId,
+      sequence: checked.context.nextSequence,
+      period: checked.context.period,
+      elapsedMs: checked.elapsedMs,
+      occurredAt: checked.context.occurredAt,
+      teamSide: options.teamSide,
+    }))
+  }
+  if (roleChanges.changes.length > 0) {
+    events.push(createBasketballLineupEvent({
+      eventType: 'basketball.role_changed',
+      payload: { captureCommandId, changes: roleChanges.changes },
+      recorderUserId: options.recorderUserId,
+      sequence: checked.context.nextSequence + events.length,
+      period: checked.context.period,
+      elapsedMs: checked.elapsedMs,
+      occurredAt: checked.context.occurredAt,
+      teamSide: options.teamSide,
+    }))
+  }
+  return appendLineupEvents(state, events)
 }
 
 export function changeBasketballParticipantRoles(
@@ -117,22 +155,18 @@ export function changeBasketballParticipantRoles(
   if (options.changes.length === 0) {
     return failure(state, 'invalid_participant', 'Select at least one Basketball role change.')
   }
-  const changes = options.changes.map(change => ({
-    participantId: change.participantId,
-    position: change.position?.trim() || null,
-    captain: change.captain,
-  }))
-  if (changes.some(change =>
-    !projectionParticipantOnSide(state, options.teamSide, change.participantId) ||
-    (change.position !== null && change.position.length > 80)
-  )) return failure(state, 'invalid_participant', 'Basketball role change participant is unavailable.')
+  const normalized = normalizeRoleChanges(state, options.teamSide, options.changes)
+  if (!normalized.ok) return failure(state, 'invalid_participant', normalized.message)
+  if (normalized.changes.length === 0) {
+    return failure(state, 'command_failed', 'Change at least one Basketball role before committing.')
+  }
 
   const event = createBasketballLineupEvent({
     id: options.eventId ?? createBasketballUuid(),
     eventType: 'basketball.role_changed',
     payload: {
       captureCommandId: options.captureCommandId ?? createBasketballCaptureCommandId(),
-      changes,
+      changes: normalized.changes,
     },
     recorderUserId: options.recorderUserId,
     sequence: checked.context.nextSequence,
@@ -343,13 +377,29 @@ function canonicalParticipantIds(
     .map(value => value.participantId)
 }
 
-function projectionParticipantOnSide(
+function normalizeRoleChanges(
   state: GameState,
   teamSide: BasketballTeamSide,
-  participantId: string
-): boolean {
-  if (state.sportGameState?.sportId !== 'basketball') return false
-  return state.sportGameState.projection.participants[participantId]?.teamSide === teamSide
+  input: BasketballRoleChange[]
+): { ok: true; changes: BasketballRoleChange[] } | { ok: false; message: string } {
+  if (state.sportGameState?.sportId !== 'basketball') {
+    return { ok: false, message: 'Basketball role authority is unavailable.' }
+  }
+  const ids = new Set<string>()
+  const changes: BasketballRoleChange[] = []
+  for (const inputChange of input) {
+    const participant = state.sportGameState.projection.participants[inputChange.participantId]
+    const position = inputChange.position?.trim() || null
+    if (!participant || participant.teamSide !== teamSide || ids.has(inputChange.participantId) ||
+        (position !== null && position.length > 80)) {
+      return { ok: false, message: 'Basketball role change participant is unavailable.' }
+    }
+    ids.add(inputChange.participantId)
+    if (participant.position !== position || participant.captain !== inputChange.captain) {
+      changes.push({ participantId: inputChange.participantId, position, captain: inputChange.captain })
+    }
+  }
+  return { ok: true, changes }
 }
 
 function sameIds(left: readonly string[], right: readonly string[]): boolean {
