@@ -4,7 +4,9 @@ import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
 import { classifyShotZone, normalizedCourtLocationToFeet } from './courtGeometry'
+import { basketballHistoricalDisplayMs } from './historicalTime'
 import { resolveBasketballPeriodSegment } from './rules'
+import { orderBasketballEventsForProjection } from './lineupReplay'
 import type {
   BasketballMatchEvent,
   BasketballShotEvent,
@@ -22,6 +24,7 @@ export type BasketballTimelineFamily =
   | 'shooting'
   | 'related_stats'
   | 'fouls_free_throws'
+  | 'lineups'
   | 'administration'
   | 'match_control'
 
@@ -34,6 +37,7 @@ export const BASKETBALL_TIMELINE_FAMILIES: ReadonlyArray<{
   { id: 'shooting', label: 'Shooting' },
   { id: 'related_stats', label: 'Related stats' },
   { id: 'fouls_free_throws', label: 'Fouls / FT' },
+  { id: 'lineups', label: 'Lineups' },
   { id: 'administration', label: 'Administration' },
   { id: 'match_control', label: 'Match control' },
 ]
@@ -62,9 +66,14 @@ export interface BasketballTimelineEventReview {
   title: string
   actorLabel: string
   periodLabel: string
+  displayClockLabel: string
+  canonicalElapsedLabel: string
   sequenceLabel: string
   teamSide: BasketballMatchEvent['teamSide']
   participantIds: string[]
+  lineupOutgoingParticipantIds: string[]
+  lineupIncomingParticipantIds: string[]
+  lineupCurrentParticipantIds: string[]
   families: BasketballTimelineFamily[]
   revised: boolean
   removed: boolean
@@ -190,7 +199,8 @@ export function buildBasketballTimelineReview(
     diagnosticsByEvent,
     relationshipWarnings,
     knownParticipantIds,
-    recordedLaterIds.has(event.id)
+    recordedLaterIds.has(event.id),
+    validActive
   ))
   const eventById = new Map(reviews.map(review => [review.id, review]))
   const activeReviews = validActive.map(event => eventById.get(event.id)!).filter(Boolean)
@@ -200,11 +210,14 @@ export function buildBasketballTimelineReview(
   return {
     complete: inspection.complete,
     diagnostics: inspection.diagnostics,
-    globalWarnings: [...new Set(inspection.diagnostics
-      .filter(item => item.eventId === null || isBasketballNegativeScoreDiagnostic(item))
-      .map(item => isBasketballNegativeScoreDiagnostic(item)
-        ? BASKETBALL_NEGATIVE_SCORE_RECOVERY_MESSAGE
-        : item.message))],
+    globalWarnings: [...new Set([
+      ...inspection.diagnostics
+        .filter(item => item.eventId === null || isBasketballNegativeScoreDiagnostic(item))
+        .map(item => isBasketballNegativeScoreDiagnostic(item)
+          ? BASKETBALL_NEGATIVE_SCORE_RECOVERY_MESSAGE
+          : item.message),
+      ...lineupQualityWarnings(sportState.projection),
+    ])],
     activeGroups: groupReviews(
       activeReviews,
       activeCounts,
@@ -529,9 +542,11 @@ function reviewEvent(
   diagnosticsByEvent: Map<string, string[]>,
   relationshipWarnings: Array<{ eventId: string; relatedEventId: string; message: string }>,
   knownParticipantIds: Set<string>,
-  recordedLater: boolean
+  recordedLater: boolean,
+  activeEvents: BasketballMatchEvent[]
 ): BasketballTimelineEventReview {
   const participantIds = participantIdsForEvent(state, event)
+  const lineupTransition = lineupTransitionForEvent(state, event, activeEvents)
   const warnings = [
     ...(diagnosticsByEvent.get(event.id) ?? []),
     ...relationshipWarnings
@@ -545,9 +560,14 @@ function reviewEvent(
     title: eventTitle(state, event),
     actorLabel: actorLabel(state, event),
     periodLabel: periodLabel(state, event.period.id),
+    displayClockLabel: displayClockLabel(state, event),
+    canonicalElapsedLabel: formatElapsed(event.elapsedMs),
     sequenceLabel: `Capture #${event.sequence}`,
     teamSide: event.teamSide,
     participantIds,
+    lineupOutgoingParticipantIds: lineupTransition.outgoing,
+    lineupIncomingParticipantIds: lineupTransition.incoming,
+    lineupCurrentParticipantIds: lineupTransition.current,
     families: familiesForEvent(event),
     revised: event.revision > 1,
     removed: event.deletedAt !== null,
@@ -627,7 +647,9 @@ function recordedLaterEventIds(events: BasketballMatchEvent[]): Set<string> {
   const endedPeriods = new Set<string>()
   let currentPeriodId: string | null = null
   for (const event of [...events].sort(compareGameEventCaptureOrder)) {
+    if (event.payload.recordedLater === true) result.add(event.id)
     if (
+      event.payload.recordedLater !== true &&
       isRecordedLaterEligible(event) &&
       (currentPeriodId !== event.period.id || endedPeriods.has(event.period.id))
     ) {
@@ -728,6 +750,12 @@ function eventTitle(
 
 function familiesForEvent(event: BasketballMatchEvent): BasketballTimelineFamily[] {
   const families: BasketballTimelineFamily[] = ['all']
+  if (
+    event.eventType === 'basketball.lineup_confirmed' ||
+    event.eventType === 'basketball.substitution' ||
+    event.eventType === 'basketball.role_changed' ||
+    event.eventType === 'basketball.equal_play_override'
+  ) families.push('lineups')
   if (
     (event.eventType === 'basketball.shot' && event.payload.made) ||
     event.eventType === 'basketball.score_adjustment'
@@ -849,6 +877,15 @@ function participantIdsForEvent(state: GameState, event: BasketballMatchEvent): 
   const ids = new Set<string>()
   if (event.eventType === 'basketball.match_roster_added') ids.add(event.payload.participant.id)
   if (event.eventType === 'basketball.participant_resolved') ids.add(event.payload.participantId)
+  if (event.eventType === 'basketball.substitution' || event.eventType === 'basketball.lineup_confirmed') {
+    event.payload.participantIds.forEach(id => ids.add(id))
+  }
+  if (event.eventType === 'basketball.role_changed') {
+    event.payload.changes.forEach(change => ids.add(change.participantId))
+  }
+  if (event.eventType === 'basketball.equal_play_override') {
+    event.payload.candidateParticipantIds.forEach(id => ids.add(id))
+  }
   for (const actor of event.actors) {
     if (actor.participantId) {
       ids.add(actor.participantId)
@@ -879,6 +916,86 @@ function periodLabel(state: GameState, periodId: string): string {
   if (state.sportGameState?.sportId !== 'basketball') return periodId
   return state.sportGameState.projection.periods.find(period => period.id === periodId)?.label ??
     resolveBasketballPeriodSegment(state.sportGameState.setup.rulesSnapshot, periodId)?.label ?? periodId
+}
+
+function lineupTransitionForEvent(
+  state: GameState,
+  event: BasketballMatchEvent,
+  activeEvents: BasketballMatchEvent[]
+): { outgoing: string[]; incoming: string[]; current: string[] } {
+  if (event.eventType === 'basketball.lineup_confirmed') {
+    return { outgoing: [], incoming: [], current: [...event.payload.participantIds] }
+  }
+  if (event.eventType !== 'basketball.substitution' || state.sportGameState?.sportId !== 'basketball') {
+    return { outgoing: [], incoming: [], current: [] }
+  }
+  const setup = state.sportGameState.setup
+  const replayEvents = event.deletedAt === null
+    ? activeEvents
+    : [...activeEvents, event]
+  let current = setup.version === 2 && setup.openingLineups
+    ? [...(setup.openingLineups[event.teamSide]?.participantIds ?? [])]
+    : setup.participants
+      .filter(participant => participant.teamSide === event.teamSide && participant.initialStatus === 'starter')
+      .map(participant => participant.id)
+  for (const candidate of orderBasketballEventsForProjection(replayEvents)) {
+    if (candidate.eventType !== 'basketball.substitution' || candidate.teamSide !== event.teamSide) continue
+    const next = [...candidate.payload.participantIds]
+    if (candidate.id === event.id) {
+      const prior = new Set(current)
+      const resulting = new Set(next)
+      return {
+        outgoing: current.filter(id => !resulting.has(id)),
+        incoming: next.filter(id => !prior.has(id)),
+        current: next,
+      }
+    }
+    current = next
+  }
+  return { outgoing: [], incoming: [], current: [...event.payload.participantIds] }
+}
+
+function lineupQualityWarnings(projection: BasketballSportGameState['projection']): string[] {
+  if (!projection.lineup) return []
+  const warnings: string[] = []
+  for (const side of ['tracked', 'opponent'] as const) {
+    const lineup = projection.lineup.sides[side]
+    if (!lineup) continue
+    const label = side === 'tracked' ? 'Tracked' : 'Opponent'
+    if (lineup.boundaryConfirmationRequired) {
+      warnings.push(`${label} lineup confirmation is required before Clock Start.`)
+    }
+    if (lineup.replacementRequiredParticipantIds.length > 0) {
+      warnings.push(`${label} lineup has an ejected or disqualified player awaiting replacement.`)
+    }
+    if (lineup.incompletePeriodIds.length > 0) {
+      warnings.push(`${label} lineup history is deliberately incomplete after Set Current Lineup; uncertain minutes remain unestimated.`)
+    }
+  }
+  return warnings
+}
+
+function displayClockLabel(state: GameState, event: BasketballMatchEvent): string {
+  if (event.elapsedMs === null || state.sportGameState?.sportId !== 'basketball') return 'No game clock'
+  const segment = resolveBasketballPeriodSegment(
+    state.sportGameState.setup.rulesSnapshot,
+    event.period.id
+  )
+  if (!segment) return formatElapsed(event.elapsedMs)
+  const displayMs = basketballHistoricalDisplayMs(
+    segment.durationMs,
+    event.elapsedMs,
+    state.sportGameState.setup.rulesSnapshot.clockDisplayDirection === 'count_down'
+  )
+  return formatElapsed(Math.max(0, displayMs))
+}
+
+function formatElapsed(valueMs: number | null): string {
+  if (valueMs === null) return 'No game clock'
+  const totalSeconds = Math.floor(Math.max(0, valueMs) / 1_000)
+  const tenths = Math.floor((Math.max(0, valueMs) % 1_000) / 100)
+  const base = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`
+  return tenths > 0 ? `${base}.${tenths}` : base
 }
 
 function teamLabel(state: GameState, side: BasketballMatchEvent['teamSide']): string {

@@ -43,8 +43,7 @@ into three implementation PRs in
 BKE-6A3 and BKE-6B1 through BKE-6B4 are implemented. BKE-6C product and delivery decisions are
 approved as four slices in
   [PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md](PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md);
-  BKE-6C1 live substitution capture, BKE-6C2 boundary/equal-play review, and BKE-6C3 roles/current-
-  lineup recovery are implemented; BKE-6C4 is next.
+  BKE-6C1 through BKE-6C4 are implemented. BKE-6D is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

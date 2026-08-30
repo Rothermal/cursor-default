@@ -1705,6 +1705,12 @@ export default function GameTracker() {
           errorMessage={eventCorrectionError}
           onUndoTop={handleBasketballUndo}
           onRestore={handleBasketballRestore}
+          onOpenTimeline={() => {
+            setEventCorrectionError(null)
+            setShowRecentEvents(false)
+            setBasketballWorkspace('timeline')
+            window.setTimeout(() => basketballTimelineTabRef.current?.focus(), 0)
+          }}
           onClose={() => {
             setEventCorrectionError(null)
             setShowRecentEvents(false)

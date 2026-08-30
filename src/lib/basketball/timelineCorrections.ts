@@ -60,6 +60,8 @@ export interface BasketballTimelineRemovalPreview extends BasketballTimelineCorr
 
 export interface BasketballTimelineRestorePreview extends BasketballTimelineCorrectionPreviewBase {
   kind: 'restore'
+  scope: BasketballTimelineRemovalScope
+  captureCommandId: string | null
   selectedDependentIds: string[]
   restoreOptions: BasketballTimelineRestoreOption[]
 }
@@ -182,7 +184,8 @@ export function previewBasketballTimelineRestore(
   knownCompatiblePreview?: Pick<
     BasketballTimelineRestorePreview,
     'eventLabel' | 'restoreOptions' | 'streamFingerprint'
-  >
+  >,
+  scope: BasketballTimelineRemovalScope = 'event'
 ): BasketballCommandResult<BasketballTimelineRestorePreview> {
   const prepared = prepareState(state)
   if (!prepared.ok) return prepared
@@ -192,11 +195,26 @@ export function previewBasketballTimelineRestore(
     return commandFailure('restore_unavailable', 'Basketball lifecycle and identity boundaries are read-only.')
   }
 
-  const baseMutation: GameEventMutation = { type: 'restore', eventId }
-  const baseCandidate = validatePlan(prepared.value.state, [baseMutation])
+  const captureCommandId = captureCommandIdForEvent(event)
+  if (scope === 'capture_group' && !captureCommandId) {
+    return commandFailure('restore_unavailable', 'This event does not belong to a persisted capture group.')
+  }
+  const groupEvents = scope === 'capture_group'
+    ? prepared.value.deleted.filter(candidate => captureCommandIdForEvent(candidate) === captureCommandId)
+    : [event]
+  const groupEventIds = new Set(groupEvents.map(candidate => candidate.id))
+  if (groupEvents.some(candidate => READ_ONLY_EVENT_TYPES.has(candidate.eventType))) {
+    return commandFailure('restore_unavailable', 'Basketball lifecycle and identity boundaries are read-only.')
+  }
+  const baseMutations: GameEventMutation[] = groupEvents.map(candidate => ({
+    type: 'restore',
+    eventId: candidate.id,
+  }))
+  const baseCandidate = validatePlan(prepared.value.state, baseMutations)
   if (!baseCandidate.ok) return baseCandidate
   const relatedDeletedIds = new Set(prepared.value.deleted
-    .filter(candidate => candidate.id !== event.id && relationshipSourceId(candidate) === event.id)
+    .filter(candidate => !groupEventIds.has(candidate.id) &&
+      Boolean(relationshipSourceId(candidate) && groupEventIds.has(relationshipSourceId(candidate)!)))
     .map(candidate => candidate.id))
   const streamFingerprint = eventStreamFingerprint(prepared.value.state)
   const canReusePreview = knownCompatiblePreview?.streamFingerprint === streamFingerprint &&
@@ -209,7 +227,7 @@ export function previewBasketballTimelineRestore(
   } else {
     const labels = buildBasketballTimelineReview(prepared.value.state).eventById
     eventLabel = labels.get(event.id)?.title ?? 'Basketball event'
-    options = compatibleRestoreOptions(prepared.value, event, labels)
+    options = compatibleRestoreOptions(prepared.value, groupEvents, baseMutations, labels)
   }
   const compatibleIds = new Set(options.map(option => option.eventId))
   const selected = [...new Set(selectedDependentIds)]
@@ -220,7 +238,7 @@ export function previewBasketballTimelineRestore(
     )
   }
   const mutations: GameEventMutation[] = [
-    baseMutation,
+    ...baseMutations,
     ...selected.map(dependentId => ({ type: 'restore' as const, eventId: dependentId })),
   ]
   const candidate = validatePlan(prepared.value.state, mutations)
@@ -237,6 +255,8 @@ export function previewBasketballTimelineRestore(
     ok: true,
     value: {
       kind: 'restore',
+      scope,
+      captureCommandId,
       eventId,
       eventLabel,
       streamFingerprint,
@@ -271,18 +291,26 @@ export function restoreBasketballTimelineEvent(
   if (READ_ONLY_EVENT_TYPES.has(source.eventType)) {
     return failure(state, 'restore_unavailable', 'Basketball lifecycle and identity boundaries are read-only.')
   }
+  const captureCommandId = captureCommandIdForEvent(source)
+  if (preview.scope === 'capture_group' && captureCommandId !== preview.captureCommandId) {
+    return failure(state, 'command_failed', 'The restoration capture group changed. Review it again.')
+  }
+  const groupEvents = preview.scope === 'capture_group'
+    ? prepared.value.deleted.filter(candidate => captureCommandIdForEvent(candidate) === preview.captureCommandId)
+    : [source]
+  const groupEventIds = new Set(groupEvents.map(event => event.id))
   const selected = [...new Set(preview.selectedDependentIds)]
   const selectedEvents = selected.map(eventId =>
     prepared.value.deleted.find(event => event.id === eventId)
   )
   if (
     selectedEvents.some(event => !event) ||
-    selectedEvents.some(event => event && relationshipSourceId(event) !== source.id)
+    selectedEvents.some(event => event && !groupEventIds.has(relationshipSourceId(event) ?? ''))
   ) {
     return failure(state, 'restore_unavailable', 'A selected related event can no longer be restored with this event.')
   }
   const mutations: GameEventMutation[] = [
-    { type: 'restore', eventId: preview.eventId },
+    ...groupEvents.map(event => ({ type: 'restore' as const, eventId: event.id })),
     ...selected.map(eventId => ({ type: 'restore' as const, eventId })),
   ]
   if (!sameStringSet(mutations.map(mutation => mutation.eventId), preview.affectedEventIds)) {
@@ -487,15 +515,17 @@ function buildRemovalPlan(
 
 function compatibleRestoreOptions(
   prepared: PreparedBasketballState,
-  source: BasketballMatchEvent,
+  groupEvents: BasketballMatchEvent[],
+  baseMutations: GameEventMutation[],
   labels: ReadonlyMap<string, { title: string }>
 ): BasketballTimelineRestoreOption[] {
+  const groupEventIds = new Set(groupEvents.map(event => event.id))
   const candidates = prepared.deleted.filter(event =>
-    event.id !== source.id && relationshipSourceId(event) === source.id
+    !groupEventIds.has(event.id) && groupEventIds.has(relationshipSourceId(event) ?? '')
   )
   return candidates
     .filter(candidate => validatePlan(prepared.state, [
-      { type: 'restore', eventId: source.id },
+      ...baseMutations,
       { type: 'restore', eventId: candidate.id },
     ]).ok)
     .sort(compareGameEventCaptureOrder)

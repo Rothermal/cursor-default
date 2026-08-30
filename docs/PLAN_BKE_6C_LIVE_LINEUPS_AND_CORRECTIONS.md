@@ -1,7 +1,7 @@
 # Plan: BKE-6C Live Lineups and Corrections
 
-Status: Product and delivery Q&A complete. All 16 implementation decisions are approved. BKE-6C1
-through BKE-6C3 are implemented; BKE-6C4 is next.
+Status: Complete. All 16 implementation decisions and BKE-6C1 through BKE-6C4 are implemented.
+BKE-6D is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -85,7 +85,7 @@ incomplete intervals and exact derived playing time without changing clockless o
 | BKE-6C1 (complete) | Side-aware multi-player substitution sheet, balanced/unbalanced checked commands, resulting-lineup review, and replacement-required entry | Paused tracked and optional opponent lineups can transition atomically without inventing eligibility changes |
 | BKE-6C2 (complete) | Configured-boundary review, lineup-changing confirmations, equal-play evaluation, enforced override authorization, and Clock Start gating | Every required boundary has explicit lineup evidence and no unresolved enforced decision can start the clock |
 | BKE-6C3 (complete) | Position/captain history, late-player entry integration, short-handed/replacement recovery, and reasoned Set Current Lineup | Present lineup authority can recover truthfully while uncertain prior time remains explicitly incomplete |
-| BKE-6C4 | Grouped Recent Events behavior, consequence-aware Timeline correction, stale preview rejection, diagnostics, accessibility/responsive hardening, and exit audit | Complete and incomplete histories correct atomically and derive trustworthy intervals/minutes without compatibility regressions |
+| BKE-6C4 (complete) | Grouped Recent Events behavior, consequence-aware Timeline correction, stale preview rejection, diagnostics, accessibility/responsive hardening, and exit audit | Complete and incomplete histories correct atomically and derive trustworthy intervals/minutes without compatibility regressions |
 
 The slices are intentionally sequential. Each receives its own feature branch, implementation PR,
 regression record, and review cycle.
@@ -358,6 +358,17 @@ the originating side's lineup sheet. See
 - full hydration/reprojection, parking/import/export, and mixed-sport compatibility suites; and
 - phone/tablet/desktop, narrow-height, keyboard/focus, screen-reader announcements, reduced motion,
   and no-overlap visual smoke.
+
+Implementation record: BKE-6C4 is complete. `lineupCorrectionCommands.ts` owns stale-safe
+draft, preview, and atomic apply for substitution, role, equal-play override, and lineup-confirmation
+history. Marked historical lineup events replay at their effective period and elapsed time before
+participation is re-derived, while ordinary capture ordering remains unchanged. Timeline exposes a
+Lineups family, familiar and canonical clocks, transition participants, reasons, roles, violations,
+capture metadata, revisions, completeness diagnostics, and the consequence preview. Capture-group
+remove and restore remain atomic; Recent Events keeps only the newest dependency-free quick Undo
+and routes older groups to Timeline. Successful correction clears the quick-Undo receipt and remains
+local nonterminal only. See
+[REGRESSION_BKE_6C4_LINEUP_CORRECTIONS.md](REGRESSION_BKE_6C4_LINEUP_CORRECTIONS.md).
 
 ## 10. Cross-Slice Engineering Rules
 

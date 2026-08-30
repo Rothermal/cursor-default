@@ -8,6 +8,7 @@ interface BasketballRecentEventsPopupProps {
   errorMessage?: string | null
   onUndoTop: () => void
   onRestore: () => void
+  onOpenTimeline: () => void
   onClose: () => void
   visibleCount?: number
 }
@@ -18,6 +19,7 @@ export default function BasketballRecentEventsPopup({
   errorMessage,
   onUndoTop,
   onRestore,
+  onOpenTimeline,
   onClose,
   visibleCount = 5,
 }: BasketballRecentEventsPopupProps) {
@@ -90,6 +92,7 @@ export default function BasketballRecentEventsPopup({
               {recent.map((unit, index) => {
                 const isTop = index === 0
                 const canUndo = isTop && unit.undoable
+                const openTimeline = !canUndo && unit.kind !== 'boundary'
                 return (
                   <li
                     key={unit.id}
@@ -107,25 +110,29 @@ export default function BasketballRecentEventsPopup({
                     </div>
                     <button
                       type="button"
-                      onClick={canUndo ? onUndoTop : undefined}
-                      disabled={!canUndo}
+                      onClick={canUndo ? onUndoTop : openTimeline ? onOpenTimeline : undefined}
+                      disabled={!canUndo && !openTimeline}
                       className={`h-10 shrink-0 rounded-lg px-3 text-sm font-semibold transition-transform ${
-                        canUndo
+                        canUndo || openTimeline
                           ? 'bg-blue-600 text-white active:scale-95'
                           : 'border border-slate-200 bg-slate-50 text-slate-400'
                       }`}
                       aria-label={canUndo
                         ? `Undo ${unit.who} ${unit.what}`
+                        : openTimeline
+                          ? `Review ${unit.who} ${unit.what} in Timeline`
                         : unit.kind === 'boundary'
                           ? `${unit.what} is a lifecycle boundary`
                           : 'Undo older capture unavailable'}
                       title={canUndo
                         ? 'Undo this capture'
+                        : openTimeline
+                          ? 'Review consequences in Timeline'
                         : unit.kind === 'boundary'
                           ? 'Use lifecycle controls to manage period transitions'
                           : 'Undo newer captures first'}
                     >
-                      {unit.kind === 'boundary' ? 'Boundary' : 'Undo'}
+                      {unit.kind === 'boundary' ? 'Boundary' : openTimeline ? 'Timeline' : 'Undo'}
                     </button>
                   </li>
                 )
