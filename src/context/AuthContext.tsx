@@ -9,6 +9,7 @@ import {
 } from '../lib/appAccessSignal'
 import { clearSoccerReleaseCapabilityCache } from '../lib/soccer/releaseCapabilities'
 import { clearBasketballReleaseCapabilityCache } from '../lib/basketball/releaseCapabilities'
+import { clearBasketballClockLineupCapabilityCache } from '../lib/basketball/clockLineupCapabilities'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (capabilityUserId.current !== nextUserId) {
       clearSoccerReleaseCapabilityCache()
       clearBasketballReleaseCapabilityCache()
+      clearBasketballClockLineupCapabilityCache()
       capabilityUserId.current = nextUserId
     }
   }, [user?.id])
@@ -156,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAppAccessLoading(false)
     clearSoccerReleaseCapabilityCache()
     clearBasketballReleaseCapabilityCache()
+    clearBasketballClockLineupCapabilityCache()
     clearPersistedGameStorage()
     await supabase.auth.signOut()
   }, [])

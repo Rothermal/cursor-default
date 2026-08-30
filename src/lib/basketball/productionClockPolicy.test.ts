@@ -13,7 +13,7 @@ describe('BKE-6B1 production clock policy', () => {
   const v2 = getBasketballRulesProfile('nfhs', 1)!.rules
   const anchored = upgradeBasketballRulesDraftToV3(v2, 'nfhs')
 
-  it('distinguishes clockless setup from anchored allow and block decisions', () => {
+  it('allows completed anchored local, cloud, and equal-play setup workflows', () => {
     expect(getBasketballAnchoredSetupPolicy({
       rules: anchored,
       cloudIntent: 'local_only',
@@ -28,20 +28,16 @@ describe('BKE-6B1 production clock policy', () => {
         'youth_equal_play'
       ),
       cloudIntent: 'local_only',
-    })).toMatchObject({
-      applicable: true,
-      allowed: false,
-      reason: 'equal_play_requires_bke_6c',
-    })
+    })).toEqual({ applicable: true, allowed: true })
     expect(getBasketballAnchoredSetupPolicy({
       rules: anchored,
       cloudIntent: 'automatic',
-    })).toMatchObject({ applicable: true, allowed: false, reason: 'cloud_requires_bke_6d' })
+    })).toEqual({ applicable: true, allowed: true })
     expect(getBasketballAnchoredSetupPolicy({
       rules: anchored,
       cloudIntent: 'local_only',
       cloudGameId: 'game-1',
-    })).toMatchObject({ applicable: true, allowed: false, reason: 'cloud_requires_bke_6d' })
+    })).toEqual({ applicable: true, allowed: true })
   })
 
   it('classifies only parking and replacement commits as mutating actions', () => {

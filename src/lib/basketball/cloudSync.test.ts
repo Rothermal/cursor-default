@@ -3,6 +3,8 @@ import { sports } from '../../config/sports'
 import type { GameEventSyncConflict, GameState, Player } from '../../types'
 import { eventCloudTransportAdapterForSport } from '../eventCloudTransportAdapters'
 import { resolveEventConflictInState } from '../gameEvents/eventConflictResolution'
+import { addGameEvent } from '../gameEvents/mutations'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import type { GameEvent } from '../gameEvents/types'
 import { createInitialState } from '../gameReducer'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
@@ -11,6 +13,11 @@ import {
   addBasketballLateParticipant,
   prepareBasketballGameStart,
 } from './commands'
+import { setBasketballClock, startBasketballClock } from './clockCommands'
+import type { BasketballAnchoredCloudAuthorizationDependencies } from './cloudAuthorization'
+import { createBasketballLineupEvent } from './lineupEvents'
+import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
+import type { BasketballMatchParticipant } from './types'
 import {
   assertHealthyBasketballEventGame,
   basketballCloudParticipants,
@@ -46,8 +53,15 @@ function player(id: string, name: string, number = ''): Player {
   return { id, name, number, stats: {} }
 }
 
-function startedState(sourceTeam = false): GameState {
+function startedState(sourceTeam = false, anchored = false): GameState {
   const base = createInitialState()
+  const trackedPlayers = anchored
+    ? Array.from({ length: 5 }, (_, index) =>
+        player(`player-${index + 1}`, `Player ${index + 1}`, String(index + 1)))
+    : [player('player-1', 'Alex One', '4'), player('player-2', 'Blake Two', '12')]
+  const participantIds = trackedPlayers.map((_, index) =>
+    `70000000-0000-4000-8000-${String(index + 101).padStart(12, '0')}`
+  )
   const initial: GameState = {
     ...base,
     gameDataAuthority: 'sport_events',
@@ -62,8 +76,7 @@ function startedState(sourceTeam = false): GameState {
     players: [
       { ...player(TEAM_PLAYER_HOME_ID, 'Aces Team'), isTeamPlayer: true },
       { ...player(TEAM_PLAYER_OPP_ID, 'Bears Team'), isTeamPlayer: true },
-      player('player-1', 'Alex One', '4'),
-      player('player-2', 'Blake Two', '12'),
+      ...trackedPlayers,
     ],
     teamStatsConfig: {
       periodsPerGame: 4,
@@ -80,17 +93,80 @@ function startedState(sourceTeam = false): GameState {
       ? { ...base.cloudSync, teamId: 'team-1', seasonId: 'season-1' }
       : base.cloudSync,
   }
+  const participants: BasketballMatchParticipant[] = trackedPlayers.map((value, index) => ({
+    id: participantIds[index],
+    playerId: value.id,
+    displayName: value.name,
+    number: value.number || null,
+    teamSide: 'tracked',
+    initialStatus: 'starter',
+    position: null,
+    captain: index === 0,
+  }))
   const result = prepareBasketballGameStart(initial, {
     recorderUserId: 'user-1',
     occurredAt: '2026-08-15T12:00:00.000Z',
     eventId: '70000000-0000-4000-8000-000000000001',
-    participantIds: [
-      '70000000-0000-4000-8000-000000000101',
-      '70000000-0000-4000-8000-000000000102',
-    ],
+    participantIds: anchored ? undefined : participantIds,
+    reviewedSetup: anchored
+      ? {
+          rulesSnapshot: upgradeBasketballRulesDraftToV3(
+            getBasketballRulesProfile('nfhs', 1)!.rules,
+            'nfhs'
+          ),
+          rulesSource: {
+            profileId: 'nfhs',
+            profileVersion: 1,
+            personalRevision: null,
+            teamRevision: null,
+            hasExplicitMatchOverrides: false,
+          },
+          sourceTeamId: sourceTeam ? 'team-1' : null,
+          sourceSeasonId: sourceTeam ? 'season-1' : null,
+          courtOrientation: 'standard',
+          version3Setup: {
+            participants,
+            openingLineups: {
+              tracked: { participantIds, shortHandedReason: null },
+              opponent: null,
+            },
+          },
+        }
+      : undefined,
   })
   if (!result.ok) throw new Error(result.message)
   return result.state
+}
+
+function authorizationDependencies(
+  overrides: Partial<BasketballAnchoredCloudAuthorizationDependencies> = {}
+): BasketballAnchoredCloudAuthorizationDependencies {
+  return {
+    loadAppAccess: vi.fn(async () => ({
+      access: { status: 'active' as const, appRole: 'user' as const, updatedAt: null },
+      error: null,
+    })),
+    loadTeamRole: vi.fn(async () => 'scorer' as const),
+    loadReleaseCapabilities: vi.fn(async () => ({
+      status: 'ready' as const,
+      capabilities: {
+        contractVersion: 2 as const,
+        migration: 62 as const,
+        eventTransportVersion: 4 as const,
+        recoveryVersion: 1 as const,
+        recorderResolutionVersion: 1 as const,
+        canonicalFinalizationVersion: 1 as const,
+        summaryAuthorityVersion: 1 as const,
+        aggregateSourceVersion: 1 as const,
+        settingsContractVersion: 1 as const,
+      },
+    })),
+    loadClockLineupCapabilities: vi.fn(async () => ({
+      status: 'ready' as const,
+      capabilities: { clockAndLineupsVersion: 1 as const },
+    })),
+    ...overrides,
+  }
 }
 
 function queryResult(data: unknown, error: { message: string } | null = null) {
@@ -270,6 +346,56 @@ describe('Basketball event cloud transport adapter', () => {
     )
   })
 
+  it('fresh-authorizes and round-trips a running anchored recorder stream', async () => {
+    const started = startBasketballClock(startedState(false, true), {
+      recorderUserId: 'user-1',
+      occurredAt: '2026-08-15T12:00:01.000Z',
+      eventId: '70000000-0000-4000-8000-000000000050',
+    })
+    if (!started.ok) throw new Error(started.message)
+    const deps = authorizationDependencies()
+
+    const result = await syncBasketballEventGameToCloud({
+      state: started.state,
+      userId: 'user-1',
+      localGameId: '80000000-0000-4000-8000-000000000001',
+    }, deps)
+
+    expect(result.gameId).toBe('cloud-game-1')
+    expect(deps.loadAppAccess).toHaveBeenCalledOnce()
+    expect(deps.loadReleaseCapabilities).toHaveBeenCalledWith('user-1')
+    expect(deps.loadClockLineupCapabilities).toHaveBeenCalledWith('user-1')
+    expect(cloudMock.upsert).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects stale anchored team access before bind, pull, or upload', async () => {
+    const deps = authorizationDependencies({
+      loadTeamRole: vi.fn(async () => 'viewer' as const),
+    })
+    await expect(syncBasketballEventGameToCloud({
+      state: startedState(true, true),
+      userId: 'user-1',
+      localGameId: '80000000-0000-4000-8000-000000000001',
+    }, deps)).rejects.toThrow('current team role')
+
+    expect(cloudMock.rpc).not.toHaveBeenCalled()
+    expect(cloudMock.load).not.toHaveBeenCalled()
+    expect(cloudMock.upsert).not.toHaveBeenCalled()
+  })
+
+  it('keeps clockless event transport off the anchored capability path', async () => {
+    const deps = authorizationDependencies()
+    await syncBasketballEventGameToCloud({
+      state: startedState(),
+      userId: 'user-1',
+      localGameId: '80000000-0000-4000-8000-000000000001',
+    }, deps)
+
+    expect(deps.loadAppAccess).not.toHaveBeenCalled()
+    expect(deps.loadReleaseCapabilities).not.toHaveBeenCalled()
+    expect(deps.loadClockLineupCapabilities).not.toHaveBeenCalled()
+  })
+
   it('validates a new binding before pulling or uploading recorder events', async () => {
     const validateBinding = vi.fn(() => {
       throw new Error('duplicate local binding')
@@ -395,6 +521,116 @@ describe('Basketball event cloud transport adapter', () => {
     )
   })
 
+  it('authorizes anchored adoption while keeping the recorder source isolated', async () => {
+    const remote = startedState(false, true)
+    mockBasketballCloudRows(remote)
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: remote.eventStream,
+      inspection: {
+        complete: true,
+        activeEvents: remote.eventStream!.events,
+        deletedEvents: [],
+        diagnostics: [],
+      },
+      quarantinedRows: [],
+      error: null,
+    })
+    const deps = authorizationDependencies()
+
+    const adopted = await loadBasketballCloudGameById('user-1', 'cloud-game-1', deps)
+
+    expect(adopted?.sportGameState?.sportId).toBe('basketball')
+    expect(adopted?.sportGameState?.sportId === 'basketball'
+      ? adopted.sportGameState.projection.clock?.running
+      : null).toBe(false)
+    expect(deps.loadClockLineupCapabilities).toHaveBeenCalledWith('user-1')
+  })
+
+  it('reprojects adjusted clock and recorded-later lineup history from cloud', async () => {
+    const running = startBasketballClock(startedState(false, true), {
+      recorderUserId: 'user-1',
+      occurredAt: '2026-08-15T12:00:01.000Z',
+      eventId: '70000000-0000-4000-8000-000000000060',
+    })
+    if (!running.ok) throw new Error(running.message)
+    const adjusted = setBasketballClock(running.state, {
+      recorderUserId: 'user-1',
+      occurredAt: '2026-08-15T12:00:06.000Z',
+      elapsedMs: 20_000,
+      reason: 'Official clock correction',
+      pauseEventId: '70000000-0000-4000-8000-000000000061',
+      eventId: '70000000-0000-4000-8000-000000000062',
+      captureCommandId: '70000000-0000-4000-8000-000000000063',
+    })
+    if (!adjusted.ok || adjusted.state.sportGameState?.sportId !== 'basketball') {
+      throw new Error(adjusted.ok ? 'missing Basketball state' : adjusted.message)
+    }
+    const periods = adjusted.state.sportGameState.projection.periods
+    const period = periods[periods.length - 1]
+    if (!period) throw new Error('missing active period')
+    const participant = adjusted.state.sportGameState.setup.participants[1]!
+    const recordedLater = createBasketballLineupEvent({
+      id: '70000000-0000-4000-8000-000000000064',
+      eventType: 'basketball.role_changed',
+      payload: {
+        captureCommandId: '70000000-0000-4000-8000-000000000065',
+        changes: [{ participantId: participant.id, position: 'G', captain: false }],
+        recordedLater: true,
+      },
+      recorderUserId: 'user-1',
+      sequence: adjusted.state.eventStream!.events.length + 1,
+      period: { id: period.id, order: period.order },
+      elapsedMs: 4_000,
+      occurredAt: '2026-08-15T12:00:07.000Z',
+      teamSide: 'tracked',
+    })
+    const appended = addGameEvent(
+      adjusted.state,
+      recordedLater,
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    if (!appended.ok) throw new Error(appended.error.message)
+    mockBasketballCloudRows(appended.state)
+    cloudMock.load.mockResolvedValue({
+      ok: true,
+      eventStream: appended.state.eventStream,
+      inspection: {
+        complete: true,
+        activeEvents: appended.state.eventStream!.events,
+        deletedEvents: [],
+        diagnostics: [],
+      },
+      quarantinedRows: [],
+      error: null,
+    })
+
+    const adopted = await loadBasketballCloudGameById(
+      'user-1',
+      'cloud-game-1',
+      authorizationDependencies()
+    )
+    if (adopted?.sportGameState?.sportId !== 'basketball') {
+      throw new Error('missing adopted Basketball state')
+    }
+
+    expect(adopted.sportGameState.projection.clock).toMatchObject({
+      running: false,
+      elapsedMs: 20_000,
+      lastRunningElapsedMs: null,
+      lastAdjustmentEventId: '70000000-0000-4000-8000-000000000062',
+    })
+    const trackedLineup = adopted.sportGameState.projection.lineup?.sides.tracked
+    if (!trackedLineup) throw new Error('missing adopted tracked lineup')
+    const roleHistory = trackedLineup.roleHistoryByParticipantId[participant.id]
+    expect(roleHistory?.[roleHistory.length - 1]).toMatchObject({
+      eventId: '70000000-0000-4000-8000-000000000064',
+      elapsedMs: 4_000,
+      position: 'G',
+    })
+  })
+
   it('reports an empty recorder stream and can create an independent local start', async () => {
     const source = startedState()
     mockBasketballCloudRows(source)
@@ -416,6 +652,29 @@ describe('Basketball event cloud transport adapter', () => {
       eventType: 'basketball.period_started',
       recorderUserId: 'user-2',
       sequence: 1,
+    })
+  })
+
+  it('starts an authorized independent anchored recorder paused at elapsed zero', async () => {
+    const remote = startedState(false, true)
+    mockBasketballCloudRows(remote)
+    const deps = authorizationDependencies()
+
+    const independent = await createBasketballIndependentRecorderState(
+      'user-2',
+      'cloud-game-1',
+      deps
+    )
+
+    expect(independent.eventStream?.events).toHaveLength(1)
+    expect(independent.eventStream?.events[0]).toMatchObject({
+      eventType: 'basketball.period_started',
+      recorderUserId: 'user-2',
+      elapsedMs: 0,
+    })
+    expect(assertHealthyBasketballEventGame(independent).projection.clock).toMatchObject({
+      running: false,
+      elapsedMs: 0,
     })
   })
 

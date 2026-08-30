@@ -19,8 +19,8 @@ import {
   ensureBasketballReleaseCapabilities,
   requiresBasketballEventCloudPreflight,
 } from '../lib/basketball/releaseCapabilities'
+import { ensureBasketballClockLineupCapabilities } from '../lib/basketball/clockLineupCapabilities'
 import {
-  getBasketballAnchoredSetupPolicy,
   hasStartedBasketballEventGame,
   isBasketballEventSetupIntent,
   isBasketballMatchRulesV3,
@@ -101,6 +101,8 @@ export default function GameSetup() {
   } = useSettings()
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
+  const currentUserIdRef = useRef(userId)
+  currentUserIdRef.current = userId
   const accountScope = basketballSetupAccountScope(userId)
   const explicitSport = requestedSportId
     ? sports.find(item => item.id === requestedSportId) ?? null
@@ -835,11 +837,6 @@ export default function GameSetup() {
     currentBasketballDraft?.authority === 'sport_events' &&
     isBasketballEventSetupIntent(state)
   )
-  const anchoredBasketballSetup = Boolean(
-    currentBasketballDraft?.event &&
-    isBasketballMatchRulesV3(currentBasketballDraft.event.reviewedRules) &&
-    currentBasketballDraft.event.reviewedRules.clockModel === 'anchored'
-  )
   const canProceed = Boolean(
     resolvedTeamName &&
     opponentName.trim() &&
@@ -960,16 +957,6 @@ export default function GameSetup() {
         setSetupError('Basketball setup is still loading or contains invalid fields.')
         return
       }
-      if (basketballDraft.event) {
-        const anchoredPolicy = getBasketballAnchoredSetupPolicy({
-          rules: basketballDraft.event.reviewedRules,
-          cloudIntent: basketballDraft.event.cloudIntent,
-        })
-        if (anchoredPolicy.applicable && !anchoredPolicy.allowed) {
-          setSetupError(anchoredPolicy.message)
-          return
-        }
-      }
       const validation = buildBasketballSetupGameState({
         draft: basketballDraft,
         sport,
@@ -1005,11 +992,33 @@ export default function GameSetup() {
       const capability = await ensureBasketballReleaseCapabilities(userId, {
         force: forceCapabilityCheck,
       })
-      setCheckingBasketballCapabilities(false)
+      if (currentUserIdRef.current !== userId) {
+        setCheckingBasketballCapabilities(false)
+        setBasketballCapabilityFailure('The signed-in account changed. Retry before starting this game.')
+        return
+      }
       if (capability.status !== 'ready') {
+        setCheckingBasketballCapabilities(false)
         setBasketballCapabilityFailure(capability.error)
         return
       }
+      const rules = basketballDraft?.event?.reviewedRules
+      if (rules && isBasketballMatchRulesV3(rules) && rules.clockModel === 'anchored') {
+        const clockAndLineups = await ensureBasketballClockLineupCapabilities(userId, {
+          force: forceCapabilityCheck,
+        })
+        if (currentUserIdRef.current !== userId) {
+          setCheckingBasketballCapabilities(false)
+          setBasketballCapabilityFailure('The signed-in account changed. Retry before starting this game.')
+          return
+        }
+        if (clockAndLineups.status !== 'ready') {
+          setCheckingBasketballCapabilities(false)
+          setBasketballCapabilityFailure(clockAndLineups.error)
+          return
+        }
+      }
+      setCheckingBasketballCapabilities(false)
     }
 
     const hasActiveGame = Boolean(state.sport && state.players.length > 0)
@@ -1532,15 +1541,13 @@ export default function GameSetup() {
                   <p className="text-xs font-medium text-amber-950">
                     Cloud policy: {basketballCloudIntent === 'automatic' ? 'Automatic' : 'Local only'}
                   </p>
-                  {teamMode === 'existing' && (
-                    <div
-                      className="grid grid-cols-2 rounded-md bg-amber-100 p-1"
-                      role="group"
-                      aria-label="Basketball cloud policy"
-                    >
+                  <div
+                    className="grid grid-cols-2 rounded-md bg-amber-100 p-1"
+                    role="group"
+                    aria-label="Basketball cloud policy"
+                  >
                       <button
                         type="button"
-                        disabled={anchoredBasketballSetup}
                         onClick={() => {
                           setBasketballCloudIntent('automatic')
                           setSetupError(null)
@@ -1568,13 +1575,7 @@ export default function GameSetup() {
                       >
                         Local only
                       </button>
-                    </div>
-                  )}
-                  {anchoredBasketballSetup && teamMode === 'existing' && (
-                    <p className="text-xs text-amber-800">
-                      Anchored games remain local-only until the clock cloud workflow is available.
-                    </p>
-                  )}
+                  </div>
                 </div>
               )}
               <p className="text-xs text-amber-900">

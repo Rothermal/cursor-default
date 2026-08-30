@@ -1,8 +1,8 @@
 # Plan: BKE-6 Basketball Clock and Lineups
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
-decisions are approved. BKE-6A, BKE-6B, BKE-6C, BKE-6D1, and BKE-6D2 are implemented. BKE-6D's
-32 detailed decisions and four-slice delivery plan are approved; BKE-6D3 is next.
+decisions are approved. BKE-6A, BKE-6B, BKE-6C, and BKE-6D1 through BKE-6D3 are implemented.
+BKE-6D's 32 detailed decisions and four-slice delivery plan are approved; BKE-6D4 is next.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -446,9 +446,9 @@ Each slice receives a detailed implementation plan and review before code begins
 | BKE-6E | Release-entry audit, older-client/clockless parity, responsive/accessibility/PWA hardening, rollback record, owner smoke, and broader matrix disposition | Anchored remains default-off, owner evidence is recorded honestly, and broader enablement is blocked until its matrix passes |
 
 BKE-6B and BKE-6C are complete across four implementation PRs each. BKE-6D1 completes anchored
-destination detail and BKE-6D2 completes exact-second, DNP, and coverage-aware plus-minus
-aggregates. BKE-6D3 next owns anchored transport before publication work. These remain delivery
-slices, not new product scope.
+destination detail, BKE-6D2 completes exact-second, DNP, and coverage-aware plus-minus aggregates,
+and BKE-6D3 completes dual-capability anchored transport. BKE-6D4 next owns readiness,
+finalization, and reopen/republication. These remain delivery slices, not new product scope.
 
 ---
 

@@ -1,7 +1,7 @@
 # Plan: BKE-6D Cloud Summary, Aggregates, and Lifecycle
 
-Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 and BKE-6D2
-are implemented; BKE-6D3 anchored cloud transport is next.
+Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 through
+BKE-6D3 are implemented; BKE-6D4 readiness, finalization, and reopen is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -304,6 +304,15 @@ than widening an existing exact response.
 ---
 
 ## 7. BKE-6D3: Anchored Cloud Transport
+
+Status: Implemented. Exact setup-v2/rules-v3 anchored games use the existing Basketball v4
+one-recorder transport after fresh app/team access plus release and clock/lineup capability checks.
+Automatic creation and later Enable Cloud both retain checkpoint-first activation, duplicate-binding
+protection, strict recorder isolation, stale-account guards, and rollback-safe local policy. Running,
+adjusted-clock, and recorded-later lineup streams reproject through the shared event engine; malformed
+or mixed-recorder streams fail closed. Clockless Basketball, Legacy Basketball, Soccer, and aggregate
+routes remain unchanged. No migration was added. See
+[REGRESSION_BKE_6D3_ANCHORED_CLOUD_TRANSPORT.md](REGRESSION_BKE_6D3_ANCHORED_CLOUD_TRANSPORT.md).
 
 The shared event transport is payload-agnostic and remains the only row-level sync engine. BKE-6D3
 removes anchored client policy blocks only after it proves the following route:

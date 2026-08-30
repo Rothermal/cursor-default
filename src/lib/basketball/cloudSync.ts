@@ -1,7 +1,7 @@
 import { sports } from '../../config/sports'
 import type { GameEventSyncConflict, GameState, Player } from '../../types'
 import { loadGameEventStreamForRecorder } from '../gameEvents/cloud'
-import { isPlainObject } from '../gameEvents/envelope'
+import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
 import {
   gameEventSyncBase,
   gameEventSyncConflictFromRow,
@@ -29,6 +29,11 @@ import {
 } from './state'
 import type { BasketballSportGameState } from './types'
 import { isBasketballEventLocalOnly } from './eventCloudPolicy'
+import {
+  authorizeBasketballAnchoredCloudMutation,
+  isBasketballAnchoredCloudAuthority,
+  type BasketballAnchoredCloudAuthorizationDependencies,
+} from './cloudAuthorization'
 
 export interface BasketballCloudGameRow {
   id: string
@@ -61,6 +66,7 @@ export interface SyncBasketballEventGameInput {
   userId: string
   localGameId: string
   validateBinding?: (gameId: string) => void | Promise<void>
+  assertCurrent?: () => void
 }
 
 export async function loadBasketballCloudDataAuthority(
@@ -165,21 +171,38 @@ export const basketballEventCloudTransportAdapter: EventCloudTransportAdapter = 
 
 // GameContext routes only structurally marked Basketball event games here. The adapter performs
 // the full health check before binding or uploading, so malformed streams fail closed.
-export function syncBasketballEventGameToCloud(
-  input: SyncBasketballEventGameInput
+export async function syncBasketballEventGameToCloud(
+  input: SyncBasketballEventGameInput,
+  authorizationDependencies?: BasketballAnchoredCloudAuthorizationDependencies
 ): Promise<SyncBasketballEventGameResult> {
   if (isBasketballEventLocalOnly(input.state)) {
-    return Promise.reject(new Error('This Basketball game is configured for local-only tracking.'))
+    throw new Error('This Basketball game is configured for local-only tracking.')
   }
+  assertHealthyBasketballEventGame(input.state)
+  if (input.state.eventStream?.events.some(event => (
+    !isGameEventEnvelope(event) || event.recorderUserId !== input.userId
+  ))) {
+    throw new Error('Basketball cloud sync cannot blend another recorder stream.')
+  }
+  await authorizeBasketballAnchoredCloudMutation(
+    input,
+    authorizationDependencies
+  )
+  input.assertCurrent?.()
   return syncEventGameToCloud({ ...input, adapter: basketballEventCloudTransportAdapter })
 }
 
 export async function loadBasketballCloudGameById(
   userId: string,
-  gameId: string
+  gameId: string,
+  authorizationDependencies?: BasketballAnchoredCloudAuthorizationDependencies
 ): Promise<GameState | null> {
   if (!supabase) throw new Error('Supabase client not configured')
   const shell = await loadBasketballCloudShell(gameId)
+  await authorizeBasketballAnchoredCloudMutation(
+    { state: shell.state, userId },
+    authorizationDependencies
+  )
   const [{ data: conflictData, error: conflictError }, remote] = await Promise.all([
     supabase
       .from('game_event_conflicts')
@@ -250,9 +273,14 @@ export async function loadBasketballCloudGameById(
 
 export async function createBasketballIndependentRecorderState(
   userId: string,
-  gameId: string
+  gameId: string,
+  authorizationDependencies?: BasketballAnchoredCloudAuthorizationDependencies
 ): Promise<GameState> {
   const shell = await loadBasketballCloudShell(gameId)
+  await authorizeBasketballAnchoredCloudMutation(
+    { state: shell.state, userId },
+    authorizationDependencies
+  )
   if (shell.game.status === 'final') {
     throw new Error('Finalized games cannot add a recorder.')
   }
@@ -276,6 +304,7 @@ export async function createBasketballIndependentRecorderState(
     throw new Error('Basketball cloud setup has no first regulation period.')
   }
   const occurredAt = new Date().toISOString()
+  const anchored = isBasketballAnchoredCloudAuthority(shell.state)
   const started = addGameEvent(
     initialized.state,
     createBasketballLifecycleEvent({
@@ -285,6 +314,7 @@ export async function createBasketballIndependentRecorderState(
       recorderUserId: userId,
       sequence: 1,
       period: { id: firstPeriod.id, order: firstPeriod.order },
+      elapsedMs: anchored ? 0 : null,
       occurredAt,
     }),
     gameEventRegistry,
