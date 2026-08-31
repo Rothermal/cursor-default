@@ -1,7 +1,8 @@
 # Plan: BKE-6D Cloud Summary, Aggregates, and Lifecycle
 
 Status: Implemented. All 32 product and implementation decisions and BKE-6D1 through BKE-6D4
-are complete. BKE-6E release evidence and hardening is next.
+are complete. BKE-6E release evidence and hardening is approved in
+[PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md); BKE-6E1 is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -506,6 +507,8 @@ BKE-6D must not:
 
 BKE-6E owns release-entry audit, older-client/PWA/responsive hardening, rollback evidence, owner
 smoke consolidation, and disposition of the complete multi-device/role/offline/mixed-sport matrix.
+Its three-slice delivery contract is recorded in
+[PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md).
 
 ---
 

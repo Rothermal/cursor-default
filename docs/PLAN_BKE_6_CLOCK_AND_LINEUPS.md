@@ -2,7 +2,7 @@
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
 decisions are approved. BKE-6A, BKE-6B, BKE-6C, and BKE-6D are implemented through migration 064.
-BKE-6E release evidence and hardening is next.
+BKE-6E is approved as three release-hardening slices; BKE-6E1 is next.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -13,6 +13,8 @@ BKE-6B detail: [PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md](PLAN_BKE_6B_PRODUCTIO
 BKE-6C detail: [PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md](PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md)
 
 BKE-6D detail: [PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md](PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md)
+
+BKE-6E detail: [PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md)
 
 ---
 
@@ -443,7 +445,7 @@ Each slice receives a detailed implementation plan and review before code begins
 | BKE-6B | Personal/team/match controls, immutable setup review, opening lineup, same-five boundary confirmation for equal-play-off rules, sticky live clock, timestamps, expiration/recovery, Set Clock, and parking guards. Detailed as BKE-6B1 through BKE-6B4 in [PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md](PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md) | A new local anchored game can setup, run, pause, confirm the unchanged five, adjust, expire, park/reload, and complete periods without affecting clockless games |
 | BKE-6C | Multi-player substitutions, lineup-changing boundary review, roles/captain, short-handed/replacement flows, equal-play enforcement/override, Recent Events, Timeline correction, and Set Current Lineup. Detailed as BKE-6C1 through BKE-6C4 in [PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md](PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md) | Complete and incomplete lineup histories are accurately captured, corrected, diagnosed, and converted to exact intervals/minutes |
 | BKE-6D | Players/Overview/Timeline detail, exact-second aggregates, plus-minus quality, cloud capability/bind/sync, recorder readiness, finalization, correction/resume reopen, and republication. Detailed as BKE-6D1 through BKE-6D4 in [PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md](PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md) | One coherent recorder can sync and publish anchored authority; remote/canonical review is read-only and aggregate output is quality-gated |
-| BKE-6E | Release-entry audit, older-client/clockless parity, responsive/accessibility/PWA hardening, rollback record, owner smoke, and broader matrix disposition | Anchored remains default-off, owner evidence is recorded honestly, and broader enablement is blocked until its matrix passes |
+| BKE-6E | Release-entry audit, older-client/clockless parity, responsive/accessibility/PWA hardening, rollback record, owner smoke, and broader matrix disposition. Detailed as BKE-6E1 through BKE-6E3 in [PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md) | Anchored remains default-off, owner evidence is recorded honestly, and broader enablement is blocked until its matrix passes |
 
 BKE-6B and BKE-6C are complete across four implementation PRs each. BKE-6D1 completes anchored
 destination detail, BKE-6D2 completes exact-second, DNP, and coverage-aware plus-minus aggregates,
