@@ -42,6 +42,10 @@ The following decisions are inherited and are not reopened by BKE-6E:
    still required before access materially broadens.
 9. Release-blocking defects found by the audit are fixed in this phase. Nonblocking visual polish
    is recorded for later work rather than expanding BKE-6E into a reskin.
+10. Cloud-bound team games deliberately require online source-team role resolution for authorized
+    equal-play overrides. Recorders who require offline live capture must choose local-only before
+    play. This limitation is accepted for the default-off owner rollout, must be explicit in the
+    matrix, and must be reconsidered before access broadens.
 
 ---
 
@@ -98,14 +102,18 @@ Still required:
 
 Scope:
 
-- inventory every Basketball discovery and new-game entry path, including Sport Dashboard, Team
-  Info, direct setup links, replacement/continue flows, matching draft resume, and cloud enablement;
+- inventory every Basketball discovery, preference, and new-game entry path, including Sport
+  Select, Sport Dashboard, Settings App/Sports discovery, Basketball Tracker settings, Team Info,
+  direct setup links, replacement/continue flows, matching draft resume, and cloud enablement;
 - prove creation policy, device preference, setup authority, capability preflight, account/team
   access, no-mutation cancellation, and exact matching pre-start reuse at those boundaries;
 - add focused automated parity for Legacy Basketball, clockless Event Basketball, existing Event
   records with the preference off, Soccer, and mixed-sport parking;
 - verify that both exact capability parsers, caches, fresh mutation checks, and migration-064
   finalization/reopen contracts fail closed without blocking local-only play;
+- preserve the existing `releaseEntryGuards.test.ts` declaration guard and
+  `sportAvailability.test.ts` stage-derived policy coverage rather than adding a duplicate stage
+  test;
 - create `REGRESSION_BKE_6E_RELEASE.md` as the single operator record, linking rather than copying
   the exhaustive BKE-4E, BKE-5, and BKE-6 slice matrices; and
 - update release and rollback guidance without changing the production stage.
@@ -128,10 +136,13 @@ Scope:
   behavior;
 - test installed-PWA and browser reload/background recovery, offline local capture, reconnect,
   stale service-worker guidance, wall-clock movement warnings, and expiration alerts;
+- surface a concise build or commit identifier that lets an operator verify the exact deployed
+  candidate from the running app without exposing account or environment secrets;
 - exercise multi-game parking, import/export, account isolation, Soccer plus Basketball parking,
   and running-clock mutation confirmations;
-- rehearse the preference-off and release-stage rollback paths while proving existing records stay
-  accessible; and
+- rehearse the preference-off and client release-stage rollback paths while proving existing
+  records stay accessible, including a stale installed PWA that has not yet loaded the rollback
+  bundle; and
 - record nonblocking visual refinements separately rather than broadening this slice.
 
 Recommended viewport set:
@@ -152,7 +163,8 @@ Exit condition:
 
 Scope:
 
-- deploy the exact merged candidate and record the commit/deployment identifier;
+- deploy the exact merged candidate, record the commit/deployment identifier, and confirm the
+  running app displays that same identifier before smoke begins;
 - confirm migration 064 and both fixed capability handshakes in the deployed Supabase project;
 - run one local-only anchored game through rules review, opening lineup, clock, stoppage,
   substitution, boundary/equal-play handling, correction, Summary, and completion;
@@ -181,15 +193,15 @@ Exit condition:
 
 | Group | Required coverage |
 |---|---|
-| A. Policy and entry | Development and production policy, preference off/on, sport discovery, every setup entry, direct links, cancellation, matching pre-start reuse, existing-record access |
+| A. Policy and entry | Development and production policy, preference off/on, Sport Select, Sport Dashboard, Settings App/Sports, Basketball Tracker settings, every setup entry, direct links, cancellation, matching pre-start reuse, existing-record access |
 | B. Access and capability | App access, team roles, account/team isolation, exact release and clock capability shapes, local-only fallback, migration 064 ceiling |
 | C. Local authority | Rules/source review, opening lineup, clock lifecycle, substitutions, equal play, corrections, periods/overtime, completion, recovery |
 | D. Cloud lifecycle | Bind, running upload, adoption, conflicts, recorder presence, primary, checkpoint, finalization, Correct records, Resume game, republication |
 | E. Review and aggregates | Local/remote/canonical Summary, Timeline, shot review, exact participation, DNP, plus-minus quality, destination routing, provenance |
 | F. Compatibility | Legacy Basketball, clockless Event Basketball, older setup/rules, malformed/unknown authority, Soccer, mixed-sport parking |
-| G. Recovery and PWA | Offline capture, reconnect, reload/background, stale PWA, import/export, quota/recovery state, account switch, duplicate binding |
+| G. Recovery and PWA | Local-only offline capture, cloud-bound online-role limitation, reconnect, reload/background, stale-PWA rollback propagation, import/export, quota/recovery state, account switch, duplicate binding |
 | H. Responsive and accessibility | Four viewports, keyboard, focus, dialog semantics, status alerts, reduced motion, sound/vibration unavailable behavior |
-| I. Operations | Exact candidate, migrations/capabilities, CI, owner smoke, broader-matrix status, rollback rehearsal, evidence hygiene |
+| I. Operations | Running-app build identifier, exact candidate, migrations/capabilities, CI, owner smoke, broader-matrix status, rollback rehearsal, evidence hygiene |
 
 Automation supports release confidence but does not substitute for the rows that require a real
 browser, installed PWA, Supabase project, second account, or second device.
@@ -203,22 +215,31 @@ browser, installed PWA, Supabase project, second account, or second device.
 Disable the Basketball Event Tracker device preference. This stops new Event discovery/creation on
 that device while preserving access to every existing Event game and all historical review.
 
-### Release rollback
+### Release and deployment rollback
 
 Change the centralized Basketball Event release stage from `opt_in` to `internal` and redeploy.
 This blocks new production Event creation without deleting, converting, or hiding existing games.
-The rollback must be covered by a policy test so it remains a one-line operational change.
+It is a client build-time change, not a separate server switch: stopping creation is eventually
+consistent with deployment propagation. A device that remains offline or keeps a stale installed
+PWA open can continue using the old creation policy until it loads the rollback bundle. The only
+immediate control is the user's per-device preference; it is not a remote operator control.
 
-### Deployment rollback
+There is intentionally no server-side feature flag fallback. The capability RPCs prove schema
+availability; revoking their grants or dropping required objects would also break existing
+cloud-bound records. BKE-6E2 must rehearse a stale-client rollback and surface a build identifier so
+the operator can confirm that the new bundle is active. Preserve the existing declaration and
+stage-derived policy tests that keep the stage change deployable; do not add a third overlapping
+guard.
 
-Redeploy the previous known-good client when a release candidate has a client-only blocker. Users
-with a stale installed PWA should close all app windows, reopen online, and verify the displayed
-build before continuing an active game.
+For any other client-only blocker, redeploy the previous known-good client. The operator must record
+its build identifier, bring the device online, close all installed app windows, reopen the app, and
+confirm that displayed identifier before continuing an active game.
 
 ### Data and server rules
 
-- Do not reverse migrations 061, 063, or 064 merely to disable creation; they are additive
-  capability and trusted-boundary contracts used by existing records.
+- Do not reverse migrations 061 through 064 merely to disable creation; they are additive release,
+  settings, clock/lineup, and trusted-boundary contracts used by current runtime behavior and
+  existing records.
 - Do not delete or rewrite event streams as rollback.
 - Export local recovery data before destructive troubleshooting.
 - A server-contract defect requires a new forward migration and a repeated exact-candidate smoke
@@ -242,6 +263,16 @@ The owner-only default-off rollout may proceed after the exact-candidate owner s
 even if clearly identified broader-role or second-device rows remain `Not run`. Wider discovery,
 default-on behavior, or promotion beyond the initial operating rollout requires the complete
 broader matrix to pass or receive an explicit, documented risk acceptance.
+
+At minimum, broader rollout remains blocked until these live rows pass:
+
+- a second account proves owner/admin/scorer equal-play override access and viewer/removed-member
+  denial after a fresh role resolution;
+- a second device proves strict same-recorder adoption, conflict/checkpoint handling, primary
+  selection, finalization, and reopen/republication without blending streams; and
+- installed-PWA offline/reconnect and stale-bundle rollback behavior passes alongside mixed-sport
+  parking and existing-record access. Cloud-bound equal-play override while offline retains the
+  accepted online-role limitation unless a later plan deliberately changes it.
 
 ---
 
