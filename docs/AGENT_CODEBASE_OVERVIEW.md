@@ -332,8 +332,10 @@ capture, preset/custom/none positions, independent captains, late-bench return, 
 and reasoned current-lineup recovery; see `REGRESSION_BKE_6C3_ROLES_AND_RECOVERY.md`. BKE-6C4 adds
 effective-time historical lineup replay, consequence-aware stale-safe Timeline editing, grouped
 remove/restore, Recent Events Timeline routing, and lineup diagnostics; see
-`REGRESSION_BKE_6C4_LINEUP_CORRECTIONS.md`. BKE-6C and BKE-6D are complete. BKE-6E remains; rules versions 1-2, setup version 1, and existing games remain
-clockless, and shot-clock/possession work stays out.
+`REGRESSION_BKE_6C4_LINEUP_CORRECTIONS.md`. BKE-6C and BKE-6D are complete. BKE-6E is approved as
+three release-hardening slices in `PLAN_BKE_6E_RELEASE_HARDENING.md`; BKE-6E1 is next. Rules
+versions 1-2, setup version 1, and existing games remain clockless, and shot-clock/possession work
+stays out.
 
 BKE-6D is approved in `PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md` as four slices. BKE-6D1
 extends the existing isolated Summary source model with exact participation/stint/role detail,
@@ -355,7 +357,8 @@ one-recorder transport after fresh access and both capability checks, with check
 activation, strict adoption, stale-account guards, and no migration. BKE-6D4 completes the phase:
 Correct records is terminal and Timeline-only, Resume game restores the exact paused clock and
 requires lineup review plus explicit Start, and republication remains manager-explicit. BKE-6E
-retains release-entry evidence and the broader live matrix.
+retains release-entry evidence and the broader live matrix; its audit, hardening, and owner smoke
+contract is detailed in `PLAN_BKE_6E_RELEASE_HARDENING.md`.
 
 SOC-3A derives soccer score, side attacking totals, player attacking totals, and goalkeeper
 totals from active event revisions. Event actors use stable match `participantId` references;
@@ -592,6 +595,7 @@ flowchart LR
 | [`PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md`](PLAN_BKE_6B_PRODUCTION_SETUP_AND_CLOCK.md) | Complete BKE-6B1 through BKE-6B4 plan: contracts, guarded local setup/opening lineups, canonical live clock, and parking/period-flow exit |
 | [`PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md`](PLAN_BKE_6C_LIVE_LINEUPS_AND_CORRECTIONS.md) / [`REGRESSION_BKE_6C1_LIVE_SUBSTITUTIONS.md`](REGRESSION_BKE_6C1_LIVE_SUBSTITUTIONS.md) / [`REGRESSION_BKE_6C2_BOUNDARY_EQUAL_PLAY.md`](REGRESSION_BKE_6C2_BOUNDARY_EQUAL_PLAY.md) / [`REGRESSION_BKE_6C3_ROLES_AND_RECOVERY.md`](REGRESSION_BKE_6C3_ROLES_AND_RECOVERY.md) / [`REGRESSION_BKE_6C4_LINEUP_CORRECTIONS.md`](REGRESSION_BKE_6C4_LINEUP_CORRECTIONS.md) | Complete BKE-6C1 through BKE-6C4 plan and evidence: live substitutions, boundary/equal-play review, roles/current-lineup recovery, and grouped correction/exit |
 | [`PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md`](PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md) / [`REGRESSION_BKE_6D1_SUMMARY_DETAIL.md`](REGRESSION_BKE_6D1_SUMMARY_DETAIL.md) / [`REGRESSION_BKE_6D2_EXACT_AGGREGATES.md`](REGRESSION_BKE_6D2_EXACT_AGGREGATES.md) / [`REGRESSION_BKE_6D3_ANCHORED_CLOUD_TRANSPORT.md`](REGRESSION_BKE_6D3_ANCHORED_CLOUD_TRANSPORT.md) / [`REGRESSION_BKE_6D4_FINALIZATION_AND_REOPEN.md`](REGRESSION_BKE_6D4_FINALIZATION_AND_REOPEN.md) | BKE-6D is complete through migration 064: Summary detail, exact aggregates, anchored transport, trusted finalization, mode-aware reopen, recorder handoff, and explicit republication |
+| [`PLAN_BKE_6E_RELEASE_HARDENING.md`](PLAN_BKE_6E_RELEASE_HARDENING.md) | Approved BKE-6E1 through BKE-6E3 release audit, responsive/accessibility/PWA hardening, rollback, exact-candidate owner smoke, and broader-matrix disposition; BKE-6E1 is next |
 | [`REGRESSION_BKE_6B1_CLOCK_SETUP_CONTRACTS.md`](REGRESSION_BKE_6B1_CLOCK_SETUP_CONTRACTS.md) / [`REGRESSION_BKE_6B2_ANCHORED_SETUP.md`](REGRESSION_BKE_6B2_ANCHORED_SETUP.md) / [`REGRESSION_BKE_6B3_LIVE_CLOCK.md`](REGRESSION_BKE_6B3_LIVE_CLOCK.md) / [`REGRESSION_BKE_6B_PRODUCTION_CLOCK.md`](REGRESSION_BKE_6B_PRODUCTION_CLOCK.md) | Complete BKE-6B device/settings/draft, setup, live clock, and production exit evidence |
 | [`REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md`](REGRESSION_BKE_5_SETTINGS_AND_ROLLOUT.md) | BKE-5D1 hardening and BKE-5D2 default-off production activation evidence; deployment smoke, rollback, and the broader-release matrix remain |
 

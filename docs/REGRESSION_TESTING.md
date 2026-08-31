@@ -1324,6 +1324,20 @@ rows against the deployed released build. CI alone is not release sign-off.
 
 ---
 
+## 11y. Basketball release hardening and sign-off (BKE-6E)
+
+BKE-6E keeps the production Event tracker opt-in and device-default-off while consolidating release
+entry, capability, compatibility, PWA/offline, mixed-sport, responsive/accessibility, rollback, and
+owner-smoke evidence. The approved three-slice contract lives in
+[the BKE-6E plan](PLAN_BKE_6E_RELEASE_HARDENING.md).
+
+BKE-6E1 creates `REGRESSION_BKE_6E_RELEASE.md` as the operator record. BKE-6E2 records focused
+release-surface and rollback evidence, and BKE-6E3 repeats release-sensitive rows against the exact
+deployed candidate. CI and owner-only acceptance do not imply that unexecuted broader-role or
+second-device rows passed.
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.
