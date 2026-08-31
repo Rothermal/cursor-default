@@ -1331,10 +1331,11 @@ entry, capability, compatibility, PWA/offline, mixed-sport, responsive/accessibi
 owner-smoke evidence. The approved three-slice contract lives in
 [the BKE-6E plan](PLAN_BKE_6E_RELEASE_HARDENING.md).
 
-BKE-6E1 creates `REGRESSION_BKE_6E_RELEASE.md` as the operator record. BKE-6E2 records focused
-release-surface and rollback evidence, and BKE-6E3 repeats release-sensitive rows against the exact
-deployed candidate. CI and owner-only acceptance do not imply that unexecuted broader-role or
-second-device rows passed.
+BKE-6E1 implements the audited release-policy consumer allowlist and creates
+[the BKE-6E release matrix](REGRESSION_BKE_6E_RELEASE.md) as the operator record. BKE-6E2 records
+focused release-surface and rollback evidence, and BKE-6E3 repeats release-sensitive rows against
+the exact deployed candidate. CI and owner-only acceptance do not imply that unexecuted
+broader-role or second-device rows passed.
 
 ---
 

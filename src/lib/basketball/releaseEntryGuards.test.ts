@@ -1,10 +1,25 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PWA_MAX_PRECACHE_ASSET_BYTES } from '../pwaBuildPolicy'
 
 const source = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n')
+
+function implementationSourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const path = resolve(directory, entry.name)
+    if (entry.isDirectory()) return implementationSourceFiles(path)
+    if (!entry.isFile() || !/\.tsx?$/.test(entry.name) || entry.name.includes('.test.')) return []
+    return [relative(process.cwd(), path).replace(/\\/g, '/')]
+  })
+}
+
+function implementationConsumers(symbol: string): string[] {
+  return implementationSourceFiles(resolve(process.cwd(), 'src'))
+    .filter(path => path !== 'src/lib/sportAvailability.ts' && source(path).includes(symbol))
+    .sort()
+}
 
 function between(value: string, start: string, end: string): string {
   const startIndex = value.indexOf(start)
@@ -203,6 +218,23 @@ describe('Basketball release entry guards', () => {
     expect(policy).toContain('export function getBasketballEventCreationPolicy(')
     expect(wholeSportPolicy).not.toContain('Basketball')
     expect(wholeSportPolicy).not.toContain('releaseStage?:')
+  })
+
+  it('keeps every release-policy consumer on an audited allowlist', () => {
+    expect(implementationConsumers('getBasketballEventCreationPolicy')).toEqual([
+      'src/components/settings/BasketballSettings.tsx',
+      'src/context/GameContext.tsx',
+      'src/pages/GameSetup.tsx',
+    ])
+    expect(implementationConsumers('getSportAvailabilityPolicy')).toEqual([
+      'src/pages/Admin.tsx',
+      'src/pages/GameSetup.tsx',
+      'src/pages/SoccerGameSetup.tsx',
+      'src/pages/SportDashboard.tsx',
+      'src/pages/SportSelect.tsx',
+      'src/pages/TeamInfo.tsx',
+      'src/pages/Teams.tsx',
+    ])
   })
 
   it('rechecks Event creation before capability, parking, tournament, or commit mutation', () => {
