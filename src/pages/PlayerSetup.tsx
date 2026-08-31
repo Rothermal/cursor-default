@@ -12,7 +12,6 @@ import {
 } from '../lib/teamPlayers'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
-  getBasketballAnchoredSetupPolicy,
   hasStartedBasketballEventGame,
   isBasketballMatchRulesV2,
   isBasketballMatchRulesV3,
@@ -342,15 +341,6 @@ export default function PlayerSetup() {
       ReturnType<typeof basketballVersion3StartSetupFromDraft>
     > | undefined
     if (isBasketballMatchRulesV3(draft.event.reviewedRules)) {
-      const policy = getBasketballAnchoredSetupPolicy({
-        rules: draft.event.reviewedRules,
-        cloudIntent: draft.event.cloudIntent,
-        cloudGameId: state.cloudSync.gameId,
-      })
-      if (policy.applicable && !policy.allowed) {
-        setRosterError(policy.message)
-        return
-      }
       preparedDraft = reconcileBasketballSetupTrackedRoster(
         draft,
         individualPlayers.map(player => ({

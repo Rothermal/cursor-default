@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
@@ -105,6 +105,8 @@ export default function Games() {
     parkingError,
   } = useGame()
   const userId = user?.id ?? null
+  const currentUserIdRef = useRef(userId)
+  currentUserIdRef.current = userId
   const supabaseClient = supabase
   const requestedSportId = searchParams.get('sport')
   const scopedSport = useMemo(
@@ -519,6 +521,11 @@ export default function Games() {
           setLoadingGameId(null)
           return
         }
+        if (currentUserIdRef.current !== userId) {
+          setError('The signed-in account changed. Open the Basketball game again.')
+          setLoadingGameId(null)
+          return
+        }
         const hasActiveGame = Boolean(
           state.sport && (state.gameInfo || state.players.length > 0)
         )
@@ -556,6 +563,10 @@ export default function Games() {
             setError(err instanceof Error ? err.message : 'Could not start recorder stream')
             return null
           })
+          if (currentUserIdRef.current !== userId) {
+            setError('The signed-in account changed. Open the Basketball game again.')
+            basketballGame = null
+          }
         }
         if (!basketballGame) {
           setLoadingGameId(null)

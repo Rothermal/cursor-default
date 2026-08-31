@@ -27,6 +27,10 @@ const readyCapabilities = {
     settingsContractVersion: 1 as const,
   },
 }
+const readyClockLineupCapabilities = {
+  status: 'ready' as const,
+  capabilities: { clockAndLineupsVersion: 1 as const },
+}
 
 function localOnlyState(sourceTeam = false, anchored = false): GameState {
   const base = createInitialState()
@@ -123,6 +127,7 @@ function dependencies(
       error: null,
     })),
     loadCapabilities: vi.fn(async () => readyCapabilities),
+    loadClockLineupCapabilities: vi.fn(async () => readyClockLineupCapabilities),
     loadTeamRole: vi.fn(async () => 'scorer' as const),
     sync: vi.fn(async input => {
       await input.validateBinding?.('cloud-game-1')
@@ -170,19 +175,20 @@ describe('Basketball local-only cloud enable', () => {
     expect(canOfferBasketballEventCloudEnable(malformed, 'user-1')).toBe(false)
   })
 
-  it('blocks anchored games at both offer and command layers until BKE-6D', async () => {
+  it('enables anchored games only after both capability contracts pass', async () => {
     const state = localOnlyState(false, true)
     const deps = dependencies()
 
-    expect(canOfferBasketballEventCloudEnable(state, 'user-1')).toBe(false)
+    expect(canOfferBasketballEventCloudEnable(state, 'user-1')).toBe(true)
     await expect(enableBasketballEventCloud({
       state,
       userId: 'user-1',
       localGameId: 'local-1',
-    }, deps)).rejects.toThrow('BKE-6D')
-    expect(deps.loadAppAccess).not.toHaveBeenCalled()
-    expect(deps.loadCapabilities).not.toHaveBeenCalled()
-    expect(deps.sync).not.toHaveBeenCalled()
+    }, deps)).resolves.toMatchObject({ cloudGameId: 'cloud-game-1' })
+    expect(deps.loadAppAccess).toHaveBeenCalledOnce()
+    expect(deps.loadCapabilities).toHaveBeenCalledWith('user-1')
+    expect(deps.loadClockLineupCapabilities).toHaveBeenCalledWith('user-1')
+    expect(deps.sync).toHaveBeenCalledOnce()
   })
 
   it('fresh-checks access and capability before returning a confirmed automatic binding', async () => {
@@ -200,6 +206,7 @@ describe('Basketball local-only cloud enable', () => {
 
     expect(deps.loadAppAccess).toHaveBeenCalledOnce()
     expect(deps.loadCapabilities).toHaveBeenCalledWith('user-1')
+    expect(deps.loadClockLineupCapabilities).not.toHaveBeenCalled()
     expect(deps.loadTeamRole).not.toHaveBeenCalled()
     expect(assertCurrent).toHaveBeenCalledOnce()
     expect(validateBinding).toHaveBeenCalledWith('cloud-game-1')
@@ -273,6 +280,21 @@ describe('Basketball local-only cloud enable', () => {
       userId: 'user-1',
       localGameId: 'local-1',
     }, deps)).rejects.toThrow('could not be checked while offline')
+    expect(deps.sync).not.toHaveBeenCalled()
+  })
+
+  it('fails anchored enable before transport when the clock contract is unavailable', async () => {
+    const deps = dependencies({
+      loadClockLineupCapabilities: vi.fn(async () => ({
+        status: 'backend_update_required' as const,
+        error: 'Basketball clocks require the latest backend update.',
+      })),
+    })
+    await expect(enableBasketballEventCloud({
+      state: localOnlyState(false, true),
+      userId: 'user-1',
+      localGameId: 'local-1',
+    }, deps)).rejects.toThrow('latest backend update')
     expect(deps.sync).not.toHaveBeenCalled()
   })
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import ResultBadge from '../components/team-info/ResultBadge'
 import BasketballFinalizationPanel from '../components/basketball/BasketballFinalizationPanel'
@@ -173,6 +173,8 @@ export default function GameInfo() {
   const fallbackTeamId = searchParams.get('teamId')
   const { user, isConfigured } = useAuth()
   const userId = user?.id ?? null
+  const currentUserIdRef = useRef(userId)
+  currentUserIdRef.current = userId
   const {
     state,
     dispatch,
@@ -483,6 +485,11 @@ export default function GameInfo() {
         setOpeningGame(false)
         return
       }
+      if (currentUserIdRef.current !== user.id) {
+        setError('The signed-in account changed. Open the Basketball game again.')
+        setOpeningGame(false)
+        return
+      }
 
       const hasActiveGame = Boolean(state.sport && (state.gameInfo || state.players.length > 0))
       if (source.kind === 'local') {
@@ -516,6 +523,10 @@ export default function GameInfo() {
           setError(caught instanceof Error ? caught.message : 'Could not start recorder stream')
           return null
         })
+        if (currentUserIdRef.current !== user.id) {
+          setError('The signed-in account changed. Open the Basketball game again.')
+          basketballGame = null
+        }
       }
       if (!basketballGame) {
         setOpeningGame(false)

@@ -877,6 +877,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
               state: snapshot,
               userId: snapshotUserId!,
               localGameId: record.localGameId,
+              assertCurrent: () => {
+                if (prevUserIdRef.current !== snapshotUserId) {
+                  throw new Error('The signed-in account changed before Basketball cloud sync.')
+                }
+              },
             })
           : syncRoute === 'aggregate'
           ? await syncGameSnapshotToCloud({

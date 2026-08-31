@@ -18,14 +18,20 @@ describe('Basketball release entry guards', () => {
   it('preflights internal event-cloud continuation before game mutation', () => {
     const setup = source('src/pages/GameSetup.tsx')
     const handler = between(setup, 'const handleNext = async (', '\n  return (')
-    const capabilityIndex = handler.indexOf('await ensureBasketballReleaseCapabilities')
+    const releaseCapabilityIndex = handler.indexOf('await ensureBasketballReleaseCapabilities')
+    const clockCapabilityIndex = handler.indexOf('await ensureBasketballClockLineupCapabilities')
 
-    expect(capabilityIndex).toBeGreaterThanOrEqual(0)
-    expect(capabilityIndex).toBeLessThan(handler.indexOf('prepareActiveGameMutation'))
-    expect(capabilityIndex).toBeLessThan(handler.indexOf('startNewGame(sport)'))
-    expect(capabilityIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
-    expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_CLOUD_SYNC_STATE'"))
-    expect(capabilityIndex).toBeLessThan(handler.indexOf("type: 'SET_GAME_INFO'"))
+    expect(releaseCapabilityIndex).toBeGreaterThanOrEqual(0)
+    expect(clockCapabilityIndex).toBeGreaterThan(releaseCapabilityIndex)
+    for (const mutation of [
+      'prepareActiveGameMutation',
+      'startNewGame(sport)',
+      ".from('tournaments')",
+      "type: 'SET_CLOUD_SYNC_STATE'",
+      "type: 'SET_GAME_INFO'",
+    ]) {
+      expect(clockCapabilityIndex).toBeLessThan(handler.indexOf(mutation))
+    }
   })
 
   it('offers the complete capability recovery matrix without committing setup', () => {
@@ -44,17 +50,18 @@ describe('Basketball release entry guards', () => {
     expect(recovery).toContain("setBasketballCloudIntent('local_only')")
   })
 
-  it('can return a local-only team draft to automatic without resetting rule overrides', () => {
+  it('can return a local-only draft to automatic without resetting rule overrides', () => {
     const setup = source('src/pages/GameSetup.tsx')
     const policyControl = between(
       setup,
       'aria-label="Basketball cloud policy"',
-      '\n                  {anchoredBasketballSetup'
+      '\n                  </div>\n                </div>'
     )
 
     expect(policyControl).toContain('Automatic Cloud')
     expect(policyControl).toContain("setBasketballCloudIntent('automatic')")
     expect(policyControl).not.toContain('setBasketballMatchOverrides')
+    expect(policyControl).not.toContain('disabled={anchoredBasketballSetup}')
   })
 
   it('keeps Basketball Team Info entry mutation-free until setup Continue', () => {
@@ -207,6 +214,7 @@ describe('Basketball release entry guards', () => {
 
     expect(guardIndex).toBeGreaterThanOrEqual(0)
     expect(guardIndex).toBeLessThan(handler.indexOf('await ensureBasketballReleaseCapabilities'))
+    expect(guardIndex).toBeLessThan(handler.indexOf('await ensureBasketballClockLineupCapabilities'))
     expect(guardIndex).toBeLessThan(handler.indexOf('prepareActiveGameMutation'))
     expect(guardIndex).toBeLessThan(handler.indexOf(".from('tournaments')"))
     expect(guardIndex).toBeLessThan(handler.indexOf('commitGameSetup('))
@@ -232,9 +240,25 @@ describe('Basketball release entry guards', () => {
   it('clears Basketball capability success when the auth account changes', () => {
     const auth = source('src/context/AuthContext.tsx')
     expect(auth).toContain('clearBasketballReleaseCapabilityCache()')
+    expect(auth).toContain('clearBasketballClockLineupCapabilityCache()')
     expect(auth).toContain('capabilityUserId.current !== nextUserId')
     const signOut = between(auth, 'const signOut = useCallback(async () => {', '\n  return (')
     expect(signOut).toContain('clearBasketballReleaseCapabilityCache()')
+    expect(signOut).toContain('clearBasketballClockLineupCapabilityCache()')
+  })
+
+  it('rejects stale-account Basketball cloud adoption before local hydration', () => {
+    const gameInfo = source('src/pages/GameInfo.tsx')
+    const games = source('src/pages/Games.tsx')
+
+    expect(gameInfo).toContain('currentUserIdRef.current !== user.id')
+    expect(gameInfo.indexOf('currentUserIdRef.current !== user.id')).toBeLessThan(
+      gameInfo.indexOf('openGameSnapshot(basketballGame)')
+    )
+    expect(games).toContain('currentUserIdRef.current !== userId')
+    expect(games.indexOf('currentUserIdRef.current !== userId')).toBeLessThan(
+      games.indexOf('openGameSnapshot(basketballGame)')
+    )
   })
 
   it('commits later cloud enablement only after the guarded transport succeeds', () => {
@@ -263,6 +287,7 @@ describe('Basketball release entry guards', () => {
 
   it('keeps one anchored clock strip mounted above both Basketball workspaces', () => {
     const tracker = source('src/pages/GameTracker.tsx')
+    const teamRoleHook = source('src/hooks/useTeamRole.ts')
     const clockStrip = source('src/components/basketball/BasketballClockStrip.tsx')
     const lineupSheet = source('src/components/basketball/BasketballLineupSheet.tsx')
     const boundaryReview = source('src/components/basketball/BasketballBoundaryReviewDialog.tsx')
@@ -299,6 +324,12 @@ describe('Basketball release entry guards', () => {
     expect(lineupSheet).toContain('role="dialog"')
     expect(lineupSheet).toContain("event.key === 'Escape'")
     expect(clockStrip).not.toContain('lazy(() => import(')
+    expect(tracker).toContain('basketballEqualPlayAuthorityTeamId(state)')
+    expect(tracker).toContain('useTeamRole(\n    equalPlayAuthorityTeamId === state.cloudSync.teamId')
+    expect(tracker).toContain(
+      'canAuthorizeBasketballEqualPlayOverride(state, equalPlayAccess)'
+    )
+    expect(teamRoleHook).toContain('}, [isConfigured, teamId, userId])')
     expect(boundaryReview).not.toContain('fallback={null}')
     expect(eventDetail).toContain('participantLabel(change.participantId)')
     expect(eventDetail).not.toContain('`${change.participantId}:')

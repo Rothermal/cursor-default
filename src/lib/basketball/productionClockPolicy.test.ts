@@ -1,49 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../types'
 import { createInitialState } from '../gameReducer'
-import { getBasketballRulesProfile, upgradeBasketballRulesDraftToV3 } from './profiles'
 import {
   basketballWorkflowActionKind,
-  getBasketballAnchoredSetupPolicy,
   isRunningAnchoredBasketballGame,
   shouldInterceptRunningBasketballClock,
 } from './productionClockPolicy'
 
 describe('BKE-6B1 production clock policy', () => {
-  const v2 = getBasketballRulesProfile('nfhs', 1)!.rules
-  const anchored = upgradeBasketballRulesDraftToV3(v2, 'nfhs')
-
-  it('distinguishes clockless setup from anchored allow and block decisions', () => {
-    expect(getBasketballAnchoredSetupPolicy({
-      rules: anchored,
-      cloudIntent: 'local_only',
-    })).toEqual({ applicable: true, allowed: true })
-    expect(getBasketballAnchoredSetupPolicy({
-      rules: v2,
-      cloudIntent: 'local_only',
-    })).toEqual({ applicable: false })
-    expect(getBasketballAnchoredSetupPolicy({
-      rules: upgradeBasketballRulesDraftToV3(
-        getBasketballRulesProfile('youth_equal_play', 1)!.rules,
-        'youth_equal_play'
-      ),
-      cloudIntent: 'local_only',
-    })).toMatchObject({
-      applicable: true,
-      allowed: false,
-      reason: 'equal_play_requires_bke_6c',
-    })
-    expect(getBasketballAnchoredSetupPolicy({
-      rules: anchored,
-      cloudIntent: 'automatic',
-    })).toMatchObject({ applicable: true, allowed: false, reason: 'cloud_requires_bke_6d' })
-    expect(getBasketballAnchoredSetupPolicy({
-      rules: anchored,
-      cloudIntent: 'local_only',
-      cloudGameId: 'game-1',
-    })).toMatchObject({ applicable: true, allowed: false, reason: 'cloud_requires_bke_6d' })
-  })
-
   it('classifies only parking and replacement commits as mutating actions', () => {
     expect(basketballWorkflowActionKind('setup_visit')).toBe('mutation_free')
     expect(basketballWorkflowActionKind('setup_edit')).toBe('mutation_free')

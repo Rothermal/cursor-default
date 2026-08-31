@@ -1,55 +1,5 @@
 import type { GameState } from '../../types'
 import { pauseBasketballClock } from './clockCommands'
-import { isBasketballMatchRulesV3 } from './rules'
-import type {
-  BasketballMatchRulesV2,
-  BasketballMatchRulesV3,
-} from './types'
-
-export type BasketballAnchoredSetupBlockReason =
-  | 'equal_play_requires_bke_6c'
-  | 'cloud_requires_bke_6d'
-
-export type BasketballAnchoredSetupPolicy =
-  | { applicable: false }
-  | { applicable: true; allowed: true }
-  | {
-      applicable: true
-      allowed: false
-      reason: BasketballAnchoredSetupBlockReason
-      message: string
-    }
-
-export function getBasketballAnchoredSetupPolicy({
-  rules,
-  cloudIntent,
-  cloudGameId = null,
-}: {
-  rules: BasketballMatchRulesV2 | BasketballMatchRulesV3
-  cloudIntent: 'automatic' | 'local_only'
-  cloudGameId?: string | null
-}): BasketballAnchoredSetupPolicy {
-  if (!isBasketballMatchRulesV3(rules) || rules.clockModel !== 'anchored') {
-    return { applicable: false }
-  }
-  if (rules.equalPlayPolicy.mode !== 'off') {
-    return {
-      applicable: true,
-      allowed: false,
-      reason: 'equal_play_requires_bke_6c',
-      message: 'Advisory and enforced equal play require the upcoming lineup workflow.',
-    }
-  }
-  if (cloudIntent !== 'local_only' || cloudGameId) {
-    return {
-      applicable: true,
-      allowed: false,
-      reason: 'cloud_requires_bke_6d',
-      message: 'Anchored Basketball cloud games require the upcoming cloud workflow.',
-    }
-  }
-  return { applicable: true, allowed: true }
-}
 
 export function isRunningAnchoredBasketballGame(state: GameState): boolean {
   return state.sport?.id === 'basketball' &&
