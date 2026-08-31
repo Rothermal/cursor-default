@@ -72,6 +72,10 @@ pnpm build
 The source-consumer allowlist fails when a new use of `getBasketballEventCreationPolicy` or
 `getSportAvailabilityPolicy` appears without review.
 
+This inventory intentionally follows direct symbol consumers. Do not alias, re-export, or wrap
+either policy helper; introducing an adapter requires a new audited boundary and an explicit
+inventory update rather than allowlisting only the adapter.
+
 | Surface | Policy responsibility | BKE-6E1 disposition |
 |---|---|---|
 | Sport Select | Generic sport discovery only; parked counts remain sport-scoped | Audited and allowlisted |
@@ -99,10 +103,20 @@ The source-consumer allowlist fails when a new use of `getBasketballEventCreatio
 | Device default | Event tracker off unchanged |
 | Migration ceiling | `064`; no migration added |
 | Focused release tests | Pass; 7 files, 67 tests |
-| Lint | Pass; 0 errors, 6 Fast Refresh warnings (3 current tree plus 3 duplicates from the linked `.worktrees` checkout) |
+| Lint | Pass; 0 errors, 3 Fast Refresh warnings in the candidate tree; repository-local worktrees and generated checkout directories are excluded |
 | Full tests | Pass; 180 files, 1,287 tests |
 | Production build | Pass; PWA generated with 12 precache entries (2,198.70 KiB) |
-| CI | Pending PR |
+| CI | Pass on PR #350 |
+
+Focused release validation used:
+
+```text
+pnpm exec vitest run src/lib/basketball/releaseEntryGuards.test.ts src/lib/basketball/releasePolicy.test.ts src/lib/sportAvailability.test.ts src/lib/basketball/releaseCapabilities.test.ts src/lib/basketball/clockLineupCapabilities.test.ts src/lib/basketball/cloudAuthorization.test.ts src/lib/basketball/migration064.test.ts
+```
+
+The BKE-6E1 compatibility scope was resolved by mapping existing automated parity contracts into
+F02 and F05 and retaining explicit manual rows F01, F03, and F04. No new parity behavior is claimed
+for an unexecuted manual row.
 
 ## Operator Metadata
 
@@ -220,7 +234,7 @@ history or revoke grants used by existing games.
 | I03 | Disable the device preference | New Event creation stops immediately on that device; existing Event and Legacy records remain available | E3 owner smoke | Not run |
 | I04 | Change the client stage to `internal`, build, deploy, and refresh/close-reopen an online PWA | New Event creation stops after bundle propagation; no server objects or existing records are changed | E2 hardening | Not run |
 | I05 | Repeat I04 with an offline/stale PWA | Old policy persists visibly until the new bundle loads; no claim of immediate remote shutdown is made | E2 hardening | Not run |
-| I06 | Run lint, full tests, production build, and CI on the exact candidate | All automated gates pass; existing warnings are recorded separately | Automated | Local lint/tests/build pass; CI pending PR |
+| I06 | Run lint, full tests, production build, and CI on the exact candidate | All automated gates pass; existing warnings are recorded separately | Automated | Local lint/tests/build pass; PR #350 CI pass |
 
 ## Go/No-Go
 
