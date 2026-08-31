@@ -18,6 +18,7 @@ export type BasketballWorkflowAction =
   | 'setup_replace_commit'
   | 'new_game_commit'
   | 'resume_commit'
+  | 'reload_commit'
 
 export function basketballWorkflowActionKind(
   action: BasketballWorkflowAction
@@ -33,6 +34,7 @@ export function basketballWorkflowActionKind(
     case 'setup_replace_commit':
     case 'new_game_commit':
     case 'resume_commit':
+    case 'reload_commit':
       return 'park_or_replace'
   }
 }

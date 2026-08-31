@@ -1,7 +1,7 @@
 # Plan: BKE-6E Release Hardening and Sign-off
 
-Status: BKE-6E1 release audit, consumer allowlist, compatibility evidence map, and consolidated
-operator matrix are implemented with no migration or runtime change. BKE-6E2 is next.
+Status: BKE-6E1 release audit and BKE-6E2 release-surface hardening are implemented. The
+consolidated matrix keeps exact deployed browser/PWA evidence pending for BKE-6E3, which is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -129,6 +129,12 @@ Exit condition:
 - no release-stage, permission, migration, or product-behavior change is hidden in the audit.
 
 ### BKE-6E2: Release-Surface Hardening and Rollback Rehearsal
+
+Status: Implemented. Deployed builds expose the exact GitHub SHA, PWA updates require an explicit
+reload choice and prepare a running anchored clock first, and critical compact/focus/safe-area/
+reduced-motion contracts are pinned in automation. The consolidated matrix contains repeatable
+viewport, keyboard, installed-PWA, recovery, and rollback procedures; exact deployed results remain
+honestly pending for BKE-6E3.
 
 Scope:
 

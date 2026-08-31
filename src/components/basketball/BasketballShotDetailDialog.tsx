@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { CircleAlert, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import type { BasketballShotDetailModel } from '../../lib/basketball/timeline'
+import { useModalFocus } from '../../hooks/useModalFocus'
 
 interface BasketballShotDetailDialogProps {
   detail: BasketballShotDetailModel
@@ -19,19 +20,15 @@ export default function BasketballShotDetailDialog({
   onRestore,
   showCaptureSequence = false,
 }: BasketballShotDetailDialogProps) {
+  const dialogRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    closeRef.current?.focus()
-  }, [])
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  useModalFocus({
+    enabled: true,
+    dialogRef,
+    initialFocusRef: closeRef,
+    onClose,
+  })
 
   return (
     <div
@@ -39,9 +36,11 @@ export default function BasketballShotDetailDialog({
       onClick={onClose}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-shot-detail-title"
+        tabIndex={-1}
         className="flex h-full w-full flex-col bg-white shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-slate-200"
         onClick={event => event.stopPropagation()}
       >

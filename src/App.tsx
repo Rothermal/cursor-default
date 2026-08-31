@@ -39,6 +39,7 @@ import SoccerSummary from './pages/SoccerSummary'
 import { isSoccerSummaryRoute } from './lib/soccer/summary'
 import BasketballSummary from './pages/BasketballSummary'
 import { isBasketballSummaryRoute } from './lib/basketball/summary'
+import PwaStatus from './components/PwaStatus'
 
 function GameSetupRoute() {
   const { state } = useGame()
@@ -153,6 +154,7 @@ function AppRoutes() {
   return (
     <SettingsProvider>
       <GameProvider>
+        <PwaStatus />
         <AppShell>
           <Routes>
             <Route path="/" element={<SportSelect />} />

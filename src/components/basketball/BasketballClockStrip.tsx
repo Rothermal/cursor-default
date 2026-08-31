@@ -371,7 +371,7 @@ export default function BasketballClockStrip({
 
   return (
     <>
-      <section className="sticky top-0 z-30 border-y border-slate-300 bg-white/95 shadow-sm backdrop-blur" aria-label="Basketball game clock">
+      <section className="sticky top-0 z-30 border-y border-slate-300 bg-white/95 shadow-sm backdrop-blur safe-top" aria-label="Basketball game clock">
         <div className="mx-auto w-full max-w-lg px-3 py-2">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
@@ -413,13 +413,13 @@ export default function BasketballClockStrip({
           </div>
         )}
 
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          <button type="button" className="btn-secondary min-h-10 text-xs" onClick={openSetClock}>
+        <div className="mt-2 grid grid-cols-3 gap-1.5 sm:gap-2">
+          <button type="button" className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-slate-200 px-1.5 py-2 text-xs font-semibold text-slate-700" onClick={openSetClock}>
             <Settings2 size={15} aria-hidden /> Set Clock
           </button>
           <button
             type="button"
-            className="btn-secondary min-h-10 text-xs"
+            className="min-h-10 min-w-0 rounded-md bg-slate-200 px-1.5 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40"
             disabled={!clock.running || Boolean(unsafeMessage)}
             onClick={() => { setShowStoppage(value => !value); setShowSetClock(false) }}
           >
@@ -428,7 +428,7 @@ export default function BasketballClockStrip({
           <button
             ref={lineupButtonRef}
             type="button"
-            className="btn-secondary flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 text-xs"
+            className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-slate-200 px-1.5 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40"
             disabled={Boolean(lineupDisabledReason)}
             title={lineupDisabledReason ?? undefined}
             aria-label={lineupDisabledReason ? `Lineup unavailable. ${lineupDisabledReason}` : 'Lineup'}

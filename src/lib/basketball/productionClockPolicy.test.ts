@@ -13,6 +13,7 @@ describe('BKE-6B1 production clock policy', () => {
     expect(basketballWorkflowActionKind('setup_edit')).toBe('mutation_free')
     expect(basketballWorkflowActionKind('route_navigation')).toBe('mutation_free')
     expect(basketballWorkflowActionKind('park_commit')).toBe('park_or_replace')
+    expect(basketballWorkflowActionKind('reload_commit')).toBe('park_or_replace')
     expect(basketballWorkflowActionKind('resume_commit')).toBe('park_or_replace')
   })
 
@@ -20,6 +21,7 @@ describe('BKE-6B1 production clock policy', () => {
     const state = runningState()
     expect(isRunningAnchoredBasketballGame(state)).toBe(true)
     expect(shouldInterceptRunningBasketballClock(state, 'park_commit')).toBe(true)
+    expect(shouldInterceptRunningBasketballClock(state, 'reload_commit')).toBe(true)
     expect(shouldInterceptRunningBasketballClock(state, 'setup_visit')).toBe(false)
     expect(shouldInterceptRunningBasketballClock({
       ...state,

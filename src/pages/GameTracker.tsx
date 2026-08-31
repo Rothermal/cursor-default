@@ -1702,7 +1702,7 @@ export default function GameTracker() {
         <BasketballTimeline />
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 px-4 py-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 px-4 py-3 safe-bottom">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="min-w-0 pr-3 text-xs text-slate-400">
             {(isBasketballEventMode ? eventLastActionLabel : lastActionLabel) && (

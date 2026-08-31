@@ -14,6 +14,11 @@
   input, select, textarea {
     @apply outline-none;
   }
+
+  :focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
@@ -36,6 +41,29 @@
     animation: shot-marker-pulse 0.55s ease-out 1;
     transform-box: fill-box;
     transform-origin: center;
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    .shot-marker-pulse {
+      animation: none !important;
+    }
   }
 }
 
