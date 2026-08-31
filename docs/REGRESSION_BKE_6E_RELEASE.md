@@ -1,7 +1,7 @@
 # BKE-6E Basketball Release Regression Matrix
 
-Status: BKE-6E1 release audit and automated contract inventory implemented. BKE-6E2 manual
-release-surface hardening and BKE-6E3 exact-candidate owner smoke remain pending.
+Status: BKE-6E1 release audit and BKE-6E2 release-surface hardening are implemented. The exact
+BKE-6E2 merge candidate is deployed; BKE-6E3 owner smoke and final sign-off are in progress.
 
 Plan: [PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md)
 
@@ -183,6 +183,90 @@ unavailable rather than failing capture.
 5. To resume the owner preview, restore `opt_in` in a new reviewed commit and repeat the same exact-
    build verification. Never edit or reverse migrations 061 through 064 for client rollback.
 
+## BKE-6E3 Owner Smoke Run Sheet
+
+This is the minimum exact-candidate path for the initial owner-only, default-off rollout. It does
+not replace the rows marked **Broader gate**. Record private evidence outside the repository and
+enter only the disposition and non-sensitive notes here.
+
+### Candidate
+
+| Field | Value |
+|---|---|
+| Merge commit | `cc0a41237dd8d46478069aa7afeaa45fd50f7f10` |
+| Expected displayed build | `cc0a41237dd8` |
+| Pages deployment | Run `33419187582`; completed successfully on 2026-08-31 |
+| Production URL | `https://rothermal.github.io/cursor-default/` |
+| Production policy | `opt_in`; device preference default-off |
+| Required migration ceiling | `064` |
+
+Before gameplay, confirm the running app displays `cc0a41237dd8`. In Supabase, confirm migration
+`064` is the highest applied migration. Starting a cloud-backed anchored setup while signed in and
+active must pass the exact release contract v2 and clock/lineup version 1 handshakes before any
+local slot is created; an actionable capability failure is a failed run, not permission to continue.
+
+### Run 1: Entry and local authority
+
+1. With the Event preference off, confirm Basketball remains available and Legacy remains an
+   option. Enable the preference and enter Basketball setup from the Sport Dashboard.
+2. Choose Event and explicit local-only authority, review version-3 rules, assign five tracked
+   starters plus Bench/DNP, and start. Period 1 must open paused at canonical elapsed `0:00` with
+   no cloud binding; count-up displays `0:00`, while count-down displays the configured duration.
+3. Exercise Start/Pause, one stoppage, Set Clock, a shot, free throw, foul, timeout, turnover,
+   substitution/role change, and one Timeline remove/restore. End a period and open the next.
+4. While running, cancel one park attempt and accept the next. Cancel must change nothing; accept
+   must append and persist Pause before parking. Resume and complete the game, then review all
+   Summary tabs.
+
+Covers: A02-A04, C01-C06, E02, G01-G02, H01-H05, I01.
+
+### Run 2: Cloud lifecycle
+
+1. Start a new Event game with Personal cloud or an existing team while online. Confirm capability
+   recovery does not create or replace a local game before Continue succeeds.
+2. Assign the opening lineup, start, record several event families, sync, reload, and resume the
+   matching binding. Confirm the same source and clock/lineup authority return.
+3. End the game, checkpoint/finalize, and inspect canonical Summary plus one aggregate destination.
+   Use **Correct records**, reopen with a reason, make one correction, end again, and explicitly
+   republish. Confirm publication history remains visible.
+
+Covers: B04, D01-D02, E01-E03, F03, I02.
+
+### Run 3: Compatibility and gating
+
+1. Turn the Event preference off. Confirm new Event creation is unavailable while the completed
+   Event games from Runs 1-2 remain reachable.
+2. Open one Legacy or clockless Basketball record and verify its established tracking/review path.
+3. Park Basketball, open or resume an existing Soccer game, then return to Basketball. Confirm no
+   court/field, event stream, parked id, or transport crossover.
+
+Covers: F01, F03-F04, I03.
+
+### Run 4: Installed PWA and offline recovery
+
+1. At a supported phone/PWA size, repeat a short local-only clock/capture/correction path online,
+   then offline. Dismiss the offline notice and confirm it stays dismissed without covering Undo;
+   reconnect and confirm a later offline transition announces again.
+2. Park/reload offline, reopen the same local authority, reconnect, and confirm cloud actions never
+   claimed success while disconnected.
+3. If another build is available, exercise **Later**, cancel one running-clock **Update now**, then
+   accept it. The displayed build changes only after activation and the accepted running-clock path
+   persists Pause before reload. Otherwise mark only this update-activation substep `Not run`.
+
+Covers: G01-G03, H01-H05, I01, I04-I05. Release-stage rollback remains a separate broader gate
+unless it is deliberately rehearsed with reviewed `internal` and restored `opt_in` deployments.
+
+### Owner result
+
+| Run | Result | Non-sensitive evidence/notes |
+|---|---|---|
+| Exact candidate and migration/capabilities | Pass | Owner confirmed displayed build `cc0a41237dd8` in a desktop browser; release, clock/lineup, and migration-064 entry-point checks all returned `true`. Authenticated capability responses remain covered by Run 2. |
+| Run 1: Entry and local authority | Blocked | Core setup/capture/correction and running-clock pause safety passed. Replacement setup continuity failed in [issue #352](https://github.com/Rothermal/cursor-default/issues/352). Completion reached Summary, which reported unresolved tracked-lineup boundary authority; diagnostic [issue #353](https://github.com/Rothermal/cursor-default/issues/353). Both investigations are intentionally deferred. |
+| Run 2: Cloud lifecycle | Pending | Owner account and deployed Supabase required |
+| Run 3: Compatibility and gating | Pending | Existing Legacy/clockless and Soccer records required |
+| Run 4: Installed PWA and offline recovery | Pending | Installed/mobile browser required; update-activation substep may be `Not run` |
+| Owner-only release disposition | Pending | Broader rollout remains blocked independently |
+
 ## Operator Metadata
 
 Complete metadata separately for the BKE-6E2 hardening candidate and BKE-6E3 exact deployed
@@ -190,26 +274,26 @@ candidate.
 
 | Field | BKE-6E2 hardening | BKE-6E3 deployed owner smoke |
 |---|---|---|
-| Date/time | Not run | Not run |
-| Commit/deployment | Not run | Not run |
-| Running-app build identifier | Implemented; exact deployed value pending | Not run |
-| Supabase project | Not run | Not run |
-| Highest migration | Must be `064` | Must be `064` |
-| Browser/version | Not run | Not run |
-| Browser or installed PWA | Not run | Not run |
+| Date/time | Not run | 2026-08-31 |
+| Commit/deployment | Not run | `cc0a41237dd8d46478069aa7afeaa45fd50f7f10`; Pages run `33419187582` |
+| Running-app build identifier | Implemented; exact deployed value pending | Pass; displayed `cc0a41237dd8` |
+| Supabase project | Not run | Deployed project; identifier intentionally omitted |
+| Highest migration | Must be `064` | Migration-064 entry point present; ledger value not separately recorded |
+| Browser/version | Not run | Desktop browser; version not recorded |
+| Browser or installed PWA | Not run | Desktop browser |
 | Viewport/device | Not run | Not run |
 | Accounts used | Not run | Not run |
 | Team roles used | Not run | Not run |
-| Reviewer | Not run | Not run |
+| Reviewer | Not run | Owner |
 
 ## A. Policy and Entry
 
 | ID | Procedure | Expected | Class | Result/evidence |
 |---|---|---|---|---|
 | A01 | Exercise internal/opt-in, development/production, and preference off/on policy combinations | New Event creation follows the centralized stage and device preference; existing access is always true | Automated | `sportAvailability.test.ts` |
-| A02 | With preference off, inspect Sport Select, Sport Dashboard, Settings App/Sports, and Basketball Tracker settings | Basketball whole-sport navigation remains available when enabled; new Event choice is unavailable while Legacy remains usable | E2 hardening | Not run |
-| A03 | Enable the preference and enter setup from Sport Dashboard, Team Info, and a direct team/sport URL | Entry is mutation-free; setup owns authority choice and Continue owns the guarded commit | E3 owner smoke | Not run |
-| A04 | Cancel setup and capability recovery from each entry with another active game | Active id, parked ids, state, dirty flags, and setup draft follow their documented no-mutation behavior | E3 owner smoke | Not run |
+| A02 | With preference off, inspect Sport Select, Sport Dashboard, Settings App/Sports, and Basketball Tracker settings | Basketball whole-sport navigation remains available when enabled; new Event choice is unavailable while Legacy remains usable | E2 hardening | Pass for owner New Game path; Legacy remained available and Event followed the device preference. Other navigation surfaces remain broader matrix coverage. |
+| A03 | Enable the preference and enter setup from Sport Dashboard, Team Info, and a direct team/sport URL | Entry is mutation-free; setup owns authority choice and Continue owns the guarded commit | E3 owner smoke | Pass for owner Sport Dashboard path; local-only Event setup committed only after explicit choices. Team Info/direct-link variants remain broader matrix coverage. |
+| A04 | Cancel setup and capability recovery from each entry with another active game | Active id, parked ids, state, dirty flags, and setup draft follow their documented no-mutation behavior | E3 owner smoke | Pass for the owner running-game replacement cancellation path; Cancel preserved the active game and running clock. Other entries remain broader matrix coverage. |
 | A05 | Disable preference after committing a pre-start Event slot, then continue its exact draft | Exact matching pre-start continuation works; a new or mismatched Event draft fails closed | Automated | `releasePolicy.test.ts` |
 | A06 | Add a new implementation consumer of either release policy helper | Consumer allowlist fails until the entry is audited | Automated | `releaseEntryGuards.test.ts` |
 
@@ -231,12 +315,12 @@ history or revoke grants used by existing games.
 
 | ID | Procedure | Expected | Class | Result/evidence |
 |---|---|---|---|---|
-| C01 | Create a local-only rules-v3/setup-v2 game with five starters | Period 1 opens paused at zero with immutable rules/setup and no cloud binding | E3 owner smoke | Not run |
-| C02 | Start, pause with/without stoppage, Set Clock, expire, end period, and open the next period | Canonical elapsed time remains monotonic and periods open paused; expiration creates one authoritative Pause | E3 owner smoke | Not run |
-| C03 | Record shots, free throws, fouls, timeouts, turnovers, substitutions, roles, and late participants | One canonical command time and checked event transitions preserve projection | E3 owner smoke | Not run |
-| C04 | Exercise changed-five and equal-play-off/advisory/enforced boundaries | Review and reasoned override rules match the immutable profile and current lineup | E3 owner smoke | Not run |
-| C05 | Correct clock, lineup, gameplay, and administrative events through Timeline | Consequence preview, stale rejection, grouped remove/restore, and full reprojection stay coherent | E3 owner smoke | Not run |
-| C06 | Park or replace while the clock is running | Confirmed workflow appends Pause before storage mutation; Cancel changes nothing | E3 owner smoke | Not run |
+| C01 | Create a local-only rules-v3/setup-v2 game with five starters | Period 1 opens paused at canonical elapsed zero with immutable rules/setup and no cloud binding; display follows configured count direction | E3 owner smoke | Pass; owner confirmed paused opening, correct configured count-down duration/direction, and no setup error or cloud binding. |
+| C02 | Start, pause with/without stoppage, Set Clock, expire, end period, and open the next period | Canonical elapsed time remains monotonic and periods open paused; expiration creates one authoritative Pause | E3 owner smoke | Pass for Start/Pause/Set Clock and configured count-down continuation; expiration and period boundary pending. |
+| C03 | Record shots, free throws, fouls, timeouts, turnovers, substitutions, roles, and late participants | One canonical command time and checked event transitions preserve projection | E3 owner smoke | Pass for owner shot, turnover, foul/free-throw trip, timeout, paused substitution, and role path; late participant remains broader matrix coverage. |
+| C04 | Exercise changed-five and equal-play-off/advisory/enforced boundaries | Review and reasoned override rules match the immutable profile and current lineup | E3 owner smoke | Blocked; completed Summary reported `Tracked lineup requires boundary review`. It is not yet known whether a required review was skipped or failed to persist; [issue #353](https://github.com/Rothermal/cursor-default/issues/353). |
+| C05 | Correct clock, lineup, gameplay, and administrative events through Timeline | Consequence preview, stale rejection, grouped remove/restore, and full reprojection stay coherent | E3 owner smoke | Pass for owner made-shot remove/restore and score reprojection; exhaustive event-family correction remains automated/broader coverage. |
+| C06 | Park or replace while the clock is running | Confirmed workflow appends Pause before storage mutation; Cancel changes nothing | E3 owner smoke | Pass for clock safety: Cancel changed nothing and Accept paused/parked durably. The new replacement slot then lost setup continuity; [issue #352](https://github.com/Rothermal/cursor-default/issues/352). |
 
 ## D. Cloud Lifecycle, Roles, and Recorders
 
@@ -294,7 +378,7 @@ history or revoke grants used by existing games.
 
 | ID | Procedure | Expected | Class | Result/evidence |
 |---|---|---|---|---|
-| I01 | Inspect the running app after deployment | A concise displayed build/commit identifier matches the exact candidate | E2 hardening | SHA injection and display implemented; exact deployed match pending |
+| I01 | Inspect the running app after deployment | A concise displayed build/commit identifier matches the exact candidate | E2 hardening | Pass; owner confirmed displayed `cc0a41237dd8` matches deployed merge commit `cc0a41237dd8d46478069aa7afeaa45fd50f7f10` |
 | I02 | Confirm migrations and call both capability handshakes | Highest migration is 064; release contract v2 and clock/lineup version 1 are exact | E3 owner smoke | Not run |
 | I03 | Disable the device preference | New Event creation stops immediately on that device; existing Event and Legacy records remain available | E3 owner smoke | Not run |
 | I04 | Change the client stage to `internal`, build, deploy, then accept the online PWA update prompt or close every scoped client and reopen after activation | Displayed build changes and new Event creation stops after activation; refresh alone is not sufficient, and no server objects or existing records are changed | E2 hardening | Repeatable rollback procedure prepared; deployed rehearsal pending |
