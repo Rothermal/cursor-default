@@ -313,7 +313,7 @@ describe('Basketball finalization repository', () => {
       complete: false,
       diagnostics: [{
         code: 'validation_failed',
-        message: 'Corrupt fixture event.',
+        message: 'Basketball clock adjustment is stale.',
         eventId: null,
       }],
     }
@@ -323,7 +323,7 @@ describe('Basketball finalization repository', () => {
       }
       if (name === 'get_basketball_anchored_finalization_readiness_v1') {
         return Promise.resolve({
-          data: [{ applicable: true, blocker_codes: ['source_invalid'] }],
+          data: [{ applicable: true, blocker_codes: [] }],
           error: null,
         })
       }
@@ -339,6 +339,32 @@ describe('Basketball finalization repository', () => {
         score: null,
         blockers: [{ code: 'source_invalid' }],
       })
+  })
+
+  it('keeps shared client-only blocker disagreements strict', async () => {
+    const source = anchoredRecorderProjection()
+    if (source.state.sportGameState?.sportId !== 'basketball') {
+      throw new Error('Anchored fixture projection is unavailable.')
+    }
+    source.state.sportGameState.projection.status = 'in_progress'
+    source.state.sportGameState.projection.endReason = null
+    cloudMock.rpc.mockImplementation((name: string) => {
+      if (name === 'get_basketball_finalization_readiness') {
+        return Promise.resolve({ data: [readinessRow()], error: null })
+      }
+      if (name === 'get_basketball_anchored_finalization_readiness_v1') {
+        return Promise.resolve({
+          data: [{ applicable: true, blocker_codes: [] }],
+          error: null,
+        })
+      }
+      throw new Error(`Unexpected RPC: ${name}`)
+    })
+    recorderMock.loadRecorders.mockResolvedValue([recorder])
+    recorderMock.loadProjection.mockResolvedValue(source)
+
+    await expect(prepareBasketballFinalization('game-1', { userId: 'manager-1' }))
+      .rejects.toThrow('Client and server Basketball readiness do not agree')
   })
 
   it('strictly parses authoritative readiness', async () => {

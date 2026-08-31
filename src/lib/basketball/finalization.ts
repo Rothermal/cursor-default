@@ -827,7 +827,9 @@ function mergeAnchoredFinalizationBlockers(
   for (const blocker of server) {
     if (!merged.some(candidate => candidate.code === blocker.code)) merged.push(blocker)
   }
-  if (client.some(blocker => !serverCodes.has(blocker.code))) {
+  if (client.some(blocker => (
+    blocker.code !== 'source_invalid' && !serverCodes.has(blocker.code)
+  ))) {
     throw new Error('Client and server Basketball readiness do not agree. Reload before finalizing.')
   }
   return merged

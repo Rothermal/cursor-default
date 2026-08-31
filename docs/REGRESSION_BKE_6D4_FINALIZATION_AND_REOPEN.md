@@ -20,8 +20,8 @@ correction, migration 064 source/grant checks, parking, cloud transport, and mix
 
 | Gate | Result |
 |---|---|
-| Focused BKE-6D4 tests | Passed: 6 files, 107 tests |
-| Full Vitest suite | Passed: 180 files, 1,285 tests |
+| Focused BKE-6D4 tests | Passed: 6 files, 108 tests |
+| Full Vitest suite | Passed: 180 files, 1,286 tests |
 | TypeScript | Passed: `pnpm typecheck` |
 | ESLint | Passed with 0 errors and the 6 pre-existing Fast Refresh warnings |
 | Production build | Passed: 2,168 modules transformed |
@@ -30,8 +30,10 @@ correction, migration 064 source/grant checks, parking, cloud transport, and mix
 The focused tests independently exercise all ten blocker codes, combined ordering, corrupt and
 clockless authority, abandoned and completed/overtime authority, stale persisted clock rows,
 blocked preview behavior, server blocker catalog/order source parity, Correct-records lineup
-editing, idempotent recorder handoff, and local/cloud reopen reason parity. Migration source tests
-do not replace the live Supabase parity matrix below.
+editing, idempotent recorder handoff, and local/cloud reopen reason parity. A client-only
+`source_invalid` remains actionable because full client reprojection is intentionally stricter than
+the server's row checks; every shared client-only blocker still triggers the stale-parity guard.
+Migration source tests do not replace the live Supabase parity matrix below.
 
 ## Contract Matrix
 
