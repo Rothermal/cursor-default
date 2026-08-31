@@ -106,12 +106,13 @@ describe('Basketball anchored cloud authorization', () => {
   it('keeps an unresolved local-only team role playable without weakening cloud authority', () => {
     const localOnly = state('team-1')
     localOnly.cloudSync.eventCloudPolicy = 'local_only'
-
-    expect(canAuthorizeBasketballEqualPlayOverride(localOnly, {
+    const unresolved = {
       role: null,
       loading: true,
       error: null,
-    })).toBe(true)
+    }
+
+    expect(canAuthorizeBasketballEqualPlayOverride(localOnly, unresolved)).toBe(true)
     expect(canAuthorizeBasketballEqualPlayOverride(localOnly, {
       role: null,
       loading: false,
@@ -123,14 +124,13 @@ describe('Basketball anchored cloud authorization', () => {
       error: null,
     })).toBe(false)
 
-    const cloudBound = structuredClone(localOnly)
-    cloudBound.cloudSync.eventCloudPolicy = 'automatic'
-    cloudBound.cloudSync.teamId = 'team-1'
-    expect(canAuthorizeBasketballEqualPlayOverride(cloudBound, {
-      role: null,
-      loading: true,
-      error: null,
-    })).toBe(false)
+    const automaticUnbound = structuredClone(localOnly)
+    automaticUnbound.cloudSync.eventCloudPolicy = 'automatic'
+    expect(canAuthorizeBasketballEqualPlayOverride(automaticUnbound, unresolved)).toBe(false)
+
+    const localOnlyBound = structuredClone(localOnly)
+    localOnlyBound.cloudSync.teamId = 'team-1'
+    expect(canAuthorizeBasketballEqualPlayOverride(localOnlyBound, unresolved)).toBe(false)
   })
 
   it('fresh-checks app, team, release, and clock authority before mutation', async () => {

@@ -39,7 +39,9 @@ local-only team-sourced games with no cloud binding. The role matrix permits own
 scorer while denying a resolved viewer or missing/removed membership. An explicitly local-only game
 may continue while that role lookup is loading or unavailable, avoiding an offline live-play
 deadlock; cloud-bound games fail closed, and every later cloud mutation freshly rechecks the source
-team role. The role hook reloads when either the source team or signed-in account changes.
+team role. Cloud-bound live recording deliberately requires online role resolution; recorders who
+need offline live capture must select the local-only path before play. The role hook reloads when
+either the source team or signed-in account changes.
 
 Source guards enforce both setup preflights before active-game replacement, tournament writes, or
 commit. Capability caches are account-isolated and cleared on account change/sign-out; in-flight
