@@ -1,7 +1,7 @@
 # Plan: BKE-6E Release Hardening and Sign-off
 
-Status: BKE-6E1 release audit, consumer allowlist, compatibility evidence map, and consolidated
-operator matrix are implemented with no migration or runtime change. BKE-6E2 is next.
+Status: BKE-6E1 release audit and BKE-6E2 release-surface hardening are implemented. The
+consolidated matrix keeps exact deployed browser/PWA evidence pending for BKE-6E3, which is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -130,6 +130,12 @@ Exit condition:
 
 ### BKE-6E2: Release-Surface Hardening and Rollback Rehearsal
 
+Status: Implemented. Deployed builds expose the exact GitHub SHA, PWA updates require an explicit
+reload choice and prepare a running anchored clock first, and critical compact/focus/safe-area/
+reduced-motion contracts are pinned in automation. The consolidated matrix contains repeatable
+viewport, keyboard, installed-PWA, recovery, and rollback procedures; exact deployed results remain
+honestly pending for BKE-6E3.
+
 Scope:
 
 - exercise the setup, opening-lineup, live clock, substitution, Timeline, Summary, Game Info, and
@@ -224,8 +230,11 @@ Change the centralized Basketball Event release stage from `opt_in` to `internal
 This blocks new production Event creation without deleting, converting, or hiding existing games.
 It is a client build-time change, not a separate server switch: stopping creation is eventually
 consistent with deployment propagation. A device that remains offline or keeps a stale installed
-PWA open can continue using the old creation policy until it loads the rollback bundle. The only
-immediate control is the user's per-device preference; it is not a remote operator control.
+PWA open can continue using the old creation policy until the rollback bundle activates. With
+prompt-mode updates, loading or refreshing is not sufficient: the user must accept the update
+prompt, or close every client in scope and reopen after the waiting worker activates. Choosing
+**Later** or dismissing the prompt can retain the old policy for that session. The only immediate
+control is the user's per-device preference; it is not a remote operator control.
 
 There is intentionally no server-side feature flag fallback. The capability RPCs prove schema
 availability; revoking their grants or dropping required objects would also break existing
@@ -235,8 +244,9 @@ stage-derived policy tests that keep the stage change deployable; do not add a t
 guard.
 
 For any other client-only blocker, redeploy the previous known-good client. The operator must record
-its build identifier, bring the device online, close all installed app windows, reopen the app, and
-confirm that displayed identifier before continuing an active game.
+its build identifier, bring the device online, accept the update prompt or close all installed app
+windows and reopen after activation, and confirm that displayed identifier before continuing an
+active game.
 
 ### Data and server rules
 

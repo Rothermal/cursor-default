@@ -48,8 +48,8 @@ slices in
 [PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md](PLAN_BKE_6D_CLOUD_SUMMARY_AND_AGGREGATES.md).
 BKE-6D1 through BKE-6D4 are complete through migration 064. BKE-6E release evidence and
 hardening is approved as three slices in
-[PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md). BKE-6E1 is implemented;
-BKE-6E2 release-surface hardening is next.
+[PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md). BKE-6E1 and BKE-6E2 are
+implemented; BKE-6E3 exact-candidate owner smoke is next.
 
 This roadmap does not block soccer and must not be implemented inside an SOC pull request.
 

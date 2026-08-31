@@ -131,6 +131,8 @@ function workflowConfirmationMessage(action: BasketballWorkflowAction): string {
       return 'Park the current game and start another?'
     case 'resume_commit':
       return 'Park the current game and open the selected game?'
+    case 'reload_commit':
+      return 'Reload to apply the app update? Your current game remains saved.'
     case 'setup_visit':
     case 'setup_edit':
     case 'setup_cancel':
@@ -485,6 +487,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!hasActiveGame) return true
 
       const runningClock = shouldInterceptRunningBasketballClock(current, action)
+      if (action === 'reload_commit' && !runningClock) return true
+
       const message = runningClock
         ? 'The Basketball clock is running. Pause and continue?'
         : workflowConfirmationMessage(action)
@@ -496,6 +500,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       })
       if (!paused.ok) {
         setParkingError(paused.message)
+        return false
+      }
+      try {
+        setParkedGames(saveActiveGameState(paused.state, userId))
+        setActiveLocalGameId(getActiveLocalGameId(userId))
+      } catch (error) {
+        setParkingError(parkedGameStorageErrorMessage(error))
         return false
       }
       stateRef.current = paused.state

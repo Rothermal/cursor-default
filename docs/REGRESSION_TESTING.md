@@ -1332,10 +1332,11 @@ owner-smoke evidence. The approved three-slice contract lives in
 [the BKE-6E plan](PLAN_BKE_6E_RELEASE_HARDENING.md).
 
 BKE-6E1 implements the audited release-policy consumer allowlist and creates
-[the BKE-6E release matrix](REGRESSION_BKE_6E_RELEASE.md) as the operator record. BKE-6E2 records
-focused release-surface and rollback evidence, and BKE-6E3 repeats release-sensitive rows against
-the exact deployed candidate. CI and owner-only acceptance do not imply that unexecuted
-broader-role or second-device rows passed.
+[the BKE-6E release matrix](REGRESSION_BKE_6E_RELEASE.md) as the operator record. BKE-6E2 adds the
+deployed build id, controlled PWA update/reload preparation, compact/safe-area/reduced-motion and
+critical modal-focus contracts, plus repeatable viewport, keyboard, PWA, recovery, and rollback
+procedures. BKE-6E3 records exact deployed results. CI and owner-only acceptance do not imply that
+unexecuted broader-role or second-device rows passed.
 
 ---
 

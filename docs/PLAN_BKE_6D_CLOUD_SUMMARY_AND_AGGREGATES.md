@@ -2,7 +2,7 @@
 
 Status: Implemented. All 32 product and implementation decisions and BKE-6D1 through BKE-6D4
 are complete. BKE-6E release evidence and hardening is approved in
-[PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md); BKE-6E1 is complete and BKE-6E2 is next.
+[PLAN_BKE_6E_RELEASE_HARDENING.md](PLAN_BKE_6E_RELEASE_HARDENING.md); BKE-6E1 and BKE-6E2 are complete, and BKE-6E3 is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 

@@ -118,6 +118,71 @@ The BKE-6E1 compatibility scope was resolved by mapping existing automated parit
 F02 and F05 and retaining explicit manual rows F01, F03, and F04. No new parity behavior is claimed
 for an unexecuted manual row.
 
+## BKE-6E2 Implementation Record
+
+| Field | Value |
+|---|---|
+| Branch | `feature/bke-6e2-release-surface-hardening` |
+| Runtime scope | Build identity, prompt-based PWA updates, offline/update status, compact clock controls, safe areas, reduced motion, and focused modal keyboard handling |
+| Release behavior | Production remains `opt_in`; device preference remains default-off |
+| Migration ceiling | `064`; no migration added |
+| Deployed identity | GitHub Pages injects `VITE_APP_BUILD_ID` from the exact `github.sha`; the shell displays a safe 12-character label and exposes the full id as its accessible name/title |
+| PWA update policy | Prompt before reload; an active anchored clock uses the centralized `reload_commit` preparation and must pause successfully before applying the worker update |
+| Local validation | Typecheck pass; lint pass with 3 existing Fast Refresh warnings; focused release suite 5 files/49 tests plus review follow-up workflow suite 3 files/72 tests; full suite 181 files/1,291 tests; production PWA build pass with 12 precache entries (2,212.09 KiB) |
+| Built artifact probe | `bke6e2-probe`, update guidance, and `reload_commit` are present in the production bundle; the worker waits for an explicit `SKIP_WAITING` message |
+| Exact browser/PWA evidence | Pending the merged/deployed candidate; use the procedures below and retain the result in this matrix |
+
+### Responsive procedure
+
+Use browser responsive mode for `320 x 568`, `390 x 844`, `768 x 1024`, and `1440 x 900`.
+At each size, keep zoom at 100% and exercise Game Setup rules/source review, opening-lineup
+Starter/Bench/DNP assignment, Track and Timeline, Set Clock, stoppage, lineup and boundary sheets,
+shot detail/correction, Summary tabs, Game Info, and Basketball settings. At the two phone sizes,
+also rotate once and return to portrait. Record blocking horizontal page scroll, clipped primary
+buttons, hidden dialog footers, keyboard-covered inputs, sticky-clock overlap, bottom-action overlap,
+or text that cannot wrap. A horizontally scrolling lineup chip rail or tab strip is expected and is
+not page-level overflow.
+
+### Keyboard and announcement procedure
+
+Starting from the control that opens each surface, use only `Tab`, `Shift+Tab`, arrow keys where a
+tablist documents them, `Enter`, `Space`, and `Escape`. Confirm that focus is visible, remains inside
+open dialogs, returns to the opener on close, and can reach Start/Pause, Set Clock, Lineup, Timeline
+detail/correction, Summary tabs, update controls, and recovery actions. Trigger a clock expiration,
+unsafe clock recovery, failed save, offline transition, and available PWA update. Confirm concise
+status/alert announcements without reading the ticking clock every tenth of a second. Enable OS or
+browser reduced motion and verify marker pulses, spinners, and transitions do not create sustained
+motion. On devices without audio or vibration APIs, confirm those settings are disabled and labeled
+unavailable rather than failing capture.
+
+### Installed-PWA and recovery procedure
+
+1. Install the deployed app, open it online, and record the displayed full build id.
+2. Start a local-only anchored game, run the clock briefly, pause, capture an event, park/reload, and
+   confirm the same local authority reopens.
+3. Go offline, repeat local capture/correction and a reload, and confirm cloud actions wait without
+   claiming success. Reconnect and confirm normal sync/recovery status returns.
+4. While the anchored clock is running, make a newer worker available and choose **Update now**.
+   Cancel once and verify no reload; accept once and verify the centralized preparation pauses the
+   clock before the worker reload.
+5. Confirm the newly displayed build id matches the deployed candidate. A dismissed update remains
+   on the old displayed build until a later reload/update and must not be described as current.
+
+### Release-stage rollback rehearsal
+
+1. Record the current deployed build id and prove one existing Legacy, clockless Event, anchored
+   local/parked, and cloud/canonical record remains reachable.
+2. Change only `BASKETBALL_EVENT_RELEASE_STAGE` from `opt_in` to `internal`, run the release-policy
+   tests and production build, then deploy that exact rollback commit. Do not change migrations,
+   capability grants, stored games, or device preferences.
+3. On an online installed app, wait for the update prompt, apply it, and verify the displayed build
+   id changes. New Event discovery/creation must stop; all records from step 1 must still open.
+4. Keep a second installed app offline on the prior build. Verify its unchanged build id makes the
+   stale policy visible; immediate remote shutdown is explicitly not expected. Bring it online,
+   apply the update, and repeat the stopped-creation/existing-access check.
+5. To resume the owner preview, restore `opt_in` in a new reviewed commit and repeat the same exact-
+   build verification. Never edit or reverse migrations 061 through 064 for client rollback.
+
 ## Operator Metadata
 
 Complete metadata separately for the BKE-6E2 hardening candidate and BKE-6E3 exact deployed
@@ -127,7 +192,7 @@ candidate.
 |---|---|---|
 | Date/time | Not run | Not run |
 | Commit/deployment | Not run | Not run |
-| Running-app build identifier | Not available until BKE-6E2 | Not run |
+| Running-app build identifier | Implemented; exact deployed value pending | Not run |
 | Supabase project | Not run | Not run |
 | Highest migration | Must be `064` | Must be `064` |
 | Browser/version | Not run | Not run |
@@ -211,7 +276,7 @@ history or revoke grants used by existing games.
 |---|---|---|---|---|
 | G01 | Run local-only capture/correction offline, park, reload, and reconnect | Local work remains coherent without capability claims; owned dirty work resumes safely | E2 hardening | Not run |
 | G02 | Reload/background a running clock with safe and unsafe wall-time movement | Safe anchor resumes; unsafe movement requires explicit recovery instead of silently accepting time | E2 hardening | Not run |
-| G03 | Install the PWA, deploy a release-stage rollback, and keep one stale client open/offline | Stale client remains on the old bundle until online reload; operator guidance and displayed build make this visible | E2 hardening | Not run |
+| G03 | Install the PWA, deploy a release-stage rollback, and keep one stale client open/offline | Stale client remains on the old bundle until the prompt is accepted or all scoped clients close and the waiting worker activates; operator guidance and displayed build make this visible | E2 hardening | Runbook prepared; exact deployed rehearsal pending |
 | G04 | Switch anonymous/account A/account B with parked and bound games | Local and cloud ownership, capability cache, drafts, and recovery state remain isolated | Broader gate | Not run |
 | G05 | Exercise duplicate binding, stale sync completion, quota, cap, and recovery export | No authority is overwritten or falsely marked clean; recovery remains available | E2 hardening | Not run |
 
@@ -219,22 +284,22 @@ history or revoke grants used by existing games.
 
 | ID | Procedure | Expected | Class | Result/evidence |
 |---|---|---|---|---|
-| H01 | Run setup, opening lineup, tracker, sheets, Timeline, Summary, and settings at `320 x 568` | Primary controls remain reachable with no blocking overlap or clipping | E2 hardening | Not run |
-| H02 | Repeat the live path in an installed PWA at `390 x 844` | Safe areas/browser chrome do not hide clock, lineup, correction, or parking controls | E2 hardening | Not run |
-| H03 | Review the same surfaces at `768 x 1024` and `1440 x 900` | Stable layout remains scan-friendly without stretched or shifting controls | E2 hardening | Not run |
-| H04 | Navigate tabs, dialogs, sheets, clock, correction, and recovery by keyboard | Focus is visible/logical, dialogs restore focus, and no primary workflow traps | E2 hardening | Not run |
-| H05 | Trigger expiration, offline, conflict, save, error, and completion states | Status is announced without duplication or sensitive detail; reduced motion and unavailable sound/vibration degrade safely | E2 hardening | Not run |
+| H01 | Run setup, opening lineup, tracker, sheets, Timeline, Summary, and settings at `320 x 568` | Primary controls remain reachable with no blocking overlap or clipping | E2 hardening | Compact clock contract implemented; exact browser row pending |
+| H02 | Repeat the live path in an installed PWA at `390 x 844` | Safe areas/browser chrome do not hide clock, lineup, correction, or parking controls | E2 hardening | Safe-area contracts implemented; installed-PWA row pending |
+| H03 | Review the same surfaces at `768 x 1024` and `1440 x 900` | Stable layout remains scan-friendly without stretched or shifting controls | E2 hardening | Procedure prepared; exact browser row pending |
+| H04 | Navigate tabs, dialogs, sheets, clock, correction, and recovery by keyboard | Focus is visible/logical, dialogs restore focus, and no primary workflow traps | E2 hardening | Visible-focus and critical modal contracts implemented; exact keyboard row pending |
+| H05 | Trigger expiration, offline, conflict, save, error, and completion states | Status is announced without duplication or sensitive detail; reduced motion and unavailable sound/vibration degrade safely | E2 hardening | Status, reduced-motion, and unavailable-device contracts implemented; live announcement row pending |
 
 ## I. Operations, Rollback, and Sign-off
 
 | ID | Procedure | Expected | Class | Result/evidence |
 |---|---|---|---|---|
-| I01 | Inspect the running app after deployment | A concise displayed build/commit identifier matches the exact candidate | E2 hardening | Not available until BKE-6E2 |
+| I01 | Inspect the running app after deployment | A concise displayed build/commit identifier matches the exact candidate | E2 hardening | SHA injection and display implemented; exact deployed match pending |
 | I02 | Confirm migrations and call both capability handshakes | Highest migration is 064; release contract v2 and clock/lineup version 1 are exact | E3 owner smoke | Not run |
 | I03 | Disable the device preference | New Event creation stops immediately on that device; existing Event and Legacy records remain available | E3 owner smoke | Not run |
-| I04 | Change the client stage to `internal`, build, deploy, and refresh/close-reopen an online PWA | New Event creation stops after bundle propagation; no server objects or existing records are changed | E2 hardening | Not run |
-| I05 | Repeat I04 with an offline/stale PWA | Old policy persists visibly until the new bundle loads; no claim of immediate remote shutdown is made | E2 hardening | Not run |
-| I06 | Run lint, full tests, production build, and CI on the exact candidate | All automated gates pass; existing warnings are recorded separately | Automated | Local lint/tests/build pass; PR #350 CI pass |
+| I04 | Change the client stage to `internal`, build, deploy, then accept the online PWA update prompt or close every scoped client and reopen after activation | Displayed build changes and new Event creation stops after activation; refresh alone is not sufficient, and no server objects or existing records are changed | E2 hardening | Repeatable rollback procedure prepared; deployed rehearsal pending |
+| I05 | Repeat I04 with an offline/stale PWA, including **Later** or prompt dismissal | Old policy persists visibly for that session until the waiting rollback bundle activates; no claim of immediate remote shutdown is made | E2 hardening | Stale-build guidance implemented; deployed rehearsal pending |
+| I06 | Run lint, full tests, production build, and CI on the exact candidate | All automated gates pass; existing warnings are recorded separately | Automated | BKE-6E2 local typecheck/lint/1,291 tests/build pass; updated PR CI is the exact-candidate gate |
 
 ## Go/No-Go
 
@@ -256,7 +321,7 @@ receives an issue and explicit disposition rather than silently expanding BKE-6E
 
 | Decision | Reviewer | Date | Evidence/notes |
 |---|---|---|---|
-| BKE-6E1 automated release audit | Pending PR review | Pending | Consumer allowlist, matrix, and CI |
-| BKE-6E2 release-surface hardening | Pending | Pending | Responsive/accessibility/PWA/rollback rows |
+| BKE-6E1 automated release audit | Accepted in PR #350 | 2026-08-31 | Consumer allowlist, matrix, and CI |
+| BKE-6E2 release-surface hardening | Pending PR review | Pending | Runtime contracts implemented; exact browser/PWA/rollback evidence remains pending |
 | BKE-6E3 owner-only exact-candidate smoke | Pending | Pending | Local/cloud smoke and deployed identifier |
 | Broader rollout | Blocked | Pending | D03, D05-D07, and G03-G04 must pass |
