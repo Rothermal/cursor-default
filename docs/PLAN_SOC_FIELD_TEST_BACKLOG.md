@@ -355,7 +355,7 @@ opponent label without leaving the stream incomplete.
 
 ### S14 - Cannot finalize a completed soccer game
 
-**Status:** confirmed — cloud blocker  
+**Status:** implemented — pending deployed field verification
 **Theme:** finalization  
 **Where:** `SoccerFinalizationPanel`; `finalizeSoccerGame` in
 `src/lib/soccer/finalization.ts`;
@@ -384,11 +384,16 @@ public Soccer RPC name remains stable. A mismatch after that preparation is a
 race, stale readiness/checkpoint detail, or fingerprint/revision disagreement
 that needs captured evidence rather than another speculative retry.
 
-**Likely direction:** show the real mismatch (checkpoint stale, stream
-incomplete, or primary changed). Offer Sync / reload readiness before
-submit. Do not offer Finalize when the local or primary projection is
-incomplete. After `S13` is repaired, re-test this match path before
-changing the RPC.
+**Implemented direction:** finalization now reloads the cloud-primary stream,
+reconfirms its exact revisions and fingerprint even when coarse readiness says
+the existing checkpoint is current, then reloads readiness before publication.
+The second readiness check rejects a changed primary, newly opened conflict,
+non-terminal stream, stale checkpoint, or lost manager access. Existing
+projection-health and canonical-publication guards remain unchanged.
+
+Field verification should retry one of the previously affected completed games
+and one newly completed cloud game. A failure after this repair should capture
+the evidence below before changing the RPC.
 
 **Investigation evidence to capture:** game id, current user id, selected
 primary id, readiness before/after preparation, recorder checkpoint count and

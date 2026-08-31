@@ -155,12 +155,18 @@ export async function prepareSoccerFinalization(
     throw new Error('Complete or abandon the primary match before finalizing.')
   }
 
-  if (!readiness.primaryCheckpointCurrent) {
-    await confirmPrimaryCheckpoint(gameId, recorder.recorderId, projection)
-    readiness = await loadSoccerFinalizationReadiness(gameId)
-    if (!readiness.primaryCheckpointCurrent) {
-      throw new Error('Primary recorder checkpoint is not current.')
-    }
+  // Readiness proves that checkpoint revisions still match the cloud rows, but
+  // not that its fingerprint matches this freshly loaded projection.
+  await confirmPrimaryCheckpoint(gameId, recorder.recorderId, projection)
+  readiness = await loadSoccerFinalizationReadiness(gameId)
+  if (
+    !readiness.canFinalize ||
+    readiness.primaryRecorderId !== recorder.recorderId ||
+    !readiness.primaryEnded ||
+    !readiness.primaryCheckpointCurrent ||
+    readiness.primaryConflictCount > 0
+  ) {
+    throw new Error('Primary recorder readiness changed. Review finalization again.')
   }
 
   return {

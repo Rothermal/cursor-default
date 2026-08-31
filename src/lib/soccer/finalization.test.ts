@@ -14,11 +14,21 @@ import type { SoccerMatchSetup } from './types'
 const cloudMock = vi.hoisted(() => ({
   rpc: vi.fn(),
 }))
+const recorderMock = vi.hoisted(() => ({
+  loadRecorders: vi.fn(),
+  loadProjection: vi.fn(),
+  loadPrimaryReview: vi.fn(),
+}))
 
 vi.mock('../supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => cloudMock.rpc(...args),
   },
+}))
+vi.mock('./recorders', () => ({
+  loadSoccerGameRecorders: recorderMock.loadRecorders,
+  loadSoccerRecorderProjection: recorderMock.loadProjection,
+  loadSoccerPrimaryCloudReview: recorderMock.loadPrimaryReview,
 }))
 
 import {
@@ -26,6 +36,7 @@ import {
   loadSoccerCanonicalPublication,
   loadSoccerFinalizationReadiness,
   inspectSoccerCanonicalSnapshot,
+  prepareSoccerFinalization,
   soccerProjectionFromCanonicalSnapshot,
 } from './finalization'
 
@@ -128,6 +139,9 @@ function endedProjection(): SoccerRecorderProjection {
 describe('soccer finalization repository', () => {
   beforeEach(() => {
     cloudMock.rpc.mockReset()
+    recorderMock.loadRecorders.mockReset()
+    recorderMock.loadProjection.mockReset()
+    recorderMock.loadPrimaryReview.mockReset()
   })
 
   it('round-trips a canonical publication through deterministic projection rebuild', () => {
@@ -225,6 +239,59 @@ describe('soccer finalization repository', () => {
     })
   })
 
+  it('reconfirms the exact primary checkpoint even when readiness reports current', async () => {
+    const projection = endedProjection()
+    recorderMock.loadRecorders.mockResolvedValue([projection.recorder])
+    recorderMock.loadProjection.mockResolvedValue(projection)
+    cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === 'get_soccer_finalization_readiness'
+        ? { data: [readinessRow()], error: null }
+        : name === 'confirm_soccer_primary_checkpoint_for_finalization'
+          ? { data: '2026-07-23T12:02:00.000Z', error: null }
+          : { data: null, error: { message: `Unexpected RPC ${name}` } }
+    ))
+
+    await expect(prepareSoccerFinalization(baseState())).resolves.toMatchObject({
+      recorder: projection.recorder,
+      projection,
+    })
+    expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
+      'get_soccer_finalization_readiness',
+      'confirm_soccer_primary_checkpoint_for_finalization',
+      'get_soccer_finalization_readiness',
+    ])
+    expect(cloudMock.rpc.mock.calls[1]?.[1]).toMatchObject({
+      p_game_id: 'game-1',
+      p_primary_recorded_by: 'recorder-a',
+      p_event_count: projection.eventStream.events.length,
+    })
+  })
+
+  it('stops when primary readiness changes after exact checkpoint confirmation', async () => {
+    const projection = endedProjection()
+    recorderMock.loadRecorders.mockResolvedValue([projection.recorder])
+    recorderMock.loadProjection.mockResolvedValue(projection)
+    let readinessLoads = 0
+    cloudMock.rpc.mockImplementation((name: string) => {
+      if (name === 'confirm_soccer_primary_checkpoint_for_finalization') {
+        return Promise.resolve({ data: '2026-07-23T12:02:00.000Z', error: null })
+      }
+      if (name === 'get_soccer_finalization_readiness') {
+        readinessLoads += 1
+        return Promise.resolve({
+          data: [readinessRow({
+            primary_recorded_by: readinessLoads === 1 ? 'recorder-a' : 'recorder-b',
+          })],
+          error: null,
+        })
+      }
+      return Promise.resolve({ data: null, error: { message: `Unexpected RPC ${name}` } })
+    })
+
+    await expect(prepareSoccerFinalization(baseState()))
+      .rejects.toThrow('Primary recorder readiness changed')
+  })
+
   it('loads the active canonical publication and preserves its snapshot', async () => {
     const snapshot = createSoccerCanonicalSnapshot(
       'game-1',
@@ -254,3 +321,21 @@ describe('soccer finalization repository', () => {
     })
   })
 })
+
+function readinessRow(overrides: Record<string, unknown> = {}) {
+  return {
+    game_status: 'in_progress',
+    can_finalize: true,
+    can_reopen: false,
+    primary_recorded_by: 'recorder-a',
+    primary_display_name: 'Recorder A',
+    primary_ended: true,
+    primary_checkpoint_current: true,
+    primary_conflict_count: 0,
+    primary_locked: false,
+    active_publication_id: null,
+    finalized_at: null,
+    non_primary_attention_count: 0,
+    ...overrides,
+  }
+}
