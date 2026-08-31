@@ -2,7 +2,7 @@
 
 Status: Product Q&A complete. All 48 clock, lineup, correction, cloud, settings, and rollout
 decisions are approved. BKE-6A, BKE-6B, BKE-6C, and BKE-6D are implemented through migration 064.
-BKE-6E is approved as three release-hardening slices; BKE-6E1 is next.
+BKE-6E is approved as three release-hardening slices; BKE-6E1 is implemented and BKE-6E2 is next.
 
 Parent: [PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md](PLAN_BASKETBALL_EVENT_MODEL_ROADMAP.md)
 
@@ -450,7 +450,9 @@ Each slice receives a detailed implementation plan and review before code begins
 BKE-6B and BKE-6C are complete across four implementation PRs each. BKE-6D1 completes anchored
 destination detail, BKE-6D2 completes exact-second, DNP, and coverage-aware plus-minus aggregates,
 and BKE-6D3 completes dual-capability anchored transport. BKE-6D4 completes readiness,
-finalization, and reopen/republication. These remain delivery slices, not new product scope.
+finalization, and reopen/republication. BKE-6E1 completes the release-entry consumer audit and
+consolidated matrix without changing runtime behavior. These remain delivery slices, not new
+product scope.
 
 ---
 

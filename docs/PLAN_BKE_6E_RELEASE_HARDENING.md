@@ -1,7 +1,7 @@
 # Plan: BKE-6E Release Hardening and Sign-off
 
-Status: Approved carry-forward scope. BKE-6A through BKE-6D are implemented through migration
-064. BKE-6E1 is the next implementation slice.
+Status: BKE-6E1 release audit, consumer allowlist, compatibility evidence map, and consolidated
+operator matrix are implemented with no migration or runtime change. BKE-6E2 is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -99,6 +99,9 @@ Still required:
 ## 5. Delivery Slices
 
 ### BKE-6E1: Release Audit and Consolidated Matrix
+
+Status: Implemented. `releaseEntryGuards.test.ts` enforces the audited implementation-consumer
+allowlists, and [REGRESSION_BKE_6E_RELEASE.md](REGRESSION_BKE_6E_RELEASE.md) is the operator record.
 
 Scope:
 
