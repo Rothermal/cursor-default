@@ -51,6 +51,8 @@ export default function SoccerPlayerSetup() {
   const [rosterLoading, setRosterLoading] = useState(
     Boolean(setup?.sourceTeamId && state.players.length === 0)
   )
+  const [rosterLoadError, setRosterLoadError] = useState<string | null>(null)
+  const [rosterLoadAttempt, setRosterLoadAttempt] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [confirmShortHanded, setConfirmShortHanded] = useState(false)
   const cloudRosterLoaded = useRef(false)
@@ -67,10 +69,15 @@ export default function SoccerPlayerSetup() {
 
   useEffect(() => {
     if (!setup?.sourceTeamId || !supabase || cloudRosterLoaded.current) return
+    if (state.players.length > 0) {
+      cloudRosterLoaded.current = true
+      setRosterLoading(false)
+      return
+    }
     let cancelled = false
     const loadRoster = async () => {
       setRosterLoading(true)
-      setError(null)
+      setRosterLoadError(null)
       const { data, error: loadError } = await supabase!
         .from('team_players')
         .select('player_id,jersey_number,position,players!inner(id,first_name,last_name)')
@@ -79,7 +86,7 @@ export default function SoccerPlayerSetup() {
         .order('joined_at', { ascending: true })
       if (cancelled) return
       if (loadError) {
-        setError(loadError.message)
+        setRosterLoadError(loadError.message)
         setRosterLoading(false)
         return
       }
@@ -107,10 +114,10 @@ export default function SoccerPlayerSetup() {
     }
     void loadRoster()
     return () => { cancelled = true }
-  }, [dispatch, setup?.sourceTeamId, state.players.length])
+  }, [dispatch, rosterLoadAttempt, setup?.sourceTeamId, state.players.length])
 
   useEffect(() => {
-    if (setup?.sourceTeamId && !cloudRosterLoaded.current) return
+    if (setup?.sourceTeamId && !cloudRosterLoaded.current && state.players.length === 0) return
     setDrafts(current => {
       const next = [...current]
       let changed = false
@@ -292,6 +299,20 @@ export default function SoccerPlayerSetup() {
         {error && (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {rosterLoadError && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p>Could not load the cloud roster: {rosterLoadError}</p>
+            <button
+              type="button"
+              onClick={() => setRosterLoadAttempt(attempt => attempt + 1)}
+              className="mt-2 font-semibold underline disabled:opacity-50"
+              disabled={rosterLoading}
+            >
+              Retry roster
+            </button>
           </div>
         )}
 

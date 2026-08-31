@@ -2,6 +2,13 @@ import { useCallback, useMemo, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { playerRosterSelectLabel } from '../lib/display'
 import type { MergePlayerCandidate } from '../lib/mergePlayerScope'
+import {
+  parseSoccerRosterRole,
+  serializeSoccerRosterRole,
+  soccerRosterRoleLabel,
+  SOCCER_ROSTER_ROLE_OPTIONS,
+  type SoccerRosterRoleGroup,
+} from '../lib/soccer/rosterRole'
 
 export type MergePlayerOption = MergePlayerCandidate
 
@@ -55,7 +62,12 @@ interface Props {
   onMerged: () => void
 }
 
-export default function MergePlayerWizard({ supabase, candidates, onClose, onMerged }: Props) {
+export default function MergePlayerWizard({
+  supabase,
+  candidates,
+  onClose,
+  onMerged,
+}: Props) {
   const [step, setStep] = useState<WizardStep>('intro')
   const [survivorId, setSurvivorId] = useState('')
   const [duplicateId, setDuplicateId] = useState('')
@@ -65,6 +77,7 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
   const [tpResolutions, setTpResolutions] = useState<
     Array<{ team_id: string; jersey_number: string; is_active: boolean; position: string | null }>
   >([])
+  const [teamSportsById, setTeamSportsById] = useState<Record<string, string>>({})
   const [confirmText, setConfirmText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -85,12 +98,36 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
       p_duplicate_id: duplicateId,
       p_survivor_id: survivorId,
     })
-    setLoading(false)
     if (rpcError) {
+      setLoading(false)
       setError(rpcError.message)
       return
     }
     const p = parsePreview(data)
+    const conflictTeamIds = p.team_players.map(row => row.team_id)
+    if (conflictTeamIds.length > 0) {
+      const { data: teamRows, error: teamError } = await supabase
+        .from('teams')
+        .select('id,seasons!inner(sport)')
+        .in('id', conflictTeamIds)
+      if (teamError) {
+        setLoading(false)
+        setError(`Could not load roster sports: ${teamError.message}`)
+        return
+      }
+      type TeamSportRow = { id: string; seasons: { sport: string } }
+      const nextTeamSportsById = Object.fromEntries(
+        ((teamRows ?? []) as unknown as TeamSportRow[]).map(row => [row.id, row.seasons.sport])
+      )
+      if (conflictTeamIds.some(teamId => !nextTeamSportsById[teamId])) {
+        setLoading(false)
+        setError('Could not identify the sport for every roster conflict.')
+        return
+      }
+      setTeamSportsById(nextTeamSportsById)
+    } else {
+      setTeamSportsById({})
+    }
     setPreview(p)
     setGameStatKeeps(p.game_stats.map(c => c.survivor_row.id))
     setCorrectionChoices(p.stat_corrections.map(() => 'survivor'))
@@ -102,6 +139,7 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
         position: t.survivor.position,
       }))
     )
+    setLoading(false)
     setStep('resolve')
   }, [duplicateId, survivorId, supabase])
 
@@ -354,12 +392,20 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
                       <p className="text-sm font-medium text-slate-700">{row.team_name}</p>
                       <p className="text-xs text-slate-500">
                         Survivor: #{row.survivor.jersey_number ?? '—'} · active {row.survivor.is_active ? 'yes' : 'no'}
-                        {row.survivor.position != null && row.survivor.position !== '' && ` · ${row.survivor.position}`}
+                        {row.survivor.position != null && row.survivor.position !== '' && (
+                          ` · ${teamSportsById[row.team_id] === 'soccer'
+                            ? soccerRosterRoleLabel(row.survivor.position)
+                            : row.survivor.position}`
+                        )}
                       </p>
                       <p className="text-xs text-slate-500">
                         Duplicate: #{row.duplicate.jersey_number ?? '—'} · active{' '}
                         {row.duplicate.is_active ? 'yes' : 'no'}
-                        {row.duplicate.position != null && row.duplicate.position !== '' && ` · ${row.duplicate.position}`}
+                        {row.duplicate.position != null && row.duplicate.position !== '' && (
+                          ` · ${teamSportsById[row.team_id] === 'soccer'
+                            ? soccerRosterRoleLabel(row.duplicate.position)
+                            : row.duplicate.position}`
+                        )}
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -396,23 +442,47 @@ export default function MergePlayerWizard({ supabase, candidates, onClose, onMer
                           </label>
                         </div>
                       </div>
-                      <div>
-                        <label className="text-xs text-slate-500">Position (optional)</label>
-                        <input
-                          type="text"
-                          value={tpResolutions[i]?.position ?? ''}
-                          onChange={e => {
-                            const v = e.target.value
-                            setTpResolutions(prev => {
-                              const next = [...prev]
-                              next[i] = { ...next[i], position: v.trim() === '' ? null : v }
-                              return next
-                            })
-                          }}
-                          className="input-field text-sm"
-                          placeholder="Optional"
-                        />
-                      </div>
+                      {teamSportsById[row.team_id] === 'soccer' ? (
+                        <div>
+                          <label className="text-xs text-slate-500">Default role</label>
+                          <select
+                            value={parseSoccerRosterRole(tpResolutions[i]?.position).group}
+                            onChange={event => {
+                              const value = serializeSoccerRosterRole(
+                                event.target.value as SoccerRosterRoleGroup
+                              )
+                              setTpResolutions(prev => {
+                                const next = [...prev]
+                                next[i] = { ...next[i], position: value }
+                                return next
+                              })
+                            }}
+                            className="input-field text-sm"
+                          >
+                            {SOCCER_ROSTER_ROLE_OPTIONS.map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="text-xs text-slate-500">Position (optional)</label>
+                          <input
+                            type="text"
+                            value={tpResolutions[i]?.position ?? ''}
+                            onChange={e => {
+                              const v = e.target.value
+                              setTpResolutions(prev => {
+                                const next = [...prev]
+                                next[i] = { ...next[i], position: v.trim() === '' ? null : v }
+                                return next
+                              })
+                            }}
+                            className="input-field text-sm"
+                            placeholder="Optional"
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </section>

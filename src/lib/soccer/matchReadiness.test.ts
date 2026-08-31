@@ -12,7 +12,9 @@ describe('Soccer match-readiness wiring', () => {
 
     expect(teams).toContain("const isSoccerTeam = selectedTeam?.seasons.sport === 'soccer'")
     expect(teams).toContain("...(isSoccerTeam ? { position } : {})")
-    expect(teams).toContain(".update(isSoccerTeam ? { jersey_number, position } : { jersey_number })")
+    expect(teams).toContain('isSoccerTeam && editingPlayerSoccerRoleDirty ? { position } : {}')
+    expect(teams).toContain('setEditingPlayerSoccerRoleDirty(true)')
+    expect(teams).toContain('existingPlayerSoccerRole')
     expect(teams).toContain('SOCCER_ROSTER_ROLE_OPTIONS.map')
   })
 
@@ -21,8 +23,21 @@ describe('Soccer match-readiness wiring', () => {
 
     expect(setup).toContain(".select('player_id,jersey_number,position,players!inner(id,first_name,last_name)')")
     expect(setup).toContain('parseSoccerRosterRole(row.position)')
-    expect(setup).toContain('if (setup?.sourceTeamId && !cloudRosterLoaded.current) return')
+    expect(setup).toContain('if (state.players.length > 0)')
+    expect(setup).toContain('setRosterLoadAttempt(attempt => attempt + 1)')
+    expect(setup).toContain("!cloudRosterLoaded.current && state.players.length === 0")
     expect(setup).toContain('initialRole: rosterRolesByPlayerId.current[player.id]')
+  })
+
+  it('keeps Soccer merge resolutions strict while preserving untouched raw values', () => {
+    const merge = source('src/components/MergePlayerWizard.tsx')
+
+    expect(merge).toContain(".select('id,seasons!inner(sport)')")
+    expect(merge).toContain('Could not load roster sports')
+    expect(merge).toContain("teamSportsById[row.team_id] === 'soccer'")
+    expect(merge).toContain('soccerRosterRoleLabel(row.survivor.position)')
+    expect(merge).toContain('value={parseSoccerRosterRole(tpResolutions[i]?.position).group}')
+    expect(merge).toContain('serializeSoccerRosterRole(')
   })
 
   it('places the pitch and quick capture before collapsed marker filters', () => {
@@ -40,5 +55,6 @@ describe('Soccer match-readiness wiring', () => {
     expect(fieldTab).toContain("setMarkerFamilyFilter('shots')")
     expect(fieldTab).toContain("setMarkerSideFilter('opponent')")
     expect(fieldTab).toContain("setMarkerScope('match')")
+    expect(fieldTab).toContain('· {markerFilterSummary}')
   })
 })

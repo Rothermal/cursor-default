@@ -290,8 +290,9 @@ Null, unknown, and legacy free text safely fall back to Midfielder.
 
 **Storage note:** `SoccerTeamSettings` remains exactly `{ rules }`; role data is
 team-roster scoped, not global player identity or team settings. Player merges
-already preserve the surviving team roster entry. `S19` may consume these
-stable defaults later without changing live role-event authority.
+preserve untouched raw legacy values and expose strict Soccer labels/options
+when a roster conflict needs a decision. `S19` may consume these stable
+defaults later without changing live role-event authority.
 
 **Not this item:** formation drawings (`S19`), minutes-by-role analysis, or
 treating role as a second player identity.

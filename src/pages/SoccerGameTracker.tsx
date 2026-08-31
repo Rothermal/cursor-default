@@ -259,6 +259,21 @@ export default function SoccerGameTracker() {
   const capturePreferences = soccerState.capturePreferences
   const fieldCaptureEnabled =
     healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal
+  const markerFilterSummary = [
+    markerFamilyFilter === 'all'
+      ? null
+      : markerFamilyFilter === 'shots'
+        ? 'Shots'
+        : markerFamilyFilter === 'defense'
+          ? 'Defense'
+          : 'Incidents',
+    markerSideFilter === 'all'
+      ? null
+      : markerSideFilter === 'tracked'
+        ? 'Tracked'
+        : 'Opponent',
+    markerScope === 'current' ? 'Current period' : 'Full match',
+  ].filter(Boolean).join(' · ')
   const reviewPeriodId = projection.currentPeriodId
     ?? projection.completedPeriodIds[projection.completedPeriodIds.length - 1]
     ?? null
@@ -647,7 +662,7 @@ export default function SoccerGameTracker() {
 
               <details className="border-y border-slate-200 py-2">
                 <summary className="cursor-pointer text-sm font-semibold text-slate-600">
-                  Marker filters
+                  Marker filters <span className="font-normal text-slate-500">· {markerFilterSummary}</span>
                 </summary>
                 <div className="mt-3 space-y-3">
                   <div>

@@ -28,6 +28,8 @@ Remove two high-friction steps before the next live match:
 9. Marker family, side, and period are review-only controls in a collapsed section below the pitch.
 10. Marker filtering semantics, field coordinates, event schemas, and Soccer release policy do not
     change.
+11. Legacy free-text positions remain byte-for-byte unchanged until a manager explicitly changes
+    the Soccer role control; read fallback does not silently become a write migration.
 
 ## Implementation
 
@@ -35,16 +37,21 @@ Remove two high-friction steps before the next live match:
 
 - Add a strict parse/serialize helper under `src/lib/soccer/`.
 - Read and write `team_players.position` in the existing Teams roster editor.
+- Keep the existing merge-player conflict editor sport-aware: Soccer rows show strict role labels
+  and options, while untouched raw legacy values pass through unchanged.
 - Show the role selector only for Soccer teams and only to users who may manage the roster.
 - Include `position` in the Soccer cloud-roster query and prefill `initialRole` for newly loaded
   participants.
 - Preserve roles already frozen into an existing match setup.
+- Reuse an already-loaded local roster when offline and expose Retry when the required cloud roster
+  cannot be loaded.
 
 ### S3 - prioritize the field
 
 - Render `SoccerField` immediately after live side/player/capture controls.
 - Keep Goal/Foul/Card/Team quick capture immediately below the field.
 - Move marker filters into a native collapsed disclosure below quick capture.
+- Include the active family/side/period scope in the collapsed disclosure summary.
 - Preserve all current filter values and marker projection behavior.
 
 ## Acceptance
@@ -52,6 +59,7 @@ Remove two high-friction steps before the next live match:
 - A Soccer roster manager can set one of four default roles for every active player.
 - A new cloud-team Soccer match prefills each participant from that team-scoped default.
 - Missing or malformed role data safely displays and prefills Midfielder.
+- Saving only a name or jersey number does not normalize an untouched legacy position value.
 - Changing a role in setup or during a game does not alter the team default.
 - Basketball and other sports do not show or interpret the Soccer role control.
 - On the Field tab, the pitch appears before marker review filters.
