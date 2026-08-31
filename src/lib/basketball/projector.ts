@@ -8,7 +8,7 @@ import type {
 } from '../gameEvents/types'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../teamPlayers'
-import { resolveBasketballPeriodSegment } from './rules'
+import { isBasketballMatchRulesV3, resolveBasketballPeriodSegment } from './rules'
 import {
   applyBasketballClockEvent,
   clearPendingBasketballStoppageAfterEvent,
@@ -443,6 +443,7 @@ function applyMatchEnded(
   const momentError = validateActiveMoment(projection, sportState, event)
   if (momentError) return momentError
   projection.status = event.payload.reason === 'suspended' ? 'suspended' : 'ended'
+  projection.reopenMode = null
   projection.endedAt = event.occurredAt
   projection.endReason = event.payload.reason
   projection.result = resultForEnd(projection, event.payload.reason)
@@ -459,6 +460,25 @@ function applyMatchReopened(
   if (projection.status !== 'ended' && projection.status !== 'suspended') {
     return 'Only an ended or suspended Basketball match can reopen.'
   }
+  const mode = event.payload.mode ?? null
+  if (mode) {
+    const rules = sportState.setup.rulesSnapshot
+    if (
+      sportState.setup.version !== 2 ||
+      !isBasketballMatchRulesV3(rules) ||
+      rules.clockModel !== 'anchored'
+    ) return 'Basketball reopen mode requires anchored setup authority.'
+    projection.reopenMode = mode
+    if (mode === 'correct_records') return null
+    projection.completedPeriodIds = projection.completedPeriodIds.filter(
+      periodId => periodId !== event.period.id
+    )
+    projection.status = 'in_progress'
+    projection.endedAt = null
+    projection.endReason = null
+    projection.result = 'unresolved'
+    return null
+  }
   projection.status = projection.currentPeriodId &&
     !projection.completedPeriodIds.includes(projection.currentPeriodId)
     ? 'in_progress'
@@ -466,6 +486,7 @@ function applyMatchReopened(
   projection.endedAt = null
   projection.endReason = null
   projection.result = 'unresolved'
+  projection.reopenMode = null
   return null
 }
 

@@ -1340,6 +1340,9 @@ rows against the deployed released build. CI alone is not release sign-off.
 
 ## Quick smoke (minimal path)
 
+For anchored Basketball canonical readiness, Correct records, Resume game, recorder handoff, and
+explicit republication, use [the BKE-6D4 matrix](REGRESSION_BKE_6D4_FINALIZATION_AND_REOPEN.md).
+
 1. **Offline:** Sport → Setup → 2 players → Game → tap stats → Summary.  
 2. **Cloud:** Sign in → Teams → create team + 2 players → Cloud Games → new game from that team → record stats → Summary → Finalize.  
 2b. **Merge (024):** Teams as owner/admin → **Merge players** → complete wizard with **MERGE** confirm (use test duplicates only).  

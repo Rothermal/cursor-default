@@ -808,8 +808,12 @@ function prepareState(state: GameState): BasketballCommandResult<PreparedState> 
   if (!rebuilt.inspection.complete || rebuilt.state.sportGameState?.sportId !== 'basketball' || !rebuilt.state.eventStream) {
     return commandFailure('command_failed', 'Resolve Basketball Timeline diagnostics before editing events.')
   }
-  const status = rebuilt.state.sportGameState.projection.status
-  if (status !== 'in_progress' && status !== 'period_break') {
+  const projection = rebuilt.state.sportGameState.projection
+  const status = projection.status
+  if (
+    status !== 'in_progress' && status !== 'period_break' &&
+    !(status === 'ended' && projection.reopenMode === 'correct_records')
+  ) {
     return commandFailure('invalid_period', 'Reopen the Basketball game before editing events.')
   }
   const inspection = inspectGameEventStream(rebuilt.state.eventStream, gameEventRegistry)

@@ -347,7 +347,11 @@ function prepareState(
   }
   if (!recovering && (
     rebuilt.state.sportGameState.projection.status !== 'in_progress' &&
-    rebuilt.state.sportGameState.projection.status !== 'period_break'
+    rebuilt.state.sportGameState.projection.status !== 'period_break' &&
+    !(
+      rebuilt.state.sportGameState.projection.status === 'ended' &&
+      rebuilt.state.sportGameState.projection.reopenMode === 'correct_records'
+    )
   )) {
     return commandFailure('invalid_period', 'Reopen the Basketball game before changing Timeline events.')
   }

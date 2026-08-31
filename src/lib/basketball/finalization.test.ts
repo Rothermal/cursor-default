@@ -376,6 +376,8 @@ describe('Basketball finalization repository', () => {
       snapshot: createBasketballCanonicalSnapshot('game-1', recorderId, projection.state),
       score: { tracked: 2, opponent: 0 },
       endReason: 'completed',
+      anchored: false,
+      blockers: [],
     }
     cloudMock.rpc.mockResolvedValue({
       data: {
@@ -471,7 +473,7 @@ describe('Basketball finalization repository', () => {
       },
     ])
     expect(cloudMock.rpc).toHaveBeenCalledWith(
-      'get_basketball_canonical_publication_history',
+      'get_basketball_canonical_publication_history_v1',
       { p_game_id: 'game-1' }
     )
   })
@@ -518,6 +520,9 @@ describe('Basketball finalization repository', () => {
     await expect(reopenBasketballCloudGame('game-1', '  Correct scorer  ')).resolves.toEqual({
       gameId: 'game-1',
       publicationId: 'publication-1',
+      primaryRecorderId: null,
+      reason: 'Correct scorer',
+      mode: null,
       reopenedAt: '2026-08-16T18:15:00.000Z',
     })
     expect(cloudMock.rpc).toHaveBeenCalledWith('reopen_basketball_event_game', {

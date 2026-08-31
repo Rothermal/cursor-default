@@ -27,6 +27,7 @@ export function createBasketballMatchProjection(
 ): BasketballMatchProjection {
   const projection: BasketballMatchProjection = {
     status: 'not_started',
+    reopenMode: null,
     currentPeriodId: null,
     periods: [],
     startedPeriodIds: [],

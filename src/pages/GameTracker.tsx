@@ -393,6 +393,11 @@ export default function GameTracker() {
   const basketballSportState = isBasketballEventMode && state.sportGameState?.sportId === 'basketball'
     ? state.sportGameState
     : null
+  const basketballCorrectionMode = basketballSportState?.projection.status === 'ended' &&
+    basketballSportState.projection.reopenMode === 'correct_records'
+  useEffect(() => {
+    if (basketballCorrectionMode) setBasketballWorkspace('timeline')
+  }, [basketballCorrectionMode])
   const basketballMatchOpen = basketballSportState?.projection.status === 'in_progress' ||
     basketballSportState?.projection.status === 'period_break'
   const basketballCaptureUnits = useMemo(
@@ -1154,7 +1159,7 @@ export default function GameTracker() {
         )}
       </div>
 
-      {isBasketballEventMode && (
+      {isBasketballEventMode && !basketballCorrectionMode && (
         <BasketballClockStrip
           state={state}
           recorderUserId={user?.id ?? null}
@@ -1171,7 +1176,7 @@ export default function GameTracker() {
         />
       )}
 
-      {isBasketballEventMode && (
+      {isBasketballEventMode && !basketballCorrectionMode && (
         <div className="mx-auto w-full max-w-lg px-3 pb-2">
           <div className="grid h-11 grid-cols-2 rounded-lg border border-slate-300 bg-slate-100 p-1" role="tablist" aria-label="Basketball game workspace">
             <button
@@ -1216,7 +1221,14 @@ export default function GameTracker() {
         </div>
       )}
 
-      {(!isBasketballEventMode || basketballWorkspace === 'track') ? (
+      {basketballCorrectionMode ? (
+        <div className="mx-auto w-full max-w-lg space-y-3 px-3 pb-28">
+          <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+            Correct records mode. Live capture remains locked until this result is republished.
+          </p>
+          <BasketballTimeline />
+        </div>
+      ) : (!isBasketballEventMode || basketballWorkspace === 'track') ? (
         <div
           id={isBasketballEventMode ? 'basketball-track-panel' : undefined}
           role={isBasketballEventMode ? 'tabpanel' : undefined}
@@ -1700,7 +1712,7 @@ export default function GameTracker() {
           <button
             onClick={() => setShowRecentEvents(true)}
             disabled={isBasketballEventMode
-              ? basketballCaptureUnits.length === 0 && !canRestoreBasketball
+              ? basketballCorrectionMode || (basketballCaptureUnits.length === 0 && !canRestoreBasketball)
               : actionLog.length === 0}
             className="btn-secondary py-2 px-4 text-sm disabled:opacity-30"
           >

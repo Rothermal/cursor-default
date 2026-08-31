@@ -632,7 +632,11 @@ export function basketballTimelineCorrectionsEnabled(
 ): boolean {
   if (!authorityEditable || state.sportGameState?.sportId !== 'basketball') return false
   return state.sportGameState.projection.status === 'in_progress' ||
-    state.sportGameState.projection.status === 'period_break'
+    state.sportGameState.projection.status === 'period_break' ||
+    (
+      state.sportGameState.projection.status === 'ended' &&
+      state.sportGameState.projection.reopenMode === 'correct_records'
+    )
 }
 
 function sequenceLabelForEvents(events: BasketballMatchEvent[]): string {

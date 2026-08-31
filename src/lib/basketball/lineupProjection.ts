@@ -97,6 +97,9 @@ export function applyBasketballLineupEffectsAfterEvent(
     case 'basketball.period_ended':
       closePeriodLineups(projection, event.id, event.elapsedMs!)
       return null
+    case 'basketball.match_ended':
+      closePeriodLineups(projection, event.id, event.elapsedMs!)
+      return null
     case 'basketball.clock_started':
       projection.lineup.runningClockIntervals.push({
         periodId: event.period.id,
@@ -120,6 +123,11 @@ export function applyBasketballLineupEffectsAfterEvent(
     case 'basketball.match_roster_added':
       ensureParticipantProjection(projection, event.payload.participant.id, event.payload.participant.teamSide)
       return null
+    case 'basketball.match_reopened':
+      if (event.payload.mode === 'resume_game') {
+        reopenBasketballLineupsForResume(projection, event.id, event.period.id, event.elapsedMs!)
+      }
+      return null
     case 'basketball.foul':
     case 'basketball.ejection':
       refreshReplacementRequirements(projection)
@@ -127,6 +135,22 @@ export function applyBasketballLineupEffectsAfterEvent(
     default:
       return null
   }
+}
+
+function reopenBasketballLineupsForResume(
+  projection: BasketballMatchProjection,
+  eventId: string,
+  periodId: string,
+  elapsedMs: number
+): void {
+  for (const side of enabledSides(projection)) {
+    closeOpenLineupInterval(side, eventId, elapsedMs)
+    side.clockStartedInPeriod = false
+    side.boundaryConfirmationRequired = true
+    side.boundaryConfirmedPeriodId = null
+    openLineupInterval(side, periodId, elapsedMs, eventId, true)
+  }
+  refreshReplacementRequirements(projection)
 }
 
 export function basketballLineupProjectionDiagnostics(

@@ -1,7 +1,7 @@
 # Plan: BKE-6D Cloud Summary, Aggregates, and Lifecycle
 
-Status: Approved. All 32 product and implementation decisions are complete. BKE-6D1 through
-BKE-6D3 are implemented; BKE-6D4 readiness, finalization, and reopen is next.
+Status: Implemented. All 32 product and implementation decisions and BKE-6D1 through BKE-6D4
+are complete. BKE-6E release evidence and hardening is next.
 
 Parent: [PLAN_BKE_6_CLOCK_AND_LINEUPS.md](PLAN_BKE_6_CLOCK_AND_LINEUPS.md)
 
@@ -372,6 +372,14 @@ Basketball wrapper in this slice without widening Soccer or shared grants.
 ## 8. BKE-6D4: Readiness, Finalization, and Reopen
 
 BKE-6D4 extends the BKE-4C policy; it does not create a second publication system.
+
+Implementation: migration `064_basketball_anchored_finalization_reopen.sql` adds fixed anchored
+readiness/finalization, mode-aware reopen, versioned history, and recorder-handoff wrappers. The
+client independently evaluates ordered blockers, reruns both capabilities and current access before
+mutation, and applies a handoff only to the prior recorder's matching parked binding. Correct
+records stays terminal and Timeline-only; Resume game restores the exact paused period/clock and
+requires lineup review plus explicit Start. Existing clockless RPCs and mode-less reopen semantics
+remain unchanged. See `REGRESSION_BKE_6D4_FINALIZATION_AND_REOPEN.md`.
 
 ### Readiness and finalization
 

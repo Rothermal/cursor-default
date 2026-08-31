@@ -33,6 +33,11 @@ import {
 } from '../lib/basketball/cloudSync'
 import { enableBasketballEventCloud } from '../lib/basketball/enableCloudSync'
 import {
+  applyBasketballReopenHandoff,
+  loadBasketballReopenHandoff,
+  type BasketballReopenHandoff,
+} from '../lib/basketball/reopenHandoff'
+import {
   pauseRunningBasketballClockForWorkflow,
   shouldInterceptRunningBasketballClock,
   type BasketballWorkflowAction,
@@ -87,7 +92,6 @@ import {
   listParkedGameRecords,
   listParkedGames,
   loadActiveParkedGameState,
-  markParkedCloudGameReopened,
   parkActiveGame,
   parkedGameStorageErrorMessage,
   saveActiveGameState,
@@ -351,7 +355,10 @@ interface GameContextType {
   flushCloudSync: () => Promise<FlushCloudSyncResult>
   flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
   enableBasketballCloudSync: () => Promise<FlushCloudSyncResult>
-  markEventCloudGameReopened: (gameId: string) => void
+  markEventCloudGameReopened: (
+    gameId: string,
+    handoff?: BasketballReopenHandoff | null
+  ) => Promise<void>
   resolveEventConflict: (
     eventId: string,
     resolution: 'local' | 'remote'
@@ -1231,24 +1238,56 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { ok: true }
   }, [isConfigured, isOnline, userId])
 
-  const markEventCloudGameReopened = useCallback((gameId: string) => {
+  const markEventCloudGameReopened = useCallback(async (
+    gameId: string,
+    suppliedHandoff?: BasketballReopenHandoff | null
+  ) => {
     try {
-      setParkedGames(markParkedCloudGameReopened(userId, gameId))
-      if (stateRef.current.cloudSync.gameId === gameId) {
-        dispatch({
-          type: 'SET_CLOUD_SYNC_STATE',
-          cloudSync: {
-            gameStatus: 'in_progress',
-            status: 'idle',
-            lastError: null,
-          },
+      const handoff = suppliedHandoff === undefined
+        ? await loadBasketballReopenHandoff(gameId)
+        : suppliedHandoff
+      const matches = listParkedGameRecords(userId).filter(
+        record => record.gameState.cloudSync.gameId === gameId
+      )
+      for (const record of matches) {
+        const cloudStateChanged = record.gameState.cloudSync.gameStatus !== 'in_progress' ||
+          record.gameState.cloudSync.status !== 'idle' ||
+          record.gameState.cloudSync.lastError !== null
+        const cloudReopenedState: GameState = cloudStateChanged
+          ? {
+              ...record.gameState,
+              cloudSync: {
+                ...record.gameState.cloudSync,
+                gameStatus: 'in_progress',
+                status: 'idle',
+                lastError: null,
+              },
+            }
+          : record.gameState
+        const applied = handoff && userId
+          ? applyBasketballReopenHandoff(cloudReopenedState, userId, gameId, handoff)
+          : { ok: true as const, state: cloudReopenedState, changed: cloudStateChanged }
+        if (!applied.ok) {
+          setParkingError(applied.reason)
+          return
+        }
+        if (!applied.changed) continue
+        const dirty = Boolean(handoff && applied.changed)
+        saveParkedGameRecordStateAtomically(record.localGameId, applied.state, userId, {
+          dirty: dirty ? true : record.sync.dirty,
+          nextAttemptAt: dirty ? null : record.sync.nextAttemptAt,
         })
+        if (record.localGameId === activeLocalGameId) {
+          stateRef.current = applied.state
+          dispatch({ type: 'HYDRATE_STATE', state: applied.state })
+        }
       }
+      setParkedGames(listParkedGames(userId))
       setParkingError(null)
     } catch (error) {
       setParkingError(parkedGameStorageErrorMessage(error))
     }
-  }, [userId])
+  }, [activeLocalGameId, userId])
 
   const resolveEventConflict = useCallback(
     (eventId: string, resolution: 'local' | 'remote') => {
