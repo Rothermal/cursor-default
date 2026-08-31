@@ -51,6 +51,10 @@
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
   }
 
+  .pwa-status-game-offset {
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

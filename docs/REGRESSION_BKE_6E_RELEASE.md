@@ -128,7 +128,7 @@ for an unexecuted manual row.
 | Migration ceiling | `064`; no migration added |
 | Deployed identity | GitHub Pages injects `VITE_APP_BUILD_ID` from the exact `github.sha`; the shell displays a safe 12-character label and exposes the full id as its accessible name/title |
 | PWA update policy | Prompt before reload; an active anchored clock uses the centralized `reload_commit` preparation and must pause successfully before applying the worker update |
-| Local validation | Typecheck pass; lint pass with 3 existing Fast Refresh warnings; focused release suite 5 files/49 tests; full suite 181 files/1,291 tests; production PWA build pass with 12 precache entries (2,211.93 KiB) |
+| Local validation | Typecheck pass; lint pass with 3 existing Fast Refresh warnings; focused release suite 5 files/49 tests plus review follow-up workflow suite 3 files/72 tests; full suite 181 files/1,291 tests; production PWA build pass with 12 precache entries (2,212.09 KiB) |
 | Built artifact probe | `bke6e2-probe`, update guidance, and `reload_commit` are present in the production bundle; the worker waits for an explicit `SKIP_WAITING` message |
 | Exact browser/PWA evidence | Pending the merged/deployed candidate; use the procedures below and retain the result in this matrix |
 
@@ -276,7 +276,7 @@ history or revoke grants used by existing games.
 |---|---|---|---|---|
 | G01 | Run local-only capture/correction offline, park, reload, and reconnect | Local work remains coherent without capability claims; owned dirty work resumes safely | E2 hardening | Not run |
 | G02 | Reload/background a running clock with safe and unsafe wall-time movement | Safe anchor resumes; unsafe movement requires explicit recovery instead of silently accepting time | E2 hardening | Not run |
-| G03 | Install the PWA, deploy a release-stage rollback, and keep one stale client open/offline | Stale client remains on the old bundle until online reload; operator guidance and displayed build make this visible | E2 hardening | Runbook prepared; exact deployed rehearsal pending |
+| G03 | Install the PWA, deploy a release-stage rollback, and keep one stale client open/offline | Stale client remains on the old bundle until the prompt is accepted or all scoped clients close and the waiting worker activates; operator guidance and displayed build make this visible | E2 hardening | Runbook prepared; exact deployed rehearsal pending |
 | G04 | Switch anonymous/account A/account B with parked and bound games | Local and cloud ownership, capability cache, drafts, and recovery state remain isolated | Broader gate | Not run |
 | G05 | Exercise duplicate binding, stale sync completion, quota, cap, and recovery export | No authority is overwritten or falsely marked clean; recovery remains available | E2 hardening | Not run |
 
@@ -297,9 +297,9 @@ history or revoke grants used by existing games.
 | I01 | Inspect the running app after deployment | A concise displayed build/commit identifier matches the exact candidate | E2 hardening | SHA injection and display implemented; exact deployed match pending |
 | I02 | Confirm migrations and call both capability handshakes | Highest migration is 064; release contract v2 and clock/lineup version 1 are exact | E3 owner smoke | Not run |
 | I03 | Disable the device preference | New Event creation stops immediately on that device; existing Event and Legacy records remain available | E3 owner smoke | Not run |
-| I04 | Change the client stage to `internal`, build, deploy, and refresh/close-reopen an online PWA | New Event creation stops after bundle propagation; no server objects or existing records are changed | E2 hardening | Repeatable rollback procedure prepared; deployed rehearsal pending |
-| I05 | Repeat I04 with an offline/stale PWA | Old policy persists visibly until the new bundle loads; no claim of immediate remote shutdown is made | E2 hardening | Stale-build guidance implemented; deployed rehearsal pending |
-| I06 | Run lint, full tests, production build, and CI on the exact candidate | All automated gates pass; existing warnings are recorded separately | Automated | BKE-6E2 local typecheck/lint/1,291 tests/build pass; CI pending PR |
+| I04 | Change the client stage to `internal`, build, deploy, then accept the online PWA update prompt or close every scoped client and reopen after activation | Displayed build changes and new Event creation stops after activation; refresh alone is not sufficient, and no server objects or existing records are changed | E2 hardening | Repeatable rollback procedure prepared; deployed rehearsal pending |
+| I05 | Repeat I04 with an offline/stale PWA, including **Later** or prompt dismissal | Old policy persists visibly for that session until the waiting rollback bundle activates; no claim of immediate remote shutdown is made | E2 hardening | Stale-build guidance implemented; deployed rehearsal pending |
+| I06 | Run lint, full tests, production build, and CI on the exact candidate | All automated gates pass; existing warnings are recorded separately | Automated | BKE-6E2 local typecheck/lint/1,291 tests/build pass; updated PR CI is the exact-candidate gate |
 
 ## Go/No-Go
 

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { CloudOff, Download, RefreshCw, X } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useGame } from '../context/GameContext'
 import { APP_BUILD_LABEL } from '../lib/buildInfo'
 
 export default function PwaStatus() {
   const { prepareActiveGameMutation } = useGame()
+  const { pathname } = useLocation()
   const [online, setOnline] = useState(() => navigator.onLine)
+  const [offlineDismissed, setOfflineDismissed] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [updateError, setUpdateError] = useState<string | null>(null)
   const {
@@ -21,7 +24,10 @@ export default function PwaStatus() {
   })
 
   useEffect(() => {
-    const handleOnline = () => setOnline(true)
+    const handleOnline = () => {
+      setOnline(true)
+      setOfflineDismissed(false)
+    }
     const handleOffline = () => setOnline(false)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -43,16 +49,21 @@ export default function PwaStatus() {
     }
   }
 
-  if (!needRefresh && !offlineReady && online && !updateError) return null
+  if (!needRefresh && !offlineReady && (online || offlineDismissed) && !updateError) return null
 
   const dismiss = () => {
+    if (!online) setOfflineDismissed(true)
     setOfflineReady(false)
     setNeedRefresh(false)
     setUpdateError(null)
   }
 
+  const gameTrackerOffset = pathname === '/game'
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] px-3 safe-bottom sm:px-4">
+    <div
+      className={`pointer-events-none fixed inset-x-0 z-[80] px-3 sm:px-4 ${gameTrackerOffset ? 'pwa-status-game-offset' : 'bottom-0 safe-bottom'}`}
+    >
       <section
         role="status"
         aria-live="polite"

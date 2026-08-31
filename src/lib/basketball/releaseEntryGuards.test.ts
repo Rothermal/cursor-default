@@ -447,6 +447,7 @@ describe('Basketball release entry guards', () => {
 
     expect(context).toContain('const prepareActiveGameMutation = useCallback(')
     expect(context).toContain("'The Basketball clock is running. Pause and continue?'")
+    expect(context).toContain("if (action === 'reload_commit' && !runningClock) return true")
     expect(context).toContain('pauseRunningBasketballClockForWorkflow(current, action')
     expect(context.indexOf('saveActiveGameState(paused.state, userId)'))
       .toBeLessThan(context.indexOf("dispatch({ type: 'HYDRATE_STATE', state: paused.state })"))
@@ -460,6 +461,9 @@ describe('Basketball release entry guards', () => {
     const deploy = source('.github/workflows/deploy.yml')
     const shell = source('src/components/AppShell.tsx')
     const status = source('src/components/PwaStatus.tsx')
+    const css = source('src/index.css')
+    const releasePlan = source('docs/PLAN_BKE_6E_RELEASE_HARDENING.md')
+    const releaseMatrix = source('docs/REGRESSION_BKE_6E_RELEASE.md')
     const applyUpdate = between(
       status,
       'const applyUpdate = async () => {',
@@ -474,6 +478,14 @@ describe('Basketball release entry guards', () => {
     expect(status).toContain("useRegisterSW({\n    immediate: true")
     expect(status).toContain('Existing games remain saved.')
     expect(status).toContain('stays active until you choose Update')
+    expect(status).toContain('const [offlineDismissed, setOfflineDismissed] = useState(false)')
+    expect(status).toContain('setOfflineDismissed(false)')
+    expect(status).toContain('if (!online) setOfflineDismissed(true)')
+    expect(status).toContain('(online || offlineDismissed)')
+    expect(status).toContain("pathname === '/game'")
+    expect(css).toContain('.pwa-status-game-offset')
+    expect(releasePlan).toContain('loading or refreshing is not sufficient')
+    expect(releaseMatrix).toContain('refresh alone is not sufficient')
     expect(applyUpdate.indexOf("prepareActiveGameMutation('reload_commit')"))
       .toBeLessThan(applyUpdate.indexOf('updateServiceWorker(true)'))
   })

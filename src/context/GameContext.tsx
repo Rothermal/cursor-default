@@ -487,6 +487,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!hasActiveGame) return true
 
       const runningClock = shouldInterceptRunningBasketballClock(current, action)
+      if (action === 'reload_commit' && !runningClock) return true
+
       const message = runningClock
         ? 'The Basketball clock is running. Pause and continue?'
         : workflowConfirmationMessage(action)
