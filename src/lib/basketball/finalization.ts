@@ -85,9 +85,9 @@ export interface BasketballFinalizationPreview {
   readiness: BasketballFinalizationReadiness
   recorder: BasketballRecorderSummary
   projection: BasketballRecorderProjection
-  snapshot: BasketballCanonicalSnapshot
-  score: { tracked: number; opponent: number }
-  endReason: 'completed' | 'abandoned'
+  snapshot: BasketballCanonicalSnapshot | null
+  score: { tracked: number; opponent: number } | null
+  endReason: 'completed' | 'abandoned' | null
   anchored: boolean
   blockers: BasketballAnchoredFinalizationBlocker[]
 }
@@ -185,26 +185,29 @@ export async function prepareBasketballFinalization(
   const basketballState = projection.state.sportGameState?.sportId === 'basketball'
     ? projection.state.sportGameState
     : null
-  if (!projection.inspection.complete || !basketballState) {
-    throw new Error(
-      projection.inspection.diagnostics[0]?.message ??
-        'Primary recorder projection needs attention.'
-    )
-  }
-  const endReason = basketballState.projection.endReason
-  if (
-    basketballState.projection.status !== 'ended' ||
-    (endReason !== 'completed' && endReason !== 'abandoned')
-  ) {
-    throw new Error('Complete or abandon the primary Basketball game before finalizing.')
-  }
-  const anchoredEvaluation = evaluateBasketballAnchoredFinalization(projection.state)
-  if (
-    !anchoredEvaluation.applicable &&
-    endReason === 'completed' &&
-    basketballState.projection.score.tracked === basketballState.projection.score.opponent
-  ) {
-    throw new Error('A tied Basketball game requires another overtime.')
+  const anchoredEvaluation = evaluateBasketballAnchoredFinalization(projection.state, {
+    projectionComplete: projection.inspection.complete,
+  })
+  if (!anchoredEvaluation.applicable) {
+    if (!projection.inspection.complete || !basketballState) {
+      throw new Error(
+        projection.inspection.diagnostics[0]?.message ??
+          'Primary recorder projection needs attention.'
+      )
+    }
+    const legacyEndReason = basketballState.projection.endReason
+    if (
+      basketballState.projection.status !== 'ended' ||
+      (legacyEndReason !== 'completed' && legacyEndReason !== 'abandoned')
+    ) {
+      throw new Error('Complete or abandon the primary Basketball game before finalizing.')
+    }
+    if (
+      legacyEndReason === 'completed' &&
+      basketballState.projection.score.tracked === basketballState.projection.score.opponent
+    ) {
+      throw new Error('A tied Basketball game requires another overtime.')
+    }
   }
   if (anchoredEvaluation.applicable) {
     if (!options?.userId) {
@@ -217,7 +220,11 @@ export async function prepareBasketballFinalization(
     })
   }
 
-  if (!readiness.primaryCheckpointCurrent) {
+  const endReason = basketballState?.projection.endReason
+  const terminal = projection.inspection.complete &&
+    basketballState?.projection.status === 'ended' &&
+    (endReason === 'completed' || endReason === 'abandoned')
+  if (terminal && !readiness.primaryCheckpointCurrent) {
     await confirmPrimaryCheckpoint(gameId, recorder.recorderId, projection)
     readiness = await loadBasketballFinalizationReadiness(gameId)
     if (
@@ -247,9 +254,13 @@ export async function prepareBasketballFinalization(
     readiness,
     recorder,
     projection,
-    snapshot: createBasketballCanonicalSnapshot(gameId, recorder.recorderId, projection.state),
-    score: { ...basketballState.projection.score },
-    endReason,
+    snapshot: terminal
+      ? createBasketballCanonicalSnapshot(gameId, recorder.recorderId, projection.state)
+      : null,
+    score: projection.inspection.complete && basketballState
+      ? { ...basketballState.projection.score }
+      : null,
+    endReason: terminal ? endReason : null,
     anchored: anchoredEvaluation.applicable,
     blockers,
   }
@@ -262,6 +273,9 @@ export async function finalizeBasketballGame(
   if (!supabase) throw new Error('Supabase client not configured')
   if (preview.blockers.length > 0) {
     throw new Error('Resolve every Basketball finalization blocker before publishing.')
+  }
+  if (!preview.snapshot || !preview.score || !preview.endReason || !preview.projection.inspection.complete) {
+    throw new Error('Basketball finalization preview is not publishable.')
   }
   if (preview.anchored) {
     if (!options?.userId) {

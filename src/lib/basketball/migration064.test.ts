@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { BASKETBALL_ANCHORED_FINALIZATION_BLOCKER_ORDER } from './anchoredFinalization'
 
 const sql = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/064_basketball_anchored_finalization_reopen.sql'),
@@ -47,5 +48,21 @@ describe('migration 064 Basketball anchored finalization and reopen', () => {
     expect(sql.match(/perform public\.get_basketball_release_capabilities\(\);/g)).toHaveLength(2)
     expect(sql.match(/perform public\.get_basketball_clock_lineup_capabilities_v1\(\);/g)).toHaveLength(2)
     expect(sql).not.toContain('soccer')
+  })
+
+  it('keeps the server blocker catalog in the client presentation order', () => {
+    const positions = BASKETBALL_ANCHORED_FINALIZATION_BLOCKER_ORDER.map(code => {
+      const position = sql.indexOf(`array_append(v_blockers, '${code}')`)
+      expect(position, `missing server blocker ${code}`).toBeGreaterThanOrEqual(0)
+      return position
+    })
+    expect(positions).toEqual([...positions].sort((left, right) => left - right))
+  })
+
+  it('validates persisted clock payload anchors independently of paused state', () => {
+    expect(sql).toContain("event.event_type = 'basketball.clock_started'")
+    expect(sql).toContain("(event.payload->>'anchorelapsedms')::numeric <> event.elapsed_ms")
+    expect(sql).toContain("(event.payload->>'elapsedms')::numeric <> event.elapsed_ms")
+    expect(sql).toContain("(event.payload->>'toelapsedms')::numeric <> event.elapsed_ms")
   })
 })

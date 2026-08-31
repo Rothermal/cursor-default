@@ -822,8 +822,12 @@ export function reopenBasketballMatch(
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const reason = options.reason.trim()
-  if (!reason) {
-    return failure(state, 'command_failed', 'Enter a reason for reopening the Basketball game.')
+  if (reason.length < 3) {
+    return failure(
+      state,
+      'command_failed',
+      'Basketball reopen reasons must contain at least 3 characters.'
+    )
   }
   if (reason.length > 240) {
     return failure(state, 'command_failed', 'Basketball reopen reasons cannot exceed 240 characters.')

@@ -5,6 +5,7 @@ import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEventActor, GameEventDiagnostic } from '../gameEvents/types'
 import { classifyShotZone, normalizedCourtLocationToFeet } from './courtGeometry'
 import { basketballHistoricalDisplayMs } from './historicalTime'
+import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { resolveBasketballPeriodSegment } from './rules'
 import { orderBasketballEventsForProjection } from './lineupReplay'
 import type {
@@ -631,12 +632,7 @@ export function basketballTimelineCorrectionsEnabled(
   authorityEditable: boolean
 ): boolean {
   if (!authorityEditable || state.sportGameState?.sportId !== 'basketball') return false
-  return state.sportGameState.projection.status === 'in_progress' ||
-    state.sportGameState.projection.status === 'period_break' ||
-    (
-      state.sportGameState.projection.status === 'ended' &&
-      state.sportGameState.projection.reopenMode === 'correct_records'
-    )
+  return isBasketballTimelineCorrectionProjection(state.sportGameState.projection)
 }
 
 function sequenceLabelForEvents(events: BasketballMatchEvent[]): string {

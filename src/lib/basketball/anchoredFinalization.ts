@@ -1,6 +1,7 @@
 import type { GameState } from '../../types'
 import { gameEventRegistry } from '../gameEvents/runtime'
 import { inspectGameEventStream } from '../gameEvents/stream'
+import type { GameEvent } from '../gameEvents/types'
 import { isBasketballAnchoredCloudAuthority } from './cloudAuthorization'
 
 export type BasketballAnchoredFinalizationBlockerCode =
@@ -25,6 +26,24 @@ export interface BasketballAnchoredFinalizationEvaluation {
   blockers: BasketballAnchoredFinalizationBlocker[]
 }
 
+export interface BasketballAnchoredFinalizationEvaluationOptions {
+  projectionComplete?: boolean
+}
+
+export const BASKETBALL_ANCHORED_FINALIZATION_BLOCKER_ORDER: readonly
+  BasketballAnchoredFinalizationBlockerCode[] = [
+    'source_invalid',
+    'terminal_outcome_required',
+    'periods_incomplete',
+    'clock_not_paused',
+    'clock_anchor_unsafe',
+    'tracked_lineup_incomplete',
+    'replacement_required',
+    'boundary_review_required',
+    'equal_play_override_incomplete',
+    'completed_game_tied',
+  ]
+
 const blockerMessages: Record<BasketballAnchoredFinalizationBlockerCode, string> = {
   source_invalid: 'The primary Basketball event stream does not project completely.',
   terminal_outcome_required: 'Complete or abandon the primary Basketball game before finalizing.',
@@ -39,7 +58,8 @@ const blockerMessages: Record<BasketballAnchoredFinalizationBlockerCode, string>
 }
 
 export function evaluateBasketballAnchoredFinalization(
-  state: GameState
+  state: GameState,
+  options: BasketballAnchoredFinalizationEvaluationOptions = {}
 ): BasketballAnchoredFinalizationEvaluation {
   if (!isBasketballAnchoredCloudAuthority(state)) {
     return { applicable: false, blockers: [] }
@@ -50,14 +70,45 @@ export function evaluateBasketballAnchoredFinalization(
     ? state.sportGameState
     : null
   const stream = state.eventStream
-  if (!sportState || !stream || !inspectGameEventStream(stream, gameEventRegistry).complete) {
+  const inspection = stream
+    ? inspectGameEventStream(stream, gameEventRegistry)
+    : null
+  if (!sportState || !stream || !inspection?.complete) {
     addBlocker(blockers, 'source_invalid')
+    return { applicable: true, blockers }
+  }
+
+  const clockRowsUnsafe = inspection.activeEvents.some(event => {
+    if (event.eventType === 'basketball.clock_started') {
+      return typeof event.payload.anchorElapsedMs !== 'number' ||
+        event.payload.anchorElapsedMs !== event.elapsedMs
+    }
+    if (event.eventType === 'basketball.clock_paused') {
+      return typeof event.payload.elapsedMs !== 'number' ||
+        event.payload.elapsedMs !== event.elapsedMs
+    }
+    if (event.eventType === 'basketball.clock_adjusted') {
+      return typeof event.payload.toElapsedMs !== 'number' ||
+        event.payload.toElapsedMs !== event.elapsedMs
+    }
+    return false
+  })
+  const latestClockStart = latestSequence(inspection.activeEvents, 'basketball.clock_started')
+  const latestClockPause = latestSequence(inspection.activeEvents, 'basketball.clock_paused')
+  const rawClockRunning = latestClockStart !== null &&
+    (latestClockPause === null || latestClockStart > latestClockPause)
+  if (options.projectionComplete === false) {
+    if (rawClockRunning) addBlocker(blockers, 'clock_not_paused')
+    if (rawClockRunning || clockRowsUnsafe) addBlocker(blockers, 'clock_anchor_unsafe')
+    if (blockers.length === 0) addBlocker(blockers, 'source_invalid')
     return { applicable: true, blockers }
   }
 
   const projection = sportState.projection
   const terminal = projection.status === 'ended' &&
     (projection.endReason === 'completed' || projection.endReason === 'abandoned')
+  const completedTied = projection.endReason === 'completed' &&
+    projection.score.tracked === projection.score.opponent
   if (!terminal) addBlocker(blockers, 'terminal_outcome_required')
 
   if (projection.endReason === 'completed') {
@@ -68,15 +119,13 @@ export function evaluateBasketballAnchoredFinalization(
     if ([...requiredPeriodIds].some(id => !projection.completedPeriodIds.includes(id))) {
       addBlocker(blockers, 'periods_incomplete')
     }
-    if (projection.score.tracked === projection.score.opponent) {
-      addBlocker(blockers, 'completed_game_tied')
-    }
   }
 
   const clock = projection.clock
   if (!clock || clock.running) addBlocker(blockers, 'clock_not_paused')
   if (
     !clock ||
+    clockRowsUnsafe ||
     clock.anchorElapsedMs !== null ||
     clock.anchorOccurredAt !== null ||
     clock.lastRunningElapsedMs !== null
@@ -98,8 +147,21 @@ export function evaluateBasketballAnchoredFinalization(
   if (!lineup?.enforcedOverridesComplete || lineup.pendingEqualPlayOverride) {
     addBlocker(blockers, 'equal_play_override_incomplete')
   }
+  if (completedTied) addBlocker(blockers, 'completed_game_tied')
 
   return { applicable: true, blockers }
+}
+
+function latestSequence(
+  events: readonly GameEvent[],
+  eventType: string
+): number | null {
+  let latest: number | null = null
+  for (const event of events) {
+    if (event.eventType !== eventType) continue
+    if (latest === null || event.sequence > latest) latest = event.sequence
+  }
+  return latest
 }
 
 export function basketballAnchoredFinalizationBlockerMessage(

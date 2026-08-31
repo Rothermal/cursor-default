@@ -45,7 +45,7 @@ export default function BasketballReopenDialog({
           </button>
         </header>
 
-        <form className="space-y-4 px-4 py-4" onSubmit={event => { event.preventDefault(); if (trimmedReason) onSubmit(trimmedReason) }}>
+        <form className="space-y-4 px-4 py-4" onSubmit={event => { event.preventDefault(); if (trimmedReason.length >= 3) onSubmit(trimmedReason) }}>
           <label className="block text-sm font-semibold text-slate-700">
             Reason
             <textarea
@@ -60,7 +60,7 @@ export default function BasketballReopenDialog({
           {errorMessage && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{errorMessage}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
             <button type="button" onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-            <button type="submit" disabled={!trimmedReason} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-40">
+            <button type="submit" disabled={trimmedReason.length < 3} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-40">
               <RotateCcw size={16} aria-hidden />
               Reopen game
             </button>

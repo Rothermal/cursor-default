@@ -605,31 +605,6 @@ export function listParkedGameRecords(ownerId: string | null): ParkedGameRecord[
     .filter(record => !record.ownerId || !ownerId || record.ownerId === ownerId)
 }
 
-export function markParkedCloudGameReopened(
-  ownerId: string | null,
-  cloudGameId: string
-): ParkedGameSummary[] {
-  const matches = listParkedGameRecords(ownerId).filter(
-    record => record.gameState.cloudSync.gameId === cloudGameId
-  )
-  for (const record of matches) {
-    saveParkedGameRecordState(
-      record.localGameId,
-      {
-        ...record.gameState,
-        cloudSync: {
-          ...record.gameState.cloudSync,
-          gameStatus: 'in_progress',
-          status: 'idle',
-          lastError: null,
-        },
-      },
-      ownerId
-    )
-  }
-  return listParkedGames(ownerId)
-}
-
 /**
  * True when any parked (or active-persisted) local game is bound to this cloud game and
  * still has unsynced progress. Cloud Games/Admin delete must check this — the active

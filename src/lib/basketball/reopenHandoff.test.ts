@@ -10,6 +10,7 @@ import {
 } from './finalization'
 import { applyBasketballReopenHandoff, type BasketballReopenHandoff } from './reopenHandoff'
 import { buildBasketballHistoricalShotDraft } from './shotEditCommands'
+import { basketballLineupCorrectionDraft } from './lineupCorrectionCommands'
 import { basketballTimelineCorrectionsEnabled } from './timeline'
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
@@ -43,6 +44,13 @@ describe('BKE-6D4 anchored finalization and reopen handoff', () => {
     })
     expect(basketballTimelineCorrectionsEnabled(applied.state, true)).toBe(true)
     expect(buildBasketballHistoricalShotDraft(applied.state).ok).toBe(true)
+    const substitution = applied.state.eventStream?.events.find(event => (
+      isGameEventEnvelope(event) && event.eventType === 'basketball.substitution'
+    ))
+    if (!substitution || !isGameEventEnvelope(substitution)) {
+      throw new Error('Anchored fixture substitution is unavailable.')
+    }
+    expect(basketballLineupCorrectionDraft(applied.state, substitution.id).ok).toBe(true)
 
     const repeated = applyBasketballReopenHandoff(
       applied.state,

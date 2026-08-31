@@ -15,6 +15,7 @@ import {
   type BasketballCommandResult,
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
+import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { createBasketballUuid } from './id'
 import { defaultBasketballHistoricalTime, validateBasketballHistoricalTime } from './historicalTime'
 import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
@@ -490,11 +491,7 @@ function prepareState(
     return commandFailure('command_failed', 'Resolve Basketball Timeline diagnostics before editing events.')
   }
   const projection = rebuilt.state.sportGameState.projection
-  const status = projection.status
-  if (
-    !recovering && status !== 'in_progress' && status !== 'period_break' &&
-    !(status === 'ended' && projection.reopenMode === 'correct_records')
-  ) {
+  if (!recovering && !isBasketballTimelineCorrectionProjection(projection)) {
     return commandFailure('invalid_period', 'Reopen the Basketball game before editing events.')
   }
   const inspection = inspectGameEventStream(rebuilt.state.eventStream, gameEventRegistry)

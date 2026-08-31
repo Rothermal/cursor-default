@@ -15,6 +15,7 @@ import {
   type BasketballCommandResult,
 } from './commands'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
+import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import {
   isThreePointer,
   normalizedCourtLocationToFeet,
@@ -612,11 +613,7 @@ function prepareHistoricalShotState(state: GameState): BasketballCommandResult<G
     return commandFailure('command_failed', 'Resolve Basketball Timeline diagnostics before adding shots.')
   }
   const projection = rebuilt.state.sportGameState.projection
-  const status = projection.status
-  if (
-    status !== 'in_progress' && status !== 'period_break' &&
-    !(status === 'ended' && projection.reopenMode === 'correct_records')
-  ) {
+  if (!isBasketballTimelineCorrectionProjection(projection)) {
     return commandFailure('invalid_period', 'Reopen the Basketball game before adding shots.')
   }
   return { ok: true, value: rebuilt.state }
@@ -759,11 +756,7 @@ function prepareShotEditState(
     return commandFailure('command_failed', 'Resolve Basketball Timeline diagnostics before editing shots.')
   }
   const projection = rebuilt.state.sportGameState.projection
-  const status = projection.status
-  if (
-    status !== 'in_progress' && status !== 'period_break' &&
-    !(status === 'ended' && projection.reopenMode === 'correct_records')
-  ) {
+  if (!isBasketballTimelineCorrectionProjection(projection)) {
     return commandFailure('invalid_period', 'Reopen the Basketball game before editing shots.')
   }
   const inspection = inspectGameEventStream(rebuilt.state.eventStream, gameEventRegistry)

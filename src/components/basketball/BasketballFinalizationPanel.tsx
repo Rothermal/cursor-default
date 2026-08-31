@@ -402,18 +402,22 @@ export default function BasketballFinalizationPanel({
               This locks <span className="font-semibold">{preview.recorder.displayName}</span> as
               the canonical recorder and publishes this result.
             </p>
-            <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
-              <div>
-                <p className="text-3xl font-bold text-blue-800">{preview.score.tracked}</p>
-                <p className="text-xs text-slate-500">Tracked</p>
+            {preview.score && (
+              <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
+                <div>
+                  <p className="text-3xl font-bold text-blue-800">{preview.score.tracked}</p>
+                  <p className="text-xs text-slate-500">Tracked</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-slate-800">{preview.score.opponent}</p>
+                  <p className="text-xs text-slate-500">Opponent</p>
+                </div>
               </div>
-              <div>
-                <p className="text-3xl font-bold text-slate-800">{preview.score.opponent}</p>
-                <p className="text-xs text-slate-500">Opponent</p>
-              </div>
-            </div>
+            )}
             <p className="mt-3 text-xs font-semibold capitalize text-slate-600">
-              {preview.endReason} | checkpoint current | {preview.projection.eventStream.events.length} events
+              {preview.endReason ?? 'Not ready'} | {preview.readiness.primaryCheckpointCurrent
+                ? 'checkpoint current'
+                : 'checkpoint pending'} | {preview.projection.eventStream.events.length} events
             </p>
             {preview.readiness.nonPrimaryAttentionCount > 0 && (
               <p className="mt-3 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -444,7 +448,13 @@ export default function BasketballFinalizationPanel({
               <button
                 type="button"
                 onClick={() => { void confirmFinalization() }}
-                disabled={busy || preview.blockers.length > 0}
+                disabled={
+                  busy ||
+                  preview.blockers.length > 0 ||
+                  !preview.snapshot ||
+                  !preview.score ||
+                  !preview.endReason
+                }
                 className="min-h-11 bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50"
               >
                 {busy ? 'Finalizing...' : 'Finalize and Lock'}
