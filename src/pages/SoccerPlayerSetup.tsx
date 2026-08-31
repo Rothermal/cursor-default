@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
+import { parseSoccerRosterRole } from '../lib/soccer/rosterRole'
 import {
   createSoccerSportGameState,
   createSoccerUuid,
@@ -53,6 +54,7 @@ export default function SoccerPlayerSetup() {
   const [error, setError] = useState<string | null>(null)
   const [confirmShortHanded, setConfirmShortHanded] = useState(false)
   const cloudRosterLoaded = useRef(false)
+  const rosterRolesByPlayerId = useRef<Record<string, SoccerMatchParticipant['initialRole']>>({})
 
   useEffect(() => {
     if (state.eventStream?.events.length) navigate('/game', { replace: true })
@@ -65,18 +67,13 @@ export default function SoccerPlayerSetup() {
 
   useEffect(() => {
     if (!setup?.sourceTeamId || !supabase || cloudRosterLoaded.current) return
-    if (state.players.length > 0) {
-      cloudRosterLoaded.current = true
-      setRosterLoading(false)
-      return
-    }
     let cancelled = false
     const loadRoster = async () => {
       setRosterLoading(true)
       setError(null)
       const { data, error: loadError } = await supabase!
         .from('team_players')
-        .select('player_id,jersey_number,players!inner(id,first_name,last_name)')
+        .select('player_id,jersey_number,position,players!inner(id,first_name,last_name)')
         .eq('team_id', setup.sourceTeamId)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -89,11 +86,16 @@ export default function SoccerPlayerSetup() {
       type RosterRow = {
         player_id: string
         jersey_number: string | null
+        position: string | null
         players: { id: string; first_name: string; last_name: string | null }
       }
+      const rows = (data ?? []) as unknown as RosterRow[]
+      rosterRolesByPlayerId.current = Object.fromEntries(
+        rows.map(row => [row.player_id, parseSoccerRosterRole(row.position)])
+      )
       dispatch({
         type: 'SET_PLAYERS',
-        players: ((data ?? []) as unknown as RosterRow[]).map(row => ({
+        players: rows.map(row => ({
           id: row.player_id,
           name: `${row.players.first_name} ${row.players.last_name ?? ''}`.trim(),
           number: row.jersey_number ?? '',
@@ -108,6 +110,7 @@ export default function SoccerPlayerSetup() {
   }, [dispatch, setup?.sourceTeamId, state.players.length])
 
   useEffect(() => {
+    if (setup?.sourceTeamId && !cloudRosterLoaded.current) return
     setDrafts(current => {
       const next = [...current]
       let changed = false
@@ -120,14 +123,15 @@ export default function SoccerPlayerSetup() {
           displayName: player.name,
           number: player.number || null,
           initialStatus: 'bench',
-          initialRole: { group: 'midfielder', label: null },
+          initialRole: rosterRolesByPlayerId.current[player.id]
+            ?? { group: 'midfielder', label: null },
           selected: !hadSavedSelection.current,
         })
         changed = true
       }
       return changed ? next : current
     })
-  }, [state.players])
+  }, [setup?.sourceTeamId, state.players])
 
   useEffect(() => {
     if (!setup || state.eventStream?.events.length) return

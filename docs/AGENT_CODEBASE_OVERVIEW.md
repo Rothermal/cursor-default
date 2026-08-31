@@ -397,7 +397,11 @@ renders the anchored clock without per-second reducer writes and uses checked he
 `src/lib/soccer/live.ts` for periods, substitutions, roles, direction, rules, participant
 changes, history corrections, diagnostics, and match end/reopen. SOC-6E1 keeps those existing
 record routes available in production, and SOC-6E3 makes new Soccer discovery and creation a
-device-local production opt-in. Cloud teams are read-only roster
+device-local production opt-in. The S11 match-readiness follow-up stores strict Soccer default
+roles in the existing team-scoped `team_players.position` field and snapshots them only into fresh
+cloud-team participant drafts; setup and live role changes remain match-only. S3 keeps capture-side,
+player, and mode controls above the live pitch, moves quick capture directly below it, and collapses
+marker review filters below both. Cloud teams are read-only roster
 sources; SOC-5A mirrors healthy local event streams, SOC-5B resumes the same recorder from cloud,
 and SOC-5C lets additional authorized team recorders start independent streams against the same
 game while viewers inspect only the primary stream. SOC-5D review resolves the active canonical

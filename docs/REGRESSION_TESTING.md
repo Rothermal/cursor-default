@@ -1340,6 +1340,20 @@ unexecuted broader-role or second-device rows passed.
 
 ---
 
+## 11z. Soccer match readiness: default roles and field priority
+
+| # | Scenario | Expected |
+|---|---|---|
+| 11z.1 | Open a Soccer team in Team Manage, add or edit players, and assign Goalkeeper, Defender, Midfielder, and Forward defaults | Each role saves on that team roster and remains visible after reload; non-Soccer rosters show no Soccer role control |
+| 11z.2 | Start a new cloud-team Soccer match and continue to Player Setup | Every fresh participant prefills the saved team role; null, unknown, or legacy roster position text falls back to Midfielder |
+| 11z.3 | Change a player's role in Player Setup or during the match, then reopen Team Manage | The match uses the override and the team roster default is unchanged |
+| 11z.4 | Open the live Soccer Field tab on a narrow phone viewport | Side, player, and Shot/Defense/Foul controls lead directly to the pitch; quick capture follows it; Marker filters are collapsed below |
+| 11z.5 | Expand Marker filters and exercise family, side, and period options | Existing markers filter exactly as before and the disclosure remains keyboard-operable |
+
+See [the focused S11/S3 plan](PLAN_SOC_MATCH_READINESS_S11_S3.md) for fixed scope and storage decisions.
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.

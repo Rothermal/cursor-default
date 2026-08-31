@@ -94,7 +94,8 @@ or the rest of detailed goal metadata (`M5`).
 
 ### S2 - Substitution from the Field tab
 
-**Status:** confirmed — largest first-match challenge  
+**Status:** confirmed — largest first-match challenge
+
 **Theme:** lineup during live play  
 **Where:** `SoccerGameTracker` Field tab, `SoccerLiveActionDialog` `substitution`
 
@@ -118,11 +119,13 @@ buttons to the four-column row.
 
 ### S3 - Keep the pitch on screen
 
-**Status:** confirmed — largest first-match challenge  
+**Status:** implemented — focused field-priority slice; see
+[`PLAN_SOC_MATCH_READINESS_S11_S3.md`](PLAN_SOC_MATCH_READINESS_S11_S3.md)
+
 **Theme:** mobile layout  
 **Where:** Field tab chrome in `SoccerGameTracker`
 
-Above the pitch the Field tab currently stacks:
+Before this slice, the Field tab stacked:
 
 - Tracked / Opponent
 - player chips
@@ -134,8 +137,10 @@ Above the pitch the Field tab currently stacks:
 On a phone the pitch and quick actions sit below that chrome. Marker filters
 are review controls; they do not need to stay expanded while recording.
 
-**Likely direction:** keep side, player, and capture mode visible; collapse
-marker filters behind a review control; do not change marker meaning.
+**Implemented direction:** side, player, and capture mode remain visible. The
+pitch and quick capture now precede a collapsed, native Marker filters
+disclosure. Marker meaning and saved filter state did not change. The broader
+`S2` substitution/action-shell work remains open.
 
 **Not this item:** application-wide reskin (`M14`).
 
@@ -262,7 +267,9 @@ defense sheet from the current location/player. Keep one
 
 ### S11 - Default player role that carries between games
 
-**Status:** confirmed  
+**Status:** implemented; see
+[`PLAN_SOC_MATCH_READINESS_S11_S3.md`](PLAN_SOC_MATCH_READINESS_S11_S3.md)
+
 **Theme:** roster / setup  
 **Where:** `SoccerPlayerSetup` `initialRole`; in-game `soccer.role_changed`; no player- or roster-level soccer role
 
@@ -275,18 +282,16 @@ Owner confirmation: role may still change during a match, but the default
 should be assignable on the player/roster and reused the next time that
 player is in a soccer lineup.
 
-**Likely direction:** store a soccer default role on the roster/player used by
-setup, prefill `initialRole` from it, and keep live Role / `soccer.role_changed`
-as the match override only. Do not write in-game role changes back unless the
-recorder explicitly updates the default.
+**Implemented direction:** Soccer team roster entries store one strict
+`soccer:*` role in `team_players.position`. Team management defaults new rows
+to Midfielder and lets roster managers edit the value. Fresh cloud-team match
+setup prefills `initialRole`; setup and live Role changes remain match-only.
+Null, unknown, and legacy free text safely fall back to Midfielder.
 
-**Planning note:** `SoccerTeamSettings` cannot accept this today; its local and
-SQL validators require exactly `{ rules }`. A role belongs to a player's team
-roster entry, not the global player identity. The focused plan must choose
-between using the existing team-scoped `team_players.position` text field with
-a strict Soccer mapping or adding explicit sport metadata to the roster. It
-must also define legacy/null fallback to Midfielder and merge behavior before
-`S19` consumes the defaults.
+**Storage note:** `SoccerTeamSettings` remains exactly `{ rules }`; role data is
+team-roster scoped, not global player identity or team settings. Player merges
+already preserve the surviving team roster entry. `S19` may consume these
+stable defaults later without changing live role-event authority.
 
 **Not this item:** formation drawings (`S19`), minutes-by-role analysis, or
 treating role as a second player identity.
@@ -656,9 +661,10 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Code-confirmed defect or constraint | `S2`, `S3`, `S13`, `S18`, `S21` | Plan the smallest repair with regression coverage |
+| Code-confirmed defect or constraint | `S2`, `S13`, `S18`, `S21` | Plan the smallest repair with regression coverage |
 | Confirmed symptom; reproduce the exact branch | `S12`, `S14` | Capture source/authority and failure details before choosing a fix |
-| Confirmed product request with open data/UX choices | `S11`, `S15`, `S16`, `S19` | Short Q&A, then a focused phase plan |
+| Confirmed product request with open data/UX choices | `S15`, `S16`, `S19` | Short Q&A, then a focused phase plan |
+| Implemented focused follow-up | `S3`, `S11` | Validate during the next live match and iterate from evidence |
 | Approved implementation plan | `S17`, `S20` | Deliver the reader-first restart slices in `PLAN_SOC_RESTARTS.md` |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 

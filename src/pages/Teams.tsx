@@ -23,6 +23,13 @@ import { hasUnsyncedParkedBindingForCloudTeam } from '../lib/gameParking'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import {
+  parseSoccerRosterRole,
+  serializeSoccerRosterRole,
+  soccerRosterRoleLabel,
+  SOCCER_ROSTER_ROLE_OPTIONS,
+  type SoccerRosterRoleGroup,
+} from '../lib/soccer/rosterRole'
+import {
   acceptedTeamRole,
   canClaimPlayerGuardianship,
   canChangeTeamMemberRole,
@@ -59,6 +66,7 @@ interface PlayerRow {
   first_name: string
   last_name: string | null
   jersey_number: string | null
+  position: string | null
   nickname: string | null
 }
 
@@ -167,6 +175,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [newPlayerFirst, setNewPlayerFirst] = useState('')
   const [newPlayerLast, setNewPlayerLast] = useState('')
   const [newPlayerNumber, setNewPlayerNumber] = useState('')
+  const [newPlayerSoccerRole, setNewPlayerSoccerRole] = useState<SoccerRosterRoleGroup>('midfielder')
 
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
   const [editingTeamName, setEditingTeamName] = useState('')
@@ -176,6 +185,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [editingPlayerLast, setEditingPlayerLast] = useState('')
   const [editingPlayerNumber, setEditingPlayerNumber] = useState('')
   const [editingPlayerNickname, setEditingPlayerNickname] = useState('')
+  const [editingPlayerSoccerRole, setEditingPlayerSoccerRole] = useState<SoccerRosterRoleGroup>('midfielder')
   const [savingNickname, setSavingNickname] = useState(false)
 
   const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([])
@@ -216,6 +226,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     () => teams.find(team => team.id === selectedTeamId) ?? null,
     [teams, selectedTeamId]
   )
+  const isSoccerTeam = selectedTeam?.seasons.sport === 'soccer'
   const visibleTeams = useMemo(
     () =>
       !isManagementRoute && scopedSport
@@ -351,7 +362,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('team_players')
-        .select('jersey_number,players!inner(id,created_by,first_name,last_name,nickname)')
+        .select('jersey_number,position,players!inner(id,created_by,first_name,last_name,nickname)')
         .eq('team_id', selectedTeamId)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -363,13 +374,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         return
       }
 
-      type TeamPlayerJoin = { jersey_number: string | null; players: { id: string; created_by: string | null; first_name: string; last_name: string | null; nickname: string | null } }
+      type TeamPlayerJoin = { jersey_number: string | null; position: string | null; players: { id: string; created_by: string | null; first_name: string; last_name: string | null; nickname: string | null } }
       setPlayers(((data ?? []) as unknown as TeamPlayerJoin[]).map(row => ({
         id: row.players.id,
         created_by: row.players.created_by,
         first_name: row.players.first_name,
         last_name: row.players.last_name,
         jersey_number: row.jersey_number,
+        position: row.position,
         nickname: row.players.nickname,
       })))
       setLoadingPlayers(false)
@@ -844,12 +856,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     }
 
     const jerseyNumber = newPlayerNumber.trim() || null
+    const position = isSoccerTeam ? serializeSoccerRosterRole(newPlayerSoccerRole) : null
     const { error: junctionError } = await supabaseClient
       .from('team_players')
       .insert({
         team_id: selectedTeamId,
         player_id: playerData.id,
         jersey_number: jerseyNumber,
+        ...(isSoccerTeam ? { position } : {}),
         is_active: true,
       })
 
@@ -869,11 +883,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       first_name: playerData.first_name as string,
       last_name: (playerData.last_name as string | null) ?? null,
       jersey_number: jerseyNumber,
+      position,
       nickname: (playerData.nickname as string | null) ?? null,
     }])
     setNewPlayerFirst('')
     setNewPlayerLast('')
     setNewPlayerNumber('')
+    setNewPlayerSoccerRole('midfielder')
   }
 
   const handleAddExistingPlayer = async () => {
@@ -882,12 +898,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setAddingExistingPlayer(true)
 
     const jerseyNumber = existingPlayerNumber.trim() || null
+    const position = isSoccerTeam ? serializeSoccerRosterRole(newPlayerSoccerRole) : null
     const { error: junctionError } = await supabaseClient
       .from('team_players')
       .insert({
         team_id: selectedTeamId,
         player_id: selectedExistingPlayerId,
         jersey_number: jerseyNumber,
+        ...(isSoccerTeam ? { position } : {}),
         is_active: true,
       })
 
@@ -909,11 +927,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         first_name: poolPlayer.first_name,
         last_name: poolPlayer.last_name,
         jersey_number: jerseyNumber,
+        position,
         nickname: poolPlayer.nickname,
       }])
     }
     setSelectedExistingPlayerId('')
     setExistingPlayerNumber('')
+    setNewPlayerSoccerRole('midfielder')
   }
 
   const handleClaimGuardian = async (playerId: string) => {
@@ -1073,6 +1093,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setEditingPlayerLast(player.last_name?.trim() ?? '')
     setEditingPlayerNumber(player.jersey_number?.trim() ?? '')
     setEditingPlayerNickname(player.nickname?.trim() ?? '')
+    setEditingPlayerSoccerRole(parseSoccerRosterRole(player.position).group as SoccerRosterRoleGroup)
   }
 
   const cancelEditPlayer = () => {
@@ -1081,6 +1102,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setEditingPlayerLast('')
     setEditingPlayerNumber('')
     setEditingPlayerNickname('')
+    setEditingPlayerSoccerRole('midfielder')
   }
 
   const handleSavePlayer = async () => {
@@ -1098,6 +1120,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     const first_name = editingPlayerFirst.trim()
     const last_name = editingPlayerLast.trim() || null
     const jersey_number = editingPlayerNumber.trim() || null
+    const position = isSoccerTeam ? serializeSoccerRosterRole(editingPlayerSoccerRole) : player.position
     const nickname = editingPlayerNickname.trim() || null
     const playerRes = mayEditIdentity
       ? await supabaseClient.rpc('update_player_identity', {
@@ -1110,7 +1133,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     const junctionRes = mayManageRoster
       ? await supabaseClient
           .from('team_players')
-          .update({ jersey_number })
+          .update(isSoccerTeam ? { jersey_number, position } : { jersey_number })
           .eq('team_id', selectedTeamId)
           .eq('player_id', editingPlayerId)
       : { error: null }
@@ -1126,7 +1149,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           ? {
               ...p,
               ...(mayEditIdentity ? { first_name, last_name, nickname } : {}),
-              ...(mayManageRoster ? { jersey_number } : {}),
+              ...(mayManageRoster ? { jersey_number, ...(isSoccerTeam ? { position } : {}) } : {}),
             }
           : p
       )
@@ -1544,6 +1567,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       className="input-field col-span-5"
                     />
                   </div>
+                  {isSoccerTeam && (
+                    <label className="block text-xs font-semibold text-slate-600">
+                      Default role
+                      <select
+                        value={newPlayerSoccerRole}
+                        onChange={event => setNewPlayerSoccerRole(event.target.value as SoccerRosterRoleGroup)}
+                        className="input-field mt-1 w-full"
+                      >
+                        {SOCCER_ROSTER_ROLE_OPTIONS.map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <button
                     type="button"
                     onClick={() => { void handleAddPlayer() }}
@@ -1578,6 +1615,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                         ))}
                     </select>
                   </div>
+                  {isSoccerTeam && (
+                    <label className="block text-xs font-semibold text-slate-600">
+                      Default role
+                      <select
+                        value={newPlayerSoccerRole}
+                        onChange={event => setNewPlayerSoccerRole(event.target.value as SoccerRosterRoleGroup)}
+                        className="input-field mt-1 w-full"
+                      >
+                        {SOCCER_ROSTER_ROLE_OPTIONS.map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <button
                     type="button"
                     onClick={() => { void handleAddExistingPlayer() }}
@@ -1649,6 +1700,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               className="input-field text-sm"
                               disabled={!mayEditIdentity}
                             />
+                            {isSoccerTeam && mayManageRoster && (
+                              <label className="block text-xs font-semibold text-slate-600">
+                                Default role
+                                <select
+                                  value={editingPlayerSoccerRole}
+                                  onChange={event => setEditingPlayerSoccerRole(event.target.value as SoccerRosterRoleGroup)}
+                                  className="input-field mt-1 w-full text-sm"
+                                >
+                                  {SOCCER_ROSTER_ROLE_OPTIONS.map(option => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
+                              </label>
+                            )}
                             <div className="flex gap-2">
                               <button
                                 type="button"
@@ -1673,14 +1738,19 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               <span className="text-slate-500 shrink-0">
                                 #{player.jersey_number || '—'}
                               </span>
-                              <p className="font-medium text-slate-700 truncate">
-                                {playerDisplayName(player)}
-                                {player.nickname?.trim() && (
-                                  <span className="text-slate-400 font-normal text-xs ml-1">
-                                    ({[player.first_name, player.last_name].filter(Boolean).join(' ')})
-                                  </span>
+                              <div className="min-w-0">
+                                <p className="font-medium text-slate-700 truncate">
+                                  {playerDisplayName(player)}
+                                  {player.nickname?.trim() && (
+                                    <span className="text-slate-400 font-normal text-xs ml-1">
+                                      ({[player.first_name, player.last_name].filter(Boolean).join(' ')})
+                                    </span>
+                                  )}
+                                </p>
+                                {isSoccerTeam && (
+                                  <p className="text-xs text-slate-500">{soccerRosterRoleLabel(player.position)}</p>
                                 )}
-                              </p>
+                              </div>
                             </div>
                             <div className="flex max-w-[60%] flex-wrap items-center justify-end gap-1">
                               {selectedTeam && (
