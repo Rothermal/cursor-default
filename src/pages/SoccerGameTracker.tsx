@@ -259,6 +259,21 @@ export default function SoccerGameTracker() {
   const capturePreferences = soccerState.capturePreferences
   const fieldCaptureEnabled =
     healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal
+  const markerFilterSummary = [
+    markerFamilyFilter === 'all'
+      ? null
+      : markerFamilyFilter === 'shots'
+        ? 'Shots'
+        : markerFamilyFilter === 'defense'
+          ? 'Defense'
+          : 'Incidents',
+    markerSideFilter === 'all'
+      ? null
+      : markerSideFilter === 'tracked'
+        ? 'Tracked'
+        : 'Opponent',
+    markerScope === 'current' ? 'Current period' : 'Full match',
+  ].filter(Boolean).join(' · ')
   const reviewPeriodId = projection.currentPeriodId
     ?? projection.completedPeriodIds[projection.completedPeriodIds.length - 1]
     ?? null
@@ -591,34 +606,6 @@ export default function SoccerGameTracker() {
                 </div>
               </div>
 
-              <div>
-                <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker family</p>
-                <div className="grid grid-cols-4 rounded-md bg-slate-200 p-1">
-                  <ModeButton active={markerFamilyFilter === 'all'} label="All" onClick={() => setMarkerFamilyFilter('all')} />
-                  <ModeButton active={markerFamilyFilter === 'shots'} label="Shots" onClick={() => setMarkerFamilyFilter('shots')} />
-                  <ModeButton active={markerFamilyFilter === 'defense'} label="Defense" onClick={() => setMarkerFamilyFilter('defense')} />
-                  <ModeButton active={markerFamilyFilter === 'incidents'} label="Incidents" onClick={() => setMarkerFamilyFilter('incidents')} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker side</p>
-                  <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
-                    <ModeButton active={markerSideFilter === 'all'} label="All" onClick={() => setMarkerSideFilter('all')} />
-                    <ModeButton active={markerSideFilter === 'tracked'} label="Tracked" onClick={() => setMarkerSideFilter('tracked')} />
-                    <ModeButton active={markerSideFilter === 'opponent'} label="Opp." onClick={() => setMarkerSideFilter('opponent')} />
-                  </div>
-                </div>
-                <div>
-                  <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker period</p>
-                  <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
-                    <ModeButton active={markerScope === 'current'} label="Current" onClick={() => setMarkerScope('current')} />
-                    <ModeButton active={markerScope === 'match'} label="Match" onClick={() => setMarkerScope('match')} />
-                  </div>
-                </div>
-              </div>
-
               <SoccerField
                 trackedDirection={projection.attackingDirection}
                 captureSide={capturePreferences.teamSide}
@@ -672,6 +659,41 @@ export default function SoccerGameTracker() {
                   onClick={() => openIncident('team_event', null)}
                 />
               </div>
+
+              <details className="border-y border-slate-200 py-2">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-600">
+                  Marker filters <span className="font-normal text-slate-500">· {markerFilterSummary}</span>
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker family</p>
+                    <div className="grid grid-cols-4 rounded-md bg-slate-200 p-1">
+                      <ModeButton active={markerFamilyFilter === 'all'} label="All" onClick={() => setMarkerFamilyFilter('all')} />
+                      <ModeButton active={markerFamilyFilter === 'shots'} label="Shots" onClick={() => setMarkerFamilyFilter('shots')} />
+                      <ModeButton active={markerFamilyFilter === 'defense'} label="Defense" onClick={() => setMarkerFamilyFilter('defense')} />
+                      <ModeButton active={markerFamilyFilter === 'incidents'} label="Incidents" onClick={() => setMarkerFamilyFilter('incidents')} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker side</p>
+                      <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
+                        <ModeButton active={markerSideFilter === 'all'} label="All" onClick={() => setMarkerSideFilter('all')} />
+                        <ModeButton active={markerSideFilter === 'tracked'} label="Tracked" onClick={() => setMarkerSideFilter('tracked')} />
+                        <ModeButton active={markerSideFilter === 'opponent'} label="Opp." onClick={() => setMarkerSideFilter('opponent')} />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker period</p>
+                      <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                        <ModeButton active={markerScope === 'current'} label="Current" onClick={() => setMarkerScope('current')} />
+                        <ModeButton active={markerScope === 'match'} label="Match" onClick={() => setMarkerScope('match')} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
           ) : mainTab === 'lineup' ? (
             <>

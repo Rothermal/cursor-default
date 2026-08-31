@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { supabase } from '../lib/supabase'
+import { parseSoccerRosterRole } from '../lib/soccer/rosterRole'
 import {
   createSoccerSportGameState,
   createSoccerUuid,
@@ -50,9 +51,12 @@ export default function SoccerPlayerSetup() {
   const [rosterLoading, setRosterLoading] = useState(
     Boolean(setup?.sourceTeamId && state.players.length === 0)
   )
+  const [rosterLoadError, setRosterLoadError] = useState<string | null>(null)
+  const [rosterLoadAttempt, setRosterLoadAttempt] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [confirmShortHanded, setConfirmShortHanded] = useState(false)
   const cloudRosterLoaded = useRef(false)
+  const rosterRolesByPlayerId = useRef<Record<string, SoccerMatchParticipant['initialRole']>>({})
 
   useEffect(() => {
     if (state.eventStream?.events.length) navigate('/game', { replace: true })
@@ -73,27 +77,32 @@ export default function SoccerPlayerSetup() {
     let cancelled = false
     const loadRoster = async () => {
       setRosterLoading(true)
-      setError(null)
+      setRosterLoadError(null)
       const { data, error: loadError } = await supabase!
         .from('team_players')
-        .select('player_id,jersey_number,players!inner(id,first_name,last_name)')
+        .select('player_id,jersey_number,position,players!inner(id,first_name,last_name)')
         .eq('team_id', setup.sourceTeamId)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
       if (cancelled) return
       if (loadError) {
-        setError(loadError.message)
+        setRosterLoadError(loadError.message)
         setRosterLoading(false)
         return
       }
       type RosterRow = {
         player_id: string
         jersey_number: string | null
+        position: string | null
         players: { id: string; first_name: string; last_name: string | null }
       }
+      const rows = (data ?? []) as unknown as RosterRow[]
+      rosterRolesByPlayerId.current = Object.fromEntries(
+        rows.map(row => [row.player_id, parseSoccerRosterRole(row.position)])
+      )
       dispatch({
         type: 'SET_PLAYERS',
-        players: ((data ?? []) as unknown as RosterRow[]).map(row => ({
+        players: rows.map(row => ({
           id: row.player_id,
           name: `${row.players.first_name} ${row.players.last_name ?? ''}`.trim(),
           number: row.jersey_number ?? '',
@@ -105,9 +114,10 @@ export default function SoccerPlayerSetup() {
     }
     void loadRoster()
     return () => { cancelled = true }
-  }, [dispatch, setup?.sourceTeamId, state.players.length])
+  }, [dispatch, rosterLoadAttempt, setup?.sourceTeamId, state.players.length])
 
   useEffect(() => {
+    if (setup?.sourceTeamId && !cloudRosterLoaded.current && state.players.length === 0) return
     setDrafts(current => {
       const next = [...current]
       let changed = false
@@ -120,14 +130,15 @@ export default function SoccerPlayerSetup() {
           displayName: player.name,
           number: player.number || null,
           initialStatus: 'bench',
-          initialRole: { group: 'midfielder', label: null },
+          initialRole: rosterRolesByPlayerId.current[player.id]
+            ?? { group: 'midfielder', label: null },
           selected: !hadSavedSelection.current,
         })
         changed = true
       }
       return changed ? next : current
     })
-  }, [state.players])
+  }, [setup?.sourceTeamId, state.players])
 
   useEffect(() => {
     if (!setup || state.eventStream?.events.length) return
@@ -288,6 +299,20 @@ export default function SoccerPlayerSetup() {
         {error && (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {rosterLoadError && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p>Could not load the cloud roster: {rosterLoadError}</p>
+            <button
+              type="button"
+              onClick={() => setRosterLoadAttempt(attempt => attempt + 1)}
+              className="mt-2 font-semibold underline disabled:opacity-50"
+              disabled={rosterLoading}
+            >
+              Retry roster
+            </button>
           </div>
         )}
 
