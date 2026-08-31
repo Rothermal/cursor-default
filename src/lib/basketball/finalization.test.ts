@@ -15,6 +15,7 @@ import {
 import { adjustBasketballScore } from './directCommands'
 import {
   BASKETBALL_CANONICAL_PAYLOAD_SCHEMA_VERSION,
+  basketballCanonicalAuthorityState,
   createBasketballCanonicalSnapshot,
   EVENT_PLATFORM_CANONICAL_ENVELOPE_VERSION,
   finalizeBasketballGame,
@@ -26,6 +27,7 @@ import {
   reopenBasketballCloudGame,
   type BasketballFinalizationPreview,
 } from './finalization'
+import { makeAnchoredCanonicalAggregateSource } from './aggregateTestFixtures'
 import type { BasketballRecorderProjection, BasketballRecorderSummary } from './recorders'
 
 const cloudMock = vi.hoisted(() => ({ rpc: vi.fn() }))
@@ -33,11 +35,16 @@ const recorderMock = vi.hoisted(() => ({
   loadRecorders: vi.fn(),
   loadProjection: vi.fn(),
 }))
+const authorizationMock = vi.hoisted(() => ({ authorize: vi.fn() }))
 
 vi.mock('../supabase', () => ({ supabase: { rpc: cloudMock.rpc } }))
 vi.mock('./recorders', () => ({
   loadBasketballGameRecorders: recorderMock.loadRecorders,
   loadBasketballRecorderProjection: recorderMock.loadProjection,
+}))
+vi.mock('./cloudAuthorization', async importOriginal => ({
+  ...await importOriginal<typeof import('./cloudAuthorization')>(),
+  authorizeBasketballAnchoredCloudMutation: authorizationMock.authorize,
 }))
 
 const basketball = sports.find(sport => sport.id === 'basketball')!
@@ -177,6 +184,8 @@ beforeEach(() => {
   cloudMock.rpc.mockReset()
   recorderMock.loadRecorders.mockReset()
   recorderMock.loadProjection.mockReset()
+  authorizationMock.authorize.mockReset()
+  authorizationMock.authorize.mockResolvedValue(true)
 })
 
 describe('Basketball canonical snapshot contract', () => {
@@ -266,6 +275,98 @@ describe('Basketball canonical snapshot contract', () => {
 })
 
 describe('Basketball finalization repository', () => {
+  it('returns agreed anchored blockers before a publishable preview exists', async () => {
+    const source = anchoredRecorderProjection()
+    if (source.state.sportGameState?.sportId !== 'basketball') {
+      throw new Error('Anchored fixture projection is unavailable.')
+    }
+    source.state.sportGameState.projection.status = 'in_progress'
+    source.state.sportGameState.projection.endReason = null
+    cloudMock.rpc.mockImplementation((name: string) => {
+      if (name === 'get_basketball_finalization_readiness') {
+        return Promise.resolve({ data: [readinessRow()], error: null })
+      }
+      if (name === 'get_basketball_anchored_finalization_readiness_v1') {
+        return Promise.resolve({
+          data: [{ applicable: true, blocker_codes: ['terminal_outcome_required'] }],
+          error: null,
+        })
+      }
+      throw new Error(`Unexpected RPC: ${name}`)
+    })
+    recorderMock.loadRecorders.mockResolvedValue([recorder])
+    recorderMock.loadProjection.mockResolvedValue(source)
+
+    await expect(prepareBasketballFinalization('game-1', { userId: 'manager-1' }))
+      .resolves.toMatchObject({
+        anchored: true,
+        snapshot: null,
+        endReason: null,
+        blockers: [{ code: 'terminal_outcome_required' }],
+      })
+  })
+
+  it('returns source_invalid when anchored projection cannot rebuild', async () => {
+    const source = anchoredRecorderProjection()
+    source.inspection = {
+      ...source.inspection,
+      complete: false,
+      diagnostics: [{
+        code: 'validation_failed',
+        message: 'Basketball clock adjustment is stale.',
+        eventId: null,
+      }],
+    }
+    cloudMock.rpc.mockImplementation((name: string) => {
+      if (name === 'get_basketball_finalization_readiness') {
+        return Promise.resolve({ data: [readinessRow()], error: null })
+      }
+      if (name === 'get_basketball_anchored_finalization_readiness_v1') {
+        return Promise.resolve({
+          data: [{ applicable: true, blocker_codes: [] }],
+          error: null,
+        })
+      }
+      throw new Error(`Unexpected RPC: ${name}`)
+    })
+    recorderMock.loadRecorders.mockResolvedValue([recorder])
+    recorderMock.loadProjection.mockResolvedValue(source)
+
+    await expect(prepareBasketballFinalization('game-1', { userId: 'manager-1' }))
+      .resolves.toMatchObject({
+        anchored: true,
+        snapshot: null,
+        score: null,
+        blockers: [{ code: 'source_invalid' }],
+      })
+  })
+
+  it('keeps shared client-only blocker disagreements strict', async () => {
+    const source = anchoredRecorderProjection()
+    if (source.state.sportGameState?.sportId !== 'basketball') {
+      throw new Error('Anchored fixture projection is unavailable.')
+    }
+    source.state.sportGameState.projection.status = 'in_progress'
+    source.state.sportGameState.projection.endReason = null
+    cloudMock.rpc.mockImplementation((name: string) => {
+      if (name === 'get_basketball_finalization_readiness') {
+        return Promise.resolve({ data: [readinessRow()], error: null })
+      }
+      if (name === 'get_basketball_anchored_finalization_readiness_v1') {
+        return Promise.resolve({
+          data: [{ applicable: true, blocker_codes: [] }],
+          error: null,
+        })
+      }
+      throw new Error(`Unexpected RPC: ${name}`)
+    })
+    recorderMock.loadRecorders.mockResolvedValue([recorder])
+    recorderMock.loadProjection.mockResolvedValue(source)
+
+    await expect(prepareBasketballFinalization('game-1', { userId: 'manager-1' }))
+      .rejects.toThrow('Client and server Basketball readiness do not agree')
+  })
+
   it('strictly parses authoritative readiness', async () => {
     cloudMock.rpc.mockResolvedValue({ data: [readinessRow()], error: null })
 
@@ -376,6 +477,8 @@ describe('Basketball finalization repository', () => {
       snapshot: createBasketballCanonicalSnapshot('game-1', recorderId, projection.state),
       score: { tracked: 2, opponent: 0 },
       endReason: 'completed',
+      anchored: false,
+      blockers: [],
     }
     cloudMock.rpc.mockResolvedValue({
       data: {
@@ -471,7 +574,7 @@ describe('Basketball finalization repository', () => {
       },
     ])
     expect(cloudMock.rpc).toHaveBeenCalledWith(
-      'get_basketball_canonical_publication_history',
+      'get_basketball_canonical_publication_history_v1',
       { p_game_id: 'game-1' }
     )
   })
@@ -518,6 +621,9 @@ describe('Basketball finalization repository', () => {
     await expect(reopenBasketballCloudGame('game-1', '  Correct scorer  ')).resolves.toEqual({
       gameId: 'game-1',
       publicationId: 'publication-1',
+      primaryRecorderId: null,
+      reason: 'Correct scorer',
+      mode: null,
       reopenedAt: '2026-08-16T18:15:00.000Z',
     })
     expect(cloudMock.rpc).toHaveBeenCalledWith('reopen_basketball_event_game', {
@@ -552,3 +658,35 @@ describe('Basketball finalization repository', () => {
     )
   })
 })
+
+function anchoredRecorderProjection(): BasketballRecorderProjection {
+  const source = makeAnchoredCanonicalAggregateSource({ gameId: 'game-1' })
+  const snapshot = structuredClone(source.canonicalSnapshot)
+  const initial = createInitialState()
+  const publication = {
+    publicationId: source.publicationId,
+    publicationNumber: source.publicationNumber,
+    primaryRecorderId: snapshot.primaryRecorderId,
+    primaryDisplayName: recorder.displayName,
+    snapshot,
+    snapshotFingerprint: source.snapshotFingerprint,
+    finalizedBy: recorderId,
+    finalizedByDisplayName: recorder.displayName,
+    finalizedAt: source.finalizedAt,
+  }
+  const state = basketballCanonicalAuthorityState({
+    ...initial,
+    sport: basketball,
+    cloudSync: {
+      ...initial.cloudSync,
+      gameId: 'game-1',
+      gameStatus: 'in_progress',
+    },
+  }, publication)
+  return {
+    recorder,
+    state,
+    eventStream: state.eventStream!,
+    inspection: inspectGameEventStream(state.eventStream!, gameEventRegistry),
+  }
+}

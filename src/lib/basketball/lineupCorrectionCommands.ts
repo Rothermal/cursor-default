@@ -11,6 +11,7 @@ import type {
 } from './commands'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
+import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { validateBasketballHistoricalTime } from './historicalTime'
 import { formatBasketballDurationMs } from './duration'
 import { isBasketballLineupEvent } from './lineupProjection'
@@ -236,11 +237,8 @@ function prepareLineupCorrection(
   if (state.sportGameState?.sportId !== 'basketball' || !state.eventStream) {
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
-  if (
-    state.sportGameState.projection.status !== 'in_progress' &&
-    state.sportGameState.projection.status !== 'period_break'
-  ) {
-    return commandFailure('invalid_period', 'Lineup correction is available only in a local nonterminal game.')
+  if (!isBasketballTimelineCorrectionProjection(state.sportGameState.projection)) {
+    return commandFailure('invalid_period', 'Reopen the Basketball game before correcting lineup history.')
   }
   if (state.sportGameState.projection.clock?.running) {
     return commandFailure('command_failed', 'Pause the Basketball clock before correcting lineup history.')

@@ -70,6 +70,6 @@ setup and queue operations also reject a changed account before cloud mutation o
 
 ## Exit
 
-BKE-6D3 is implementation-complete. BKE-6D4 next owns trusted anchored readiness, finalization,
+BKE-6D3 is implementation-complete. BKE-6D4 subsequently completed trusted anchored readiness, finalization,
 mode-aware Correct records/Resume game reopen, recorder-owner handoff, and explicit republication.
 The live Supabase matrix remains required before broader access.

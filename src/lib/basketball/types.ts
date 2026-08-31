@@ -19,6 +19,7 @@ export type BasketballMatchStatus =
   | 'suspended'
   | 'ended'
 export type BasketballMatchEndReason = 'completed' | 'suspended' | 'abandoned'
+export type BasketballReopenMode = 'correct_records' | 'resume_game'
 export type BasketballMatchResult =
   | 'tracked_win'
   | 'opponent_win'
@@ -454,6 +455,7 @@ export interface BasketballLineupProjection {
 
 export interface BasketballMatchProjection {
   status: BasketballMatchStatus
+  reopenMode: BasketballReopenMode | null
   currentPeriodId: string | null
   periods: BasketballMatchSegment[]
   startedPeriodIds: string[]
@@ -537,6 +539,7 @@ export interface BasketballMatchEndedPayload extends BasketballCapturePayload {
 
 export interface BasketballMatchReopenedPayload extends BasketballCapturePayload {
   reason: string | null
+  mode: BasketballReopenMode | null
 }
 
 export interface BasketballClockStartedPayload extends BasketballCapturePayload {

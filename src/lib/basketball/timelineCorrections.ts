@@ -12,6 +12,7 @@ import type {
 } from './commands'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { reconcileBasketballPlayerRows } from './courtCorrections'
+import { isBasketballTimelineCorrectionProjection } from './correctionAvailability'
 import { basketballRecoverableScoreAdjustmentId } from './scoreAdjustmentRecovery'
 import {
   basketballTimeoutKindLimit,
@@ -345,10 +346,10 @@ function prepareState(
   ) {
     return commandFailure('command_failed', 'Resolve Basketball Timeline diagnostics before changing events.')
   }
-  if (!recovering && (
-    rebuilt.state.sportGameState.projection.status !== 'in_progress' &&
-    rebuilt.state.sportGameState.projection.status !== 'period_break'
-  )) {
+  if (
+    !recovering &&
+    !isBasketballTimelineCorrectionProjection(rebuilt.state.sportGameState.projection)
+  ) {
     return commandFailure('invalid_period', 'Reopen the Basketball game before changing Timeline events.')
   }
   const inspection = inspectGameEventStream(rebuilt.state.eventStream, gameEventRegistry)

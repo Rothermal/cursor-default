@@ -45,6 +45,7 @@ import {
 import { createBasketballStatEvent } from './statEvents'
 import type {
   BasketballMatchParticipant,
+  BasketballReopenMode,
   BasketballMatchRulesV2,
   BasketballMatchRulesV3,
   BasketballMatchEvent,
@@ -128,6 +129,7 @@ export interface BasketballLifecycleCommandOptions {
 
 export interface BasketballReopenCommandOptions extends BasketballLifecycleCommandOptions {
   reason: string
+  mode?: BasketballReopenMode
 }
 
 export type BasketballCaptureActorSelection =
@@ -512,6 +514,12 @@ export function getBasketballCommandContext(
     return commandFailure('setup_incomplete', 'An initialized Basketball event game is required.')
   }
   const projection = state.sportGameState.projection
+  if (projection.reopenMode === 'correct_records') {
+    return commandFailure(
+      'cloud_flow_unsupported',
+      'Correct-records mode allows Timeline correction only.'
+    )
+  }
   if (projection.status !== 'in_progress' || !projection.currentPeriodId) {
     return commandFailure('invalid_period', 'Basketball capture requires an active period.')
   }
@@ -814,11 +822,24 @@ export function reopenBasketballMatch(
     return failure(state, 'cloud_flow_unsupported', 'Reopen the finalized game before editing it.')
   }
   const reason = options.reason.trim()
-  if (!reason) {
-    return failure(state, 'command_failed', 'Enter a reason for reopening the Basketball game.')
+  if (reason.length < 3) {
+    return failure(
+      state,
+      'command_failed',
+      'Basketball reopen reasons must contain at least 3 characters.'
+    )
   }
   if (reason.length > 240) {
     return failure(state, 'command_failed', 'Basketball reopen reasons cannot exceed 240 characters.')
+  }
+  const rules = state.sportGameState?.sportId === 'basketball'
+    ? state.sportGameState.setup.rulesSnapshot
+    : null
+  if (
+    options.mode &&
+    (!rules || !isBasketballMatchRulesV3(rules) || rules.clockModel !== 'anchored')
+  ) {
+    return failure(state, 'command_failed', 'Reopen modes require anchored Basketball authority.')
   }
   const context = getBasketballTerminalLifecycleContext(
     state,
@@ -829,7 +850,7 @@ export function reopenBasketballMatch(
   const event = createBasketballLifecycleEvent({
     id: options.eventId,
     eventType: 'basketball.match_reopened',
-    payload: { reason, captureCommandId: null },
+    payload: { reason, mode: options.mode ?? null, captureCommandId: null },
     recorderUserId: options.recorderUserId,
     sequence: context.value.nextSequence,
     period: context.value.period,

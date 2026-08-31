@@ -265,6 +265,7 @@ describe('BKE-1B1 Basketball foundation', () => {
     })
     const reopened = event(2, 'basketball.match_reopened', {
       reason: 'Officials resumed play',
+      mode: null,
       captureCommandId: null,
     })
     const result = project([

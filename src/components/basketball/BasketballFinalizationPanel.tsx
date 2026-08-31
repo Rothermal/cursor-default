@@ -1,7 +1,10 @@
 import { AlertTriangle, CheckCircle2, LockKeyhole, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { FlushCloudSyncResult } from '../../context/GameContext'
+import type { GameState } from '../../types'
+import { isBasketballAnchoredCloudAuthority } from '../../lib/basketball/cloudAuthorization'
 import {
+  basketballCanonicalAuthorityState,
   finalizeBasketballGame,
   loadBasketballCanonicalPublication,
   loadBasketballCanonicalPublicationHistory,
@@ -16,11 +19,14 @@ import {
   type BasketballFinalizationReadiness,
   type BasketballFinalizationResult,
   type BasketballPrimaryFinalizationConflict,
+  type BasketballReopenResult,
 } from '../../lib/basketball/finalization'
+import type { BasketballReopenMode } from '../../lib/basketball/types'
 
 interface BasketballFinalizationPanelProps {
   gameId: string
   gameStatus: string
+  baseState: GameState
   currentUserId: string | null
   canManage: boolean
   trackedScore: number | null
@@ -28,12 +34,13 @@ interface BasketballFinalizationPanelProps {
   ownedLocalTerminal: boolean
   flushCloudSync?: () => Promise<FlushCloudSyncResult>
   onFinalized: (result: BasketballFinalizationResult) => void
-  onReopened: () => void
+  onReopened: (result: BasketballReopenResult) => void | Promise<void>
 }
 
 export default function BasketballFinalizationPanel({
   gameId,
   gameStatus,
+  baseState,
   currentUserId,
   canManage,
   trackedScore,
@@ -56,6 +63,9 @@ export default function BasketballFinalizationPanel({
   const [error, setError] = useState<string | null>(null)
   const [reopenOpen, setReopenOpen] = useState(false)
   const [reopenReason, setReopenReason] = useState('')
+  const [reopenMode, setReopenMode] = useState<BasketballReopenMode>('correct_records')
+  const anchoredPublication = publication?.snapshot.sportGameState.setup.version === 2 &&
+    publication.snapshot.sportGameState.setup.rulesSnapshot.clockModel === 'anchored'
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -93,7 +103,10 @@ export default function BasketballFinalizationPanel({
         const sync = await flushCloudSync()
         if (!sync.ok) throw new Error(sync.reason)
       }
-      setPreview(await prepareBasketballFinalization(gameId))
+      setPreview(await prepareBasketballFinalization(
+        gameId,
+        currentUserId ? { userId: currentUserId } : undefined
+      ))
       await refresh()
     } catch (caught) {
       await refresh()
@@ -108,7 +121,10 @@ export default function BasketballFinalizationPanel({
     setBusy(true)
     setError(null)
     try {
-      const result = await finalizeBasketballGame(preview)
+      const result = await finalizeBasketballGame(
+        preview,
+        currentUserId ? { userId: currentUserId } : undefined
+      )
       setPreview(null)
       await refresh()
       onFinalized(result)
@@ -158,11 +174,27 @@ export default function BasketballFinalizationPanel({
     setBusy(true)
     setError(null)
     try {
-      await reopenBasketballCloudGame(gameId, reopenReason)
+      const authorityState = publication
+        ? basketballCanonicalAuthorityState(baseState, publication)
+        : null
+      const anchored = anchoredPublication && authorityState
+        ? isBasketballAnchoredCloudAuthority(authorityState)
+        : false
+      const result = await reopenBasketballCloudGame(
+        gameId,
+        reopenReason,
+        anchored
+          ? {
+              mode: reopenMode,
+              authorityState: authorityState!,
+              userId: currentUserId ?? undefined,
+            }
+          : undefined
+      )
       setReopenOpen(false)
       setReopenReason('')
       setPreview(null)
-      onReopened()
+      await onReopened(result)
       await refresh()
     } catch (caught) {
       await refresh()
@@ -293,6 +325,9 @@ export default function BasketballFinalizationPanel({
                   </p>
                   {!item.isActive && (
                     <p className="mt-1 text-slate-500">
+                      {item.reopenMode
+                        ? `${item.reopenMode === 'correct_records' ? 'Correct records' : 'Resume game'} | `
+                        : ''}
                       {item.invalidationReason} | {item.invalidatedByDisplayName} |{' '}
                       {new Date(item.invalidatedAt!).toLocaleString()}
                     </p>
@@ -367,18 +402,22 @@ export default function BasketballFinalizationPanel({
               This locks <span className="font-semibold">{preview.recorder.displayName}</span> as
               the canonical recorder and publishes this result.
             </p>
-            <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
-              <div>
-                <p className="text-3xl font-bold text-blue-800">{preview.score.tracked}</p>
-                <p className="text-xs text-slate-500">Tracked</p>
+            {preview.score && (
+              <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
+                <div>
+                  <p className="text-3xl font-bold text-blue-800">{preview.score.tracked}</p>
+                  <p className="text-xs text-slate-500">Tracked</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-slate-800">{preview.score.opponent}</p>
+                  <p className="text-xs text-slate-500">Opponent</p>
+                </div>
               </div>
-              <div>
-                <p className="text-3xl font-bold text-slate-800">{preview.score.opponent}</p>
-                <p className="text-xs text-slate-500">Opponent</p>
-              </div>
-            </div>
+            )}
             <p className="mt-3 text-xs font-semibold capitalize text-slate-600">
-              {preview.endReason} | checkpoint current | {preview.projection.eventStream.events.length} events
+              {preview.endReason ?? 'Not ready'} | {preview.readiness.primaryCheckpointCurrent
+                ? 'checkpoint current'
+                : 'checkpoint pending'} | {preview.projection.eventStream.events.length} events
             </p>
             {preview.readiness.nonPrimaryAttentionCount > 0 && (
               <p className="mt-3 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -386,6 +425,16 @@ export default function BasketballFinalizationPanel({
                 {preview.readiness.nonPrimaryAttentionCount === 1 ? '' : 's'} need attention and
                 will remain audit-only.
               </p>
+            )}
+            {preview.blockers.length > 0 && (
+              <div className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <p className="font-bold">Finalization needs attention</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  {preview.blockers.map(blocker => (
+                    <li key={blocker.code}>{blocker.message}</li>
+                  ))}
+                </ul>
+              </div>
             )}
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button
@@ -399,7 +448,13 @@ export default function BasketballFinalizationPanel({
               <button
                 type="button"
                 onClick={() => { void confirmFinalization() }}
-                disabled={busy}
+                disabled={
+                  busy ||
+                  preview.blockers.length > 0 ||
+                  !preview.snapshot ||
+                  !preview.score ||
+                  !preview.endReason
+                }
                 className="min-h-11 bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50"
               >
                 {busy ? 'Finalizing...' : 'Finalize and Lock'}
@@ -440,6 +495,29 @@ export default function BasketballFinalizationPanel({
               The current publication stays in history. Reopen the owned recorder stream to make
               corrections, sync it, and publish a new result.
             </p>
+            {anchoredPublication && (
+              <fieldset className="mt-4">
+                <legend className="text-xs font-bold text-slate-600">Mode</legend>
+                <div className="mt-1 grid h-11 grid-cols-2 border border-slate-300 bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setReopenMode('correct_records')}
+                    aria-pressed={reopenMode === 'correct_records'}
+                    className={`text-sm font-bold ${reopenMode === 'correct_records' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                  >
+                    Correct records
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReopenMode('resume_game')}
+                    aria-pressed={reopenMode === 'resume_game'}
+                    className={`text-sm font-bold ${reopenMode === 'resume_game' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                  >
+                    Resume game
+                  </button>
+                </div>
+              </fieldset>
+            )}
             <label className="mt-4 block text-xs font-bold text-slate-600" htmlFor="basketball-cloud-reopen-reason">
               Reason
             </label>

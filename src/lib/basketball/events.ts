@@ -140,6 +140,12 @@ function validateMatchEndedPayload(payload: JsonObject): boolean {
 function validateMatchReopenedPayload(payload: JsonObject): boolean {
   return isPlainObject(payload) &&
     (payload.reason === null || isNonEmptyString(payload.reason)) &&
+    (
+      payload.mode === undefined ||
+      payload.mode === null ||
+      payload.mode === 'correct_records' ||
+      payload.mode === 'resume_game'
+    ) &&
     validCaptureCommandId(payload.captureCommandId)
 }
 

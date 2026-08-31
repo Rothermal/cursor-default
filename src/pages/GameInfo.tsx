@@ -226,6 +226,16 @@ export default function GameInfo() {
   }, [game, sport, statTotals])
 
   useEffect(() => {
+    if (
+      game?.status !== 'in_progress' ||
+      game.sport_id !== 'basketball' ||
+      basketballDataAuthority !== 'sport_events' ||
+      !userId
+    ) return
+    void markEventCloudGameReopened(game.id)
+  }, [basketballDataAuthority, game?.id, game?.sport_id, game?.status, markEventCloudGameReopened, userId])
+
+  useEffect(() => {
     if (!gameId || !isConfigured || !supabaseClient) {
       setLoading(false)
       return
@@ -732,6 +742,7 @@ export default function GameInfo() {
                 <BasketballFinalizationPanel
                   gameId={game.id}
                   gameStatus={game.status}
+                  baseState={state}
                   currentUserId={userId}
                   canManage={canManageRecorderAuthority}
                   trackedScore={game.home_team_score ?? null}
@@ -757,7 +768,7 @@ export default function GameInfo() {
                       })
                     }
                   }}
-                  onReopened={() => {
+                  onReopened={async result => {
                     setGame(current => current ? {
                       ...current,
                       status: 'in_progress',
@@ -765,7 +776,18 @@ export default function GameInfo() {
                       opponent_score: 0,
                       home_score_adjustment: 0,
                     } : current)
-                    markEventCloudGameReopened(game.id)
+                    await markEventCloudGameReopened(
+                      game.id,
+                      result.mode && result.primaryRecorderId
+                        ? {
+                            publicationId: result.publicationId,
+                            primaryRecorderId: result.primaryRecorderId,
+                            reason: result.reason,
+                            mode: result.mode,
+                            reopenedAt: result.reopenedAt,
+                          }
+                        : null
+                    )
                   }}
                 />
               </>

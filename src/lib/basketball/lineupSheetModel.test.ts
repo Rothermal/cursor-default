@@ -167,6 +167,7 @@ function projectedGame({ opponent = false }: { opponent?: boolean } = {}): Baske
   ].map(participant => [participant.participantId, participant]))
   return {
     status: 'in_progress',
+    reopenMode: null,
     currentPeriodId: 'period-1',
     periods: [],
     startedPeriodIds: ['period-1'],

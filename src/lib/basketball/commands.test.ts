@@ -1073,6 +1073,10 @@ describe('BKE-2A Basketball lifecycle commands', () => {
       recorderUserId: 'recorder-1',
       reason: '   ',
     })).toMatchObject({ ok: false, state: suspended.state, code: 'command_failed' })
+    expect(reopenBasketballMatch(suspended.state, {
+      recorderUserId: 'recorder-1',
+      reason: 'No',
+    })).toMatchObject({ ok: false, state: suspended.state, code: 'command_failed' })
 
     const reopened = reopenBasketballMatch(suspended.state, {
       recorderUserId: 'recorder-1',
