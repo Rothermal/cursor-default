@@ -321,6 +321,37 @@ describe('Basketball event cloud transport adapter', () => {
     }))
   })
 
+  it('does not claim a source-team link for late tracked free-text players', () => {
+    const state = startedState(true)
+    const added = addBasketballLateParticipant(state, {
+      recorderUserId: 'user-1',
+      teamSide: 'tracked',
+      displayName: 'Late Tracked',
+      number: '9',
+      occurredAt: '2026-08-15T12:02:00.000Z',
+      eventId: '70000000-0000-4000-8000-000000000211',
+      participantId: '70000000-0000-4000-8000-000000000212',
+      playerId: '70000000-0000-4000-8000-000000000213',
+      captureCommandId: '70000000-0000-4000-8000-000000000214',
+    })
+    if (!added.ok) throw new Error(added.message)
+    const participants = basketballCloudParticipants(
+      assertHealthyBasketballEventGame(added.state)
+    )
+
+    expect(participants).toContainEqual(expect.objectContaining({
+      client_participant_id: '70000000-0000-4000-8000-000000000212',
+      client_player_id: '70000000-0000-4000-8000-000000000213',
+      source_player_id: null,
+      snapshot: expect.objectContaining({ teamSide: 'tracked', addedDuringMatch: true }),
+    }))
+    expect(participants).toContainEqual(expect.objectContaining({
+      client_player_id: 'player-1',
+      source_player_id: 'player-1',
+      snapshot: expect.objectContaining({ teamSide: 'tracked', addedDuringMatch: false }),
+    }))
+  })
+
   it('round-trips a healthy stream using only event transport contracts', async () => {
     const result = await syncBasketballEventGameToCloud({
       state: startedState(),
