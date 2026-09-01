@@ -32,6 +32,10 @@ import {
   type SoccerTackleOutcome,
   type SoccerTeamSide,
 } from '../../lib/soccer'
+import {
+  normalizeSoccerIncidentActorSelection,
+  type SoccerIncidentAttribution,
+} from '../../lib/soccer/incidentAttribution'
 import type { GameState } from '../../types'
 import SoccerField from './SoccerField'
 
@@ -61,7 +65,7 @@ interface SoccerIncidentCaptureDialogProps {
   onClose: () => void
 }
 
-type Attribution = 'participant' | 'team' | 'unknown' | 'staff'
+type Attribution = SoccerIncidentAttribution
 const DEFENSIVE_ACTIONS: Array<{ value: SoccerDefensiveAction; label: string }> = [
   { value: 'tackle', label: 'Tackle' },
   { value: 'interception', label: 'Interception' },
@@ -222,6 +226,26 @@ export default function SoccerIncidentCaptureDialog({
   const replacementOutInvalid = effectiveDisciplineChoice === 'keeper_handoff' &&
     !fieldPlayers.some(participant => participant.participantId === replacementOutId && participant.participantId !== participantId)
 
+  const changeTeamSide = (nextSide: SoccerTeamSide) => {
+    const main = normalizeSoccerIncidentActorSelection(
+      nextSide,
+      attribution,
+      participantId
+    )
+    const fouled = normalizeSoccerIncidentActorSelection(
+      oppositeTeamSide(nextSide),
+      fouledAttribution === 'none' ? 'unknown' : fouledAttribution,
+      fouledParticipantId
+    )
+    setTeamSide(nextSide)
+    setAttribution(main.attribution)
+    setParticipantId(main.participantId)
+    if (fouledAttribution !== 'none') {
+      setFouledAttribution(fouled.attribution)
+      setFouledParticipantId(fouled.participantId)
+    }
+  }
+
   useEffect(() => {
     if (!draft || !projection) return
     const event = draft.event
@@ -243,11 +267,26 @@ export default function SoccerIncidentCaptureDialog({
       ? event.actors.find(actor => actor.role === 'fouled') ?? null
       : null
 
-    setTeamSide(event?.teamSide ?? draft.teamSide)
+    const initialTeamSide = event?.teamSide ?? draft.teamSide
+    const initialAttribution = normalizeSoccerIncidentActorSelection(
+      initialTeamSide,
+      actorAttribution(mainActor, event?.eventType === 'soccer.card'),
+      mainActor?.participantId ?? defaultParticipant?.participantId ?? ''
+    )
+    const initialFouledAttribution = fouled
+      ? actorAttribution(fouled, false) as 'participant' | 'team' | 'unknown'
+      : 'none'
+    const normalizedFouled = normalizeSoccerIncidentActorSelection(
+      oppositeTeamSide(initialTeamSide),
+      initialFouledAttribution === 'none' ? 'unknown' : initialFouledAttribution,
+      fouled?.participantId ?? ''
+    )
+
+    setTeamSide(initialTeamSide)
     setLocation(event?.location ?? draft.location)
-    setAttribution(actorAttribution(mainActor, event?.eventType === 'soccer.card'))
-    setParticipantId(mainActor?.participantId ?? defaultParticipant?.participantId ?? '')
-    setActorLabel(mainActor?.label ?? (event?.teamSide === 'tracked' ? 'Unknown tracked player' : 'Unknown opponent'))
+    setAttribution(initialAttribution.attribution)
+    setParticipantId(initialAttribution.participantId)
+    setActorLabel(mainActor?.label ?? (initialTeamSide === 'tracked' ? 'Unknown tracked player' : 'Unknown opponent'))
     setAction(event?.eventType === 'soccer.defensive_action' ? event.payload.action : 'interception')
     setTackleOutcome(event?.eventType === 'soccer.defensive_action' && event.payload.tackleOutcome
       ? event.payload.tackleOutcome
@@ -262,8 +301,12 @@ export default function SoccerIncidentCaptureDialog({
     setNote(event?.eventType === 'soccer.card' || event?.eventType === 'soccer.foul'
       ? event.payload.note ?? ''
       : '')
-    setFouledAttribution(fouled ? actorAttribution(fouled, false) as 'participant' | 'team' | 'unknown' : 'none')
-    setFouledParticipantId(fouled?.participantId ?? '')
+    setFouledAttribution(initialFouledAttribution === 'none'
+      ? 'none'
+      : normalizedFouled.attribution)
+    setFouledParticipantId(initialFouledAttribution === 'none'
+      ? ''
+      : normalizedFouled.participantId)
     setFouledLabel(fouled?.label ?? 'Unknown opponent')
     setTeamEventKind(event?.eventType === 'soccer.team_event' ? event.payload.kind : 'corner')
     setOffsideActorRecorded(Boolean(event?.eventType === 'soccer.team_event' && mainActor))
@@ -318,11 +361,16 @@ export default function SoccerIncidentCaptureDialog({
       setError('The event family cannot change during correction.')
       return
     }
+    const mainSelection = normalizeSoccerIncidentActorSelection(
+      teamSide,
+      attribution,
+      participantId
+    )
     const actor = actorRequired ? createActor(
         projection.participants,
         mainActorRole(draft.kind),
-        attribution,
-        participantId,
+        mainSelection.attribution,
+        mainSelection.participantId,
         actorLabel,
         teamSide === 'tracked' ? state.gameInfo?.teamName : state.gameInfo?.opponentName
       ) : null
@@ -332,11 +380,16 @@ export default function SoccerIncidentCaptureDialog({
     }
     const actors: GameEventActor[] = actor ? [actor] : []
     if (draft.kind === 'foul' && fouledAttribution !== 'none') {
+      const fouledSelection = normalizeSoccerIncidentActorSelection(
+        oppositeTeamSide(teamSide),
+        fouledAttribution,
+        fouledParticipantId
+      )
       const fouled = createActor(
         projection.participants,
         'fouled',
-        fouledAttribution,
-        fouledParticipantId,
+        fouledSelection.attribution,
+        fouledSelection.participantId,
         fouledLabel,
         teamSide === 'tracked' ? state.gameInfo?.opponentName : state.gameInfo?.teamName
       )
@@ -423,7 +476,7 @@ export default function SoccerIncidentCaptureDialog({
           {mode !== 'live' && (
             <MomentEditor
               teamSide={teamSide}
-              onTeamSide={setTeamSide}
+              onTeamSide={changeTeamSide}
               timings={periodTimings}
               selectedPeriodId={selectedPeriodId}
               onSelectedPeriodId={setSelectedPeriodId}
@@ -738,4 +791,8 @@ function cornerLocation(direction: 'left_to_right' | 'right_to_left', side: 'lef
 
 function oppositeDirection(direction: 'left_to_right' | 'right_to_left'): 'left_to_right' | 'right_to_left' {
   return direction === 'left_to_right' ? 'right_to_left' : 'left_to_right'
+}
+
+function oppositeTeamSide(side: SoccerTeamSide): SoccerTeamSide {
+  return side === 'tracked' ? 'opponent' : 'tracked'
 }

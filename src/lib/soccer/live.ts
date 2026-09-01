@@ -867,7 +867,7 @@ export function updateSoccerHistoryEvent(
   changes: Partial<GameEventEditableFields>,
   now = new Date().toISOString()
 ): SoccerLiveResult {
-  return mutationResult(updateGameEvent(
+  return historyMutationResult(state, updateGameEvent(
     state,
     eventId,
     changes,
@@ -882,7 +882,7 @@ export function deleteSoccerHistoryEvent(
   eventId: string,
   now = new Date().toISOString()
 ): SoccerLiveResult {
-  return mutationResult(deleteGameEvent(
+  return historyMutationResult(state, deleteGameEvent(
     state,
     eventId,
     now,
@@ -896,7 +896,7 @@ export function restoreSoccerHistoryEvent(
   eventId: string,
   now = new Date().toISOString()
 ): SoccerLiveResult {
-  return mutationResult(restoreGameEvent(
+  return historyMutationResult(state, restoreGameEvent(
     state,
     eventId,
     now,
@@ -1154,6 +1154,18 @@ function mutationResult(result: ReturnType<typeof addGameEvent>): SoccerLiveResu
         inspection: result.inspection,
       }
     : { ok: false, state: result.state, message: result.error.message }
+}
+
+function historyMutationResult(
+  originalState: GameState,
+  result: ReturnType<typeof updateGameEvent>
+): SoccerLiveResult {
+  const converted = mutationResult(result)
+  if (!converted.ok) return converted
+  if (inspectSoccerHistory(originalState).complete && !converted.inspection.complete) {
+    return failure(originalState, 'That change would leave the match history incomplete.')
+  }
+  return converted
 }
 
 function failure(state: GameState, message: string): SoccerLiveResult & { ok: false } {

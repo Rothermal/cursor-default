@@ -326,7 +326,7 @@ responsible.
 
 ### S13 - Opponent foul can attach a tracked player and lock the match
 
-**Status:** confirmed — live correctness bug  
+**Status:** implemented — pending deployed recovery verification
 **Theme:** opponent attribution  
 **Where:** `SoccerIncidentCaptureDialog`;
 `validateIncidentActor` in `src/lib/soccer/soc4.ts`
@@ -340,16 +340,31 @@ The newest foul was `Opponent / Murdoch Rothermal / direct free kick` at
 revision 2. Cloud sync showed the same truncated message, plus Retry/Export.
 Live controls were locked behind Review Timeline Issues.
 
-Cause: new incident sheets default `attribution` to `participant` even when
-`teamSide` is `opponent`. Opponent ActorEditor hides the Player chip, but
-save still sends the selected tracked participant. Projection then fails
-closed and parks the raw event.
+Cause: the affected foul was revision 2, so the invalid actor/side combination
+entered through Timeline correction rather than live append. A correction
+could retain tracked-player attribution after changing the event side because
+the opponent ActorEditor hid the Player chip without clearing its selection.
+The shared edit primitive returned the resulting incomplete rebuild for
+recovery, and the Soccer tracker committed it without distinguishing a repair
+from a healthy-to-incomplete change. Live append already rejects incomplete
+projections before changing state.
 
-**Likely direction:** when the event side is opponent, never keep a tracked
-`participantId` on the committing actor. Default opponent incidents to
-unknown/label or team. Reject in the sheet before append. After a bad
-historical row exists, Timeline Correct must be able to convert it to an
-opponent label without leaving the stream incomplete.
+**Implemented direction:** incident actor selection is normalized when the
+sheet opens, when a historical event changes sides, and again at Save. An
+opponent actor can no longer retain tracked-player attribution or a tracked
+`participantId`; it becomes an unknown/labeled opponent while team and staff
+attribution remain intact. The same rule applies to the optional fouled actor
+on the opposite side. The tracker also rejects any correction that would turn
+a healthy projection incomplete, while still permitting a correction against
+an already-incomplete stream so it can be repaired in place. Edit, remove, and
+restore commands surface that refusal through each dialog's local error state;
+the tracker repeats the guard as defense in depth.
+
+Opening an affected foul from Timeline **Correct** now preselects a labeled
+opponent actor without the stale tracked participant. Saving the correction
+revises the existing event through the checked mutation path, allowing the
+stream to rebuild instead of creating a second event. Field verification must
+repair the reported row and confirm that live controls and cloud sync recover.
 
 **Not this item:** a full opponent roster (`M4` / `S5`).
 

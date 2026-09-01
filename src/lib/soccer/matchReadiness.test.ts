@@ -40,6 +40,21 @@ describe('Soccer match-readiness wiring', () => {
     expect(merge).toContain('serializeSoccerRosterRole(')
   })
 
+  it('normalizes incident actors at every stale-selection boundary', () => {
+    const dialog = source('src/components/soccer/SoccerIncidentCaptureDialog.tsx')
+
+    expect(dialog).toContain('const main = normalizeSoccerIncidentActorSelection(')
+    expect(dialog).toContain('const initialAttribution = normalizeSoccerIncidentActorSelection(')
+    expect(dialog).toContain('const mainSelection = normalizeSoccerIncidentActorSelection(')
+  })
+
+  it('blocks healthy Soccer history from becoming incomplete while allowing recovery', () => {
+    const tracker = source('src/pages/SoccerGameTracker.tsx')
+
+    expect(tracker).toContain('if (inspection.complete && !result.inspection.complete)')
+    expect(tracker).toContain("setError('That change would leave the match history incomplete.')")
+  })
+
   it('places the pitch and quick capture before collapsed marker filters', () => {
     const tracker = source('src/pages/SoccerGameTracker.tsx')
     const fieldTabStart = tracker.indexOf(") : mainTab === 'field' ? (")
