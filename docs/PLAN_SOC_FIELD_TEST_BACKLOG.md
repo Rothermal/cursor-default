@@ -511,7 +511,7 @@ shot to that corner.
 
 ### S18 - Flipped field keeps cluster counts upright
 
-**Status:** confirmed — display bug  
+**Status:** implemented — pending deployed field verification
 **Theme:** field review  
 **Where:** `SoccerField` applies `rotate-180` to the whole SVG when
 `fieldFlipped` is true; `SoccerMarkerCluster` draws the count as SVG
@@ -525,10 +525,12 @@ Tap mapping already remaps through `soccerFieldLocation(..., flipped)`.
 The count (and other in-SVG text such as a foul `!`) rotates with the
 pitch.
 
-**Likely direction:** keep stored coordinates. Counter-rotate marker
-labels/counts when the pitch is flipped, or flip by remapping display
-coordinates instead of rotating the entire SVG. Do not change event
-locations.
+**Implemented direction:** stored coordinates and the existing pitch rotation
+remain unchanged. `SoccerField` passes the display flip to individual markers
+and clusters, then counter-rotates value and identity glyphs around each marker
+center. Cluster counts, foul `!` glyphs, and the offside X-plus-underline stay
+upright. Geometric triangle markers remain pitch-relative and rotate with the
+field. Event locations, marker placement, and tap mapping do not change.
 
 **Not this item:** persisting the flip (`S9`).
 
