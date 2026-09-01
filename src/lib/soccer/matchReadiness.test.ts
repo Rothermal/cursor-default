@@ -73,12 +73,19 @@ describe('Soccer match-readiness wiring', () => {
     expect(fieldTab).toContain('· {markerFilterSummary}')
   })
 
-  it('counter-rotates marker text when the field is flipped', () => {
+  it('counter-rotates screen-upright marker glyphs when the field is flipped', () => {
     const field = source('src/components/soccer/SoccerField.tsx')
+    const markerStart = field.indexOf('<SoccerMarker\n')
+    const markerEnd = field.indexOf('/>', markerStart)
+    const clusterStart = field.indexOf('<SoccerMarkerCluster\n')
+    const clusterEnd = field.indexOf('/>', clusterStart)
+    const offsideStart = field.indexOf("marker.kind === 'offside'")
+    const offsideEnd = field.indexOf('</g>', offsideStart)
 
-    expect(field).toContain('marker={cluster[0]}\n              flipped={flipped}')
-    expect(field).toContain('markers={cluster}\n              flipped={flipped}')
-    expect(field.match(/transform=\{uprightMarkerTextTransform\(flipped, x, y\)\}/g)).toHaveLength(2)
+    expect(field.slice(markerStart, markerEnd)).toContain('flipped={flipped}')
+    expect(field.slice(clusterStart, clusterEnd)).toContain('flipped={flipped}')
+    expect(field.slice(offsideStart, offsideEnd)).toContain('transform={uprightMarkerGlyphTransform(flipped, x, y)}')
+    expect(field.match(/transform=\{uprightMarkerGlyphTransform\(flipped, x, y\)\}/g)).toHaveLength(3)
     expect(field).toContain('return flipped ? `rotate(180 ${x} ${y})` : undefined')
   })
 })

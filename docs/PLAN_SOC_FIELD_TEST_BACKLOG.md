@@ -527,9 +527,10 @@ pitch.
 
 **Implemented direction:** stored coordinates and the existing pitch rotation
 remain unchanged. `SoccerField` passes the display flip to individual markers
-and clusters, and counter-rotates only SVG text around each marker center. This
-keeps cluster counts and foul `!` glyphs upright without changing marker
-placement, directional shapes, event locations, or tap mapping.
+and clusters, then counter-rotates value and identity glyphs around each marker
+center. Cluster counts, foul `!` glyphs, and the offside X-plus-underline stay
+upright. Geometric triangle markers remain pitch-relative and rotate with the
+field. Event locations, marker placement, and tap mapping do not change.
 
 **Not this item:** persisting the flip (`S9`).
 
