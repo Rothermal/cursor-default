@@ -299,14 +299,17 @@ treating role as a second player identity.
 
 ### S12 - Edit shots from Timeline, not only from the pitch
 
-**Status:** confirmed  
+**Status:** implemented; pending merge
 **Theme:** correction  
 **Where:** tracker Timeline (`SoccerTimeline` → `SoccerLocatedEventEditor`);
 Field marker tap (`editFieldEvent` → `SoccerShotCaptureDialog`)
 
 Owner confirmation: located shots can be edited by selecting the marker on
 the pitch, but the same correction was not available or did not work from the
-event tracker / Timeline during use.
+event tracker / Timeline during use. The reproduced case was an owned live
+Tracker game with one recorder: changing a shot to another player in the
+Timeline editor did not persist, while editing the same marker from the pitch
+worked.
 
 Code review found that `SoccerTimeline.editEvent` already routes every
 `soccer.shot` and `soccer.own_goal` (located or unlocated) through
@@ -315,12 +318,12 @@ therefore a confirmed symptom, not yet a proven missing route. Authority can
 also matter: an owned local source is editable, while canonical, cloud-primary,
 and alternate recordings are intentionally read-only.
 
-**Likely direction:** reproduce first and record the exact surface/source:
-live Tracker Timeline versus post-game Summary Timeline, local versus cloud,
-whether the Correct pencil is absent, and whether the sheet opens but save
-fails. Add a focused regression for the failing branch. Only then change the
-route, visibility gate, busy wrapper, or error presentation that is actually
-responsible.
+**Resolution:** the Timeline wrapper rebuilt its inline correction draft on
+every parent render. The live clock redraw therefore reran the shared dialog's
+initialization effect and restored the original player selection before Save.
+Timeline shot and incident correction drafts are now memoized by event identity,
+matching the stable state-backed draft used by pitch-marker editing. A wiring
+regression prevents located Timeline editors from returning to inline drafts.
 
 **Not this item:** out-of-order undo (`S4`) or changing revision rules.
 
