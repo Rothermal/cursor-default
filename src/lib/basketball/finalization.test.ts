@@ -412,17 +412,12 @@ describe('Basketball finalization repository', () => {
     })
   })
 
-  it('confirms the exact isolated primary checkpoint before returning a review', async () => {
+  it('reconfirms the exact primary checkpoint even when readiness reports current', async () => {
     const projection = recorderProjection()
-    let readinessCalls = 0
     cloudMock.rpc.mockImplementation((name: string) => {
       if (name === 'get_basketball_finalization_readiness') {
-        readinessCalls += 1
         return Promise.resolve({
-          data: [{
-            ...readinessRow(),
-            primary_checkpoint_current: readinessCalls > 1,
-          }],
+          data: [readinessRow()],
           error: null,
         })
       }
@@ -431,10 +426,7 @@ describe('Basketball finalization repository', () => {
       }
       throw new Error(`Unexpected RPC: ${name}`)
     })
-    recorderMock.loadRecorders.mockResolvedValue([{
-      ...recorder,
-      checkpointCurrent: false,
-    }])
+    recorderMock.loadRecorders.mockResolvedValue([recorder])
     recorderMock.loadProjection.mockResolvedValue(projection)
 
     await expect(prepareBasketballFinalization('game-1')).resolves.toMatchObject({
@@ -452,6 +444,11 @@ describe('Basketball finalization repository', () => {
         p_stream_fingerprint: eventStreamFingerprint(projection.state),
       }
     )
+    expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
+      'get_basketball_finalization_readiness',
+      'confirm_basketball_primary_checkpoint_for_finalization',
+      'get_basketball_finalization_readiness',
+    ])
   })
 
   it('submits the exact reviewed checkpoint and parses finalization identity', async () => {
