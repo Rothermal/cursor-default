@@ -324,6 +324,8 @@ initialization effect and restored the original player selection before Save.
 Timeline shot and incident correction drafts are now memoized by event identity,
 matching the stable state-backed draft used by pitch-marker editing. A wiring
 regression prevents located Timeline editors from returning to inline drafts.
+Both shared dialogs also pin edit initialization by event id and revision, so a
+future caller cannot reintroduce the reset by rebuilding an equivalent wrapper.
 
 **Not this item:** out-of-order undo (`S4`) or changing revision rules.
 

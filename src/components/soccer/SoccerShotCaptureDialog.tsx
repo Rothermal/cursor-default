@@ -26,6 +26,7 @@ import {
   type SoccerTeamSide,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
+import { useStableSoccerCorrectionDraft } from '../../hooks/useStableSoccerCorrectionDraft'
 import SoccerField from './SoccerField'
 
 export interface SoccerCaptureDraft {
@@ -74,6 +75,7 @@ export default function SoccerShotCaptureDialog({
   onTrackedParticipantUsed,
   onClose,
 }: SoccerShotCaptureDialogProps) {
+  const initializationDraft = useStableSoccerCorrectionDraft(draft)
   const sportState = state.sportGameState?.sportId === 'soccer' ? state.sportGameState : null
   const projection = sportState?.projection ?? null
   const onField = useMemo(
@@ -156,8 +158,8 @@ export default function SoccerShotCaptureDialog({
     : historicalGoalkeeper ? [historicalGoalkeeper] : []
 
   useEffect(() => {
-    if (!draft) return
-    const event = draft.event
+    if (!initializationDraft) return
+    const event = initializationDraft.event
     const selectedIsOnField = onField.some(participant => participant.participantId === selectedParticipantId)
     const defaultParticipantId = selectedIsOnField
       ? selectedParticipantId ?? ''
@@ -173,13 +175,13 @@ export default function SoccerShotCaptureDialog({
     const initialTiming = periodTimings.find(item => item.period.id === event?.period.id)
       ?? periodTimings[periodTimings.length - 1]
       ?? null
-    setTeamSide(event?.teamSide ?? draft.teamSide)
-    setOutcome(shot?.payload.outcome ?? (ownGoalEvent ? 'goal' : draft.outcome ?? null))
+    setTeamSide(event?.teamSide ?? initializationDraft.teamSide)
+    setOutcome(shot?.payload.outcome ?? (ownGoalEvent ? 'goal' : initializationDraft.outcome ?? null))
     setSituation(shot?.payload.situation ?? 'open_play')
     setSourceEventId(shot?.payload.sourceEventId ?? '')
     setOwnGoal(Boolean(ownGoalEvent))
-    setLocation(event?.location ?? draft.location)
-    setTrackedShooterId(shooter?.participantId ?? (shooter?.kind === 'team' || draft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
+    setLocation(event?.location ?? initializationDraft.location)
+    setTrackedShooterId(shooter?.participantId ?? (shooter?.kind === 'team' || initializationDraft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
     setOpponentShooterMode(shooter?.kind === 'team' ? 'team' : 'unknown')
     setOpponentShooterLabel(opponentLabel(shooter, 'Unknown opponent'))
     setPrimaryCreatorId(primary?.participantId ?? '')
@@ -202,16 +204,16 @@ export default function SoccerShotCaptureDialog({
     setLocationEditorOpen(false)
     setLocationFieldFlipped(false)
     setError(null)
-  }, [draft, mode, onField, periodTimings, selectedParticipantId])
+  }, [initializationDraft, mode, onField, periodTimings, selectedParticipantId])
 
   useEffect(() => {
-    if (draft && !trackedGoalkeeperId && goalkeeper) {
+    if (initializationDraft && !trackedGoalkeeperId && goalkeeper) {
       setTrackedGoalkeeperId(goalkeeper.participantId)
     }
-  }, [draft, goalkeeper, trackedGoalkeeperId])
+  }, [goalkeeper, initializationDraft, trackedGoalkeeperId])
 
   useEffect(() => {
-    if (!draft || mode === 'live' || !moment) return
+    if (!initializationDraft || mode === 'live' || !moment) return
     const validIds = new Set(historicalParticipants.map(participant => participant.participantId))
     const fallbackId = historicalParticipants.find(participant => soccerParticipantRoleAt(
       participant,
@@ -227,7 +229,7 @@ export default function SoccerShotCaptureDialog({
     setTrackedGoalkeeperId(current => current && validIds.has(current) && current === historicalGoalkeeper?.participantId
       ? current
       : historicalGoalkeeper?.participantId ?? '')
-  }, [draft, historicalGoalkeeper, historicalParticipants, initialRoles, mode, moment])
+  }, [historicalGoalkeeper, historicalParticipants, initialRoles, initializationDraft, mode, moment])
 
   if (!draft || !projection) return null
 
