@@ -19,10 +19,16 @@ export function sameSoccerCorrectionDraft<T extends SoccerCorrectionDraft>(
     current.event.revision === next.event.revision
 }
 
-export function useStableSoccerCorrectionDraft<T extends SoccerCorrectionDraft>(draft: T | null): T | null {
-  const stableDraft = useRef(draft)
-  if (!sameSoccerCorrectionDraft(stableDraft.current, draft)) {
-    stableDraft.current = draft
+export function stabilizeSoccerCorrectionDraft<T extends SoccerCorrectionDraft>(
+  holder: { current: T | null },
+  next: T | null
+): T | null {
+  if (!sameSoccerCorrectionDraft(holder.current, next)) {
+    holder.current = next
   }
-  return stableDraft.current
+  return holder.current
+}
+
+export function useStableSoccerCorrectionDraft<T extends SoccerCorrectionDraft>(draft: T | null): T | null {
+  return stabilizeSoccerCorrectionDraft(useRef(draft), draft)
 }
