@@ -340,17 +340,23 @@ The newest foul was `Opponent / Murdoch Rothermal / direct free kick` at
 revision 2. Cloud sync showed the same truncated message, plus Retry/Export.
 Live controls were locked behind Review Timeline Issues.
 
-Cause: new incident sheets default `attribution` to `participant` even when
-`teamSide` is `opponent`. Opponent ActorEditor hides the Player chip, but
-save still sends the selected tracked participant. Projection then fails
-closed and parks the raw event.
+Cause: the affected foul was revision 2, so the invalid actor/side combination
+entered through Timeline correction rather than live append. A correction
+could retain tracked-player attribution after changing the event side because
+the opponent ActorEditor hid the Player chip without clearing its selection.
+The shared edit primitive returned the resulting incomplete rebuild for
+recovery, and the Soccer tracker committed it without distinguishing a repair
+from a healthy-to-incomplete change. Live append already rejects incomplete
+projections before changing state.
 
 **Implemented direction:** incident actor selection is normalized when the
 sheet opens, when a historical event changes sides, and again at Save. An
 opponent actor can no longer retain tracked-player attribution or a tracked
 `participantId`; it becomes an unknown/labeled opponent while team and staff
 attribution remain intact. The same rule applies to the optional fouled actor
-on the opposite side.
+on the opposite side. The tracker also rejects any correction that would turn
+a healthy projection incomplete, while still permitting a correction against
+an already-incomplete stream so it can be repaired in place.
 
 Opening an affected foul from Timeline **Correct** now preselects a labeled
 opponent actor without the stale tracked participant. Saving the correction

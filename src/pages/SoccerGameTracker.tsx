@@ -341,6 +341,10 @@ export default function SoccerGameTracker() {
       setError(result.message)
       return false
     }
+    if (inspection.complete && !result.inspection.complete) {
+      setError('That change would leave the match history incomplete.')
+      return false
+    }
     applyingRef.current = true
     setIsApplying(true)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
