@@ -224,7 +224,9 @@ export async function prepareBasketballFinalization(
   const terminal = projection.inspection.complete &&
     basketballState?.projection.status === 'ended' &&
     (endReason === 'completed' || endReason === 'abandoned')
-  if (terminal && !readiness.primaryCheckpointCurrent) {
+  if (terminal) {
+    // The shared readiness check does not compare the stored fingerprint with
+    // this freshly loaded projection, so exact confirmation cannot be skipped.
     await confirmPrimaryCheckpoint(gameId, recorder.recorderId, projection)
     readiness = await loadBasketballFinalizationReadiness(gameId)
     if (
