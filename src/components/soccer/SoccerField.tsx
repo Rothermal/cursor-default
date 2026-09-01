@@ -110,12 +110,14 @@ export default function SoccerField({
             <SoccerMarker
               key={cluster[0].id}
               marker={cluster[0]}
+              flipped={flipped}
               onSelect={onMarker ? () => onMarker(cluster[0].id) : undefined}
             />
           ) : (
             <SoccerMarkerCluster
               key={cluster.map(marker => marker.id).join(':')}
               markers={cluster}
+              flipped={flipped}
               onSelect={onCluster ? () => onCluster(cluster.map(marker => marker.id)) : undefined}
             />
           ))}
@@ -172,7 +174,15 @@ function LegendGlyph({ kind }: { kind: SoccerFieldMarkerKind }) {
   return <span className="h-0 w-0 border-x-[5px] border-b-[9px] border-x-transparent border-b-slate-500" />
 }
 
-function SoccerMarker({ marker, onSelect }: { marker: SoccerFieldMarker; onSelect?: () => void }) {
+function SoccerMarker({
+  marker,
+  flipped,
+  onSelect,
+}: {
+  marker: SoccerFieldMarker
+  flipped: boolean
+  onSelect?: () => void
+}) {
   const x = marker.x * 100
   const y = marker.y * 64
   const color = marker.teamSide === 'tracked' ? '#facc15' : '#38bdf8'
@@ -217,7 +227,7 @@ function SoccerMarker({ marker, onSelect }: { marker: SoccerFieldMarker; onSelec
       ) : marker.kind === 'recovery' ? (
         <g stroke={color} strokeWidth="0.9" strokeLinecap="round"><line x1={x - 1.5} y1={y} x2={x + 1.5} y2={y} /><line x1={x} y1={y - 1.5} x2={x} y2={y + 1.5} /></g>
       ) : marker.kind === 'foul' ? (
-        <text x={x} y={y + 1.25} textAnchor="middle" fill={color} fontSize="3.7" fontWeight="700">!</text>
+        <text x={x} y={y + 1.25} transform={uprightMarkerTextTransform(flipped, x, y)} textAnchor="middle" fill={color} fontSize="3.7" fontWeight="700">!</text>
       ) : marker.kind === 'yellow_card' || marker.kind === 'red_card' ? (
         <rect x={x - 1.05} y={y - 1.55} width="2.1" height="3.1" rx="0.25" fill={marker.kind === 'yellow_card' ? '#fde047' : '#ef4444'} stroke={color} strokeWidth="0.55" />
       ) : marker.kind === 'offside' ? (
@@ -229,15 +239,27 @@ function SoccerMarker({ marker, onSelect }: { marker: SoccerFieldMarker; onSelec
   )
 }
 
-function SoccerMarkerCluster({ markers, onSelect }: { markers: SoccerFieldMarker[]; onSelect?: () => void }) {
+function SoccerMarkerCluster({
+  markers,
+  flipped,
+  onSelect,
+}: {
+  markers: SoccerFieldMarker[]
+  flipped: boolean
+  onSelect?: () => void
+}) {
   const x = markers.reduce((total, marker) => total + marker.x, 0) / markers.length * 100
   const y = markers.reduce((total, marker) => total + marker.y, 0) / markers.length * 64
   return (
     <g role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} aria-label={`${markers.length} events at this location`} className={onSelect ? 'cursor-pointer outline-none' : undefined} onClick={event => { event.stopPropagation(); onSelect?.() }} onKeyDown={event => { if (!onSelect || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); event.stopPropagation(); onSelect() }}>
       <circle cx={x} cy={y} r="4.2" fill="#0f172a" stroke="#f8fafc" strokeWidth="0.65" />
-      <text x={x} y={y + 1.35} textAnchor="middle" fill="#f8fafc" fontSize="4" fontWeight="700">{markers.length}</text>
+      <text x={x} y={y + 1.35} transform={uprightMarkerTextTransform(flipped, x, y)} textAnchor="middle" fill="#f8fafc" fontSize="4" fontWeight="700">{markers.length}</text>
     </g>
   )
+}
+
+function uprightMarkerTextTransform(flipped: boolean, x: number, y: number): string | undefined {
+  return flipped ? `rotate(180 ${x} ${y})` : undefined
 }
 
 function oppositeDirection(direction: SoccerAttackingDirection): SoccerAttackingDirection {

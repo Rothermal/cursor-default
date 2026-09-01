@@ -72,4 +72,13 @@ describe('Soccer match-readiness wiring', () => {
     expect(fieldTab).toContain("setMarkerScope('match')")
     expect(fieldTab).toContain('· {markerFilterSummary}')
   })
+
+  it('counter-rotates marker text when the field is flipped', () => {
+    const field = source('src/components/soccer/SoccerField.tsx')
+
+    expect(field).toContain('marker={cluster[0]}\n              flipped={flipped}')
+    expect(field).toContain('markers={cluster}\n              flipped={flipped}')
+    expect(field.match(/transform=\{uprightMarkerTextTransform\(flipped, x, y\)\}/g)).toHaveLength(2)
+    expect(field).toContain('return flipped ? `rotate(180 ${x} ${y})` : undefined')
+  })
 })
