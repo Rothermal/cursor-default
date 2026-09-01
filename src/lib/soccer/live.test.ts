@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, SportConfig } from '../../types'
+import { updateGameEvent } from '../gameEvents/mutations'
+import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState, gameReducer } from '../gameReducer'
 import { prepareSoccerKickoff } from './kickoff'
 import {
@@ -485,23 +487,46 @@ describe('soccer live match actions', () => {
     expect(reopened.state.sportGameState?.projection.status).toBe('period_break')
   })
 
-  it('preserves an invalid historical correction and exposes projection diagnostics', () => {
+  it('rejects a healthy-to-incomplete correction but permits in-place recovery', () => {
     const state = kickedOffState()
     const event = inspectSoccerHistory(state).activeEvents.find(
       candidate => candidate.eventType === 'soccer.opening_lineup'
     )
     if (!event) throw new Error('opening lineup event missing')
-    const corrected = updateSoccerHistoryEvent(
+    const invalid = updateGameEvent(
+      state,
+      event.id,
+      { payload: { starters: [{ participantId: 'match-defender', role: { group: 'defender', label: null } }] } },
+      '2026-07-18T12:05:00.000Z',
+      gameEventRegistry,
+      gameEventProjectors
+    )
+    expect(invalid.ok).toBe(true)
+    if (!invalid.ok) return
+    expect(invalid.inspection.complete).toBe(false)
+
+    const rejected = updateSoccerHistoryEvent(
       state,
       event.id,
       { payload: { starters: [{ participantId: 'match-defender', role: { group: 'defender', label: null } }] } },
       '2026-07-18T12:05:00.000Z'
     )
-    expect(corrected.ok).toBe(true)
-    if (!corrected.ok) return
-    expect(corrected.inspection.complete).toBe(false)
-    expect(corrected.inspection.diagnostics[0]?.code).toBe('semantic_validation_failed')
-    expect(corrected.state.eventStream?.events).toHaveLength(3)
+    expect(rejected).toMatchObject({
+      ok: false,
+      message: 'That change would leave the match history incomplete.',
+    })
+    if (rejected.ok) return
+    expect(rejected.state).toBe(state)
+
+    const repaired = updateSoccerHistoryEvent(
+      invalid.state,
+      event.id,
+      { payload: event.payload },
+      '2026-07-18T12:06:00.000Z'
+    )
+    expect(repaired.ok).toBe(true)
+    if (!repaired.ok) return
+    expect(repaired.inspection.complete).toBe(true)
   })
 
   it('toggles a running clock to stopped at the rendered time', () => {

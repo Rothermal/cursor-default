@@ -356,7 +356,9 @@ opponent actor can no longer retain tracked-player attribution or a tracked
 attribution remain intact. The same rule applies to the optional fouled actor
 on the opposite side. The tracker also rejects any correction that would turn
 a healthy projection incomplete, while still permitting a correction against
-an already-incomplete stream so it can be repaired in place.
+an already-incomplete stream so it can be repaired in place. Edit, remove, and
+restore commands surface that refusal through each dialog's local error state;
+the tracker repeats the guard as defense in depth.
 
 Opening an affected foul from Timeline **Correct** now preselects a labeled
 opponent actor without the stale tracked participant. Saving the correction
