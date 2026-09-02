@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SOCCER_PERSONAL_SETTINGS,
+  SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION,
+  SOCCER_TEAM_SETTINGS_SCHEMA_VERSION,
+  copySoccerTeamRules,
   parseSoccerPersonalSettings,
   parseSoccerRulesOverride,
   parseSoccerTeamSettings,
@@ -8,9 +11,15 @@ import {
   resolveSoccerSettingsHierarchy,
   soccerRulesOverrideFingerprint,
   soccerRulesOverrideFromDifference,
+  soccerTeamSettingsFingerprint,
 } from './settings'
 
 describe('soccer settings schema', () => {
+  it('keeps personal version one separate from current team version two', () => {
+    expect(SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION).toBe(1)
+    expect(SOCCER_TEAM_SETTINGS_SCHEMA_VERSION).toBe(2)
+  })
+
   it('stores only match fields that differ from inherited rules', () => {
     const inherited = resolveSoccerSettingsHierarchy().rules
     const desired = {
@@ -66,6 +75,7 @@ describe('soccer settings schema', () => {
     })
     expect(parseSoccerTeamSettings({
       rules: { shootoutAvailable: true },
+      formation: null,
     })).toEqual({
       ok: false,
       error: 'shootoutAvailable is derived from tieResolution and cannot be stored.',
@@ -79,10 +89,87 @@ describe('soccer settings schema', () => {
     })).toMatchObject({ ok: false })
     expect(parseSoccerTeamSettings({
       rules: { maxOnFieldPlayers: 7 },
+      formation: null,
     })).toEqual({
       ok: true,
-      value: { rules: { maxOnFieldPlayers: 7 } },
+      value: { rules: { maxOnFieldPlayers: 7 }, formation: null },
     })
+  })
+
+  it('normalizes legacy team version one and round-trips team version two', () => {
+    expect(parseSoccerTeamSettings({
+      rules: { maxOnFieldPlayers: 7 },
+    }, 1)).toEqual({
+      ok: true,
+      value: { rules: { maxOnFieldPlayers: 7 }, formation: null },
+    })
+    expect(parseSoccerTeamSettings({
+      rules: { maxOnFieldPlayers: 7 },
+      formation: {
+        version: 1,
+        templateId: '7v7-2-3-1',
+        assignments: { gk: '11111111-1111-4111-8111-111111111111' },
+      },
+    })).toEqual({
+      ok: true,
+      value: {
+        rules: { maxOnFieldPlayers: 7 },
+        formation: {
+          version: 1,
+          templateId: '7v7-2-3-1',
+          assignments: { gk: '11111111-1111-4111-8111-111111111111' },
+        },
+      },
+    })
+  })
+
+  it('rejects team payloads that do not match their declared schema', () => {
+    expect(parseSoccerTeamSettings({ rules: {} })).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({ rules: {}, formation: null }, 1)).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({ rules: {}, formation: null }, 3)).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({
+      rules: {},
+      formation: {
+        version: 1,
+        templateId: '7v7-2-3-1',
+        assignments: {
+          gk: '11111111-1111-4111-8111-111111111111',
+          st: '11111111-1111-4111-8111-111111111111',
+        },
+      },
+    })).toMatchObject({ ok: false })
+  })
+
+  it('fingerprints formation changes and copies only rules across teams', () => {
+    const target = {
+      rules: { maxOnFieldPlayers: 7 },
+      formation: {
+        version: 1 as const,
+        templateId: '7v7-2-3-1' as const,
+        assignments: { gk: '11111111-1111-4111-8111-111111111111' },
+      },
+    }
+    const source = {
+      rules: { maxOnFieldPlayers: 9 },
+      formation: {
+        version: 1 as const,
+        templateId: '9v9-3-3-2' as const,
+        assignments: { gk: '22222222-2222-4222-8222-222222222222' },
+      },
+    }
+
+    expect(soccerTeamSettingsFingerprint(target)).not.toBe(
+      soccerTeamSettingsFingerprint({ ...target, formation: null })
+    )
+    expect(copySoccerTeamRules(target, source)).toEqual({
+      rules: source.rules,
+      formation: target.formation,
+    })
+    expect(copySoccerTeamRules(target, null)).toEqual({
+      rules: {},
+      formation: target.formation,
+    })
+    expect(copySoccerTeamRules(target, source).formation).not.toBe(target.formation)
   })
 
   it('rejects unknown nested segment fields', () => {
@@ -108,6 +195,7 @@ describe('soccer settings schema', () => {
     })).toMatchObject({ ok: false })
     expect(parseSoccerTeamSettings({
       rules: { unknownRule: true },
+      formation: null,
     })).toEqual({
       ok: false,
       error: 'Unknown soccer rule: unknownRule.',

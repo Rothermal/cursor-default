@@ -370,7 +370,7 @@ write-back from live play.
 ## 5. Delivery Slices
 
 ```text
-S19A  Domain + settings schema
+S19A  Domain + settings schema [implemented]
       Template catalog, strict model/parsers, pure draft/application helpers,
       team schema v1->v2 compatibility, migration, cache/RPC/audit tests
 
@@ -386,6 +386,11 @@ S19C  Match setup prefill
 Each slice should use its own feature branch and PR. `S19A` must merge and its
 migration must be applied before `S19B` can save version-2 settings. `S19C`
 must not merge before both readers and the editor can round-trip the formation.
+
+S19A is implemented through migration `065`. Its verification map is
+[`REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md`](REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md).
+S19B remains the next slice; migration `065` must be applied before that editor
+is deployed.
 
 ## 6. File Map
 
@@ -463,7 +468,7 @@ must not merge before both readers and the editor can round-trip the formation.
 - read-only users cannot open pickers or save/clear;
 - prefill runs once for a fresh team setup and never resets manual edits;
 - mismatched formation shows a warning and uses roster defaults;
-- stale players are not fabricated; and
+- stale players are not fabricated;
 - every formation-prefilled participant has `initialRole.label === null`; and
 - existing non-formation Soccer setup/kickoff tests remain green.
 

@@ -8,8 +8,14 @@ import {
   type SoccerMatchRulesOverride,
 } from './rules'
 import type { SoccerMatchRules } from './types'
+import {
+  parseSoccerTeamFormation,
+  type SoccerTeamFormationV1,
+} from './formation'
 
-export const SOCCER_SETTINGS_SCHEMA_VERSION = 1
+export const SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION = 1
+export const SOCCER_TEAM_SETTINGS_SCHEMA_VERSION = 2
+export const SOCCER_LEGACY_TEAM_SETTINGS_SCHEMA_VERSION = 1
 const MAX_STORED_INTEGER = 2_147_483_647
 
 export type SoccerSettingsLayer = 'personal' | 'team' | 'match'
@@ -26,6 +32,7 @@ export interface SoccerPersonalSettings {
 
 export interface SoccerTeamSettings {
   rules: SoccerMatchRulesOverride
+  formation: SoccerTeamFormationV1 | null
 }
 
 export interface SoccerSettingsDiagnostic {
@@ -135,6 +142,25 @@ export function soccerRulesOverrideFingerprint(
   return stableJson(ordered)
 }
 
+export function soccerTeamSettingsFingerprint(
+  settings: SoccerTeamSettings
+): string {
+  return stableJson({
+    rules: JSON.parse(soccerRulesOverrideFingerprint(settings.rules)) as unknown,
+    formation: settings.formation,
+  })
+}
+
+export function copySoccerTeamRules(
+  target: SoccerTeamSettings,
+  source: SoccerTeamSettings | null
+): SoccerTeamSettings {
+  return {
+    rules: structuredClone(source?.rules ?? {}),
+    formation: structuredClone(target.formation),
+  }
+}
+
 export function parseSoccerPersonalSettings(
   value: unknown
 ): SoccerSettingsParseResult<SoccerPersonalSettings> {
@@ -162,15 +188,33 @@ export function parseSoccerPersonalSettings(
 }
 
 export function parseSoccerTeamSettings(
-  value: unknown
+  value: unknown,
+  schemaVersion = SOCCER_TEAM_SETTINGS_SCHEMA_VERSION
 ): SoccerSettingsParseResult<SoccerTeamSettings> {
-  if (!hasExactKeys(value, ['rules'])) {
-    return invalid('Team soccer settings must contain only rules.')
+  if (schemaVersion === SOCCER_LEGACY_TEAM_SETTINGS_SCHEMA_VERSION) {
+    if (!hasExactKeys(value, ['rules'])) {
+      return invalid('Legacy team soccer settings must contain only rules.')
+    }
+    const rules = parseSoccerConfigurableRules(value.rules, false)
+    return rules.ok
+      ? { ok: true, value: { rules: rules.value, formation: null } }
+      : rules
+  }
+  if (schemaVersion !== SOCCER_TEAM_SETTINGS_SCHEMA_VERSION) {
+    return invalid('Team soccer settings use an unsupported schema.')
+  }
+  if (!hasExactKeys(value, ['rules', 'formation'])) {
+    return invalid('Team soccer settings must contain only rules and formation.')
   }
   const rules = parseSoccerConfigurableRules(value.rules, false)
-  return rules.ok
-    ? { ok: true, value: { rules: rules.value } }
-    : rules
+  if (!rules.ok) return rules
+  if (value.formation === null) {
+    return { ok: true, value: { rules: rules.value, formation: null } }
+  }
+  const formation = parseSoccerTeamFormation(value.formation)
+  return formation.ok
+    ? { ok: true, value: { rules: rules.value, formation: formation.value } }
+    : formation
 }
 
 export function parseSoccerRulesOverride(

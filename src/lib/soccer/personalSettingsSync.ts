@@ -6,7 +6,7 @@ import type { SportSettingsCloudRecord } from '../sportSettingsCloud'
 import { stableJson } from '../gameEvents/stream'
 import {
   DEFAULT_SOCCER_PERSONAL_SETTINGS,
-  SOCCER_SETTINGS_SCHEMA_VERSION,
+  SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION,
   parseSoccerPersonalSettings,
   type SoccerPersonalSettings,
 } from './settings'
@@ -42,7 +42,7 @@ export type SoccerPersonalSettingsReconciliation =
 export function validSoccerSettingsCache(
   record: SportSettingsCacheRecord | null
 ): SportSettingsCacheRecord<SoccerPersonalSettings> | null {
-  if (!record || record.schemaVersion !== SOCCER_SETTINGS_SCHEMA_VERSION) return null
+  if (!record || record.schemaVersion !== SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION) return null
   const parsed = parseSoccerPersonalSettings(record.settings)
   return parsed.ok ? { ...record, settings: parsed.value } : null
 }
@@ -54,7 +54,7 @@ export function reconcileSoccerPersonalSettings(
   now = new Date().toISOString()
 ): SoccerPersonalSettingsReconciliation {
   if (cloudRecord) {
-    const parsedCloud = cloudRecord.schemaVersion === SOCCER_SETTINGS_SCHEMA_VERSION
+    const parsedCloud = cloudRecord.schemaVersion === SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION
       ? parseSoccerPersonalSettings(cloudRecord.settings)
       : { ok: false as const, error: 'Cloud soccer settings use an unsupported schema.' }
 
@@ -119,7 +119,7 @@ export function createSoccerSettingsCacheRecord(
   return {
     version: 1,
     sportId: 'soccer',
-    schemaVersion: SOCCER_SETTINGS_SCHEMA_VERSION,
+    schemaVersion: SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION,
     revision: options.revision,
     settings: structuredClone(settings),
     pending: options.pending

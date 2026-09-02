@@ -4,12 +4,16 @@ import type {
   SportSettingsCacheScope,
 } from '../sportSettingsStorage'
 import {
-  SOCCER_SETTINGS_SCHEMA_VERSION,
+  SOCCER_LEGACY_TEAM_SETTINGS_SCHEMA_VERSION,
+  SOCCER_TEAM_SETTINGS_SCHEMA_VERSION,
   parseSoccerTeamSettings,
   type SoccerTeamSettings,
 } from './settings'
 
-export const EMPTY_SOCCER_TEAM_SETTINGS: SoccerTeamSettings = { rules: {} }
+export const EMPTY_SOCCER_TEAM_SETTINGS: SoccerTeamSettings = {
+  rules: {},
+  formation: null,
+}
 
 export function soccerTeamSettingsCacheScope(
   userId: string,
@@ -21,16 +25,16 @@ export function soccerTeamSettingsCacheScope(
 export function validSoccerTeamSettingsCache(
   record: SportSettingsCacheRecord | null
 ): SportSettingsCacheRecord<SoccerTeamSettings> | null {
-  if (!record || record.schemaVersion !== SOCCER_SETTINGS_SCHEMA_VERSION) return null
-  const parsed = parseSoccerTeamSettings(record.settings)
+  if (!record || !isSupportedTeamSchema(record.schemaVersion)) return null
+  const parsed = parseSoccerTeamSettings(record.settings, record.schemaVersion)
   return parsed.ok ? { ...record, settings: parsed.value } : null
 }
 
 export function parseCloudSoccerTeamSettings(
   record: SportSettingsCloudRecord
 ): SportSettingsCloudRecord<SoccerTeamSettings> | null {
-  if (record.schemaVersion !== SOCCER_SETTINGS_SCHEMA_VERSION) return null
-  const parsed = parseSoccerTeamSettings(record.settings)
+  if (!isSupportedTeamSchema(record.schemaVersion)) return null
+  const parsed = parseSoccerTeamSettings(record.settings, record.schemaVersion)
   return parsed.ok ? { ...record, settings: parsed.value } : null
 }
 
@@ -46,11 +50,16 @@ export function createSoccerTeamSettingsCacheRecord(
   return {
     version: 1,
     sportId: 'soccer',
-    schemaVersion: SOCCER_SETTINGS_SCHEMA_VERSION,
+    schemaVersion: SOCCER_TEAM_SETTINGS_SCHEMA_VERSION,
     revision: options.revision,
     settings: structuredClone(settings),
     pending: null,
     cloudUpdatedAt: options.cloudUpdatedAt,
     cachedAt: now,
   }
+}
+
+function isSupportedTeamSchema(schemaVersion: number): boolean {
+  return schemaVersion === SOCCER_LEGACY_TEAM_SETTINGS_SCHEMA_VERSION ||
+    schemaVersion === SOCCER_TEAM_SETTINGS_SCHEMA_VERSION
 }

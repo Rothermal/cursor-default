@@ -5,9 +5,10 @@ import { useSettings } from '../../context/SettingsContext'
 import { useSoccerTeamSettings } from '../../hooks/useSoccerTeamSettings'
 import { loadTeamSportSettings } from '../../lib/sportSettingsCloud'
 import {
+  copySoccerTeamRules,
   parseSoccerTeamSettings,
   resolveSoccerSettingsHierarchy,
-  soccerRulesOverrideFingerprint,
+  soccerTeamSettingsFingerprint,
   type SoccerTeamSettings,
 } from '../../lib/soccer/settings'
 import SoccerRulesOverrideEditor from '../soccer/SoccerRulesOverrideEditor'
@@ -42,10 +43,10 @@ export default function SoccerTeamSettingsPanel({
   const [copyError, setCopyError] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const previousSavedFingerprint = useRef(
-    soccerRulesOverrideFingerprint(team.settings.rules)
+    soccerTeamSettingsFingerprint(team.settings)
   )
-  const dirty = soccerRulesOverrideFingerprint(draft.rules) !==
-    soccerRulesOverrideFingerprint(team.settings.rules)
+  const dirty = soccerTeamSettingsFingerprint(draft) !==
+    soccerTeamSettingsFingerprint(team.settings)
   const sharedWritable = mayEdit &&
     (team.status === 'synced' || team.status === 'missing')
   const inherited = useMemo(
@@ -57,14 +58,14 @@ export default function SoccerTeamSettingsPanel({
 
   useEffect(() => {
     const previous = previousSavedFingerprint.current
-    const next = soccerRulesOverrideFingerprint(team.settings.rules)
-    const current = soccerRulesOverrideFingerprint(draft.rules)
+    const next = soccerTeamSettingsFingerprint(team.settings)
+    const current = soccerTeamSettingsFingerprint(draft)
     if (current === previous || current === next) {
       if (current !== next) setDraft(structuredClone(team.settings))
       setBaseRevision(team.revision)
     }
     previousSavedFingerprint.current = next
-  }, [draft.rules, team.revision, team.settings])
+  }, [draft, team.revision, team.settings])
 
   const handleSave = async () => {
     if (!mayEdit) return
@@ -91,7 +92,7 @@ export default function SoccerTeamSettingsPanel({
     }
     setCopying(false)
     if (loaded.status === 'missing') {
-      setDraft({ rules: {} })
+      setDraft(current => copySoccerTeamRules(current, null))
       return
     }
     if (loaded.status !== 'loaded') {
@@ -102,12 +103,15 @@ export default function SoccerTeamSettingsPanel({
       )
       return
     }
-    const parsed = parseSoccerTeamSettings(loaded.record.settings)
+    const parsed = parseSoccerTeamSettings(
+      loaded.record.settings,
+      loaded.record.schemaVersion
+    )
     if (!parsed.ok) {
       setCopyError('That team has invalid or unsupported soccer defaults.')
       return
     }
-    setDraft(parsed.value)
+    setDraft(current => copySoccerTeamRules(current, parsed.value))
   }
 
   return (
@@ -223,7 +227,7 @@ export default function SoccerTeamSettingsPanel({
           override={draft.rules}
           overrideLabel="Team override"
           readOnly={!sharedWritable}
-          onChange={rules => setDraft({ rules })}
+          onChange={rules => setDraft(current => ({ ...current, rules }))}
         />
       )}
 
