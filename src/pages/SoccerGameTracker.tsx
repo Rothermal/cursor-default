@@ -259,6 +259,11 @@ export default function SoccerGameTracker() {
   const capturePreferences = soccerState.capturePreferences
   const fieldCaptureEnabled =
     healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal
+  const substitutionActionEnabled =
+    healthy &&
+    (projection.status === 'in_progress' || projection.status === 'period_break') &&
+    !isApplying &&
+    !cloudFinal
   const markerFilterSummary = [
     markerFamilyFilter === 'all'
       ? null
@@ -663,6 +668,30 @@ export default function SoccerGameTracker() {
                   onClick={() => openIncident('team_event', null)}
                 />
               </div>
+
+              {!ended && (
+                <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2" aria-label="Field match actions">
+                  <button
+                    type="button"
+                    onClick={() => openDialog('substitution')}
+                    disabled={!substitutionActionEnabled}
+                    className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md border border-emerald-700 bg-emerald-50 px-3 text-sm font-bold text-emerald-800 disabled:border-slate-300 disabled:bg-slate-50 disabled:text-slate-500 disabled:opacity-50"
+                  >
+                    <Repeat2 size={18} />
+                    <span className="truncate">Substitution</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActionsOpen(true)}
+                    disabled={!healthy || isApplying || cloudFinal}
+                    className="grid min-h-12 w-12 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 disabled:opacity-40"
+                    aria-label="More match actions"
+                    title="More match actions"
+                  >
+                    <MoreHorizontal size={20} />
+                  </button>
+                </div>
+              )}
 
               <details className="border-y border-slate-200 py-2">
                 <summary className="cursor-pointer text-sm font-semibold text-slate-600">

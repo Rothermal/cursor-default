@@ -94,7 +94,7 @@ or the rest of detailed goal metadata (`M5`).
 
 ### S2 - Substitution from the Field tab
 
-**Status:** confirmed — largest first-match challenge
+**Status:** implemented; pending deployed field verification
 
 **Theme:** lineup during live play  
 **Where:** `SoccerGameTracker` Field tab, `SoccerLiveActionDialog` `substitution`
@@ -105,15 +105,16 @@ roles, clock correction, late participant, and rules.
 
 Owner confirmation: first live matches made this the biggest workflow gap.
 
-**Likely direction:** a Field-tab Sub control that opens the existing
-substitution window. Optional later: tap a Lineup row to start the same window
-(`S8`).
+**Resolution:** the Field tab now has a compact match-action row immediately
+below Quick capture. Its primary Substitution control opens the existing
+substitution window during active play and period breaks; an icon-only overflow
+keeps the remaining match actions reachable without expanding the four-slot
+capture row. Optional later: tap a Lineup row to start the same window (`S8`).
 
-**Planning note:** the current quick row is already full (Goal, Foul, Card,
-Team), and the restart plan renames Team rather than freeing that slot. Plan
-`S2` with `S3` as one Field-shell pass that defines compact primary actions and
-an overflow/review treatment. Do not keep adding one-off fifth and sixth
-buttons to the four-column row.
+**Field-shell note:** the current quick row remains Goal, Foul, Card, and Team;
+the restart plan may rename Team rather than free that slot. Future Field
+actions should extend the match-action/overflow treatment rather than add a
+fifth or sixth capture button.
 
 **Not this item:** changing substitution-window or return-sub rules.
 
@@ -299,7 +300,7 @@ treating role as a second player identity.
 
 ### S12 - Edit shots from Timeline, not only from the pitch
 
-**Status:** implemented; pending merge
+**Status:** implemented; pending deployed field verification
 **Theme:** correction  
 **Where:** tracker Timeline (`SoccerTimeline` → `SoccerLocatedEventEditor`);
 Field marker tap (`editFieldEvent` → `SoccerShotCaptureDialog`)
