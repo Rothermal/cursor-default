@@ -4,7 +4,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { teamDisplayName } from '../lib/display'
-import { canRenameSeason, normalizedSeasonName } from '../lib/seasonWorkflow'
+import {
+  canRenameSeason,
+  decideSeasonRename,
+  normalizedSeasonName,
+} from '../lib/seasonWorkflow'
 import { supabase } from '../lib/supabase'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
@@ -103,20 +107,19 @@ export default function SeasonInfo() {
 
   const handleRenameSeason = async () => {
     const userId = user?.id
-    if (
-      !supabaseClient ||
-      !season ||
-      !userId ||
-      savingName ||
-      !canRenameSeason(season.owner_id, userId)
-    ) return
+    if (!supabaseClient || !season || savingName) return
 
-    const nextName = normalizedSeasonName(nameDraft)
-    if (!nextName) {
+    const decision = decideSeasonRename(
+      { ownerId: season.owner_id, name: season.name },
+      nameDraft,
+      userId
+    )
+    if (decision.outcome === 'blocked') return
+    if (decision.outcome === 'invalid') {
       setNameError('Season name is required.')
       return
     }
-    if (nextName === season.name) {
+    if (decision.outcome === 'unchanged') {
       setNameDraft(season.name)
       setEditingName(false)
       setNameError(null)
@@ -127,9 +130,9 @@ export default function SeasonInfo() {
     setNameError(null)
     const { data, error: renameError } = await supabaseClient
       .from('seasons')
-      .update({ name: nextName })
+      .update({ name: decision.name })
       .eq('id', season.id)
-      .eq('owner_id', userId)
+      .eq('owner_id', season.owner_id)
       .select('id,owner_id,name,sport,start_date,end_date')
       .single()
     setSavingName(false)

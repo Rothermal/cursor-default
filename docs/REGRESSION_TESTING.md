@@ -133,6 +133,7 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 | 4.1d | Teams -> Create Team -> Create new season | Sport and Season name are separately labeled; Season name starts empty and is required |
 | 4.2 | Create team (name, sport, season) | Opens `/team/manage?teamId=<id>` for the created team |
 | 4.2a | Team Info -> season link -> Season Info -> rename pencil (season owner) | Save updates the heading and the same season name across team/season views; team members do not see rename controls |
+| 4.2b | First-sync a legacy local game with no season binding and no same-name cloud team | Compatibility fallback may create/reuse a year-named season from the game date; the game remains accessible and custom season names are not inferred |
 | 4.3 | Team Manage → add players (number, first, last) | Players appear in Roster |
 | 4.4 | Edit team name (pencil) → change primary name → Save | Team name updates in list; reflected in Game Setup dropdown and Games page |
 | 4.4b | Edit team nickname (pencil) → set or clear display name → Save | If set: display name shown in list with primary name in parens; if cleared: primary name shown directly |

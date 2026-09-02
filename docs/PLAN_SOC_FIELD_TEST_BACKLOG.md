@@ -619,6 +619,13 @@ owner-only inline rename that updates the same `seasons.name`; accepted team
 members retain read-only season access. Settings → Data remains the broader
 season-management path.
 
+**Compatibility note:** legacy aggregate first-time sync still resolves an
+unbound game by same-name cloud team first, then by a year-named season from
+the game date. If neither exists, it creates that year-named season. Custom
+season names and later renames do not change this fallback, so an unmatched
+local team can still produce a separate `2027` season; Settings → Data remains
+the reconciliation path. Changing that sync authority is outside `S21`.
+
 **Not this item:** changing season sport after create, moving a team
 between seasons (already rejected), or season standings (`M1`).
 
