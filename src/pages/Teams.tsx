@@ -22,6 +22,7 @@ import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { hasUnsyncedParkedBindingForCloudTeam } from '../lib/gameParking'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import { normalizedSeasonName } from '../lib/seasonWorkflow'
 import {
   parseSoccerRosterRole,
   serializeSoccerRosterRole,
@@ -163,7 +164,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
   const [newTeamName, setNewTeamName] = useState('')
   const [newTeamSport, setNewTeamSport] = useState('basketball')
-  const [newTeamSeason, setNewTeamSeason] = useState(new Date().getFullYear().toString())
+  const [newTeamSeason, setNewTeamSeason] = useState('')
 
   useEffect(() => {
     if (formSports.length === 0) return
@@ -770,7 +771,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
       }
       seasonData = found
     } else {
-      if (!newTeamSeason.trim()) {
+      const seasonName = normalizedSeasonName(newTeamSeason)
+      if (!seasonName) {
         setError('Season name is required')
         setCreatingTeam(false)
         return
@@ -779,7 +781,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         .from('seasons')
         .insert({
           owner_id: userId,
-          name: newTeamSeason.trim(),
+          name: seasonName,
           sport: newTeamSport,
         })
         .select('id,name,sport')
@@ -1316,25 +1318,31 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
               </div>
               {seasonMode === 'new' && (
                 <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={newTeamSport}
-                    onChange={e => setNewTeamSport(e.target.value)}
-                    className="input-field"
-                  >
-                    {formSports.map(sport => (
-                      <option key={sport.id} value={sport.id}>
-                        {sport.icon} {sport.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={newTeamSeason}
-                    onChange={e => setNewTeamSeason(e.target.value)}
-                    placeholder="Season name (required)"
-                    className="input-field"
-                    required
-                  />
+                  <label className="block text-xs font-medium text-slate-500">
+                    Sport
+                    <select
+                      value={newTeamSport}
+                      onChange={e => setNewTeamSport(e.target.value)}
+                      className="input-field mt-1"
+                    >
+                      {formSports.map(sport => (
+                        <option key={sport.id} value={sport.id}>
+                          {sport.icon} {sport.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-xs font-medium text-slate-500">
+                    Season name
+                    <input
+                      type="text"
+                      value={newTeamSeason}
+                      onChange={e => setNewTeamSeason(e.target.value)}
+                      placeholder="Spring 2027"
+                      className="input-field mt-1"
+                      required
+                    />
+                  </label>
                 </div>
               )}
               <button
@@ -1346,7 +1354,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                   || formSports.length === 0
                   || scopedSportDisabled
                   || (seasonMode === 'existing' && !selectedSeasonId)
-                  || (seasonMode === 'new' && !newTeamSeason.trim())
+                  || (seasonMode === 'new' && !normalizedSeasonName(newTeamSeason))
                 }
                 className="btn-primary w-full"
               >

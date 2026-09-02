@@ -589,7 +589,8 @@ scope by owner decision.
 
 ### S21 - Name the season when creating it
 
-**Status:** confirmed — create-and-edit gap, soccer and basketball  
+**Status:** implemented; pending deployed verification
+
 **Theme:** seasons / teams  
 **Where:** Teams Create Team (`src/pages/Teams.tsx`); Season Info
 (`src/pages/SeasonInfo.tsx`); Settings → Data → Seasons (`src/pages/Admin.tsx`)
@@ -611,10 +612,19 @@ renamed; the season cannot. Settings → Data → Seasons has a labeled New
 Season name field and a pencil edit, but that is not the Teams create
 path the owner used.
 
-**Likely direction:** on Teams create, show a labeled Season name field
-(empty or clearly editable, not a silent year). Keep sport as its own
-control. Add rename on Season Info or keep Settings edit as a second
-path. Do not invent a second season identity besides `seasons.name`.
+**Resolution:** Teams creation now shows separate labeled Sport and Season
+name controls. The name starts empty with an example placeholder instead of
+silently presenting the current year as the value. Season Info now offers an
+owner-only inline rename that updates the same `seasons.name`; accepted team
+members retain read-only season access. Settings → Data remains the broader
+season-management path.
+
+**Compatibility note:** legacy aggregate first-time sync still resolves an
+unbound game by same-name cloud team first, then by a year-named season from
+the game date. If neither exists, it creates that year-named season. Custom
+season names and later renames do not change this fallback, so an unmatched
+local team can still produce a separate `2027` season; Settings → Data remains
+the reconciliation path. Changing that sync authority is outside `S21`.
 
 **Not this item:** changing season sport after create, moving a team
 between seasons (already rejected), or season standings (`M1`).
@@ -691,9 +701,8 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Code-confirmed defect or constraint | `S21` | Plan the smallest repair with regression coverage |
 | Confirmed product request with open data/UX choices | `S15`, `S16`, `S19` | Short Q&A, then a focused phase plan |
-| Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18` | Run the linked regression rows during the next live or deployed test |
+| Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S21` | Run the linked regression rows during the next live or deployed test |
 | Approved implementation plan | `S17`, `S20` | Deliver the reader-first restart slices in `PLAN_SOC_RESTARTS.md` |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
@@ -715,8 +724,8 @@ exercise those constraints rather than bypass them.
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only
   after restart capture is stable.
-- **General season UX:** `S21` is cross-sport and should not ride in a Soccer
-  event-model PR.
+- **General season UX:** `S21` is implemented as a cross-sport Teams / Season
+  Info workflow, independent of the Soccer event model.
 
 These packages are planning boundaries, not a requirement to combine every
 item into one large PR. Each may still ship in reader/domain/UI slices.

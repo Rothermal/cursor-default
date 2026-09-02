@@ -25,6 +25,7 @@ import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { isMissingTeamStatsConfigColumnError } from '../lib/cloudSyncHelpers'
 import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import { normalizedSeasonName } from '../lib/seasonWorkflow'
 import {
   exportParkedGames,
   getParkedGameStorageInfo,
@@ -441,12 +442,13 @@ export default function Admin() {
   }, [seasonsActive, isConfigured, userId, supabaseClient])
 
   const handleCreateSeason = async () => {
-    if (!supabaseClient || !newSeasonName.trim()) return
+    const seasonName = normalizedSeasonName(newSeasonName)
+    if (!supabaseClient || !userId || !seasonName) return
     setCreatingSeason(true)
     setSeasonsError(null)
     const { error } = await supabaseClient.from('seasons').insert({
       owner_id: userId,
-      name: newSeasonName.trim(),
+      name: seasonName,
       sport: newSeasonSport,
       start_date: newSeasonStartDate || null,
       end_date: newSeasonEndDate || null,
@@ -460,11 +462,12 @@ export default function Admin() {
   }
 
   const handleSaveSeasonEdit = async (season: AdminSeasonRow) => {
-    if (!supabaseClient || !editSeasonName.trim()) return
+    const seasonName = normalizedSeasonName(editSeasonName)
+    if (!supabaseClient || !seasonName) return
     setSeasonsError(null)
     setDeletingId(season.id)
     const { error } = await supabaseClient.from('seasons').update({
-      name: editSeasonName.trim(),
+      name: seasonName,
       start_date: editSeasonStartDate || null,
       end_date: editSeasonEndDate || null,
     }).eq('id', season.id)

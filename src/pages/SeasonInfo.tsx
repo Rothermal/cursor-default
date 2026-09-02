@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Check, Pencil, X } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { sports } from '../config/sports'
 import { useAuth } from '../context/AuthContext'
 import { teamDisplayName } from '../lib/display'
+import {
+  canRenameSeason,
+  decideSeasonRename,
+  normalizedSeasonName,
+} from '../lib/seasonWorkflow'
 import { supabase } from '../lib/supabase'
 import { teamInfoPath, teamLeaderboardPath } from '../lib/teamInfo'
 
 interface SeasonInfoRow {
   id: string
+  owner_id: string
   name: string
   sport: string
   start_date: string | null
@@ -26,13 +33,17 @@ export default function SeasonInfo() {
   const [searchParams] = useSearchParams()
   const seasonId = searchParams.get('seasonId')
   const teamId = searchParams.get('teamId')
-  const { isConfigured } = useAuth()
+  const { isConfigured, user } = useAuth()
   const supabaseClient = supabase
 
   const [season, setSeason] = useState<SeasonInfoRow | null>(null)
   const [teams, setTeams] = useState<SeasonTeamRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
 
   const sport = useMemo(
     () => (season ? sports.find(item => item.id === season.sport) ?? null : null),
@@ -57,7 +68,7 @@ export default function SeasonInfo() {
       const [seasonRes, teamsRes] = await Promise.all([
         supabaseClient
           .from('seasons')
-          .select('id,name,sport,start_date,end_date')
+          .select('id,owner_id,name,sport,start_date,end_date')
           .eq('id', seasonId)
           .single(),
         supabaseClient
@@ -81,6 +92,9 @@ export default function SeasonInfo() {
       }
 
       setSeason(seasonRes.data as SeasonInfoRow)
+      setNameDraft((seasonRes.data as SeasonInfoRow).name)
+      setEditingName(false)
+      setNameError(null)
       setTeams((teamsRes.data ?? []) as SeasonTeamRow[])
       setLoading(false)
     }
@@ -90,6 +104,48 @@ export default function SeasonInfo() {
       cancelled = true
     }
   }, [seasonId, isConfigured, supabaseClient])
+
+  const handleRenameSeason = async () => {
+    const userId = user?.id
+    if (!supabaseClient || !season || savingName) return
+
+    const decision = decideSeasonRename(
+      { ownerId: season.owner_id, name: season.name },
+      nameDraft,
+      userId
+    )
+    if (decision.outcome === 'blocked') return
+    if (decision.outcome === 'invalid') {
+      setNameError('Season name is required.')
+      return
+    }
+    if (decision.outcome === 'unchanged') {
+      setNameDraft(season.name)
+      setEditingName(false)
+      setNameError(null)
+      return
+    }
+
+    setSavingName(true)
+    setNameError(null)
+    const { data, error: renameError } = await supabaseClient
+      .from('seasons')
+      .update({ name: decision.name })
+      .eq('id', season.id)
+      .eq('owner_id', season.owner_id)
+      .select('id,owner_id,name,sport,start_date,end_date')
+      .single()
+    setSavingName(false)
+
+    if (renameError || !data) {
+      setNameError(renameError?.message ?? 'Could not rename season.')
+      return
+    }
+
+    setSeason(data as SeasonInfoRow)
+    setNameDraft((data as SeasonInfoRow).name)
+    setEditingName(false)
+  }
 
   if (!isConfigured) {
     return (
@@ -149,9 +205,76 @@ export default function SeasonInfo() {
                 {sport?.icon ? `${sport.icon} ` : ''}
                 {sport?.name ?? season.sport}
               </p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 break-words">
-                {season.name}
-              </h1>
+              {editingName ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={nameDraft}
+                    onChange={event => setNameDraft(event.target.value)}
+                    onKeyDown={event => {
+                      if (savingName) return
+                      if (event.key === 'Enter') void handleRenameSeason()
+                      if (event.key === 'Escape') {
+                        setNameDraft(season.name)
+                        setEditingName(false)
+                        setNameError(null)
+                      }
+                    }}
+                    aria-label="Season name"
+                    className="input-field min-w-0 flex-1 text-lg font-semibold"
+                    disabled={savingName}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleRenameSeason()}
+                    disabled={savingName || !normalizedSeasonName(nameDraft)}
+                    aria-label="Save season name"
+                    title="Save season name"
+                    className="btn-primary flex h-10 w-10 shrink-0 items-center justify-center p-0"
+                  >
+                    <Check size={18} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNameDraft(season.name)
+                      setEditingName(false)
+                      setNameError(null)
+                    }}
+                    disabled={savingName}
+                    aria-label="Cancel season rename"
+                    title="Cancel"
+                    className="btn-secondary flex h-10 w-10 shrink-0 items-center justify-center p-0"
+                  >
+                    <X size={18} aria-hidden />
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-1 flex items-start gap-2">
+                  <h1 className="min-w-0 flex-1 text-2xl font-bold text-slate-900 break-words">
+                    {season.name}
+                  </h1>
+                  {canRenameSeason(season.owner_id, user?.id) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNameDraft(season.name)
+                        setEditingName(true)
+                        setNameError(null)
+                      }}
+                      aria-label="Rename season"
+                      title="Rename season"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    >
+                      <Pencil size={17} aria-hidden />
+                    </button>
+                  )}
+                </div>
+              )}
+              {nameError && (
+                <p role="alert" className="mt-2 text-sm text-red-600">{nameError}</p>
+              )}
               {(season.start_date || season.end_date) && (
                 <p className="mt-1 text-sm text-slate-500">
                   {[season.start_date, season.end_date].filter(Boolean).join(' to ')}
