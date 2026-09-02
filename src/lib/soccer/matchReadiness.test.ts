@@ -55,6 +55,21 @@ describe('Soccer match-readiness wiring', () => {
     expect(tracker).toContain("setError('That change would leave the match history incomplete.')")
   })
 
+  it('keeps Timeline correction drafts stable across live clock renders', () => {
+    const editor = source('src/components/soccer/SoccerLocatedEventEditor.tsx')
+    const shotDialog = source('src/components/soccer/SoccerShotCaptureDialog.tsx')
+    const incidentDialog = source('src/components/soccer/SoccerIncidentCaptureDialog.tsx')
+
+    expect(editor).toContain('const shotDraft = useMemo<SoccerCaptureDraft | null>')
+    expect(editor).toContain('const incidentDraft = useMemo<SoccerIncidentDraft | null>')
+    expect(editor).toContain('draft={shotDraft}')
+    expect(editor).toContain('draft={incidentDraft}')
+    expect(editor.match(/}, \[event\]\)/g)).toHaveLength(2)
+    expect(editor).not.toContain('draft={{')
+    expect(shotDialog).toContain('const initializationDraft = useStableSoccerCorrectionDraft(draft)')
+    expect(incidentDialog).toContain('const initializationDraft = useStableSoccerCorrectionDraft(draft)')
+  })
+
   it('places the pitch and quick capture before collapsed marker filters', () => {
     const tracker = source('src/pages/SoccerGameTracker.tsx')
     const fieldTabStart = tracker.indexOf(") : mainTab === 'field' ? (")

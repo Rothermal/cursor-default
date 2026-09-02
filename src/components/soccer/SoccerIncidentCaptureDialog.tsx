@@ -37,6 +37,7 @@ import {
   type SoccerIncidentAttribution,
 } from '../../lib/soccer/incidentAttribution'
 import type { GameState } from '../../types'
+import { useStableSoccerCorrectionDraft } from '../../hooks/useStableSoccerCorrectionDraft'
 import SoccerField from './SoccerField'
 
 export type SoccerIncidentKind = 'defense' | 'foul' | 'card' | 'team_event'
@@ -106,6 +107,7 @@ export default function SoccerIncidentCaptureDialog({
   onTrackedParticipantUsed,
   onClose,
 }: SoccerIncidentCaptureDialogProps) {
+  const initializationDraft = useStableSoccerCorrectionDraft(draft)
   const sportState = state.sportGameState?.sportId === 'soccer' ? state.sportGameState : null
   const projection = sportState?.projection ?? null
   const periodTimings = useMemo(() => soccerPeriodTimings(state), [state])
@@ -247,8 +249,8 @@ export default function SoccerIncidentCaptureDialog({
   }
 
   useEffect(() => {
-    if (!draft || !projection) return
-    const event = draft.event
+    if (!initializationDraft || !projection) return
+    const event = initializationDraft.event
     const mainActor = event ? primaryActor(event) : null
     const initialTiming = periodTimings.find(item => item.period.id === event?.period.id)
       ?? periodTimings[periodTimings.length - 1]
@@ -258,7 +260,7 @@ export default function SoccerIncidentCaptureDialog({
       ? event.payload.sanction
       : event?.eventType === 'soccer.foul'
         ? event.payload.sanction
-        : draft.kind === 'card' ? 'yellow' : 'none'
+        : initializationDraft.kind === 'card' ? 'yellow' : 'none'
     const eventResolution = event?.eventType === 'soccer.card' || event?.eventType === 'soccer.foul'
       ? event.payload.lineupResolution
       : null
@@ -267,7 +269,7 @@ export default function SoccerIncidentCaptureDialog({
       ? event.actors.find(actor => actor.role === 'fouled') ?? null
       : null
 
-    const initialTeamSide = event?.teamSide ?? draft.teamSide
+    const initialTeamSide = event?.teamSide ?? initializationDraft.teamSide
     const initialAttribution = normalizeSoccerIncidentActorSelection(
       initialTeamSide,
       actorAttribution(mainActor, event?.eventType === 'soccer.card'),
@@ -283,7 +285,7 @@ export default function SoccerIncidentCaptureDialog({
     )
 
     setTeamSide(initialTeamSide)
-    setLocation(event?.location ?? draft.location)
+    setLocation(event?.location ?? initializationDraft.location)
     setAttribution(initialAttribution.attribution)
     setParticipantId(initialAttribution.participantId)
     setActorLabel(mainActor?.label ?? (initialTeamSide === 'tracked' ? 'Unknown tracked player' : 'Unknown opponent'))
@@ -328,7 +330,7 @@ export default function SoccerIncidentCaptureDialog({
     setLocationEditorOpen(false)
     setFieldFlipped(false)
     setError(null)
-  }, [draft, periodTimings, participants, projection, selectedParticipantId])
+  }, [initializationDraft, periodTimings, participants, projection, selectedParticipantId])
 
   useEffect(() => {
     if (!disciplineApplies || !selectedRole) return
