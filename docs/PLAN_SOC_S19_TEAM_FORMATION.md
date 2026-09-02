@@ -144,6 +144,11 @@ Every slot definition includes:
 - normalized editor coordinates with goalkeeper near `y = 1` and attack near
   `y = 0`.
 
+Formation coordinates are an editor-only coordinate space. They are never a
+`GameEventLocation`, never pass through `soccerFieldLocation`, and must not be
+reused as match-field event coordinates; formation attack runs along the
+editor's vertical axis independently of match direction.
+
 Catalog invariants:
 
 - slot count equals template player count;
@@ -229,7 +234,10 @@ and stale ids remain repairable.
 ### 2.3 Copy and conflict behavior
 
 The existing Copy Team Defaults action must copy `rules` only. It preserves the
-target team's formation because source player ids belong to another team.
+target team's formation because source player ids belong to another team. This
+applies to both current `setDraft` branches: a successfully parsed source
+replaces only `draft.rules`, while a source with no saved settings replaces
+`draft.rules` with `{}`. Neither branch replaces or clears `draft.formation`.
 Copying rules that changes `maxOnFieldPlayers` may leave the target formation
 mismatched; show that warning and offer a compatible template or Clear
 Formation. Saving the rule change remains allowed, and match setup will not
@@ -317,12 +325,17 @@ change must not overwrite recorder edits.
 
 For each active roster player:
 
-- assigned to a valid slot: selected, `starter`, role from the catalog slot;
+- assigned to a valid slot: selected, `starter`, and `initialRole` set to
+  `{ group: <slot role group>, label: null }`;
 - unassigned: selected, `bench`, role from `team_players.position` via `S11`;
 - assigned by stale/unavailable id: no participant is fabricated and the
   remaining valid assignments may still apply; show a repair warning; and
 - duplicate/malformed assignments: reject the formation before application
   and use roster defaults.
+
+A slot's tactical label and id are editor presentation only. Never copy either
+into a participant, including `initialRole.label`; this prevents formation
+metadata from flowing through `soccer.opening_lineup` into immutable event rows.
 
 The setup remains editable. Existing max-starter, exact-one-goalkeeper,
 short-handed confirmation, and kickoff checks remain authoritative.
@@ -419,8 +432,9 @@ must not merge before both readers and the editor can round-trip the formation.
 - unavailable roster assignments are reported and removed only by explicit
   save preparation;
 - partial formations, including empty goalkeeper, remain valid;
-- application maps assigned players to starter/slot role and unassigned
-  players to bench/roster role; and
+- application maps assigned players to starter/slot broad role with
+  `initialRole.label === null`, never copies the slot label/id, and maps
+  unassigned players to bench/roster role; and
 - mismatch, malformed, and duplicate formation data never partially apply.
 
 ### Settings and SQL
@@ -433,7 +447,8 @@ must not merge before both readers and the editor can round-trip the formation.
 - old cached/cloud rows remain usable and first explicit save upgrades to
   version 2;
 - conflict/reload/discard replace the whole formation draft;
-- cross-team Copy copies rules and preserves the target formation;
+- both cross-team Copy branches (saved source and no-settings source) copy only
+  rules and preserve the target formation;
 - audit metadata records only coarse `formation` change; and
 - owner/admin write and scorer/viewer read-only behavior remains unchanged.
 
@@ -449,6 +464,7 @@ must not merge before both readers and the editor can round-trip the formation.
 - prefill runs once for a fresh team setup and never resets manual edits;
 - mismatched formation shows a warning and uses roster defaults;
 - stale players are not fabricated; and
+- every formation-prefilled participant has `initialRole.label === null`; and
 - existing non-formation Soccer setup/kickoff tests remain green.
 
 ## 8. Manual Regression
