@@ -543,7 +543,9 @@ field. Event locations, marker placement, and tap mapping do not change.
 
 ### S19 - Team formation lineup on a pitch
 
-**Status:** confirmed idea — later than live-tracker fixes  
+**Status:** approved plan — see
+[`PLAN_SOC_S19_TEAM_FORMATION.md`](PLAN_SOC_S19_TEAM_FORMATION.md)
+
 **Theme:** team settings / setup  
 **Where:** Teams / Team Manage; `SoccerTeamSettings` today is only a sparse
 rules override; Player Setup has starter/bench plus `initialRole`, no
@@ -557,11 +559,14 @@ settings with compare-and-swap writes. A formation would be a new optional
 settings field plus a visual editor: pick a shape, place named roster
 players on slots, save for the team.
 
-**Likely direction:** persist `{ formation, slots[] }` on team soccer
-settings. Player Setup can prefill starters and default roles (`S11`) from
-those slots. Live Role / substitution still override the match. Do not
-treat the formation as a live tactical board, and do not write every sub
-back to the team default.
+**Approved direction:** store one versioned template plus stable player-to-slot
+assignments in revisioned team Soccer settings. Fixed 11v11, 9v9, and 7v7
+templates provide tactical labels, broad roles, and editor-only coordinates.
+Owners/admins edit through a visual pitch plus accessible slot list;
+scorers/viewers review. Player Setup applies a matching formation once as
+editable starter/role prefill and stores only the resulting existing match
+participants. Live Role and Substitution events remain authoritative and
+never write back to the team default.
 
 **Not this item:** in-match formation changes, opponent formations, or
 heatmaps.
@@ -701,9 +706,9 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed product request with open data/UX choices | `S15`, `S16`, `S19` | Short Q&A, then a focused phase plan |
+| Confirmed product request with open data/UX choices | `S15`, `S16` | Short Q&A, then a focused phase plan |
 | Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S21` | Run the linked regression rows during the next live or deployed test |
-| Approved implementation plan | `S17`, `S20` | Deliver the reader-first restart slices in `PLAN_SOC_RESTARTS.md` |
+| Approved implementation plan | `S17`, `S19`, `S20` | Deliver from the linked focused execution plans |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
 The `S12` repair preserves the shared editor route, and the `S14` repair keeps
@@ -718,8 +723,8 @@ exercise those constraints rather than bypass them.
   `S4`, `S6`, and `S10` without implementing those unconfirmed items.
 - **Timeline correction:** `S12` is implemented; deployed live correction
   verification remains.
-- **Roster defaults:** `S11` is implemented; `S19` follows only after field
-  verification confirms role storage is stable.
+- **Roster defaults:** `S11` is implemented; `S19` has an approved three-slice
+  formation/settings/setup plan.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only
@@ -772,7 +777,8 @@ Broader Basketball event work continues in
 - Two pins on the same spot correctly counted as 2. Flip reversed
   placement correctly, but the cluster number was upside down (`S18`).
 - Teams page: set a soccer lineup on a pitch (4-3-3, 4-4-2, 3-4-3), stored
-  as a team setting. Just an idea (`S19`).
+  as a team setting. Product decisions and a three-slice plan are approved
+  (`S19`).
 - Asked whether throw-ins can be tracked. They cannot today (`S20`).
 - Creating a new soccer or basketball season has no option to name it.
   Not only later editing (`S21`).
