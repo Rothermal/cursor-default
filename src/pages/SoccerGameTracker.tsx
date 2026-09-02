@@ -58,6 +58,7 @@ import {
   recordSoccerDirectionChange,
   reopenSoccerMatch,
   soccerLifecycleAction,
+  soccerMatchActionsAvailable,
   soccerFieldReviewEvents,
   soccerClockDisplayValue,
   startNextSoccerPeriod,
@@ -261,7 +262,7 @@ export default function SoccerGameTracker() {
     healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal
   const substitutionActionEnabled =
     healthy &&
-    (projection.status === 'in_progress' || projection.status === 'period_break') &&
+    soccerMatchActionsAvailable(projection) &&
     !isApplying &&
     !cloudFinal
   const markerFilterSummary = [
@@ -636,7 +637,7 @@ export default function SoccerGameTracker() {
                 onCluster={setClusterEventIds}
               />
 
-              <div className="grid grid-cols-4 gap-2" aria-label="Quick capture">
+              <div className="grid grid-cols-4 gap-2" role="group" aria-label="Quick capture">
                 <QuickCaptureButton
                   label="Goal"
                   icon={<Goal size={18} />}
@@ -670,7 +671,7 @@ export default function SoccerGameTracker() {
               </div>
 
               {!ended && (
-                <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2" aria-label="Field match actions">
+                <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2" role="group" aria-label="Field match actions">
                   <button
                     type="button"
                     onClick={() => openDialog('substitution')}
@@ -991,7 +992,7 @@ function ActionSheet({ status, onClose, onAction, onDirection }: {
     { kind: 'rules', label: 'Match rules', icon: <SlidersHorizontal size={20} /> },
     { kind: 'end', label: 'End match', icon: <Flag size={20} /> },
   ]
-  const standardControls = status === 'in_progress' || status === 'period_break'
+  const standardControls = soccerMatchActionsAvailable({ status })
   const actions = standardControls
     ? standardActions
     : [{ kind: 'end' as const, label: 'Match status', icon: <Flag size={20} /> }]

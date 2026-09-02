@@ -923,6 +923,12 @@ export function isSoccerHalftimeBreak(projection: SoccerMatchProjection): boolea
   )
 }
 
+export function soccerMatchActionsAvailable(
+  projection: Pick<SoccerMatchProjection, 'status'>
+): boolean {
+  return projection.status === 'in_progress' || projection.status === 'period_break'
+}
+
 export function soccerClockDisplayValue(
   state: GameState,
   nowMs = Date.now()

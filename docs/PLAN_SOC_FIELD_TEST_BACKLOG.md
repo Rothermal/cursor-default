@@ -141,7 +141,8 @@ are review controls; they do not need to stay expanded while recording.
 **Implemented direction:** side, player, and capture mode remain visible. The
 pitch and quick capture now precede a collapsed, native Marker filters
 disclosure. Marker meaning and saved filter state did not change. The broader
-`S2` substitution/action-shell work remains open.
+`S2` substitution/action-shell work now adds a primary Field-tab action and
+scalable overflow without moving review controls above the pitch.
 
 **Not this item:** application-wide reskin (`M14`).
 
@@ -690,24 +691,26 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Code-confirmed defect or constraint | `S2`, `S13`, `S18`, `S21` | Plan the smallest repair with regression coverage |
-| Confirmed symptom; reproduce the exact branch | `S12`, `S14` | Capture source/authority and failure details before choosing a fix |
+| Code-confirmed defect or constraint | `S21` | Plan the smallest repair with regression coverage |
 | Confirmed product request with open data/UX choices | `S15`, `S16`, `S19` | Short Q&A, then a focused phase plan |
-| Implemented focused follow-up | `S3`, `S11` | Validate during the next live match and iterate from evidence |
+| Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18` | Run the linked regression rows during the next live or deployed test |
 | Approved implementation plan | `S17`, `S20` | Deliver the reader-first restart slices in `PLAN_SOC_RESTARTS.md` |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
-`S12` must not be implemented as a second editor path: the shared editor route
-already exists. `S14` must not weaken finalization authority to make the error
-go away. Both begin with evidence.
+The `S12` repair preserves the shared editor route, and the `S14` repair keeps
+finalization authority intact. Their deployed verification must continue to
+exercise those constraints rather than bypass them.
 
 ### 6.2 Recommended work packages
 
-- **Correctness recovery:** `S13`, then reproduce and repair `S14`.
-- **Field shell:** `S2` + `S3` + `S18`; reserve a scalable action layout for
-  later `S4`, `S6`, and `S10` without implementing those unconfirmed items.
-- **Timeline correction:** `S12` as a verify-first focused repair.
-- **Roster defaults:** `S11`; `S19` follows only after role storage is stable.
+- **Correctness recovery:** `S13` and `S14` are implemented; deployed recovery
+  verification remains.
+- **Field shell:** `S2` + `S3` + `S18` are implemented with room for later
+  `S4`, `S6`, and `S10` without implementing those unconfirmed items.
+- **Timeline correction:** `S12` is implemented; deployed live correction
+  verification remains.
+- **Roster defaults:** `S11` is implemented; `S19` follows only after field
+  verification confirms role storage is stable.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only

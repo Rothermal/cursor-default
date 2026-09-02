@@ -29,6 +29,7 @@ import {
   reviseSoccerShot,
   soccerAttackingDirectionAt,
   soccerClockDisplayValue,
+  soccerMatchActionsAvailable,
   soccerPeriodTimings,
   startNextSoccerPeriod,
   toggleSoccerClock,
@@ -36,7 +37,7 @@ import {
 } from './live'
 import { resolveSoccerMatchRules } from './rules'
 import { createSoccerSportGameState, normalizeSoccerSportGameState, participantActiveMs } from './state'
-import type { SoccerMatchSetup } from './types'
+import type { SoccerMatchSetup, SoccerMatchStatus } from './types'
 
 const soccer: SportConfig = {
   id: 'soccer',
@@ -120,6 +121,17 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it.each<[SoccerMatchStatus, boolean]>([
+    ['not_started', false],
+    ['in_progress', true],
+    ['period_break', true],
+    ['shootout', false],
+    ['suspended', false],
+    ['ended', false],
+  ])('reports match-action availability for %s', (status, expected) => {
+    expect(soccerMatchActionsAvailable({ status })).toBe(expected)
+  })
+
   it('fails closed when correction type or historical timing is inconsistent', () => {
     expect(resolveSoccerCaptureSaveOperation('live', 'soccer.shot', null, false))
       .toEqual({ ok: true, operation: 'record_live' })

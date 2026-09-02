@@ -101,7 +101,9 @@ describe('Soccer match-readiness wiring', () => {
     expect(fieldTab).toContain("onClick={() => openDialog('substitution')}")
     expect(fieldTab).toContain('disabled={!substitutionActionEnabled}')
     expect(fieldTab).toContain('aria-label="More match actions"')
-    expect(fieldTab).toContain('grid grid-cols-4 gap-2" aria-label="Quick capture"')
+    expect(fieldTab.split('<QuickCaptureButton').length - 1).toBe(4)
+    expect(fieldTab).toContain('role="group" aria-label="Quick capture"')
+    expect(fieldTab).toContain('role="group" aria-label="Field match actions"')
   })
 
   it('counter-rotates screen-upright marker glyphs when the field is flipped', () => {
