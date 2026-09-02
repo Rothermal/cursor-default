@@ -1340,7 +1340,7 @@ unexecuted broader-role or second-device rows passed.
 
 ---
 
-## 11z. Soccer match readiness: default roles and field priority
+## 11z. Soccer match readiness: default roles and field actions
 
 | # | Scenario | Expected |
 |---|---|---|
@@ -1351,6 +1351,8 @@ unexecuted broader-role or second-device rows passed.
 | 11z.3a | Give a Soccer roster row legacy free text, edit only its jersey/name, then resolve a merge conflict involving that row | The unrelated save preserves the raw value; merge preview uses a Soccer role label and only an explicit role change writes a strict `soccer:*` value |
 | 11z.4 | Open the live Soccer Field tab on a narrow phone viewport | Side, player, and Shot/Defense/Foul controls lead directly to the pitch; quick capture follows it; Marker filters are collapsed below |
 | 11z.5 | Review the collapsed Marker filters summary, then expand and exercise family, side, and period options | The active scope stays visible while collapsed; existing markers filter exactly as before and the disclosure remains keyboard-operable |
+| 11z.6 | During active play, tap Substitution in the Field match-action row, exchange an on-field player for an available substitute, and save | The existing Substitution Window opens directly; the lineup, role, substitution count, and window count update once |
+| 11z.7 | End the period and reopen Substitution from the Field tab, then inspect the adjacent overflow control | Substitution remains available for the period break and offers the halftime-window choice; overflow opens the remaining Match Actions without adding a fifth quick-capture button |
 
 See [the focused S11/S3 plan](PLAN_SOC_MATCH_READINESS_S11_S3.md) for fixed scope and storage decisions.
 

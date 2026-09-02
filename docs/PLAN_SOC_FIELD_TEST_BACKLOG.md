@@ -94,7 +94,7 @@ or the rest of detailed goal metadata (`M5`).
 
 ### S2 - Substitution from the Field tab
 
-**Status:** confirmed — largest first-match challenge
+**Status:** implemented; pending deployed field verification
 
 **Theme:** lineup during live play  
 **Where:** `SoccerGameTracker` Field tab, `SoccerLiveActionDialog` `substitution`
@@ -105,15 +105,16 @@ roles, clock correction, late participant, and rules.
 
 Owner confirmation: first live matches made this the biggest workflow gap.
 
-**Likely direction:** a Field-tab Sub control that opens the existing
-substitution window. Optional later: tap a Lineup row to start the same window
-(`S8`).
+**Resolution:** the Field tab now has a compact match-action row immediately
+below Quick capture. Its primary Substitution control opens the existing
+substitution window during active play and period breaks; an icon-only overflow
+keeps the remaining match actions reachable without expanding the four-slot
+capture row. Optional later: tap a Lineup row to start the same window (`S8`).
 
-**Planning note:** the current quick row is already full (Goal, Foul, Card,
-Team), and the restart plan renames Team rather than freeing that slot. Plan
-`S2` with `S3` as one Field-shell pass that defines compact primary actions and
-an overflow/review treatment. Do not keep adding one-off fifth and sixth
-buttons to the four-column row.
+**Field-shell note:** the current quick row remains Goal, Foul, Card, and Team;
+the restart plan may rename Team rather than free that slot. Future Field
+actions should extend the match-action/overflow treatment rather than add a
+fifth or sixth capture button.
 
 **Not this item:** changing substitution-window or return-sub rules.
 
@@ -140,7 +141,8 @@ are review controls; they do not need to stay expanded while recording.
 **Implemented direction:** side, player, and capture mode remain visible. The
 pitch and quick capture now precede a collapsed, native Marker filters
 disclosure. Marker meaning and saved filter state did not change. The broader
-`S2` substitution/action-shell work remains open.
+`S2` substitution/action-shell work now adds a primary Field-tab action and
+scalable overflow without moving review controls above the pitch.
 
 **Not this item:** application-wide reskin (`M14`).
 
@@ -299,7 +301,7 @@ treating role as a second player identity.
 
 ### S12 - Edit shots from Timeline, not only from the pitch
 
-**Status:** implemented; pending merge
+**Status:** implemented; pending deployed field verification
 **Theme:** correction  
 **Where:** tracker Timeline (`SoccerTimeline` → `SoccerLocatedEventEditor`);
 Field marker tap (`editFieldEvent` → `SoccerShotCaptureDialog`)
@@ -689,24 +691,26 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Code-confirmed defect or constraint | `S2`, `S13`, `S18`, `S21` | Plan the smallest repair with regression coverage |
-| Confirmed symptom; reproduce the exact branch | `S12`, `S14` | Capture source/authority and failure details before choosing a fix |
+| Code-confirmed defect or constraint | `S21` | Plan the smallest repair with regression coverage |
 | Confirmed product request with open data/UX choices | `S15`, `S16`, `S19` | Short Q&A, then a focused phase plan |
-| Implemented focused follow-up | `S3`, `S11` | Validate during the next live match and iterate from evidence |
+| Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18` | Run the linked regression rows during the next live or deployed test |
 | Approved implementation plan | `S17`, `S20` | Deliver the reader-first restart slices in `PLAN_SOC_RESTARTS.md` |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
-`S12` must not be implemented as a second editor path: the shared editor route
-already exists. `S14` must not weaken finalization authority to make the error
-go away. Both begin with evidence.
+The `S12` repair preserves the shared editor route, and the `S14` repair keeps
+finalization authority intact. Their deployed verification must continue to
+exercise those constraints rather than bypass them.
 
 ### 6.2 Recommended work packages
 
-- **Correctness recovery:** `S13`, then reproduce and repair `S14`.
-- **Field shell:** `S2` + `S3` + `S18`; reserve a scalable action layout for
-  later `S4`, `S6`, and `S10` without implementing those unconfirmed items.
-- **Timeline correction:** `S12` as a verify-first focused repair.
-- **Roster defaults:** `S11`; `S19` follows only after role storage is stable.
+- **Correctness recovery:** `S13` and `S14` are implemented; deployed recovery
+  verification remains.
+- **Field shell:** `S2` + `S3` + `S18` are implemented with room for later
+  `S4`, `S6`, and `S10` without implementing those unconfirmed items.
+- **Timeline correction:** `S12` is implemented; deployed live correction
+  verification remains.
+- **Roster defaults:** `S11` is implemented; `S19` follows only after field
+  verification confirms role storage is stable.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only
