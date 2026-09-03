@@ -1,8 +1,8 @@
 # SOC-S19B Formation Editor Regression
 
 Use this checklist for the Team Manage editor delivered by
-`PLAN_SOC_S19_TEAM_FORMATION.md`. S19B stores a reusable team default; it does
-not apply that default to Player Setup. One-time setup prefill belongs to S19C.
+`PLAN_SOC_S19_TEAM_FORMATION.md`. S19B stores a reusable team default; S19C
+later consumes that default in Player Setup.
 
 ## Deployment Gate
 
@@ -52,7 +52,8 @@ the existing permission/CAS storage boundaries.
 
 ## Expected Boundary
 
-- Soccer Player Setup behavior is unchanged until S19C.
+- Soccer Player Setup behavior is outside this slice; use the S19C matrix for
+  current prefill behavior.
 - No formation template or slot metadata enters match setup, events, cloud
   event rows, Summary, or aggregates.
 - A failed or incomplete roster request never triggers stale-assignment cleanup.

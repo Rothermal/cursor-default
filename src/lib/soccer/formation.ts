@@ -289,6 +289,35 @@ export interface SoccerFormationApplicationResult<TDraft> {
   error: string | null
 }
 
+export type SoccerFormationPrefillDecision =
+  | 'wait'
+  | 'apply'
+  | 'skip_no_team'
+  | 'skip_existing'
+  | 'skip_edited'
+  | 'resolved'
+
+export function decideSoccerFormationPrefill(options: {
+  hasSourceTeam: boolean
+  alreadyResolved: boolean
+  hadSavedParticipants: boolean
+  userEdited: boolean
+  rosterReady: boolean
+  settingsSettled: boolean
+  rosterDraftsReady: boolean
+}): SoccerFormationPrefillDecision {
+  if (options.alreadyResolved) return 'resolved'
+  if (!options.hasSourceTeam) return 'skip_no_team'
+  if (options.hadSavedParticipants) return 'skip_existing'
+  if (options.userEdited) return 'skip_edited'
+  if (
+    !options.rosterReady ||
+    !options.settingsSettled ||
+    !options.rosterDraftsReady
+  ) return 'wait'
+  return 'apply'
+}
+
 export function applySoccerFormationToRosterDrafts<
   TDraft extends SoccerFormationParticipantDraft,
 >(
