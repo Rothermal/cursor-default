@@ -1,23 +1,21 @@
 import { Check, Copy, RefreshCw, Save, Settings2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../ConfirmDialog'
 import { useSettings } from '../../context/SettingsContext'
 import { useSoccerTeamSettings } from '../../hooks/useSoccerTeamSettings'
 import { loadTeamSportSettings } from '../../lib/sportSettingsCloud'
 import {
+  applySoccerFormationTemplateToTeamSettings,
   copySoccerTeamRules,
   parseSoccerTeamSettings,
+  prepareSoccerTeamSettingsSave,
   resolveSoccerOverrideEditorRules,
   resolveSoccerSettingsHierarchy,
   soccerTeamSettingsFingerprint,
   type SoccerTeamSettings,
 } from '../../lib/soccer/settings'
 import {
-  createSoccerTeamFormation,
-  getSoccerFormationTemplate,
-  prepareSoccerFormationForSave,
-  switchSoccerFormationTemplate,
   unavailableSoccerFormationPlayerIds,
   type SoccerFormationTemplateId,
 } from '../../lib/soccer/formation'
@@ -64,6 +62,9 @@ export default function SoccerTeamSettingsPanel({
   const [activeTab, setActiveTab] = useState<'rules' | 'formation'>('rules')
   const [confirmClearFormation, setConfirmClearFormation] = useState(false)
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
+  const tabGroupId = useId()
+  const rulesTabRef = useRef<HTMLButtonElement>(null)
+  const formationTabRef = useRef<HTMLButtonElement>(null)
   const previousSavedFingerprint = useRef(
     soccerTeamSettingsFingerprint(team.settings)
   )
@@ -88,7 +89,7 @@ export default function SoccerTeamSettingsPanel({
       : [],
     [activeRosterIds, draft.formation, rosterReady]
   )
-  const formationNeedsCleanup = activeTab === 'formation' &&
+  const formationNeedsCleanup = sharedWritable && activeTab === 'formation' &&
     unavailablePlayerIds.length > 0
   const saveEnabled = dirty || formationNeedsCleanup
 
@@ -105,13 +106,13 @@ export default function SoccerTeamSettingsPanel({
 
   const handleSave = async () => {
     if (!mayEdit) return
-    const cleanupCount = formationNeedsCleanup ? unavailablePlayerIds.length : 0
-    const candidate = cleanupCount > 0 && draft.formation
-      ? {
-          ...draft,
-          formation: prepareSoccerFormationForSave(draft.formation, activeRosterIds),
-        }
-      : draft
+    const prepared = prepareSoccerTeamSettingsSave(draft, {
+      cleanUnavailableAssignments: activeTab === 'formation',
+      rosterReady,
+      activePlayerIds: activeRosterIds,
+    })
+    const candidate = prepared.settings
+    const cleanupCount = prepared.removedUnavailableCount
     if (await team.save(candidate, baseRevision)) {
       setDraft(structuredClone(candidate))
       setSaveNotice(cleanupCount > 0
@@ -130,15 +131,28 @@ export default function SoccerTeamSettingsPanel({
   }
 
   const handleTemplateSelect = (templateId: SoccerFormationTemplateId) => {
-    const template = getSoccerFormationTemplate(templateId)
-    if (!template) return
     setSaveNotice(null)
-    setDraft(current => ({
-      rules: { ...current.rules, maxOnFieldPlayers: template.playerCount },
-      formation: current.formation
-        ? switchSoccerFormationTemplate(current.formation, templateId)
-        : createSoccerTeamFormation(templateId),
-    }))
+    setDraft(current => applySoccerFormationTemplateToTeamSettings(current, templateId))
+  }
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const tabs = [rulesTabRef, formationTabRef]
+    const currentIndex = activeTab === 'rules' ? 0 : 1
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex + tabs.length - 1) % tabs.length
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % tabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1
+    } else {
+      return
+    }
+    event.preventDefault()
+    setActiveTab(nextIndex === 0 ? 'rules' : 'formation')
+    tabs[nextIndex]?.current?.focus()
   }
 
   const handleCopy = async () => {
@@ -271,19 +285,29 @@ export default function SoccerTeamSettingsPanel({
         <>
           <div className="grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1" role="tablist" aria-label="Soccer default settings">
             <button
+              ref={rulesTabRef}
+              id={`${tabGroupId}-rules-tab`}
               type="button"
               role="tab"
               aria-selected={activeTab === 'rules'}
+              aria-controls={`${tabGroupId}-rules-panel`}
+              tabIndex={activeTab === 'rules' ? 0 : -1}
               onClick={() => setActiveTab('rules')}
+              onKeyDown={handleTabKeyDown}
               className={`h-9 rounded text-sm font-semibold ${activeTab === 'rules' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
             >
               Rules
             </button>
             <button
+              ref={formationTabRef}
+              id={`${tabGroupId}-formation-tab`}
               type="button"
               role="tab"
               aria-selected={activeTab === 'formation'}
+              aria-controls={`${tabGroupId}-formation-panel`}
+              tabIndex={activeTab === 'formation' ? 0 : -1}
               onClick={() => setActiveTab('formation')}
+              onKeyDown={handleTabKeyDown}
               className={`h-9 rounded text-sm font-semibold ${activeTab === 'formation' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
             >
               Formation
@@ -291,7 +315,12 @@ export default function SoccerTeamSettingsPanel({
           </div>
 
           {activeTab === 'rules' ? (
-            <div className="space-y-4" role="tabpanel" aria-label="Soccer rules defaults">
+            <div
+              id={`${tabGroupId}-rules-panel`}
+              className="space-y-4"
+              role="tabpanel"
+              aria-labelledby={`${tabGroupId}-rules-tab`}
+            >
               {sharedWritable && copyOptions.length > 0 && (
                 <div className="border-y border-slate-200 py-3 space-y-2">
                   <p className="text-sm font-semibold text-slate-700">Copy from another team</p>
@@ -332,7 +361,11 @@ export default function SoccerTeamSettingsPanel({
               />
             </div>
           ) : (
-            <div role="tabpanel" aria-label="Soccer formation defaults">
+            <div
+              id={`${tabGroupId}-formation-panel`}
+              role="tabpanel"
+              aria-labelledby={`${tabGroupId}-formation-tab`}
+            >
               <SoccerFormationEditor
                 formation={draft.formation}
                 playerCount={resolvedDraftRules.maxOnFieldPlayers}
