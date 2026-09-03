@@ -1,8 +1,8 @@
 # Soccer Restarts Implementation Plan
 
-Status: approved implementation plan reviewed against the current SOC-4/SOC-6
-implementation. Corner, throw-in, and goal-kick capture are in scope;
-tap-to-place and omitted-taker behavior are resolved.
+Status: implementation in progress. R1 domain readers are implemented; R2-R4
+remain. Corner, throw-in, and goal-kick capture are in scope; tap-to-place and
+omitted-taker behavior are resolved.
 
 > **For agentic workers:** Implement this plan task-by-task. Use review
 > checkpoints between delivery slices. Do not implement directly from
@@ -234,7 +234,7 @@ Live defaults:
 ## 6. Delivery slices
 
 ```text
-R1  Domain readers: kinds, taker, totals, suggestion helper, compatibility tests
+R1  Domain readers: kinds, taker, totals, suggestion helper, compatibility tests [implemented]
 R2  Review readers: Timeline / Summary / Field labels and team comparison
 R3  Writers: one-shot live capture plus historical Add/Edit
 R4  Regression docs and backlog status
@@ -252,7 +252,7 @@ payloads. Capability and live Supabase checks remain part of exit regression.
 
 **Files:** `types.ts`, `events.ts`, `state.ts`, `soc4.ts`, `field.ts`, tests
 
-- [ ] Add failing tests:
+- [x] Add failing tests:
   - located `throw_in` with no actor increments `sideTotals.tracked.throwIns`
   - located `goal_kick` increments `goalKicks`
   - registry and projection accept one tracked `taker` on a tracked throw-in
@@ -264,10 +264,19 @@ payloads. Capability and live Supabase checks remain part of exit regression.
   - registry rejects duplicate or multiple actor roles for each kind
   - kind suggestions cover attacking corners, touchlines, defending goal area,
     ambiguous interior points, both attacking directions, and flipped display
-- [ ] Confirm new tests fail, then implement kinds, both registry actor gates,
+- [x] Confirm new tests fail, then implement kinds, both registry actor gates,
   defensive projection validation, totals, and the pure suggestion helper.
-- [ ] Run focused Soccer domain/field tests.
-- [ ] Commit `feat(soccer): add restart team events`.
+- [x] Run focused Soccer domain/field tests.
+- [x] Commit `feat(soccer): add restart team events`.
+
+R1 keeps event schema version 1 and accepts historical located or unlocated
+team events. Restart kinds permit at most one `taker`; Offside permits at most
+one `offside_player`; projection retains the contextual opponent/tracked
+identity gate. Suggestions use canonical coordinates with an eight-percent
+end/touchline threshold and the center thirty-percent of the defending end as
+the goal-area band. They are defaults only and never alter the saved location.
+The Field marker reader recognizes both new kinds with the existing generic
+restart glyph so reader deployment can precede R2 presentation work.
 
 ### Task 2: Add review readers
 

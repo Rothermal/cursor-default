@@ -73,7 +73,8 @@ export interface SoccerFieldReviewEvent {
   markerKind:
     | 'goal' | 'saved' | 'blocked' | 'off_target' | 'woodwork' | 'own_goal'
     | 'tackle_won' | 'tackle_lost' | 'interception' | 'clearance' | 'recovery'
-    | 'foul' | 'yellow_card' | 'red_card' | 'corner' | 'offside'
+    | 'foul' | 'yellow_card' | 'red_card'
+    | 'corner' | 'throw_in' | 'goal_kick' | 'offside'
 }
 
 type SoccerFieldReviewMatchEvent =

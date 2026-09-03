@@ -1,6 +1,6 @@
 # Soccer S19 Team Formation Plan
 
-Status: implementation complete; migration and deployed verification pending
+Status: implementation and migration complete; deployed verification pending
 
 Backlog: `S19` in
 [PLAN_SOC_FIELD_TEST_BACKLOG.md](PLAN_SOC_FIELD_TEST_BACKLOG.md)
@@ -392,8 +392,8 @@ round-trip the formation.
 S19A is implemented through migration `065`. Its verification map is
 [`REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md`](REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md).
 S19B is implemented in Team Manage and S19C implements one-time Player Setup
-prefill. Migration `065` remains a hard deployment prerequisite for current
-team-setting saves and formation round-trip verification.
+prefill. Migration `065` was applied successfully; deployed formation
+round-trip and setup-prefill verification remain.
 
 ## 6. File Map
 

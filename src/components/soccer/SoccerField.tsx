@@ -7,7 +7,8 @@ import { clusterSoccerMarkerPoints, soccerFieldLocation } from '../../lib/soccer
 export type SoccerFieldMarkerKind =
   | 'goal' | 'saved' | 'blocked' | 'off_target' | 'woodwork' | 'own_goal'
   | 'tackle_won' | 'tackle_lost' | 'interception' | 'clearance' | 'recovery'
-  | 'foul' | 'yellow_card' | 'red_card' | 'corner' | 'offside'
+  | 'foul' | 'yellow_card' | 'red_card'
+  | 'corner' | 'throw_in' | 'goal_kick' | 'offside'
 
 export interface SoccerFieldMarker {
   id: string
@@ -220,7 +221,10 @@ function SoccerMarker({
         </g>
       ) : marker.kind === 'woodwork' || marker.kind === 'interception' ? (
         <path d={`M ${x} ${y - 1.7} L ${x + 1.7} ${y} L ${x} ${y + 1.7} L ${x - 1.7} ${y} Z`} {...common} />
-      ) : marker.kind === 'own_goal' || marker.kind === 'corner' ? (
+      ) : marker.kind === 'own_goal' ||
+        marker.kind === 'corner' ||
+        marker.kind === 'throw_in' ||
+        marker.kind === 'goal_kick' ? (
         <path d={`M ${x} ${y - 1.8} L ${x + 1.8} ${y + 1.5} L ${x - 1.8} ${y + 1.5} Z`} {...common} />
       ) : marker.kind === 'clearance' ? (
         <path d={`M ${x - 1.8} ${y + 1.4} L ${x + 1.8} ${y} L ${x - 1.8} ${y - 1.4} Z`} {...common} />

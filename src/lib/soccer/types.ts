@@ -40,7 +40,7 @@ export type SoccerDisciplineReason =
   | 'abusive_language'
   | 'second_caution'
   | 'other_not_recorded'
-export type SoccerTeamEventKind = 'corner' | 'offside'
+export type SoccerTeamEventKind = 'corner' | 'offside' | 'throw_in' | 'goal_kick'
 export type SoccerShootoutEligibilityChangeReason =
   | 'equalization'
   | 'sent_off'
@@ -200,6 +200,8 @@ export interface SoccerSideAttackingTotals {
   redCards: number
   corners: number
   offsides: number
+  throwIns: number
+  goalKicks: number
   penaltiesWon: number
   penaltiesConceded: number
   staffYellowCards: number

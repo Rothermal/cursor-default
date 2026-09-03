@@ -1,5 +1,16 @@
 import type { GameEvent, GameEventLocation } from '../gameEvents/types'
-import type { SoccerAttackingDirection } from './types'
+import type {
+  SoccerAttackingDirection,
+  SoccerTeamEventKind,
+} from './types'
+
+const RESTART_BOUNDARY_THRESHOLD = 0.08
+const GOAL_AREA_HALF_WIDTH = 0.15
+
+type SuggestedSoccerRestartKind = Extract<
+  SoccerTeamEventKind,
+  'corner' | 'throw_in' | 'goal_kick'
+>
 
 export function soccerFieldLocation(
   displayX: number,
@@ -14,6 +25,40 @@ export function soccerFieldLocation(
     y: flipped ? 1 - y : y,
     attackingDirection,
   }
+}
+
+export function suggestSoccerRestartKind(
+  location: Pick<GameEventLocation, 'x' | 'y'>,
+  teamSide: 'tracked' | 'opponent',
+  trackedAttackingDirection: SoccerAttackingDirection
+): SuggestedSoccerRestartKind | null {
+  if (
+    !Number.isFinite(location.x) ||
+    !Number.isFinite(location.y) ||
+    location.x < 0 ||
+    location.x > 1 ||
+    location.y < 0 ||
+    location.y > 1
+  ) return null
+
+  const attackingDirection = teamSide === 'tracked'
+    ? trackedAttackingDirection
+    : oppositeDirection(trackedAttackingDirection)
+  const nearAttackingEnd = attackingDirection === 'left_to_right'
+    ? location.x >= 1 - RESTART_BOUNDARY_THRESHOLD
+    : location.x <= RESTART_BOUNDARY_THRESHOLD
+  const nearDefendingEnd = attackingDirection === 'left_to_right'
+    ? location.x <= RESTART_BOUNDARY_THRESHOLD
+    : location.x >= 1 - RESTART_BOUNDARY_THRESHOLD
+  const nearTouchline = location.y <= RESTART_BOUNDARY_THRESHOLD ||
+    location.y >= 1 - RESTART_BOUNDARY_THRESHOLD
+
+  if (nearAttackingEnd && nearTouchline) return 'corner'
+  if (nearTouchline) return 'throw_in'
+  if (nearDefendingEnd && Math.abs(location.y - 0.5) <= GOAL_AREA_HALF_WIDTH) {
+    return 'goal_kick'
+  }
+  return null
 }
 
 export function isSoccerLocatedEditableEvent(
@@ -94,4 +139,8 @@ export function clusterSoccerMarkerPoints<TPoint extends SoccerMarkerPoint>(
 
 function clamp(value: number): number {
   return Math.min(1, Math.max(0, value))
+}
+
+function oppositeDirection(direction: SoccerAttackingDirection): SoccerAttackingDirection {
+  return direction === 'left_to_right' ? 'right_to_left' : 'left_to_right'
 }
