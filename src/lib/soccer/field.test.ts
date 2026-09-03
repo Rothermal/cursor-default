@@ -31,6 +31,11 @@ describe('soccer restart suggestions', () => {
       'opponent',
       'right_to_left'
     )).toBe('throw_in')
+    expect(suggestSoccerRestartKind(
+      { x: 0.9, y: 0.02 },
+      'tracked',
+      'left_to_right'
+    )).toBe('throw_in')
   })
 
   it('suggests goal kicks in the awarded side defending goal area', () => {
@@ -54,6 +59,11 @@ describe('soccer restart suggestions', () => {
   it('leaves ambiguous interior locations unselected', () => {
     expect(suggestSoccerRestartKind(
       { x: 0.5, y: 0.5 },
+      'tracked',
+      'left_to_right'
+    )).toBeNull()
+    expect(suggestSoccerRestartKind(
+      { x: 0.04, y: 0.66 },
       'tracked',
       'left_to_right'
     )).toBeNull()

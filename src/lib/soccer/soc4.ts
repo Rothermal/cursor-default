@@ -326,7 +326,7 @@ function applyTeamEvent(
       event.teamSide,
       event,
       false,
-      event.teamSide === 'opponent'
+      false
     )
     if (actorError) return `Restart taker ${actorError}`
   }
