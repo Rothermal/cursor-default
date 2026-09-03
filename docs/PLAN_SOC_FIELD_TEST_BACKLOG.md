@@ -37,7 +37,7 @@ item is planned.
 2. Keep `M*` items listed so later season/coach requests do not get lost.
 3. When an item is confirmed, write a focused plan and Q&A the way SOC-4 / F5-F12
    were planned. File lists, acceptance, and regression belong in that plan.
-   Restart capture has an approved plan in
+   Restart capture has an active reader-first plan with R1 implemented in
    [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md).
 4. After a plan ships, mark the item implemented here and link the plan.
 
@@ -543,7 +543,7 @@ field. Event locations, marker placement, and tap mapping do not change.
 
 ### S19 - Team formation lineup on a pitch
 
-**Status:** implemented; migration and deployed verification pending — see
+**Status:** implemented; migration applied, deployed verification pending — see
 [`PLAN_SOC_S19_TEAM_FORMATION.md`](PLAN_SOC_S19_TEAM_FORMATION.md)
 
 **Theme:** team settings / setup  
@@ -726,8 +726,8 @@ exercise those constraints rather than bypass them.
 - **Roster defaults:** `S11` is implemented; `S19A` provides the formation
   catalog and versioned team-settings foundation, `S19B` provides the Team
   Manage editor, and `S19C` applies matching defaults once to editable setup
-  drafts. Apply migration 065 before using current team-setting saves or
-  verifying formation round trips.
+  drafts. Migration 065 is applied; verify current team-setting round trips and
+  setup prefill in the deployed app.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only

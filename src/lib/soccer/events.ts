@@ -149,7 +149,7 @@ export const soccerEventDefinitions: GameEventDefinition<GameEvent>[] = [
   incidentDefinition('soccer.defensive_action', validateDefensiveAction, ['defender'], ['defender']),
   incidentDefinition('soccer.foul', validateFoul, ['committed_by', 'fouled'], ['committed_by']),
   incidentDefinition('soccer.card', validateCard, ['recipient'], ['recipient'], true),
-  incidentDefinition('soccer.team_event', validateTeamEvent, ['offside_player'], []),
+  incidentDefinition('soccer.team_event', validateTeamEvent, ['offside_player', 'taker'], []),
   shootoutDefinition('soccer.shootout_started', validateShootoutStarted, [], []),
   shootoutDefinition(
     'soccer.shootout_eligibility_changed',
@@ -248,8 +248,7 @@ function incidentDefinition(
         eventType === 'soccer.card' || actor.kind !== 'staff'
       )
       const validTeamEventActors = eventType !== 'soccer.team_event' ||
-        event.payload.kind === 'offside' ||
-        event.actors.length === 0
+        teamEventActorsHaveValidRoles(event.payload, event.actors)
       if (
         event.sportId !== 'soccer' ||
         event.eventType !== eventType ||
@@ -316,6 +315,19 @@ function actorsHaveRoles(
   return roles.every(role => allowedRoles.includes(role)) &&
     requiredRoles.every(role => roles.includes(role)) &&
     new Set(roles).size === roles.length
+}
+
+function teamEventActorsHaveValidRoles(
+  payload: JsonObject,
+  actors: GameEventActor[]
+): boolean {
+  if (payload.kind === 'offside') {
+    return actorsHaveRoles(actors, ['offside_player'], [])
+  }
+  if (payload.kind === 'corner' || payload.kind === 'throw_in' || payload.kind === 'goal_kick') {
+    return actorsHaveRoles(actors, ['taker'], [])
+  }
+  return false
 }
 
 function validateOpeningLineup(payload: JsonObject): boolean {
@@ -449,7 +461,10 @@ function validateCard(payload: JsonObject): boolean {
 }
 
 function validateTeamEvent(payload: JsonObject): boolean {
-  return payload.kind === 'corner' || payload.kind === 'offside'
+  return payload.kind === 'corner' ||
+    payload.kind === 'offside' ||
+    payload.kind === 'throw_in' ||
+    payload.kind === 'goal_kick'
 }
 
 function validateDisciplineLineupResolution(value: unknown): boolean {

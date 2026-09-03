@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { GameEvent, GameEventActor, GameEventPeriod, JsonObject } from '../gameEvents/types'
+import type {
+  GameEvent,
+  GameEventActor,
+  GameEventLocation,
+  GameEventPeriod,
+  JsonObject,
+} from '../gameEvents/types'
 import {
   addGameEvents,
   initializeGameEventStream,
@@ -125,6 +131,7 @@ function event<TType extends keyof SoccerEventPayloadByType>(
     period?: GameEventPeriod
     teamSide?: 'tracked' | 'opponent'
     actors?: GameEventActor[]
+    location?: GameEventLocation | null
   } = {}
 ): GameEvent<JsonObject, string, string> {
   return createSoccerEvent({
@@ -138,6 +145,7 @@ function event<TType extends keyof SoccerEventPayloadByType>(
     occurredAt: new Date(Date.parse('2026-07-21T12:00:00.000Z') + sequence * 1_000).toISOString(),
     teamSide: options.teamSide,
     actors: options.actors,
+    location: options.location,
   })
 }
 
@@ -606,6 +614,99 @@ describe('SOC-4A normal-match projection', () => {
     })
 
     expect(gameEventRegistry.inspect(corner).ok).toBe(false)
+  })
+
+  it('projects historical corners and located restart totals with optional takers', () => {
+    const throwIn = event(4, 'soccer.team_event', { kind: 'throw_in' }, {
+      elapsedMs: 750,
+      location: { x: 0.5, y: 0, attackingDirection: 'left_to_right' },
+    })
+    expect(gameEventRegistry.inspect(throwIn).ok).toBe(true)
+
+    const trackedTakerThrowIn = event(5, 'soccer.team_event', { kind: 'throw_in' }, {
+      elapsedMs: 1_000,
+      actors: [participantActor('taker', 'match-defender', 'defender')],
+      location: { x: 0.4, y: 1, attackingDirection: 'left_to_right' },
+    })
+    expect(gameEventRegistry.inspect(trackedTakerThrowIn).ok).toBe(true)
+
+    const state = append(initializedState(), [
+      ...kickoffEvents(),
+      event(3, 'soccer.team_event', { kind: 'corner' }, { elapsedMs: 500 }),
+      throwIn,
+      trackedTakerThrowIn,
+      event(6, 'soccer.team_event', { kind: 'goal_kick' }, {
+        elapsedMs: 1_250,
+        teamSide: 'opponent',
+        actors: [unknownActor('taker', 'Opponent keeper')],
+        location: { x: 1, y: 0.5, attackingDirection: 'right_to_left' },
+      }),
+    ])
+
+    expect(state.sportGameState!.projection.sideTotals.tracked).toMatchObject({
+      corners: 1,
+      throwIns: 2,
+      goalKicks: 0,
+    })
+    expect(state.sportGameState!.projection.sideTotals.opponent).toMatchObject({
+      corners: 0,
+      throwIns: 0,
+      goalKicks: 1,
+    })
+  })
+
+  it('accepts a generic taker shape but rejects tracked identity on an opponent restart', () => {
+    const opponentThrowIn = event(3, 'soccer.team_event', { kind: 'throw_in' }, {
+      elapsedMs: 500,
+      teamSide: 'opponent',
+      actors: [participantActor('taker', 'match-defender', 'defender')],
+    })
+
+    expect(gameEventRegistry.inspect(opponentThrowIn).ok).toBe(true)
+    expect(addGameEvents(
+      initializedState(),
+      [...kickoffEvents(), opponentThrowIn],
+      gameEventRegistry,
+      gameEventProjectors
+    ).ok).toBe(false)
+
+    const trackedLabel = event(4, 'soccer.team_event', { kind: 'goal_kick' }, {
+      elapsedMs: 750,
+      actors: [unknownActor('taker', 'Unrostered taker')],
+    })
+    expect(gameEventRegistry.inspect(trackedLabel).ok).toBe(true)
+    expect(addGameEvents(
+      initializedState(),
+      [...kickoffEvents(), trackedLabel],
+      gameEventRegistry,
+      gameEventProjectors
+    ).ok).toBe(false)
+  })
+
+  it('rejects cross-kind and duplicate team-event actors during schema inspection', () => {
+    const invalidEvents = [
+      ...(['corner', 'throw_in', 'goal_kick'] as const).flatMap((kind, index) => [
+        event(20 + index * 2, 'soccer.team_event', { kind }, {
+          actors: [unknownActor('offside_player', 'Wrong role')],
+        }),
+        event(21 + index * 2, 'soccer.team_event', { kind }, {
+          actors: [unknownActor('taker', 'One'), unknownActor('taker', 'Two')],
+        }),
+      ]),
+      event(30, 'soccer.team_event', { kind: 'offside' }, {
+        actors: [unknownActor('taker', 'Wrong role')],
+      }),
+      event(31, 'soccer.team_event', { kind: 'offside' }, {
+        actors: [
+          unknownActor('offside_player', 'One'),
+          unknownActor('offside_player', 'Two'),
+        ],
+      }),
+    ]
+
+    for (const invalidEvent of invalidEvents) {
+      expect(gameEventRegistry.inspect(invalidEvent).ok).toBe(false)
+    }
   })
 
   it('rebuilds the same projection when raw events arrive in a different array order', () => {

@@ -296,24 +296,53 @@ function applyTeamEvent(
   event: Extract<SoccerNormalIncident, { eventType: 'soccer.team_event' }>
 ): string | null {
   const offsidePlayer = actorForRole(event.actors, 'offside_player')
-  if (event.payload.kind === 'corner') {
-    if (offsidePlayer) return 'A corner cannot identify an offside player.'
-    projection.sideTotals[event.teamSide].corners += 1
+  const taker = actorForRole(event.actors, 'taker')
+  if (event.payload.kind === 'offside') {
+    if (taker || event.actors.length > (offsidePlayer ? 1 : 0)) {
+      return 'An offside event can identify only one offside player.'
+    }
+    if (offsidePlayer) {
+      const actorError = validateIncidentActor(
+        projection,
+        offsidePlayer,
+        event.teamSide,
+        event,
+        true,
+        true
+      )
+      if (actorError) return `Offside actor ${actorError}`
+    }
+    projection.sideTotals[event.teamSide].offsides += 1
     return null
   }
-  if (offsidePlayer) {
+
+  if (offsidePlayer || event.actors.length > (taker ? 1 : 0)) {
+    return 'A restart can identify only one taker.'
+  }
+  if (taker) {
     const actorError = validateIncidentActor(
       projection,
-      offsidePlayer,
+      taker,
       event.teamSide,
       event,
-      true,
-      true
+      false,
+      false
     )
-    if (actorError) return `Offside actor ${actorError}`
+    if (actorError) return `Restart taker ${actorError}`
   }
-  projection.sideTotals[event.teamSide].offsides += 1
-  return null
+  switch (event.payload.kind) {
+    case 'corner':
+      projection.sideTotals[event.teamSide].corners += 1
+      return null
+    case 'throw_in':
+      projection.sideTotals[event.teamSide].throwIns += 1
+      return null
+    case 'goal_kick':
+      projection.sideTotals[event.teamSide].goalKicks += 1
+      return null
+    default:
+      return 'Unsupported team event kind.'
+  }
 }
 
 function applyDiscipline(

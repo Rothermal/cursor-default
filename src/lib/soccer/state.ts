@@ -240,6 +240,8 @@ function emptySideTotals(): SoccerMatchProjection['sideTotals']['tracked'] {
     redCards: 0,
     corners: 0,
     offsides: 0,
+    throwIns: 0,
+    goalKicks: 0,
     penaltiesWon: 0,
     penaltiesConceded: 0,
     staffYellowCards: 0,
