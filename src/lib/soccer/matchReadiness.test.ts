@@ -59,10 +59,13 @@ describe('Soccer match-readiness wiring', () => {
     expect(setup).toContain('const userEditedDrafts = useRef(false)')
     expect(setup).toContain('const [rosterReady, setRosterReady] = useState(!setup?.sourceTeamId)')
     expect(setup).toContain('decideSoccerFormationPrefill({')
+    expect(setup).toContain('userEdited: userEditedDrafts.current,')
     expect(setup).toContain('rosterDraftsReady: state.players.every')
     expect(setup).toContain('applySoccerFormationToRosterDrafts(')
     expect(setup).toContain('setup.rulesSnapshot.maxOnFieldPlayers')
+    expect(setup.match(/formationPrefillResolved\.current = true/g)).toHaveLength(3)
     expect(setup.match(/userEditedDrafts\.current = true/g)).toHaveLength(3)
+    expect(setup.match(/setDrafts\(/g)).toHaveLength(5)
     expect(setup).toContain("result.status === 'count_mismatch' || result.status === 'invalid'")
   })
 
