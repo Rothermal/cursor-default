@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  applySoccerFormationTemplateToTeamSettings,
   DEFAULT_SOCCER_PERSONAL_SETTINGS,
   SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION,
   SOCCER_TEAM_SETTINGS_SCHEMA_VERSION,
@@ -9,6 +10,7 @@ import {
   parseSoccerPersonalSettings,
   parseSoccerRulesOverride,
   parseSoccerTeamSettings,
+  prepareSoccerTeamSettingsSave,
   resolveSoccerOverrideEditorRules,
   resolveSoccerSettingsHierarchy,
   soccerRulesOverrideFingerprint,
@@ -183,6 +185,86 @@ describe('soccer settings schema', () => {
     expect(panel).toContain('setDraft(current => copySoccerTeamRules(current, null))')
     expect(panel).toContain('setDraft(current => copySoccerTeamRules(current, parsed.value))')
     expect(panel).not.toContain('setDraft(parsed.value)')
+  })
+
+  it('atomically applies a formation template and its player count to one draft', () => {
+    const current = {
+      rules: { allowReturnSubstitutions: true },
+      formation: {
+        version: 1 as const,
+        templateId: '11v11-4-3-3' as const,
+        assignments: {
+          gk: '11111111-1111-4111-8111-111111111111',
+          rw: '22222222-2222-4222-8222-222222222222',
+        },
+      },
+    }
+
+    const next = applySoccerFormationTemplateToTeamSettings(
+      current,
+      '9v9-3-3-2'
+    )
+
+    expect(next.rules).toEqual({
+      allowReturnSubstitutions: true,
+      maxOnFieldPlayers: 9,
+    })
+    expect(next.formation).toEqual({
+      version: 1,
+      templateId: '9v9-3-3-2',
+      assignments: { gk: '11111111-1111-4111-8111-111111111111' },
+    })
+    expect(current.formation.templateId).toBe('11v11-4-3-3')
+  })
+
+  it('never cleans unavailable assignments without a positively loaded roster', () => {
+    const current = {
+      rules: { maxOnFieldPlayers: 7 },
+      formation: {
+        version: 1 as const,
+        templateId: '7v7-2-3-1' as const,
+        assignments: {
+          gk: '11111111-1111-4111-8111-111111111111',
+          st: '22222222-2222-4222-8222-222222222222',
+        },
+      },
+    }
+    const activePlayerIds = ['11111111-1111-4111-8111-111111111111']
+
+    expect(prepareSoccerTeamSettingsSave(current, {
+      cleanUnavailableAssignments: true,
+      rosterReady: false,
+      activePlayerIds,
+    })).toEqual({
+      settings: current,
+      removedUnavailableCount: 0,
+    })
+    expect(prepareSoccerTeamSettingsSave(current, {
+      cleanUnavailableAssignments: false,
+      rosterReady: true,
+      activePlayerIds,
+    })).toEqual({
+      settings: current,
+      removedUnavailableCount: 0,
+    })
+    expect(prepareSoccerTeamSettingsSave(current, {
+      cleanUnavailableAssignments: true,
+      rosterReady: true,
+      activePlayerIds,
+    })).toEqual({
+      settings: {
+        rules: current.rules,
+        formation: {
+          version: 1,
+          templateId: '7v7-2-3-1',
+          assignments: { gk: activePlayerIds[0] },
+        },
+      },
+      removedUnavailableCount: 1,
+    })
+    expect(current.formation.assignments.st).toBe(
+      '22222222-2222-4222-8222-222222222222'
+    )
   })
 
   it('rejects unknown nested segment fields', () => {

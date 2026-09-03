@@ -374,7 +374,7 @@ S19A  Domain + settings schema [implemented]
       Template catalog, strict model/parsers, pure draft/application helpers,
       team schema v1->v2 compatibility, migration, cache/RPC/audit tests
 
-S19B  Team Manage editor
+S19B  Team Manage editor [implemented]
       Rules/Formation tabs, visual pitch, accessible slot list, picker,
       stale-player repair, read-only view, full-draft CAS/save/discard/clear
 
@@ -391,8 +391,9 @@ round-trip the formation.
 
 S19A is implemented through migration `065`. Its verification map is
 [`REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md`](REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md).
-S19B remains the next slice after the S19A application and migration are both
-deployed.
+S19B is implemented in Team Manage. Migration `065` remains a hard deployment
+prerequisite for S19A/S19B team-setting saves. S19C is the next slice and owns
+one-time Player Setup prefill.
 
 ## 6. File Map
 
@@ -415,6 +416,11 @@ deployed.
 - `src/pages/Teams.tsx` only for active-roster data plumbing if the panel does
   not already receive enough roster context
 - focused editor transition/wiring tests
+
+Implemented with `SoccerFormationEditor`, Rules/Formation tabs, positively
+verified active-roster plumbing, explicit save-time stale-assignment cleanup,
+read-only rendering, and the existing full-draft CAS controls. See
+[`REGRESSION_SOC_S19B_FORMATION_EDITOR.md`](REGRESSION_SOC_S19B_FORMATION_EDITOR.md).
 
 ### S19C
 

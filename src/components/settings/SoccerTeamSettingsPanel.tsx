@@ -1,16 +1,27 @@
 import { Check, Copy, RefreshCw, Save, Settings2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ConfirmDialog from '../ConfirmDialog'
 import { useSettings } from '../../context/SettingsContext'
 import { useSoccerTeamSettings } from '../../hooks/useSoccerTeamSettings'
 import { loadTeamSportSettings } from '../../lib/sportSettingsCloud'
 import {
+  applySoccerFormationTemplateToTeamSettings,
   copySoccerTeamRules,
   parseSoccerTeamSettings,
+  prepareSoccerTeamSettingsSave,
+  resolveSoccerOverrideEditorRules,
   resolveSoccerSettingsHierarchy,
   soccerTeamSettingsFingerprint,
   type SoccerTeamSettings,
 } from '../../lib/soccer/settings'
+import {
+  unavailableSoccerFormationPlayerIds,
+  type SoccerFormationTemplateId,
+} from '../../lib/soccer/formation'
+import SoccerFormationEditor, {
+  type SoccerFormationRosterPlayer,
+} from '../soccer/SoccerFormationEditor'
 import SoccerRulesOverrideEditor from '../soccer/SoccerRulesOverrideEditor'
 
 export interface SoccerTeamSettingsCopyOption {
@@ -23,12 +34,18 @@ export default function SoccerTeamSettingsPanel({
   teamName,
   mayEdit,
   copyOptions,
+  roster,
+  rosterReady,
+  rosterLoading,
   onAuditChange,
 }: {
   teamId: string
   teamName: string
   mayEdit: boolean
   copyOptions: SoccerTeamSettingsCopyOption[]
+  roster: readonly SoccerFormationRosterPlayer[]
+  rosterReady: boolean
+  rosterLoading: boolean
   onAuditChange: () => void
 }) {
   const navigate = useNavigate()
@@ -42,6 +59,12 @@ export default function SoccerTeamSettingsPanel({
   const [copying, setCopying] = useState(false)
   const [copyError, setCopyError] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'rules' | 'formation'>('rules')
+  const [confirmClearFormation, setConfirmClearFormation] = useState(false)
+  const [saveNotice, setSaveNotice] = useState<string | null>(null)
+  const tabGroupId = useId()
+  const rulesTabRef = useRef<HTMLButtonElement>(null)
+  const formationTabRef = useRef<HTMLButtonElement>(null)
   const previousSavedFingerprint = useRef(
     soccerTeamSettingsFingerprint(team.settings)
   )
@@ -55,6 +78,20 @@ export default function SoccerTeamSettingsPanel({
     }),
     [soccerSettings.rules]
   )
+  const resolvedDraftRules = useMemo(
+    () => resolveSoccerOverrideEditorRules(inherited.rules, draft.rules).rules,
+    [draft.rules, inherited.rules]
+  )
+  const activeRosterIds = useMemo(() => roster.map(player => player.id), [roster])
+  const unavailablePlayerIds = useMemo(
+    () => rosterReady && draft.formation
+      ? unavailableSoccerFormationPlayerIds(draft.formation, activeRosterIds)
+      : [],
+    [activeRosterIds, draft.formation, rosterReady]
+  )
+  const formationNeedsCleanup = sharedWritable && activeTab === 'formation' &&
+    unavailablePlayerIds.length > 0
+  const saveEnabled = dirty || formationNeedsCleanup
 
   useEffect(() => {
     const previous = previousSavedFingerprint.current
@@ -69,15 +106,60 @@ export default function SoccerTeamSettingsPanel({
 
   const handleSave = async () => {
     if (!mayEdit) return
-    if (await team.save(draft, baseRevision)) {
+    const prepared = prepareSoccerTeamSettingsSave(draft, {
+      cleanUnavailableAssignments: activeTab === 'formation',
+      rosterReady,
+      activePlayerIds: activeRosterIds,
+    })
+    const candidate = prepared.settings
+    const cleanupCount = prepared.removedUnavailableCount
+    if (await team.save(candidate, baseRevision)) {
+      setDraft(structuredClone(candidate))
+      setSaveNotice(cleanupCount > 0
+        ? `Saved shared defaults and removed ${cleanupCount} unavailable ${cleanupCount === 1 ? 'assignment' : 'assignments'}.`
+        : 'Shared defaults saved.')
       onAuditChange()
     }
+  }
+
+  const handlePlayerCountChange = (count: 7 | 9 | 11) => {
+    setSaveNotice(null)
+    setDraft(current => ({
+      ...current,
+      rules: { ...current.rules, maxOnFieldPlayers: count },
+    }))
+  }
+
+  const handleTemplateSelect = (templateId: SoccerFormationTemplateId) => {
+    setSaveNotice(null)
+    setDraft(current => applySoccerFormationTemplateToTeamSettings(current, templateId))
+  }
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const tabs = [rulesTabRef, formationTabRef]
+    const currentIndex = activeTab === 'rules' ? 0 : 1
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex + tabs.length - 1) % tabs.length
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % tabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1
+    } else {
+      return
+    }
+    event.preventDefault()
+    setActiveTab(nextIndex === 0 ? 'rules' : 'formation')
+    tabs[nextIndex]?.current?.focus()
   }
 
   const handleCopy = async () => {
     if (!sharedWritable || !copyTeamId) return
     setCopying(true)
     setCopyError(null)
+    setSaveNotice(null)
     let loaded
     try {
       loaded = await loadTeamSportSettings(copyTeamId, 'soccer')
@@ -155,6 +237,12 @@ export default function SoccerTeamSettingsPanel({
         </p>
       )}
 
+      {saveNotice && (
+        <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {saveNotice}
+        </p>
+      )}
+
       {team.conflict && (
         <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
           <p className="text-sm font-semibold text-amber-900">
@@ -166,6 +254,7 @@ export default function SoccerTeamSettingsPanel({
               const cloud = team.conflict
               team.useCloud()
               if (cloud) setDraft(structuredClone(cloud))
+              setSaveNotice(null)
             }}
             className="btn-secondary w-full text-sm"
           >
@@ -192,43 +281,114 @@ export default function SoccerTeamSettingsPanel({
         {editorOpen ? 'Close Defaults Editor' : 'Open Defaults Editor'}
       </button>
 
-      {editorOpen && sharedWritable && copyOptions.length > 0 && (
-        <div className="border-y border-slate-200 py-3 space-y-2">
-          <p className="text-sm font-semibold text-slate-700">Copy from another team</p>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <select
-              value={copyTeamId}
-              onChange={event => setCopyTeamId(event.target.value)}
-              className="input-field"
-              aria-label="Source soccer team"
-            >
-              <option value="">Choose a soccer team</option>
-              {copyOptions.map(option => (
-                <option key={option.id} value={option.id}>{option.name}</option>
-              ))}
-            </select>
+      {editorOpen && (
+        <>
+          <div className="grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1" role="tablist" aria-label="Soccer default settings">
             <button
+              ref={rulesTabRef}
+              id={`${tabGroupId}-rules-tab`}
               type="button"
-              onClick={() => void handleCopy()}
-              disabled={!copyTeamId || copying}
-              className="btn-secondary inline-flex items-center justify-center gap-2 px-3 disabled:opacity-40"
+              role="tab"
+              aria-selected={activeTab === 'rules'}
+              aria-controls={`${tabGroupId}-rules-panel`}
+              tabIndex={activeTab === 'rules' ? 0 : -1}
+              onClick={() => setActiveTab('rules')}
+              onKeyDown={handleTabKeyDown}
+              className={`h-9 rounded text-sm font-semibold ${activeTab === 'rules' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
             >
-              {copying ? <RefreshCw size={16} className="animate-spin" /> : <Copy size={16} />}
-              Copy
+              Rules
+            </button>
+            <button
+              ref={formationTabRef}
+              id={`${tabGroupId}-formation-tab`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'formation'}
+              aria-controls={`${tabGroupId}-formation-panel`}
+              tabIndex={activeTab === 'formation' ? 0 : -1}
+              onClick={() => setActiveTab('formation')}
+              onKeyDown={handleTabKeyDown}
+              className={`h-9 rounded text-sm font-semibold ${activeTab === 'formation' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+            >
+              Formation
             </button>
           </div>
-        </div>
-      )}
 
-      {editorOpen && (
-        <SoccerRulesOverrideEditor
-          inherited={inherited.rules}
-          inheritedSources={inherited.sources}
-          override={draft.rules}
-          overrideLabel="Team override"
-          readOnly={!sharedWritable}
-          onChange={rules => setDraft(current => ({ ...current, rules }))}
-        />
+          {activeTab === 'rules' ? (
+            <div
+              id={`${tabGroupId}-rules-panel`}
+              className="space-y-4"
+              role="tabpanel"
+              aria-labelledby={`${tabGroupId}-rules-tab`}
+            >
+              {sharedWritable && copyOptions.length > 0 && (
+                <div className="border-y border-slate-200 py-3 space-y-2">
+                  <p className="text-sm font-semibold text-slate-700">Copy from another team</p>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                    <select
+                      value={copyTeamId}
+                      onChange={event => setCopyTeamId(event.target.value)}
+                      className="input-field"
+                      aria-label="Source soccer team"
+                    >
+                      <option value="">Choose a soccer team</option>
+                      {copyOptions.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopy()}
+                      disabled={!copyTeamId || copying}
+                      className="btn-secondary inline-flex items-center justify-center gap-2 px-3 disabled:opacity-40"
+                    >
+                      {copying ? <RefreshCw size={16} className="animate-spin" /> : <Copy size={16} />}
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+              <SoccerRulesOverrideEditor
+                inherited={inherited.rules}
+                inheritedSources={inherited.sources}
+                override={draft.rules}
+                overrideLabel="Team override"
+                readOnly={!sharedWritable}
+                onChange={rules => {
+                  setSaveNotice(null)
+                  setDraft(current => ({ ...current, rules }))
+                }}
+              />
+            </div>
+          ) : (
+            <div
+              id={`${tabGroupId}-formation-panel`}
+              role="tabpanel"
+              aria-labelledby={`${tabGroupId}-formation-tab`}
+            >
+              <SoccerFormationEditor
+                formation={draft.formation}
+                playerCount={resolvedDraftRules.maxOnFieldPlayers}
+                roster={roster}
+                rosterReady={rosterReady}
+                rosterLoading={rosterLoading}
+                readOnly={!sharedWritable}
+                onPlayerCountChange={handlePlayerCountChange}
+                onTemplateSelect={handleTemplateSelect}
+                onFormationChange={formation => {
+                  setSaveNotice(null)
+                  setDraft(current => ({ ...current, formation }))
+                }}
+                onRequestClear={() => setConfirmClearFormation(true)}
+              />
+              {formationNeedsCleanup && (
+                <p role="status" className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Saving from this tab will remove {unavailablePlayerIds.length} unavailable {unavailablePlayerIds.length === 1 ? 'assignment' : 'assignments'}.
+                </p>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {editorOpen && mayEdit && (
@@ -236,10 +396,11 @@ export default function SoccerTeamSettingsPanel({
           <button
             type="button"
             className="btn-secondary"
-            disabled={!dirty}
+            disabled={!saveEnabled}
             onClick={() => {
               setDraft(structuredClone(team.settings))
               setBaseRevision(team.revision)
+              setSaveNotice(null)
             }}
           >
             Discard
@@ -247,12 +408,12 @@ export default function SoccerTeamSettingsPanel({
           <button
             type="button"
             className="btn-primary inline-flex items-center justify-center gap-2"
-            disabled={!dirty || !sharedWritable || team.status === 'saving'}
+            disabled={!saveEnabled || !sharedWritable || team.status === 'saving'}
             onClick={() => void handleSave()}
           >
             {team.status === 'saving' ? (
               <RefreshCw size={17} className="animate-spin" />
-            ) : team.status === 'synced' && !dirty ? (
+            ) : team.status === 'synced' && !saveEnabled ? (
               <Check size={17} />
             ) : (
               <Save size={17} />
@@ -261,6 +422,19 @@ export default function SoccerTeamSettingsPanel({
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmClearFormation}
+        title="Clear Formation"
+        message="Remove this team's saved formation? Rules are unchanged, and the change is not shared until you save."
+        confirmLabel="Clear Formation"
+        onConfirm={() => {
+          setDraft(current => ({ ...current, formation: null }))
+          setConfirmClearFormation(false)
+          setSaveNotice(null)
+        }}
+        onCancel={() => setConfirmClearFormation(false)}
+      />
     </section>
   )
 }

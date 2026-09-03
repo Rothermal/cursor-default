@@ -9,7 +9,13 @@ import {
 } from './rules'
 import type { SoccerMatchRules } from './types'
 import {
+  createSoccerTeamFormation,
+  getSoccerFormationTemplate,
   parseSoccerTeamFormation,
+  prepareSoccerFormationForSave,
+  switchSoccerFormationTemplate,
+  unavailableSoccerFormationPlayerIds,
+  type SoccerFormationTemplateId,
   type SoccerTeamFormationV1,
 } from './formation'
 
@@ -158,6 +164,63 @@ export function copySoccerTeamRules(
   return {
     rules: structuredClone(source?.rules ?? {}),
     formation: structuredClone(target.formation),
+  }
+}
+
+export function applySoccerFormationTemplateToTeamSettings(
+  settings: SoccerTeamSettings,
+  templateId: SoccerFormationTemplateId
+): SoccerTeamSettings {
+  const template = getSoccerFormationTemplate(templateId)
+  if (!template) return structuredClone(settings)
+  return {
+    rules: {
+      ...structuredClone(settings.rules),
+      maxOnFieldPlayers: template.playerCount,
+    },
+    formation: settings.formation
+      ? switchSoccerFormationTemplate(settings.formation, templateId)
+      : createSoccerTeamFormation(templateId),
+  }
+}
+
+export interface SoccerTeamSettingsSavePreparation {
+  settings: SoccerTeamSettings
+  removedUnavailableCount: number
+}
+
+export function prepareSoccerTeamSettingsSave(
+  settings: SoccerTeamSettings,
+  options: {
+    cleanUnavailableAssignments: boolean
+    rosterReady: boolean
+    activePlayerIds: Iterable<string>
+  }
+): SoccerTeamSettingsSavePreparation {
+  const activePlayerIds = [...options.activePlayerIds]
+  if (
+    !options.cleanUnavailableAssignments ||
+    !options.rosterReady ||
+    !settings.formation
+  ) {
+    return {
+      settings: structuredClone(settings),
+      removedUnavailableCount: 0,
+    }
+  }
+  const removedUnavailableCount = unavailableSoccerFormationPlayerIds(
+    settings.formation,
+    activePlayerIds
+  ).length
+  return {
+    settings: {
+      rules: structuredClone(settings.rules),
+      formation: prepareSoccerFormationForSave(
+        settings.formation,
+        activePlayerIds
+      ),
+    },
+    removedUnavailableCount,
   }
 }
 
