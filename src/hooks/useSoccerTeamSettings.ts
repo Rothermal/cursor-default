@@ -9,7 +9,7 @@ import {
   saveSportSettingsCache,
 } from '../lib/sportSettingsStorage'
 import {
-  SOCCER_SETTINGS_SCHEMA_VERSION,
+  SOCCER_TEAM_SETTINGS_SCHEMA_VERSION,
   parseSoccerTeamSettings,
   type SoccerTeamSettings,
 } from '../lib/soccer/settings'
@@ -224,7 +224,7 @@ export function useSoccerTeamSettings(
         result = await saveTeamSportSettings(
           teamId,
           'soccer',
-          SOCCER_SETTINGS_SCHEMA_VERSION,
+          SOCCER_TEAM_SETTINGS_SCHEMA_VERSION,
           expectedRevision,
           parsed.value
         )

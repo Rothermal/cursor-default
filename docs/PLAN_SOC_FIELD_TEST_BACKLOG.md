@@ -543,21 +543,21 @@ field. Event locations, marker placement, and tap mapping do not change.
 
 ### S19 - Team formation lineup on a pitch
 
-**Status:** approved plan — see
+**Status:** implementation in progress; S19A foundation implemented — see
 [`PLAN_SOC_S19_TEAM_FORMATION.md`](PLAN_SOC_S19_TEAM_FORMATION.md)
 
 **Theme:** team settings / setup  
-**Where:** Teams / Team Manage; `SoccerTeamSettings` today is only a sparse
-rules override; Player Setup has starter/bench plus `initialRole`, no
-pitch
+**Where:** Teams / Team Manage; S19A extends `SoccerTeamSettings` with the
+versioned formation foundation, but the editor remains S19B. Player Setup has
+starter/bench plus `initialRole`; S19C will apply the saved default there.
 
 Owner idea: set a soccer lineup on a pitch from the Teams page. Formations
 such as 4-3-3, 4-4-2, 3-4-3. Store it as a team setting.
 
 This is not a new event family. SOC-6D already has owner/admin team soccer
-settings with compare-and-swap writes. A formation would be a new optional
-settings field plus a visual editor: pick a shape, place named roster
-players on slots, save for the team.
+settings with compare-and-swap writes. S19A adds the optional versioned
+settings field and fixed catalog. S19B adds the visual editor for choosing a
+shape and placing named roster players on slots.
 
 **Approved direction:** store one versioned template plus stable player-to-slot
 assignments in revisioned team Soccer settings. Fixed 11v11, 9v9, and 7v7
@@ -708,7 +708,8 @@ Use these labels before turning an item into an implementation plan:
 |---|---|---|
 | Confirmed product request with open data/UX choices | `S15`, `S16` | Short Q&A, then a focused phase plan |
 | Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S21` | Run the linked regression rows during the next live or deployed test |
-| Approved implementation plan | `S17`, `S19`, `S20` | Deliver from the linked focused execution plans |
+| Approved implementation plan | `S17`, `S20` | Deliver from the linked focused execution plans |
+| Implementation in progress | `S19` | Deploy migration 065 before/with S19A, then deliver S19B |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
 The `S12` repair preserves the shared editor route, and the `S14` repair keeps
@@ -723,8 +724,10 @@ exercise those constraints rather than bypass them.
   `S4`, `S6`, and `S10` without implementing those unconfirmed items.
 - **Timeline correction:** `S12` is implemented; deployed live correction
   verification remains.
-- **Roster defaults:** `S11` is implemented; `S19` has an approved three-slice
-  formation/settings/setup plan.
+- **Roster defaults:** `S11` is implemented; `S19A` provides the formation
+  catalog and versioned team-settings foundation. Apply migration 065 before
+  or with the S19A application deploy; S19B owns the editor and S19C owns setup
+  prefill.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only

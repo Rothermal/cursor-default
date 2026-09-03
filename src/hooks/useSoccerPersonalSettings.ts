@@ -19,7 +19,7 @@ import {
 } from '../lib/soccer/personalSettingsSync'
 import {
   DEFAULT_SOCCER_PERSONAL_SETTINGS,
-  SOCCER_SETTINGS_SCHEMA_VERSION,
+  SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION,
   parseSoccerPersonalSettings,
   type SoccerPersonalSettings,
 } from '../lib/soccer/settings'
@@ -128,7 +128,7 @@ export function useSoccerPersonalSettings(
     try {
     const result = await saveUserSportSettings(
       'soccer',
-      SOCCER_SETTINGS_SCHEMA_VERSION,
+      SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION,
       expectedRevision,
       settings
     )
@@ -577,7 +577,7 @@ function initialState(
 function parseCloudSoccerRecord(
   record: SportSettingsCloudRecord
 ): SportSettingsCloudRecord<SoccerPersonalSettings> | null {
-  if (record.schemaVersion !== SOCCER_SETTINGS_SCHEMA_VERSION) return null
+  if (record.schemaVersion !== SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION) return null
   const parsed = parseSoccerPersonalSettings(record.settings)
   return parsed.ok ? { ...record, settings: parsed.value } : null
 }
