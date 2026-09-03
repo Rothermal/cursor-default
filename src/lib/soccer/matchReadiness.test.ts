@@ -18,6 +18,25 @@ describe('Soccer match-readiness wiring', () => {
     expect(teams).toContain('SOCCER_ROSTER_ROLE_OPTIONS.map')
   })
 
+  it('wires the S19B formation editor to a positively loaded active roster', () => {
+    const teams = source('src/pages/Teams.tsx')
+    const panel = source('src/components/settings/SoccerTeamSettingsPanel.tsx')
+    const editor = source('src/components/soccer/SoccerFormationEditor.tsx')
+
+    expect(teams).toContain(".eq('is_active', true)")
+    expect(teams).toContain('setRosterLoadedTeamId(null)')
+    expect(teams).toContain('setRosterLoadedTeamId(selectedTeamId)')
+    expect(teams).toContain('rosterReady={rosterLoadedTeamId === selectedTeam.id}')
+    expect(panel).toContain("const [activeTab, setActiveTab] = useState<'rules' | 'formation'>('rules')")
+    expect(panel).toContain("const formationNeedsCleanup = activeTab === 'formation'")
+    expect(panel).toContain('prepareSoccerFormationForSave(draft.formation, activeRosterIds)')
+    expect(panel).toContain('setDraft(current => copySoccerTeamRules(current, parsed.value))')
+    expect(panel).toContain('title="Clear Formation"')
+    expect(editor).toContain('role="list" aria-label="Formation slots"')
+    expect(editor).toContain('disabled={pickerDisabled}')
+    expect(editor).toContain('moved from ${previousSlot.label} to ${slot.label}.')
+  })
+
   it('loads roster positions before creating fresh cloud-team participant drafts', () => {
     const setup = source('src/pages/SoccerPlayerSetup.tsx')
 

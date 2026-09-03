@@ -150,6 +150,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [teamRolesById, setTeamRolesById] = useState<Record<string, TeamRole>>({})
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
   const [players, setPlayers] = useState<PlayerRow[]>([])
+  const [rosterLoadedTeamId, setRosterLoadedTeamId] = useState<string | null>(null)
 
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [loadingPlayers, setLoadingPlayers] = useState(false)
@@ -356,12 +357,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   useEffect(() => {
     if (!isManagementRoute || !selectedTeamId || !isConfigured || !userId || !supabaseClient) {
       setPlayers([])
+      setRosterLoadedTeamId(null)
       return
     }
 
     let cancelled = false
     const loadPlayers = async () => {
       setLoadingPlayers(true)
+      setRosterLoadedTeamId(null)
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('team_players')
@@ -387,6 +390,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         position: row.position,
         nickname: row.players.nickname,
       })))
+      setRosterLoadedTeamId(selectedTeamId)
       setLoadingPlayers(false)
     }
 
@@ -1926,6 +1930,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     id: team.id,
                     name: `${teamDisplayName(team)} (${team.seasons.name})`,
                   }))}
+                roster={players.map(player => ({
+                  id: player.id,
+                  name: playerRosterSelectLabel(player),
+                  number: player.jersey_number?.trim() || null,
+                }))}
+                rosterReady={rosterLoadedTeamId === selectedTeam.id}
+                rosterLoading={loadingPlayers}
                 onAuditChange={() => setAuditRefresh(value => value + 1)}
               />
             </section>
