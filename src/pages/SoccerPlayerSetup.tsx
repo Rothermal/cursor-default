@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
+import { useSoccerTeamSettings } from '../hooks/useSoccerTeamSettings'
 import { supabase } from '../lib/supabase'
 import { parseSoccerRosterRole } from '../lib/soccer/rosterRole'
 import {
   createSoccerSportGameState,
   createSoccerUuid,
+  applySoccerFormationToRosterDrafts,
+  decideSoccerFormationPrefill,
   prepareSoccerKickoff,
   validateSoccerMatchSetup,
   type SoccerMatchParticipant,
@@ -18,6 +21,11 @@ import {
 
 interface ParticipantDraft extends SoccerMatchParticipant {
   selected: boolean
+}
+
+interface FormationPrefillNotice {
+  tone: 'info' | 'warning'
+  message: string
 }
 
 type ParticipantDraftPatch = Partial<Pick<
@@ -41,6 +49,7 @@ export default function SoccerPlayerSetup() {
     ? state.sportGameState
     : null
   const setup = soccerState?.setup ?? null
+  const teamSettings = useSoccerTeamSettings(setup?.sourceTeamId ?? null)
   const [step, setStep] = useState<'roster' | 'lineup'>('roster')
   const hadSavedSelection = useRef(Boolean(setup?.participants.length))
   const [drafts, setDrafts] = useState<ParticipantDraft[]>(() =>
@@ -51,11 +60,15 @@ export default function SoccerPlayerSetup() {
   const [rosterLoading, setRosterLoading] = useState(
     Boolean(setup?.sourceTeamId && state.players.length === 0)
   )
+  const [rosterReady, setRosterReady] = useState(!setup?.sourceTeamId)
   const [rosterLoadError, setRosterLoadError] = useState<string | null>(null)
   const [rosterLoadAttempt, setRosterLoadAttempt] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [formationNotice, setFormationNotice] = useState<FormationPrefillNotice | null>(null)
   const [confirmShortHanded, setConfirmShortHanded] = useState(false)
   const cloudRosterLoaded = useRef(false)
+  const formationPrefillResolved = useRef(false)
+  const userEditedDrafts = useRef(false)
   const rosterRolesByPlayerId = useRef<Record<string, SoccerMatchParticipant['initialRole']>>({})
 
   useEffect(() => {
@@ -69,14 +82,16 @@ export default function SoccerPlayerSetup() {
 
   useEffect(() => {
     if (!setup?.sourceTeamId || !supabase || cloudRosterLoaded.current) return
-    if (state.players.length > 0) {
+    if (state.players.length > 0 && hadSavedSelection.current) {
       cloudRosterLoaded.current = true
+      setRosterReady(true)
       setRosterLoading(false)
       return
     }
     let cancelled = false
     const loadRoster = async () => {
       setRosterLoading(true)
+      setRosterReady(false)
       setRosterLoadError(null)
       const { data, error: loadError } = await supabase!
         .from('team_players')
@@ -110,6 +125,7 @@ export default function SoccerPlayerSetup() {
         })),
       })
       cloudRosterLoaded.current = true
+      setRosterReady(true)
       setRosterLoading(false)
     }
     void loadRoster()
@@ -141,6 +157,84 @@ export default function SoccerPlayerSetup() {
   }, [setup?.sourceTeamId, state.players])
 
   useEffect(() => {
+    const settingsForTeam = Boolean(
+      setup?.sourceTeamId && teamSettings.scopeTeamId === setup.sourceTeamId
+    )
+    const settingsSettled = settingsForTeam && [
+      'synced',
+      'cached',
+      'missing',
+      'backend_update_required',
+      'error',
+    ].includes(teamSettings.status)
+    const settingsFailed = teamSettings.status === 'backend_update_required' ||
+      teamSettings.status === 'error'
+    const decision = decideSoccerFormationPrefill({
+      hasSourceTeam: Boolean(setup?.sourceTeamId),
+      alreadyResolved: formationPrefillResolved.current,
+      hadSavedParticipants: hadSavedSelection.current,
+      userEdited: userEditedDrafts.current,
+      rosterReady,
+      settingsSettled,
+      rosterDraftsReady: state.players.every(player =>
+        drafts.some(draft => draft.playerId === player.id)
+      ),
+    })
+
+    if (decision === 'wait' || decision === 'resolved') return
+    if (decision === 'skip_edited') {
+      formationPrefillResolved.current = true
+      setFormationNotice({
+        tone: 'info',
+        message: 'Team formation was not applied because this match roster was already edited.',
+      })
+      return
+    }
+    if (decision === 'skip_existing' || decision === 'skip_no_team') {
+      formationPrefillResolved.current = true
+      return
+    }
+    if (settingsFailed) {
+      setFormationNotice({
+        tone: 'warning',
+        message: `Team formation defaults could not be loaded. Roster role defaults remain available.${teamSettings.error ? ` ${teamSettings.error}` : ''}`,
+      })
+      return
+    }
+    if (!setup) return
+
+    const result = applySoccerFormationToRosterDrafts(
+      drafts,
+      teamSettings.settings.formation,
+      setup.rulesSnapshot.maxOnFieldPlayers
+    )
+    formationPrefillResolved.current = true
+    if (result.status === 'applied') {
+      setDrafts(result.drafts)
+      setFormationNotice(result.unavailablePlayerIds.length > 0
+        ? {
+            tone: 'warning',
+            message: `Team formation applied without ${result.unavailablePlayerIds.length} unavailable ${result.unavailablePlayerIds.length === 1 ? 'player' : 'players'}. Repair the shared formation in Team Manage.`,
+          }
+        : {
+            tone: 'info',
+            message: 'Team formation applied. Review the opening lineup before kickoff.',
+          })
+      return
+    }
+    if (result.status === 'no_formation') {
+      setFormationNotice(null)
+      return
+    }
+    if (result.status === 'count_mismatch' || result.status === 'invalid') {
+      setFormationNotice({
+        tone: 'warning',
+        message: `${result.error ?? 'The saved team formation is invalid.'} Roster role defaults were used instead.`,
+      })
+    }
+  }, [drafts, rosterReady, setup, state.players, teamSettings.error, teamSettings.scopeTeamId, teamSettings.settings.formation, teamSettings.status])
+
+  useEffect(() => {
     if (!setup || state.eventStream?.events.length) return
     const participants = selectedParticipants(drafts)
     if (JSON.stringify(participants) === JSON.stringify(setup.participants)) return
@@ -161,6 +255,7 @@ export default function SoccerPlayerSetup() {
 
   const addParticipant = () => {
     if (!name.trim()) return
+    userEditedDrafts.current = true
     const gameOnly = Boolean(setup.sourceTeamId)
     const id = createSoccerUuid()
     if (!gameOnly) {
@@ -184,6 +279,7 @@ export default function SoccerPlayerSetup() {
   }
 
   const addUnknownGoalkeeper = () => {
+    userEditedDrafts.current = true
     const existing = drafts.find(draft => draft.kind === 'anonymous' && draft.displayName === 'Goalkeeper unknown')
     if (existing) {
       updateDraft(existing.id, {
@@ -206,6 +302,7 @@ export default function SoccerPlayerSetup() {
   }
 
   function updateDraft(id: string, patch: ParticipantDraftPatch) {
+    userEditedDrafts.current = true
     setDrafts(current => current.map(draft => draft.id === id
       ? {
           ...draft,
@@ -313,6 +410,29 @@ export default function SoccerPlayerSetup() {
             >
               Retry roster
             </button>
+          </div>
+        )}
+
+        {formationNotice && (
+          <div
+            role={formationNotice.tone === 'warning' ? 'alert' : 'status'}
+            className={`rounded-md border px-3 py-2 text-sm ${
+              formationNotice.tone === 'warning'
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-blue-200 bg-blue-50 text-blue-800'
+            }`}
+          >
+            <p>{formationNotice.message}</p>
+            {formationNotice.tone === 'warning' &&
+              (teamSettings.status === 'error' || teamSettings.status === 'backend_update_required') && (
+                <button
+                  type="button"
+                  onClick={() => void teamSettings.refresh()}
+                  className="mt-2 font-semibold underline"
+                >
+                  Retry team defaults
+                </button>
+              )}
           </div>
         )}
 

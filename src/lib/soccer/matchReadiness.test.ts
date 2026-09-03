@@ -45,10 +45,28 @@ describe('Soccer match-readiness wiring', () => {
 
     expect(setup).toContain(".select('player_id,jersey_number,position,players!inner(id,first_name,last_name)')")
     expect(setup).toContain('parseSoccerRosterRole(row.position)')
-    expect(setup).toContain('if (state.players.length > 0)')
+    expect(setup).toContain('if (state.players.length > 0 && hadSavedSelection.current)')
     expect(setup).toContain('setRosterLoadAttempt(attempt => attempt + 1)')
     expect(setup).toContain("!cloudRosterLoaded.current && state.players.length === 0")
     expect(setup).toContain('initialRole: rosterRolesByPlayerId.current[player.id]')
+  })
+
+  it('applies a coherent team formation once without overwriting recorder edits', () => {
+    const setup = source('src/pages/SoccerPlayerSetup.tsx')
+
+    expect(setup).toContain('useSoccerTeamSettings(setup?.sourceTeamId ?? null)')
+    expect(setup).toContain('const formationPrefillResolved = useRef(false)')
+    expect(setup).toContain('const userEditedDrafts = useRef(false)')
+    expect(setup).toContain('const [rosterReady, setRosterReady] = useState(!setup?.sourceTeamId)')
+    expect(setup).toContain('decideSoccerFormationPrefill({')
+    expect(setup).toContain('userEdited: userEditedDrafts.current,')
+    expect(setup).toContain('rosterDraftsReady: state.players.every')
+    expect(setup).toContain('applySoccerFormationToRosterDrafts(')
+    expect(setup).toContain('setup.rulesSnapshot.maxOnFieldPlayers')
+    expect(setup.match(/formationPrefillResolved\.current = true/g)).toHaveLength(3)
+    expect(setup.match(/userEditedDrafts\.current = true/g)).toHaveLength(3)
+    expect(setup.match(/setDrafts\(/g)).toHaveLength(5)
+    expect(setup).toContain("result.status === 'count_mismatch' || result.status === 'invalid'")
   })
 
   it('keeps Soccer merge resolutions strict while preserving untouched raw values', () => {

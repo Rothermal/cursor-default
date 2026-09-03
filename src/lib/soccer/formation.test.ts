@@ -5,6 +5,7 @@ import {
   assignSoccerFormationPlayer,
   clearSoccerFormationSlot,
   createSoccerTeamFormation,
+  decideSoccerFormationPrefill,
   getSoccerFormationTemplate,
   parseSoccerTeamFormation,
   prepareSoccerFormationForSave,
@@ -198,5 +199,25 @@ describe('soccer formation setup application', () => {
       status: 'invalid',
       drafts,
     })
+  })
+
+  it('waits for coherent inputs and never reapplies over saved or edited drafts', () => {
+    const ready = {
+      hasSourceTeam: true,
+      alreadyResolved: false,
+      hadSavedParticipants: false,
+      userEdited: false,
+      rosterReady: true,
+      settingsSettled: true,
+      rosterDraftsReady: true,
+    }
+    expect(decideSoccerFormationPrefill(ready)).toBe('apply')
+    expect(decideSoccerFormationPrefill({ ...ready, rosterReady: false })).toBe('wait')
+    expect(decideSoccerFormationPrefill({ ...ready, settingsSettled: false })).toBe('wait')
+    expect(decideSoccerFormationPrefill({ ...ready, rosterDraftsReady: false })).toBe('wait')
+    expect(decideSoccerFormationPrefill({ ...ready, alreadyResolved: true })).toBe('resolved')
+    expect(decideSoccerFormationPrefill({ ...ready, hadSavedParticipants: true })).toBe('skip_existing')
+    expect(decideSoccerFormationPrefill({ ...ready, userEdited: true })).toBe('skip_edited')
+    expect(decideSoccerFormationPrefill({ ...ready, hasSourceTeam: false })).toBe('skip_no_team')
   })
 })

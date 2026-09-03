@@ -1,6 +1,6 @@
 # Soccer S19 Team Formation Plan
 
-Status: approved implementation plan
+Status: implementation complete; migration and deployed verification pending
 
 Backlog: `S19` in
 [PLAN_SOC_FIELD_TEST_BACKLOG.md](PLAN_SOC_FIELD_TEST_BACKLOG.md)
@@ -378,7 +378,7 @@ S19B  Team Manage editor [implemented]
       Rules/Formation tabs, visual pitch, accessible slot list, picker,
       stale-player repair, read-only view, full-draft CAS/save/discard/clear
 
-S19C  Match setup prefill
+S19C  Match setup prefill [implemented]
       Coherent roster/settings load, one-time starter/role mapping,
       mismatch/stale warnings, regression docs and plan completion
 ```
@@ -391,9 +391,9 @@ round-trip the formation.
 
 S19A is implemented through migration `065`. Its verification map is
 [`REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md`](REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md).
-S19B is implemented in Team Manage. Migration `065` remains a hard deployment
-prerequisite for S19A/S19B team-setting saves. S19C is the next slice and owns
-one-time Player Setup prefill.
+S19B is implemented in Team Manage and S19C implements one-time Player Setup
+prefill. Migration `065` remains a hard deployment prerequisite for current
+team-setting saves and formation round-trip verification.
 
 ## 6. File Map
 
@@ -431,6 +431,12 @@ read-only rendering, and the existing full-draft CAS controls. See
 - `docs/PLAN_SOC_FIELD_TEST_BACKLOG.md`
 - `docs/REGRESSION_TESTING.md`
 - `docs/AGENT_CODEBASE_OVERVIEW.md` and `AGENTS.md` after implementation
+
+Implemented with a tested one-time readiness decision, independent cached/cloud
+team-settings consumption, coherent active-roster role loading, editable
+starter/broad-role mapping, and visible mismatch, unavailable-player, and
+settings-fallback notices. See
+[`REGRESSION_SOC_S19C_SETUP_PREFILL.md`](REGRESSION_SOC_S19C_SETUP_PREFILL.md).
 
 ## 7. Automated Coverage
 
