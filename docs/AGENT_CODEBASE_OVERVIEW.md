@@ -455,8 +455,9 @@ cleanup, and fail-closed broad-role setup mapping. Personal Soccer settings
 remain schema version 1; logical team settings now include
 `{ rules, formation }`, read legacy team version 1 as `formation: null`, and
 write team version 2. Migration 065 adds strict template/slot/UUID validation
-and coarse formation audit metadata. S19B owns the Team Manage editor and S19C
-owns one-time Player Setup prefill; see
+and coarse formation audit metadata; deploy it before or atomically with the
+S19A application because every current team save writes v2. S19B owns the Team
+Manage editor and S19C owns one-time Player Setup prefill; see
 `docs/REGRESSION_SOC_S19A_FORMATION_FOUNDATION.md`.
 
 SOC-6E1 centralizes release, discovery/new-game, and existing-record policy in

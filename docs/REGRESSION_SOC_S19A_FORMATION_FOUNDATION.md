@@ -34,11 +34,12 @@ The focused suite verifies:
 
 ## Migration
 
-Apply `supabase/migrations/065_soccer_team_formation.sql` before S19B is
-deployed. The migration is additive at the settings-contract layer: it keeps
-personal Soccer settings at schema version 1, keeps accepting legacy team
-version 1 `{ rules }`, and permits current team version 2
-`{ rules, formation }`.
+Apply `supabase/migrations/065_soccer_team_formation.sql` before or atomically
+with the S19A application deploy. From S19A onward, every Soccer team-settings
+save writes schema version 2; the pre-065 backend rejects both that version and
+its `{ rules, formation }` payload. The migration keeps personal Soccer
+settings at schema version 1, keeps accepting legacy team version 1 `{ rules }`,
+and permits current team version 2 `{ rules, formation }`.
 
 After applying it, confirm the migration completes without error. Existing
 team settings do not require a bulk update; their first explicit save from a

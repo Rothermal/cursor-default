@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { SOCCER_FORMATION_TEMPLATES } from './formation'
 
 const sql = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/065_soccer_team_formation.sql'),
@@ -29,6 +30,22 @@ describe('migration 065 soccer team formation contracts', () => {
     expect(sql).toContain('soccer formation player ids must be uuids')
     expect(sql).toContain('having count(*) > 1')
     expect(sql).toContain('soccer formation player may occupy only one slot')
+  })
+
+  it('keeps every SQL template slot list identical to the TypeScript catalog', () => {
+    const pairs = [...sql.matchAll(/when '([^']+)' then array\[([^\]]+)\]/g)]
+    const sqlSlots = Object.fromEntries(pairs.map(match => [
+      match[1],
+      match[2].split(',').map(value => value.trim().replace(/'/g, '')),
+    ]))
+
+    expect(Object.keys(sqlSlots)).toHaveLength(SOCCER_FORMATION_TEMPLATES.length)
+    for (const template of SOCCER_FORMATION_TEMPLATES) {
+      expect([template.id, sqlSlots[template.id]]).toEqual([
+        template.id,
+        template.slots.map(slot => slot.id),
+      ])
+    }
   })
 
   it('keeps revisioned manager authority and records only coarse formation audit metadata', () => {

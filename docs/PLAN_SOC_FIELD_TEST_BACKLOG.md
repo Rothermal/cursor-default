@@ -709,7 +709,7 @@ Use these labels before turning an item into an implementation plan:
 | Confirmed product request with open data/UX choices | `S15`, `S16` | Short Q&A, then a focused phase plan |
 | Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S21` | Run the linked regression rows during the next live or deployed test |
 | Approved implementation plan | `S17`, `S20` | Deliver from the linked focused execution plans |
-| Implementation in progress | `S19` | S19A is implemented through migration 065; apply it, then deliver S19B |
+| Implementation in progress | `S19` | Deploy migration 065 before/with S19A, then deliver S19B |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
 The `S12` repair preserves the shared editor route, and the `S14` repair keeps
@@ -726,7 +726,8 @@ exercise those constraints rather than bypass them.
   verification remains.
 - **Roster defaults:** `S11` is implemented; `S19A` provides the formation
   catalog and versioned team-settings foundation. Apply migration 065 before
-  implementing the S19B editor; S19C owns setup prefill.
+  or with the S19A application deploy; S19B owns the editor and S19C owns setup
+  prefill.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only

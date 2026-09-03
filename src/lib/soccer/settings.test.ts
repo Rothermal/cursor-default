@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SOCCER_PERSONAL_SETTINGS,
@@ -170,6 +172,17 @@ describe('soccer settings schema', () => {
       formation: target.formation,
     })
     expect(copySoccerTeamRules(target, source).formation).not.toBe(target.formation)
+  })
+
+  it('wires both Team Manage copy branches through rules-only copying', () => {
+    const panel = readFileSync(
+      resolve(process.cwd(), 'src/components/settings/SoccerTeamSettingsPanel.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+
+    expect(panel).toContain('setDraft(current => copySoccerTeamRules(current, null))')
+    expect(panel).toContain('setDraft(current => copySoccerTeamRules(current, parsed.value))')
+    expect(panel).not.toContain('setDraft(parsed.value)')
   })
 
   it('rejects unknown nested segment fields', () => {
