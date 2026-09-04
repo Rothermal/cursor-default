@@ -240,11 +240,6 @@ export default function SoccerFieldReview({
         event={editing}
         state={source.state}
         recorderUserId={recorderUserId}
-        selectedParticipantId={
-          source.state.sportGameState?.sportId === 'soccer'
-            ? source.state.sportGameState.capturePreferences.selectedParticipantId
-            : null
-        }
         busy={busy}
         onApply={onApply}
         onClose={() => setEditing(null)}

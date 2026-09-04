@@ -88,6 +88,23 @@ describe('Soccer match-readiness wiring', () => {
     expect(dialog).toContain('const mainSelection = normalizeSoccerIncidentActorSelection(')
   })
 
+  it('keeps Soccer event actor selection local and role-ordered', () => {
+    const tracker = source('src/pages/SoccerGameTracker.tsx')
+    const timeline = source('src/components/soccer/SoccerTimeline.tsx')
+    const editor = source('src/components/soccer/SoccerLocatedEventEditor.tsx')
+    const shotDialog = source('src/components/soccer/SoccerShotCaptureDialog.tsx')
+    const incidentDialog = source('src/components/soccer/SoccerIncidentCaptureDialog.tsx')
+
+    expect(tracker).not.toContain('PlayerChip')
+    expect(tracker).not.toContain('selectedParticipantId')
+    expect(timeline).not.toContain('selectedParticipantId')
+    expect(editor).not.toContain('selectedParticipantId')
+    expect(shotDialog).not.toContain('selectedParticipantId')
+    expect(incidentDialog).not.toContain('selectedParticipantId')
+    expect(shotDialog).toContain('sortSoccerActorParticipants(')
+    expect(incidentDialog).toContain('sortSoccerActorParticipants(')
+  })
+
   it('blocks healthy Soccer history from becoming incomplete while allowing recovery', () => {
     const tracker = source('src/pages/SoccerGameTracker.tsx')
 
