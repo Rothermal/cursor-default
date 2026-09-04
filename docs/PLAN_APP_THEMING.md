@@ -49,14 +49,17 @@ semantic tokens rather than Light/Dark checks scattered through components.
 Planning inventory at the time this document was written:
 
 - 157 TSX files and 35 routed page files.
-- 115 source files contain an explicit white utility.
-- 140 source files contain explicit slate utilities.
-- Approximate high-frequency utilities include 375 `bg-white`, 106
-  `bg-slate-50`, 395 `border-slate-200`, and hundreds of explicit slate text
+- 117 source files contain an explicit white utility.
+- 141 source files contain explicit slate utilities.
+- Approximate high-frequency utilities include 377 `bg-white`, 106
+  `bg-slate-50`, 396 `border-slate-200`, and hundreds of explicit slate text
   declarations.
 - `tailwind.config.js` has no semantic color aliases or dark-mode configuration.
 - `index.html` fixes the body to `bg-slate-50 text-slate-900` and has one static
   browser `theme-color`.
+- `vite.config.ts` separately fixes the generated web-app manifest's
+  `theme_color`; unlike the HTML meta element, installed-PWA manifest metadata is
+  not runtime-switchable.
 - `index.css` provides shared `.card` and `.input-field` classes, but both encode
   Light colors directly.
 - `SettingsProvider` mounts only after auth and app-access gates. An effect inside
@@ -99,27 +102,38 @@ cards, low-contrast text, Light inputs, and mismatched dialogs throughout the ap
 
 ### 5.1 Stored preference
 
-Extend device settings with a strict version-compatible value:
+Use a dedicated, versioned appearance record rather than nesting the preference
+inside the existing `statkeeper_settings` object:
 
 ```ts
 type AppThemePreference = 'light' | 'dark'
 
-interface AppSettings {
-  appearance: {
-    theme: AppThemePreference
-  }
-  // existing fields remain unchanged
+interface StoredAppearancePreference {
+  version: 1
+  theme: AppThemePreference
 }
+
+const APPEARANCE_STORAGE_KEY = 'statkeeper_appearance'
 ```
 
 Requirements:
 
 - Missing, malformed, or unsupported values resolve to `light`.
-- `mergeStoredSettings` preserves existing partial/deep-merge behavior.
-- The preference stays under `statkeeper_settings`; do not add it to parked-game
-  export, game storage, or cloud settings.
+- Do not store the preference under `statkeeper_settings`. Older cached clients
+  rebuild that object from a known-field whitelist and write it on mount, which
+  would silently erase an unknown `appearance` field. A dedicated key lets old
+  clients ignore and preserve the newer preference.
+- The appearance record is not part of parked-game export, game storage, full
+  settings rewrites, or cloud settings.
+- A presentation-only appearance provider should mount outside `AuthProvider` so
+  Auth, access gates, loading states, and authenticated routes share one runtime
+  value. The App settings page consumes that provider even though the preference
+  is physically stored separately from the other app settings.
 - Provide one strict parser and one application helper rather than duplicating
   storage/document mutations in components.
+- Test the downgrade/stale-client case directly: rewriting
+  `statkeeper_settings` must not remove `statkeeper_appearance` or change the
+  active theme.
 
 ### 5.2 Pre-React bootstrap
 
@@ -127,16 +141,18 @@ The document must know the theme before the module bundle and providers mount. A
 a tiny defensive bootstrap in the HTML head or an equivalent blocking entry script
 that:
 
-1. reads only the appearance preference from `statkeeper_settings`;
+1. reads only the appearance preference from `statkeeper_appearance`;
 2. treats every error or unknown value as Light;
 3. sets `data-theme="light|dark"` on `document.documentElement`;
 4. sets the matching CSS `color-scheme`;
-5. updates the browser/PWA `theme-color` to the active canvas/header color;
+5. updates the HTML `theme-color` meta element used by supporting browser chrome;
 6. never blocks app startup when storage is unavailable.
 
 The runtime setter applies the same document state synchronously. Bootstrap and
 runtime behavior need contract tests or shared constants so accepted values and
-colors cannot drift.
+colors cannot drift. The dedicated key is also the compatibility boundary: a
+cached pre-theming client may rewrite its own settings object, but cannot erase the
+new appearance record.
 
 ### 5.3 Semantic tokens
 
@@ -182,7 +198,12 @@ default migration path is token replacement.
 
 - Set `color-scheme` so native inputs, selects, scrollbars, and browser UI match.
 - Keep focus-visible treatment at least as clear as the current blue outline.
-- Update mobile browser/PWA theme color when preference changes.
+- Update the HTML `theme-color` meta element when preference changes so supporting
+  browser chrome follows the active theme.
+- Keep the generated web-app manifest's `theme_color` in `vite.config.ts` fixed to
+  one neutral color that works with both themes. Installed PWA splash/task-switcher
+  chrome is build-time manifest metadata and cannot be changed by the runtime
+  preference.
 - Ensure overscroll/root backgrounds do not reveal Light behind a Dark page.
 - Preserve reduced-motion behavior; theme switching should not animate the whole
   document or flash between palettes.
@@ -217,12 +238,13 @@ default migration path is token replacement.
 
 Goal: establish the contract without exposing an incomplete Dark experience.
 
-- Add strict Light/Dark settings parsing and defaults.
+- Add strict Light/Dark appearance-record parsing and defaults.
 - Add pre-React bootstrap and runtime document application helpers.
 - Add semantic CSS variables and Tailwind aliases.
 - Convert body/root, `.card`, `.input-field`, common buttons, segmented controls,
   confirmation dialogs, overlays, loading shells, and focus treatment.
-- Test missing/corrupt/legacy settings, persistence, document state, and theme color.
+- Test missing/corrupt/legacy appearance records, persistence, document state,
+  dynamic HTML theme color, and the fixed manifest-color contract.
 - Add a development-only way to force either theme for phase verification.
 - Keep the production Settings selector hidden.
 
@@ -353,11 +375,11 @@ Each implementation phase adds a focused regression document. THM-6 combines the
 Likely foundation files:
 
 - `index.html`
+- `vite.config.ts`
 - `tailwind.config.js`
 - `src/index.css`
-- `src/lib/settingsStorage.ts`
-- `src/context/SettingsContext.tsx`
-- a small presentation-only theme helper/context if THM-1 requires it
+- a small presentation-only appearance storage/helper module
+- a small appearance provider mounted outside `AuthProvider`
 - `src/pages/Admin.tsx` for the eventual Settings -> App control
 
 Large conversion areas are `src/pages/`, shared `src/components/`, shot charts,
@@ -381,7 +403,9 @@ No database migration is expected for the approved device-local first release.
 | Native inputs remain Light | Root `color-scheme` plus browser testing |
 | Theme dirties active games | Keep it outside GameState and fingerprints |
 | Future themes require a rewrite | Theme identifiers plus semantic tokens |
-| App/PWA browser chrome mismatches | Update theme-color at bootstrap and runtime |
+| Browser chrome mismatches | Update the HTML theme-color at bootstrap and runtime |
+| Installed PWA chrome cannot follow runtime choice | Pick one manifest theme color in `vite.config.ts` that is acceptable with both themes |
+| Stale cached client erases a newer preference | Store appearance under a dedicated key untouched by legacy settings rewrites |
 | Context overload | One coherent surface-family PR per phase |
 
 ---
