@@ -682,7 +682,8 @@ between seasons (already rejected), or season standings (`M1`).
 
 **Status:** confirmed correctness defect; highest-priority new item
 **Theme:** roster identity / cloud recovery
-**Where:** private event-platform v4 binding; Soccer cloud sync; roster removal
+**Where:** private event-platform v4 binding; Soccer cloud sync; Teams and
+Settings/Advanced permanent player deletion
 
 A locally intact Soccer game failed cloud binding after its source-team roster
 changed:
@@ -693,11 +694,18 @@ Soccer game binding failed: Participant source player is not on the source team
 
 The sanitized recovery export still contained 24 participant snapshots, 84
 events, and 14 referenced participants. The game-scoped history survived; a
-current-roster membership check prevented it from syncing. Normal Teams and
-Player Setup removal already marks `team_players.is_active = false`, and the
-current binder accepts inactive rows. Planning must therefore find any path
-that physically removes or remaps the membership row as well as correct the
-historical binding rule.
+current-roster membership check prevented it from syncing. The normal Teams
+**Remove** action marks `team_players.is_active = false`, and the current binder
+accepts inactive rows.
+
+The destructive path is confirmed. Teams `handleDeletePlayer` and
+Settings/Advanced `handleAdminDeletePlayer` hard-delete the shared `players`
+row. The `team_players.player_id` foreign key uses `ON DELETE CASCADE`, so every
+membership for that identity disappears. Neither player-delete handler checks
+active or parked unsynced games. By contrast, the neighboring team/game delete
+handlers already block destructive deletion when matching unsynced local work
+exists. The focused plan starts from this known asymmetry; it does not need to
+rediscover the reported mutation path.
 
 **Required direction:** a source roster is setup input, not mutable authority
 over an opened match. Preserve immutable participant display/number/identity
@@ -714,10 +722,11 @@ the source identity. A retry must preserve the event count, score, participant
 ids, and finalization state. Do not silently trust arbitrary client-supplied
 `source_player_id` values.
 
-**Acceptance seed:** cover roster deactivation/removal after opening lineup,
-minutes, substitution, and stat events; first bind versus already-bound sync;
-active and completed games; recovery export/import; and a successful retry
-with no duplicate participants or events.
+**Acceptance seed:** cover Teams and Settings/Advanced permanent deletion plus
+ordinary roster deactivation after opening lineup, minutes, substitution, and
+stat events; first bind versus already-bound sync; active and completed games;
+recovery export/import; and a successful retry with no duplicate participants
+or events.
 
 ### S23 - Team-level default starter and bench status
 
@@ -922,7 +931,7 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed correctness defect | `S22` | Reproduce current-roster mutation paths, then write a recovery/security plan |
+| Confirmed correctness defect | `S22` | Plan player-delete guards, durable historical binding, and recovery for already-affected games |
 | Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S23`, `S24` | Short Q&A where choices remain, then a focused phase plan |
 | Confirmed implementation direction | `S25` | Small Soccer slice plus a cross-sport inventory; retain sport-specific behavior and compatibility tests |
 | Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
