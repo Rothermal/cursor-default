@@ -1,5 +1,5 @@
 import { MapPin, MapPinOff, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type {
   GameEventActor,
   GameEventLocation,
@@ -13,6 +13,7 @@ import {
   soccerParticipantRoleAt,
   soccerParticipantWasOnFieldAt,
   soccerPeriodTimings,
+  sortSoccerActorParticipants,
   updateSoccerHistoryEvent,
   type SoccerCardEvent,
   type SoccerCardSanction,
@@ -21,6 +22,7 @@ import {
   type SoccerDisciplineCaptureChoice,
   type SoccerDisciplineLineupResolution,
   type SoccerDisciplineReason,
+  type SoccerEventMoment,
   type SoccerFoulEvent,
   type SoccerFoulRestart,
   type SoccerLiveResult,
@@ -59,10 +61,8 @@ interface SoccerIncidentCaptureDialogProps {
   draft: SoccerIncidentDraft | null
   state: GameState
   recorderUserId: string | null
-  selectedParticipantId: string | null
   busy: boolean
   onApply: (result: SoccerLiveResult) => boolean
-  onTrackedParticipantUsed: (participantId: string) => void
   onClose: () => void
 }
 
@@ -101,10 +101,8 @@ export default function SoccerIncidentCaptureDialog({
   draft,
   state,
   recorderUserId,
-  selectedParticipantId,
   busy,
   onApply,
-  onTrackedParticipantUsed,
   onClose,
 }: SoccerIncidentCaptureDialogProps) {
   const initializationDraft = useStableSoccerCorrectionDraft(draft)
@@ -149,17 +147,29 @@ export default function SoccerIncidentCaptureDialog({
   const selectedTiming = periodTimings.find(item => item.period.id === selectedPeriodId)
     ?? periodTimings[periodTimings.length - 1]
     ?? null
-  const moment = selectedTiming
+  const moment = useMemo(() => selectedTiming
     ? {
         period: selectedTiming.period,
         elapsedMs: selectedTiming.startElapsedMs + periodElapsedMs,
       }
-    : null
-  const eligibleParticipants = participants.filter(participant =>
-    mode === 'live'
-      ? participant.status === 'on_field'
-      : moment !== null && soccerParticipantWasOnFieldAt(participant, moment.period.id, moment.elapsedMs)
+    : null, [periodElapsedMs, selectedTiming])
+  const roleForEligibleParticipant = useCallback(
+    (participant: SoccerProjectedParticipant) => actorRoleAtMoment(
+      participant,
+      mode,
+      moment,
+      initialRoles
+    ),
+    [initialRoles, mode, moment]
   )
+  const eligibleParticipants = useMemo(() => sortSoccerActorParticipants(
+    participants.filter(participant =>
+      mode === 'live'
+        ? participant.status === 'on_field'
+        : moment !== null && soccerParticipantWasOnFieldAt(participant, moment.period.id, moment.elapsedMs)
+    ),
+    roleForEligibleParticipant
+  ), [mode, moment, participants, roleForEligibleParticipant])
   const selectedParticipant = participants.find(item => item.participantId === participantId) ?? null
   const selectedRole = selectedParticipant && moment
     ? soccerParticipantRoleAt(
@@ -255,7 +265,23 @@ export default function SoccerIncidentCaptureDialog({
     const initialTiming = periodTimings.find(item => item.period.id === event?.period.id)
       ?? periodTimings[periodTimings.length - 1]
       ?? null
-    const defaultParticipant = eligibleLiveParticipant(participants, selectedParticipantId)
+    const initialMoment = mode !== 'live' && initialTiming
+      ? {
+          period: initialTiming.period,
+          elapsedMs: event?.elapsedMs ?? initialTiming.endElapsedMs,
+        }
+      : null
+    const initialEligibleParticipants = sortSoccerActorParticipants(
+      participants.filter(participant => mode === 'live'
+        ? participant.status === 'on_field'
+        : initialMoment !== null && soccerParticipantWasOnFieldAt(
+            participant,
+            initialMoment.period.id,
+            initialMoment.elapsedMs
+          )),
+      participant => actorRoleAtMoment(participant, mode, initialMoment, initialRoles)
+    )
+    const defaultParticipant = initialEligibleParticipants[0] ?? null
     const eventSanction = event?.eventType === 'soccer.card'
       ? event.payload.sanction
       : event?.eventType === 'soccer.foul'
@@ -330,7 +356,7 @@ export default function SoccerIncidentCaptureDialog({
     setLocationEditorOpen(false)
     setFieldFlipped(false)
     setError(null)
-  }, [initializationDraft, periodTimings, participants, projection, selectedParticipantId])
+  }, [initialRoles, initializationDraft, mode, participants, periodTimings, projection])
 
   useEffect(() => {
     if (!disciplineApplies || !selectedRole) return
@@ -457,9 +483,6 @@ export default function SoccerIncidentCaptureDialog({
       return
     }
     if (!onApply(result)) return
-    if (mode === 'live' && teamSide === 'tracked' && attribution === 'participant') {
-      onTrackedParticipantUsed(participantId)
-    }
     onClose()
   }
 
@@ -725,11 +748,20 @@ function actorAttribution(actor: GameEventActor | null, allowStaff: boolean): At
   return 'unknown'
 }
 
-function eligibleLiveParticipant(participants: SoccerProjectedParticipant[], selectedParticipantId: string | null): SoccerProjectedParticipant | null {
-  return participants.find(item => item.participantId === selectedParticipantId && item.status === 'on_field')
-    ?? participants.find(item => item.status === 'on_field' && item.role.group !== 'goalkeeper')
-    ?? participants.find(item => item.status === 'on_field')
-    ?? null
+function actorRoleAtMoment(
+  participant: SoccerProjectedParticipant,
+  mode: 'live' | 'historical' | 'edit',
+  moment: SoccerEventMoment | null,
+  initialRoles: ReadonlyMap<string, SoccerRole>
+): SoccerRole {
+  return mode === 'live' || !moment
+    ? participant.role
+    : soccerParticipantRoleAt(
+        participant,
+        moment.period.id,
+        moment.elapsedMs,
+        initialRoles.get(participant.participantId)
+      )
 }
 
 function recentOpponentLabels(state: GameState): string[] {

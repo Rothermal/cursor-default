@@ -46,9 +46,7 @@ interface SoccerTimelineProps {
   busy: boolean
   onApply: (result: SoccerLiveResult) => boolean
   recorderUserId: string | null
-  selectedParticipantId?: string | null
   defaultTeamSide?: SoccerTeamSide
-  onTrackedParticipantUsed?: (participantId: string) => void
   allowAddEvent?: boolean
   readOnly?: boolean
   presentation?: 'live' | 'review'
@@ -80,9 +78,7 @@ export default function SoccerTimeline({
   busy,
   onApply,
   recorderUserId,
-  selectedParticipantId = null,
   defaultTeamSide = 'tracked',
-  onTrackedParticipantUsed = () => {},
   allowAddEvent = true,
   readOnly = false,
   presentation = 'live',
@@ -304,10 +300,8 @@ export default function SoccerTimeline({
         draft={captureDraft}
         state={state}
         recorderUserId={recorderUserId}
-        selectedParticipantId={selectedParticipantId}
         busy={busy}
         onApply={onApply}
-        onTrackedParticipantUsed={onTrackedParticipantUsed}
         onClose={() => setCaptureDraft(null)}
       />
 
@@ -315,10 +309,8 @@ export default function SoccerTimeline({
         event={locatedEditing}
         state={state}
         recorderUserId={recorderUserId}
-        selectedParticipantId={selectedParticipantId}
         busy={busy}
         onApply={onApply}
-        onTrackedParticipantUsed={onTrackedParticipantUsed}
         onClose={() => setLocatedEditing(null)}
       />
 
@@ -326,10 +318,8 @@ export default function SoccerTimeline({
         draft={incidentDraft}
         state={state}
         recorderUserId={recorderUserId}
-        selectedParticipantId={selectedParticipantId}
         busy={busy}
         onApply={onApply}
-        onTrackedParticipantUsed={onTrackedParticipantUsed}
         onClose={() => setIncidentDraft(null)}
       />
 

@@ -402,9 +402,10 @@ roles in the existing team-scoped `team_players.position` field and snapshots th
 cloud-team participant drafts; setup and live role changes remain match-only. Untouched legacy text
 reads as Midfielder without being normalized by unrelated saves, and the merge conflict editor uses
 the same strict Soccer choices. Already-loaded rosters remain usable offline and failed required
-cloud loads expose Retry. S3 keeps capture-side, player, and mode controls above the live pitch,
-moves quick capture directly below it, and collapses marker review filters below both while exposing
-the active scope in the summary. Cloud teams are read-only roster
+cloud loads expose Retry. S3 keeps capture-side and mode controls above the live pitch, moves quick
+capture directly below it, and collapses marker review filters below both while exposing the active
+scope in the summary. S25 removes the redundant sticky player row; Soccer event sheets now own actor
+selection and role-order choices for the event's live or historical moment. Cloud teams are read-only roster
 sources; SOC-5A mirrors healthy local event streams, SOC-5B resumes the same recorder from cloud,
 and SOC-5C lets additional authorized team recorders start independent streams against the same
 game while viewers inspect only the primary stream. SOC-5D review resolves the active canonical

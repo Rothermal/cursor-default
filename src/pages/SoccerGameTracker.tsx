@@ -210,35 +210,6 @@ export default function SoccerGameTracker() {
     if (!result.ok) setError(result.reason)
   }
 
-  useEffect(() => {
-    if (!soccerState || !projection) return
-    const preferences = soccerState.capturePreferences
-    const onFieldParticipants = Object.values(projection.participants)
-      .filter(participant => participant.status === 'on_field')
-    if (!preferences.selectionInitialized) {
-      const initial = onFieldParticipants.find(participant => participant.role.group !== 'goalkeeper')
-        ?? onFieldParticipants[0]
-        ?? null
-      dispatch({
-        type: 'SET_SOCCER_CAPTURE_PREFERENCES',
-        preferences: {
-          selectedParticipantId: initial?.participantId ?? null,
-          selectionInitialized: true,
-        },
-      })
-      return
-    }
-    if (
-      preferences.selectedParticipantId &&
-      !onFieldParticipants.some(participant => participant.participantId === preferences.selectedParticipantId)
-    ) {
-      dispatch({
-        type: 'SET_SOCCER_CAPTURE_PREFERENCES',
-        preferences: { selectedParticipantId: null },
-      })
-    }
-  }, [dispatch, projection, soccerState])
-
   const inspection = useMemo(() => inspectSoccerHistory(state), [state])
   const clockValue = soccerClockDisplayValue(state, nowMs)
   const segments = projection ? orderedSoccerSegments(projection.currentRules) : []
@@ -581,32 +552,6 @@ export default function SoccerGameTracker() {
                 <ModeButton active={capturePreferences.teamSide === 'opponent'} label="Opponent" onClick={() => setCaptureSide('opponent')} />
               </div>
 
-              {capturePreferences.teamSide === 'tracked' && (
-                <div className="-mx-4 w-[calc(100%+2rem)] max-w-[calc(100%+2rem)] overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <div className="flex min-w-max gap-2">
-                    <PlayerChip
-                      active={capturePreferences.selectedParticipantId === null}
-                      label="Team"
-                      onClick={() => dispatch({
-                        type: 'SET_SOCCER_CAPTURE_PREFERENCES',
-                        preferences: { selectedParticipantId: null, selectionInitialized: true },
-                      })}
-                    />
-                    {onField.map(participant => (
-                      <PlayerChip
-                        key={participant.participantId}
-                        active={capturePreferences.selectedParticipantId === participant.participantId}
-                        label={`${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`}
-                        onClick={() => dispatch({
-                          type: 'SET_SOCCER_CAPTURE_PREFERENCES',
-                          preferences: { selectedParticipantId: participant.participantId, selectionInitialized: true },
-                        })}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div>
                 <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Field capture</p>
                 <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
@@ -763,12 +708,7 @@ export default function SoccerGameTracker() {
               busy={isApplying}
               onApply={applyResult}
               recorderUserId={user?.id ?? null}
-              selectedParticipantId={capturePreferences.selectedParticipantId}
               defaultTeamSide={capturePreferences.teamSide}
-              onTrackedParticipantUsed={participantId => dispatch({
-                type: 'SET_SOCCER_CAPTURE_PREFERENCES',
-                preferences: { selectedParticipantId: participantId, selectionInitialized: true },
-              })}
               allowAddEvent={!projection.shootout}
               readOnly={cloudFinal}
             />
@@ -806,13 +746,8 @@ export default function SoccerGameTracker() {
         draft={captureDraft}
         state={state}
         recorderUserId={user?.id ?? null}
-        selectedParticipantId={capturePreferences.selectedParticipantId}
         busy={isApplying}
         onApply={applyResult}
-        onTrackedParticipantUsed={participantId => dispatch({
-          type: 'SET_SOCCER_CAPTURE_PREFERENCES',
-          preferences: { selectedParticipantId: participantId, selectionInitialized: true },
-        })}
         onClose={() => setCaptureDraft(null)}
       />
 
@@ -820,13 +755,8 @@ export default function SoccerGameTracker() {
         draft={incidentDraft}
         state={state}
         recorderUserId={user?.id ?? null}
-        selectedParticipantId={capturePreferences.selectedParticipantId}
         busy={isApplying}
         onApply={applyResult}
-        onTrackedParticipantUsed={participantId => dispatch({
-          type: 'SET_SOCCER_CAPTURE_PREFERENCES',
-          preferences: { selectedParticipantId: participantId, selectionInitialized: true },
-        })}
         onClose={() => setIncidentDraft(null)}
       />
 
@@ -1015,10 +945,6 @@ function TabButton({ active, label, icon, onClick }: { active: boolean; label: s
 
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
-}
-
-function PlayerChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`h-9 max-w-44 truncate rounded-md border px-3 text-xs font-bold ${active ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>{label}</button>
 }
 
 function QuickCaptureButton({ label, icon, disabled, onClick }: { label: string; icon: ReactNode; disabled: boolean; onClick: () => void }) {

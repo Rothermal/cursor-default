@@ -32,9 +32,6 @@ export default function SoccerReviewTimeline({
           busy={busy}
           onApply={onApply}
           recorderUserId={recorderUserId}
-          selectedParticipantId={
-            soccerState?.capturePreferences.selectedParticipantId ?? null
-          }
           defaultTeamSide={soccerState?.capturePreferences.teamSide ?? 'tracked'}
           allowAddEvent={!soccerState?.projection.shootout}
           readOnly={!editable}

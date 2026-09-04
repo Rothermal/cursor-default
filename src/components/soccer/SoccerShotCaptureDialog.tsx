@@ -1,5 +1,5 @@
 import { MapPin, MapPinOff, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { GameEventActor, GameEventLocation } from '../../lib/gameEvents/types'
 import {
   inspectSoccerHistory,
@@ -15,11 +15,14 @@ import {
   soccerParticipantWasOnFieldAt,
   soccerPeriodTimings,
   soccerShotSourceCandidates,
+  sortSoccerActorParticipants,
   type SoccerCaptureActorSelection,
   type SoccerEventMoment,
   type SoccerLiveResult,
   type SoccerMatchEvent,
   type SoccerOwnGoalEvent,
+  type SoccerProjectedParticipant,
+  type SoccerRole,
   type SoccerShotOutcome,
   type SoccerShotEvent,
   type SoccerShotSituation,
@@ -42,10 +45,8 @@ interface SoccerShotCaptureDialogProps {
   draft: SoccerCaptureDraft | null
   state: GameState
   recorderUserId: string | null
-  selectedParticipantId: string | null
   busy: boolean
   onApply: (result: SoccerLiveResult) => boolean
-  onTrackedParticipantUsed: (participantId: string) => void
   onClose: () => void
 }
 
@@ -69,10 +70,8 @@ export default function SoccerShotCaptureDialog({
   draft,
   state,
   recorderUserId,
-  selectedParticipantId,
   busy,
   onApply,
-  onTrackedParticipantUsed,
   onClose,
 }: SoccerShotCaptureDialogProps) {
   const initializationDraft = useStableSoccerCorrectionDraft(draft)
@@ -141,29 +140,52 @@ export default function SoccerShotCaptureDialog({
       : [],
     [allParticipants, moment]
   )
-  const historicalGoalkeeper = moment
-    ? historicalParticipants.find(participant => soccerParticipantRoleAt(
-        participant,
-        moment.period.id,
-        moment.elapsedMs,
-        initialRoles.get(participant.participantId)
-      ).group === 'goalkeeper') ?? null
-    : null
-  const goalkeeper = mode === 'live'
-    ? onField.find(participant => participant.role.group === 'goalkeeper') ?? null
-    : historicalGoalkeeper
-  const selectableParticipants = mode === 'live' ? onField : historicalParticipants
-  const selectableGoalkeepers = mode === 'live'
-    ? onField.filter(participant => participant.role.group === 'goalkeeper')
-    : historicalGoalkeeper ? [historicalGoalkeeper] : []
+  const roleForSelectableParticipant = useCallback(
+    (participant: SoccerProjectedParticipant) => actorRoleAtMoment(
+      participant,
+      mode,
+      moment,
+      initialRoles
+    ),
+    [initialRoles, mode, moment]
+  )
+  const selectableParticipants = useMemo(() => sortSoccerActorParticipants(
+    mode === 'live' ? onField : historicalParticipants,
+    roleForSelectableParticipant
+  ), [historicalParticipants, mode, onField, roleForSelectableParticipant])
+  const selectableGoalkeepers = selectableParticipants.filter(
+    participant => roleForSelectableParticipant(participant).group === 'goalkeeper'
+  )
+  const goalkeeper = selectableGoalkeepers[0] ?? null
+  const historicalGoalkeeper = mode === 'live' ? null : goalkeeper
 
   useEffect(() => {
     if (!initializationDraft) return
     const event = initializationDraft.event
-    const selectedIsOnField = onField.some(participant => participant.participantId === selectedParticipantId)
-    const defaultParticipantId = selectedIsOnField
-      ? selectedParticipantId ?? ''
-      : onField.find(participant => participant.role.group !== 'goalkeeper')?.participantId ?? onField[0]?.participantId ?? ''
+    const initialTiming = periodTimings.find(item => item.period.id === event?.period.id)
+      ?? periodTimings[periodTimings.length - 1]
+      ?? null
+    const initialMoment = mode !== 'live' && initialTiming
+      ? {
+          period: initialTiming.period,
+          elapsedMs: event?.elapsedMs ?? initialTiming.endElapsedMs,
+        }
+      : null
+    const initialParticipants = sortSoccerActorParticipants(
+      mode === 'live'
+        ? onField
+        : initialMoment
+          ? allParticipants.filter(participant => soccerParticipantWasOnFieldAt(
+              participant,
+              initialMoment.period.id,
+              initialMoment.elapsedMs
+            ))
+          : [],
+      participant => actorRoleAtMoment(participant, mode, initialMoment, initialRoles)
+    )
+    const defaultParticipantId = initialParticipants.find(
+      participant => actorRoleAtMoment(participant, mode, initialMoment, initialRoles).group !== 'goalkeeper'
+    )?.participantId ?? initialParticipants[0]?.participantId ?? ''
     const shot = event?.eventType === 'soccer.shot' ? event : null
     const ownGoalEvent = event?.eventType === 'soccer.own_goal' ? event : null
     const shooter = shot ? actorForRole(shot, 'shooter') : null
@@ -172,9 +194,6 @@ export default function SoccerShotCaptureDialog({
     const blocker = shot ? actorForRole(shot, 'blocker') : null
     const linkedGoalkeeper = event ? actorForRole(event, 'goalkeeper') : null
     const ownGoalBy = ownGoalEvent ? actorForRole(ownGoalEvent, 'own_goal_by') : null
-    const initialTiming = periodTimings.find(item => item.period.id === event?.period.id)
-      ?? periodTimings[periodTimings.length - 1]
-      ?? null
     setTeamSide(event?.teamSide ?? initializationDraft.teamSide)
     setOutcome(shot?.payload.outcome ?? (ownGoalEvent ? 'goal' : initializationDraft.outcome ?? null))
     setSituation(shot?.payload.situation ?? 'open_play')
@@ -193,7 +212,7 @@ export default function SoccerShotCaptureDialog({
     setOpponentBlockerLabel(opponentLabel(blocker, ''))
     setOpponentGoalkeeperLabel(opponentLabel(linkedGoalkeeper, ''))
     setTrackedGoalkeeperId(linkedGoalkeeper?.participantId ?? (mode === 'live'
-      ? onField.find(participant => participant.role.group === 'goalkeeper')?.participantId ?? ''
+      ? initialParticipants.find(participant => participant.role.group === 'goalkeeper')?.participantId ?? ''
       : ''))
     setOwnGoalParticipantId(ownGoalBy?.participantId ?? defaultParticipantId)
     setOpponentOwnGoalLabel(opponentLabel(ownGoalBy, 'Unknown opponent'))
@@ -204,7 +223,7 @@ export default function SoccerShotCaptureDialog({
     setLocationEditorOpen(false)
     setLocationFieldFlipped(false)
     setError(null)
-  }, [initializationDraft, mode, onField, periodTimings, selectedParticipantId])
+  }, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings])
 
   useEffect(() => {
     if (initializationDraft && !trackedGoalkeeperId && goalkeeper) {
@@ -214,13 +233,10 @@ export default function SoccerShotCaptureDialog({
 
   useEffect(() => {
     if (!initializationDraft || mode === 'live' || !moment) return
-    const validIds = new Set(historicalParticipants.map(participant => participant.participantId))
-    const fallbackId = historicalParticipants.find(participant => soccerParticipantRoleAt(
-      participant,
-      moment.period.id,
-      moment.elapsedMs,
-      initialRoles.get(participant.participantId)
-    ).group !== 'goalkeeper')?.participantId ?? historicalParticipants[0]?.participantId ?? ''
+    const validIds = new Set(selectableParticipants.map(participant => participant.participantId))
+    const fallbackId = selectableParticipants.find(
+      participant => roleForSelectableParticipant(participant).group !== 'goalkeeper'
+    )?.participantId ?? selectableParticipants[0]?.participantId ?? ''
     setTrackedShooterId(current => current === '__team__' || validIds.has(current) ? current : fallbackId || '__team__')
     setOwnGoalParticipantId(current => validIds.has(current) ? current : fallbackId)
     setPrimaryCreatorId(current => validIds.has(current) ? current : '')
@@ -229,7 +245,7 @@ export default function SoccerShotCaptureDialog({
     setTrackedGoalkeeperId(current => current && validIds.has(current) && current === historicalGoalkeeper?.participantId
       ? current
       : historicalGoalkeeper?.participantId ?? '')
-  }, [historicalGoalkeeper, historicalParticipants, initialRoles, initializationDraft, mode, moment])
+  }, [historicalGoalkeeper, initializationDraft, mode, moment, roleForSelectableParticipant, selectableParticipants])
 
   if (!draft || !projection) return null
 
@@ -370,9 +386,6 @@ export default function SoccerShotCaptureDialog({
       return
     }
     if (!onApply(result)) return
-    if (mode === 'live' && !ownGoal && teamSide === 'tracked' && trackedShooterId !== '__team__') {
-      onTrackedParticipantUsed(trackedShooterId)
-    }
     onClose()
   }
 
@@ -669,6 +682,22 @@ function penaltyMark(direction: 'left_to_right' | 'right_to_left'): GameEventLoc
 
 function oppositeDirection(direction: 'left_to_right' | 'right_to_left'): 'left_to_right' | 'right_to_left' {
   return direction === 'left_to_right' ? 'right_to_left' : 'left_to_right'
+}
+
+function actorRoleAtMoment(
+  participant: SoccerProjectedParticipant,
+  mode: 'live' | 'historical' | 'edit',
+  moment: SoccerEventMoment | null,
+  initialRoles: ReadonlyMap<string, SoccerRole>
+): SoccerRole {
+  return mode === 'live' || !moment
+    ? participant.role
+    : soccerParticipantRoleAt(
+        participant,
+        moment.period.id,
+        moment.elapsedMs,
+        initialRoles.get(participant.participantId)
+      )
 }
 
 function opponentLabels(state: GameState): string[] {

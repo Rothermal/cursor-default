@@ -17,10 +17,8 @@ interface SoccerLocatedEventEditorProps {
   event: GameEvent | null
   state: GameState
   recorderUserId: string | null
-  selectedParticipantId?: string | null
   busy: boolean
   onApply: (result: SoccerLiveResult) => boolean
-  onTrackedParticipantUsed?: (participantId: string) => void
   onClose: () => void
 }
 
@@ -28,10 +26,8 @@ export default function SoccerLocatedEventEditor({
   event,
   state,
   recorderUserId,
-  selectedParticipantId = null,
   busy,
   onApply,
-  onTrackedParticipantUsed = () => {},
   onClose,
 }: SoccerLocatedEventEditorProps) {
   const shotDraft = useMemo<SoccerCaptureDraft | null>(() => {
@@ -65,10 +61,8 @@ export default function SoccerLocatedEventEditor({
         draft={shotDraft}
         state={state}
         recorderUserId={recorderUserId}
-        selectedParticipantId={selectedParticipantId}
         busy={busy}
         onApply={onApply}
-        onTrackedParticipantUsed={onTrackedParticipantUsed}
         onClose={onClose}
       />
     )
@@ -80,10 +74,8 @@ export default function SoccerLocatedEventEditor({
       draft={incidentDraft}
       state={state}
       recorderUserId={recorderUserId}
-      selectedParticipantId={selectedParticipantId}
       busy={busy}
       onApply={onApply}
-      onTrackedParticipantUsed={onTrackedParticipantUsed}
       onClose={onClose}
     />
   )

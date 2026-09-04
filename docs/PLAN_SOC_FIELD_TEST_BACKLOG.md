@@ -772,7 +772,7 @@ live drag-and-drop position tracker.
 
 ### S25 - Cross-sport event-owned actor selection and role ordering
 
-**Status:** confirmed implementation direction
+**Status:** Soccer slice implemented; cross-sport inventory remains
 **Theme:** live-surface density / actor selection
 **Where:** above-pitch or above-court player defaults; event actor pickers
 
@@ -792,6 +792,15 @@ context, but that state must not silently preselect an event actor.
 For Soccer, remove the above-pitch player selector and tolerate legacy
 serialized `selectedParticipantId` preferences for compatibility without using
 them to preselect future live events.
+
+**Implemented Soccer direction:** the player bar and its initialization/update
+effects are removed. Tracker, Timeline, field review, and located-event editing
+no longer pass a sticky participant through the capture stack. The version-1
+preference fields remain parseable for parked/imported compatibility but have
+no live actor-selection authority. `sortSoccerActorParticipants` owns copied,
+deterministic role/jersey/name/id ordering; shot and incident sheets use current
+roles in live capture and historical roles at the edited event moment. See
+[`REGRESSION_SOC_S25_ACTOR_SELECTION.md`](REGRESSION_SOC_S25_ACTOR_SELECTION.md).
 
 Tracked-player options in Soccer event capture and edit sheets sort by the
 role at that event moment:
@@ -933,7 +942,7 @@ Use these labels before turning an item into an implementation plan:
 |---|---|---|
 | Confirmed correctness defect | `S22` | Plan player-delete guards, durable historical binding, and recovery for already-affected games |
 | Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S23`, `S24` | Short Q&A where choices remain, then a focused phase plan |
-| Confirmed implementation direction | `S25` | Small Soccer slice plus a cross-sport inventory; retain sport-specific behavior and compatibility tests |
+| Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
 | Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
 | Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S19`, `S21` | Run the linked regression rows during the next live or deployed test |
 | Approved implementation plan | `S17`, `S20` | Deliver from the linked focused execution plans |
@@ -949,8 +958,9 @@ exercise those constraints rather than bypass them.
   verification remains. `S22` is the next correctness plan and must preserve
   server-side identity/access validation while making game snapshots durable.
 - **Field shell:** `S2` + `S3` + `S18` are implemented with room for later
-  `S4`, `S6`, and `S10`. `S25` is a focused density/ordering follow-up and does
-  not need to wait for the larger fast-capture redesign.
+  `S4`, `S6`, and `S10`. The Soccer slice of `S25` removes the redundant player
+  row and role-orders event actor lists; deployed verification remains. The
+  cross-sport inventory does not need to block this smaller improvement.
 - **Cross-sport live labels:** `S26` shares display resolution across sports but
   needs additive immutable match labels before compact controls stop saying
   Tracked/Opponent. Keep it separate from `S25` actor selection.
@@ -1046,7 +1056,8 @@ Broader Basketball event work continues in
   its actor, with Soccer player options ordered Forward, Midfielder, Defender,
   Goalkeeper, then Custom. Apply the event-owned actor rule to every sport,
   while preserving controls with an independent filtering or stat-context job.
-  Other sports define their own role order (`S25`).
+  The Soccer slice is implemented; other sports define their own role order
+  when their live UI is reviewed (`S25`).
 - Keep `tracked` and `opponent` as internal values, but display team nicknames
   on live side selectors in every sport. Tracked cloud teams already have a
   nickname; setup needs to freeze it, and opponents need an optional
