@@ -103,6 +103,18 @@ describe('Soccer match-readiness wiring', () => {
     expect(incidentDialog).not.toContain('selectedParticipantId')
     expect(shotDialog).toContain('sortSoccerActorParticipants(')
     expect(incidentDialog).toContain('sortSoccerActorParticipants(')
+    expect(shotDialog).toContain(
+      '}, [allParticipants, initialRoles, initializationDraft, mode, onField, periodTimings])'
+    )
+    expect(incidentDialog).toContain(
+      '}, [initialRoles, initializationDraft, mode, participants, periodTimings, projection])'
+    )
+    expect(shotDialog).not.toContain(
+      '}, [initialRoles, initializationDraft, mode, moment, onField, periodTimings, selectableParticipants])'
+    )
+    expect(incidentDialog).not.toContain(
+      '}, [eligibleParticipants, initializationDraft, periodTimings, projection])'
+    )
   })
 
   it('blocks healthy Soccer history from becoming incomplete while allowing recovery', () => {

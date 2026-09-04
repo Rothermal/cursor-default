@@ -1,5 +1,5 @@
 import { MapPin, MapPinOff, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type {
   GameEventActor,
   GameEventLocation,
@@ -22,6 +22,7 @@ import {
   type SoccerDisciplineCaptureChoice,
   type SoccerDisciplineLineupResolution,
   type SoccerDisciplineReason,
+  type SoccerEventMoment,
   type SoccerFoulEvent,
   type SoccerFoulRestart,
   type SoccerLiveResult,
@@ -152,21 +153,23 @@ export default function SoccerIncidentCaptureDialog({
         elapsedMs: selectedTiming.startElapsedMs + periodElapsedMs,
       }
     : null, [periodElapsedMs, selectedTiming])
+  const roleForEligibleParticipant = useCallback(
+    (participant: SoccerProjectedParticipant) => actorRoleAtMoment(
+      participant,
+      mode,
+      moment,
+      initialRoles
+    ),
+    [initialRoles, mode, moment]
+  )
   const eligibleParticipants = useMemo(() => sortSoccerActorParticipants(
     participants.filter(participant =>
       mode === 'live'
         ? participant.status === 'on_field'
         : moment !== null && soccerParticipantWasOnFieldAt(participant, moment.period.id, moment.elapsedMs)
     ),
-    participant => mode === 'live' || !moment
-      ? participant.role
-      : soccerParticipantRoleAt(
-          participant,
-          moment.period.id,
-          moment.elapsedMs,
-          initialRoles.get(participant.participantId)
-        )
-  ), [initialRoles, mode, moment, participants])
+    roleForEligibleParticipant
+  ), [mode, moment, participants, roleForEligibleParticipant])
   const selectedParticipant = participants.find(item => item.participantId === participantId) ?? null
   const selectedRole = selectedParticipant && moment
     ? soccerParticipantRoleAt(
@@ -262,7 +265,23 @@ export default function SoccerIncidentCaptureDialog({
     const initialTiming = periodTimings.find(item => item.period.id === event?.period.id)
       ?? periodTimings[periodTimings.length - 1]
       ?? null
-    const defaultParticipant = eligibleParticipants[0] ?? null
+    const initialMoment = mode !== 'live' && initialTiming
+      ? {
+          period: initialTiming.period,
+          elapsedMs: event?.elapsedMs ?? initialTiming.endElapsedMs,
+        }
+      : null
+    const initialEligibleParticipants = sortSoccerActorParticipants(
+      participants.filter(participant => mode === 'live'
+        ? participant.status === 'on_field'
+        : initialMoment !== null && soccerParticipantWasOnFieldAt(
+            participant,
+            initialMoment.period.id,
+            initialMoment.elapsedMs
+          )),
+      participant => actorRoleAtMoment(participant, mode, initialMoment, initialRoles)
+    )
+    const defaultParticipant = initialEligibleParticipants[0] ?? null
     const eventSanction = event?.eventType === 'soccer.card'
       ? event.payload.sanction
       : event?.eventType === 'soccer.foul'
@@ -337,7 +356,7 @@ export default function SoccerIncidentCaptureDialog({
     setLocationEditorOpen(false)
     setFieldFlipped(false)
     setError(null)
-  }, [eligibleParticipants, initializationDraft, periodTimings, projection])
+  }, [initialRoles, initializationDraft, mode, participants, periodTimings, projection])
 
   useEffect(() => {
     if (!disciplineApplies || !selectedRole) return
@@ -727,6 +746,22 @@ function actorAttribution(actor: GameEventActor | null, allowStaff: boolean): At
   if (actor.kind === 'team') return 'team'
   if (allowStaff && actor.kind === 'staff') return 'staff'
   return 'unknown'
+}
+
+function actorRoleAtMoment(
+  participant: SoccerProjectedParticipant,
+  mode: 'live' | 'historical' | 'edit',
+  moment: SoccerEventMoment | null,
+  initialRoles: ReadonlyMap<string, SoccerRole>
+): SoccerRole {
+  return mode === 'live' || !moment
+    ? participant.role
+    : soccerParticipantRoleAt(
+        participant,
+        moment.period.id,
+        moment.elapsedMs,
+        initialRoles.get(participant.participantId)
+      )
 }
 
 function recentOpponentLabels(state: GameState): string[] {
