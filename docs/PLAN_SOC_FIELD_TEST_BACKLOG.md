@@ -1,7 +1,7 @@
 # Soccer Field-Test Backlog
 
-Status: living inventory after first live matches. Owner-confirmed items are
-`S2`, `S3`, `S11`–`S21`. This is not an implementation plan.
+Status: living inventory after live matches. Owner-confirmed items are `S2`,
+`S3`, `S6`, `S7`, `S9`, and `S11`–`S26`. This is not an implementation plan.
 
 Soccer SOC-1 through SOC-6E3 are implemented. The next soccer work is no longer "finish
 the first release." It is the same kind of post-use backlog basketball used after court
@@ -21,6 +21,9 @@ Track issues and future StatKeeper features that first soccer matches make visib
 
 - `S*` items are near-term product gaps in the shipped tracker, lineup, clock, and
   summary. They do not change the event-authoritative model.
+- `S25` and `S26` originate in Soccer field testing but establish cross-sport
+  live-capture conventions. Each sport still owns its role vocabulary and any
+  controls that serve a second sport-specific purpose.
 - `M*` items are SOC-0 / SOC-6 deferred modules. They stay out of the first soccer
   release and need their own phase plan if promoted.
 - Do not reopen SOC-0 through SOC-6 high-level decisions unless an item explicitly
@@ -142,7 +145,9 @@ are review controls; they do not need to stay expanded while recording.
 pitch and quick capture now precede a collapsed, native Marker filters
 disclosure. Marker meaning and saved filter state did not change. The broader
 `S2` substitution/action-shell work now adds a primary Field-tab action and
-scalable overflow without moving review controls above the pitch.
+scalable overflow without moving review controls above the pitch. Second-match
+evidence supersedes the visible-player part of this layout: `S25` removes that
+bar because each event sheet already owns actor selection.
 
 **Not this item:** application-wide reskin (`M14`).
 
@@ -185,24 +190,39 @@ season merges (still forbidden).
 
 ### S6 - Sideline clock correction
 
-**Status:** proposed  
+**Status:** confirmed product request; focused plan required
 **Theme:** clock  
-**Where:** scoreboard Start/Pause; overflow `Correct clock`
+**Where:** `prepareSoccerKickoff`; scoreboard Start/Pause; overflow
+`Correct clock`
 
 Start/Pause and End Period are on the scoreboard. Added time, a late pause,
 or a one-minute drift requires the overflow dialog. Youth matches do this
 often.
 
-**Likely direction:** keep exact clock correction; add a short path for
-common adjustments (nudge, mark added time) without hiding the current
-dialog.
+Second-match evidence adds two concrete failures. Kickoff currently appends
+Opening Lineup, Period Start, and Clock Start atomically, so the clock runs as
+soon as setup navigates to the tracker. The exact correction field displays
+`MM:SS` but requests `inputMode="numeric"`; common mobile keypads therefore
+provide no colon even though the parser expects one.
+
+**Likely direction:** starting the match establishes the opening lineup and
+first period with the clock paused at zero. The recorder explicitly presses
+Start, matching Basketball. Keep exact correction, but use separate minute and
+second controls or another keypad-safe input that does not require typing a
+colon. Add a short path for common adjustments only after the exact path is
+reliable. Opening-lineup minutes must not accrue before the explicit start.
+
+**Planning note:** changing kickoff affects event order, fresh recorder-stream
+creation, participation intervals, finalization tests, and every fixture that
+currently assumes `clock_started` is kickoff event three. Existing streams are
+historical truth and must not be rewritten.
 
 **Not this item:** inferred possession (`M9`) or automatic referee-clock
 sync.
 
 ### S7 - Offer the last restart as the next shot source
 
-**Status:** proposed  
+**Status:** confirmed product request; focused plan required
 **Theme:** set-piece linking  
 **Where:** `sourceEventId` on attacking events; live Goal/Shot sheets
 
@@ -211,9 +231,16 @@ Fouls already store a restart. Shots already accept an optional
 penalty" the default next step, so first-match set pieces are easy to
 record as unrelated open-play shots.
 
+Second-match examples make the desired presentation explicit: foul -> penalty
+kick -> goal, and corner -> header -> goal/save/miss should read as one linked
+sequence while preserving the actor, location, and detail of each event.
+
 **Likely direction:** after a located corner, penalty foul, or direct free
-kick, the next shot sheet defaults situation and source to that restart.
-The recorder can clear it.
+kick, the next shot sheet defaults situation and source to that restart. The
+recorder can clear it. First implement and display the relationship already
+representable by `sourceEventId`. During planning, determine whether that link
+is sufficient for sequence presentation before introducing a broader capture
+group or chain identifier. Header remains optional metadata under `S15`.
 
 **Not this item:** implementing new restart capture. That belongs to `S17` /
 `S20` and the dedicated restart plan.
@@ -235,17 +262,33 @@ that reuse `SoccerLiveActionDialog`.
 
 ### S9 - Persist field orientation
 
-**Status:** proposed  
-**Theme:** settings / parked match  
-**Where:** `fieldFlipped` in `SoccerGameTracker`; SOC-6D soccer settings
+**Status:** confirmed product request plus field-coordinate diagnostic
+**Theme:** settings / parked match / direction
+**Where:** `fieldFlipped` in `SoccerGameTracker`; `Switch direction` in the
+tracker action sheet; SOC-6D soccer settings
 
 SOC-0 called for a field-orientation preference where useful. The tracker
 flip is a display-only `useState` and resets on remount. Standing on the
 same sideline every week makes that noticeable.
 
-**Likely direction:** persist flip on the parked match, and optionally as
-a personal soccer setting. Do not change stored coordinates or attacking
-direction events.
+Second-match evidence also showed that an incorrect initial attacking direction
+is hard to discover and correct, and reported pins appearing tied to the
+original unflipped view. These are separate concepts:
+
+- display flip changes how the recorder sees and taps the pitch
+- attacking direction is match history and changes which goal each side attacks
+- stored event coordinates remain canonical and do not rotate after capture
+
+The current field code maps flipped taps back to canonical coordinates and
+rotates existing markers with the pitch. The report therefore needs a focused
+reproduction, not a speculative coordinate rewrite.
+
+**Likely direction:** persist display flip on the parked match and seed it from
+the personal Soccer setting. Make current attacking direction and its existing
+checked Switch direction action discoverable near the field. Add explicit
+round-trip tests for tracked/opponent capture before and after display flip,
+period direction changes, marker review, and edit. Only change coordinate math
+if one of those cases fails.
 
 **Not this item:** automatic end-switch rules (already event-owned).
 Upside-down cluster counts after flip are `S18`.
@@ -569,7 +612,8 @@ participants. Live Role and Substitution events remain authoritative and
 never write back to the team default.
 
 **Not this item:** in-match formation changes, opponent formations, or
-heatmaps.
+heatmaps. Team-level starter/bench defaults are `S23`; an in-match batch
+formation change is `S24`.
 
 ### S20 - Throw-ins
 
@@ -634,6 +678,172 @@ the reconciliation path. Changing that sync authority is outside `S21`.
 **Not this item:** changing season sport after create, moving a team
 between seasons (already rejected), or season standings (`M1`).
 
+### S22 - Roster edits cannot invalidate game participant history
+
+**Status:** confirmed correctness defect; highest-priority new item
+**Theme:** roster identity / cloud recovery
+**Where:** private event-platform v4 binding; Soccer cloud sync; roster removal
+
+A locally intact Soccer game failed cloud binding after its source-team roster
+changed:
+
+```text
+Soccer game binding failed: Participant source player is not on the source team
+```
+
+The sanitized recovery export still contained 24 participant snapshots, 84
+events, and 14 referenced participants. The game-scoped history survived; a
+current-roster membership check prevented it from syncing. Normal Teams and
+Player Setup removal already marks `team_players.is_active = false`, and the
+current binder accepts inactive rows. Planning must therefore find any path
+that physically removes or remaps the membership row as well as correct the
+historical binding rule.
+
+**Required direction:** a source roster is setup input, not mutable authority
+over an opened match. Preserve immutable participant display/number/identity
+snapshots and all event references when a roster member is deactivated. Warn
+before destructive identity changes and prefer archive/deactivate. Existing
+cloud-bound participant mappings may be reused only when their game identity
+matches exactly; new or remapped participants must still pass team access and
+identity validation.
+
+For an unbound local game whose source membership is already missing, recovery
+must identify the affected participant without discarding events and offer
+deliberate manager choices such as restoring the roster membership or resolving
+the source identity. A retry must preserve the event count, score, participant
+ids, and finalization state. Do not silently trust arbitrary client-supplied
+`source_player_id` values.
+
+**Acceptance seed:** cover roster deactivation/removal after opening lineup,
+minutes, substitution, and stat events; first bind versus already-bound sync;
+active and completed games; recovery export/import; and a successful retry
+with no duplicate participants or events.
+
+### S23 - Team-level default starter and bench status
+
+**Status:** confirmed product request; Q&A and focused plan required
+**Theme:** roster defaults / setup speed
+**Where:** Soccer team settings, Team Manage roster, Soccer Player Setup
+
+Default role (`S11`) and formation assignments (`S19`) reduce setup work, but a
+team cannot independently remember who normally starts and who begins on the
+bench. Backup goalkeepers are a common bench default. The status belongs to a
+player's membership on one team, not to the global player identity.
+
+**Likely direction:** add versioned per-team lineup-status defaults and apply
+them only when creating an editable match setup draft. A saved formation may
+provide the starter set when explicitly applied; the focused plan must define
+which setting wins when formation assignments and standalone defaults differ.
+Every match remains editable, and its immutable setup snapshot remains
+authoritative after kickoff.
+
+**Not this item:** changing a live lineup or writing match substitutions back
+to team defaults.
+
+### S24 - Apply a saved formation during a match
+
+**Status:** confirmed product request; Q&A and focused plan required
+**Theme:** live lineup / batch transition
+**Where:** tracker Lineup tab; S19 team formation catalog and assignments
+
+Coaches may change shape during a match or replace several players after an
+injury or tactical change. Editing each substitution and role separately is
+too slow. `S19` deliberately stopped at setup-only defaults, so this is a new
+live-authority feature rather than unfinished S19 work.
+
+**Likely direction:** while the clock is paused, choose a saved formation,
+preview outgoing players, incoming players, and role changes, then confirm one
+checked atomic transition. Reuse current participant ids and existing
+substitution/role semantics so minutes, substitution windows, goalkeeper
+requirements, ejections, return-sub rules, and correction history remain
+valid. Applying a formation never edits the team default.
+
+**Not this item:** opponent formations, automatic tactical inference, or a
+live drag-and-drop position tracker.
+
+### S25 - Cross-sport event-owned actor selection and role ordering
+
+**Status:** confirmed implementation direction
+**Theme:** live-surface density / actor selection
+**Where:** above-pitch or above-court player defaults; event actor pickers
+
+The horizontal player bar above the Soccer pitch consumes scarce mobile height
+and only provides a sticky default for the player dropdowns that already appear
+in each event sheet. A hidden sticky default would be worse than no bar, so the
+preference must stop influencing new live captures when the bar is removed.
+
+**Approved cross-sport direction:** when a live event sheet already owns an
+actor picker, do not reserve permanent pitch/court space for a sticky actor
+default. Each capture sheet chooses a clear local default; changing a dropdown
+affects only that draft. Keep Team / Unknown / Staff choices wherever the event
+family supports them. A sport-specific selector may remain when it has another
+visible job, such as filtering a Basketball chart or selecting the stat-grid
+context, but that state must not silently preselect an event actor.
+
+For Soccer, remove the above-pitch player selector and tolerate legacy
+serialized `selectedParticipantId` preferences for compatibility without using
+them to preselect future live events.
+
+Tracked-player options in Soccer event capture and edit sheets sort by the
+role at that event moment:
+
+```text
+Forward -> Midfielder -> Defender -> Goalkeeper -> Custom
+```
+
+Within a role, use numeric-aware jersey number, then display name, then stable
+participant id. Copy arrays before sorting, preserve historical role lookup in
+edit mode, and keep lineup/substitution selectors task-specific. Every sport
+should define an explicit actor-picker role order when roles exist. The shared
+contract accepts a sport-owned rank/comparator; it does not create one
+universal cross-sport role enum because positions and workflow priorities
+differ by sport.
+
+**Acceptance seed:** no player bar or empty gap above the pitch; a player can
+still be selected for every attributed Soccer event; closing/reopening a sheet
+does not inherit a prior event's actor; live and historical options use the
+appropriate current/historical role; keyboard labels remain unambiguous.
+
+### S26 - Show team nicknames in cross-sport side selectors
+
+**Status:** confirmed product request; cross-sport naming plan required
+**Theme:** live labels / team identity
+**Where:** Tracked/Opponent controls above sport surfaces; game setup snapshots;
+team and opponent naming
+
+`tracked` and `opponent` are correct internal side identifiers, but they are
+poor live button labels. The controls should show the teams' short display
+names so the recorder does not translate domain terminology during play.
+
+Tracked cloud teams already support editable `teams.nickname` and the shared
+`teamDisplayName` fallback. That value is not currently carried into Soccer or
+Basketball match setup: both use the selected team's primary `name`. Opponents
+have only the game-level `opponentName`, with no separate full-name and short
+display-name fields. This therefore cannot be solved reliably by relabeling one
+Soccer segmented control.
+
+**Likely direction:** define one cross-sport side-label resolver while keeping
+the stored side ids unchanged. Match setup freezes optional tracked and
+opponent display labels with the match; live side selectors show the short
+label when present and fall back to the frozen team/opponent name. Existing
+games without the new fields continue to use their current names.
+
+For an existing tracked team, seed the label from `teams.nickname`. Personal or
+local tracked teams and every opponent need an optional short-name field during
+setup. The opponent nickname is initially match-scoped; a reusable opponent
+directory is separate future work. Summaries and archival identity retain the
+full names, while compact live controls may use the short labels.
+
+**Planning note:** inventory every cross-sport `Tracked` / `Opponent` capture
+control and every immutable setup, parking, import/export, cloud binding, and
+summary reader before choosing field names. Do not derive a historical nickname
+from the current mutable team row at review time.
+
+**Acceptance seed:** Basketball and Soccer side selectors show configured short
+labels with truncation; local/personal and cloud-team setup can set or inherit a
+label; opponents can receive a match nickname; old games fall back cleanly;
+changing a team nickname later does not rewrite an opened or completed match.
+
 ## 5. Future modules (`M*`)
 
 Reserved in SOC-0 §8 and SOC-6 §9. First matches may request these; they
@@ -666,39 +876,45 @@ Correctness blockers first, then the confirmed sideline layout gaps, then
 setup/correction, then the rest.
 
 ```text
+S22 Roster edits cannot invalidate game participant history
 S13 Opponent incident cannot attach a tracked player / lock the match
 S14 Finalize must succeed or explain the real checkpoint mismatch
 S2  Substitution from the Field tab
 S3  Keep the pitch on screen
 S18 Flipped field keeps cluster counts upright
+S25 Cross-sport event-owned actor selection and role ordering
+S26 Show team nicknames in cross-sport side selectors
 S12 Edit shots from Timeline
 S11 Default player role carried between games
 S21 Name the season when creating it
 S19 Team formation lineup on a pitch
+S23 Team-level default starter and bench status
+S24 Apply a saved formation during a match
+S6  Explicit clock start and usable sideline correction
+S9  Persist and clarify field orientation
 S1  Faster shot and goal capture
 S15 Mark a goal as a header
 S16 Optional goal-mouth placement after Goal
 S4  Recent-events undo on Field
 S8  Lineup as a live board
 S5  Reusable opponent identities
-S6  Sideline clock correction
-S9  Persist field orientation
 S10 Defense without a mode switch
-S7  Last restart as next shot source
 S17 Make the existing corner event obvious
 S20 Throw-ins, only if we want them in the same sheet as corners
+S7  Link the last restart to the next shot sequence
 M1  Team standings, only after completed-match volume exists
 ```
 
-`S13` and `S14` are first because they leave a match uneditable or
-unfinalizable. Owner ranking of the remaining UX is `S2` then `S3`. `S14`
-should be re-tested on the same games after `S13` is fixed. `S15` and `S16`
-come after `S1` so extra goal metadata stays a skippable step, not another
-full attacking sheet. `S18` rides with the Field-tab work. `S17` is UI
-for the corner event that already exists, then `S7` can link the next
-shot. `S19` waits until default roles (`S11`) exist so a 4-3-3 slot can
-carry a player and a role. `M*` items stay behind a new phase name if
-promoted.
+`S22` is first because it can strand an otherwise intact match before first
+cloud binding. `S13` and `S14` follow because they leave a match uneditable or
+unfinalizable. Owner ranking of the earlier UX was `S2` then `S3`; `S25` is the
+small follow-up that removes the now-redundant Soccer player row and establishes
+the shared actor-picker contract. `S26` is nearby in UX but separately touches
+immutable setup and naming across sports. `S15` and `S16` come after `S1` so
+extra goal metadata stays a skippable step, not another full attacking sheet.
+`S17` / `S20` finish restart capture before `S7` links the next shot. `S23`
+extends setup defaults; `S24` remains a separate live atomic-transition plan.
+`M*` items stay behind a new phase name if promoted.
 
 ### 6.1 Evidence state
 
@@ -706,10 +922,13 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed product request with open data/UX choices | `S15`, `S16` | Short Q&A, then a focused phase plan |
+| Confirmed correctness defect | `S22` | Reproduce current-roster mutation paths, then write a recovery/security plan |
+| Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S23`, `S24` | Short Q&A where choices remain, then a focused phase plan |
+| Confirmed implementation direction | `S25` | Small Soccer slice plus a cross-sport inventory; retain sport-specific behavior and compatibility tests |
+| Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
 | Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S19`, `S21` | Run the linked regression rows during the next live or deployed test |
 | Approved implementation plan | `S17`, `S20` | Deliver from the linked focused execution plans |
-| Proposed follow-up awaiting match evidence | `S1`, `S4`–`S10` | Keep in backlog until confirmed or pulled into a related shell plan |
+| Proposed follow-up awaiting match evidence | `S1`, `S4`, `S5`, `S8`, `S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
 The `S12` repair preserves the shared editor route, and the `S14` repair keeps
 finalization authority intact. Their deployed verification must continue to
@@ -718,16 +937,26 @@ exercise those constraints rather than bypass them.
 ### 6.2 Recommended work packages
 
 - **Correctness recovery:** `S13` and `S14` are implemented; deployed recovery
-  verification remains.
+  verification remains. `S22` is the next correctness plan and must preserve
+  server-side identity/access validation while making game snapshots durable.
 - **Field shell:** `S2` + `S3` + `S18` are implemented with room for later
-  `S4`, `S6`, and `S10` without implementing those unconfirmed items.
+  `S4`, `S6`, and `S10`. `S25` is a focused density/ordering follow-up and does
+  not need to wait for the larger fast-capture redesign.
+- **Cross-sport live labels:** `S26` shares display resolution across sports but
+  needs additive immutable match labels before compact controls stop saying
+  Tracked/Opponent. Keep it separate from `S25` actor selection.
+- **Clock and orientation:** plan `S6` and `S9` independently. Clock changes
+  event lifecycle and minutes; orientation changes display persistence,
+  direction discoverability, and coordinate regression coverage.
 - **Timeline correction:** `S12` is implemented; deployed live correction
   verification remains.
 - **Roster defaults:** `S11` is implemented; `S19A` provides the formation
   catalog and versioned team-settings foundation, `S19B` provides the Team
   Manage editor, and `S19C` applies matching defaults once to editable setup
   drafts. Migration 065 is applied; verify current team-setting round trips and
-  setup prefill in the deployed app.
+  setup prefill in the deployed app. `S23` adds standalone starter/bench
+  defaults; `S24` is a later live batch transition and should not be folded
+  into the team-settings schema slice.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only
@@ -785,3 +1014,31 @@ Broader Basketball event work continues in
 - Asked whether throw-ins can be tracked. They cannot today (`S20`).
 - Creating a new soccer or basketball season has no option to name it.
   Not only later editing (`S21`).
+- Second-match recovery export showed an intact game-scoped participant and
+  event history, but cloud binding failed after the source roster changed with
+  `Participant source player is not on the source team`. Evidence is retained
+  here only as sanitized counts; player names and ids from the export are not
+  planning data (`S22`).
+- Match setup should open the tracker with the first period established and
+  the clock paused. The recorder starts it explicitly. Clock correction also
+  needs a mobile input that can actually enter minutes and seconds (`S6`).
+- Display flip, attacking direction, and canonical event coordinates need
+  clearer controls and a focused round-trip regression. Do not rewrite stored
+  pins based only on the reported visual symptom (`S9`).
+- Fouls/corners and their resulting penalty/free kick/header/shot outcome
+  should present as a linked sequence. Use the existing restart-to-shot link
+  before deciding that a broader chain schema is required (`S7`, `S15`).
+- Clean offside capture is already part of the approved one-shot Restart flow;
+  it is not a new event family (`S17`, `PLAN_SOC_RESTARTS.md` R3).
+- Team setup should remember normal starter/bench status, including backup
+  goalkeepers, and a saved formation should later be applicable as a reviewed
+  in-match batch change (`S23`, `S24`).
+- Remove the sticky player-selector bar above the pitch. Each event sheet owns
+  its actor, with Soccer player options ordered Forward, Midfielder, Defender,
+  Goalkeeper, then Custom. Apply the event-owned actor rule to every sport,
+  while preserving controls with an independent filtering or stat-context job.
+  Other sports define their own role order (`S25`).
+- Keep `tracked` and `opponent` as internal values, but display team nicknames
+  on live side selectors in every sport. Tracked cloud teams already have a
+  nickname; setup needs to freeze it, and opponents need an optional
+  match-scoped nickname with full-name fallback (`S26`).
