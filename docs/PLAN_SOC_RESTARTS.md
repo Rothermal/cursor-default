@@ -1,8 +1,8 @@
 # Soccer Restarts Implementation Plan
 
-Status: implementation in progress. R1 domain readers, R2 review readers, and
-R3 writers are implemented; R4 and deployed manual validation remain. Corner,
-throw-in, and goal-kick capture are in scope; tap-to-place and omitted-taker
+Status: R1-R4 implementation complete. Deployed browser/PWA and live Supabase
+validation remain recorded as pending in `REGRESSION_SOC_RESTARTS.md`. Corner,
+throw-in, and goal-kick capture are implemented; tap-to-place and omitted-taker
 behavior are resolved.
 
 > **For agentic workers:** Implement this plan task-by-task. Use review
@@ -185,7 +185,7 @@ Save
 
 The field interaction needs an accessible active-state label and live status
 announcement so it is clear that the next pitch tap records a restart rather
-than the normal capture mode. Timeline Add Event **Team Event** opens the same
+than the normal capture mode. Timeline Add Event **Restart** opens the same
 sheet without requiring an initial field tap; location stays optional there.
 Correction of an old corner can add a taker or location without changing its
 `eventType`.
@@ -238,7 +238,7 @@ Live defaults:
 R1  Domain readers: kinds, taker, totals, suggestion helper, compatibility tests [implemented]
 R2  Review readers: Timeline / Summary / Field labels and team comparison [implemented]
 R3  Writers: one-shot live capture plus historical Add/Edit [implemented]
-R4  Regression docs and backlog status
+R4  Regression docs and backlog status [implemented]
 ```
 
 Each slice may be its own PR. R1 and R2 may merge without capture UI. R3 must
@@ -319,8 +319,9 @@ writer or capture control.
 - [x] Remove the live Left/Right corner buttons and their module-private
   `cornerLocation` helper. Historical Add/Edit retains the generic Set/Clear
   field editor and does not add a replacement corner shortcut.
-- [ ] Manually verify an opponent throw-in cannot select a tracked roster
-  participant as taker.
+- [ ] Deployed check: manually verify an opponent throw-in cannot select a
+  tracked roster participant as taker; record it in
+  `REGRESSION_SOC_RESTARTS.md`.
 - [x] Commit `feat(soccer): add tap-to-place restart capture`.
 
 R3 keeps Restart as component-local one-shot state; the persisted capture mode
@@ -338,15 +339,24 @@ final fail-closed guard against opponent events carrying tracked identity.
 
 **Files:** this plan, field-test backlog, `REGRESSION_TESTING.md`, overview
 
-- [ ] Mark `S17` and `S20` implemented only after R1-R4 land.
-- [ ] Add a manual script:
+- [x] Mark `S17` and `S20` implemented after R1-R4 land.
+- [x] Add a manual script:
   - Restart -> tap an attacking corner -> confirm Corner + taker
   - Restart -> tap a touchline -> confirm opponent Throw-in without taker
   - Restart -> tap the defending goal area -> confirm Goal kick
   - flip the field and repeat equivalent taps; stored/reviewed positions remain
     canonical and labels remain correct
-- [ ] Record capability/live Supabase evidence and cached-reader compatibility.
-- [ ] Commit `docs: record soccer restart capture`.
+- [x] Add operator records for capability/live Supabase evidence and
+  cached-reader compatibility; deployed results remain pending.
+- [x] Commit `docs: record soccer restart capture`.
+
+R4 adds `REGRESSION_SOC_RESTARTS.md` as the focused operator record and links a
+condensed script from the repository-wide regression guide. The matrix records
+the reader-first merge order (R1 PR #366, R2 PR #370, then R3 PR #371), the
+unchanged migration-049 capability boundary, repeated-marker pass-through,
+canonical flip behavior, actor restrictions, historical Add/Edit, cloud
+round-trip, finalization, and local-only fallback. Implementation is complete;
+all deployed evidence cells intentionally remain `Not run` until exercised.
 
 ## 8. Acceptance
 
