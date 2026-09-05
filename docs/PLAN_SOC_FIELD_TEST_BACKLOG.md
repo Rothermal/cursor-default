@@ -685,7 +685,7 @@ between seasons (already rejected), or season standings (`M1`).
 
 ### S22 - Roster edits cannot invalidate game participant history
 
-**Status:** confirmed correctness defect; highest-priority new item
+**Status:** implemented; migration 067 and deployed recovery verification pending
 **Theme:** roster identity / cloud recovery
 **Where:** private event-platform v4 binding; Soccer cloud sync; Teams and
 Settings/Advanced permanent player deletion
@@ -899,7 +899,7 @@ Correctness blockers first, then the confirmed sideline layout gaps, then
 setup/correction, then the rest.
 
 ```text
-S22 Roster edits cannot invalidate game participant history
+S22 Roster edits cannot invalidate game participant history [implemented]
 S13 Opponent incident cannot attach a tracked player / lock the match
 S14 Finalize must succeed or explain the real checkpoint mismatch
 S2  Substitution from the Field tab
@@ -947,12 +947,11 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed correctness defect | `S22` | Plan player-delete guards, durable historical binding, and recovery for already-affected games |
 | Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S23`, `S24` | Short Q&A where choices remain, then a focused phase plan |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
 | Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
 | Implemented; owner functional verification complete | `S17`, `S20` | Keep the post-fix cloud completion replay in the focused regression record; proceed to `S7` planning when prioritized |
-| Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S19`, `S21` | Run the linked regression rows during the next live or deployed test |
+| Implemented; pending migration/deployed verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S19`, `S21`, `S22` | Apply required migrations and run the linked focused regression rows |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`, `S5`, `S8`, `S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
 The `S12` repair preserves the shared editor route, and the `S14` repair keeps
@@ -961,9 +960,9 @@ exercise those constraints rather than bypass them.
 
 ### 6.2 Recommended work packages
 
-- **Correctness recovery:** `S13` and `S14` are implemented; deployed recovery
-  verification remains. `S22` is the next correctness plan and must preserve
-  server-side identity/access validation while making game snapshots durable.
+- **Correctness recovery:** `S13`, `S14`, and `S22` are implemented; deployed
+  recovery verification remains. S22 preserves server-side identity/access
+  validation while making deleted-source game snapshots durable.
 - **Field shell:** `S2` + `S3` + `S18` are implemented with room for later
   `S4`, `S6`, and `S10`. The Soccer slice of `S25` removes the redundant player
   row and role-orders event actor lists; deployed verification remains. The

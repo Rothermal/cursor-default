@@ -359,6 +359,7 @@ interface GameContextType {
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
   flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
+  recoverDeletedEventParticipantSources: () => Promise<FlushCloudSyncResult>
   enableBasketballCloudSync: () => Promise<FlushCloudSyncResult>
   markEventCloudGameReopened: (
     gameId: string,
@@ -998,6 +999,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
                   uploaded => uploaded.conflictId === pending.conflictId
                 )
               ),
+          allowDeletedSourcePlayerRecovery: undefined,
         }
         const nextState: GameState = {
           ...payloadState,
@@ -1122,6 +1124,47 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
     return { ok: true }
   }, [isOnline, runCloudSync, userId])
+
+  const recoverDeletedEventParticipantSources = useCallback(
+    async (): Promise<FlushCloudSyncResult> => {
+      const localGameId = getActiveLocalGameId(userId)
+      const current = stateRef.current
+      if (!localGameId || !getParkedGameRecord(localGameId, userId)) {
+        return { ok: false, reason: 'This local game is unavailable.' }
+      }
+      if (!isEventCloudSyncEligible(current) || !current.cloudSync.teamId) {
+        return { ok: false, reason: 'Historical player recovery requires a team event game.' }
+      }
+
+      const recoveryState: GameState = {
+        ...current,
+        cloudSync: {
+          ...current.cloudSync,
+          allowDeletedSourcePlayerRecovery: true,
+          status: 'idle',
+          lastError: null,
+        },
+      }
+      try {
+        saveActiveGameState(recoveryState, userId)
+      } catch (error) {
+        return { ok: false, reason: parkedGameStorageErrorMessage(error) }
+      }
+      stateRef.current = recoveryState
+      dispatch({ type: 'HYDRATE_STATE', state: recoveryState })
+      await runCloudSync()
+
+      const result = getParkedGameRecord(localGameId, userId)?.gameState ?? stateRef.current
+      if (result.cloudSync.status === 'error') {
+        return { ok: false, reason: result.cloudSync.lastError ?? 'Cloud sync failed' }
+      }
+      if (result.cloudSync.status === 'offline') {
+        return { ok: false, reason: 'Offline - reconnect before preserving player history.' }
+      }
+      return { ok: true }
+    },
+    [runCloudSync, userId]
+  )
 
   const flushCloudGameSync = useCallback(async (
     gameId: string
@@ -1415,6 +1458,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         discardParkedGame,
         flushCloudSync,
         flushCloudGameSync,
+        recoverDeletedEventParticipantSources,
         enableBasketballCloudSync,
         markEventCloudGameReopened,
         resolveEventConflict,

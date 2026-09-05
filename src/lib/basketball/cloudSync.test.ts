@@ -225,7 +225,7 @@ describe('Basketball event cloud transport adapter', () => {
     cloudMock.load.mockReset()
     cloudMock.from.mockReset()
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
-      name === 'bind_basketball_event_game_v4'
+      name === 'bind_basketball_event_game_v5'
         ? {
             data: {
               game_id: 'cloud-game-1',
@@ -334,7 +334,7 @@ describe('Basketball event cloud transport adapter', () => {
       syncedAt: '2026-08-15T12:01:00.000Z',
     })
     expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
-      'bind_basketball_event_game_v4',
+      'bind_basketball_event_game_v5',
       'confirm_game_event_stream_checkpoint',
     ])
     expect(cloudMock.upsert).toHaveBeenCalledTimes(1)
@@ -411,7 +411,7 @@ describe('Basketball event cloud transport adapter', () => {
     expect(cloudMock.load).not.toHaveBeenCalled()
     expect(cloudMock.upsert).not.toHaveBeenCalled()
     expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
-      'bind_basketball_event_game_v4',
+      'bind_basketball_event_game_v5',
     ])
   })
 
@@ -424,7 +424,7 @@ describe('Basketball event cloud transport adapter', () => {
 
     expect(cloudMock.rpc).toHaveBeenNthCalledWith(
       1,
-      'bind_basketball_event_game_v4',
+      'bind_basketball_event_game_v5',
       expect.objectContaining({
         p_source_team_id: 'team-1',
         p_source_season_id: 'season-1',
@@ -480,7 +480,7 @@ describe('Basketball event cloud transport adapter', () => {
     })).rejects.toBeInstanceOf(BasketballCloudRecoveryError)
     expect(cloudMock.upsert).not.toHaveBeenCalled()
     expect(cloudMock.rpc.mock.calls.map(call => call[0])).toEqual([
-      'bind_basketball_event_game_v4',
+      'bind_basketball_event_game_v5',
     ])
   })
 

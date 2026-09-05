@@ -22,6 +22,10 @@ const mock = vi.hoisted(() => ({
 
 vi.mock('./supabase', () => ({
   supabase: {
+    rpc: (name: string) => {
+      mock.ops.push(name)
+      return Promise.resolve({ data: null, error: null })
+    },
     from: (table: string) => {
       mock.ops.push(`${table}.from`)
 
@@ -365,7 +369,7 @@ describe('syncGameSnapshotToCloud hardening', () => {
     await expect(syncGameSnapshotToCloud({ state: state(), userId: 'user-1' })).rejects.toThrow(
       'Team roster link failed'
     )
-    expect(mock.ops.indexOf('players.delete')).toBeGreaterThan(
+    expect(mock.ops.indexOf('delete_unreferenced_player')).toBeGreaterThan(
       mock.ops.indexOf('team_players.upsert')
     )
   })
@@ -384,7 +388,7 @@ describe('syncGameSnapshotToCloud hardening', () => {
       })
     ).rejects.toThrow('Team roster link failed')
     expect(mock.ops).not.toContain('players.insert')
-    expect(mock.ops).not.toContain('players.delete')
+    expect(mock.ops).not.toContain('delete_unreferenced_player')
   })
 
   it('repairs a duplicate cloud player link instead of blocking the sync', async () => {

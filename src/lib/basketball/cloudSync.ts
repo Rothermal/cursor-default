@@ -153,7 +153,7 @@ function rebuildEventGameState(state: GameState) {
 export const basketballEventCloudTransportAdapter: EventCloudTransportAdapter = {
   sportId: 'basketball',
   sportLabel: 'Basketball',
-  bindingRpc: 'bind_basketball_event_game_v4',
+  bindingRpc: 'bind_basketball_event_game_v5',
   registry: gameEventRegistry,
   remoteConflictRevisionPolicy: 'advance',
   prepare(state) {

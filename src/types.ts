@@ -243,6 +243,8 @@ export interface CloudSyncState {
   eventConflicts?: GameEventSyncConflict[]
   /** Offline-capable choices waiting for their cloud conflict audit row to close. */
   pendingEventConflictResolutions?: PendingGameEventConflictResolution[]
+  /** One explicit retry may preserve participants whose source player was permanently deleted. */
+  allowDeletedSourcePlayerRecovery?: boolean
 }
 
 export type GameAction =

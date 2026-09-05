@@ -7,6 +7,8 @@ import {
 } from './basketball/rules'
 import { createBasketballSportGameState } from './basketball/state'
 import { prepareBasketballGameStart } from './basketball/commands'
+import { resolveSoccerMatchRules } from './soccer/rules'
+import { createSoccerSportGameState } from './soccer/state'
 import { gameReducer } from './gameReducer'
 import {
   cloudSyncRouteForState,
@@ -29,6 +31,7 @@ import {
   getParkedGameRecord,
   getParkedGameStorageInfo,
   hasDirtyParkedGames,
+  hasLocalGameReferenceForCloudPlayer,
   hasUnsyncedParkedBindingForCloudGame,
   hasUnsyncedParkedBindingForCloudSeason,
   hasUnsyncedParkedBindingForCloudTeam,
@@ -654,6 +657,39 @@ describe('gameParking', () => {
       'user-1',
       'season-legacy',
       new Set(['team-other'])
+    )).toBe(false)
+  })
+
+  it('finds a cloud player in an unbound event-game participant snapshot', () => {
+    const local = gameState(soccer, 'Aces', 'Hawks')
+    local.cloudSync.teamId = 'team-1'
+    local.sportGameState = createSoccerSportGameState({
+      version: 1,
+      trackedTeamDesignation: 'home',
+      firstPeriodAttackingDirection: 'left_to_right',
+      sourceTeamId: 'team-1',
+      sourceSeasonId: 'season-1',
+      rulesSnapshot: resolveSoccerMatchRules(),
+      participants: [{
+        id: 'match-player-1',
+        kind: 'player',
+        playerId: 'cloud-player-1',
+        displayName: 'One',
+        number: '1',
+        initialStatus: 'starter',
+        initialRole: { group: 'forward', label: null },
+      }],
+    })
+
+    expect(hasLocalGameReferenceForCloudPlayer(
+      'user-1',
+      'cloud-player-1',
+      local
+    )).toBe(true)
+    expect(hasLocalGameReferenceForCloudPlayer(
+      'user-1',
+      'cloud-player-2',
+      local
     )).toBe(false)
   })
 

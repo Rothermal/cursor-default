@@ -163,6 +163,8 @@ export async function syncEventGameToCloud({
       p_game_date: state.gameInfo!.date,
       p_participants: prepared.participants,
       p_setup_snapshot: prepared.setupSnapshot,
+      p_allow_deleted_source_players:
+        state.cloudSync.allowDeletedSourcePlayerRecovery === true,
     }
   )
   if (bindingError) {
