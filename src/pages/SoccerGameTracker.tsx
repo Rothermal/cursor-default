@@ -585,7 +585,9 @@ export default function SoccerGameTracker() {
                 captureSide={capturePreferences.teamSide}
                 flipped={fieldFlipped}
                 disabled={!fieldCaptureEnabled}
-                activeCaptureLabel={restartArmed ? 'Restart capture' : undefined}
+                activeCaptureLabel={restartArmed
+                  ? `Restart - ${capturePreferences.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} attack`
+                  : undefined}
                 markers={fieldMarkers}
                 onFlip={() => setFieldFlipped(value => !value)}
                 onLocation={location => {
@@ -604,14 +606,11 @@ export default function SoccerGameTracker() {
                     openIncident(capturePreferences.captureMode, location)
                   }
                 }}
-                onMarker={eventId => {
+                onMarker={restartArmed ? undefined : eventId => {
                   const event = inspection.activeEvents.find(candidate => candidate.id === eventId)
                   if (event) editFieldEvent(event)
                 }}
-                onCluster={eventIds => {
-                  setRestartArmed(false)
-                  setClusterEventIds(eventIds)
-                }}
+                onCluster={restartArmed ? undefined : setClusterEventIds}
               />
 
               <div className="grid grid-cols-4 gap-2" role="group" aria-label="Quick capture">

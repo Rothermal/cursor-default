@@ -923,11 +923,10 @@ function mainActorRole(kind: SoccerIncidentKind, teamEventKind: SoccerTeamEventK
   return teamEventKind === 'offside' ? 'offside_player' : 'taker'
 }
 
-function actorEditorLabel(kind: SoccerIncidentKind): string {
+function actorEditorLabel(kind: Exclude<SoccerIncidentKind, 'team_event'>): string {
   if (kind === 'defense') return 'Defender'
   if (kind === 'foul') return 'Committed by'
-  if (kind === 'card') return 'Recipient'
-  return 'Event actor'
+  return 'Recipient'
 }
 
 function kindLabel(kind: SoccerIncidentKind): string {

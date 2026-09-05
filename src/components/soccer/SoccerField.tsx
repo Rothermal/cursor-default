@@ -204,10 +204,10 @@ function SoccerMarker({
       tabIndex={onSelect ? 0 : undefined}
       aria-label={marker.label}
       className={onSelect ? 'cursor-pointer outline-none' : undefined}
-      onClick={event => {
+      onClick={onSelect ? event => {
         event.stopPropagation()
-        onSelect?.()
-      }}
+        onSelect()
+      } : undefined}
       onKeyDown={event => {
         if (!onSelect || (event.key !== 'Enter' && event.key !== ' ')) return
         event.preventDefault()
@@ -259,7 +259,7 @@ function SoccerMarkerCluster({
   const x = markers.reduce((total, marker) => total + marker.x, 0) / markers.length * 100
   const y = markers.reduce((total, marker) => total + marker.y, 0) / markers.length * 64
   return (
-    <g role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} aria-label={`${markers.length} events at this location`} className={onSelect ? 'cursor-pointer outline-none' : undefined} onClick={event => { event.stopPropagation(); onSelect?.() }} onKeyDown={event => { if (!onSelect || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); event.stopPropagation(); onSelect() }}>
+    <g role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} aria-label={`${markers.length} events at this location`} className={onSelect ? 'cursor-pointer outline-none' : undefined} onClick={onSelect ? event => { event.stopPropagation(); onSelect() } : undefined} onKeyDown={event => { if (!onSelect || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); event.stopPropagation(); onSelect() }}>
       <circle cx={x} cy={y} r="4.2" fill="#0f172a" stroke="#f8fafc" strokeWidth="0.65" />
       <text x={x} y={y + 1.35} transform={uprightMarkerGlyphTransform(flipped, x, y)} textAnchor="middle" fill="#f8fafc" fontSize="4" fontWeight="700">{markers.length}</text>
     </g>

@@ -69,7 +69,7 @@ const LIVE_TIMELINE_FILTERS: ReadonlyArray<{
   { id: 'attacking', label: 'Attacking' },
   { id: 'defensive', label: 'Defensive' },
   { id: 'discipline', label: 'Discipline' },
-  { id: 'team_events', label: 'Team Events' },
+  { id: 'team_events', label: 'Restarts' },
   { id: 'match_control', label: 'Match Control' },
 ]
 
@@ -290,7 +290,7 @@ export default function SoccerTimeline({
                 ['defense', 'Defense'],
                 ['foul', 'Foul'],
                 ['card', 'Card'],
-                ['team_event', 'Team Event'],
+                ['team_event', 'Restart'],
               ] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => addEvent(kind)} className="min-h-12 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700">{label}</button>)}
             </div>
           </div>
