@@ -138,6 +138,74 @@ describe('Soccer match-readiness wiring', () => {
     expect(markerBuilder).toContain('item.participantLabel')
   })
 
+  it('keeps restart capture one-shot and preserves optional team-event actors', () => {
+    const tracker = source('src/pages/SoccerGameTracker.tsx')
+    const dialog = source('src/components/soccer/SoccerIncidentCaptureDialog.tsx')
+    const field = source('src/components/soccer/SoccerField.tsx')
+    const fieldTabStart = tracker.indexOf(") : mainTab === 'field' ? (")
+    const fieldTab = tracker.slice(
+      fieldTabStart,
+      tracker.indexOf(") : mainTab === 'lineup' ? (", fieldTabStart)
+    )
+    const setCaptureSideFn = tracker.slice(
+      tracker.indexOf('const setCaptureSide ='),
+      tracker.indexOf('const setCaptureMode =')
+    )
+    const setCaptureModeFn = tracker.slice(
+      tracker.indexOf('const setCaptureMode ='),
+      tracker.indexOf('const openIncident =')
+    )
+    const openIncidentFn = tracker.slice(
+      tracker.indexOf('const openIncident ='),
+      tracker.indexOf('const editFieldEvent =')
+    )
+    const changeTeamSideFn = dialog.slice(
+      dialog.indexOf('const changeTeamSide ='),
+      dialog.indexOf('const changeTeamEventKind =')
+    )
+    const changeTeamEventKindFn = dialog.slice(
+      dialog.indexOf('const changeTeamEventKind ='),
+      dialog.indexOf('useEffect(() =>', dialog.indexOf('const changeTeamEventKind ='))
+    )
+    const moreActionsButton = fieldTab.slice(
+      fieldTab.indexOf('onClick={() => {', fieldTab.indexOf('Substitution')),
+      fieldTab.indexOf('</button>', fieldTab.indexOf('aria-label="More match actions"'))
+    )
+
+    expect(tracker).toContain('const [restartArmed, setRestartArmed] = useState(false)')
+    expect(tracker).toContain("mainTab !== 'field'")
+    expect(tracker).toContain('suggestSoccerRestartKind(')
+    expect(tracker).toContain(
+      "openIncident('team_event', location, 'live', undefined, suggestedKind ?? 'corner')"
+    )
+    expect(fieldTab).toContain("? `Restart - ${capturePreferences.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} attack`")
+    expect(fieldTab).toContain('label="Restart"')
+    expect(fieldTab).not.toContain('label="Team"')
+    expect(fieldTab).toContain('role="status" aria-live="polite"')
+    expect(setCaptureSideFn).toContain('setRestartArmed(false)')
+    expect(setCaptureModeFn).toContain('setRestartArmed(false)')
+    expect(openIncidentFn).toContain('setRestartArmed(false)')
+    expect(fieldTab).toContain('onMarker={restartArmed ? undefined : eventId => {')
+    expect(fieldTab).toContain('onCluster={restartArmed ? undefined : setClusterEventIds}')
+    expect(moreActionsButton).toContain('setRestartArmed(false)')
+    expect(moreActionsButton).toContain('setActionsOpen(true)')
+    expect(field).toContain('activeCaptureLabel?: string')
+    expect(field).toContain('onClick={onSelect ? event => {')
+    expect(field).toContain('onClick={onSelect ? event => { event.stopPropagation(); onSelect() } : undefined}')
+    expect(dialog).toContain("mode === 'live' && draft.kind === 'team_event'")
+    expect(dialog).toContain("{ value: 'throw_in', label: 'Throw-in' }")
+    expect(dialog).toContain("{ value: 'goal_kick', label: 'Goal kick' }")
+    expect(dialog).toContain("kind === 'offside' ? 'Offside player' : 'Taker'")
+    expect(dialog).toContain("mainActorRole(draft.kind, teamEventKind)")
+    expect(dialog).toContain("teamEventKind === 'offside' ? 'offside_player' : 'taker'")
+    expect(changeTeamSideFn).toContain('setTeamEventActorRecorded(false)')
+    expect(changeTeamEventKindFn).toContain('setTeamEventActorRecorded(false)')
+    expect(dialog).toContain("function actorEditorLabel(kind: Exclude<SoccerIncidentKind, 'team_event'>)")
+    expect(dialog).toContain('actors,')
+    expect(dialog).not.toContain("teamEventKind === 'corner' ? [] : actors")
+    expect(dialog).not.toContain('function cornerLocation(')
+  })
+
   it('blocks healthy Soccer history from becoming incomplete while allowing recovery', () => {
     const tracker = source('src/pages/SoccerGameTracker.tsx')
 

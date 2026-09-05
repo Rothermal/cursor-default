@@ -1,8 +1,9 @@
 # Soccer Restarts Implementation Plan
 
-Status: implementation in progress. R1 domain readers and R2 review readers are
-implemented; R3-R4 remain. Corner, throw-in, and goal-kick capture are in scope;
-tap-to-place and omitted-taker behavior are resolved.
+Status: implementation in progress. R1 domain readers, R2 review readers, and
+R3 writers are implemented; R4 and deployed manual validation remain. Corner,
+throw-in, and goal-kick capture are in scope; tap-to-place and omitted-taker
+behavior are resolved.
 
 > **For agentic workers:** Implement this plan task-by-task. Use review
 > checkpoints between delivery slices. Do not implement directly from
@@ -236,7 +237,7 @@ Live defaults:
 ```text
 R1  Domain readers: kinds, taker, totals, suggestion helper, compatibility tests [implemented]
 R2  Review readers: Timeline / Summary / Field labels and team comparison [implemented]
-R3  Writers: one-shot live capture plus historical Add/Edit
+R3  Writers: one-shot live capture plus historical Add/Edit [implemented]
 R4  Regression docs and backlog status
 ```
 
@@ -304,23 +305,34 @@ writer or capture control.
 
 **Files:** `SoccerIncidentCaptureDialog.tsx`, `SoccerGameTracker.tsx`, focused tests
 
-- [ ] Replace Quick **Team** with **Restart** and add temporary one-shot state;
+- [x] Replace Quick **Team** with **Restart** and add temporary one-shot state;
   do not persist Restart as a capture preference.
-- [ ] Route the next main-field tap through `soccerFieldLocation`, suggest a
+- [x] Route the next main-field tap through `soccerFieldLocation`, suggest a
   kind, and open the shared confirmation sheet.
-- [ ] Allow the visible kind to be corrected before Save. Taker editing must
+- [x] Allow the visible kind to be corrected before Save. Taker editing must
   use opponent-safe attribution (`S13`) and Save must preserve valid actors.
-- [ ] Keep the Offside path and existing optional `offside_player` behavior.
-- [ ] Save/Cancel restores the prior capture mode and never leaves Restart
+- [x] Keep the Offside path and existing optional `offside_player` behavior.
+- [x] Save/Cancel restores the prior capture mode and never leaves Restart
   armed. Changing capture side or leaving the Field tab also cancels it.
-- [ ] Keep historical Add/Edit location optional and route it through the same
+- [x] Keep historical Add/Edit location optional and route it through the same
   validated command path.
-- [ ] Remove the live Left/Right corner buttons and their module-private
+- [x] Remove the live Left/Right corner buttons and their module-private
   `cornerLocation` helper. Historical Add/Edit retains the generic Set/Clear
   field editor and does not add a replacement corner shortcut.
 - [ ] Manually verify an opponent throw-in cannot select a tracked roster
   participant as taker.
-- [ ] Commit `feat(soccer): add tap-to-place restart capture`.
+- [x] Commit `feat(soccer): add tap-to-place restart capture`.
+
+R3 keeps Restart as component-local one-shot state; the persisted capture mode
+remains Shot, Defense, or Foul. The armed pitch and Restart button expose a
+visible and accessible active state. A tap uses the canonical field location,
+falls back to Corner only when geometry has no strong suggestion, then disarms
+before opening the shared sheet. Live side remains confirmable. Restart takers
+are Not recorded or a tracked on-field player for the tracked side, and Not
+recorded or a free-text label for the opponent; Offside retains optional
+tracked player or label behavior. The same four-kind sheet serves historical
+Add/Edit, including optional Set/Clear location. Domain projection remains the
+final fail-closed guard against opponent events carrying tracked identity.
 
 ### Task 4: Close docs and regression
 
