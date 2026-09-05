@@ -1,6 +1,7 @@
 # SOC-S23 - Team lineup status defaults
 
-**Status:** approved; implementation pending
+**Status:** S23A implemented; migration 068 and deployed verification pending;
+S23B and S23C pending
 **Scope:** Soccer team settings, Team Manage, and fresh Soccer Player Setup drafts
 **Depends on:** SOC-6D team settings, S11 roster roles, and S19 team formations
 
@@ -208,7 +209,7 @@ exports.
 ## 7. Implementation slices
 
 ```text
-S23A  Settings foundation
+S23A  Settings foundation [implemented]
       Pure lineup-default model/helpers, team schema v1/v2 -> v3 readers,
       strict parsers/fingerprints/copy/save preparation, migration 068,
       cloud/cache/CAS/audit compatibility, focused contract tests
@@ -234,6 +235,11 @@ the PWA update or closes all scoped tabs and reloads. This is an accepted
 deployment window, not something the new bundle can repair in the stale
 bundle. Deploy migration 068 and the S23A reader before permitting the first
 v3 save, then include stale-client refresh guidance in the rollout check.
+
+S23A is implemented with the pure lineup-default contract, team schema-v3
+reader/writer compatibility, dual-readiness cleanup preparation, migration
+068, and focused TypeScript/SQL contract coverage. See
+[`REGRESSION_SOC_S23A_LINEUP_SETTINGS.md`](REGRESSION_SOC_S23A_LINEUP_SETTINGS.md).
 
 ## 8. File map
 
