@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Pencil } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
+import { gameSideDisplayName } from '../../lib/display'
 import {
   applyBasketballRelatedEventEdit,
   basketballRelatedEventActorOptions,
@@ -109,8 +110,8 @@ export default function BasketballRelatedEventEditor({ eventId, onClose, onAppli
       <div className="min-h-0 flex-1 overflow-y-auto">
         <BasketballEditorSection title="Attribution">
           <BasketballEditorSegmentedControl label="Team" value={draft.teamSide} options={[
-            { value: 'tracked', label: state.gameInfo?.teamName || 'Tracked' },
-            { value: 'opponent', label: state.gameInfo?.opponentName || 'Opponent' },
+            { value: 'tracked', label: gameSideDisplayName(state.gameInfo, 'tracked') },
+            { value: 'opponent', label: gameSideDisplayName(state.gameInfo, 'opponent') },
           ]} onChange={value => selectSide(value as BasketballRelatedEventEditDraft['teamSide'])} />
           {draft.eventType === 'basketball.turnover' && <BasketballEditorSegmentedControl label="Turnover" value={draft.turnoverKind} options={[{ value: 'player', label: 'Player' }, { value: 'team', label: 'Team' }]} onChange={value => selectTurnoverKind(value as 'player' | 'team')} />}
           <BasketballEditorSelectField label={draft.eventType === 'basketball.turnover' ? 'Committed by' : 'Recorded for'} value={basketballShotActorSelectionKey(draft.actor, draft.teamSide)} options={actorOptions.map(option => ({ value: option.key, label: option.label }))} onChange={key => {

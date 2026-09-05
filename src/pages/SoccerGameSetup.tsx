@@ -27,11 +27,13 @@ import {
   type TeamRole,
 } from '../lib/teamPermissions'
 import SoccerRulesOverrideEditor from '../components/soccer/SoccerRulesOverrideEditor'
+import { teamDisplayName } from '../lib/display'
 
 interface SoccerCloudTeam {
   id: string
   owner_id: string
   name: string
+  nickname: string | null
   season_id: string
   accessRole: TeamRole
   seasons: { id: string; name: string; sport: string }
@@ -65,7 +67,9 @@ export default function SoccerGameSetup() {
   )
 
   const [teamName, setTeamName] = useState(state.gameInfo?.teamName ?? '')
+  const [teamNickname, setTeamNickname] = useState(state.gameInfo?.teamNickname ?? '')
   const [opponentName, setOpponentName] = useState(state.gameInfo?.opponentName ?? '')
+  const [opponentNickname, setOpponentNickname] = useState(state.gameInfo?.opponentNickname ?? '')
   const [competitionName, setCompetitionName] = useState(state.gameInfo?.tournamentName ?? '')
   const [date, setDate] = useState(
     state.gameInfo?.date ?? new Date().toISOString().slice(0, 10)
@@ -124,7 +128,7 @@ export default function SoccerGameSetup() {
       const [{ data, error }, { data: memberships, error: membershipError }] = await Promise.all([
         supabase!
           .from('teams')
-          .select('id,owner_id,name,season_id,seasons!inner(id,name,sport)')
+          .select('id,owner_id,name,nickname,season_id,seasons!inner(id,name,sport)')
           .eq('seasons.sport', 'soccer')
           .order('created_at', { ascending: false }),
         supabase!
@@ -164,7 +168,10 @@ export default function SoccerGameSetup() {
         ?? available[0]
       if (preferred) {
         setSelectedTeamId(preferred.id)
-        if (teamSource === 'cloud') setTeamName(preferred.name)
+        if (teamSource === 'cloud') {
+          setTeamName(preferred.name)
+          setTeamNickname(preferred.nickname?.trim() ?? '')
+        }
       } else if (requestedTeamId) {
         setTeamsError('That soccer team is unavailable for tracking.')
       }
@@ -316,7 +323,9 @@ export default function SoccerGameSetup() {
       type: 'SET_GAME_INFO',
       gameInfo: {
         teamName: resolvedTeam,
+        teamNickname: teamNickname.trim() || null,
         opponentName: opponentName.trim(),
+        opponentNickname: opponentNickname.trim() || null,
         tournamentName: competitionName.trim(),
         tournamentId: null,
         date,
@@ -401,7 +410,10 @@ export default function SoccerGameSetup() {
                   if (id !== selectedTeamId) releasePreservedSnapshot()
                   setSelectedTeamId(id)
                   const team = teams.find(item => item.id === id)
-                  if (team) setTeamName(team.name)
+                  if (team) {
+                    setTeamName(team.name)
+                    setTeamNickname(team.nickname?.trim() ?? '')
+                  }
                 }}
                 disabled={loadingTeams || teams.length === 0}
                 className="input-field mt-1"
@@ -409,7 +421,7 @@ export default function SoccerGameSetup() {
                 {teams.length === 0 && <option value="">No teams available</option>}
                 {teams.map(team => (
                   <option key={team.id} value={team.id}>
-                    {team.name} ({team.seasons.name})
+                    {teamDisplayName(team)} ({team.seasons.name})
                   </option>
                 ))}
               </select>
@@ -417,12 +429,14 @@ export default function SoccerGameSetup() {
           ) : (
             <TextField label="Team" value={teamName} onChange={setTeamName} required />
           )}
+          <TextField label="Team nickname" value={teamNickname} onChange={setTeamNickname} maxLength={100} />
         </section>
 
         <section className="border-t border-slate-200 pt-5 space-y-3">
           <h2 className="text-sm font-bold uppercase text-slate-500">Match</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             <TextField label="Opponent" value={opponentName} onChange={setOpponentName} required />
+            <TextField label="Opponent nickname" value={opponentNickname} onChange={setOpponentNickname} maxLength={100} />
             <label className="block text-sm font-medium text-slate-700">
               Date
               <input type="date" value={date} onChange={event => setDate(event.target.value)} className="input-field mt-1" />
@@ -568,16 +582,22 @@ function ModeButton({ active, onClick, icon, label, disabled = false }: {
   )
 }
 
-function TextField({ label, value, onChange, required = false }: {
+function TextField({ label, value, onChange, required = false, maxLength }: {
   label: string
   value: string
   onChange: (value: string) => void
   required?: boolean
+  maxLength?: number
 }) {
   return (
     <label className="block text-sm font-medium text-slate-700">
       {label}{required ? ' *' : ''}
-      <input value={value} onChange={event => onChange(event.target.value)} className="input-field mt-1" />
+      <input
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        maxLength={maxLength}
+        className="input-field mt-1"
+      />
     </label>
   )
 }

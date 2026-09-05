@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { isTeamPseudoPlayer, playersWithTeamPlaceholders } from '../lib/teamPlayers'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { gameSideDisplayName } from '../lib/display'
 
 interface CheckoutRow {
   player_id: string
@@ -170,7 +171,7 @@ export default function GameCheckout() {
           </button>
           <h1 className="text-lg font-bold">Who are you tracking?</h1>
           <p className="text-sm opacity-80 mt-1">
-            {gameInfo.teamName} vs {gameInfo.opponentName}
+            {gameSideDisplayName(gameInfo, 'tracked')} vs {gameSideDisplayName(gameInfo, 'opponent')}
           </p>
           <p className="text-xs opacity-60 mt-1">
             Select the players you will record stats for. Others can track the same game.

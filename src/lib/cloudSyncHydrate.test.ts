@@ -210,10 +210,10 @@ describe('optional game select fallbacks', () => {
       message: 'column games.notes does not exist',
     })
     expect(buildOptionalGameSelectSuffix(gaps)).toBe(
-      ',home_team_score,home_score_adjustment,tournament_id,last_opened_at,season_id,sport_id,home_team_player_id,opp_team_player_id'
+      ',home_team_score,home_score_adjustment,tournament_id,last_opened_at,season_id,sport_id,home_team_player_id,opp_team_player_id,tracked_team_nickname,opponent_nickname'
     )
     expect(buildOptionalGameSelectSuffix(gaps, { includeLastOpened: false })).toBe(
-      ',home_team_score,home_score_adjustment,tournament_id,season_id,sport_id,home_team_player_id,opp_team_player_id'
+      ',home_team_score,home_score_adjustment,tournament_id,season_id,sport_id,home_team_player_id,opp_team_player_id,tracked_team_nickname,opponent_nickname'
     )
   })
 
@@ -227,6 +227,7 @@ describe('optional game select fallbacks', () => {
       seasonId: true,
       sportId: true,
       teamPlaceholders: true,
+      sideNicknames: true,
     }
     expect(buildOptionalGameSelectSuffix(gaps)).toBe('')
     expect(buildOptionalGameSelectSuffix(gaps, { includeLastOpened: false })).toBe('')

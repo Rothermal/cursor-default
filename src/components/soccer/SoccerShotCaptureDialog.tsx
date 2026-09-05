@@ -31,6 +31,7 @@ import {
 import type { GameState } from '../../types'
 import { useStableSoccerCorrectionDraft } from '../../hooks/useStableSoccerCorrectionDraft'
 import SoccerField from './SoccerField'
+import { gameSideDisplayName } from '../../lib/display'
 
 export interface SoccerCaptureDraft {
   teamSide: SoccerTeamSide
@@ -93,6 +94,8 @@ export default function SoccerShotCaptureDialog({
   )
   const periodTimings = useMemo(() => soccerPeriodTimings(state), [state])
   const recentOpponentLabels = useMemo(() => opponentLabels(state), [state])
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentTeamLabel = gameSideDisplayName(state.gameInfo, 'opponent')
   const mode = draft?.mode ?? (draft?.event ? 'edit' : 'live')
   const [teamSide, setTeamSide] = useState<SoccerTeamSide>('tracked')
   const [outcome, setOutcome] = useState<SoccerShotOutcome | null>(null)
@@ -327,10 +330,10 @@ export default function SoccerShotCaptureDialog({
     } else {
       const shooter: SoccerCaptureActorSelection = teamSide === 'tracked'
         ? trackedShooterId === '__team__'
-          ? { kind: 'team', label: state.gameInfo?.teamName ?? 'Tracked team' }
+          ? { kind: 'team', label: trackedLabel }
           : { kind: 'participant', participantId: trackedShooterId }
         : opponentShooterMode === 'team'
-          ? { kind: 'team', label: state.gameInfo?.opponentName ?? 'Opponent' }
+          ? { kind: 'team', label: opponentTeamLabel }
           : { kind: 'unknown', label: opponentShooterLabel || 'Unknown opponent' }
       const goalkeeperSelection = teamSide === 'opponent'
         ? trackedGoalkeeperId && (outcome === 'goal' || outcome === 'saved' || situation === 'penalty')
@@ -360,7 +363,7 @@ export default function SoccerShotCaptureDialog({
         blocker: outcome === 'blocked'
           ? teamSide === 'opponent'
             ? trackedBlockerId === '__team__'
-              ? { kind: 'team', label: state.gameInfo?.teamName ?? 'Tracked team' }
+              ? { kind: 'team', label: trackedLabel }
               : trackedBlockerId === '__unknown__'
                 ? { kind: 'unknown', label: 'Unknown tracked blocker' }
                 : { kind: 'participant', participantId: trackedBlockerId }
@@ -400,7 +403,7 @@ export default function SoccerShotCaptureDialog({
       >
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
           <div className="min-w-0 flex-1">
-            <h2 id="soccer-capture-title" className="font-bold text-slate-900">{teamSide === 'tracked' ? state.gameInfo?.teamName : state.gameInfo?.opponentName}</h2>
+            <h2 id="soccer-capture-title" className="truncate font-bold text-slate-900" title={teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}>{teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}</h2>
             <p className="text-xs text-slate-500">{location ? `${Math.round(location.x * 100)}, ${Math.round(location.y * 100)}` : 'Location unknown'}</p>
           </div>
           <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button>
@@ -411,8 +414,8 @@ export default function SoccerShotCaptureDialog({
             <>
               <FieldGroup label="Side">
                 <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
-                  <ChoiceButton active={teamSide === 'tracked'} label="Tracked" onClick={() => { setTeamSide('tracked'); if (teamSide !== 'tracked') setSourceEventId('') }} compact />
-                  <ChoiceButton active={teamSide === 'opponent'} label="Opponent" onClick={() => { setTeamSide('opponent'); if (teamSide !== 'opponent') setSourceEventId('') }} compact />
+                  <ChoiceButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => { setTeamSide('tracked'); if (teamSide !== 'tracked') setSourceEventId('') }} compact />
+                  <ChoiceButton active={teamSide === 'opponent'} label={opponentTeamLabel} onClick={() => { setTeamSide('opponent'); if (teamSide !== 'opponent') setSourceEventId('') }} compact />
                 </div>
               </FieldGroup>
               <FieldGroup label="Match time">
@@ -620,6 +623,8 @@ export default function SoccerShotCaptureDialog({
             <SoccerField
               trackedDirection={trackedDirection}
               captureSide={teamSide}
+              trackedLabel={trackedLabel}
+              opponentLabel={opponentTeamLabel}
               flipped={locationFieldFlipped}
               disabled={false}
               onFlip={() => setLocationFieldFlipped(value => !value)}

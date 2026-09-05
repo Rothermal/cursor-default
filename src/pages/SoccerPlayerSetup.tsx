@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGame } from '../context/GameContext'
 import { useSoccerTeamSettings } from '../hooks/useSoccerTeamSettings'
 import { supabase } from '../lib/supabase'
+import { gameSideDisplayName } from '../lib/display'
 import { parseSoccerRosterRole } from '../lib/soccer/rosterRole'
 import {
   createSoccerSportGameState,
@@ -383,7 +384,7 @@ export default function SoccerPlayerSetup() {
           <div className="min-w-0">
             <h1 className="text-lg font-bold">{step === 'roster' ? 'Match Roster' : 'Opening Lineup'}</h1>
             <p className="text-sm text-emerald-100 truncate">
-              {state.gameInfo.teamName} vs {state.gameInfo.opponentName}
+              {gameSideDisplayName(state.gameInfo, 'tracked')} vs {gameSideDisplayName(state.gameInfo, 'opponent')}
             </p>
           </div>
           <span className="ml-auto text-xs font-semibold bg-white/15 rounded px-2 py-1">

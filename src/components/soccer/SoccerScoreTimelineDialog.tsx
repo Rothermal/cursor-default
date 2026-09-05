@@ -14,6 +14,7 @@ import {
   type SoccerTeamSide,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
+import { gameSideDisplayName } from '../../lib/display'
 
 interface SoccerScoreTimelineDialogProps {
   open: boolean
@@ -48,6 +49,8 @@ export default function SoccerScoreTimelineDialog({
   const timings = useMemo(() => soccerPeriodTimings(state), [state])
   const correctionsLocked = state.sportGameState?.sportId === 'soccer' &&
     Boolean(state.sportGameState.projection.shootout)
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
 
   useEffect(() => {
     if (open) setEditing(correctionsLocked || readOnly ? null : initialEdit)
@@ -60,7 +63,7 @@ export default function SoccerScoreTimelineDialog({
         <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
           <div className="min-w-0 flex-1">
             <h2 id="soccer-score-title" className="font-bold text-slate-900">Scoring Timeline</h2>
-            <p className="text-xs text-slate-500">{state.gameInfo?.teamName} {state.homeTeamScore ?? 0} - {state.opponentScore} {state.gameInfo?.opponentName}</p>
+            <p className="text-xs text-slate-500">{trackedLabel} {state.homeTeamScore ?? 0} - {state.opponentScore} {opponentLabel}</p>
           </div>
           <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button>
         </header>
@@ -91,6 +94,7 @@ export default function SoccerScoreTimelineDialog({
                     event={event}
                     timeLabel={soccerEventTimeLabel(event, timings)}
                     editable={!correctionsLocked && !readOnly}
+                    sideLabel={event.teamSide === 'tracked' ? trackedLabel : opponentLabel}
                     onEdit={() => {
                       if (event.eventType === 'soccer.score_adjustment') {
                         setEditing(event as SoccerScoreAdjustmentEvent)
@@ -134,6 +138,8 @@ function ScoreAdjustmentForm({ state, event, recorderUserId, busy, onApply, onCa
   const absoluteElapsedMs = timing ? timing.startElapsedMs + periodElapsedMs : 0
   const timingInvalid = !timing || absoluteElapsedMs < timing.startElapsedMs || absoluteElapsedMs > timing.endElapsedMs
   const score = teamSide === 'tracked' ? state.homeTeamScore ?? 0 : state.opponentScore
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
   const disabled = busy || !reason.trim() || timingInvalid || (delta === -1 && !event && score <= 0)
 
   const save = () => {
@@ -155,8 +161,8 @@ function ScoreAdjustmentForm({ state, event, recorderUserId, busy, onApply, onCa
       <div>
         <p className="mb-2 text-xs font-bold uppercase text-slate-500">Side</p>
         <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
-          <ModeButton active={teamSide === 'tracked'} label="Tracked" onClick={() => setTeamSide('tracked')} />
-          <ModeButton active={teamSide === 'opponent'} label="Opponent" onClick={() => setTeamSide('opponent')} />
+          <ModeButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => setTeamSide('tracked')} />
+          <ModeButton active={teamSide === 'opponent'} label={opponentLabel} onClick={() => setTeamSide('opponent')} />
         </div>
       </div>
       <div>
@@ -186,7 +192,7 @@ function ScoreAdjustmentForm({ state, event, recorderUserId, busy, onApply, onCa
   )
 }
 
-function ScoringRow({ event, timeLabel, editable, onEdit }: { event: GameEvent; timeLabel: string; editable: boolean; onEdit: () => void }) {
+function ScoringRow({ event, timeLabel, editable, sideLabel, onEdit }: { event: GameEvent; timeLabel: string; editable: boolean; sideLabel: string; onEdit: () => void }) {
   const detail = event.eventType === 'soccer.shot'
     ? actorLabel(event, 'shooter')
     : event.eventType === 'soccer.own_goal'
@@ -199,7 +205,7 @@ function ScoringRow({ event, timeLabel, editable, onEdit }: { event: GameEvent; 
     <div className="flex min-h-16 items-center gap-3 py-3">
       <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-md text-sm font-black ${event.teamSide === 'tracked' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-800'}`}>{delta > 0 ? `+${delta}` : delta}</div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-800">{event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} score</p>
+        <p className="truncate text-sm font-semibold text-slate-800">{sideLabel} score</p>
         <p className="truncate text-xs text-slate-500">{detail}</p>
         <p className="mt-0.5 text-[11px] text-slate-400">{timeLabel} · rev {event.revision}</p>
       </div>
@@ -209,7 +215,7 @@ function ScoringRow({ event, timeLabel, editable, onEdit }: { event: GameEvent; 
 }
 
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`min-h-9 rounded text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
+  return <button type="button" onClick={onClick} title={label} className={`min-h-9 min-w-0 truncate rounded px-2 text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
 }
 
 function actorLabel(event: GameEvent, role: string): string {

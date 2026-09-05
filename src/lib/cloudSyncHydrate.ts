@@ -2,6 +2,7 @@ import type { Player } from '../types'
 import { TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from './teamPlayers'
 import {
   isMissingGameTeamPlaceholderColumnError,
+  isMissingGameSideNicknameColumnError,
   isMissingHomeScoreAdjustmentColumnError,
   isMissingHomeTeamScoreColumnError,
   isMissingLastOpenedColumnError,
@@ -38,6 +39,7 @@ export type OptionalGameColumnGaps = {
   seasonId: boolean
   sportId: boolean
   teamPlaceholders: boolean
+  sideNicknames: boolean
 }
 
 export type LegacyCloudGameCandidate = {
@@ -186,6 +188,7 @@ export function detectOptionalGameColumnGaps(
     seasonId: isMissingSeasonIdColumnError(error),
     sportId: isMissingSportIdColumnError(error),
     teamPlaceholders: isMissingGameTeamPlaceholderColumnError(error),
+    sideNicknames: isMissingGameSideNicknameColumnError(error),
   }
 }
 
@@ -198,7 +201,8 @@ export function hasAnyOptionalGameColumnGap(gaps: OptionalGameColumnGaps): boole
     gaps.notes ||
     gaps.seasonId ||
     gaps.sportId ||
-    gaps.teamPlaceholders
+    gaps.teamPlaceholders ||
+    gaps.sideNicknames
   )
 }
 
@@ -211,7 +215,8 @@ export function hasLoadByIdOptionalGameColumnGap(gaps: OptionalGameColumnGaps): 
     gaps.notes ||
     gaps.seasonId ||
     gaps.sportId ||
-    gaps.teamPlaceholders
+    gaps.teamPlaceholders ||
+    gaps.sideNicknames
   )
 }
 
@@ -232,6 +237,7 @@ export function buildOptionalGameSelectSuffix(
     (includeLastOpened && !gaps.lastOpened ? ',last_opened_at' : '') +
     (!gaps.seasonId ? ',season_id' : '') +
     (!gaps.sportId ? ',sport_id' : '') +
-    (!gaps.teamPlaceholders ? ',home_team_player_id,opp_team_player_id' : '')
+    (!gaps.teamPlaceholders ? ',home_team_player_id,opp_team_player_id' : '') +
+    (!gaps.sideNicknames ? ',tracked_team_nickname,opponent_nickname' : '')
   )
 }

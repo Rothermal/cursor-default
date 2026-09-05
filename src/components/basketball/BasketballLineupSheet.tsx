@@ -18,6 +18,7 @@ import type {
   BasketballSubstitutionReasonCode,
   BasketballTeamSide,
 } from '../../lib/basketball/types'
+import { gameSideDisplayName } from '../../lib/display'
 
 const POSITION_OPTIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const
 
@@ -155,8 +156,8 @@ export default function BasketballLineupSheet({
   if (!projection || !model || availableSides.length === 0) return null
 
   const sideName = (side: BasketballTeamSide) => side === 'tracked'
-    ? state.gameInfo?.teamName || 'Tracked'
-    : state.gameInfo?.opponentName || 'Opponent'
+    ? gameSideDisplayName(state.gameInfo, 'tracked')
+    : gameSideDisplayName(state.gameInfo, 'opponent')
 
   const changeSide = (side: BasketballTeamSide) => {
     setTeamSide(side)

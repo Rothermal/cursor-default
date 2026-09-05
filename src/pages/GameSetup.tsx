@@ -53,6 +53,7 @@ import {
   parseTeamRole,
   type TeamRole,
 } from '../lib/teamPermissions'
+import { teamDisplayName } from '../lib/display'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -63,6 +64,7 @@ interface CloudTeam {
   owner_id: string
   accessRole: TeamRole
   name: string
+  nickname: string | null
   season_id: string
   seasons: {
     id: string
@@ -168,9 +170,17 @@ export default function GameSetup() {
     matchingInitialBasketballDraft?.source.teamName ??
     (initialBasketballRoute ? '' : state.gameInfo?.teamName || '')
   )
+  const [teamNickname, setTeamNickname] = useState(
+    matchingInitialBasketballDraft?.source.teamNickname ??
+    (initialBasketballRoute ? '' : state.gameInfo?.teamNickname || '')
+  )
   const [opponentName, setOpponentName] = useState(
     matchingInitialBasketballDraft?.gameInfo.opponentName ??
     (initialBasketballRoute ? '' : state.gameInfo?.opponentName || '')
+  )
+  const [opponentNickname, setOpponentNickname] = useState(
+    matchingInitialBasketballDraft?.gameInfo.opponentNickname ??
+    (initialBasketballRoute ? '' : state.gameInfo?.opponentNickname || '')
   )
   const [tournamentName, setTournamentName] = useState(
     matchingInitialBasketballDraft?.gameInfo.tournamentName ??
@@ -385,7 +395,7 @@ export default function GameSetup() {
         await Promise.all([
           supabase!
             .from('teams')
-            .select('id,owner_id,name,season_id,seasons!inner(id,name,sport,team_stats_config)')
+            .select('id,owner_id,name,nickname,season_id,seasons!inner(id,name,sport,team_stats_config)')
             .eq('seasons.sport', sport.id)
             .order('created_at', { ascending: false }),
           supabase!
@@ -425,6 +435,7 @@ export default function GameSetup() {
         setTeamMode('existing')
         setSelectedTeamId('')
         setTeamName('')
+        setTeamNickname('')
         setSeasonFilter('')
         setTeamsError('That team is unavailable for tracking. Viewer access is read-only.')
         setLoadingTeams(false)
@@ -445,6 +456,7 @@ export default function GameSetup() {
         setTeamMode('new')
         setSelectedTeamId('')
         setTeamName(restoredPersonalDraft.source.teamName)
+        setTeamNickname(restoredPersonalDraft.source.teamNickname ?? '')
         setSelectedNewTeamSeasonId(restoredPersonalDraft.source.seasonId ?? '')
         setLoadingTeams(false)
         return
@@ -461,6 +473,7 @@ export default function GameSetup() {
       setTeamMode('existing')
       setSelectedTeamId(preferredTeam.id)
       setTeamName(preferredTeam.name)
+      setTeamNickname(preferredTeam.nickname?.trim() ?? '')
       if (requestedTeam) setSeasonFilter(preferredTeam.season_id)
       setLoadingTeams(false)
     }
@@ -524,7 +537,9 @@ export default function GameSetup() {
     setBasketballMatchOverrides(restored.event?.matchOverrides ?? {})
     setCommittedLocalGameId(restored.committedLocalGameId)
     setTeamName(restored.source.teamName)
+    setTeamNickname(restored.source.teamNickname ?? '')
     setOpponentName(restored.gameInfo.opponentName)
+    setOpponentNickname(restored.gameInfo.opponentNickname ?? '')
     setTournamentName(restored.gameInfo.tournamentName)
     setDate(restored.gameInfo.date)
     setTeamMode(restored.source.kind === 'team' ? 'existing' : 'new')
@@ -642,6 +657,7 @@ export default function GameSetup() {
         teamId: selectedTeam.id,
         seasonId: selectedTeam.season_id,
         teamName: selectedTeam.name,
+        teamNickname: teamNickname.trim() || null,
         seasonName: selectedTeam.seasons.name,
         accessRole: selectedTeam.accessRole,
       }
@@ -649,6 +665,7 @@ export default function GameSetup() {
       source = {
         kind: 'personal',
         teamName,
+        teamNickname: teamNickname.trim() || null,
         seasonId: selectedNewTeamSeasonId || null,
         seasonName: selectedNewTeamSeasonRow?.name ?? '',
       }
@@ -736,6 +753,7 @@ export default function GameSetup() {
       authority: basketballAuthority,
       gameInfo: {
         opponentName,
+        opponentNickname: opponentNickname.trim() || null,
         tournamentMode,
         tournamentId: tournamentMode === 'existing' ? selectedTournamentId : null,
         tournamentName: tournamentDraftName,
@@ -768,6 +786,7 @@ export default function GameSetup() {
     newTournamentName,
     newTournamentUrl,
     opponentName,
+    opponentNickname,
     requestedTeamId,
     selectedNewTeamSeasonId,
     selectedNewTeamSeasonRow,
@@ -775,6 +794,7 @@ export default function GameSetup() {
     selectedTournamentId,
     teamMode,
     teamName,
+    teamNickname,
     tournamentName,
     tournaments,
   ])
@@ -1246,7 +1266,9 @@ export default function GameSetup() {
       type: 'SET_GAME_INFO',
       gameInfo: {
         teamName: resolvedTeamName,
+        teamNickname: teamNickname.trim() || null,
         opponentName: opponentName.trim(),
+        opponentNickname: opponentNickname.trim() || null,
         tournamentName: resolvedTournamentName,
         tournamentId: resolvedTournamentId,
         date,
@@ -1413,6 +1435,7 @@ export default function GameSetup() {
                           if (filtered.length > 0 && !filtered.some(t => t.id === selectedTeamId)) {
                             setSelectedTeamId(filtered[0].id)
                             setTeamName(filtered[0].name)
+                            setTeamNickname(filtered[0].nickname?.trim() ?? '')
                           }
                         }}
                         className="input-field"
@@ -1433,13 +1456,16 @@ export default function GameSetup() {
                       const nextTeamId = e.target.value
                       setSelectedTeamId(nextTeamId)
                       const team = teams.find(item => item.id === nextTeamId)
-                      if (team) setTeamName(team.name)
+                      if (team) {
+                        setTeamName(team.name)
+                        setTeamNickname(team.nickname?.trim() ?? '')
+                      }
                     }}
                     className="input-field"
                   >
                     {filteredTeams.map(team => (
                       <option key={team.id} value={team.id}>
-                        {team.name}{team.seasons?.name ? ` (${team.seasons.name})` : ''}
+                        {teamDisplayName(team)}{team.seasons?.name ? ` (${team.seasons.name})` : ''}
                       </option>
                     ))}
                   </select>
@@ -1497,6 +1523,20 @@ export default function GameSetup() {
               />
             </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">
+              Your Team Nickname
+            </label>
+            <input
+              type="text"
+              value={teamNickname}
+              onChange={e => setTeamNickname(e.target.value)}
+              placeholder="Optional short label"
+              maxLength={100}
+              className="input-field"
+            />
+          </div>
 
           {showBasketballEventToggle && (
             <section className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
@@ -1607,6 +1647,20 @@ export default function GameSetup() {
               value={opponentName}
               onChange={e => setOpponentName(e.target.value)}
               placeholder="e.g., Tigers"
+              className="input-field"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">
+              Opponent Nickname
+            </label>
+            <input
+              type="text"
+              value={opponentNickname}
+              onChange={e => setOpponentNickname(e.target.value)}
+              placeholder="Optional short label"
+              maxLength={100}
               className="input-field"
             />
           </div>

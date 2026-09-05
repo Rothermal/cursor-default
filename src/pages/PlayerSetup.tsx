@@ -11,6 +11,7 @@ import {
   TEAM_PLAYER_OPP_ID,
 } from '../lib/teamPlayers'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { gameSideDisplayName } from '../lib/display'
 import {
   hasStartedBasketballEventGame,
   isBasketballMatchRulesV2,
@@ -527,7 +528,7 @@ export default function PlayerSetup() {
           <div>
             <h1 className="text-lg font-bold">{sport.icon} {sport.name}</h1>
             <p className="text-sm opacity-80">
-              {state.gameInfo.teamName} vs {state.gameInfo.opponentName}
+              {gameSideDisplayName(state.gameInfo, 'tracked')} vs {gameSideDisplayName(state.gameInfo, 'opponent')}
             </p>
           </div>
         </div>

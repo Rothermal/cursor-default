@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, Play, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import type { GameState } from '../../types'
+import { gameSideDisplayName } from '../../lib/display'
 import {
   isBasketballEditableRelatedEvent,
   type BasketballHistoricalRelatedEventType,
@@ -67,6 +68,12 @@ export default function BasketballTimeline({
   const { state: contextState } = useGame()
   const state = reviewState ?? contextState
   const summaryMode = mode === 'summary'
+  const trackedSideLabel = summaryMode
+    ? state.gameInfo?.teamName || 'Tracked team'
+    : gameSideDisplayName(state.gameInfo, 'tracked', 'Tracked team')
+  const opponentSideLabel = summaryMode
+    ? state.gameInfo?.opponentName || 'Opponent'
+    : gameSideDisplayName(state.gameInfo, 'opponent')
   const allowMutations = editingEnabled ?? !summaryMode
   const review = useMemo(
     () => buildBasketballTimelineReview(state, {
@@ -237,8 +244,8 @@ export default function BasketballTimeline({
             }))}
             options={[
               { value: 'all', label: 'Both sides' },
-              { value: 'tracked', label: state.gameInfo?.teamName || 'Tracked team' },
-              { value: 'opponent', label: state.gameInfo?.opponentName || 'Opponent' },
+              { value: 'tracked', label: trackedSideLabel },
+              { value: 'opponent', label: opponentSideLabel },
             ]}
           />
           <FilterSelect
@@ -389,9 +396,9 @@ export default function BasketballTimeline({
               : 'Unknown participant'
           }}
           teamLabel={eventDetail.teamSide === 'tracked'
-            ? state.gameInfo?.teamName || 'Tracked team'
+            ? trackedSideLabel
             : eventDetail.teamSide === 'opponent'
-              ? state.gameInfo?.opponentName || 'Opponent'
+              ? opponentSideLabel
               : 'Game administration'}
           onClose={() => {
             setEventDetail(null)

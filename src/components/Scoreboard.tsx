@@ -4,6 +4,7 @@ import { getDisplayedHomeScore } from '../lib/gameScore'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import type { BasketballTeamSide } from '../lib/basketball/types'
 import { isBasketballEventLocalOnly } from '../lib/basketball/eventCloudPolicy'
+import { gameSideDisplayName } from '../lib/display'
 
 interface EventScoreControls {
   disabled: boolean
@@ -25,6 +26,8 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
 
   const rosterPlayers = players.filter(p => !isTeamPseudoPlayer(p))
   const teamScore = getDisplayedHomeScore(sport, rosterPlayers, homeTeamScore, homeScoreAdjustment)
+  const trackedLabel = gameSideDisplayName(gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(gameInfo, 'opponent')
 
   const syncLabel = (() => {
     if (isBasketballEventLocalOnly(state) && cloudSync.status !== 'error') {
@@ -56,7 +59,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
       <div className="flex items-center justify-between">
         <div className="flex-1 text-center">
           <p className="text-xs font-medium uppercase tracking-wide opacity-80">
-            {gameInfo.teamName}
+            {trackedLabel}
           </p>
           <p className="text-4xl font-bold tabular-nums">{teamScore}</p>
           {!readOnly && <div className="flex justify-center gap-2 mt-1">
@@ -77,7 +80,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
             <button
               onClick={() => eventScoreControls.onAdjust('tracked', -1)}
               disabled={eventScoreControls.disabled || teamScore === 0}
-              aria-label={`Decrease ${gameInfo.teamName} score`}
+              aria-label={`Decrease ${trackedLabel} score`}
               className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
             >
               -
@@ -85,7 +88,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
             <button
               onClick={() => eventScoreControls.onAdjust('tracked', 1)}
               disabled={eventScoreControls.disabled}
-              aria-label={`Increase ${gameInfo.teamName} score`}
+              aria-label={`Increase ${trackedLabel} score`}
               className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
             >
               +
@@ -102,7 +105,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
 
         <div className="flex-1 text-center">
           <p className="text-xs font-medium uppercase tracking-wide opacity-80">
-            {gameInfo.opponentName}
+            {opponentLabel}
           </p>
           <p className="text-4xl font-bold tabular-nums">{opponentScore}</p>
           {!readOnly && <div className="flex justify-center gap-2 mt-1">
@@ -123,7 +126,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
             <button
               onClick={() => eventScoreControls.onAdjust('opponent', -1)}
               disabled={eventScoreControls.disabled || opponentScore === 0}
-              aria-label={`Decrease ${gameInfo.opponentName} score`}
+              aria-label={`Decrease ${opponentLabel} score`}
               className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
             >
               -
@@ -131,7 +134,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
             <button
               onClick={() => eventScoreControls.onAdjust('opponent', 1)}
               disabled={eventScoreControls.disabled}
-              aria-label={`Increase ${gameInfo.opponentName} score`}
+              aria-label={`Increase ${opponentLabel} score`}
               className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
             >
               +

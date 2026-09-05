@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Clock3, Pause, Play, Settings2, Users } from 'lucide-react'
 import type { GameState } from '../../types'
+import { gameSideDisplayName } from '../../lib/display'
 import type { BasketballDeviceSettings } from '../../lib/settingsStorage'
 import {
   pauseBasketballClock,
@@ -321,7 +322,7 @@ export default function BasketballClockStrip({
       setLineupError(result.message)
       return
     }
-    const sideLabel = input.teamSide === 'tracked' ? 'Tracked' : 'Opponent'
+    const sideLabel = gameSideDisplayName(stateRef.current.gameInfo, input.teamSide)
     setLineupSide(null)
     setLineupError(null)
     setNotice(`${sideLabel} lineup updated.`)

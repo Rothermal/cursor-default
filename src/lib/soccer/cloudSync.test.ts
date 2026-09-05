@@ -21,6 +21,9 @@ const cloudMock = vi.hoisted(() => ({
   from: vi.fn(),
   select: vi.fn(),
   in: vi.fn(),
+  update: vi.fn(),
+  eq: vi.fn(),
+  is: vi.fn(),
 }))
 
 vi.mock('../supabase', () => ({
@@ -169,9 +172,15 @@ describe('soccer event cloud sync helpers', () => {
     cloudMock.from.mockReset()
     cloudMock.select.mockReset()
     cloudMock.in.mockReset()
-    cloudMock.from.mockReturnValue({ select: cloudMock.select })
+    cloudMock.update.mockReset()
+    cloudMock.eq.mockReset()
+    cloudMock.is.mockReset()
+    cloudMock.from.mockReturnValue({ select: cloudMock.select, update: cloudMock.update })
     cloudMock.select.mockReturnValue({ in: cloudMock.in })
     cloudMock.in.mockResolvedValue({ data: [], error: null })
+    cloudMock.update.mockReturnValue({ eq: cloudMock.eq })
+    cloudMock.eq.mockReturnValue({ is: cloudMock.is })
+    cloudMock.is.mockResolvedValue({ data: [], error: null })
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
       name === 'bind_soccer_event_game_v4'
         ? {
@@ -270,6 +279,34 @@ describe('soccer event cloud sync helpers', () => {
       p_event_count: 3,
       p_max_sequence: 2,
     })
+  })
+
+  it('freezes each side nickname independently so one existing label cannot block the other', async () => {
+    const state = startedState()
+    state.gameInfo = {
+      ...state.gameInfo!,
+      teamNickname: ' Aces ',
+      opponentNickname: ' Cubs ',
+    }
+
+    await syncSoccerEventGameToCloud({
+      state,
+      userId: 'user-1',
+      localGameId: '20000000-0000-4000-8000-000000000001',
+    })
+
+    expect(cloudMock.update.mock.calls).toEqual([
+      [{ tracked_team_nickname: 'Aces' }],
+      [{ opponent_nickname: 'Cubs' }],
+    ])
+    expect(cloudMock.eq.mock.calls).toEqual([
+      ['id', 'cloud-game-1'],
+      ['id', 'cloud-game-1'],
+    ])
+    expect(cloudMock.is.mock.calls).toEqual([
+      ['tracked_team_nickname', null],
+      ['opponent_nickname', null],
+    ])
   })
 
   it('skips closed conflict rows and submits only the latest choice for an open row', async () => {

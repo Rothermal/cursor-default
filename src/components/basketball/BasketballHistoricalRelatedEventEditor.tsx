@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
+import { gameSideDisplayName } from '../../lib/display'
 import {
   applyBasketballHistoricalRelatedEvent,
   basketballRelatedEventActorOptions,
@@ -117,8 +118,8 @@ export default function BasketballHistoricalRelatedEventEditor({ eventType, onCl
           }} />
           <BasketballHistoricalTimeField key={draft.period.id} state={state} period={draft.period} elapsedMs={draft.elapsedMs} onChange={elapsedMs => update({ elapsedMs })} />
           <BasketballEditorSegmentedControl label={paired ? 'Steal team' : 'Team'} value={draft.teamSide} options={[
-            { value: 'tracked', label: state.gameInfo?.teamName || 'Tracked' },
-            { value: 'opponent', label: state.gameInfo?.opponentName || 'Opponent' },
+            { value: 'tracked', label: gameSideDisplayName(state.gameInfo, 'tracked') },
+            { value: 'opponent', label: gameSideDisplayName(state.gameInfo, 'opponent') },
           ]} onChange={value => selectSide(value as BasketballHistoricalRelatedEventDraft['teamSide'])} />
           {!paired && draft.eventType === 'basketball.turnover' && <BasketballEditorSegmentedControl label="Turnover" value={draft.turnoverKind} options={[{ value: 'player', label: 'Player' }, { value: 'team', label: 'Team' }]} onChange={value => selectTurnoverKind(value as 'player' | 'team')} />}
           <BasketballEditorSelectField label={paired ? 'Stealer' : draft.eventType === 'basketball.turnover' ? 'Committed by' : 'Recorded for'} value={basketballShotActorSelectionKey(draft.actor, draft.teamSide)} options={actorOptions.map(option => ({ value: option.key, label: option.label }))} onChange={key => {
@@ -130,7 +131,7 @@ export default function BasketballHistoricalRelatedEventEditor({ eventType, onCl
         </BasketballEditorSection>
         {paired ? (
           <BasketballEditorSection title="Linked turnover">
-            <p className="text-sm font-semibold text-slate-700">{oppositeSide(draft.teamSide) === 'tracked' ? state.gameInfo?.teamName || 'Tracked team' : state.gameInfo?.opponentName || 'Opponent'}</p>
+            <p className="text-sm font-semibold text-slate-700">{gameSideDisplayName(state.gameInfo, oppositeSide(draft.teamSide), 'Team')}</p>
             <BasketballEditorSegmentedControl label="Turnover" value={draft.pairedTurnoverKind} options={[{ value: 'player', label: 'Player' }, { value: 'team', label: 'Team' }]} onChange={value => selectPairedTurnoverKind(value as 'player' | 'team')} />
             <BasketballEditorSelectField label="Committed by" value={basketballShotActorSelectionKey(draft.pairedTurnoverActor, oppositeSide(draft.teamSide))} options={pairedTurnoverOptions.map(option => ({ value: option.key, label: option.label }))} onChange={key => {
               const option = pairedTurnoverOptions.find(candidate => candidate.key === key)

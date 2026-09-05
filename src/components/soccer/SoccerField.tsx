@@ -32,6 +32,8 @@ interface SoccerFieldProps {
   presentation?: 'capture' | 'review'
   legendFamilies?: readonly SoccerFieldReviewFamily[]
   activeCaptureLabel?: string
+  trackedLabel?: string
+  opponentLabel?: string
 }
 
 export default function SoccerField({
@@ -47,6 +49,8 @@ export default function SoccerField({
   presentation = 'capture',
   legendFamilies,
   activeCaptureLabel,
+  trackedLabel = 'Tracked',
+  opponentLabel = 'Opponent',
 }: SoccerFieldProps) {
   const captureDirection = captureSide === 'tracked'
     ? trackedDirection
@@ -60,7 +64,7 @@ export default function SoccerField({
           <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase text-slate-600">
             {displayDirection === 'left_to_right' ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
             <span className="truncate">
-              {activeCaptureLabel ?? `${captureSide === 'tracked' ? 'Tracked' : 'Opponent'} attack`}
+              {activeCaptureLabel ?? `${captureSide === 'tracked' ? trackedLabel : opponentLabel} attack`}
             </span>
           </div>
           <button
@@ -134,7 +138,7 @@ export default function SoccerField({
         )}
       </div>
       {markers.length > 0 && (
-        <MarkerLegend families={legendFamilies} />
+        <MarkerLegend families={legendFamilies} trackedLabel={trackedLabel} opponentLabel={opponentLabel} />
       )}
     </div>
   )
@@ -142,14 +146,18 @@ export default function SoccerField({
 
 function MarkerLegend({
   families = ['attack', 'defense', 'restarts', 'discipline'],
+  trackedLabel,
+  opponentLabel,
 }: {
   families?: readonly SoccerFieldReviewFamily[]
+  trackedLabel: string
+  opponentLabel: string
 }) {
   const visible = new Set(families)
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-600" aria-label="Field marker legend">
-      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-yellow-400" />Tracked</span>
-      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" />Opponent</span>
+      <span className="flex min-w-0 items-center gap-1"><span className="h-2 w-2 shrink-0 rounded-full bg-yellow-400" /><span className="truncate" title={trackedLabel}>{trackedLabel}</span></span>
+      <span className="flex min-w-0 items-center gap-1"><span className="h-2 w-2 shrink-0 rounded-full bg-sky-400" /><span className="truncate" title={opponentLabel}>{opponentLabel}</span></span>
       {visible.has('attack') && (
         <>
           <span className="flex items-center gap-1"><LegendGlyph kind="goal" />Goal</span>
