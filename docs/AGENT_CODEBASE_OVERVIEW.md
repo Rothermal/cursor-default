@@ -197,7 +197,11 @@ only marked Basketball event games through that adapter, supports personal and a
 binding in the durable queue, and keeps nonfinal bound games locally authoritative and editable.
 BKE-4B3 adds strict current-recorder cloud adoption, resume-first parked bindings, shared explicit
 conflict controls, durable recovery metadata, malformed-source quarantine, and duplicate-binding
-import protection. Aggregate Basketball remains on snapshot sync; Event creation remained internal
+import protection. Post-await sync/recovery adoption compares the game fingerprint and a separate
+conflict-recovery fingerprint because a Soccer cloud choice can preserve the event revision while
+changing only recovery metadata. Pending retries keep the latest choice per durable conflict,
+skip rows the recorder can read as already resolved, and fail closed when a row is missing or
+unauthorized. Aggregate Basketball remains on snapshot sync; Event creation remained internal
 at this phase. The live two-device matrix is the BKE-4B exit signoff. BKE-4C
 recorder/finalization product and delivery decisions are approved in four slices. BKE-4C1 adds
 migration 057 with role-limited fixed Basketball recorder/readiness,

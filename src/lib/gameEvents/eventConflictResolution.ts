@@ -1,11 +1,36 @@
 import type { GameState } from '../../types'
-import { applyGameEventConflictResolution } from './cloudConflicts'
+import {
+  applyGameEventConflictResolution,
+  gameEventSyncFingerprint,
+} from './cloudConflicts'
 import type { EventCloudTransportAdapter } from './cloudTransport'
 import { isGameEventEnvelope } from './envelope'
 
 export type EventConflictResolutionResult =
   | { ok: true; state: GameState }
   | { ok: false; reason: string }
+
+export function eventConflictRecoveryFingerprint(state: GameState): string {
+  const eventSyncBase = Object.entries(state.cloudSync.eventSyncBase ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+  const eventConflicts = (state.cloudSync.eventConflicts ?? [])
+    .map(conflict => ({
+      conflictId: conflict.conflictId,
+      eventId: conflict.eventId,
+      local: gameEventSyncFingerprint(conflict.localEvent),
+      remote: gameEventSyncFingerprint(conflict.remoteEvent),
+    }))
+    .sort((left, right) => left.conflictId.localeCompare(right.conflictId))
+  const pending = (state.cloudSync.pendingEventConflictResolutions ?? [])
+    .map(item => ({ ...item }))
+    .sort((left, right) => (
+      left.conflictId.localeCompare(right.conflictId) ||
+      left.eventId.localeCompare(right.eventId) ||
+      left.resolution.localeCompare(right.resolution)
+    ))
+
+  return JSON.stringify({ eventSyncBase, eventConflicts, pending })
+}
 
 export function resolveEventConflictInState(
   state: GameState,
@@ -52,7 +77,9 @@ export function resolveEventConflictInState(
       },
       eventConflicts: remainingConflicts,
       pendingEventConflictResolutions: [
-        ...(state.cloudSync.pendingEventConflictResolutions ?? []),
+        ...(state.cloudSync.pendingEventConflictResolutions ?? []).filter(
+          pending => pending.conflictId !== applied.pending.conflictId
+        ),
         applied.pending,
       ],
       status: remainingConflicts.length > 0 ? 'error' : 'idle',

@@ -1,4 +1,9 @@
-import type { GameEventSyncConflict, GameState, Player } from '../../types'
+import type {
+  GameEventSyncConflict,
+  GameState,
+  PendingGameEventConflictResolution,
+  Player,
+} from '../../types'
 import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { supabase } from '../supabase'
 import {
@@ -90,6 +95,16 @@ export function eventRevisionCheckpoint(state: GameState): Array<{
 
 export function eventStreamFingerprint(state: GameState): string {
   return JSON.stringify(canonicalGameEventStreamForFingerprint(state.eventStream))
+}
+
+export function latestPendingConflictResolutions(
+  pending: PendingGameEventConflictResolution[]
+): PendingGameEventConflictResolution[] {
+  const latestByConflictId = new Map<string, PendingGameEventConflictResolution>()
+  for (const item of pending) {
+    latestByConflictId.set(item.conflictId, item)
+  }
+  return [...latestByConflictId.values()]
 }
 
 export function assertHealthyEventGame(
@@ -260,7 +275,29 @@ export async function syncEventGameToCloud({
     }
   }
 
-  for (const pending of state.cloudSync.pendingEventConflictResolutions ?? []) {
+  const pendingResolutions = latestPendingConflictResolutions(
+    state.cloudSync.pendingEventConflictResolutions ?? []
+  )
+  let conflictStatusById = new Map<string, string>()
+  if (pendingResolutions.length > 0) {
+    const { data: conflictRows, error: conflictStatusError } = await supabase
+      .from('game_event_conflicts')
+      .select('id,status')
+      .in('id', pendingResolutions.map(pending => pending.conflictId))
+    if (conflictStatusError) {
+      throw new Error(`Event conflict status could not load: ${conflictStatusError.message}`)
+    }
+    conflictStatusById = new Map(
+      (conflictRows ?? []).map(row => [row.id, row.status])
+    )
+  }
+
+  for (const pending of pendingResolutions) {
+    const conflictStatus = conflictStatusById.get(pending.conflictId)
+    if (conflictStatus === 'resolved') continue
+    if (conflictStatus !== 'open') {
+      throw new Error('Event conflict resolution could not sync: Conflict was not found')
+    }
     const resolvedEvent = mergedState.eventStream!.events.find(
       rawEvent => isGameEventEnvelope(rawEvent) && rawEvent.id === pending.eventId
     )
