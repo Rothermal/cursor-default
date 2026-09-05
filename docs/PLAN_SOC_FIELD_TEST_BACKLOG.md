@@ -40,7 +40,7 @@ item is planned.
 2. Keep `M*` items listed so later season/coach requests do not get lost.
 3. When an item is confirmed, write a focused plan and Q&A the way SOC-4 / F5-F12
    were planned. File lists, acceptance, and regression belong in that plan.
-   Restart capture has an active reader-first plan with R1-R3 implemented in
+   Restart capture has a completed reader-first plan with R1-R4 implemented in
    [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md).
 4. After a plan ships, mark the item implemented here and link the plan.
 
@@ -55,9 +55,9 @@ First matches already have:
 | Surface | What is already there |
 |---|---|
 | Setup | Immutable rules snapshot, IFAB / U.S. High School / Custom profiles, local or cloud roster |
-| Tracker | Full-pitch Field tab, Tracked/Opponent side, persisted capture mode, player chips, located Shot/Defense/Foul, quick Goal/Foul/Card/Team, Lineup, Timeline, shootout workspace |
+| Tracker | Full-pitch Field tab, Tracked/Opponent side, persisted capture mode, player chips, located Shot/Defense/Foul, quick Goal/Foul/Card plus one-shot Restart, Lineup, Timeline, shootout workspace |
 | Clock | Start/pause, period end, overflow clock correction, suspend/abandon/reopen |
-| Events | Shots with outcomes and creators, own goals, score adjustments, tackles/interceptions/clearances/recoveries, fouls/cards, corners/offsides, substitutions, roles, late participants |
+| Events | Shots with outcomes and creators, own goals, score adjustments, tackles/interceptions/clearances/recoveries, fouls/cards, corners/offsides/throw-ins/goal kicks, substitutions, roles, late participants |
 | Cloud | Independent recorder streams, conflicts, checkpoints, manager finalization/reopen |
 | Summary | Overview, Players, Timeline, Field, Shootout; local / primary / canonical sources |
 | Aggregates | Canonical `soc_*` player and team scopes; no standings |
@@ -534,21 +534,23 @@ or treating placement as a second shot event.
 
 ### S17 - Make the existing corner event obvious
 
-**Status:** approved plan — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)
+**Status:** implemented; owner functional verification complete — see
+[`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md) and
+[`REGRESSION_SOC_RESTARTS.md`](REGRESSION_SOC_RESTARTS.md)
+
 **Theme:** restarts  
-**Where:** Field Quick **Team** → Team Event sheet → Corner / Offside;
-Left/Right shortcuts; `soccer.team_event` `kind: 'corner'`
+**Where:** Field Quick **Restart** → main pitch tap → Restart sheet;
+`soccer.team_event` `kind: 'corner'`
 
 Owner follow-up: if corner is already an event, the gap is probably that
 the UI is not clean.
 
-That matches the current path. Corner is not a Field-tab control. It is
-hidden behind Quick Team, then a Corner/Offside toggle. Left/Right only
-set a corner-arc pin; they are not presented as “this corner, this side.”
-Save then drops actors, so even if a taker were chosen, it would not
-stick. Timeline/Field just say Team Event / Restart.
+The original gap was a corner hidden behind Quick Team and Left/Right
+shortcuts whose save path dropped actors. The implemented path makes Restart
+a visible one-shot field mode. The next canonical pitch tap opens the shared
+four-kind sheet, and Save preserves an optional side-safe taker.
 
-**Approved direction:** keep the existing corner event. Replace Quick Team
+**Implemented direction:** keep the existing corner event. Replace Quick Team
 with a one-shot Restart mode: tap Restart, tap the corner on the main field,
 then confirm the kind and optional taker. `GameEvent.location` is the placement
 source of truth; do not add a redundant left/right payload. Timeline can say
@@ -617,20 +619,21 @@ formation change is `S24`.
 
 ### S20 - Throw-ins
 
-**Status:** approved plan — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)
+**Status:** implemented; owner functional verification complete — see
+[`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md) and
+[`REGRESSION_SOC_RESTARTS.md`](REGRESSION_SOC_RESTARTS.md)
+
 **Theme:** restarts  
 **Where:** `SoccerTeamEventKind` and the shared live/historical sheet expose
-`'corner' | 'offside' | 'throw_in' | 'goal_kick'`; regression closure remains
-in R4.
+`'corner' | 'offside' | 'throw_in' | 'goal_kick'`.
 
-There is no throw-in event, quick action, or stat. SOC-0 / SOC-4 left
-throw-ins, goal kicks, and routine free kicks out of the core catalog on
-purpose. Corners are the restart that did ship; they are just hard to
-find (`S17`).
+SOC-0 / SOC-4 originally left throw-ins, goal kicks, and routine free kicks out
+of the core catalog. R1-R4 now add optional Throw-in and Goal-kick capture to
+the shared restart event while routine free kicks remain foul metadata.
 
 Owner asked after first matches whether throw-ins can be tracked.
 
-**Approved direction if promoted:** reuse the one-shot Restart flow from
+**Implemented direction:** reuse the one-shot Restart flow from
 `S17`: tap the main field, then confirm side, kind, and optional taker. Add
 `kind: 'throw_in'` and `kind: 'goal_kick'`; the existing event location is
 authoritative. Do not require an event on every restart. Goal kicks are in
@@ -919,8 +922,8 @@ S4  Recent-events undo on Field
 S8  Lineup as a live board
 S5  Reusable opponent identities
 S10 Defense without a mode switch
-S17 Make the existing corner event obvious
-S20 Throw-ins, only if we want them in the same sheet as corners
+S17 Make the existing corner event obvious [implemented]
+S20 Throw-ins and goal kicks [implemented]
 S7  Link the last restart to the next shot sequence
 M1  Team standings, only after completed-match volume exists
 ```
@@ -932,7 +935,9 @@ small follow-up that removes the now-redundant Soccer player row and establishes
 the shared actor-picker contract. `S26` is nearby in UX but separately touches
 immutable setup and naming across sports. `S15` and `S16` come after `S1` so
 extra goal metadata stays a skippable step, not another full attacking sheet.
-`S17` / `S20` finish restart capture before `S7` links the next shot. `S23`
+`S17` / `S20` have finished restart capture and owner functional verification;
+the shared completion-loop defect found during that run was fixed by PR #373.
+`S7` can now plan the next-shot link. `S23`
 extends setup defaults; `S24` remains a separate live atomic-transition plan.
 `M*` items stay behind a new phase name if promoted.
 
@@ -946,8 +951,8 @@ Use these labels before turning an item into an implementation plan:
 | Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S23`, `S24` | Short Q&A where choices remain, then a focused phase plan |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
 | Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
+| Implemented; owner functional verification complete | `S17`, `S20` | Keep the post-fix cloud completion replay in the focused regression record; proceed to `S7` planning when prioritized |
 | Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S19`, `S21` | Run the linked regression rows during the next live or deployed test |
-| Approved implementation plan | `S17`, `S20` | Deliver from the linked focused execution plans |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`, `S5`, `S8`, `S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
 The `S12` repair preserves the shared editor route, and the `S14` repair keeps
@@ -980,8 +985,9 @@ exercise those constraints rather than bypass them.
   into the team-settings schema slice.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
-- **Restarts:** `S17` + `S20` through `PLAN_SOC_RESTARTS.md`; `S7` follows only
-  after restart capture is stable.
+- **Restarts:** `S17` + `S20` are implemented through
+  `PLAN_SOC_RESTARTS.md`; run `REGRESSION_SOC_RESTARTS.md` during deployed
+  testing. `S7` follows only after restart capture is stable.
 - **General season UX:** `S21` is implemented as a cross-sport Teams / Season
   Info workflow, independent of the Soccer event model.
 
@@ -1024,15 +1030,16 @@ Broader Basketball event work continues in
 - Want shot/goal placement: shot from the left that landed on the right.
   Either a second field pin, or a goal-mouth view after a goal (`S16`).
 - Track corner kicks by tapping the corner and optionally recording the taker
-  (`S17`). The original left/right wording is superseded by tap-to-place. The
-  event already exists; the Field UI is not clean (Quick Team ->
-  Corner/Offside, no taker, weak Timeline label).
+  (`S17`). The original left/right wording is superseded by the implemented
+  one-shot tap-to-place Restart flow; deployed verification remains.
 - Two pins on the same spot correctly counted as 2. Flip reversed
   placement correctly, but the cluster number was upside down (`S18`).
 - Teams page: set a soccer lineup on a pitch (4-3-3, 4-4-2, 3-4-3), stored
   as a team setting. Product decisions and a three-slice plan are approved
   (`S19`).
-- Asked whether throw-ins can be tracked. They cannot today (`S20`).
+- Asked whether throw-ins can be tracked. They now share the optional
+  tap-to-place Restart flow with Corner and Goal kick (`S20`); deployed
+  verification remains.
 - Creating a new soccer or basketball season has no option to name it.
   Not only later editing (`S21`).
 - Second-match recovery export showed an intact game-scoped participant and
@@ -1049,8 +1056,8 @@ Broader Basketball event work continues in
 - Fouls/corners and their resulting penalty/free kick/header/shot outcome
   should present as a linked sequence. Use the existing restart-to-shot link
   before deciding that a broader chain schema is required (`S7`, `S15`).
-- Clean offside capture is already part of the approved one-shot Restart flow;
-  it is not a new event family (`S17`, `PLAN_SOC_RESTARTS.md` R3).
+- Clean offside capture is part of the implemented one-shot Restart flow; it is
+  not a new event family (`S17`, `PLAN_SOC_RESTARTS.md` R1-R4).
 - Team setup should remember normal starter/bench status, including backup
   goalkeepers, and a saved formation should later be applicable as a reviewed
   in-match batch change (`S23`, `S24`).

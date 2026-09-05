@@ -1364,6 +1364,27 @@ See [the focused S11/S3 plan](PLAN_SOC_MATCH_READINESS_S11_S3.md) for fixed scop
 
 ---
 
+## 11za. Soccer restart capture (S17/S20)
+
+R1-R4 implement reader-first Corner, Throw-in, Goal-kick, and Offside capture
+through the existing `soccer.team_event`. No migration or new capability
+version is required. Use
+[the focused restart matrix](REGRESSION_SOC_RESTARTS.md) for the complete
+operator record, cached/PWA compatibility rule, and failure handling.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 11za.1 | Run the focused and full automated commands in the restart matrix | Kind/actor validation, geometry, projection, review, one-shot wiring, cloud transport, and capability coverage pass |
+| 11za.2 | Restart -> tap the tracked attacking corner -> save Corner with a tracked taker | Corner is suggested, the actor persists, and the normal Shot/Defense/Foul preference does not change |
+| 11za.3 | Arm Restart and tap the same corner after a marker already exists there | Marker selection is disabled while armed, so the tap opens a new event instead of correcting the prior corner |
+| 11za.4 | Restart -> opponent touchline -> save Throw-in without a taker | Throw-in is suggested, no tracked player can be selected, and review says `Taker not recorded` |
+| 11za.5 | Restart -> awarded side's defending goal area -> confirm Goal kick; flip and repeat | Goal kick is suggested and both orientations store/review the equivalent canonical pitch location |
+| 11za.6 | Timeline Add/Edit each kind with Set/Clear location and actor changes | Historical unknown locations remain valid and corrections preserve only kind-valid, side-safe actors |
+| 11za.7 | Sync, reload/resume, inspect Timeline/Summary, then finalize a disposable cloud game | Migration 049 capability preflight succeeds and Supabase round-trip/canonical review preserve kind, side, actor, location, totals, and revisions |
+| 11za.8 | Open R3 data with an available cached R1/R2 client; refresh any pre-R1 installed shell before use | Reader-first clients inspect every writer payload; unsupported pre-R1 clients are updated rather than used to mutate the game |
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.
