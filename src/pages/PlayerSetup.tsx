@@ -111,8 +111,8 @@ export default function PlayerSetup() {
     if (!sport?.teamCategories?.length || !state.gameInfo) return
     const nextPlayers = playersWithTeamPlaceholders(
       state.players,
-      gameSideDisplayName(state.gameInfo, 'tracked'),
-      gameSideDisplayName(state.gameInfo, 'opponent')
+      state.gameInfo.teamName,
+      state.gameInfo.opponentName
     )
     if (!nextPlayers) return
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })

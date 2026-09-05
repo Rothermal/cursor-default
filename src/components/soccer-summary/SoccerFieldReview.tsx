@@ -18,7 +18,6 @@ import {
 } from '../../lib/soccer/summaryField'
 import type { SoccerSummarySource } from '../../lib/soccer/summarySource'
 import type { GameEvent } from '../../lib/gameEvents/types'
-import { gameSideDisplayName } from '../../lib/display'
 
 interface SoccerFieldReviewProps {
   source: SoccerSummarySource
@@ -57,8 +56,6 @@ export default function SoccerFieldReview({
     [families, orientation, participant, period, side, source]
   )
   const editable = canEditSoccerSummaryField(source)
-  const trackedLabel = gameSideDisplayName(source.state.gameInfo, 'tracked')
-  const opponentLabel = gameSideDisplayName(source.state.gameInfo, 'opponent')
   const selected = selectedIds.flatMap(id => {
     const item = review.events.find(event => event.event.id === id)
     return item ? [item] : []
@@ -129,8 +126,8 @@ export default function SoccerFieldReview({
             value={side}
             options={[
               { id: 'all', label: 'Both' },
-              { id: 'tracked', label: trackedLabel },
-              { id: 'opponent', label: opponentLabel },
+              { id: 'tracked', label: 'Tracked' },
+              { id: 'opponent', label: 'Opponent' },
             ]}
             onChange={setSide}
           />
@@ -183,8 +180,6 @@ export default function SoccerFieldReview({
           <SoccerField
             trackedDirection="left_to_right"
             captureSide="tracked"
-            trackedLabel={trackedLabel}
-            opponentLabel={opponentLabel}
             flipped={false}
             disabled
             markers={markers}

@@ -21,7 +21,6 @@ import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from '../basketball/BasketballTimelineCorrectionDialog'
 import { basketballCourtOrientationForState } from '../../lib/basketball/courtGeometry'
-import { gameSideDisplayName } from '../../lib/display'
 
 interface Props {
   source: BasketballSummarySource
@@ -31,8 +30,6 @@ type FocusTarget = HTMLElement | SVGElement
 
 export default function BasketballShotReview({ source }: Props) {
   const review = useMemo(() => basketballSummaryShotReview(source.state), [source.state])
-  const trackedLabel = gameSideDisplayName(source.state.gameInfo, 'tracked')
-  const opponentLabel = gameSideDisplayName(source.state.gameInfo, 'opponent')
   const [filters, setFilters] = useState<BasketballSummaryShotFilters>(
     DEFAULT_BASKETBALL_SUMMARY_SHOT_FILTERS
   )
@@ -155,8 +152,8 @@ export default function BasketballShotReview({ source }: Props) {
           <div className="grid grid-cols-3 rounded-md border border-slate-300 bg-slate-100 p-0.5">
             {([
               ['all', 'All'],
-              ['tracked', gameSideDisplayName(source.state.gameInfo, 'tracked')],
-              ['opponent', gameSideDisplayName(source.state.gameInfo, 'opponent')],
+              ['tracked', source.state.gameInfo?.teamName || 'Tracked'],
+              ['opponent', source.state.gameInfo?.opponentName || 'Opponent'],
             ] as const).map(([value, label]) => (
               <button
                 key={value}
@@ -182,7 +179,7 @@ export default function BasketballShotReview({ source }: Props) {
               { value: 'all', label: 'All players' },
               ...review.participants.map(participant => ({
                 value: participant.id,
-                label: `${participant.label} (${participant.teamSide === 'tracked' ? trackedLabel : opponentLabel})`,
+                label: `${participant.label} (${participant.teamSide === 'tracked' ? 'Tracked' : 'Opponent'})`,
               })),
             ]}
           />
@@ -226,8 +223,8 @@ export default function BasketballShotReview({ source }: Props) {
 
       <section className="border-b border-slate-200 bg-white px-3 py-4" aria-label="Filtered shot court">
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-xs font-semibold text-slate-600">
-          <LegendMark color="bg-blue-600" label={gameSideDisplayName(source.state.gameInfo, 'tracked')} />
-          <LegendMark color="bg-amber-600" label={gameSideDisplayName(source.state.gameInfo, 'opponent')} />
+          <LegendMark color="bg-blue-600" label={source.state.gameInfo?.teamName || 'Tracked'} />
+          <LegendMark color="bg-amber-600" label={source.state.gameInfo?.opponentName || 'Opponent'} />
           <span>Circle = made</span>
           <span>X = missed</span>
         </div>
@@ -257,16 +254,12 @@ export default function BasketballShotReview({ source }: Props) {
         shots={locatedShots}
         emptyMessage="No located shots match these filters."
         onOpen={openDetail}
-        trackedLabel={trackedLabel}
-        opponentLabel={opponentLabel}
       />
       <ShotList
         title="Unlocated shots"
         shots={unlocatedShots}
         emptyMessage="No unlocated shots match these filters."
         onOpen={openDetail}
-        trackedLabel={trackedLabel}
-        opponentLabel={opponentLabel}
         unlocated
       />
 
@@ -296,7 +289,7 @@ export default function BasketballShotReview({ source }: Props) {
                   }}
                   className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-blue-50"
                 >
-                  <ShotRowContent shot={shot} trackedLabel={trackedLabel} opponentLabel={opponentLabel} />
+                  <ShotRowContent shot={shot} />
                 </button>
               ))}
             </div>
@@ -355,16 +348,12 @@ function ShotList({
   shots,
   emptyMessage,
   onOpen,
-  trackedLabel,
-  opponentLabel,
   unlocated = false,
 }: {
   title: string
   shots: BasketballSummaryShot[]
   emptyMessage: string
   onOpen: (shot: BasketballSummaryShot, trigger?: HTMLElement | null) => void
-  trackedLabel: string
-  opponentLabel: string
   unlocated?: boolean
 }) {
   return (
@@ -389,7 +378,7 @@ function ShotList({
                 onClick={event => onOpen(shot, event.currentTarget)}
                 className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left active:bg-blue-50"
               >
-                <ShotRowContent shot={shot} trackedLabel={trackedLabel} opponentLabel={opponentLabel} />
+                <ShotRowContent shot={shot} />
                 <Eye size={16} className="shrink-0 text-slate-400" aria-hidden />
               </button>
             </li>
@@ -400,7 +389,7 @@ function ShotList({
   )
 }
 
-function ShotRowContent({ shot, trackedLabel, opponentLabel }: { shot: BasketballSummaryShot; trackedLabel: string; opponentLabel: string }) {
+function ShotRowContent({ shot }: { shot: BasketballSummaryShot }) {
   return (
     <span className="min-w-0 flex-1">
       <span className="flex flex-wrap items-center gap-1.5">
@@ -408,7 +397,7 @@ function ShotRowContent({ shot, trackedLabel, opponentLabel }: { shot: Basketbal
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
           shot.teamSide === 'tracked' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-900'
         }`}>
-          {shot.teamSide === 'tracked' ? trackedLabel : opponentLabel}
+          {shot.teamSide === 'tracked' ? 'Tracked' : 'Opponent'}
         </span>
       </span>
       <span className="mt-0.5 block truncate text-xs font-semibold text-slate-600">

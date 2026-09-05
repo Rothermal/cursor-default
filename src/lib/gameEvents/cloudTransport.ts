@@ -173,14 +173,9 @@ export async function syncEventGameToCloud({
   if (!binding?.game_id || !binding.game_status || !binding.participant_id_map) {
     throw new Error(`${adapter.sportLabel} game binding returned an invalid response`)
   }
-  await freezeGameSideNickname(
+  await freezeGameSideNicknames(
     binding.game_id,
-    'tracked_team_nickname',
-    state.gameInfo!.teamNickname
-  )
-  await freezeGameSideNickname(
-    binding.game_id,
-    'opponent_nickname',
+    state.gameInfo!.teamNickname,
     state.gameInfo!.opponentNickname
   )
   await validateBinding?.(binding.game_id)
@@ -365,20 +360,27 @@ export async function syncEventGameToCloud({
   }
 }
 
-async function freezeGameSideNickname(
+async function freezeGameSideNicknames(
   gameId: string,
-  column: 'tracked_team_nickname' | 'opponent_nickname',
-  nickname: string | null | undefined
+  trackedNickname: string | null | undefined,
+  opponentNickname: string | null | undefined
 ): Promise<void> {
-  const value = nickname?.trim()
-  if (!value || !supabase) return
-  const { error } = await supabase
+  const tracked = trackedNickname?.trim()
+  const opponent = opponentNickname?.trim()
+  if ((!tracked && !opponent) || !supabase) return
+
+  let query = supabase
     .from('games')
-    .update({ [column]: value })
+    .update({
+      ...(tracked ? { tracked_team_nickname: tracked } : {}),
+      ...(opponent ? { opponent_nickname: opponent } : {}),
+    })
     .eq('id', gameId)
-    .is(column, null)
+  if (tracked) query = query.is('tracked_team_nickname', null)
+  if (opponent) query = query.is('opponent_nickname', null)
+  const { error } = await query
   if (error) {
-    throw new Error(`Game side nickname could not be saved: ${error.message}`)
+    console.warn('[StatKeeper] Game side nicknames could not be saved', error.message)
   }
 }
 

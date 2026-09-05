@@ -14,7 +14,6 @@ import {
   type SoccerShootoutReview as SoccerShootoutReviewModel,
 } from '../../lib/soccer'
 import type { SoccerSummarySource } from '../../lib/soccer/summarySource'
-import { gameSideDisplayName } from '../../lib/display'
 
 interface SoccerShootoutReviewProps {
   source: SoccerSummarySource
@@ -35,8 +34,8 @@ export default function SoccerShootoutReview({
   }, [source])
   if (!review) return null
 
-  const trackedName = gameSideDisplayName(source.state.gameInfo, 'tracked')
-  const opponentName = gameSideDisplayName(source.state.gameInfo, 'opponent')
+  const trackedName = source.state.gameInfo?.teamName ?? 'Tracked'
+  const opponentName = source.state.gameInfo?.opponentName ?? 'Opponent'
   const status = shootoutStatus(review, trackedName, opponentName)
 
   return (

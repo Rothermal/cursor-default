@@ -339,11 +339,7 @@ export default function GameTracker() {
     if (state.cloudSync.teamId && !canTrackGames(teamAccess.role)) return
     if (!sport?.teamCategories?.length || !gameInfo) return
 
-    const nextPlayers = playersWithTeamPlaceholders(
-      players,
-      gameSideDisplayName(gameInfo, 'tracked'),
-      gameSideDisplayName(gameInfo, 'opponent')
-    )
+    const nextPlayers = playersWithTeamPlaceholders(players, gameInfo.teamName, gameInfo.opponentName)
     if (!nextPlayers) return
 
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })

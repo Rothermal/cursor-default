@@ -68,6 +68,12 @@ export default function BasketballTimeline({
   const { state: contextState } = useGame()
   const state = reviewState ?? contextState
   const summaryMode = mode === 'summary'
+  const trackedSideLabel = summaryMode
+    ? state.gameInfo?.teamName || 'Tracked team'
+    : gameSideDisplayName(state.gameInfo, 'tracked', 'Tracked team')
+  const opponentSideLabel = summaryMode
+    ? state.gameInfo?.opponentName || 'Opponent'
+    : gameSideDisplayName(state.gameInfo, 'opponent')
   const allowMutations = editingEnabled ?? !summaryMode
   const review = useMemo(
     () => buildBasketballTimelineReview(state, {
@@ -238,8 +244,8 @@ export default function BasketballTimeline({
             }))}
             options={[
               { value: 'all', label: 'Both sides' },
-              { value: 'tracked', label: gameSideDisplayName(state.gameInfo, 'tracked', 'Tracked team') },
-              { value: 'opponent', label: gameSideDisplayName(state.gameInfo, 'opponent') },
+              { value: 'tracked', label: trackedSideLabel },
+              { value: 'opponent', label: opponentSideLabel },
             ]}
           />
           <FilterSelect
@@ -390,9 +396,9 @@ export default function BasketballTimeline({
               : 'Unknown participant'
           }}
           teamLabel={eventDetail.teamSide === 'tracked'
-            ? gameSideDisplayName(state.gameInfo, 'tracked', 'Tracked team')
+            ? trackedSideLabel
             : eventDetail.teamSide === 'opponent'
-              ? gameSideDisplayName(state.gameInfo, 'opponent')
+              ? opponentSideLabel
               : 'Game administration'}
           onClose={() => {
             setEventDetail(null)

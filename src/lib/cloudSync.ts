@@ -1141,7 +1141,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
 
   const { data: teamRow, error: teamError } = await supabase
     .from('teams')
-    .select('id,name,nickname,season_id')
+    .select('id,name,season_id')
     .eq('id', gameRow.team_id)
     .maybeSingle()
 
@@ -1275,7 +1275,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     status: gameRow.status,
     gameInfo: {
       teamName: teamRow.name as string,
-      teamNickname: gameRow.tracked_team_nickname ?? (teamRow.nickname as string | null) ?? null,
+      teamNickname: gameRow.tracked_team_nickname ?? null,
       opponentName: gameRow.opponent_name,
       opponentNickname: gameRow.opponent_nickname ?? null,
       tournamentName: gameRow.tournament_name ?? '',

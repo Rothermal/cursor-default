@@ -1,6 +1,5 @@
 import { ChevronLeft, RefreshCw } from 'lucide-react'
 import type { BasketballSummarySource } from '../../lib/basketball/summarySource'
-import { gameSideDisplayName } from '../../lib/display'
 
 interface Props {
   source: BasketballSummarySource
@@ -60,12 +59,12 @@ export default function BasketballSummaryHeader({
 
         <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <TeamScore
-            name={gameSideDisplayName(source.state.gameInfo, 'tracked', 'Tracked team')}
+            name={source.state.gameInfo?.teamName || 'Tracked team'}
             score={healthy && projection ? projection.score.tracked : null}
           />
           <span className="text-sm font-semibold text-slate-500">vs</span>
           <TeamScore
-            name={gameSideDisplayName(source.state.gameInfo, 'opponent')}
+            name={source.state.gameInfo?.opponentName || 'Opponent'}
             score={healthy && projection ? projection.score.opponent : null}
             align="right"
           />
