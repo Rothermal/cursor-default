@@ -53,6 +53,7 @@ export interface SoccerIncidentDraft {
   kind: SoccerIncidentKind
   teamSide: SoccerTeamSide
   location: GameEventLocation | null
+  teamEventKind?: SoccerTeamEventKind
   mode?: 'live' | 'historical' | 'edit'
   event?: SoccerIncidentEvent
 }
@@ -80,6 +81,13 @@ const RESTARTS: Array<{ value: SoccerFoulRestart; label: string }> = [
   { value: 'penalty', label: 'Penalty' },
   { value: 'advantage', label: 'Advantage' },
   { value: 'none', label: 'None' },
+]
+
+const TEAM_EVENTS: Array<{ value: SoccerTeamEventKind; label: string }> = [
+  { value: 'corner', label: 'Corner' },
+  { value: 'throw_in', label: 'Throw-in' },
+  { value: 'goal_kick', label: 'Goal kick' },
+  { value: 'offside', label: 'Offside' },
 ]
 
 const REASONS: Array<{ value: SoccerDisciplineReason; label: string }> = [
@@ -134,7 +142,7 @@ export default function SoccerIncidentCaptureDialog({
   const [fouledParticipantId, setFouledParticipantId] = useState('')
   const [fouledLabel, setFouledLabel] = useState('Unknown opponent')
   const [teamEventKind, setTeamEventKind] = useState<SoccerTeamEventKind>('corner')
-  const [offsideActorRecorded, setOffsideActorRecorded] = useState(false)
+  const [teamEventActorRecorded, setTeamEventActorRecorded] = useState(false)
   const [disciplineChoice, setDisciplineChoice] = useState<SoccerDisciplineCaptureChoice>('stay')
   const [replacementInId, setReplacementInId] = useState('')
   const [replacementOutId, setReplacementOutId] = useState('')
@@ -252,10 +260,25 @@ export default function SoccerIncidentCaptureDialog({
     setTeamSide(nextSide)
     setAttribution(main.attribution)
     setParticipantId(main.participantId)
+    if (
+      draft?.kind === 'team_event' &&
+      nextSide === 'tracked' &&
+      teamEventKind !== 'offside' &&
+      main.attribution !== 'participant'
+    ) setTeamEventActorRecorded(false)
     if (fouledAttribution !== 'none') {
       setFouledAttribution(fouled.attribution)
       setFouledParticipantId(fouled.participantId)
     }
+  }
+
+  const changeTeamEventKind = (nextKind: SoccerTeamEventKind) => {
+    setTeamEventKind(nextKind)
+    if (
+      nextKind !== 'offside' &&
+      teamSide === 'tracked' &&
+      attribution !== 'participant'
+    ) setTeamEventActorRecorded(false)
   }
 
   useEffect(() => {
@@ -314,7 +337,9 @@ export default function SoccerIncidentCaptureDialog({
     setLocation(event?.location ?? initializationDraft.location)
     setAttribution(initialAttribution.attribution)
     setParticipantId(initialAttribution.participantId)
-    setActorLabel(mainActor?.label ?? (initialTeamSide === 'tracked' ? 'Unknown tracked player' : 'Unknown opponent'))
+    setActorLabel(mainActor?.label ?? (initializationDraft.kind === 'team_event'
+      ? ''
+      : initialTeamSide === 'tracked' ? 'Unknown tracked player' : 'Unknown opponent'))
     setAction(event?.eventType === 'soccer.defensive_action' ? event.payload.action : 'interception')
     setTackleOutcome(event?.eventType === 'soccer.defensive_action' && event.payload.tackleOutcome
       ? event.payload.tackleOutcome
@@ -336,8 +361,10 @@ export default function SoccerIncidentCaptureDialog({
       ? ''
       : normalizedFouled.participantId)
     setFouledLabel(fouled?.label ?? 'Unknown opponent')
-    setTeamEventKind(event?.eventType === 'soccer.team_event' ? event.payload.kind : 'corner')
-    setOffsideActorRecorded(Boolean(event?.eventType === 'soccer.team_event' && mainActor))
+    setTeamEventKind(event?.eventType === 'soccer.team_event'
+      ? event.payload.kind
+      : initializationDraft.teamEventKind ?? 'corner')
+    setTeamEventActorRecorded(Boolean(event?.eventType === 'soccer.team_event' && mainActor))
     setDisciplineChoice(eventResolution
       ? eventResolution.exit === 'none'
         ? 'stay'
@@ -370,8 +397,7 @@ export default function SoccerIncidentCaptureDialog({
 
   if (!draft || !projection || !sportState) return null
 
-  const actorRequired = draft.kind !== 'team_event' ||
-    (teamEventKind === 'offside' && offsideActorRecorded)
+  const actorRequired = draft.kind !== 'team_event' || teamEventActorRecorded
   const participantActorInvalid = actorRequired && attribution === 'participant' &&
     !eligibleParticipants.some(participant => participant.participantId === participantId)
   const fouledParticipantInvalid = draft.kind === 'foul' && fouledAttribution === 'participant' &&
@@ -396,7 +422,7 @@ export default function SoccerIncidentCaptureDialog({
     )
     const actor = actorRequired ? createActor(
         projection.participants,
-        mainActorRole(draft.kind),
+        mainActorRole(draft.kind, teamEventKind),
         mainSelection.attribution,
         mainSelection.participantId,
         actorLabel,
@@ -468,7 +494,7 @@ export default function SoccerIncidentCaptureDialog({
       payload: payload as unknown as JsonObject,
       teamSide,
       location: eventLocation,
-      actors: draft.kind === 'team_event' && teamEventKind === 'corner' ? [] : actors,
+      actors,
       ...(mode !== 'live' && moment ? { period: moment.period, elapsedMs: moment.elapsedMs } : {}),
     }
     const result = mode === 'edit' && draft.event
@@ -511,6 +537,15 @@ export default function SoccerIncidentCaptureDialog({
             />
           )}
 
+          {mode === 'live' && draft.kind === 'team_event' && (
+            <FieldGroup label="Side">
+              <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                <ChoiceButton active={teamSide === 'tracked'} label="Tracked" onClick={() => changeTeamSide('tracked')} compact />
+                <ChoiceButton active={teamSide === 'opponent'} label="Opponent" onClick={() => changeTeamSide('opponent')} compact />
+              </div>
+            </FieldGroup>
+          )}
+
           {draft.kind === 'defense' && (
             <FieldGroup label="Action">
               <div className="grid grid-cols-2 gap-2">
@@ -521,13 +556,37 @@ export default function SoccerIncidentCaptureDialog({
           )}
 
           {draft.kind === 'team_event' && (
-            <FieldGroup label="Team event">
-              <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><ChoiceButton active={teamEventKind === 'corner'} label="Corner" onClick={() => setTeamEventKind('corner')} compact /><ChoiceButton active={teamEventKind === 'offside'} label="Offside" onClick={() => setTeamEventKind('offside')} compact /></div>
-              {teamEventKind === 'offside' && <label className="mt-2 flex min-h-10 items-center justify-between text-sm font-medium text-slate-700">Record offside player<input type="checkbox" checked={offsideActorRecorded} onChange={event => setOffsideActorRecorded(event.target.checked)} className="h-5 w-5 accent-emerald-700" /></label>}
+            <FieldGroup label="Restart type">
+              <div className="grid grid-cols-2 gap-1 rounded-md bg-slate-200 p-1">
+                {TEAM_EVENTS.map(option => (
+                  <ChoiceButton
+                    key={option.value}
+                    active={teamEventKind === option.value}
+                    label={option.label}
+                    onClick={() => changeTeamEventKind(option.value)}
+                    compact
+                  />
+                ))}
+              </div>
             </FieldGroup>
           )}
 
-          {(draft.kind !== 'team_event' || (teamEventKind === 'offside' && offsideActorRecorded)) && (
+          {draft.kind === 'team_event' ? (
+            <TeamEventActorEditor
+              kind={teamEventKind}
+              side={teamSide}
+              recorded={teamEventActorRecorded}
+              onRecorded={setTeamEventActorRecorded}
+              attribution={attribution}
+              onAttribution={setAttribution}
+              participantId={participantId}
+              onParticipantId={setParticipantId}
+              participants={eligibleParticipants}
+              actorLabel={actorLabel}
+              onActorLabel={setActorLabel}
+              recentLabels={recentLabels}
+            />
+          ) : (
             <ActorEditor
               label={actorEditorLabel(draft.kind)}
               side={teamSide}
@@ -595,13 +654,6 @@ export default function SoccerIncidentCaptureDialog({
             />
           )}
 
-          {draft.kind === 'team_event' && teamEventKind === 'corner' && (
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setLocation(cornerLocation(captureDirection, 'left'))} className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">Left corner</button>
-              <button type="button" onClick={() => setLocation(cornerLocation(captureDirection, 'right'))} className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">Right corner</button>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setLocationEditorOpen(value => !value)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><MapPin size={16} /> Set location</button>
             <button type="button" onClick={() => setLocation(null)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><MapPinOff size={16} /> Clear location</button>
@@ -656,6 +708,78 @@ function ActorEditor({ label, side, allowStaff, attribution, onAttribution, part
     : [{ value: 'unknown', label: 'Player / unknown' }, { value: 'team', label: 'Team' }]
   if (allowStaff) options.push({ value: 'staff', label: 'Staff' })
   return <FieldGroup label={label}><div className={`grid gap-1 rounded-md bg-slate-200 p-1 ${options.length === 2 ? 'grid-cols-2' : options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>{options.map(option => <ChoiceButton key={option.value} active={attribution === option.value} label={option.label} onClick={() => onAttribution(option.value)} compact />)}</div>{attribution === 'participant' && <select value={participantId} onChange={event => onParticipantId(event.target.value)} className="input-field mt-2"><option value="">Select player</option>{participants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select>}{(attribution === 'unknown' || attribution === 'staff') && <input value={actorLabel} onChange={event => onActorLabel(event.target.value)} list={side === 'opponent' && recentLabels.length ? 'soccer-incident-opponents' : undefined} placeholder={attribution === 'staff' ? 'Coach or staff name' : 'Player label'} className="input-field mt-2" />}</FieldGroup>
+}
+
+function TeamEventActorEditor({ kind, side, recorded, onRecorded, attribution, onAttribution, participantId, onParticipantId, participants, actorLabel, onActorLabel, recentLabels }: {
+  kind: SoccerTeamEventKind
+  side: SoccerTeamSide
+  recorded: boolean
+  onRecorded: (value: boolean) => void
+  attribution: Attribution
+  onAttribution: (value: Attribution) => void
+  participantId: string
+  onParticipantId: (value: string) => void
+  participants: SoccerProjectedParticipant[]
+  actorLabel: string
+  onActorLabel: (value: string) => void
+  recentLabels: string[]
+}) {
+  const selection = !recorded
+    ? 'none'
+    : attribution === 'participant' && side === 'tracked' ? 'participant' : 'unknown'
+  const choices = side === 'tracked'
+    ? [
+        { value: 'none' as const, label: 'Not recorded' },
+        { value: 'participant' as const, label: 'Player' },
+        ...(kind === 'offside'
+          ? [{ value: 'unknown' as const, label: 'Label' }]
+          : []),
+      ]
+    : [
+        { value: 'none' as const, label: 'Not recorded' },
+        { value: 'unknown' as const, label: 'Label' },
+      ]
+  const choose = (value: 'none' | 'participant' | 'unknown') => {
+    if (value === 'none') {
+      onRecorded(false)
+      return
+    }
+    onRecorded(true)
+    onAttribution(value)
+    onParticipantId(value === 'participant'
+      ? participantId || participants[0]?.participantId || ''
+      : '')
+  }
+  return (
+    <FieldGroup label={kind === 'offside' ? 'Offside player' : 'Taker'}>
+      <div className={`grid gap-1 rounded-md bg-slate-200 p-1 ${choices.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {choices.map(choice => (
+          <ChoiceButton
+            key={choice.value}
+            active={selection === choice.value}
+            label={choice.label}
+            onClick={() => choose(choice.value)}
+            compact
+          />
+        ))}
+      </div>
+      {selection === 'participant' && (
+        <select value={participantId} onChange={event => onParticipantId(event.target.value)} className="input-field mt-2">
+          <option value="">Select player</option>
+          {participants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}
+        </select>
+      )}
+      {selection === 'unknown' && (
+        <input
+          value={actorLabel}
+          onChange={event => onActorLabel(event.target.value)}
+          list={side === 'opponent' && recentLabels.length ? 'soccer-incident-opponents' : undefined}
+          placeholder="Player label"
+          className="input-field mt-2"
+        />
+      )}
+    </FieldGroup>
+  )
 }
 
 function OptionalFouledEditor({ committingSide, attribution, onAttribution, participantId, onParticipantId, participants, label, onLabel, recentLabels }: {
@@ -736,7 +860,13 @@ function buildLineupResolution(applies: boolean, participantId: string, sanction
 }
 
 function primaryActor(event: SoccerIncidentEvent): GameEventActor | null {
-  const role = event.eventType === 'soccer.defensive_action' ? 'defender' : event.eventType === 'soccer.foul' ? 'committed_by' : event.eventType === 'soccer.card' ? 'recipient' : 'offside_player'
+  const role = event.eventType === 'soccer.defensive_action'
+    ? 'defender'
+    : event.eventType === 'soccer.foul'
+      ? 'committed_by'
+      : event.eventType === 'soccer.card'
+        ? 'recipient'
+        : event.payload.kind === 'offside' ? 'offside_player' : 'taker'
   return event.actors.find(actor => actor.role === role) ?? null
 }
 
@@ -786,23 +916,23 @@ function kindEventType(kind: SoccerIncidentKind): SoccerIncidentEvent['eventType
   return 'soccer.team_event'
 }
 
-function mainActorRole(kind: SoccerIncidentKind): string {
+function mainActorRole(kind: SoccerIncidentKind, teamEventKind: SoccerTeamEventKind): string {
   if (kind === 'defense') return 'defender'
   if (kind === 'foul') return 'committed_by'
   if (kind === 'card') return 'recipient'
-  return 'offside_player'
+  return teamEventKind === 'offside' ? 'offside_player' : 'taker'
 }
 
 function actorEditorLabel(kind: SoccerIncidentKind): string {
   if (kind === 'defense') return 'Defender'
   if (kind === 'foul') return 'Committed by'
   if (kind === 'card') return 'Recipient'
-  return 'Offside player (optional)'
+  return 'Event actor'
 }
 
 function kindLabel(kind: SoccerIncidentKind): string {
   if (kind === 'defense') return 'Defense'
-  if (kind === 'team_event') return 'Team Event'
+  if (kind === 'team_event') return 'Restart'
   return kind[0].toUpperCase() + kind.slice(1)
 }
 
@@ -813,14 +943,6 @@ function dialogTitle(kind: SoccerIncidentKind, mode: 'live' | 'historical' | 'ed
 
 function participantLabel(participant: Pick<SoccerProjectedParticipant, 'displayName' | 'number'>): string {
   return `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`
-}
-
-function cornerLocation(direction: 'left_to_right' | 'right_to_left', side: 'left' | 'right'): GameEventLocation {
-  return {
-    x: direction === 'left_to_right' ? 0.98 : 0.02,
-    y: side === 'left' ? 0.02 : 0.98,
-    attackingDirection: direction,
-  }
 }
 
 function oppositeDirection(direction: 'left_to_right' | 'right_to_left'): 'left_to_right' | 'right_to_left' {

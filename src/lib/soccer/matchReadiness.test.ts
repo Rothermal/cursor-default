@@ -138,6 +138,61 @@ describe('Soccer match-readiness wiring', () => {
     expect(markerBuilder).toContain('item.participantLabel')
   })
 
+  it('keeps restart capture one-shot and preserves optional team-event actors', () => {
+    const tracker = source('src/pages/SoccerGameTracker.tsx')
+    const dialog = source('src/components/soccer/SoccerIncidentCaptureDialog.tsx')
+    const field = source('src/components/soccer/SoccerField.tsx')
+    const fieldTabStart = tracker.indexOf(") : mainTab === 'field' ? (")
+    const fieldTab = tracker.slice(
+      fieldTabStart,
+      tracker.indexOf(") : mainTab === 'lineup' ? (", fieldTabStart)
+    )
+    const setCaptureSideFn = tracker.slice(
+      tracker.indexOf('const setCaptureSide ='),
+      tracker.indexOf('const setCaptureMode =')
+    )
+    const setCaptureModeFn = tracker.slice(
+      tracker.indexOf('const setCaptureMode ='),
+      tracker.indexOf('const openIncident =')
+    )
+    const openIncidentFn = tracker.slice(
+      tracker.indexOf('const openIncident ='),
+      tracker.indexOf('const editFieldEvent =')
+    )
+    const moreActionsButton = fieldTab.slice(
+      fieldTab.indexOf('onClick={() => {', fieldTab.indexOf('Substitution')),
+      fieldTab.indexOf('</button>', fieldTab.indexOf('aria-label="More match actions"'))
+    )
+
+    expect(tracker).toContain('const [restartArmed, setRestartArmed] = useState(false)')
+    expect(tracker).toContain("mainTab !== 'field'")
+    expect(tracker).toContain('suggestSoccerRestartKind(')
+    expect(tracker).toContain(
+      "openIncident('team_event', location, 'live', undefined, suggestedKind ?? 'corner')"
+    )
+    expect(fieldTab).toContain('activeCaptureLabel={restartArmed ? \'Restart capture\' : undefined}')
+    expect(fieldTab).toContain('label="Restart"')
+    expect(fieldTab).not.toContain('label="Team"')
+    expect(fieldTab).toContain('role="status" aria-live="polite"')
+    expect(setCaptureSideFn).toContain('setRestartArmed(false)')
+    expect(setCaptureModeFn).toContain('setRestartArmed(false)')
+    expect(openIncidentFn).toContain('setRestartArmed(false)')
+    expect(fieldTab).toContain('onCluster={eventIds => {')
+    expect(fieldTab).toContain('setClusterEventIds(eventIds)')
+    expect(moreActionsButton).toContain('setRestartArmed(false)')
+    expect(moreActionsButton).toContain('setActionsOpen(true)')
+    expect(field).toContain('activeCaptureLabel?: string')
+    expect(dialog).toContain("mode === 'live' && draft.kind === 'team_event'")
+    expect(dialog).toContain("{ value: 'throw_in', label: 'Throw-in' }")
+    expect(dialog).toContain("{ value: 'goal_kick', label: 'Goal kick' }")
+    expect(dialog).toContain("kind === 'offside' ? 'Offside player' : 'Taker'")
+    expect(dialog).toContain("mainActorRole(draft.kind, teamEventKind)")
+    expect(dialog).toContain("teamEventKind === 'offside' ? 'offside_player' : 'taker'")
+    expect(dialog).toContain('actors,')
+    expect(dialog).not.toContain("teamEventKind === 'corner' ? [] : actors")
+    expect(dialog).not.toContain('function cornerLocation(')
+  })
+
   it('blocks healthy Soccer history from becoming incomplete while allowing recovery', () => {
     const tracker = source('src/pages/SoccerGameTracker.tsx')
 

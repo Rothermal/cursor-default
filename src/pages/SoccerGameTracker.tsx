@@ -61,6 +61,7 @@ import {
   soccerMatchActionsAvailable,
   soccerFieldReviewEvents,
   soccerTeamEventReviewPresentation,
+  suggestSoccerRestartKind,
   soccerClockDisplayValue,
   startNextSoccerPeriod,
   toggleSoccerClock,
@@ -105,6 +106,7 @@ export default function SoccerGameTracker() {
   const [isApplying, setIsApplying] = useState(false)
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
   const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
+  const [restartArmed, setRestartArmed] = useState(false)
   const [fieldFlipped, setFieldFlipped] = useState(false)
   const [markerSideFilter, setMarkerSideFilter] = useState<MarkerSideFilter>('all')
   const [markerScope, setMarkerScope] = useState<MarkerScope>('current')
@@ -137,6 +139,14 @@ export default function SoccerGameTracker() {
     applyingRef.current = false
     setIsApplying(false)
   }, [state])
+
+  useEffect(() => {
+    if (
+      mainTab !== 'field' ||
+      projection?.status !== 'in_progress' ||
+      state.cloudSync.gameStatus === 'final'
+    ) setRestartArmed(false)
+  }, [mainTab, projection?.status, state.cloudSync.gameStatus])
 
   const cloudConflicts = state.cloudSync.eventConflicts ?? []
   const primaryRecorder = primarySoccerRecorder(recorders)
@@ -272,10 +282,12 @@ export default function SoccerGameTracker() {
     }))
 
   const setCaptureSide = (teamSide: 'tracked' | 'opponent') => {
+    setRestartArmed(false)
     dispatch({ type: 'SET_SOCCER_CAPTURE_PREFERENCES', preferences: { teamSide } })
   }
 
   const setCaptureMode = (captureMode: 'shot' | 'defense' | 'foul') => {
+    setRestartArmed(false)
     dispatch({ type: 'SET_SOCCER_CAPTURE_PREFERENCES', preferences: { captureMode } })
   }
 
@@ -283,13 +295,16 @@ export default function SoccerGameTracker() {
     kind: SoccerIncidentKind,
     location: SoccerIncidentDraft['location'],
     mode: SoccerIncidentDraft['mode'] = 'live',
-    event?: SoccerIncidentEvent
+    event?: SoccerIncidentEvent,
+    teamEventKind?: SoccerTeamEventKind
   ) => {
     if (cloudFinal) return
+    setRestartArmed(false)
     setIncidentDraft({
       kind,
       teamSide: event?.teamSide ?? capturePreferences.teamSide,
       location: event?.location ?? location,
+      teamEventKind,
       mode,
       event,
     })
@@ -297,6 +312,7 @@ export default function SoccerGameTracker() {
 
   const editFieldEvent = (event: GameEvent) => {
     if (cloudFinal) return
+    setRestartArmed(false)
     if (event.eventType === 'soccer.shot' || event.eventType === 'soccer.own_goal') {
       const attackingEvent = event as SoccerShotEvent | SoccerOwnGoalEvent
       setCaptureDraft({
@@ -336,6 +352,7 @@ export default function SoccerGameTracker() {
   }
 
   const openDialog = (kind: SoccerLiveDialogKind, participantId: string | null = null) => {
+    setRestartArmed(false)
     setDialogParticipantId(participantId)
     setDialogKind(kind)
     setActionsOpen(false)
@@ -568,9 +585,19 @@ export default function SoccerGameTracker() {
                 captureSide={capturePreferences.teamSide}
                 flipped={fieldFlipped}
                 disabled={!fieldCaptureEnabled}
+                activeCaptureLabel={restartArmed ? 'Restart capture' : undefined}
                 markers={fieldMarkers}
                 onFlip={() => setFieldFlipped(value => !value)}
                 onLocation={location => {
+                  if (restartArmed) {
+                    const suggestedKind = suggestSoccerRestartKind(
+                      location,
+                      capturePreferences.teamSide,
+                      projection.attackingDirection
+                    )
+                    openIncident('team_event', location, 'live', undefined, suggestedKind ?? 'corner')
+                    return
+                  }
                   if (capturePreferences.captureMode === 'shot') {
                     setCaptureDraft({ teamSide: capturePreferences.teamSide, location })
                   } else {
@@ -581,7 +608,10 @@ export default function SoccerGameTracker() {
                   const event = inspection.activeEvents.find(candidate => candidate.id === eventId)
                   if (event) editFieldEvent(event)
                 }}
-                onCluster={setClusterEventIds}
+                onCluster={eventIds => {
+                  setRestartArmed(false)
+                  setClusterEventIds(eventIds)
+                }}
               />
 
               <div className="grid grid-cols-4 gap-2" role="group" aria-label="Quick capture">
@@ -590,6 +620,7 @@ export default function SoccerGameTracker() {
                   icon={<Goal size={18} />}
                   disabled={!fieldCaptureEnabled}
                   onClick={() => {
+                    setRestartArmed(false)
                     setCaptureDraft({
                       teamSide: capturePreferences.teamSide,
                       location: null,
@@ -610,12 +641,16 @@ export default function SoccerGameTracker() {
                   onClick={() => openIncident('card', null)}
                 />
                 <QuickCaptureButton
-                  label="Team"
+                  label="Restart"
                   icon={<Flag size={18} />}
                   disabled={!fieldCaptureEnabled}
-                  onClick={() => openIncident('team_event', null)}
+                  pressed={restartArmed}
+                  onClick={() => setRestartArmed(value => !value)}
                 />
               </div>
+              <p className="sr-only" role="status" aria-live="polite">
+                {restartArmed ? 'Restart capture armed. Tap the field to choose its location.' : ''}
+              </p>
 
               {!ended && (
                 <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2" role="group" aria-label="Field match actions">
@@ -630,7 +665,10 @@ export default function SoccerGameTracker() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActionsOpen(true)}
+                    onClick={() => {
+                      setRestartArmed(false)
+                      setActionsOpen(true)
+                    }}
                     disabled={!healthy || isApplying || cloudFinal}
                     className="grid min-h-12 w-12 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 disabled:opacity-40"
                     aria-label="More match actions"
@@ -949,9 +987,9 @@ function ModeButton({ active, label, onClick }: { active: boolean; label: string
   return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
 }
 
-function QuickCaptureButton({ label, icon, disabled, onClick }: { label: string; icon: ReactNode; disabled: boolean; onClick: () => void }) {
+function QuickCaptureButton({ label, icon, disabled, pressed, onClick }: { label: string; icon: ReactNode; disabled: boolean; pressed?: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-bold text-slate-700 disabled:opacity-40">
+    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-1 text-[11px] font-bold disabled:opacity-40 ${pressed ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-300' : 'border-slate-300 bg-white text-slate-700'}`}>
       {icon}
       <span className="truncate">{label}</span>
     </button>

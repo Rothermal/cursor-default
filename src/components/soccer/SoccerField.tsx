@@ -31,6 +31,7 @@ interface SoccerFieldProps {
   onCluster?: (markerIds: string[]) => void
   presentation?: 'capture' | 'review'
   legendFamilies?: readonly SoccerFieldReviewFamily[]
+  activeCaptureLabel?: string
 }
 
 export default function SoccerField({
@@ -45,6 +46,7 @@ export default function SoccerField({
   onCluster,
   presentation = 'capture',
   legendFamilies,
+  activeCaptureLabel,
 }: SoccerFieldProps) {
   const captureDirection = captureSide === 'tracked'
     ? trackedDirection
@@ -57,7 +59,9 @@ export default function SoccerField({
         <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase text-slate-600">
             {displayDirection === 'left_to_right' ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
-            <span className="truncate">{captureSide === 'tracked' ? 'Tracked' : 'Opponent'} attack</span>
+            <span className="truncate">
+              {activeCaptureLabel ?? `${captureSide === 'tracked' ? 'Tracked' : 'Opponent'} attack`}
+            </span>
           </div>
           <button
             type="button"
@@ -71,12 +75,12 @@ export default function SoccerField({
         </div>
       )}
 
-      <div className="relative aspect-[100/64] w-full overflow-hidden rounded-md border-2 border-white bg-emerald-700 shadow-sm">
+      <div className={`relative aspect-[100/64] w-full overflow-hidden rounded-md border-2 border-white bg-emerald-700 shadow-sm ${activeCaptureLabel ? 'ring-4 ring-amber-300 ring-offset-2' : ''}`}>
         <svg
           viewBox="0 0 100 64"
           className={`block h-full w-full origin-center transition-transform motion-reduce:transition-none ${flipped ? 'rotate-180' : ''} ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
           role="group"
-          aria-label="Soccer field"
+          aria-label={activeCaptureLabel ? `Soccer field, ${activeCaptureLabel} armed` : 'Soccer field'}
           onClick={event => {
             if (disabled) return
             const bounds = event.currentTarget.getBoundingClientRect()
