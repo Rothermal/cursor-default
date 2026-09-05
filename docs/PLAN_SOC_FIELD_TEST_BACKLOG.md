@@ -735,7 +735,8 @@ or events.
 
 ### S23 - Team-level default starter and bench status
 
-**Status:** confirmed product request; Q&A and focused plan required
+**Status:** approved plan; implementation pending - see
+[`PLAN_SOC_S23_LINEUP_STATUS_DEFAULTS.md`](PLAN_SOC_S23_LINEUP_STATUS_DEFAULTS.md)
 **Theme:** roster defaults / setup speed
 **Where:** Soccer team settings, Team Manage roster, Soccer Player Setup
 
@@ -744,12 +745,13 @@ team cannot independently remember who normally starts and who begins on the
 bench. Backup goalkeepers are a common bench default. The status belongs to a
 player's membership on one team, not to the global player identity.
 
-**Likely direction:** add versioned per-team lineup-status defaults and apply
-them only when creating an editable match setup draft. A saved formation may
-provide the starter set when explicitly applied; the focused plan must define
-which setting wins when formation assignments and standalone defaults differ.
-Every match remains editable, and its immutable setup snapshot remains
-authoritative after kickoff.
+**Approved direction:** add a sparse stable-player starter list to versioned
+Soccer team settings. A valid applicable formation owns the complete starter
+set; otherwise the standalone defaults apply once to a fresh editable setup
+draft. Active players not listed default to Bench. Inactive members retain
+their defaults, stale ids require explicit cleanup, and existing kickoff
+validation remains authoritative. Structurally corrupt settings continue to
+fail closed. Team defaults never rewrite an existing match draft or live match.
 
 **Not this item:** changing a live lineup or writing match substitutions back
 to team defaults.
@@ -947,7 +949,8 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S23`, `S24` | Short Q&A where choices remain, then a focused phase plan |
+| Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S24` | Short Q&A where choices remain, then a focused phase plan |
+| Approved focused plan; implementation pending | `S23` | Implement S23A settings foundation, S23B Team Manage editor, then S23C setup prefill |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
 | Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
 | Implemented; owner functional verification complete | `S17`, `S20` | Keep the post-fix cloud completion replay in the focused regression record; proceed to `S7` planning when prioritized |
@@ -979,9 +982,9 @@ exercise those constraints rather than bypass them.
   catalog and versioned team-settings foundation, `S19B` provides the Team
   Manage editor, and `S19C` applies matching defaults once to editable setup
   drafts. Migration 065 is applied; verify current team-setting round trips and
-  setup prefill in the deployed app. `S23` adds standalone starter/bench
-  defaults; `S24` is a later live batch transition and should not be folded
-  into the team-settings schema slice.
+  setup prefill in the deployed app. `S23` is approved as three focused slices
+  for standalone starter/bench defaults; `S24` is a later live batch transition
+  and should not be folded into the team-settings schema slice.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` are implemented through
