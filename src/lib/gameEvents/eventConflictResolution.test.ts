@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { GameEventSyncConflict, GameState } from '../../types'
 import { sports } from '../../config/sports'
@@ -46,6 +48,22 @@ function state(): GameState {
 }
 
 describe('event conflict recovery fingerprint', () => {
+  it('guards both post-await GameContext paths with recovery metadata', () => {
+    const context = readFileSync(
+      resolve(process.cwd(), 'src/context/GameContext.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+
+    expect(context).toContain(
+      'const snapshotRecoveryFingerprint = eventConflictRecoveryFingerprint(snapshot)'
+    )
+    expect(
+      context.match(
+        /eventConflictRecoveryFingerprint\(latestState\) === snapshotRecoveryFingerprint/g
+      )
+    ).toHaveLength(2)
+  })
+
   it('ignores ordinary sync status but detects conflict recovery changes', () => {
     const source = state()
     const statusOnly: GameState = {

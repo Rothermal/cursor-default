@@ -102,7 +102,6 @@ export function latestPendingConflictResolutions(
 ): PendingGameEventConflictResolution[] {
   const latestByConflictId = new Map<string, PendingGameEventConflictResolution>()
   for (const item of pending) {
-    latestByConflictId.delete(item.conflictId)
     latestByConflictId.set(item.conflictId, item)
   }
   return [...latestByConflictId.values()]
