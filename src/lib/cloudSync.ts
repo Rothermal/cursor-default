@@ -659,11 +659,9 @@ async function ensurePlayerId(
     // so leaving it behind would orphan one player per retry. Best effort: never let a
     // cleanup failure mask the error that actually stopped the sync.
     if (createdPlayerId) {
-      const { error: cleanupError } = await supabase
-        .from('players')
-        .delete()
-        .eq('id', createdPlayerId)
-        .eq('created_by', userId)
+      const { error: cleanupError } = await supabase.rpc('delete_unreferenced_player', {
+        p_player_id: createdPlayerId,
+      })
       if (cleanupError) {
         console.warn('[StatKeeper] Failed to clean up unlinked player row', cleanupError.message)
       }

@@ -75,6 +75,8 @@ import {
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameSideDisplayName } from '../lib/display'
+import { canOfferDeletedSourcePlayerRecovery } from '../lib/gameEvents/deletedSourceRecovery'
+import { useTeamRole } from '../hooks/useTeamRole'
 import {
   loadSoccerGameRecorders,
   primarySoccerRecorder,
@@ -90,8 +92,15 @@ type MarkerFamilyFilter = 'all' | 'shots' | 'defense' | 'incidents'
 
 export default function SoccerGameTracker() {
   const navigate = useNavigate()
-  const { state, dispatch, flushCloudSync, resolveEventConflict } = useGame()
+  const {
+    state,
+    dispatch,
+    flushCloudSync,
+    recoverDeletedEventParticipantSources,
+    resolveEventConflict,
+  } = useGame()
   const { user } = useAuth()
+  const teamAccess = useTeamRole(state.cloudSync.teamId)
   const soccerState = state.sportGameState?.sportId === 'soccer'
     ? state.sportGameState
     : null
@@ -123,6 +132,7 @@ export default function SoccerGameTracker() {
   const [recordersOpen, setRecordersOpen] = useState(false)
   const [recorders, setRecorders] = useState<SoccerRecorderSummary[]>([])
   const [recordersLoading, setRecordersLoading] = useState(false)
+  const [deletedPlayerRecoveryOpen, setDeletedPlayerRecoveryOpen] = useState(false)
   const applyingRef = useRef(false)
 
   const invalidRoute = !state.sport || state.sport.id !== 'soccer' || !state.gameInfo || !soccerState || !projection
@@ -223,7 +233,19 @@ export default function SoccerGameTracker() {
     if (!result.ok) setError(result.reason)
   }
 
+  const recoverDeletedPlayerHistory = async () => {
+    setDeletedPlayerRecoveryOpen(false)
+    setSyncBusy(true)
+    const result = await recoverDeletedEventParticipantSources()
+    setSyncBusy(false)
+    if (!result.ok) setError(result.reason)
+  }
+
   const inspection = useMemo(() => inspectSoccerHistory(state), [state])
+  const canRecoverDeletedPlayer = canOfferDeletedSourcePlayerRecovery(
+    state.cloudSync.lastError,
+    teamAccess.role
+  )
   const clockValue = soccerClockDisplayValue(state, nowMs)
   const segments = projection ? orderedSoccerSegments(projection.currentRules) : []
   const currentSegment = segments.find(segment => segment.id === projection?.currentPeriodId) ?? null
@@ -487,9 +509,12 @@ export default function SoccerGameTracker() {
             <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white">Review</button>
           </div>
         ) : state.cloudSync.status === 'error' ? (
-          <div className="mx-4 mt-4 flex items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
+          <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
             <BadgeAlert size={20} className="shrink-0" />
             <p className="min-w-0 flex-1 truncate text-xs" title={state.cloudSync.lastError ?? undefined}>{state.cloudSync.lastError ?? 'Cloud sync needs attention.'}</p>
+            {canRecoverDeletedPlayer && (
+              <button type="button" onClick={() => setDeletedPlayerRecoveryOpen(true)} disabled={syncBusy} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white disabled:opacity-50">Preserve History</button>
+            )}
             <button type="button" onClick={() => { void retrySync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-red-700 px-3 text-xs font-bold text-white disabled:opacity-50">{syncBusy ? 'Retrying...' : 'Retry'}</button>
             <button type="button" onClick={exportRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
           </div>
@@ -884,6 +909,17 @@ export default function SoccerGameTracker() {
           setScoreTimelineOpen(false)
           setScoreAdjustmentEdit(null)
         }}
+      />
+
+      <ConfirmDialog
+        open={deletedPlayerRecoveryOpen}
+        title="Preserve deleted player history?"
+        message="A player used by this match may have been permanently deleted from the cloud roster. A team owner or admin can keep the match participant's frozen name, number, and events without linking them to another player. No events or scores will be changed."
+        confirmLabel="Preserve and Retry"
+        cancelLabel="Cancel"
+        destructive={false}
+        onConfirm={() => { void recoverDeletedPlayerHistory() }}
+        onCancel={() => setDeletedPlayerRecoveryOpen(false)}
       />
 
       <ConfirmDialog

@@ -636,6 +636,39 @@ export function hasUnsyncedParkedBindingForCloudTeam(
   )
 }
 
+function gameReferencesCloudPlayer(state: GameState, cloudPlayerId: string): boolean {
+  const sportState = state.sportGameState
+  if (
+    (sportState?.sportId === 'soccer' || sportState?.sportId === 'basketball') &&
+    sportState.setup.sourceTeamId
+  ) {
+    return Object.values(sportState.projection.participants).some(
+      participant => participant.playerId === cloudPlayerId
+    )
+  }
+
+  return Object.entries(state.cloudSync.playerIdMap).some(
+    ([localPlayerId, remotePlayerId]) =>
+      remotePlayerId === cloudPlayerId ||
+      (localPlayerId === cloudPlayerId && state.cloudSync.teamId !== null)
+  )
+}
+
+/**
+ * Permanent cloud-player deletion must account for every local slot, including an
+ * unbound event game whose immutable participant snapshot is still device-only.
+ */
+export function hasLocalGameReferenceForCloudPlayer(
+  ownerId: string | null,
+  cloudPlayerId: string,
+  activeState?: GameState
+): boolean {
+  if (activeState && gameReferencesCloudPlayer(activeState, cloudPlayerId)) return true
+  return listParkedGameRecords(ownerId).some(record =>
+    gameReferencesCloudPlayer(record.gameState, cloudPlayerId)
+  )
+}
+
 /**
  * True when any parked local game is bound to this cloud season (directly or through one
  * of its teams) and still has unsynced progress. The team fallback protects legacy/imported

@@ -30,6 +30,7 @@ import {
   exportParkedGames,
   getParkedGameStorageInfo,
   hasUnsyncedParkedBindingForCloudGame,
+  hasLocalGameReferenceForCloudPlayer,
   hasUnsyncedParkedBindingForCloudSeason,
   hasUnsyncedParkedBindingForCloudTeam,
   importParkedGames,
@@ -395,8 +396,16 @@ export default function Admin() {
   const handleAdminDeletePlayer = async (player: AdminPlayerRow) => {
     if (!supabaseClient || player.created_by !== userId) return
     setAdminError(null)
+    if (hasLocalGameReferenceForCloudPlayer(userId, player.player_id, gameState)) {
+      setAdminError(
+        'A local game still references this player. Remove them from the roster instead to preserve match history.'
+      )
+      return
+    }
     setDeletingId(player.id)
-    const { error } = await supabaseClient.from('players').delete().eq('id', player.player_id)
+    const { error } = await supabaseClient.rpc('delete_unreferenced_player', {
+      p_player_id: player.player_id,
+    })
     setDeletingId(null)
     if (error) { setAdminError(error.message); return }
     setAdminPlayers(prev => prev.filter(p => p.id !== player.id))
@@ -1440,7 +1449,7 @@ export default function Admin() {
               title="Delete Player"
               message={
                 confirmDeletePlayer
-                  ? `Permanently delete "${[confirmDeletePlayer.first_name, confirmDeletePlayer.last_name].filter(Boolean).join(' ')}" and all their game stats? This cannot be undone.`
+                  ? `Permanently delete "${[confirmDeletePlayer.first_name, confirmDeletePlayer.last_name].filter(Boolean).join(' ')}"? This is allowed only when the player has no game history. Otherwise, remove them from the roster.`
                   : ''
               }
               confirmLabel="Yes, Delete"

@@ -59,6 +59,7 @@ import {
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
+import { canOfferDeletedSourcePlayerRecovery } from '../lib/gameEvents/deletedSourceRecovery'
 import {
   authoritativeGameDataDiagnostics,
   SPORT_EVENTS_AUTHORITY,
@@ -184,6 +185,7 @@ export default function GameTracker() {
     state,
     dispatch,
     flushCloudSync,
+    recoverDeletedEventParticipantSources,
     parkingError,
     resolveEventConflict,
   } = useGame()
@@ -269,6 +271,7 @@ export default function GameTracker() {
   const [conflictOpen, setConflictOpen] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
   const [cloudRecoveryError, setCloudRecoveryError] = useState<string | null>(null)
+  const [deletedPlayerRecoveryOpen, setDeletedPlayerRecoveryOpen] = useState(false)
   // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
   // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
   const [showAllShots, setShowAllShots] = useState(false)
@@ -387,6 +390,19 @@ export default function GameTracker() {
     setSyncBusy(false)
     if (!result.ok) setCloudRecoveryError(result.reason)
   }
+
+  const recoverDeletedBasketballPlayerHistory = async () => {
+    setDeletedPlayerRecoveryOpen(false)
+    setSyncBusy(true)
+    const result = await recoverDeletedEventParticipantSources()
+    setSyncBusy(false)
+    if (!result.ok) setCloudRecoveryError(result.reason)
+  }
+
+  const canRecoverDeletedPlayer = canOfferDeletedSourcePlayerRecovery(
+    state.cloudSync.lastError,
+    teamAccess.role
+  )
 
   useEffect(() => {
     if (!isBasketballEventMode) setBasketballWorkspace('track')
@@ -1111,9 +1127,12 @@ export default function GameTracker() {
             <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white">Review</button>
           </div>
         ) : isBasketballEventMode && state.cloudSync.status === 'error' ? (
-          <div className="mt-3 flex items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
+          <div className="mt-3 flex flex-wrap items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
             <BadgeAlert size={20} className="shrink-0" />
             <p className="min-w-0 flex-1 truncate text-xs" title={state.cloudSync.lastError ?? undefined}>{state.cloudSync.lastError ?? 'Cloud sync needs attention.'}</p>
+            {canRecoverDeletedPlayer && (
+              <button type="button" onClick={() => setDeletedPlayerRecoveryOpen(true)} disabled={syncBusy} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white disabled:opacity-50">Preserve History</button>
+            )}
             <button type="button" onClick={() => { void retryBasketballSync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-red-700 px-3 text-xs font-bold text-white disabled:opacity-50">{syncBusy ? 'Retrying...' : 'Retry'}</button>
             <button type="button" onClick={exportBasketballRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
           </div>
@@ -1893,6 +1912,17 @@ export default function GameTracker() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={deletedPlayerRecoveryOpen}
+        title="Preserve deleted player history?"
+        message="A player used by this game may have been permanently deleted from the cloud roster. A team owner or admin can keep the frozen name, number, and events without linking them to another player. No events or scores will be changed."
+        confirmLabel="Preserve and Retry"
+        cancelLabel="Cancel"
+        destructive={false}
+        onConfirm={() => { void recoverDeletedBasketballPlayerHistory() }}
+        onCancel={() => setDeletedPlayerRecoveryOpen(false)}
+      />
 
       <ConfirmDialog
         open={pendingLocalEnd !== null}

@@ -19,7 +19,10 @@ import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePl
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
 import { resolveTeamsPageSelectedTeamId } from '../lib/teamsPageSelection'
 import { shouldBlockDiscardUnsyncedGame } from '../lib/gameSyncFingerprint'
-import { hasUnsyncedParkedBindingForCloudTeam } from '../lib/gameParking'
+import {
+  hasLocalGameReferenceForCloudPlayer,
+  hasUnsyncedParkedBindingForCloudTeam,
+} from '../lib/gameParking'
 import { getPendingSyncFlag } from '../lib/gameStorageKeys'
 import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
 import { normalizedSeasonName } from '../lib/seasonWorkflow'
@@ -1041,12 +1044,17 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const handleDeletePlayer = async (player: PlayerRow) => {
     if (!supabaseClient || player.created_by !== userId) return
     setError(null)
+    if (hasLocalGameReferenceForCloudPlayer(userId, player.id, gameState)) {
+      setError(
+        'A local game still references this player. Remove them from the roster instead to preserve match history.'
+      )
+      return
+    }
     setDeletingPlayerId(player.id)
 
-    const { error: deleteError } = await supabaseClient
-      .from('players')
-      .delete()
-      .eq('id', player.id)
+    const { error: deleteError } = await supabaseClient.rpc('delete_unreferenced_player', {
+      p_player_id: player.id,
+    })
 
     setDeletingPlayerId(null)
     if (deleteError) {
@@ -1963,7 +1971,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           title="Delete Player"
           message={
             confirmDeletePlayer
-              ? `Permanently delete "${playerDisplayName(confirmDeletePlayer)}" and all their game stats? This cannot be undone. To keep history, use "Remove" instead.`
+              ? `Permanently delete "${playerDisplayName(confirmDeletePlayer)}"? This is allowed only when the player has no game history. To preserve history, use "Remove" instead.`
               : ''
           }
           confirmLabel="Yes, Delete"
