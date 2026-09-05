@@ -127,6 +127,14 @@ The UI therefore needs the active roster for display and the complete team
 membership-id set for retention. No player identity is fabricated from a stale
 settings id.
 
+Cleanup is allowed only when both datasets are positively loaded for the same
+selected team. Extend the existing `prepareSoccerTeamSettingsSave` /
+`rosterReady` contract with separate active-roster and complete-membership
+readiness plus the complete membership-id set. A Rules or Formation save never
+cleans lineup ids. A Lineup Defaults save made before either dataset is ready
+must preserve the stored list and keep cleanup unavailable; it must never
+interpret an empty loading-state collection as proof that every id is stale.
+
 ### 4.3 Fingerprints, copy, and audit
 
 Team-settings fingerprints and full-record CAS include lineup defaults. Reload,
@@ -140,7 +148,11 @@ target team's formation and lineup defaults. Audit changed fields may include
 ## 5. Team Manage behavior
 
 Add **Lineup Defaults** as the third keyboard-operable tab beside Rules and
-Formation. Keep one shared draft and one Save/Discard boundary across all tabs.
+Formation. Replace the current binary index-to-tab conversion with one
+list-driven tab definition that owns tab id, ref, selected identity, panel, and
+cleanup mode. Arrow/Home/End navigation must update both focus and the selected
+tab identity. Keep one shared draft and one Save/Discard boundary across all
+tabs.
 
 The lineup tab shows:
 
@@ -160,6 +172,11 @@ Automatic demotion would hide that drift and choose players without authority.
 
 Changing a lineup default never changes formation slot assignments. Changing
 or clearing a formation never changes lineup defaults.
+
+Save preparation must test cleanup modes positively: only the selected
+Formation tab may request formation-assignment cleanup, and only the selected
+Lineup Defaults tab may request stale-lineup cleanup. Do not encode either as
+"not the other tab."
 
 ## 6. Player Setup behavior
 
@@ -210,6 +227,14 @@ Each slice uses its own feature branch and PR. Migration 068 must be applied
 before or with the S23A client deployment because S23A saves schema version 3.
 S23B and S23C begin only after v1, v2, and v3 settings round-trip safely.
 
+Reverse compatibility is intentionally limited by the existing strict reader.
+After the first schema-v3 save, a still-open pre-S23A client rejects that
+team's whole settings record, including rules and formation, until it accepts
+the PWA update or closes all scoped tabs and reloads. This is an accepted
+deployment window, not something the new bundle can repair in the stale
+bundle. Deploy migration 068 and the S23A reader before permitting the first
+v3 save, then include stale-client refresh guidance in the rollout check.
+
 ## 8. File map
 
 ### S23A
@@ -256,7 +281,10 @@ S23B and S23C begin only after v1, v2, and v3 settings round-trip safely.
 ### Team Manage
 
 - owner/admin edit and scorer/viewer read-only behavior;
-- tab keyboard navigation includes the third tab;
+- tab keyboard navigation asserts that focus, `aria-selected`, rendered panel,
+  and internal selected-tab identity all move to the third tab;
+- saving after keyboard navigation runs only that selected tab's positive
+  cleanup mode and never formation cleanup by index fallthrough;
 - Starter/Bench grouping and role/jersey/name ordering are deterministic;
 - starter, maximum, and goalkeeper warnings do not block save;
 - inactive entries remain stored and absent from active groups;
@@ -285,17 +313,23 @@ S23B and S23C begin only after v1, v2, and v3 settings round-trip safely.
    stale warning, explicitly save the lineup tab, and confirm cleanup.
 5. Trigger a two-session revision conflict and confirm cloud/device choices
    replace the whole rules/formation/lineup draft.
-6. Start a team match without a formation and confirm the saved starters and
+6. Delay active-roster or complete-membership loading, navigate to Lineup
+   Defaults by keyboard, and confirm Save cannot classify or remove stale ids
+   until both datasets are ready; Formation cleanup must not run.
+7. Keep one pre-S23A tab open, save schema v3 from an updated tab, and confirm
+   the stale client fails the whole team settings record closed until the PWA
+   update is accepted or all scoped tabs close and reload.
+8. Start a team match without a formation and confirm the saved starters and
    roster roles prefill once.
-7. Save a valid formation with a different starter group and confirm formation
+9. Save a valid formation with a different starter group and confirm formation
    wins completely.
-8. Make the formation incompatible with match rules and confirm standalone
+10. Make the formation incompatible with match rules and confirm standalone
    defaults apply with a visible fallback notice.
-9. Save too many starters or an invalid goalkeeper combination; confirm Team
+11. Save too many starters or an invalid goalkeeper combination; confirm Team
    Manage warns, Player Setup applies exactly, and kickoff requires correction.
-10. Edit match statuses, kick off, substitute, and change roles; confirm team
+12. Edit match statuses, kick off, substitute, and change roles; confirm team
     defaults remain unchanged.
-11. Copy rules from another Soccer team and confirm neither team's player-
+13. Copy rules from another Soccer team and confirm neither team's player-
     specific lineup defaults cross the boundary.
 
 ## 11. Exit criteria
@@ -303,6 +337,8 @@ S23B and S23C begin only after v1, v2, and v3 settings round-trip safely.
 - Migration 068 is applied and schema versions 1, 2, and 3 load safely.
 - Team settings preserve lineup defaults through save, cache, conflict, and
   audit paths without leaking player ids into audit metadata.
+- Stale-id cleanup requires same-team active-roster and complete-membership
+  readiness, and tab identity cannot select the wrong cleanup mode.
 - Team Manage supports accessible owner/admin editing and scorer/viewer review.
 - Fresh Player Setup applies exactly one formation-first prefill decision.
 - Existing kickoff, event, cloud, finalization, summary, aggregate, parking,
