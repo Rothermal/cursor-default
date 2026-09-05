@@ -66,7 +66,7 @@ export default function SoccerFieldReview({
     y: item.displayLocation?.y ?? 0,
     teamSide: item.event.teamSide,
     kind: item.markerKind,
-    label: `${item.title}, ${item.timeLabel}`,
+    label: `${item.title}, ${item.participantLabel}, ${item.timeLabel}`,
   }))
 
   useEffect(() => {

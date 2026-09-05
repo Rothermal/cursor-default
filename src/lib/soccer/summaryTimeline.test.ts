@@ -10,6 +10,7 @@ import {
   soccerSummaryTimelineReview,
   type SoccerSummaryTimelineFilter,
 } from './summaryTimeline'
+import { soccerTeamEventReviewPresentation } from './timeline'
 
 const EVENT_TYPES = [
   'soccer.opening_lineup',
@@ -104,6 +105,35 @@ describe('soccer summary timeline', () => {
     })
     expect(soccerSummaryEventMatchesFilter(noRestart, 'restarts')).toBe(false)
     expect(soccerSummaryEventMatchesFilter(noRestart, 'discipline')).toBe(false)
+  })
+
+  it('labels restart kinds, awarded sides, and known or omitted takers', () => {
+    const throwIn = event(1, 'soccer.team_event', 'regulation-1', 1, 5_000)
+    throwIn.payload = { kind: 'throw_in' }
+    throwIn.teamSide = 'tracked'
+    throwIn.actors = [{
+      role: 'taker',
+      kind: 'player',
+      participantId: 'participant-a',
+      playerId: 'player-a',
+      label: '#7 Alex',
+    }]
+    expect(soccerTeamEventReviewPresentation(throwIn)).toEqual({
+      actorLabel: '#7 Alex',
+      kindLabel: 'Throw-in',
+      label: 'Tracked throw-in - #7 Alex',
+      sideLabel: 'Tracked',
+    })
+
+    const goalKick = event(2, 'soccer.team_event', 'regulation-1', 1, 10_000)
+    goalKick.payload = { kind: 'goal_kick' }
+    goalKick.teamSide = 'opponent'
+    expect(soccerTeamEventReviewPresentation(goalKick)).toEqual({
+      actorLabel: 'Taker not recorded',
+      kindLabel: 'Goal kick',
+      label: 'Opponent goal kick - Taker not recorded',
+      sideLabel: 'Opponent',
+    })
   })
 
   it('orders oldest-first, groups periods, and separates removed events', () => {

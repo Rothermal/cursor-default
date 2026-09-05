@@ -21,6 +21,7 @@ import {
   soccerEventMatchesTimelineFilter,
   soccerEventTimeLabel,
   soccerPeriodTimings,
+  soccerTeamEventReviewPresentation,
   soccerSummaryTimelineReview,
   updateSoccerHistoryEvent,
   type SoccerLiveResult,
@@ -476,7 +477,7 @@ function HistoryRow({
     <div className="min-h-16 px-3 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-800">{eventTitle(event.eventType)}</p>
+          <p className="truncate text-sm font-semibold text-slate-800">{eventTitle(event)}</p>
           <p className="truncate text-xs text-slate-500">{eventDetail(event)}</p>
           {contextDetail && <p className="truncate text-[11px] text-slate-500">{contextDetail}</p>}
           {!review && (
@@ -500,11 +501,11 @@ function HistoryRow({
         </div>
         <div className="flex shrink-0 gap-1">
           {deleted ? (
-            onRestore && <button type="button" onClick={onRestore} className="grid h-9 w-9 place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event.eventType)}`} title="Restore"><RotateCcw size={17} /></button>
+            onRestore && <button type="button" onClick={onRestore} className="grid h-9 w-9 place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
           ) : (
             <>
-              {onEdit && <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event.eventType)}`} title="Correct"><Pencil size={17} /></button>}
-              {onDelete && <button type="button" onClick={onDelete} className="grid h-9 w-9 place-items-center text-red-600" aria-label={`Remove ${eventTitle(event.eventType)}`} title="Remove"><Trash2 size={17} /></button>}
+              {onEdit && <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event)}`} title="Correct"><Pencil size={17} /></button>}
+              {onDelete && <button type="button" onClick={onDelete} className="grid h-9 w-9 place-items-center text-red-600" aria-label={`Remove ${eventTitle(event)}`} title="Remove"><Trash2 size={17} /></button>}
             </>
           )}
         </div>
@@ -579,7 +580,7 @@ function SoccerEventCorrectionDialog({ event, state, onSave, onClose }: {
   }
 
   return (
-    <Dialog title={`Correct ${eventTitle(event.eventType)}`} onClose={onClose}>
+    <Dialog title={`Correct ${eventTitle(event)}`} onClose={onClose}>
       <div className="space-y-4">
         {renderEventEditor(draft, setDraft, setPayload, participants, segments, state)}
         {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
@@ -760,7 +761,10 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   return <label className="flex items-center justify-between text-sm font-medium text-slate-700 min-h-10">{label}<input type="checkbox" checked={checked} onChange={change => onChange(change.target.checked)} className="h-5 w-5 accent-emerald-600" /></label>
 }
 
-function eventTitle(type: string): string {
+function eventTitle(event: GameEvent): string {
+  if (event.eventType === 'soccer.team_event') {
+    return soccerTeamEventReviewPresentation(event).kindLabel
+  }
   return ({
     'soccer.opening_lineup': 'Opening lineup',
     'soccer.period_started': 'Period started',
@@ -782,12 +786,11 @@ function eventTitle(type: string): string {
     'soccer.defensive_action': 'Defensive action',
     'soccer.foul': 'Foul',
     'soccer.card': 'Card',
-    'soccer.team_event': 'Team event',
     'soccer.shootout_started': 'Shootout started',
     'soccer.shootout_eligibility_changed': 'Shootout eligibility',
     'soccer.shootout_goalkeeper_changed': 'Shootout goalkeeper',
     'soccer.shootout_kick': 'Shootout kick',
-  } as Record<string, string>)[type] ?? type
+  } as Record<string, string>)[event.eventType] ?? event.eventType
 }
 
 function eventDetail(event: GameEvent): string {
@@ -824,8 +827,8 @@ function eventDetail(event: GameEvent): string {
       return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} / ${String(payload.sanction ?? 'card').replace(/_/g, ' ')} / ${actor?.label ?? 'Team'} / ${String(payload.reason ?? '').replace(/_/g, ' ')}`
     }
     case 'soccer.team_event': {
-      const actor = event.actors.find(item => item.role === 'offside_player')
-      return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} / ${String(payload.kind ?? 'team event')}${actor?.label ? ` / ${actor.label}` : ''}`
+      const presentation = soccerTeamEventReviewPresentation(event)
+      return `${presentation.sideLabel} / ${presentation.actorLabel}`
     }
     case 'soccer.shootout_started': return `${String(payload.firstKickingSide)} first / ${String(payload.initialKicksPerSide)} kicks / ${String(payload.opponentEligibleCount)} eligible`
     case 'soccer.shootout_eligibility_changed': return `${String(payload.reason).replace(/_/g, ' ')} / ${Array.isArray(payload.trackedEligibleParticipantIds) ? payload.trackedEligibleParticipantIds.length : 0} each`
