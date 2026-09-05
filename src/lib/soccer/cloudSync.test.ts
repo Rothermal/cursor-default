@@ -18,11 +18,15 @@ const cloudMock = vi.hoisted(() => ({
   rpc: vi.fn(),
   upsert: vi.fn(),
   load: vi.fn(),
+  from: vi.fn(),
+  select: vi.fn(),
+  in: vi.fn(),
 }))
 
 vi.mock('../supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => cloudMock.rpc(...args),
+    from: (...args: unknown[]) => cloudMock.from(...args),
   },
 }))
 
@@ -162,6 +166,12 @@ describe('soccer event cloud sync helpers', () => {
     cloudMock.rpc.mockReset()
     cloudMock.upsert.mockReset()
     cloudMock.load.mockReset()
+    cloudMock.from.mockReset()
+    cloudMock.select.mockReset()
+    cloudMock.in.mockReset()
+    cloudMock.from.mockReturnValue({ select: cloudMock.select })
+    cloudMock.select.mockReturnValue({ in: cloudMock.in })
+    cloudMock.in.mockResolvedValue({ data: [], error: null })
     cloudMock.rpc.mockImplementation((name: string) => Promise.resolve(
       name === 'bind_soccer_event_game_v4'
         ? {
@@ -260,6 +270,57 @@ describe('soccer event cloud sync helpers', () => {
       p_event_count: 3,
       p_max_sequence: 2,
     })
+  })
+
+  it('skips closed conflict rows and submits only the latest choice for an open row', async () => {
+    const state = startedState()
+    const firstEvent = state.eventStream!.events[0] as GameEvent
+    const secondEvent = state.eventStream!.events[1] as GameEvent
+    state.cloudSync.pendingEventConflictResolutions = [
+      {
+        conflictId: '30000000-0000-4000-8000-000000000001',
+        eventId: firstEvent.id,
+        resolution: 'local',
+      },
+      {
+        conflictId: '30000000-0000-4000-8000-000000000002',
+        eventId: secondEvent.id,
+        resolution: 'local',
+      },
+      {
+        conflictId: '30000000-0000-4000-8000-000000000002',
+        eventId: secondEvent.id,
+        resolution: 'remote',
+      },
+    ]
+    cloudMock.in.mockResolvedValue({
+      data: [
+        { id: '30000000-0000-4000-8000-000000000001', status: 'resolved' },
+        { id: '30000000-0000-4000-8000-000000000002', status: 'open' },
+      ],
+      error: null,
+    })
+
+    const result = await syncSoccerEventGameToCloud({
+      state,
+      userId: 'user-1',
+      localGameId: '20000000-0000-4000-8000-000000000001',
+    })
+
+    expect(cloudMock.in).toHaveBeenCalledWith('id', [
+      '30000000-0000-4000-8000-000000000001',
+      '30000000-0000-4000-8000-000000000002',
+    ])
+    const resolutionCalls = cloudMock.rpc.mock.calls.filter(
+      call => call[0] === 'resolve_game_event_conflict'
+    )
+    expect(resolutionCalls).toHaveLength(1)
+    expect(resolutionCalls[0]?.[1]).toMatchObject({
+      p_conflict_id: '30000000-0000-4000-8000-000000000002',
+      p_resolution: 'remote',
+      p_resolved_event: expect.objectContaining({ id: secondEvent.id }),
+    })
+    expect(result.syncedState.cloudSync.pendingEventConflictResolutions).toEqual([])
   })
 
   it('returns the authoritative final status after a late audit upload', async () => {

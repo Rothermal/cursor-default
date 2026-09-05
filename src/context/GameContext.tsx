@@ -42,7 +42,10 @@ import {
   shouldInterceptRunningBasketballClock,
   type BasketballWorkflowAction,
 } from '../lib/basketball/productionClockPolicy'
-import { resolveEventConflictInState } from '../lib/gameEvents/eventConflictResolution'
+import {
+  eventConflictRecoveryFingerprint,
+  resolveEventConflictInState,
+} from '../lib/gameEvents/eventConflictResolution'
 import { eventCloudTransportAdapterForSport } from '../lib/eventCloudTransportAdapters'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
@@ -825,6 +828,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     async (record: ParkedGameRecord) => {
       const snapshot = record.gameState
       const snapshotFingerprint = buildGameSyncFingerprint(snapshot)
+      const snapshotRecoveryFingerprint = eventConflictRecoveryFingerprint(snapshot)
       const snapshotUserId = userId
       if (!getParkedGameRecord(record.localGameId, snapshotUserId)) return
 
@@ -955,7 +959,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
 
         const syncedPayloadState = 'syncedState' in synced ? synced.syncedState : snapshot
-        const localUnchanged = buildGameSyncFingerprint(latestState) === snapshotFingerprint
+        const localUnchanged =
+          buildGameSyncFingerprint(latestState) === snapshotFingerprint &&
+          eventConflictRecoveryFingerprint(latestState) === snapshotRecoveryFingerprint
         const payloadState =
           'syncedState' in synced && localUnchanged ? synced.syncedState : latestState
         const cloudSyncPatch: Partial<CloudSyncState> = {
@@ -1029,7 +1035,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const canApplyRecovery =
           (error instanceof SoccerCloudRecoveryError ||
             error instanceof BasketballCloudRecoveryError) &&
-          buildGameSyncFingerprint(latestState) === snapshotFingerprint
+          buildGameSyncFingerprint(latestState) === snapshotFingerprint &&
+          eventConflictRecoveryFingerprint(latestState) === snapshotRecoveryFingerprint
         const recoveredState = canApplyRecovery ? error.recoveredState : latestState
         const attempts = latestRecord.sync.attempts + 1
         const retryMs = Math.min(30_000, 1000 * 2 ** Math.min(attempts, 5))
