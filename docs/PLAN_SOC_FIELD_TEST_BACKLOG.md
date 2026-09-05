@@ -534,7 +534,7 @@ or treating placement as a second shot event.
 
 ### S17 - Make the existing corner event obvious
 
-**Status:** implemented; deployed verification pending — see
+**Status:** implemented; owner functional verification complete — see
 [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md) and
 [`REGRESSION_SOC_RESTARTS.md`](REGRESSION_SOC_RESTARTS.md)
 
@@ -619,7 +619,7 @@ formation change is `S24`.
 
 ### S20 - Throw-ins
 
-**Status:** implemented; deployed verification pending — see
+**Status:** implemented; owner functional verification complete — see
 [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md) and
 [`REGRESSION_SOC_RESTARTS.md`](REGRESSION_SOC_RESTARTS.md)
 
@@ -935,8 +935,9 @@ small follow-up that removes the now-redundant Soccer player row and establishes
 the shared actor-picker contract. `S26` is nearby in UX but separately touches
 immutable setup and naming across sports. `S15` and `S16` come after `S1` so
 extra goal metadata stays a skippable step, not another full attacking sheet.
-`S17` / `S20` have finished restart capture; validate them before `S7` links
-the next shot. `S23`
+`S17` / `S20` have finished restart capture and owner functional verification;
+the shared completion-loop defect found during that run was fixed by PR #373.
+`S7` can now plan the next-shot link. `S23`
 extends setup defaults; `S24` remains a separate live atomic-transition plan.
 `M*` items stay behind a new phase name if promoted.
 
@@ -950,7 +951,8 @@ Use these labels before turning an item into an implementation plan:
 | Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S23`, `S24` | Short Q&A where choices remain, then a focused phase plan |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
 | Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
-| Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S17`–`S21` | Run the linked regression rows during the next live or deployed test |
+| Implemented; owner functional verification complete | `S17`, `S20` | Keep the post-fix cloud completion replay in the focused regression record; proceed to `S7` planning when prioritized |
+| Implemented; pending deployed field verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S19`, `S21` | Run the linked regression rows during the next live or deployed test |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`, `S5`, `S8`, `S10` | Keep in backlog until confirmed or pulled into a related shell plan |
 
 The `S12` repair preserves the shared editor route, and the `S14` repair keeps

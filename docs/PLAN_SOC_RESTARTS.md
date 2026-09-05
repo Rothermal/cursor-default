@@ -1,9 +1,9 @@
 # Soccer Restarts Implementation Plan
 
-Status: R1-R4 implementation complete. Deployed browser/PWA and live Supabase
-validation remain recorded as pending in `REGRESSION_SOC_RESTARTS.md`. Corner,
+Status: R1-R4 implementation and owner functional regression complete. Corner,
 throw-in, and goal-kick capture are implemented; tap-to-place and omitted-taker
-behavior are resolved.
+behavior are resolved. The regression record preserves the initial shared cloud
+conflict-loop failure, its PR #373 remediation, and the remaining post-fix replay.
 
 > **For agentic workers:** Implement this plan task-by-task. Use review
 > checkpoints between delivery slices. Do not implement directly from
@@ -347,7 +347,7 @@ final fail-closed guard against opponent events carrying tracked identity.
   - flip the field and repeat equivalent taps; stored/reviewed positions remain
     canonical and labels remain correct
 - [x] Add operator records for capability/live Supabase evidence and
-  cached-reader compatibility; deployed results remain pending.
+  cached-reader compatibility; record the owner run and any optional cells not run.
 - [x] Commit `docs: record soccer restart capture`.
 
 R4 adds `REGRESSION_SOC_RESTARTS.md` as the focused operator record and links a
@@ -355,8 +355,11 @@ condensed script from the repository-wide regression guide. The matrix records
 the reader-first merge order (R1 PR #366, R2 PR #370, then R3 PR #371), the
 unchanged migration-049 capability boundary, repeated-marker pass-through,
 canonical flip behavior, actor restrictions, historical Add/Edit, cloud
-round-trip, finalization, and local-only fallback. Implementation is complete;
-all deployed evidence cells intentionally remain `Not run` until exercised.
+round-trip, finalization, and local-only fallback. Implementation is complete.
+The 2026-09-05 owner run passed restart behavior and exposed a shared cloud
+conflict-retry defect during completion; PR #373 fixed it. The post-fix
+sync/finalization replay and optional compatibility cells remain in the
+regression record without reopening this plan.
 
 ## 8. Acceptance
 
