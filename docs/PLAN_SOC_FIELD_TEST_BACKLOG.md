@@ -40,7 +40,7 @@ item is planned.
 2. Keep `M*` items listed so later season/coach requests do not get lost.
 3. When an item is confirmed, write a focused plan and Q&A the way SOC-4 / F5-F12
    were planned. File lists, acceptance, and regression belong in that plan.
-   Restart capture has an active reader-first plan with R1 implemented in
+   Restart capture has an active reader-first plan with R1-R2 implemented in
    [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md).
 4. After a plan ships, mark the item implemented here and link the plan.
 
@@ -619,7 +619,9 @@ formation change is `S24`.
 
 **Status:** approved plan — see [`PLAN_SOC_RESTARTS.md`](PLAN_SOC_RESTARTS.md)
 **Theme:** restarts  
-**Where:** `SoccerTeamEventKind` is only `'corner' | 'offside'`
+**Where:** `SoccerTeamEventKind` now reads `'corner' | 'offside' | 'throw_in' |
+'goal_kick'`, but the live and historical writers still expose only Corner and
+Offside.
 
 There is no throw-in event, quick action, or stat. SOC-0 / SOC-4 left
 throw-ins, goal kicks, and routine free kicks out of the core catalog on

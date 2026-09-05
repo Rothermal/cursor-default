@@ -70,6 +70,7 @@ import {
   type SoccerProjectedParticipant,
   type SoccerScoreAdjustmentEvent,
   type SoccerShotEvent,
+  type SoccerTeamEventKind,
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
@@ -1015,7 +1016,7 @@ function markerKind(event: GameEvent): SoccerFieldMarkerKind {
     return (event.payload as { sanction: string }).sanction === 'yellow' ? 'yellow_card' : 'red_card'
   }
   if (event.eventType === 'soccer.team_event') {
-    return (event.payload as { kind: SoccerFieldMarkerKind }).kind
+    return (event.payload as { kind: SoccerTeamEventKind }).kind
   }
   return 'saved'
 }
