@@ -59,6 +59,7 @@ import {
 import AccessUnavailable from '../components/AccessUnavailable'
 import { useTeamRole } from '../hooks/useTeamRole'
 import { canTrackGames } from '../lib/teamPermissions'
+import { canOfferDeletedSourcePlayerRecovery } from '../lib/gameEvents/deletedSourceRecovery'
 import {
   authoritativeGameDataDiagnostics,
   SPORT_EVENTS_AUTHORITY,
@@ -398,9 +399,10 @@ export default function GameTracker() {
     if (!result.ok) setCloudRecoveryError(result.reason)
   }
 
-  const canRecoverDeletedPlayer = state.cloudSync.lastError?.includes(
-    'Participant source player is not on the source team'
-  ) === true
+  const canRecoverDeletedPlayer = canOfferDeletedSourcePlayerRecovery(
+    state.cloudSync.lastError,
+    teamAccess.role
+  )
 
   useEffect(() => {
     if (!isBasketballEventMode) setBasketballWorkspace('track')

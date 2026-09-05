@@ -14,6 +14,11 @@ describe('migration 067 roster history binding recovery', () => {
     expect(sql).toContain('create or replace function public.delete_unreferenced_player')
     expect(sql).toContain('participant.source_player_id = p_player_id')
     expect(sql).toContain('stat.player_id = p_player_id')
+    expect(sql).toContain('shot.player_id = p_player_id')
+    expect(sql).toContain('correction.player_id = p_player_id')
+    expect(sql).toContain('checkout.player_id = p_player_id')
+    expect(sql).toContain('game.home_team_player_id = p_player_id')
+    expect(sql).toContain('game.opp_team_player_id = p_player_id')
     expect(sql).toContain('player_delete_has_history')
     expect(sql).toContain(
       'grant execute on function public.delete_unreferenced_player(uuid) to authenticated'

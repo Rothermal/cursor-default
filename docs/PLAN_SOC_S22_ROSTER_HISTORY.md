@@ -43,7 +43,8 @@ Migration `067_roster_history_binding_recovery.sql` drops the direct
 
 - requires the caller to be the player creator;
 - locks the player row during validation;
-- rejects event participants, legacy stats, shots, corrections, or checkouts;
+- rejects event participants, legacy stats, shots, corrections, checkouts, or
+  legacy game-level team-player placeholders;
 - deletes only an identity with no game history.
 
 The Teams and Settings/Advanced handlers additionally inspect every active and
@@ -64,8 +65,9 @@ player row genuinely gone         -> store frozen participant without source lin
 
 Fixed Soccer and Basketball v5 wrappers keep the private shared core unavailable
 to clients. Both event trackers recognize the known binding failure and offer a
-confirmation-driven **Preserve History** retry. The recovery choice is durable
-across storage/retry and clears after successful sync.
+confirmation-driven **Preserve History** retry only to a current team owner/admin.
+The recovery choice is durable long enough to survive storage and execute one bind
+attempt, then clears whether that attempt succeeds or fails.
 
 ## 4. Non-goals
 

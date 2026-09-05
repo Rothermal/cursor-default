@@ -38,12 +38,18 @@ appear; finalization/reopen behavior matches the local state.
 
 ## 4. Authority failures
 
-1. Retry recovery as a scorer or viewer.
-2. Retry with a source player that still exists but has no source-team membership.
+1. Open the known recovery failure as a scorer or viewer.
+2. Confirm **Preserve History** is absent, then verify a crafted recovery RPC call
+   is rejected by the server.
+3. As an owner/admin, retry with a source player that still exists but has no
+   source-team membership.
+4. Force one owner/admin recovery attempt to fail, then retry ordinary sync after
+   resolving the unrelated failure.
 
 Expected: owner/admin authority is required, and an existing wrong-team identity
-continues to fail normal binding validation. No partial game, participant, or event
-rows are created by either rejected attempt.
+continues to fail normal binding validation. A failed recovery does not leave
+durable recovery approval on later retries. No partial game, participant, or event
+rows are created by any rejected attempt.
 
 ## 5. Cross-sport smoke
 

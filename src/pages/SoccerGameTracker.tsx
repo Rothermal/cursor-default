@@ -75,6 +75,8 @@ import {
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameSideDisplayName } from '../lib/display'
+import { canOfferDeletedSourcePlayerRecovery } from '../lib/gameEvents/deletedSourceRecovery'
+import { useTeamRole } from '../hooks/useTeamRole'
 import {
   loadSoccerGameRecorders,
   primarySoccerRecorder,
@@ -98,6 +100,7 @@ export default function SoccerGameTracker() {
     resolveEventConflict,
   } = useGame()
   const { user } = useAuth()
+  const teamAccess = useTeamRole(state.cloudSync.teamId)
   const soccerState = state.sportGameState?.sportId === 'soccer'
     ? state.sportGameState
     : null
@@ -239,9 +242,10 @@ export default function SoccerGameTracker() {
   }
 
   const inspection = useMemo(() => inspectSoccerHistory(state), [state])
-  const canRecoverDeletedPlayer = state.cloudSync.lastError?.includes(
-    'Participant source player is not on the source team'
-  ) === true
+  const canRecoverDeletedPlayer = canOfferDeletedSourcePlayerRecovery(
+    state.cloudSync.lastError,
+    teamAccess.role
+  )
   const clockValue = soccerClockDisplayValue(state, nowMs)
   const segments = projection ? orderedSoccerSegments(projection.currentRules) : []
   const currentSegment = segments.find(segment => segment.id === projection?.currentPeriodId) ?? null

@@ -46,6 +46,7 @@ import {
   eventConflictRecoveryFingerprint,
   resolveEventConflictInState,
 } from '../lib/gameEvents/eventConflictResolution'
+import { deletedSourcePlayerRecoverySettlementPatch } from '../lib/gameEvents/deletedSourceRecovery'
 import { eventCloudTransportAdapterForSport } from '../lib/eventCloudTransportAdapters'
 import { supabase } from '../lib/supabase'
 import { isPersistedSyncLastErrorNetworkish, logClientSyncError } from '../lib/logClientSyncError'
@@ -999,7 +1000,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
                   uploaded => uploaded.conflictId === pending.conflictId
                 )
               ),
-          allowDeletedSourcePlayerRecovery: undefined,
+          ...deletedSourcePlayerRecoverySettlementPatch(),
         }
         const nextState: GameState = {
           ...payloadState,
@@ -1046,6 +1047,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           ...recoveredState,
           cloudSync: {
             ...recoveredState.cloudSync,
+            ...deletedSourcePlayerRecoverySettlementPatch(),
             status: networkish ? 'offline' : 'error',
             lastError: networkish ? null : errMsg,
           },
@@ -1058,6 +1060,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         })
         if (getActiveLocalGameId(snapshotUserId) === record.localGameId) {
           const errorPatch: Partial<CloudSyncState> = {
+            ...deletedSourcePlayerRecoverySettlementPatch(),
             status: networkish ? 'offline' : 'error',
             lastError: networkish ? null : errMsg,
           }

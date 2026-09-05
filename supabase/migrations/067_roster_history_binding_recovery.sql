@@ -43,6 +43,10 @@ begin
   ) or exists (
     select 1 from public.player_checkouts checkout
     where checkout.player_id = p_player_id
+  ) or exists (
+    select 1 from public.games game
+    where game.home_team_player_id = p_player_id
+       or game.opp_team_player_id = p_player_id
   ) then
     raise exception 'PLAYER_DELETE_HAS_HISTORY: Remove this player from the roster instead; permanent deletion would destroy game history';
   end if;
