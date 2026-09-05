@@ -15,7 +15,10 @@ import type {
   SoccerTeamEventEvent,
   SoccerTeamSide,
 } from './types'
-import { soccerEventTimeLabel } from './timeline'
+import {
+  soccerEventTimeLabel,
+  soccerTeamEventReviewPresentation,
+} from './timeline'
 import { soccerPeriodTimings } from './live'
 
 export type SoccerFieldReviewOrientation = 'normalized' | 'original'
@@ -305,6 +308,9 @@ function eventParticipantIds(event: GameEvent): string[] {
 }
 
 function eventParticipantLabel(event: GameEvent): string {
+  if (event.eventType === 'soccer.team_event') {
+    return soccerTeamEventReviewPresentation(event).actorLabel
+  }
   const labels = [...new Set(
     event.actors.flatMap(actor => actor.label ? [actor.label] : [])
   )]
@@ -327,7 +333,8 @@ function soccerFieldReviewTitle(event: GameEvent): string {
   if (event.eventType === 'soccer.card') {
     return `${side} ${humanize((event as SoccerCardEvent).payload.sanction)}`
   }
-  return `${side} ${humanize((event as SoccerTeamEventEvent).payload.kind)}`
+  const presentation = soccerTeamEventReviewPresentation(event)
+  return `${presentation.sideLabel} ${presentation.kindLabel.toLowerCase()}`
 }
 
 function soccerFieldReviewDetail(event: GameEvent): string | null {

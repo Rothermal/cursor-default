@@ -212,6 +212,8 @@ export function soccerTeamComparison(
           true
         ),
         row('corners', 'Corners', tracked.corners, opponent.corners, true),
+        row('throw_ins', 'Throw-ins', tracked.throwIns, opponent.throwIns),
+        row('goal_kicks', 'Goal kicks', tracked.goalKicks, opponent.goalKicks),
         row('offsides', 'Offsides', tracked.offsides, opponent.offsides),
         row(
           'penalty_attempts',

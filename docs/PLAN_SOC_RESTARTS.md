@@ -1,8 +1,8 @@
 # Soccer Restarts Implementation Plan
 
-Status: implementation in progress. R1 domain readers are implemented; R2-R4
-remain. Corner, throw-in, and goal-kick capture are in scope; tap-to-place and
-omitted-taker behavior are resolved.
+Status: implementation in progress. R1 domain readers and R2 review readers are
+implemented; R3-R4 remain. Corner, throw-in, and goal-kick capture are in scope;
+tap-to-place and omitted-taker behavior are resolved.
 
 > **For agentic workers:** Implement this plan task-by-task. Use review
 > checkpoints between delivery slices. Do not implement directly from
@@ -235,7 +235,7 @@ Live defaults:
 
 ```text
 R1  Domain readers: kinds, taker, totals, suggestion helper, compatibility tests [implemented]
-R2  Review readers: Timeline / Summary / Field labels and team comparison
+R2  Review readers: Timeline / Summary / Field labels and team comparison [implemented]
 R3  Writers: one-shot live capture plus historical Add/Edit
 R4  Regression docs and backlog status
 ```
@@ -283,14 +283,22 @@ restart glyph so reader deployment can precede R2 presentation work.
 **Files:** `SoccerTimeline.tsx`, `summary.ts`, `summaryTimeline.ts`,
 `summaryField.ts`, `SoccerField.tsx`, tests
 
-- [ ] Add a failing Summary test: non-zero throw-ins and goal kicks appear in
+- [x] Add a failing Summary test: non-zero throw-ins and goal kicks appear in
   team comparison; zero rows remain hidden.
-- [ ] Timeline and marker labels include kind, awarded side, and taker label.
+- [x] Timeline and marker labels include kind, awarded side, and taker label.
   Location remains visible spatially rather than duplicated as a side label.
-- [ ] Field review treats new kinds as restart-family markers.
-- [ ] Verify historical unlocated corners remain readable.
-- [ ] Run focused Summary, SOC-4, and Field tests.
-- [ ] Commit `feat(soccer): show restart labels and team totals`.
+- [x] Field review treats new kinds as restart-family markers.
+- [x] Verify historical unlocated corners remain readable.
+- [x] Run focused Summary, SOC-4, and Field tests.
+- [x] Commit `feat(soccer): show restart labels and team totals`.
+
+R2 centralizes team-event presentation for live Timeline, live Field markers,
+and Summary Field review. Labels humanize all four kinds, name the awarded
+side, and show the saved actor label; omitted restarts say `Taker not recorded`
+while an omitted Offside actor says `Player not recorded`. Summary team
+comparison adds Throw-ins and Goal kicks only when either side has a non-zero
+total. The existing generic restart glyph remains sufficient, and R2 adds no
+writer or capture control.
 
 ### Task 3: Add restart writers
 

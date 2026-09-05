@@ -104,6 +104,59 @@ describe('soccer summary field review', () => {
     expect(review.unknownLocationCount).toBe(1)
   })
 
+  it('reviews every team-event kind with deterministic side and actor labels', () => {
+    const events = [
+      event('historical-corner', 'soccer.team_event', 1, { kind: 'corner' }, {
+        location: null,
+      }),
+      event('tracked-throw', 'soccer.team_event', 2, { kind: 'throw_in' }, {
+        actors: [playerActor('taker', 'participant-a', '#7 Alex')],
+      }),
+      event('opponent-goal-kick', 'soccer.team_event', 3, { kind: 'goal_kick' }, {
+        teamSide: 'opponent',
+        actors: [{ role: 'taker', kind: 'unknown', label: 'Keeper' }],
+      }),
+    ]
+    const review = soccerSummaryFieldReview(state(), inspection(events), {
+      orientation: 'normalized',
+      side: 'all',
+      families: ['restarts'],
+      participant: 'all',
+      period: 'full_match',
+    })
+
+    expect(review.events.map(item => ({
+      id: item.event.id,
+      markerKind: item.markerKind,
+      participantLabel: item.participantLabel,
+      title: item.title,
+    }))).toEqual([
+      {
+        id: 'historical-corner',
+        markerKind: 'corner',
+        participantLabel: 'Taker not recorded',
+        title: 'Tracked corner',
+      },
+      {
+        id: 'tracked-throw',
+        markerKind: 'throw_in',
+        participantLabel: '#7 Alex',
+        title: 'Tracked throw-in',
+      },
+      {
+        id: 'opponent-goal-kick',
+        markerKind: 'goal_kick',
+        participantLabel: 'Keeper',
+        title: 'Opponent goal kick',
+      },
+    ])
+    expect(review.locatedEvents.map(item => item.event.id)).toEqual([
+      'tracked-throw',
+      'opponent-goal-kick',
+    ])
+    expect(review.unknownLocationCount).toBe(1)
+  })
+
   it('normalizes each recorded direction independently and preserves original coordinates', () => {
     const rightToLeft: GameEventLocation = {
       x: 0.2,

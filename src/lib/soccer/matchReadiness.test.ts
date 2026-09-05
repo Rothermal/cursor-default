@@ -117,6 +117,27 @@ describe('Soccer match-readiness wiring', () => {
     )
   })
 
+  it('routes team-event review labels through the shared presentation helper', () => {
+    const timeline = source('src/components/soccer/SoccerTimeline.tsx')
+    const tracker = source('src/pages/SoccerGameTracker.tsx')
+    const fieldReview = source('src/components/soccer-summary/SoccerFieldReview.tsx')
+    const eventTitleFn = timeline.slice(
+      timeline.indexOf('function eventTitle('),
+      timeline.indexOf('function eventDetail(')
+    )
+    const markerBuilder = fieldReview.slice(
+      fieldReview.indexOf('const markers: SoccerFieldMarker[]'),
+      fieldReview.indexOf('useEffect(')
+    )
+
+    expect(eventTitleFn).toContain(
+      'soccerTeamEventReviewPresentation(event).kindLabel'
+    )
+    expect(eventTitleFn).not.toMatch(/'soccer\.team_event':/)
+    expect(tracker).toContain('soccerTeamEventReviewPresentation(event).label')
+    expect(markerBuilder).toContain('item.participantLabel')
+  })
+
   it('blocks healthy Soccer history from becoming incomplete while allowing recovery', () => {
     const tracker = source('src/pages/SoccerGameTracker.tsx')
 

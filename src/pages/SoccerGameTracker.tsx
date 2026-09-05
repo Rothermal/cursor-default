@@ -60,6 +60,7 @@ import {
   soccerLifecycleAction,
   soccerMatchActionsAvailable,
   soccerFieldReviewEvents,
+  soccerTeamEventReviewPresentation,
   soccerClockDisplayValue,
   startNextSoccerPeriod,
   toggleSoccerClock,
@@ -69,6 +70,7 @@ import {
   type SoccerProjectedParticipant,
   type SoccerScoreAdjustmentEvent,
   type SoccerShotEvent,
+  type SoccerTeamEventKind,
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import {
@@ -990,7 +992,7 @@ function markerLabel(event: GameEvent): string {
     return `${side} ${(event.payload as { sanction: string }).sanction.replace(/_/g, ' ')}`
   }
   if (event.eventType === 'soccer.team_event') {
-    return `${side} ${(event.payload as { kind: string }).kind}`
+    return soccerTeamEventReviewPresentation(event).label
   }
   const payload = event.payload as { outcome?: unknown }
   const outcome = typeof payload.outcome === 'string' ? payload.outcome.replace('_', ' ') : 'shot'
@@ -1014,7 +1016,7 @@ function markerKind(event: GameEvent): SoccerFieldMarkerKind {
     return (event.payload as { sanction: string }).sanction === 'yellow' ? 'yellow_card' : 'red_card'
   }
   if (event.eventType === 'soccer.team_event') {
-    return (event.payload as { kind: 'corner' | 'offside' }).kind
+    return (event.payload as { kind: SoccerTeamEventKind }).kind
   }
   return 'saved'
 }

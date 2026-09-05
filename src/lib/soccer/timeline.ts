@@ -1,6 +1,7 @@
 import type { GameEvent } from '../gameEvents/types'
 import type { SoccerPeriodTiming } from './live'
 import { formatSoccerDuration } from './live'
+import type { SoccerTeamEventKind } from './types'
 
 export type SoccerTimelineFilter =
   | 'all'
@@ -9,6 +10,41 @@ export type SoccerTimelineFilter =
   | 'discipline'
   | 'team_events'
   | 'match_control'
+
+export interface SoccerTeamEventReviewPresentation {
+  actorLabel: string
+  kindLabel: string
+  label: string
+  sideLabel: string
+}
+
+const TEAM_EVENT_KIND_LABELS: Record<SoccerTeamEventKind, string> = {
+  corner: 'Corner',
+  offside: 'Offside',
+  throw_in: 'Throw-in',
+  goal_kick: 'Goal kick',
+}
+
+export function soccerTeamEventReviewPresentation(
+  event: Pick<GameEvent, 'actors' | 'payload' | 'teamSide'>
+): SoccerTeamEventReviewPresentation {
+  const kind = (event.payload as { kind?: unknown }).kind
+  const kindLabel = typeof kind === 'string' && kind in TEAM_EVENT_KIND_LABELS
+    ? TEAM_EVENT_KIND_LABELS[kind as SoccerTeamEventKind]
+    : 'Team event'
+  const actorRole = kind === 'offside' ? 'offside_player' : 'taker'
+  const actor = event.actors.find(candidate => candidate.role === actorRole)
+  const actorLabel = actor?.label?.trim() || (
+    kind === 'offside' ? 'Player not recorded' : 'Taker not recorded'
+  )
+  const sideLabel = event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'
+  return {
+    actorLabel,
+    kindLabel,
+    label: `${sideLabel} ${kindLabel.toLowerCase()} - ${actorLabel}`,
+    sideLabel,
+  }
+}
 
 export function isSoccerAttackingEventType(eventType: string): boolean {
   return eventType === 'soccer.shot' ||

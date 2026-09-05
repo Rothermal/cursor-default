@@ -179,11 +179,18 @@ describe('soccer summary read model', () => {
       .toEqual(['fouls', 'yellow_cards', 'red_cards'])
 
     projection.sideTotals.opponent.offsides = 2
+    projection.sideTotals.tracked.throwIns = 4
+    projection.sideTotals.opponent.goalKicks = 3
+    const attackRows = soccerTeamComparison(projection)
+      .find(section => section.id === 'attack')
+      ?.rows
     expect(
-      soccerTeamComparison(projection)
-        .find(section => section.id === 'attack')
-        ?.rows.find(row => row.id === 'offsides')
+      attackRows?.find(row => row.id === 'offsides')
     ).toMatchObject({ tracked: 0, opponent: 2 })
+    expect(attackRows?.find(row => row.id === 'throw_ins'))
+      .toMatchObject({ tracked: 4, opponent: 0 })
+    expect(attackRows?.find(row => row.id === 'goal_kicks'))
+      .toMatchObject({ tracked: 0, opponent: 3 })
   })
 
   it('returns every tied nonzero leader and hides empty categories', () => {
