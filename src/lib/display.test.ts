@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { playerDisplayName, playerRosterSelectLabel, teamDisplayName } from './display'
+import {
+  gameSideDisplayName,
+  playerDisplayName,
+  playerRosterSelectLabel,
+  teamDisplayName,
+} from './display'
 
 describe('teamDisplayName', () => {
   it('prefers trimmed nickname over official name', () => {
@@ -9,6 +14,29 @@ describe('teamDisplayName', () => {
   it('falls back to name when nickname is blank', () => {
     expect(teamDisplayName({ name: 'Riverside High', nickname: '   ' })).toBe('Riverside High')
     expect(teamDisplayName({ name: 'Riverside High' })).toBe('Riverside High')
+  })
+})
+
+describe('gameSideDisplayName', () => {
+  const gameInfo = {
+    teamName: 'Riverside High School',
+    teamNickname: 'Eagles',
+    opponentName: 'North County Academy',
+    opponentNickname: 'Knights',
+    tournamentName: '',
+    date: '2026-09-05',
+  }
+
+  it('prefers the match-frozen nickname for either side', () => {
+    expect(gameSideDisplayName(gameInfo, 'tracked')).toBe('Eagles')
+    expect(gameSideDisplayName(gameInfo, 'opponent')).toBe('Knights')
+  })
+
+  it('falls back through the full name and generic side label', () => {
+    expect(gameSideDisplayName({ ...gameInfo, teamNickname: ' ' }, 'tracked')).toBe(
+      'Riverside High School'
+    )
+    expect(gameSideDisplayName(null, 'opponent')).toBe('Opponent')
   })
 })
 

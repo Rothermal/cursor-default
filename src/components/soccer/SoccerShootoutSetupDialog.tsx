@@ -6,6 +6,7 @@ import {
   type SoccerLiveResult,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
+import { gameSideDisplayName } from '../../lib/display'
 
 interface SoccerShootoutSetupDialogProps {
   state: GameState
@@ -35,6 +36,8 @@ export default function SoccerShootoutSetupDialog({
   const [goalkeeperId, setGoalkeeperId] = useState(defaults?.trackedGoalkeeperParticipantId ?? '')
   const [opponentGoalkeeper, setOpponentGoalkeeper] = useState('Unknown')
   const [error, setError] = useState<string | null>(null)
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
 
   if (!projection || !defaults) return null
   const finalIds = defaults.trackedEligibleParticipantIds
@@ -84,8 +87,8 @@ export default function SoccerShootoutSetupDialog({
         <div className="space-y-5 p-4">
           <Field label="First kicking side">
             <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
-              <Choice active={firstSide === 'tracked'} label="Tracked" onClick={() => setFirstSide('tracked')} />
-              <Choice active={firstSide === 'opponent'} label="Opponent" onClick={() => setFirstSide('opponent')} />
+              <Choice active={firstSide === 'tracked'} label={trackedLabel} onClick={() => setFirstSide('tracked')} />
+              <Choice active={firstSide === 'opponent'} label={opponentLabel} onClick={() => setFirstSide('opponent')} />
             </div>
           </Field>
 

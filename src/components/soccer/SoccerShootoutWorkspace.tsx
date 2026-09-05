@@ -14,6 +14,7 @@ import {
   type SoccerShootoutKickOutcome,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
+import { gameSideDisplayName } from '../../lib/display'
 
 interface SoccerShootoutWorkspaceProps {
   state: GameState
@@ -53,6 +54,8 @@ export default function SoccerShootoutWorkspace({
   const [anonymousSlot, setAnonymousSlot] = useState(1)
   const [editingKick, setEditingKick] = useState<SoccerShootoutKickEvent | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentTeamLabel = gameSideDisplayName(state.gameInfo, 'opponent')
 
   const pendingRetake = shootout ? soccerShootoutPendingRetake(shootout) : null
   const usedTracked = useMemo(
@@ -102,7 +105,7 @@ export default function SoccerShootoutWorkspace({
       slot = pendingEvent?.payload.anonymousKickerSlot ?? null
     } else if (nextSide === 'tracked') {
       kicker = trackedKickerId === '__team__'
-        ? { kind: 'team', label: state.gameInfo?.teamName ?? 'Tracked team' }
+        ? { kind: 'team', label: trackedLabel }
         : trackedKickerId === '__unknown__'
           ? { kind: 'unknown', label: 'Unknown' }
           : { kind: 'participant', participantId: trackedKickerId }
@@ -111,7 +114,7 @@ export default function SoccerShootoutWorkspace({
       kicker = { kind: 'unknown', label: opponentLabel.trim() || 'Unknown opponent' }
     } else {
       kicker = opponentMode === 'team'
-        ? { kind: 'team', label: state.gameInfo?.opponentName ?? 'Opponent' }
+        ? { kind: 'team', label: opponentTeamLabel }
         : { kind: 'unknown', label: 'Unknown' }
       slot = anonymousSlot
     }
@@ -132,13 +135,13 @@ export default function SoccerShootoutWorkspace({
     <div className="space-y-5">
       <section className="border-y border-slate-200 bg-white py-4">
         <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3 text-center">
-          <Score name={state.gameInfo?.teamName ?? 'Tracked'} normal={projection.sideTotals.tracked.score} shootout={shootout.score.tracked} />
+          <Score name={trackedLabel} normal={projection.sideTotals.tracked.score} shootout={shootout.score.tracked} />
           <div className="pb-1 text-xs font-bold uppercase text-slate-400">Shootout</div>
-          <Score name={state.gameInfo?.opponentName ?? 'Opponent'} normal={projection.sideTotals.opponent.score} shootout={shootout.score.opponent} />
+          <Score name={opponentTeamLabel} normal={projection.sideTotals.opponent.score} shootout={shootout.score.opponent} />
         </div>
         <p className="mt-3 text-center text-xs font-semibold text-slate-500">
           {shootout.decided
-            ? `${shootout.winner === 'tracked' ? state.gameInfo?.teamName : state.gameInfo?.opponentName} wins the shootout`
+            ? `${shootout.winner === 'tracked' ? trackedLabel : opponentTeamLabel} wins the shootout`
             : shootout.suddenDeathRound
               ? `Sudden death, round ${shootout.suddenDeathRound}`
               : `Initial series, ${shootout.initialKicksPerSide} kicks per side`}
@@ -154,7 +157,7 @@ export default function SoccerShootoutWorkspace({
           <div className="flex min-w-max gap-2">
             {rawKicks.map((event, index) => (
               <button key={event.id} type="button" onClick={() => setEditingKick(event)} className={`min-w-24 rounded-md border px-3 py-2 text-left ${event.payload.outcome === 'retake' ? 'border-violet-300 bg-violet-50' : 'border-slate-200 bg-white'}`}>
-                <p className="text-[10px] font-bold uppercase text-slate-400">{event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} {index + 1}</p>
+                <p className="max-w-20 truncate text-[10px] font-bold uppercase text-slate-400" title={event.teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}>{event.teamSide === 'tracked' ? trackedLabel : opponentTeamLabel} {index + 1}</p>
                 <p className="mt-0.5 text-sm font-bold capitalize text-slate-800">{event.payload.outcome}</p>
                 <p className="mt-0.5 max-w-20 truncate text-[11px] text-slate-500">{event.actors.find(actor => actor.role === 'kicker')?.label ?? 'Unknown'}</p>
               </button>
@@ -168,7 +171,7 @@ export default function SoccerShootoutWorkspace({
         <section className="space-y-4 border-y border-slate-200 bg-white py-4">
           <div>
             <p className="text-xs font-bold uppercase text-slate-500">Next kick</p>
-            <p className="mt-1 text-xl font-bold text-slate-900">{nextSide === 'tracked' ? state.gameInfo?.teamName : state.gameInfo?.opponentName}</p>
+            <p className="mt-1 truncate text-xl font-bold text-slate-900" title={nextSide === 'tracked' ? trackedLabel : opponentTeamLabel}>{nextSide === 'tracked' ? trackedLabel : opponentTeamLabel}</p>
             <p className="text-xs text-slate-500">Defending goalkeeper: {goalkeeperLabel(shootout.currentGoalkeepers[nextSide === 'tracked' ? 'opponent' : 'tracked'], projection)}</p>
           </div>
 

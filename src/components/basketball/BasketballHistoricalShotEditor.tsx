@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, LocateFixed, MapPinOff, Plus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useGame } from '../../context/GameContext'
+import { gameSideDisplayName } from '../../lib/display'
 import type { ShotRecord } from '../../types'
 import {
   basketballCourtOrientationForState,
@@ -212,8 +213,8 @@ export default function BasketballHistoricalShotEditor({
             label="Team"
             value={draft.teamSide}
             options={[
-              { value: 'tracked', label: state.gameInfo?.teamName || 'Tracked' },
-              { value: 'opponent', label: state.gameInfo?.opponentName || 'Opponent' },
+              { value: 'tracked', label: gameSideDisplayName(state.gameInfo, 'tracked') },
+              { value: 'opponent', label: gameSideDisplayName(state.gameInfo, 'opponent') },
             ]}
             onChange={value => selectSide(value as BasketballHistoricalShotDraft['teamSide'])}
           />

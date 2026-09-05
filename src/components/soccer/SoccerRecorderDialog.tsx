@@ -18,6 +18,7 @@ import {
   type SoccerRecorderProjection,
   type SoccerRecorderSummary,
 } from '../../lib/soccer/recorders'
+import { gameSideDisplayName } from '../../lib/display'
 
 interface SoccerRecorderDialogProps {
   open: boolean
@@ -314,7 +315,7 @@ function RecorderProjectionView({
           <p className="text-2xl font-bold text-emerald-800">
             {projection.state.homeTeamScore ?? 0}
           </p>
-          <p className="text-[11px] text-slate-500">Tracked</p>
+          <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(projection.state.gameInfo, 'tracked')}>{gameSideDisplayName(projection.state.gameInfo, 'tracked')}</p>
         </div>
         <div>
           <p className="text-sm font-bold capitalize text-slate-700">
@@ -324,7 +325,7 @@ function RecorderProjectionView({
         </div>
         <div>
           <p className="text-2xl font-bold text-slate-800">{projection.state.opponentScore}</p>
-          <p className="text-[11px] text-slate-500">Opponent</p>
+          <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(projection.state.gameInfo, 'opponent')}>{gameSideDisplayName(projection.state.gameInfo, 'opponent')}</p>
         </div>
       </div>
 

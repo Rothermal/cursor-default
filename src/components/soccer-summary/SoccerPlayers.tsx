@@ -9,6 +9,7 @@ import {
   type SoccerReviewRate,
 } from '../../lib/soccer/summaryPlayers'
 import type { SoccerSummarySource } from '../../lib/soccer/summarySource'
+import { gameSideDisplayName } from '../../lib/display'
 import SoccerPlayerDetail from './SoccerPlayerDetail'
 
 interface SoccerPlayersProps {
@@ -66,8 +67,8 @@ export default function SoccerPlayers({
       <section className="border-b border-slate-200 bg-white px-4 py-4">
         <div className="grid grid-cols-2 border border-slate-300 p-0.5">
           {([
-            ['tracked', source.state.gameInfo?.teamName ?? 'Tracked'],
-            ['opponent', source.state.gameInfo?.opponentName ?? 'Opponent'],
+            ['tracked', gameSideDisplayName(source.state.gameInfo, 'tracked')],
+            ['opponent', gameSideDisplayName(source.state.gameInfo, 'opponent')],
           ] as const).map(([id, label]) => (
             <button
               key={id}

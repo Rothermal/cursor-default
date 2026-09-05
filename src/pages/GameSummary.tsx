@@ -16,6 +16,7 @@ import { supabase } from '../lib/supabase'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { acceptedTeamRole, canCorrectStats } from '../lib/teamPermissions'
 import { basketballCourtOrientationForState } from '../lib/basketball/courtGeometry'
+import { gameSideDisplayName } from '../lib/display'
 
 /** Per-stat resolved value plus metadata for conflict indicator (Part 1) */
 type ResolvedEntry = { value: number; source?: string; recorder_count?: number }
@@ -181,7 +182,7 @@ export default function GameSummary() {
         ? { ...homeTeamPseudo, stats: teamStatHomeStats }
         : {
             id: TEAM_PLAYER_HOME_ID,
-            name: gameInfo.teamName,
+            name: gameSideDisplayName(gameInfo, 'tracked'),
             number: '★',
             stats: teamStatHomeStats,
             isTeamPlayer: true as const,
@@ -192,7 +193,7 @@ export default function GameSummary() {
         ? { ...oppTeamPseudo, stats: teamStatOppStats }
         : {
             id: TEAM_PLAYER_OPP_ID,
-            name: gameInfo.opponentName,
+            name: gameSideDisplayName(gameInfo, 'opponent'),
             number: '★',
             stats: teamStatOppStats,
             isTeamPlayer: true as const,
@@ -202,8 +203,8 @@ export default function GameSummary() {
       <TeamStatSummary
         homeTeamPlayer={homeP}
         oppTeamPlayer={oppP}
-        homeTeamName={gameInfo.teamName}
-        oppTeamName={gameInfo.opponentName}
+        homeTeamName={gameSideDisplayName(gameInfo, 'tracked')}
+        oppTeamName={gameSideDisplayName(gameInfo, 'opponent')}
         config={cfg}
         sport={sport}
         foulBaseStatId={foulBase}
@@ -480,6 +481,8 @@ export default function GameSummary() {
     navigate(sport ? sportDashboardPath(sport.id) : '/')
     return null
   }
+  const trackedLabel = gameSideDisplayName(gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(gameInfo, 'opponent')
 
   const getPlayerStats = (playerId: string): Record<string, number> => {
     const remoteId = playerIdMap[playerId] ?? playerId
@@ -610,12 +613,12 @@ export default function GameSummary() {
 
           <div className="flex items-center justify-center gap-6">
             <div className="text-center">
-              <p className="text-sm opacity-80">{gameInfo.teamName}</p>
+              <p className="text-sm opacity-80">{trackedLabel}</p>
               <p className="text-4xl font-bold">{teamScore}</p>
             </div>
             <p className="text-xl opacity-60">vs</p>
             <div className="text-center">
-              <p className="text-sm opacity-80">{gameInfo.opponentName}</p>
+              <p className="text-sm opacity-80">{opponentLabel}</p>
               <p className="text-4xl font-bold">{opponentScore}</p>
             </div>
           </div>
@@ -838,12 +841,12 @@ export default function GameSummary() {
             <h3 className="text-sm font-semibold text-slate-600 mb-3">Team vs opponent</h3>
             <div className="flex items-center justify-center gap-6 mb-4">
               <div className="text-center">
-                <p className="text-xs text-slate-500">{gameInfo.teamName}</p>
+                <p className="text-xs text-slate-500">{trackedLabel}</p>
                 <p className="text-2xl font-bold text-slate-800">{teamScore}</p>
               </div>
               <span className="text-slate-400">vs</span>
               <div className="text-center">
-                <p className="text-xs text-slate-500">{gameInfo.opponentName}</p>
+                <p className="text-xs text-slate-500">{opponentLabel}</p>
                 <p className="text-2xl font-bold text-slate-800">{opponentScore}</p>
               </div>
             </div>

@@ -4,6 +4,7 @@ import type {
   SoccerMatchLeader,
 } from '../../lib/soccer/summary'
 import type { SoccerSummarySource } from '../../lib/soccer/summarySource'
+import { gameSideDisplayName } from '../../lib/display'
 import SoccerMatchDetails from './SoccerMatchDetails'
 import SoccerMatchLeaders from './SoccerMatchLeaders'
 import SoccerTeamComparison from './SoccerTeamComparison'
@@ -23,8 +24,8 @@ export default function SoccerOverview({
   healthy,
   actions,
 }: SoccerOverviewProps) {
-  const trackedName = source.state.gameInfo?.teamName ?? 'Tracked team'
-  const opponentName = source.state.gameInfo?.opponentName ?? 'Opponent'
+  const trackedName = gameSideDisplayName(source.state.gameInfo, 'tracked', 'Tracked team')
+  const opponentName = gameSideDisplayName(source.state.gameInfo, 'opponent')
 
   return (
     <main>

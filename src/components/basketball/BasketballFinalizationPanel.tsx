@@ -22,6 +22,7 @@ import {
   type BasketballReopenResult,
 } from '../../lib/basketball/finalization'
 import type { BasketballReopenMode } from '../../lib/basketball/types'
+import { gameSideDisplayName } from '../../lib/display'
 
 interface BasketballFinalizationPanelProps {
   gameId: string
@@ -252,7 +253,7 @@ export default function BasketballFinalizationPanel({
             <div className="grid grid-cols-3 divide-x divide-slate-200 text-center">
               <div>
                 <p className="text-xl font-bold text-blue-800">{trackedScore ?? '-'}</p>
-                <p className="text-[11px] text-slate-500">Tracked</p>
+                <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
               </div>
               <div>
                 <CheckCircle2 size={20} className="mx-auto text-emerald-600" />
@@ -260,7 +261,7 @@ export default function BasketballFinalizationPanel({
               </div>
               <div>
                 <p className="text-xl font-bold text-slate-800">{opponentScore ?? '-'}</p>
-                <p className="text-[11px] text-slate-500">Opponent</p>
+                <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
               </div>
             </div>
             <p className="mt-3 text-xs text-slate-600">
@@ -406,11 +407,11 @@ export default function BasketballFinalizationPanel({
               <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
                 <div>
                   <p className="text-3xl font-bold text-blue-800">{preview.score.tracked}</p>
-                  <p className="text-xs text-slate-500">Tracked</p>
+                  <p className="truncate text-xs text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-slate-800">{preview.score.opponent}</p>
-                  <p className="text-xs text-slate-500">Opponent</p>
+                  <p className="truncate text-xs text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
                 </div>
               </div>
             )}

@@ -10,6 +10,7 @@ import {
   getSeasonFromDate,
   invertPlayerIdMap,
   isMissingGameTeamPlaceholderColumnError,
+  isMissingGameSideNicknameColumnError,
   isMissingHomeScoreAdjustmentColumnError,
   isMissingHomeTeamScoreColumnError,
   isMissingIsTeamPlaceholderColumnError,
@@ -93,6 +94,8 @@ type CloudGameRow = {
   id: string
   team_id: string
   opponent_name: string
+  tracked_team_nickname?: string | null
+  opponent_nickname?: string | null
   tournament_name: string | null
   tournament_id?: string | null
   season_id?: string | null
@@ -272,6 +275,8 @@ async function ensureGame(
     sport_id: sportId,
     ...(seasonIdForGame ? { season_id: seasonIdForGame } : {}),
     opponent_name: state.gameInfo!.opponentName,
+    tracked_team_nickname: state.gameInfo!.teamNickname?.trim() || null,
+    opponent_nickname: state.gameInfo!.opponentNickname?.trim() || null,
     opponent_score: state.opponentScore,
     home_team_score: state.homeTeamScore,
     home_score_adjustment: state.homeScoreAdjustment,
@@ -303,13 +308,18 @@ async function ensureGame(
     omitHomeAdj: boolean,
     omitTournamentId: boolean,
     omitNotes: boolean,
-    omitSeasonId: boolean
+    omitSeasonId: boolean,
+    omitSideNicknames: boolean
   ) {
     return {
       team_id: teamId,
       sport_id: sportId,
       ...(omitSeasonId || !seasonIdForGame ? {} : { season_id: seasonIdForGame }),
       opponent_name: state.gameInfo!.opponentName,
+      ...(omitSideNicknames ? {} : {
+        tracked_team_nickname: state.gameInfo!.teamNickname?.trim() || null,
+        opponent_nickname: state.gameInfo!.opponentNickname?.trim() || null,
+      }),
       opponent_score: state.opponentScore,
       ...(omitHomeTeamScore ? {} : { home_team_score: state.homeTeamScore }),
       ...(omitHomeAdj ? {} : { home_score_adjustment: state.homeScoreAdjustment }),
@@ -365,12 +375,14 @@ async function ensureGame(
     const missingTournamentId = isMissingTournamentIdColumnError(error)
     const missingNotes = isMissingNotesColumnError(error)
     const missingSeasonId = isMissingSeasonIdColumnError(error)
+    const missingSideNicknames = isMissingGameSideNicknameColumnError(error)
     if (
       !missingHomeTeamScore &&
       !missingHomeAdj &&
       !missingTournamentId &&
       !missingNotes &&
-      !missingSeasonId
+      !missingSeasonId &&
+      !missingSideNicknames
     ) {
       throw new Error(`Game ${op} failed: ${error.message}`)
     }
@@ -389,7 +401,8 @@ async function ensureGame(
             missingHomeAdj,
             missingTournamentId,
             missingNotes,
-            missingSeasonId
+            missingSeasonId,
+            missingSideNicknames
           )
     ;({ error, data } = await run(fb))
     if (error) throw new Error(`Game ${op} failed: ${error.message}`)
@@ -1128,7 +1141,7 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
 
   const { data: teamRow, error: teamError } = await supabase
     .from('teams')
-    .select('id,name,season_id')
+    .select('id,name,nickname,season_id')
     .eq('id', gameRow.team_id)
     .maybeSingle()
 
@@ -1262,7 +1275,9 @@ async function hydrateCloudGameFromRow(userId: string, gameRow: CloudGameRow): P
     status: gameRow.status,
     gameInfo: {
       teamName: teamRow.name as string,
+      teamNickname: gameRow.tracked_team_nickname ?? (teamRow.nickname as string | null) ?? null,
       opponentName: gameRow.opponent_name,
+      opponentNickname: gameRow.opponent_nickname ?? null,
       tournamentName: gameRow.tournament_name ?? '',
       tournamentId: gameRow.tournament_id ?? null,
       date: gameRow.game_date,
@@ -1316,7 +1331,7 @@ async function loadLatestGameRow(userId: string): Promise<CloudGameRow | null> {
 
   // All optional columns (may not exist before their respective migrations)
   const allOptional =
-    'home_team_score,home_score_adjustment,tournament_id,notes,last_opened_at,season_id,sport_id,home_team_player_id,opp_team_player_id'
+    'home_team_score,home_score_adjustment,tournament_id,notes,last_opened_at,season_id,sport_id,home_team_player_id,opp_team_player_id,tracked_team_nickname,opponent_nickname'
   const baseColumns =
     'id,team_id,opponent_name,tournament_name,game_date,opponent_score,status,created_at'
 
@@ -1404,7 +1419,7 @@ export async function loadCloudGameById(userId: string, gameId: string): Promise
   const { data: gameRow, error: gameError } = await supabase
     .from('games')
     .select(
-      `${baseById},home_team_score,home_score_adjustment,tournament_id,notes,season_id,sport_id,home_team_player_id,opp_team_player_id`
+      `${baseById},home_team_score,home_score_adjustment,tournament_id,notes,season_id,sport_id,home_team_player_id,opp_team_player_id,tracked_team_nickname,opponent_nickname`
     )
     .eq('id', gameId)
     .maybeSingle()

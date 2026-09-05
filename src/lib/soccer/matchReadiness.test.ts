@@ -178,7 +178,7 @@ describe('Soccer match-readiness wiring', () => {
     expect(tracker).toContain(
       "openIncident('team_event', location, 'live', undefined, suggestedKind ?? 'corner')"
     )
-    expect(fieldTab).toContain("? `Restart - ${capturePreferences.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} attack`")
+    expect(fieldTab).toContain("? `Restart - ${capturePreferences.teamSide === 'tracked' ? trackedLabel : opponentLabel} attack`")
     expect(fieldTab).toContain('label="Restart"')
     expect(fieldTab).not.toContain('label="Team"')
     expect(fieldTab).toContain('role="status" aria-live="polite"')

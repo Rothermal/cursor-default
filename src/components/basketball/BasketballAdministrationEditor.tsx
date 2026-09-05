@@ -24,6 +24,7 @@ import {
   BasketballEditorSegmentedControl,
   BasketballEditorSelectField,
 } from './BasketballShotEditor'
+import { gameSideDisplayName } from '../../lib/display'
 
 type Props = {
   onClose: () => void
@@ -91,8 +92,8 @@ export default function BasketballAdministrationEditor(props: Props) {
         .filter(period => sportState?.projection.startedPeriodIds.includes(period.id))
         .map(period => ({ value: period.id, label: period.label }))
     : []
-  const trackedLabel = state.gameInfo?.teamName || 'Tracked'
-  const opponentLabel = state.gameInfo?.opponentName || 'Opponent'
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
   const participantOptions = draft.teamSide === 'neutral'
     ? []
     : basketballEjectionParticipantOptions(state, draft.teamSide)

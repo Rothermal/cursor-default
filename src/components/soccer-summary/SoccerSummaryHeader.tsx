@@ -1,6 +1,7 @@
 import { ChevronLeft, RefreshCw, Users } from 'lucide-react'
 import type { SoccerSummaryResult } from '../../lib/soccer/summary'
 import type { SoccerSummarySource } from '../../lib/soccer/summarySource'
+import { gameSideDisplayName } from '../../lib/display'
 
 interface SoccerSummaryHeaderProps {
   source: SoccerSummarySource
@@ -19,8 +20,8 @@ export default function SoccerSummaryHeader({
   onRefresh,
   onOpenRecorders,
 }: SoccerSummaryHeaderProps) {
-  const teamName = source.state.gameInfo?.teamName ?? 'Tracked team'
-  const opponentName = source.state.gameInfo?.opponentName ?? 'Opponent'
+  const teamName = gameSideDisplayName(source.state.gameInfo, 'tracked', 'Tracked team')
+  const opponentName = gameSideDisplayName(source.state.gameInfo, 'opponent')
   const status = source.kind === 'local'
     ? 'Local'
     : source.kind === 'cloud_primary'

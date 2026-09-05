@@ -74,6 +74,7 @@ import {
   type SoccerTeamEventKind,
 } from '../lib/soccer'
 import { sportDashboardPath } from '../lib/sportNavigation'
+import { gameSideDisplayName } from '../lib/display'
 import {
   loadSoccerGameRecorders,
   primarySoccerRecorder,
@@ -228,6 +229,8 @@ export default function SoccerGameTracker() {
   const currentSegment = segments.find(segment => segment.id === projection?.currentPeriodId) ?? null
   const lifecycleAction = projection ? soccerLifecycleAction(projection) : { kind: 'none' as const }
   const nextSegment = lifecycleAction.kind === 'start_period' ? lifecycleAction.segment : null
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
 
   if (invalidRoute || !state.gameInfo || !soccerState || !projection || !clockValue) return null
 
@@ -259,8 +262,8 @@ export default function SoccerGameTracker() {
     markerSideFilter === 'all'
       ? null
       : markerSideFilter === 'tracked'
-        ? 'Tracked'
-        : 'Opponent',
+        ? trackedLabel
+        : opponentLabel,
     markerScope === 'current' ? 'Current period' : 'Full match',
   ].filter(Boolean).join(' · ')
   const reviewPeriodId = projection.currentPeriodId
@@ -371,7 +374,7 @@ export default function SoccerGameTracker() {
             <ChevronLeft size={20} />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="font-bold truncate">{state.gameInfo.teamName} vs {state.gameInfo.opponentName}</h1>
+            <h1 className="font-bold truncate">{trackedLabel} vs {opponentLabel}</h1>
             <p className="flex min-w-0 items-center gap-2 text-xs text-emerald-100">
               <span className="truncate">{currentSegment?.label ?? (ended ? 'Match ended' : nextSegment ? `${nextSegment.label} next` : 'Periods complete')}</span>
               <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-semibold">
@@ -390,8 +393,8 @@ export default function SoccerGameTracker() {
       <main className="mx-auto w-full min-w-0 max-w-2xl">
         <section className="px-4 py-4 text-center border-b border-slate-200 bg-white">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${state.gameInfo.teamName} scoring timeline`}>
-              <p className="truncate text-xs font-semibold text-slate-500">{state.gameInfo.teamName}</p>
+            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${trackedLabel} scoring timeline`}>
+              <p className="truncate text-xs font-semibold text-slate-500">{trackedLabel}</p>
               <p className="text-4xl font-bold tabular-nums text-emerald-800">{state.homeTeamScore ?? 0}</p>
             </button>
             <div className="min-w-24">
@@ -405,8 +408,8 @@ export default function SoccerGameTracker() {
               </div>
               <p className="mt-1 text-[11px] font-medium text-slate-500">{projection.clock.running ? 'Running' : 'Stopped'}</p>
             </div>
-            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${state.gameInfo.opponentName} scoring timeline`}>
-              <p className="truncate text-xs font-semibold text-slate-500">{state.gameInfo.opponentName}</p>
+            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${opponentLabel} scoring timeline`}>
+              <p className="truncate text-xs font-semibold text-slate-500">{opponentLabel}</p>
               <p className="text-4xl font-bold tabular-nums text-slate-800">{state.opponentScore}</p>
             </button>
           </div>
@@ -417,7 +420,7 @@ export default function SoccerGameTracker() {
             </button>
           ) : ended ? (
             <div className="mt-5 space-y-2">
-              <p className="text-sm font-bold text-slate-700">{matchResultLabel(projection, state.gameInfo.teamName, state.gameInfo.opponentName)}</p>
+              <p className="text-sm font-bold text-slate-700">{matchResultLabel(projection, trackedLabel, opponentLabel)}</p>
               <button
                 type="button"
                 onClick={() => navigate(soccerSummaryPath({ from: 'tracker' }))}
@@ -553,6 +556,8 @@ export default function SoccerGameTracker() {
                   captureSide={capturePreferences.teamSide}
                   flipped={fieldFlipped}
                   disabled
+                  trackedLabel={trackedLabel}
+                  opponentLabel={opponentLabel}
                   markers={fieldMarkers}
                   onFlip={() => setFieldFlipped(value => !value)}
                   onLocation={() => {}}
@@ -567,8 +572,8 @@ export default function SoccerGameTracker() {
           ) : mainTab === 'field' ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
-                <ModeButton active={capturePreferences.teamSide === 'tracked'} label="Tracked" onClick={() => setCaptureSide('tracked')} />
-                <ModeButton active={capturePreferences.teamSide === 'opponent'} label="Opponent" onClick={() => setCaptureSide('opponent')} />
+                <ModeButton active={capturePreferences.teamSide === 'tracked'} label={trackedLabel} onClick={() => setCaptureSide('tracked')} />
+                <ModeButton active={capturePreferences.teamSide === 'opponent'} label={opponentLabel} onClick={() => setCaptureSide('opponent')} />
               </div>
 
               <div>
@@ -586,8 +591,10 @@ export default function SoccerGameTracker() {
                 flipped={fieldFlipped}
                 disabled={!fieldCaptureEnabled}
                 activeCaptureLabel={restartArmed
-                  ? `Restart - ${capturePreferences.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} attack`
+                  ? `Restart - ${capturePreferences.teamSide === 'tracked' ? trackedLabel : opponentLabel} attack`
                   : undefined}
+                trackedLabel={trackedLabel}
+                opponentLabel={opponentLabel}
                 markers={fieldMarkers}
                 onFlip={() => setFieldFlipped(value => !value)}
                 onLocation={location => {
@@ -698,8 +705,8 @@ export default function SoccerGameTracker() {
                       <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker side</p>
                       <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
                         <ModeButton active={markerSideFilter === 'all'} label="All" onClick={() => setMarkerSideFilter('all')} />
-                        <ModeButton active={markerSideFilter === 'tracked'} label="Tracked" onClick={() => setMarkerSideFilter('tracked')} />
-                        <ModeButton active={markerSideFilter === 'opponent'} label="Opp." onClick={() => setMarkerSideFilter('opponent')} />
+                        <ModeButton active={markerSideFilter === 'tracked'} label={trackedLabel} onClick={() => setMarkerSideFilter('tracked')} />
+                        <ModeButton active={markerSideFilter === 'opponent'} label={opponentLabel} onClick={() => setMarkerSideFilter('opponent')} />
                       </div>
                     </div>
                     <div>

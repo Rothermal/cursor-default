@@ -81,7 +81,9 @@ export interface SportConfig {
 
 export interface GameInfo {
   teamName: string
+  teamNickname?: string | null
   opponentName: string
+  opponentNickname?: string | null
   tournamentName: string
   /** Supabase tournaments.id — set when user picks an existing or newly-created tournament. */
   tournamentId?: string | null

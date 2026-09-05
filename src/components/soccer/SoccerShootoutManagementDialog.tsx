@@ -13,6 +13,8 @@ import {
   type SoccerShootoutGoalkeeperChangeReason,
 } from '../../lib/soccer'
 import type { GameState } from '../../types'
+import { useGame } from '../../context/GameContext'
+import { gameSideDisplayName } from '../../lib/display'
 
 export type SoccerShootoutManagementKind = 'card' | 'goalkeeper' | 'eligibility'
 
@@ -169,7 +171,7 @@ function EligibilityForm({ state, recorderUserId, busy, onApply, onClose }: Prop
 }
 
 function soccerProjection(state: GameState) { if (state.sportGameState?.sportId !== 'soccer' || !state.sportGameState.projection.shootout) throw new Error('Shootout unavailable'); return state.sportGameState.projection }
-function SideChoice({ side, onSide }: { side: 'tracked' | 'opponent'; onSide: (side: 'tracked' | 'opponent') => void }) { return <Field label="Side"><div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><Choice active={side === 'tracked'} label="Tracked" onClick={() => onSide('tracked')} /><Choice active={side === 'opponent'} label="Opponent" onClick={() => onSide('opponent')} /></div></Field> }
+function SideChoice({ side, onSide }: { side: 'tracked' | 'opponent'; onSide: (side: 'tracked' | 'opponent') => void }) { const { state } = useGame(); return <Field label="Side"><div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><Choice active={side === 'tracked'} label={gameSideDisplayName(state.gameInfo, 'tracked')} onClick={() => onSide('tracked')} /><Choice active={side === 'opponent'} label={gameSideDisplayName(state.gameInfo, 'opponent')} onClick={() => onSide('opponent')} /></div></Field> }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <section><h3 className="mb-2 text-xs font-bold uppercase text-slate-500">{label}</h3>{children}</section> }
 function Choice({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) { return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-bold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button> }
 function Submit({ busy, label, onClick }: { busy: boolean; label: string; onClick: () => void }) { return <button type="button" disabled={busy} onClick={onClick} className="min-h-12 w-full rounded-md bg-emerald-700 text-sm font-bold text-white disabled:opacity-40">{label}</button> }

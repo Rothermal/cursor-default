@@ -17,6 +17,7 @@ import {
 } from '../lib/sportNavigation'
 import { isTeamPseudoPlayer } from '../lib/teamPlayers'
 import { getSportAvailabilityPolicy } from '../lib/sportAvailability'
+import { gameSideDisplayName } from '../lib/display'
 import {
   basketballSetupAccountScope,
   basketballSetupDraftHasMeaningfulEdits,
@@ -284,8 +285,8 @@ export default function SportDashboard() {
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold text-blue-800 truncate">
-                  {state.gameInfo?.teamName ?? 'Setup in progress'}
-                  {state.gameInfo?.opponentName ? ` vs ${state.gameInfo.opponentName}` : ''}
+                  {state.gameInfo ? gameSideDisplayName(state.gameInfo, 'tracked') : 'Setup in progress'}
+                  {state.gameInfo?.opponentName ? ` vs ${gameSideDisplayName(state.gameInfo, 'opponent')}` : ''}
                 </p>
                 {liveScoreLine && (
                   <p className="text-base font-bold text-blue-800 tabular-nums mt-0.5">

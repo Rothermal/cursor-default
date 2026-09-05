@@ -41,6 +41,7 @@ import {
 import type { GameState } from '../../types'
 import { useStableSoccerCorrectionDraft } from '../../hooks/useStableSoccerCorrectionDraft'
 import SoccerField from './SoccerField'
+import { gameSideDisplayName } from '../../lib/display'
 
 export type SoccerIncidentKind = 'defense' | 'foul' | 'card' | 'team_event'
 export type SoccerIncidentEvent =
@@ -126,6 +127,8 @@ export default function SoccerIncidentCaptureDialog({
     [sportState?.setup?.participants]
   )
   const recentLabels = useMemo(() => recentOpponentLabels(state), [state])
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentTeamLabel = gameSideDisplayName(state.gameInfo, 'opponent')
   const mode = draft?.mode ?? (draft?.event ? 'edit' : 'live')
   const [teamSide, setTeamSide] = useState<SoccerTeamSide>('tracked')
   const [location, setLocation] = useState<GameEventLocation | null>(null)
@@ -426,7 +429,7 @@ export default function SoccerIncidentCaptureDialog({
         mainSelection.attribution,
         mainSelection.participantId,
         actorLabel,
-        teamSide === 'tracked' ? state.gameInfo?.teamName : state.gameInfo?.opponentName
+        teamSide === 'tracked' ? trackedLabel : opponentTeamLabel
       ) : null
     if (actorRequired && !actor) {
       setError('Choose a valid event actor.')
@@ -445,7 +448,7 @@ export default function SoccerIncidentCaptureDialog({
         fouledSelection.attribution,
         fouledSelection.participantId,
         fouledLabel,
-        teamSide === 'tracked' ? state.gameInfo?.opponentName : state.gameInfo?.teamName
+        teamSide === 'tracked' ? opponentTeamLabel : trackedLabel
       )
       if (!fouled) {
         setError('Choose a valid fouled actor.')
@@ -534,14 +537,16 @@ export default function SoccerIncidentCaptureDialog({
               periodElapsedMs={periodElapsedMs}
               onPeriodElapsedMs={setPeriodElapsedMs}
               invalid={timingInvalid}
+              trackedLabel={trackedLabel}
+              opponentLabel={opponentTeamLabel}
             />
           )}
 
           {mode === 'live' && draft.kind === 'team_event' && (
             <FieldGroup label="Side">
               <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
-                <ChoiceButton active={teamSide === 'tracked'} label="Tracked" onClick={() => changeTeamSide('tracked')} compact />
-                <ChoiceButton active={teamSide === 'opponent'} label="Opponent" onClick={() => changeTeamSide('opponent')} compact />
+                <ChoiceButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => changeTeamSide('tracked')} compact />
+                <ChoiceButton active={teamSide === 'opponent'} label={opponentTeamLabel} onClick={() => changeTeamSide('opponent')} compact />
               </div>
             </FieldGroup>
           )}
@@ -658,7 +663,7 @@ export default function SoccerIncidentCaptureDialog({
             <button type="button" onClick={() => setLocationEditorOpen(value => !value)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><MapPin size={16} /> Set location</button>
             <button type="button" onClick={() => setLocation(null)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><MapPinOff size={16} /> Clear location</button>
           </div>
-          {locationEditorOpen && <SoccerField trackedDirection={trackedDirection} captureSide={teamSide} flipped={fieldFlipped} disabled={false} onFlip={() => setFieldFlipped(value => !value)} onLocation={next => { setLocation(next); setLocationEditorOpen(false) }} />}
+          {locationEditorOpen && <SoccerField trackedDirection={trackedDirection} captureSide={teamSide} trackedLabel={trackedLabel} opponentLabel={opponentTeamLabel} flipped={fieldFlipped} disabled={false} onFlip={() => setFieldFlipped(value => !value)} onLocation={next => { setLocation(next); setLocationEditorOpen(false) }} />}
 
           {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           <button type="button" onClick={save} disabled={saveDisabled} className="min-h-12 w-full rounded-md bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-40">{mode === 'edit' ? 'Save Correction' : `Log ${kindLabel(draft.kind)}`}</button>
@@ -674,10 +679,10 @@ function FieldGroup({ label, children }: { label: string; children: ReactNode })
 }
 
 function ChoiceButton({ active, label, onClick, compact = false }: { active: boolean; label: string; onClick: () => void; compact?: boolean }) {
-  return <button type="button" onClick={onClick} className={`${compact ? 'min-h-8' : 'min-h-10'} rounded-md px-2 text-xs font-bold ${active ? 'bg-emerald-700 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}>{label}</button>
+  return <button type="button" onClick={onClick} title={label} className={`${compact ? 'min-h-8' : 'min-h-10'} min-w-0 truncate rounded-md px-2 text-xs font-bold ${active ? 'bg-emerald-700 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}>{label}</button>
 }
 
-function MomentEditor({ teamSide, onTeamSide, timings, selectedPeriodId, onSelectedPeriodId, periodElapsedMs, onPeriodElapsedMs, invalid }: {
+function MomentEditor({ teamSide, onTeamSide, timings, selectedPeriodId, onSelectedPeriodId, periodElapsedMs, onPeriodElapsedMs, invalid, trackedLabel, opponentLabel }: {
   teamSide: SoccerTeamSide
   onTeamSide: (side: SoccerTeamSide) => void
   timings: Array<{ period: GameEventPeriod; label: string; startElapsedMs: number; endElapsedMs: number }>
@@ -686,8 +691,10 @@ function MomentEditor({ teamSide, onTeamSide, timings, selectedPeriodId, onSelec
   periodElapsedMs: number
   onPeriodElapsedMs: (value: number) => void
   invalid: boolean
+  trackedLabel: string
+  opponentLabel: string
 }) {
-  return <div className="space-y-4"><FieldGroup label="Side"><div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><ChoiceButton active={teamSide === 'tracked'} label="Tracked" onClick={() => onTeamSide('tracked')} compact /><ChoiceButton active={teamSide === 'opponent'} label="Opponent" onClick={() => onTeamSide('opponent')} compact /></div></FieldGroup><FieldGroup label="Match time"><div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem] gap-2"><select value={selectedPeriodId} onChange={event => { const next = timings.find(item => item.period.id === event.target.value); onSelectedPeriodId(event.target.value); onPeriodElapsedMs(next ? next.endElapsedMs - next.startElapsedMs : 0) }} className="input-field">{timings.map(item => <option key={item.period.id} value={item.period.id}>{item.label}</option>)}</select><label className="text-[11px] font-bold uppercase text-slate-500">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => onPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000)} className="input-field mt-1" /></label><label className="text-[11px] font-bold uppercase text-slate-500">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => onPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000)} className="input-field mt-1" /></label></div>{invalid && <p className="mt-2 text-xs font-medium text-amber-700">Choose a time inside the recorded period.</p>}</FieldGroup></div>
+  return <div className="space-y-4"><FieldGroup label="Side"><div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><ChoiceButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => onTeamSide('tracked')} compact /><ChoiceButton active={teamSide === 'opponent'} label={opponentLabel} onClick={() => onTeamSide('opponent')} compact /></div></FieldGroup><FieldGroup label="Match time"><div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem] gap-2"><select value={selectedPeriodId} onChange={event => { const next = timings.find(item => item.period.id === event.target.value); onSelectedPeriodId(event.target.value); onPeriodElapsedMs(next ? next.endElapsedMs - next.startElapsedMs : 0) }} className="input-field">{timings.map(item => <option key={item.period.id} value={item.period.id}>{item.label}</option>)}</select><label className="text-[11px] font-bold uppercase text-slate-500">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => onPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000)} className="input-field mt-1" /></label><label className="text-[11px] font-bold uppercase text-slate-500">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => onPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000)} className="input-field mt-1" /></label></div>{invalid && <p className="mt-2 text-xs font-medium text-amber-700">Choose a time inside the recorded period.</p>}</FieldGroup></div>
 }
 
 function ActorEditor({ label, side, allowStaff, attribution, onAttribution, participantId, onParticipantId, participants, actorLabel, onActorLabel, recentLabels }: {

@@ -173,6 +173,16 @@ export async function syncEventGameToCloud({
   if (!binding?.game_id || !binding.game_status || !binding.participant_id_map) {
     throw new Error(`${adapter.sportLabel} game binding returned an invalid response`)
   }
+  await freezeGameSideNickname(
+    binding.game_id,
+    'tracked_team_nickname',
+    state.gameInfo!.teamNickname
+  )
+  await freezeGameSideNickname(
+    binding.game_id,
+    'opponent_nickname',
+    state.gameInfo!.opponentNickname
+  )
   await validateBinding?.(binding.game_id)
 
   const cloudToLocalParticipantId = Object.fromEntries(
@@ -352,6 +362,23 @@ export async function syncEventGameToCloud({
     playerIdMap: binding.participant_id_map,
     syncedAt: checkpointData,
     syncedState,
+  }
+}
+
+async function freezeGameSideNickname(
+  gameId: string,
+  column: 'tracked_team_nickname' | 'opponent_nickname',
+  nickname: string | null | undefined
+): Promise<void> {
+  const value = nickname?.trim()
+  if (!value || !supabase) return
+  const { error } = await supabase
+    .from('games')
+    .update({ [column]: value })
+    .eq('id', gameId)
+    .is(column, null)
+  if (error) {
+    throw new Error(`Game side nickname could not be saved: ${error.message}`)
   }
 }
 

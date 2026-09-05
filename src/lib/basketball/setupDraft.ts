@@ -40,6 +40,7 @@ export type BasketballSetupSource =
   | {
       kind: 'personal'
       teamName: string
+      teamNickname?: string | null
       seasonId: string | null
       seasonName: string
     }
@@ -48,6 +49,7 @@ export type BasketballSetupSource =
       teamId: string
       seasonId: string
       teamName: string
+      teamNickname?: string | null
       seasonName: string
       accessRole: BasketballSetupAccessRole
     }
@@ -96,6 +98,7 @@ export interface BasketballSetupDraftV1 {
   authority: BasketballSetupAuthority
   gameInfo: {
     opponentName: string
+    opponentNickname?: string | null
     tournamentMode: 'none' | 'existing' | 'new' | 'text'
     tournamentId: string | null
     tournamentName: string
@@ -183,6 +186,7 @@ export function createBasketballSetupDraft({
     authority: 'legacy',
     gameInfo: {
       opponentName: '',
+      opponentNickname: null,
       tournamentMode: 'none',
       tournamentId: null,
       tournamentName: '',
@@ -701,7 +705,9 @@ export function buildBasketballSetupGameState({
     type: 'SET_GAME_INFO',
     gameInfo: {
       teamName: current.source.teamName.trim(),
+      teamNickname: current.source.teamNickname?.trim() || null,
       opponentName: current.gameInfo.opponentName.trim(),
+      opponentNickname: current.gameInfo.opponentNickname?.trim() || null,
       tournamentName: current.gameInfo.tournamentName.trim(),
       tournamentId: current.gameInfo.tournamentId,
       date: current.gameInfo.date,
@@ -713,18 +719,23 @@ export function buildBasketballSetupGameState({
 function parseSource(value: unknown): BasketballSetupSource | null {
   if (!isPlainObject(value)) return null
   if (value.kind === 'personal') {
-    if (!hasExactKeys(value, ['kind', 'teamName', 'seasonId', 'seasonName'])) return null
+    if (!hasExactKeys(value, ['kind', 'teamName', 'seasonId', 'seasonName']) &&
+        !hasExactKeys(value, ['kind', 'teamName', 'teamNickname', 'seasonId', 'seasonName'])) return null
     if (typeof value.teamName !== 'string' ||
+        (value.teamNickname !== undefined && !isNullableString(value.teamNickname)) ||
         !isNullableNonEmptyString(value.seasonId) ||
         typeof value.seasonName !== 'string') return null
     return structuredClone(value as BasketballSetupSource)
   }
   if (value.kind === 'team') {
-    if (!hasExactKeys(value, [
-      'kind', 'teamId', 'seasonId', 'teamName', 'seasonName', 'accessRole',
-    ])) return null
+    const legacyKeys = ['kind', 'teamId', 'seasonId', 'teamName', 'seasonName', 'accessRole']
+    const nicknameKeys = [
+      'kind', 'teamId', 'seasonId', 'teamName', 'teamNickname', 'seasonName', 'accessRole',
+    ]
+    if (!hasExactKeys(value, legacyKeys) && !hasExactKeys(value, nicknameKeys)) return null
     if (!isNonEmptyString(value.teamId) || !isNonEmptyString(value.seasonId) ||
         !isNonEmptyString(value.teamName) || typeof value.seasonName !== 'string' ||
+        (value.teamNickname !== undefined && !isNullableString(value.teamNickname)) ||
         !isAccessRole(value.accessRole)) return null
     return structuredClone(value as BasketballSetupSource)
   }
@@ -732,15 +743,18 @@ function parseSource(value: unknown): BasketballSetupSource | null {
 }
 
 function parseGameInfo(value: unknown): BasketballSetupDraftV1['gameInfo'] | null {
-  if (!hasExactKeys(value, [
+  const legacyKeys = [
     'opponentName',
     'tournamentMode',
     'tournamentId',
     'tournamentName',
     'tournamentUrl',
     'date',
-  ])) return null
+  ]
+  const nicknameKeys = ['opponentNickname', ...legacyKeys]
+  if (!hasExactKeys(value, legacyKeys) && !hasExactKeys(value, nicknameKeys)) return null
   if (typeof value.opponentName !== 'string' ||
+      (value.opponentNickname !== undefined && !isNullableString(value.opponentNickname)) ||
       !['none', 'existing', 'new', 'text'].includes(String(value.tournamentMode)) ||
       !isNullableNonEmptyString(value.tournamentId) ||
       typeof value.tournamentName !== 'string' ||
@@ -910,6 +924,10 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isNullableNonEmptyString(value: unknown): value is string | null {
   return value === null || isNonEmptyString(value)
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string'
 }
 
 function isAccountScope(value: unknown): value is BasketballSetupAccountScope {

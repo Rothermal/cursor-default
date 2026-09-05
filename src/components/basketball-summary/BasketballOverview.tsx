@@ -5,6 +5,7 @@ import type {
   BasketballSummaryResult,
 } from '../../lib/basketball/summary'
 import type { BasketballSummarySource } from '../../lib/basketball/summarySource'
+import { gameSideDisplayName } from '../../lib/display'
 import {
   basketballRegulationPeriodCount,
   isBasketballMatchRulesV3,
@@ -119,12 +120,12 @@ export default function BasketballOverview({
             </thead>
             <tbody className="divide-y divide-slate-200">
               <PeriodRow
-                name={gameInfo?.teamName || 'Tracked team'}
+                name={gameSideDisplayName(gameInfo, 'tracked', 'Tracked team')}
                 values={periods.map(period => period.tracked)}
                 total={result.trackedScore}
               />
               <PeriodRow
-                name={gameInfo?.opponentName || 'Opponent'}
+                name={gameSideDisplayName(gameInfo, 'opponent')}
                 values={periods.map(period => period.opponent)}
                 total={result.opponentScore}
               />

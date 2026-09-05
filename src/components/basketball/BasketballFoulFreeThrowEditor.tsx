@@ -19,6 +19,7 @@ import {
 import { basketballShotActorSelectionKey } from '../../lib/basketball/shotEditCommands'
 import BasketballHistoricalTimeField from './BasketballHistoricalTimeField'
 import type { BasketballTeamSide } from '../../lib/basketball/types'
+import { gameSideDisplayName } from '../../lib/display'
 import {
   BasketballEditorErrorMessage,
   BasketballEditorFrame,
@@ -109,8 +110,8 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
         .filter(period => sportState?.projection.startedPeriodIds.includes(period.id))
         .map(period => ({ value: period.id, label: period.label }))
     : []
-  const trackedLabel = state.gameInfo?.teamName || 'Tracked'
-  const opponentLabel = state.gameInfo?.opponentName || 'Opponent'
+  const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
+  const opponentLabel = gameSideDisplayName(state.gameInfo, 'opponent')
   const participantOptions = basketballFoulParticipantOptions(state, draft.teamSide)
   const drawnBySide: BasketballTeamSide = draft.teamSide === 'tracked' ? 'opponent' : 'tracked'
   const drawnByOptions = basketballFoulParticipantOptions(state, drawnBySide)

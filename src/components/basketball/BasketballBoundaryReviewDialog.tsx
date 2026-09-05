@@ -7,6 +7,7 @@ import {
 } from '../../lib/basketball/boundaryReviewModel'
 import type { BasketballTeamSide } from '../../lib/basketball/types'
 import BasketballLineupSheet, { type BasketballLineupSheetCommit } from './BasketballLineupSheet'
+import { gameSideDisplayName } from '../../lib/display'
 
 export interface BasketballBoundaryReviewCommit extends BasketballLineupSheetCommit {
   expectedCurrentParticipantIds: string[]
@@ -78,8 +79,8 @@ export default function BasketballBoundaryReviewDialog({
   if (!sportState || pendingSides.length === 0) return null
 
   const sideName = (side: BasketballTeamSide) => side === 'tracked'
-    ? state.gameInfo?.teamName || 'Tracked'
-    : state.gameInfo?.opponentName || 'Opponent'
+    ? gameSideDisplayName(state.gameInfo, 'tracked')
+    : gameSideDisplayName(state.gameInfo, 'opponent')
 
   if (editingSide) {
     const currentParticipantIds = sportState.projection.lineup?.sides[editingSide]

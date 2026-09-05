@@ -44,6 +44,17 @@ export function isMissingNotesColumnError(error: { message?: string } | null): b
   )
 }
 
+export function isMissingGameSideNicknameColumnError(
+  error: { message?: string } | null
+): boolean {
+  if (!error?.message) return false
+  return (
+    (error.message.includes('tracked_team_nickname') ||
+      error.message.includes('opponent_nickname')) &&
+    error.message.includes('column')
+  )
+}
+
 export function isMissingSeasonIdColumnError(error: { message?: string } | null): boolean {
   if (!error?.message) return false
   return error.message.includes('season_id') && error.message.includes('column')

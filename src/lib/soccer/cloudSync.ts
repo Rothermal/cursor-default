@@ -37,7 +37,9 @@ interface SoccerCloudGameRow {
   season_id: string | null
   created_by: string
   tracked_team_name: string
+  tracked_team_nickname: string | null
   opponent_name: string
+  opponent_nickname: string | null
   tournament_name: string | null
   game_date: string
   status: string
@@ -167,7 +169,7 @@ export async function loadSoccerCloudGameById(
     await Promise.all([
       supabase
         .from('games')
-        .select('id,team_id,season_id,created_by,tracked_team_name,opponent_name,tournament_name,game_date,status')
+        .select('id,team_id,season_id,created_by,tracked_team_name,tracked_team_nickname,opponent_name,opponent_nickname,tournament_name,game_date,status')
         .eq('id', gameId)
         .eq('sport_id', 'soccer')
         .maybeSingle(),
@@ -248,7 +250,9 @@ export async function loadSoccerCloudGameById(
     sport: soccerSport,
     gameInfo: {
       teamName: gameRow.tracked_team_name,
+      teamNickname: gameRow.tracked_team_nickname,
       opponentName: gameRow.opponent_name,
+      opponentNickname: gameRow.opponent_nickname,
       tournamentName: gameRow.tournament_name ?? '',
       date: gameRow.game_date,
     },

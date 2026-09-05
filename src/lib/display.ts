@@ -1,6 +1,23 @@
+import type { GameInfo } from '../types'
+
 export function teamDisplayName(team: { name: string; nickname?: string | null }): string {
   const nickname = team.nickname?.trim()
   return nickname ? nickname : team.name
+}
+
+export function gameSideDisplayName(
+  gameInfo: GameInfo | null | undefined,
+  side: 'tracked' | 'opponent',
+  fallback = side === 'tracked' ? 'Tracked' : 'Opponent'
+): string {
+  const nickname = side === 'tracked'
+    ? gameInfo?.teamNickname?.trim()
+    : gameInfo?.opponentNickname?.trim()
+  if (nickname) return nickname
+  const name = side === 'tracked'
+    ? gameInfo?.teamName.trim()
+    : gameInfo?.opponentName.trim()
+  return name || fallback
 }
 
 export function playerDisplayName(player: {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ChevronDown, CircleDot, Eye, Layers3, Play, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import type { GameState } from '../../types'
+import { gameSideDisplayName } from '../../lib/display'
 import {
   isBasketballEditableRelatedEvent,
   type BasketballHistoricalRelatedEventType,
@@ -237,8 +238,8 @@ export default function BasketballTimeline({
             }))}
             options={[
               { value: 'all', label: 'Both sides' },
-              { value: 'tracked', label: state.gameInfo?.teamName || 'Tracked team' },
-              { value: 'opponent', label: state.gameInfo?.opponentName || 'Opponent' },
+              { value: 'tracked', label: gameSideDisplayName(state.gameInfo, 'tracked', 'Tracked team') },
+              { value: 'opponent', label: gameSideDisplayName(state.gameInfo, 'opponent') },
             ]}
           />
           <FilterSelect
@@ -389,9 +390,9 @@ export default function BasketballTimeline({
               : 'Unknown participant'
           }}
           teamLabel={eventDetail.teamSide === 'tracked'
-            ? state.gameInfo?.teamName || 'Tracked team'
+            ? gameSideDisplayName(state.gameInfo, 'tracked', 'Tracked team')
             : eventDetail.teamSide === 'opponent'
-              ? state.gameInfo?.opponentName || 'Opponent'
+              ? gameSideDisplayName(state.gameInfo, 'opponent')
               : 'Game administration'}
           onClose={() => {
             setEventDetail(null)

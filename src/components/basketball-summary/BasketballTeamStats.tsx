@@ -6,6 +6,7 @@ import {
   formatBasketballRatio,
 } from '../../lib/basketball/summaryDetails'
 import type { BasketballSummarySource } from '../../lib/basketball/summarySource'
+import { gameSideDisplayName } from '../../lib/display'
 
 interface Props {
   source: BasketballSummarySource
@@ -16,8 +17,8 @@ export default function BasketballTeamStats({ source }: Props) {
     () => basketballTeamReview(source.state, source.inspection),
     [source.inspection, source.state]
   )
-  const trackedName = source.state.gameInfo?.teamName ?? 'Tracked'
-  const opponentName = source.state.gameInfo?.opponentName ?? 'Opponent'
+  const trackedName = gameSideDisplayName(source.state.gameInfo, 'tracked')
+  const opponentName = gameSideDisplayName(source.state.gameInfo, 'opponent')
   const tracked = review.totals.tracked
   const opponent = review.totals.opponent
   const quality = useMemo(() => basketballSummaryQualityReview(source.state), [source.state])

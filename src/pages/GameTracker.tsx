@@ -50,6 +50,7 @@ import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameInfoPath } from '../lib/teamInfo'
+import { gameSideDisplayName } from '../lib/display'
 import { basketballSummaryPath } from '../lib/basketball/summary'
 import {
   basketballEqualPlayAuthorityTeamId,
@@ -338,7 +339,11 @@ export default function GameTracker() {
     if (state.cloudSync.teamId && !canTrackGames(teamAccess.role)) return
     if (!sport?.teamCategories?.length || !gameInfo) return
 
-    const nextPlayers = playersWithTeamPlaceholders(players, gameInfo.teamName, gameInfo.opponentName)
+    const nextPlayers = playersWithTeamPlaceholders(
+      players,
+      gameSideDisplayName(gameInfo, 'tracked'),
+      gameSideDisplayName(gameInfo, 'opponent')
+    )
     if (!nextPlayers) return
 
     dispatch({ type: 'SET_PLAYERS', players: nextPlayers })
@@ -495,6 +500,9 @@ export default function GameTracker() {
     return null
   }
 
+  const trackedTeamLabel = gameSideDisplayName(gameInfo, 'tracked')
+  const opponentTeamLabel = gameSideDisplayName(gameInfo, 'opponent')
+
   const preferredCapturePlayerId = isBasketballEventMode
     ? basketballPlayerIdForCapturePreferences(state)
     : null
@@ -532,8 +540,8 @@ export default function GameTracker() {
     ? activeBasketballParticipant.teamSide === 'tracked' ? 'opponent' : 'tracked'
     : null
   const stealTurnoverTeamName = stealTurnoverSide === 'tracked'
-    ? gameInfo.teamName
-    : gameInfo.opponentName
+    ? trackedTeamLabel
+    : opponentTeamLabel
   const stealTurnoverCandidates = stealTurnoverSide && basketballSportState
     ? Object.values(basketballSportState.projection.participants)
         .filter(participant =>
@@ -1145,8 +1153,8 @@ export default function GameTracker() {
         {basketballSportState && currentBasketballSegment && (
           <BasketballEventBonusPanel
             periodLabel={currentBasketballSegment.label}
-            trackedTeamName={gameInfo.teamName}
-            opponentName={gameInfo.opponentName}
+            trackedTeamName={trackedTeamLabel}
+            opponentName={opponentTeamLabel}
             trackedFouls={currentBasketballFouls.tracked}
             opponentFouls={currentBasketballFouls.opponent}
             trackedStatus={currentBasketballBonus.tracked}
@@ -1555,13 +1563,13 @@ export default function GameTracker() {
               </div>
               <div className="mt-3 divide-y divide-sky-200 border-t border-sky-200">
                 <TimeoutInventoryRow
-                  label={gameInfo.teamName}
+                  label={trackedTeamLabel}
                   detail={formatBasketballTimeoutInventory(timeoutInventory.tracked)}
                   removeDisabled={!basketballPeriodActive || timeoutInventory.tracked.used === 0}
                   onRemove={() => handleTimeoutRemoval({ mode: 'charged', teamSide: 'tracked' })}
                 />
                 <TimeoutInventoryRow
-                  label={gameInfo.opponentName}
+                  label={opponentTeamLabel}
                   detail={formatBasketballTimeoutInventory(timeoutInventory.opponent)}
                   removeDisabled={!basketballPeriodActive || timeoutInventory.opponent.used === 0}
                   onRemove={() => handleTimeoutRemoval({ mode: 'charged', teamSide: 'opponent' })}
@@ -1608,7 +1616,7 @@ export default function GameTracker() {
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-800">{ejection.subjectLabel}</p>
                         <p className="line-clamp-2 text-xs text-slate-600">
-                          {ejection.teamSide === 'tracked' ? gameInfo.teamName : gameInfo.opponentName} - {ejection.reason}
+                          {ejection.teamSide === 'tracked' ? trackedTeamLabel : opponentTeamLabel} - {ejection.reason}
                         </p>
                       </div>
                       <button
@@ -1641,7 +1649,7 @@ export default function GameTracker() {
               </div>
               <div className="space-y-2">
                 {reviewableFreeThrowTrips.map(trip => {
-                  const teamName = trip.teamSide === 'tracked' ? gameInfo.teamName : gameInfo.opponentName
+                  const teamName = trip.teamSide === 'tracked' ? trackedTeamLabel : opponentTeamLabel
                   const lastShooter = [...trip.attempts]
                     .reverse()
                     .find(attempt => !attempt.deleted && attempt.shooterPlayerId)?.shooterPlayerId ?? null
@@ -1753,8 +1761,8 @@ export default function GameTracker() {
 
       {showAddPlayer && basketballSportState && basketballMatchOpen && (
         <BasketballLateParticipantDialog
-          trackedTeamName={gameInfo.teamName}
-          opponentName={gameInfo.opponentName}
+          trackedTeamName={trackedTeamLabel}
+          opponentName={opponentTeamLabel}
           defaultSide={basketballSportState.capturePreferences.teamSide}
           errorMessage={lateParticipantError}
           onAdd={handleAddBasketballParticipant}
@@ -1768,8 +1776,8 @@ export default function GameTracker() {
 
       {showScoreCorrection && basketballSportState && (
         <BasketballScoreCorrectionDialog
-          trackedTeamName={gameInfo.teamName}
-          opponentName={gameInfo.opponentName}
+          trackedTeamName={trackedTeamLabel}
+          opponentName={opponentTeamLabel}
           trackedScore={basketballSportState.projection.score.tracked}
           opponentScore={basketballSportState.projection.score.opponent}
           errorMessage={scoreCorrectionError}
@@ -1797,8 +1805,8 @@ export default function GameTracker() {
 
       {showEjectionDialog && basketballSportState && (
         <BasketballEjectionDialog
-          trackedTeamName={gameInfo.teamName}
-          opponentName={gameInfo.opponentName}
+          trackedTeamName={trackedTeamLabel}
+          opponentName={opponentTeamLabel}
           candidates={ejectionCandidates}
           foulCandidates={ejectionFoulCandidates}
           defaultSide={activeBasketballParticipant?.teamSide ?? basketballSportState.capturePreferences.teamSide}
@@ -1814,8 +1822,8 @@ export default function GameTracker() {
 
       {showTimeoutDialog && basketballSportState && timeoutInventory && (
         <BasketballTimeoutDialog
-          trackedTeamName={gameInfo.teamName}
-          opponentName={gameInfo.opponentName}
+          trackedTeamName={trackedTeamLabel}
+          opponentName={opponentTeamLabel}
           inventory={timeoutInventory}
           defaultSide={activeBasketballParticipant?.teamSide ?? basketballSportState.capturePreferences.teamSide}
           errorMessage={timeoutError}
@@ -1842,8 +1850,8 @@ export default function GameTracker() {
       {foulDialog && basketballSportState && (
         <BasketballFoulDialog
           key={`${foulDialog.teamSide}:${foulDialog.playerId ?? 'team'}:${foulDialog.foulClass}:${foulDialog.context}`}
-          trackedTeamName={gameInfo.teamName}
-          opponentName={gameInfo.opponentName}
+          trackedTeamName={trackedTeamLabel}
+          opponentName={opponentTeamLabel}
           candidates={foulCandidates}
           defaultSide={foulDialog.teamSide}
           defaultPlayerId={foulDialog.playerId}
@@ -1862,7 +1870,7 @@ export default function GameTracker() {
         <BasketballFreeThrowTripDialog
           key={selectedFreeThrowTrip.eventId}
           trip={selectedFreeThrowTrip}
-          teamName={selectedFreeThrowTrip.teamSide === 'tracked' ? gameInfo.teamName : gameInfo.opponentName}
+          teamName={selectedFreeThrowTrip.teamSide === 'tracked' ? trackedTeamLabel : opponentTeamLabel}
           candidates={freeThrowCandidates}
           suggestedPlayerId={activeFreeThrowTrip?.suggestedPlayerId}
           errorMessage={freeThrowError}

@@ -14,6 +14,7 @@ import {
 import { normalizeGameEventStream } from './gameEvents/stream'
 import { normalizeGameDataAuthority, SPORT_EVENTS_AUTHORITY } from './gameEvents/authority'
 import { normalizeSportGameState } from './sportGameState/state'
+import { gameSideDisplayName } from './display'
 import {
   basketballEventCloudPolicyForState,
   normalizeBasketballEventCloudPolicyState,
@@ -382,8 +383,8 @@ function buildSummary(
     sportId: state.sport?.id ?? null,
     sportName: state.sport?.name ?? 'Unknown sport',
     sportIcon: state.sport?.icon ?? '',
-    teamName: state.gameInfo?.teamName?.trim() || 'Untitled team',
-    opponentName: state.gameInfo?.opponentName?.trim() || 'Opponent TBD',
+    teamName: gameSideDisplayName(state.gameInfo, 'tracked', 'Untitled team'),
+    opponentName: gameSideDisplayName(state.gameInfo, 'opponent', 'Opponent TBD'),
     gameDate: state.gameInfo?.date ?? null,
     status: state.cloudSync.gameStatus,
     updatedAt,

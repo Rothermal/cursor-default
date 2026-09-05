@@ -5,6 +5,7 @@ import {
   type BasketballPlayerReviewRow,
 } from '../../lib/basketball/summaryDetails'
 import type { BasketballSummarySource } from '../../lib/basketball/summarySource'
+import { gameSideDisplayName } from '../../lib/display'
 import BasketballPlayerDetail from './BasketballPlayerDetail'
 
 interface Props {
@@ -44,8 +45,8 @@ export default function BasketballPlayers({ source }: Props) {
     <main className="mx-auto max-w-3xl pb-10">
       <section className="border-b border-slate-200 bg-white px-4 py-4">
         <div className="grid grid-cols-2 rounded-md border border-slate-300 p-0.5">
-          {([['tracked', source.state.gameInfo?.teamName ?? 'Tracked'],
-            ['opponent', source.state.gameInfo?.opponentName ?? 'Opponent']] as const)
+          {([['tracked', gameSideDisplayName(source.state.gameInfo, 'tracked')],
+            ['opponent', gameSideDisplayName(source.state.gameInfo, 'opponent')]] as const)
             .map(([id, label]) => (
               <button
                 key={id}

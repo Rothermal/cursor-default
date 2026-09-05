@@ -41,7 +41,9 @@ export interface BasketballCloudGameRow {
   season_id: string | null
   created_by: string
   tracked_team_name: string
+  tracked_team_nickname?: string | null
   opponent_name: string
+  opponent_nickname?: string | null
   tournament_name: string | null
   game_date: string
   status: string
@@ -342,7 +344,7 @@ export async function loadBasketballCloudShell(
     supabase
       .from('games')
       .select(
-        'id,team_id,season_id,created_by,tracked_team_name,opponent_name,tournament_name,game_date,status'
+        'id,team_id,season_id,created_by,tracked_team_name,tracked_team_nickname,opponent_name,opponent_nickname,tournament_name,game_date,status'
       )
       .eq('id', gameId)
       .eq('sport_id', 'basketball')
@@ -448,7 +450,9 @@ export async function loadBasketballCloudShell(
       sport: basketball,
       gameInfo: {
         teamName: game.tracked_team_name,
+        teamNickname: game.tracked_team_nickname,
         opponentName: game.opponent_name,
+        opponentNickname: game.opponent_nickname,
         tournamentName: game.tournament_name ?? '',
         tournamentId: null,
         date: game.game_date,
@@ -485,7 +489,9 @@ function isBasketballCloudGameRow(value: unknown): value is BasketballCloudGameR
       (value.season_id === null || typeof value.season_id === 'string') &&
       typeof value.created_by === 'string' && value.created_by.length > 0 &&
       typeof value.tracked_team_name === 'string' && value.tracked_team_name.length > 0 &&
+      (value.tracked_team_nickname == null || typeof value.tracked_team_nickname === 'string') &&
       typeof value.opponent_name === 'string' && value.opponent_name.length > 0 &&
+      (value.opponent_nickname == null || typeof value.opponent_nickname === 'string') &&
       (value.tournament_name === null || typeof value.tournament_name === 'string') &&
       typeof value.game_date === 'string' && Number.isFinite(Date.parse(value.game_date)) &&
       typeof value.status === 'string' && value.status.length > 0
