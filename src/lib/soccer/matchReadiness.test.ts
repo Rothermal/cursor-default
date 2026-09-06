@@ -23,22 +23,40 @@ describe('Soccer match-readiness wiring', () => {
     const panel = source('src/components/settings/SoccerTeamSettingsPanel.tsx')
     const editor = source('src/components/soccer/SoccerFormationEditor.tsx')
 
-    expect(teams).toContain(".eq('is_active', true)")
+    expect(teams).toContain(".select('is_active,jersey_number,position,players!inner")
+    expect(teams).toContain('setCompleteMembershipPlayerIds(memberships.map(row => row.players.id))')
+    expect(teams).toContain('memberships.filter(row => row.is_active)')
     expect(teams).toContain('setRosterLoadedTeamId(null)')
     expect(teams).toContain('setRosterLoadedTeamId(selectedTeamId)')
     expect(teams).toContain('rosterReady={rosterLoadedTeamId === selectedTeam.id}')
-    expect(panel).toContain("const [activeTab, setActiveTab] = useState<'rules' | 'formation'>('rules')")
-    expect(panel).toContain("const formationNeedsCleanup = sharedWritable && activeTab === 'formation'")
-    expect(panel).toContain('const prepared = prepareSoccerTeamSettingsSave(')
-    expect(panel).toContain("? { mode: 'formation', rosterReady, activePlayerIds: activeRosterIds }")
-    expect(panel).toContain(": { mode: 'none' }")
+    expect(panel).toContain("type SoccerTeamSettingsTabId = 'rules' | 'formation' | 'lineup'")
+    expect(panel).toContain("identity: 'lineup',")
+    expect(panel).toContain("panelId: `${tabGroupId}-lineup-panel`,")
+    expect(panel).toContain("selected: activeTab === 'lineup',")
+    expect(panel).toContain("cleanupMode: 'lineup',")
+    expect(panel).toContain("activeTabDefinition.cleanupMode === 'formation'")
+    expect(panel).toContain("activeTabDefinition.cleanupMode === 'lineup'")
+    expect(panel).toContain('tabDefinitionsByIdentity[activeTab]')
+    expect(panel).toContain('setActiveTab(nextTab.identity)')
+    expect(panel).toContain('nextTab.ref.current?.focus()')
     expect(panel).toContain('setDraft(current => copySoccerTeamRules(current, parsed.value))')
     expect(panel).toContain('title="Clear Formation"')
-    expect(panel).toContain('aria-controls={`${tabGroupId}-rules-panel`}')
+    expect(panel).toContain('aria-controls={tab.panelId}')
     expect(panel).toContain("event.key === 'ArrowRight'")
     expect(editor).toContain('role="list" aria-label="Formation slots"')
     expect(editor).toContain('disabled={pickerDisabled}')
     expect(editor).toContain('moved from ${previousSlot.label} to ${slot.label}.')
+
+    const handleSave = panel.slice(
+      panel.indexOf('const handleSave ='),
+      panel.indexOf('const handlePlayerCountChange =')
+    )
+    expect(handleSave.match(/mode: '(?:none|formation|lineup)'/g)).toEqual([
+      "mode: 'formation'",
+      "mode: 'lineup'",
+      "mode: 'none'",
+    ])
+    expect(handleSave).toContain('completeTeamPlayerIds: completeMembershipPlayerIds,')
   })
 
   it('loads roster positions before creating fresh cloud-team participant drafts', () => {
