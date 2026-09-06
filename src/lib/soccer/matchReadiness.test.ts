@@ -70,22 +70,25 @@ describe('Soccer match-readiness wiring', () => {
     expect(setup).toContain('initialRole: rosterRolesByPlayerId.current[player.id]')
   })
 
-  it('applies a coherent team formation once without overwriting recorder edits', () => {
+  it('applies coherent formation-first team defaults once without overwriting recorder edits', () => {
     const setup = source('src/pages/SoccerPlayerSetup.tsx')
 
     expect(setup).toContain('useSoccerTeamSettings(setup?.sourceTeamId ?? null)')
-    expect(setup).toContain('const formationPrefillResolved = useRef(false)')
+    expect(setup).toContain('const teamDefaultsPrefillResolved = useRef(false)')
     expect(setup).toContain('const userEditedDrafts = useRef(false)')
     expect(setup).toContain('const [rosterReady, setRosterReady] = useState(!setup?.sourceTeamId)')
     expect(setup).toContain('decideSoccerFormationPrefill({')
     expect(setup).toContain('userEdited: userEditedDrafts.current,')
     expect(setup).toContain('rosterDraftsReady: state.players.every')
-    expect(setup).toContain('applySoccerFormationToRosterDrafts(')
+    expect(setup).toContain('applySoccerTeamLineupPrefill(')
+    expect(setup).toContain('formation: teamSettings.settings.formation,')
+    expect(setup).toContain('lineupDefaults: teamSettings.settings.lineupDefaults,')
     expect(setup).toContain('setup.rulesSnapshot.maxOnFieldPlayers')
-    expect(setup.match(/formationPrefillResolved\.current = true/g)).toHaveLength(3)
+    expect(setup).toContain('setDrafts(result.drafts)')
+    expect(setup.match(/teamDefaultsPrefillResolved\.current = true/g)).toHaveLength(3)
     expect(setup.match(/userEditedDrafts\.current = true/g)).toHaveLength(3)
     expect(setup.match(/setDrafts\(/g)).toHaveLength(5)
-    expect(setup).toContain("result.status === 'count_mismatch' || result.status === 'invalid'")
+    expect(setup).toContain('soccerTeamLineupPrefillNotice(result, savedStarterCount)')
   })
 
   it('keeps Soccer merge resolutions strict while preserving untouched raw values', () => {

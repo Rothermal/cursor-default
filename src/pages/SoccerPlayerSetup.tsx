@@ -11,22 +11,19 @@ import { parseSoccerRosterRole } from '../lib/soccer/rosterRole'
 import {
   createSoccerSportGameState,
   createSoccerUuid,
-  applySoccerFormationToRosterDrafts,
+  applySoccerTeamLineupPrefill,
   decideSoccerFormationPrefill,
+  soccerTeamLineupPrefillNotice,
   prepareSoccerKickoff,
   validateSoccerMatchSetup,
   type SoccerMatchParticipant,
   type SoccerRoleGroup,
   type SoccerRosterStatus,
+  type SoccerTeamLineupPrefillNotice,
 } from '../lib/soccer'
 
 interface ParticipantDraft extends SoccerMatchParticipant {
   selected: boolean
-}
-
-interface FormationPrefillNotice {
-  tone: 'info' | 'warning'
-  message: string
 }
 
 type ParticipantDraftPatch = Partial<Pick<
@@ -65,10 +62,10 @@ export default function SoccerPlayerSetup() {
   const [rosterLoadError, setRosterLoadError] = useState<string | null>(null)
   const [rosterLoadAttempt, setRosterLoadAttempt] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [formationNotice, setFormationNotice] = useState<FormationPrefillNotice | null>(null)
+  const [teamDefaultsNotice, setTeamDefaultsNotice] = useState<SoccerTeamLineupPrefillNotice | null>(null)
   const [confirmShortHanded, setConfirmShortHanded] = useState(false)
   const cloudRosterLoaded = useRef(false)
-  const formationPrefillResolved = useRef(false)
+  const teamDefaultsPrefillResolved = useRef(false)
   const userEditedDrafts = useRef(false)
   const rosterRolesByPlayerId = useRef<Record<string, SoccerMatchParticipant['initialRole']>>({})
 
@@ -172,7 +169,7 @@ export default function SoccerPlayerSetup() {
       teamSettings.status === 'error'
     const decision = decideSoccerFormationPrefill({
       hasSourceTeam: Boolean(setup?.sourceTeamId),
-      alreadyResolved: formationPrefillResolved.current,
+      alreadyResolved: teamDefaultsPrefillResolved.current,
       hadSavedParticipants: hadSavedSelection.current,
       userEdited: userEditedDrafts.current,
       rosterReady,
@@ -184,56 +181,39 @@ export default function SoccerPlayerSetup() {
 
     if (decision === 'wait' || decision === 'resolved') return
     if (decision === 'skip_edited') {
-      formationPrefillResolved.current = true
-      setFormationNotice({
+      teamDefaultsPrefillResolved.current = true
+      setTeamDefaultsNotice({
         tone: 'info',
-        message: 'Team formation was not applied because this match roster was already edited.',
+        message: 'Team defaults were not applied because this match roster was already edited.',
       })
       return
     }
     if (decision === 'skip_existing' || decision === 'skip_no_team') {
-      formationPrefillResolved.current = true
+      teamDefaultsPrefillResolved.current = true
       return
     }
     if (settingsFailed) {
-      setFormationNotice({
+      setTeamDefaultsNotice({
         tone: 'warning',
-        message: `Team formation defaults could not be loaded. Roster role defaults remain available.${teamSettings.error ? ` ${teamSettings.error}` : ''}`,
+        message: `Team formation and lineup defaults could not be loaded. Roster role defaults remain available.${teamSettings.error ? ` ${teamSettings.error}` : ''}`,
       })
       return
     }
     if (!setup) return
 
-    const result = applySoccerFormationToRosterDrafts(
+    const result = applySoccerTeamLineupPrefill(
       drafts,
-      teamSettings.settings.formation,
-      setup.rulesSnapshot.maxOnFieldPlayers
+      {
+        formation: teamSettings.settings.formation,
+        lineupDefaults: teamSettings.settings.lineupDefaults,
+        maxOnFieldPlayers: setup.rulesSnapshot.maxOnFieldPlayers,
+      }
     )
-    formationPrefillResolved.current = true
-    if (result.status === 'applied') {
-      setDrafts(result.drafts)
-      setFormationNotice(result.unavailablePlayerIds.length > 0
-        ? {
-            tone: 'warning',
-            message: `Team formation applied without ${result.unavailablePlayerIds.length} unavailable ${result.unavailablePlayerIds.length === 1 ? 'player' : 'players'}. Repair the shared formation in Team Manage.`,
-          }
-        : {
-            tone: 'info',
-            message: 'Team formation applied. Review the opening lineup before kickoff.',
-          })
-      return
-    }
-    if (result.status === 'no_formation') {
-      setFormationNotice(null)
-      return
-    }
-    if (result.status === 'count_mismatch' || result.status === 'invalid') {
-      setFormationNotice({
-        tone: 'warning',
-        message: `${result.error ?? 'The saved team formation is invalid.'} Roster role defaults were used instead.`,
-      })
-    }
-  }, [drafts, rosterReady, setup, state.players, teamSettings.error, teamSettings.scopeTeamId, teamSettings.settings.formation, teamSettings.status])
+    teamDefaultsPrefillResolved.current = true
+    setDrafts(result.drafts)
+    const savedStarterCount = teamSettings.settings.lineupDefaults.starterPlayerIds.length
+    setTeamDefaultsNotice(soccerTeamLineupPrefillNotice(result, savedStarterCount))
+  }, [drafts, rosterReady, setup, state.players, teamSettings.error, teamSettings.scopeTeamId, teamSettings.settings.formation, teamSettings.settings.lineupDefaults, teamSettings.status])
 
   useEffect(() => {
     if (!setup || state.eventStream?.events.length) return
@@ -414,17 +394,17 @@ export default function SoccerPlayerSetup() {
           </div>
         )}
 
-        {formationNotice && (
+        {teamDefaultsNotice && (
           <div
-            role={formationNotice.tone === 'warning' ? 'alert' : 'status'}
+            role={teamDefaultsNotice.tone === 'warning' ? 'alert' : 'status'}
             className={`rounded-md border px-3 py-2 text-sm ${
-              formationNotice.tone === 'warning'
+              teamDefaultsNotice.tone === 'warning'
                 ? 'border-amber-200 bg-amber-50 text-amber-900'
                 : 'border-blue-200 bg-blue-50 text-blue-800'
             }`}
           >
-            <p>{formationNotice.message}</p>
-            {formationNotice.tone === 'warning' &&
+            <p>{teamDefaultsNotice.message}</p>
+            {teamDefaultsNotice.tone === 'warning' &&
               (teamSettings.status === 'error' || teamSettings.status === 'backend_update_required') && (
                 <button
                   type="button"
