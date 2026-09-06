@@ -493,8 +493,9 @@ Saved participants and recorder edits suppress delayed prefill. See
 Soccer S24A is implemented. New setups use exact version 2 and store a clone-safe,
 formation-first Team Default independently from recorder-edited Opening Lineup;
 legacy setup v1 and Soccer state v1/v2 normalize without inventing a preset.
-Durable setup-snapshot version metadata preserves the exact v1 transport shape
-for already-bound games, and an empty resolved default remains absent.
+Durable setup-snapshot version metadata preserves the exact v1 transport and
+canonical-publication shape for already-bound games; an edited unbound legacy
+pregame promotes to v2 before first bind, and an empty resolved default remains absent.
 Migration 069 keeps Soccer and Basketball setup versions 1/2 explicit in the
 private first-bind core and release contract v2 blocks new Soccer cloud setup
 before mutation when it is absent. Existing/history access remains ungated.

@@ -16,7 +16,10 @@ import {
   soccerEventRevisionCheckpoint,
   soccerEventStreamFingerprint,
 } from './cloudSync'
-import { normalizeSoccerSportGameState } from './state'
+import {
+  normalizeSoccerSportGameState,
+  soccerSetupSnapshotForTransport,
+} from './state'
 import type { SoccerMatchSetup } from './types'
 
 export interface SoccerFinalizationReadiness {
@@ -324,7 +327,7 @@ export function createSoccerCanonicalSnapshot(
     sportGameState: {
       sportId: 'soccer',
       version: soccerState.version,
-      setup: structuredClone(soccerState.setup),
+      setup: soccerSetupSnapshotForTransport(soccerState),
     },
   }
 }

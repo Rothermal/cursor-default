@@ -175,7 +175,12 @@ review. Local/personal games store `teamDefaultLineup: null`.
 Existing setup version 1 normalizes in memory with `teamDefaultLineup: null`
 without rewriting raw cloud history. A durable `setupSnapshotVersion` keeps a
 bound v1 game's transport shape pinned to v1 while runtime consumers use the
-normalized v2 setup. Increment `SOCCER_GAME_STATE_VERSION` and explicitly
+normalized v2 setup. An unbound legacy game still in Player Setup promotes its
+transport version to v2 when a pregame edit or resolved Team Default is saved,
+so its first cloud binding cannot silently discard the new preset. Canonical
+publication stores the same immutable v1/v2 setup shape used by the binding,
+then normalizes it only for review projection. Increment
+`SOCCER_GAME_STATE_VERSION` and explicitly
 continue accepting every previously supported Soccer state version; do not
 accidentally drop state version 2 while adding the new one.
 

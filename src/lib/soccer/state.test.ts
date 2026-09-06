@@ -5,6 +5,7 @@ import {
   normalizeSoccerMatchSetup,
   normalizeSoccerSportGameState,
   soccerSetupSnapshotForTransport,
+  soccerSetupSnapshotVersionForPregameEdit,
   validateSoccerMatchSetup,
 } from './state'
 import type { SoccerMatchParticipant, SoccerMatchSetupV2 } from './types'
@@ -149,5 +150,11 @@ describe('Soccer setup version 2', () => {
         setup: { teamDefaultLineup: setup.teamDefaultLineup },
       })
     expect(soccerSetupSnapshotForTransport(legacyTransport)).not.toHaveProperty('teamDefaultLineup')
+  })
+
+  it('upgrades unbound pregame edits while preserving an existing binding version', () => {
+    expect(soccerSetupSnapshotVersionForPregameEdit(1, null)).toBe(2)
+    expect(soccerSetupSnapshotVersionForPregameEdit(1, 'cloud-game-1')).toBe(1)
+    expect(soccerSetupSnapshotVersionForPregameEdit(2, 'cloud-game-1')).toBe(2)
   })
 })

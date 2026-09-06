@@ -22,6 +22,8 @@ The focused contracts cover:
 - formation-first and lineup-default preset derivation plus deselection pruning;
 - fingerprint and cloud transport preservation of the exact preset and its
   immutable v1/v2 binding version;
+- pregame promotion of edited unbound legacy setup to v2 while existing cloud
+  bindings and canonical publications retain their exact setup version;
 - migration 069's Soccer/Basketball setup-v1/v2 allow-list and private binder;
 - exact account-scoped release contract v2 parsing; and
 - unchanged historical migration 049 and migration 052 definitions.
@@ -49,6 +51,8 @@ v2 runtime model but continue transmitting the exact v1 binding shape.
 | 5 | Start a local/personal match | Setup v2 stores no Team Default |
 | 6 | Sync and reopen a setup-v2 cloud match | The exact preset survives binding, pull, conflict/recovery state, and fingerprint checks |
 | 7 | First-bind disposable Soccer v1/v2 and Basketball v1/v2 games after migration 069 | All four reviewed pairs bind; unsupported versions fail before setup writes |
+| 8 | Resume an unbound setup-v1 parked game, apply team defaults, then first-bind it | The edited draft promotes to setup v2 and its frozen Team Default survives cloud reload |
+| 9 | Finalize and review a setup-v1-bound game | The canonical publication archives setup v1 while review normalizes safely to the current runtime model |
 
 S24A intentionally has no live Team Default action. S24B defines the atomic
 transition event and S24C exposes Opening Lineup and Team Default in the live

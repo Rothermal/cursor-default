@@ -15,6 +15,7 @@ import {
   decideSoccerFormationPrefill,
   soccerTeamLineupPrefillNotice,
   soccerMatchLineupPresetFromPrefill,
+  soccerSetupSnapshotVersionForPregameEdit,
   pruneSoccerMatchLineupPreset,
   prepareSoccerKickoff,
   validateSoccerMatchSetup,
@@ -223,7 +224,7 @@ export default function SoccerPlayerSetup() {
   }, [drafts, rosterReady, setup, state.players, teamSettings.error, teamSettings.scopeTeamId, teamSettings.settings.formation, teamSettings.settings.lineupDefaults, teamSettings.status])
 
   useEffect(() => {
-    if (!setup || state.eventStream?.events.length) return
+    if (!setup || !soccerState || state.eventStream?.events.length) return
     const participants = selectedParticipants(drafts)
     const filteredTeamDefault = pruneSoccerMatchLineupPreset(
       teamDefaultLineup,
@@ -245,10 +246,13 @@ export default function SoccerPlayerSetup() {
     dispatch({
       type: 'SET_SPORT_GAME_STATE',
       sportGameState: createSoccerSportGameState(nextSetup, {
-        setupSnapshotVersion: soccerState?.setupSnapshotVersion,
+        setupSnapshotVersion: soccerSetupSnapshotVersionForPregameEdit(
+          soccerState.setupSnapshotVersion,
+          state.cloudSync.gameId
+        ),
       }),
     })
-  }, [dispatch, drafts, setup, soccerState?.setupSnapshotVersion, state.eventStream?.events.length, teamDefaultLineup])
+  }, [dispatch, drafts, setup, soccerState, state.cloudSync.gameId, state.eventStream?.events.length, teamDefaultLineup])
 
   if (invalidRoute || !state.gameInfo || !setup) return null
 

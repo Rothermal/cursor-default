@@ -125,6 +125,13 @@ export function soccerSetupSnapshotForTransport(
   }
 }
 
+export function soccerSetupSnapshotVersionForPregameEdit(
+  currentVersion: 1 | 2,
+  cloudGameId: string | null
+): 1 | 2 {
+  return cloudGameId ? currentVersion : 2
+}
+
 export function normalizeSoccerMatchSetup(value: unknown): SoccerMatchSetupV2 | null {
   if (!isPlainObject(value) || (value.version !== 1 && value.version !== 2)) return null
   const normalizedRules = normalizeSoccerMatchRules(value.rulesSnapshot)
