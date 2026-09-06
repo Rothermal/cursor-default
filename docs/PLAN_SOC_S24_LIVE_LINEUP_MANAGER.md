@@ -45,8 +45,12 @@ derived transition, and confirms one atomic event.
     short-handed confirmation. Eligibility, goalkeeper, maximum, return-sub,
     substitution-total, and substitution-window failures remain hard blocks.
 15. A change at the deterministic halftime break is classified as halftime
-    automatically. It does not consume a substitution window, but incoming
-    players still count against any configured total-substitution limit.
+    automatically. For an even regulation-segment count, halftime is the break
+    after exactly half of those segments; two halves and four quarters therefore
+    resolve correctly. Odd segment counts have no inferred halftime, and extra-
+    time breaks are never halftime. A halftime change does not consume a
+    substitution window, but incoming players still count against any configured
+    total-substitution limit.
 16. One Apply action appears as one grouped **Lineup change** Timeline entry
     and is edited, removed, or restored as one unit.
 17. Implement Soccer first. Document the target-lineup interaction contract
@@ -176,11 +180,19 @@ the game fingerprint, parking, export/import, finalization, and recovery paths.
 
 ### 4.2 Cloud setup compatibility
 
-The shared event binder currently accepts only setup snapshot version 1.
-Migration 069 must widen that private/revoked binding core to accept:
+The shared event binder currently accepts only setup snapshot version 1 even
+though reviewed anchored Basketball setup emits version 2 and migration 064
+requires Basketball setup version 2 for anchored finalization. Migration 069
+must reconcile that existing first-bind mismatch while widening the same
+private/revoked binding core to accept these explicit sport/version pairs:
 
 - Soccer setup versions 1 and 2; and
-- the existing Basketball setup version only.
+- Basketball setup versions 1 and 2.
+
+Every other sport/version pair fails closed. Basketball version-2 acceptance is
+a compatibility repair for its already-shipped setup/finalization contract; it
+does not change Basketball release stage, creation policy, capabilities, or any
+client surface.
 
 Keep every public Soccer and Basketball wrapper fixed to its sport. Do not
 grant the generic binder, loosen immutable snapshot equality, or reinterpret
@@ -189,10 +201,14 @@ the new client can fail before mutating local/cloud binding state when migration
 069 is absent. Preserve existing-game access and version-1 sync regardless of
 new-game capability.
 
-Migration 069 deploys before the setup-v2 client. The migration and client
-contract tests must prove that Basketball binding, Soccer version-1 binding,
-late audit upload, deleted-source recovery through v5, and setup immutability
-remain unchanged.
+Migration 069 deploys before the Soccer setup-v2 client. Its own focused SQL
+contract test must read migration 069 and pin the sport-specific v1/v2 allow-
+lists plus rejection of unsupported pairs. `migration052.test.ts` continues to
+describe immutable migration 052 and its historical v1-only definition; do not
+rewrite the old migration or pretend that test validates the new live
+replacement. The migration and client tests must also prove Soccer version-1
+binding, Basketball version-1/version-2 first binding, late audit upload,
+deleted-source recovery through v5, and setup immutability remain intact.
 
 ### 4.3 One target-lineup event
 
@@ -242,7 +258,11 @@ The command must:
 - reject duplicate participant ids and malformed roles;
 - reject ineligible entrants and disabled return substitutions;
 - enforce maximum players and exactly one on-field goalkeeper;
-- derive halftime from `isSoccerHalftimeBreak`, never a recorder checkbox;
+- use a corrected `isSoccerHalftimeBreak` that returns true only during a period
+  break after exactly half of an even, at-least-two regulation-segment list;
+  require the completed regulation ids to be that ordered first half, return
+  false for odd segment counts and every extra-time break, and never expose a
+  recorder checkbox;
 - enforce total substitutions and windows before append;
 - reject a no-op target; and
 - append one event only after full projection succeeds.
@@ -258,14 +278,19 @@ one **Lineup change** row with source, entering/leaving counts, role-change
 count, time, and halftime context.
 
 Edit reconstructs the projection immediately before the selected event and
-opens the same target editor in historical mode. Save revises the one complete
-target payload. Remove and restore target only that event. Every mutation must
-rebuild the full later stream and fail if dependent history becomes invalid.
-Successful correction clears any quick-undo receipt under the existing Soccer
-correction rules.
+opens the same target editor in historical mode. Save re-derives `halftime`
+from that candidate pre-event projection and revises the one complete target
+payload; the persisted flag is never copied blindly or made editable. The new
+event projector independently derives the same value during replay and rejects
+a payload whose flag does not match, so imports, cloud rows, and corrections
+cannot retain a stale window exemption. Remove and restore target only that
+event. Every mutation must rebuild the full later stream and fail if dependent
+history becomes invalid. Successful correction clears any quick-undo receipt
+under the existing Soccer correction rules.
 
 Old substitution/role rows keep their current editor and independent history.
-S24 does not retroactively infer that adjacent old rows were one action.
+S24 does not retroactively infer that adjacent old rows were one action or
+reinterpret a legacy substitution event's recorded halftime flag.
 
 ## 5. Implementation slices
 
@@ -343,8 +368,9 @@ ship before the one-event transition projector is authoritative.
 - local/personal and unresolved settings produce no Team Default;
 - setup fingerprint, bind, pull, adoption, conflict, recovery export/import,
   finalization, and reopen preserve the exact preset;
-- migration 069 accepts Soccer setup v1/v2, rejects unsupported versions, and
-  leaves Basketball's accepted version unchanged; and
+- migration 069's own test accepts only Soccer v1/v2 and Basketball v1/v2,
+  rejects every unsupported pair, and leaves migration 052's historical test
+  unchanged;
 - missing capability blocks setup-v2 cloud creation before local mutation.
 
 ### Transition domain
@@ -354,6 +380,11 @@ ship before the one-event transition projector is authoritative.
 - atomic swaps validate only the final lineup;
 - duplicate, unknown, exited, ejected, and no-return entrants fail;
 - max-player, goalkeeper, substitution-total, and window limits fail closed;
+- two-half and four-quarter matches identify only their actual midpoint break
+  as halftime; odd regulation counts and extra-time breaks never do;
+- new-event replay rejects a persisted halftime flag that differs from the
+  value derived from the pre-event projection;
+- historical correction re-derives halftime instead of retaining the old flag;
 - halftime changes skip one window but count entrants;
 - non-halftime membership changes count one window regardless of batch size;
 - role-only transition counts no substitution or window;
@@ -381,8 +412,9 @@ ship before the one-event transition projector is authoritative.
    disagree; confirm the frozen Team Default uses formation-first precedence.
 2. Manually change the kickoff lineup, begin the match, and confirm Opening
    Lineup and Team Default remain distinct presets.
-3. Make several first-half substitutions, end the half, choose Opening Lineup,
-   review the complete changes, apply, and confirm no window is consumed.
+3. Make several first-half substitutions in a two-half match, end the half,
+   choose Opening Lineup, review the complete changes, apply, and confirm no
+   window is consumed.
 4. Repeat with Team Default and confirm players and roles both restore.
 5. Change the team formation/defaults from another session after kickoff and
    confirm the active match's Team Default does not change.
@@ -395,7 +427,10 @@ ship before the one-event transition projector is authoritative.
 9. With return substitutions disabled, try restoring a previously exited
    player and confirm Apply is blocked.
 10. Run limited-substitution and limited-window matches at, below, and beyond
-    each boundary, including a multi-player halftime transition.
+    each boundary, including multi-player halftime transitions in two-half and
+    four-quarter matches. Confirm Q1/Q2 and Q3/Q4 breaks consume a window, the
+    Q2/Q3 break does not, odd regulation counts infer no halftime, and extra-
+    time breaks consume a window.
 11. Change only an on-field role and confirm no substitution counters move.
 12. Use Manage Lineup from Field, Lineup, and a participant Role action; confirm
     every entry opens the same draft and More has no duplicate controls.
@@ -410,18 +445,23 @@ ship before the one-event transition projector is authoritative.
 17. Verify 320px, 390px, and desktop layouts, keyboard/focus behavior, reduced
     motion, PWA update, and light/dark token compatibility without implementing
     the separate theming plan here.
+18. After migration 069, first-bind one eligible Soccer setup-v1 game, Soccer
+    setup-v2 game, Basketball setup-v1 game, and reviewed anchored Basketball
+    setup-v2 game. Confirm unsupported setup versions still fail before writes.
 
 ## 9. Exit criteria
 
 - Migration 069 and the exact setup-v2 capability are deployed before the new
   cloud setup writer.
-- Old Soccer setup/state versions and Basketball binding remain compatible.
+- Old Soccer setup/state versions remain compatible, and Basketball setup v1/v2
+  both pass first binding without changing Basketball release policy.
 - Every new lineup Apply is one checked, replayable, correctable event.
 - Opening Lineup and frozen Team Default remain distinct and immutable.
 - One editor replaces paired substitution rows without losing single-swap,
   outgoing-only, role-only, short-handed, or limited-substitution behavior.
-- Halftime, counts, roles, intervals, eligibility, and goalkeeper authority are
-  projection-derived and covered by tests.
+- Halftime uses the exact even regulation midpoint and is re-derived during
+  replay/correction; counts, roles, intervals, eligibility, and goalkeeper
+  authority remain projection-derived and covered by tests.
 - Local, parked, cloud-primary, canonical, finalization, reopen, conflict, and
   recovery paths preserve the new contracts.
 - Focused and full tests, typecheck, lint, production build, SQL checks, and the

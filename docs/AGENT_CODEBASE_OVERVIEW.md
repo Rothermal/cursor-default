@@ -494,8 +494,11 @@ Soccer S24 is approved but not implemented. Its four slices add a match-frozen
 Team Default beside the immutable Opening Lineup, replace paired substitution
 rows with a two-column target-lineup manager, record one complete desired
 lineup as one atomic/correctable event, and finish Timeline/deployed regression.
-Setup version 2 requires a staged cloud-binder capability migration while old
-Soccer setup version 1 and Basketball binding remain supported. See
+Setup version 2 requires a staged cloud-binder capability migration that keeps
+Soccer and Basketball setup versions 1/2 explicit; Basketball v2 acceptance
+repairs the current first-bind/finalization mismatch without changing release
+policy. Halftime is only the exact midpoint of an even regulation-segment list,
+and replay/correction must re-derive it. See
 `docs/PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md`; do not implement S24 directly from
 the field-test backlog.
 

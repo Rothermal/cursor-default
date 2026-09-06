@@ -778,6 +778,11 @@ be paused, halftime is derived automatically, invalid preset players create
 visible vacancies, and short-handed targets require explicit confirmation.
 Team changes never rewrite the frozen match preset.
 
+For supported even regulation formats, halftime is only the break after half
+the regulation segments: after Half 1 in a two-half match or Quarter 2 in a
+four-quarter match. Odd regulation counts and extra-time breaks receive no
+automatic halftime exemption.
+
 **Not this item:** opponent formations, automatic tactical inference, or a
 live drag-and-drop position tracker.
 
