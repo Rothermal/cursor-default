@@ -757,9 +757,10 @@ fail closed. Team defaults never rewrite an existing match draft or live match.
 **Not this item:** changing a live lineup or writing match substitutions back
 to team defaults.
 
-### S24 - Apply a saved formation during a match
+### S24 - Live lineup manager and match presets
 
-**Status:** confirmed product request; Q&A and focused plan required
+**Status:** approved phased plan; implementation pending - see
+[`PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md`](PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md)
 **Theme:** live lineup / batch transition
 **Where:** tracker Lineup tab; S19 team formation catalog and assignments
 
@@ -768,12 +769,19 @@ injury or tactical change. Editing each substitution and role separately is
 too slow. `S19` deliberately stopped at setup-only defaults, so this is a new
 live-authority feature rather than unfinished S19 work.
 
-**Likely direction:** while the clock is paused, choose a saved formation,
-preview outgoing players, incoming players, and role changes, then confirm one
-checked atomic transition. Reuse current participant ids and existing
-substitution/role semantics so minutes, substitution windows, goalkeeper
-requirements, ejections, return-sub rules, and correction history remain
-valid. Applying a formation never edits the team default.
+**Approved direction:** replace paired substitution rows with a full-screen
+target-lineup manager. Opening Lineup and a match-frozen Team Default replace
+the whole draft, restoring both players and roles. On Field and Bench stay
+visible side by side; tapping moves players only in the draft. One checked
+Apply records one grouped, correctable lineup transition. The clock must already
+be paused, halftime is derived automatically, invalid preset players create
+visible vacancies, and short-handed targets require explicit confirmation.
+Team changes never rewrite the frozen match preset.
+
+For supported even regulation formats, halftime is only the break after half
+the regulation segments: after Half 1 in a two-half match or Quarter 2 in a
+four-quarter match. Odd regulation counts and extra-time breaks receive no
+automatic halftime exemption.
 
 **Not this item:** opponent formations, automatic tactical inference, or a
 live drag-and-drop position tracker.
@@ -832,7 +840,8 @@ appropriate current/historical role; keyboard labels remain unambiguous.
 
 ### S26 - Show team nicknames in cross-sport side selectors
 
-**Status:** confirmed product request; cross-sport naming plan required
+**Status:** implemented across current Soccer and Basketball live controls;
+migration 066 applied
 **Theme:** live labels / team identity
 **Where:** Tracked/Opponent controls above sport surfaces; game setup snapshots;
 team and opponent naming
@@ -841,29 +850,19 @@ team and opponent naming
 poor live button labels. The controls should show the teams' short display
 names so the recorder does not translate domain terminology during play.
 
-Tracked cloud teams already support editable `teams.nickname` and the shared
-`teamDisplayName` fallback. That value is not currently carried into Soccer or
-Basketball match setup: both use the selected team's primary `name`. Opponents
-have only the game-level `opponentName`, with no separate full-name and short
-display-name fields. This therefore cannot be solved reliably by relabeling one
-Soccer segmented control.
+**Implemented direction:** `GameInfo.teamNickname` and `opponentNickname`
+freeze optional short labels with the match while `tracked` and `opponent`
+remain unchanged internal ids. `gameSideDisplayName` owns short-label then
+full-name fallback for compact live controls. Existing-team setup seeds the
+tracked value from `teams.nickname`; local/personal teams and opponents can set
+match-scoped labels. Migration 066 persists both labels on cloud games, and
+binding, hydrate, parking, import/export, and recovery retain them. Existing
+games without either value fall back to their frozen full names.
 
-**Likely direction:** define one cross-sport side-label resolver while keeping
-the stored side ids unchanged. Match setup freezes optional tracked and
-opponent display labels with the match; live side selectors show the short
-label when present and fall back to the frozen team/opponent name. Existing
-games without the new fields continue to use their current names.
-
-For an existing tracked team, seed the label from `teams.nickname`. Personal or
-local tracked teams and every opponent need an optional short-name field during
-setup. The opponent nickname is initially match-scoped; a reusable opponent
-directory is separate future work. Summaries and archival identity retain the
-full names, while compact live controls may use the short labels.
-
-**Planning note:** inventory every cross-sport `Tracked` / `Opponent` capture
-control and every immutable setup, parking, import/export, cloud binding, and
-summary reader before choosing field names. Do not derive a historical nickname
-from the current mutable team row at review time.
+Summary and archival identity continue to use full names; S26 does not replace
+those labels with nicknames. Later sports must inventory their own live side
+controls and use the shared resolver without deriving historical labels from a
+current mutable team row. A reusable opponent directory remains future work.
 
 **Acceptance seed:** Basketball and Soccer side selectors show configured short
 labels with truncation; local/personal and cloud-team setup can set or inherit a
@@ -915,7 +914,7 @@ S11 Default player role carried between games
 S21 Name the season when creating it
 S19 Team formation lineup on a pitch
 S23 Team-level default starter and bench status
-S24 Apply a saved formation during a match
+S24 Live lineup manager and match presets
 S6  Explicit clock start and usable sideline correction
 S9  Persist and clarify field orientation
 S1  Faster shot and goal capture
@@ -935,13 +934,14 @@ M1  Team standings, only after completed-match volume exists
 cloud binding. `S13` and `S14` follow because they leave a match uneditable or
 unfinalizable. Owner ranking of the earlier UX was `S2` then `S3`; `S25` is the
 small follow-up that removes the now-redundant Soccer player row and establishes
-the shared actor-picker contract. `S26` is nearby in UX but separately touches
-immutable setup and naming across sports. `S15` and `S16` come after `S1` so
+the shared actor-picker contract. `S26` separately implemented immutable live
+side labels and migration 066. `S15` and `S16` come after `S1` so
 extra goal metadata stays a skippable step, not another full attacking sheet.
 `S17` / `S20` have finished restart capture and owner functional verification;
 the shared completion-loop defect found during that run was fixed by PR #373.
 `S7` can now plan the next-shot link. `S23`
-extends setup defaults; `S24` remains a separate live atomic-transition plan.
+extends setup defaults; the approved `S24A-S24D` plan owns the separate live
+atomic-transition workflow.
 `M*` items stay behind a new phase name if promoted.
 
 ### 6.1 Evidence state
@@ -950,10 +950,11 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S24` | Short Q&A where choices remain, then a focused phase plan |
+| Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16` | Short Q&A where choices remain, then a focused phase plan |
+| Approved phased plan; implementation pending | `S24` | Implement S24A-S24D from the focused live-lineup plan |
 | Implemented; pending deployed verification | `S23` | Run the S23A-S23C settings/editor/setup regression records against the deployed app |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
-| Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
+| Implemented cross-sport live labels | `S26` | Keep internal side ids stable and include nickname fallback in later sport UI regression |
 | Implemented; owner functional verification complete | `S17`, `S20` | Keep the post-fix cloud completion replay in the focused regression record; proceed to `S7` planning when prioritized |
 | Implemented; pending migration/deployed verification | `S2`, `S3`, `S11`–`S14`, `S18`, `S19`, `S21`, `S22` | Apply required migrations and run the linked focused regression rows |
 | Proposed follow-up awaiting match evidence | `S1`, `S4`, `S5`, `S8`, `S10` | Keep in backlog until confirmed or pulled into a related shell plan |
@@ -971,9 +972,9 @@ exercise those constraints rather than bypass them.
   `S4`, `S6`, and `S10`. The Soccer slice of `S25` removes the redundant player
   row and role-orders event actor lists; deployed verification remains. The
   cross-sport inventory does not need to block this smaller improvement.
-- **Cross-sport live labels:** `S26` shares display resolution across sports but
-  needs additive immutable match labels before compact controls stop saying
-  Tracked/Opponent. Keep it separate from `S25` actor selection.
+- **Cross-sport live labels:** `S26` is implemented with immutable match labels,
+  legacy fallbacks, and migration 066. Keep it separate from `S25` actor
+  selection when reviewing later sport surfaces.
 - **Clock and orientation:** plan `S6` and `S9` independently. Clock changes
   event lifecycle and minutes; orientation changes display persistence,
   direction discoverability, and coordinate regression coverage.
@@ -985,8 +986,8 @@ exercise those constraints rather than bypass them.
   drafts. Migration 065 is applied; verify current team-setting round trips and
   setup prefill in the deployed app. `S23A-S23C` implement the schema-v3
   standalone starter/bench settings, Team Manage editor, and formation-first
-  setup prefill with migration 068 applied. `S24`
-  is a later live batch transition and should not be folded into this setup flow.
+  setup prefill with migration 068 applied. `S24A-S24D` now own the separate
+  frozen-preset, live target-lineup, and grouped-correction workflow.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` are implemented through
@@ -1071,7 +1072,7 @@ Broader Basketball event work continues in
   while preserving controls with an independent filtering or stat-context job.
   The Soccer slice is implemented; other sports define their own role order
   when their live UI is reviewed (`S25`).
-- Keep `tracked` and `opponent` as internal values, but display team nicknames
-  on live side selectors in every sport. Tracked cloud teams already have a
-  nickname; setup needs to freeze it, and opponents need an optional
-  match-scoped nickname with full-name fallback (`S26`).
+- Keep `tracked` and `opponent` as internal values, but display frozen team
+  nicknames on current Soccer/Basketball live side selectors. S26 is
+  implemented with match-scoped opponent nicknames, full-name fallback, and
+  migration 066; later sports must adopt the same display contract.
