@@ -83,6 +83,7 @@ describe('Soccer match-readiness wiring', () => {
     expect(setup).toContain('applySoccerTeamLineupPrefill(')
     expect(setup).toContain('formation: teamSettings.settings.formation,')
     expect(setup).toContain('lineupDefaults: teamSettings.settings.lineupDefaults,')
+    expect(setup).toContain('soccerSetupSnapshotVersionForPregameEdit(')
     expect(setup).toContain('setup.rulesSnapshot.maxOnFieldPlayers')
     expect(setup).toContain('setDrafts(result.drafts)')
     expect(setup.match(/teamDefaultsPrefillResolved\.current = true/g)).toHaveLength(3)
