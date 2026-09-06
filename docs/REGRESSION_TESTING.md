@@ -1385,6 +1385,17 @@ operator record, cached/PWA compatibility rule, and failure handling.
 
 ---
 
+## 11zb. Soccer team lineup defaults
+
+S23A/S23B provide the schema-v3 settings foundation and Team Manage editor.
+Use [the S23A settings matrix](REGRESSION_SOC_S23A_LINEUP_SETTINGS.md) for
+migration/schema coverage and
+[the S23B editor matrix](REGRESSION_SOC_S23B_LINEUP_EDITOR.md) for roster,
+access, keyboard, warning, cleanup, and round-trip checks. Saved defaults do
+not prefill Player Setup until S23C.
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.

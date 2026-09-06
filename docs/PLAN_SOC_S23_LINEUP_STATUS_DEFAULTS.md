@@ -1,7 +1,6 @@
 # SOC-S23 - Team lineup status defaults
 
-**Status:** S23A implemented; migration 068 and deployed verification pending;
-S23B and S23C pending
+**Status:** S23A and S23B implemented; migration 068 applied; S23C pending
 **Scope:** Soccer team settings, Team Manage, and fresh Soccer Player Setup drafts
 **Depends on:** SOC-6D team settings, S11 roster roles, and S19 team formations
 
@@ -216,7 +215,7 @@ S23A  Settings foundation [implemented]
       strict parsers/fingerprints/copy/save preparation, migration 068,
       cloud/cache/CAS/audit compatibility, focused contract tests
 
-S23B  Team Manage editor
+S23B  Team Manage editor [implemented]
       Third settings tab, grouped role-aware roster controls, counts/warnings,
       inactive retention, explicit stale-id cleanup, read-only role behavior,
       focused UI/controller regression
@@ -242,6 +241,12 @@ S23A is implemented with the pure lineup-default contract, team schema-v3
 reader/writer compatibility, dual-readiness cleanup preparation, migration
 068, and focused TypeScript/SQL contract coverage. See
 [`REGRESSION_SOC_S23A_LINEUP_SETTINGS.md`](REGRESSION_SOC_S23A_LINEUP_SETTINGS.md).
+
+S23B is implemented with the list-driven three-tab Team Manage editor,
+role-ordered active-roster groups, non-blocking count/goalkeeper warnings,
+read-only status presentation, complete-membership retention, and positively
+selected cleanup modes. See
+[`REGRESSION_SOC_S23B_LINEUP_EDITOR.md`](REGRESSION_SOC_S23B_LINEUP_EDITOR.md).
 
 ## 8. File map
 

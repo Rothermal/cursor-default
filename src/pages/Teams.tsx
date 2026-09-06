@@ -154,6 +154,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
   const [players, setPlayers] = useState<PlayerRow[]>([])
   const [rosterLoadedTeamId, setRosterLoadedTeamId] = useState<string | null>(null)
+  const [completeMembershipPlayerIds, setCompleteMembershipPlayerIds] = useState<string[]>([])
+  const [completeMembershipLoadedTeamId, setCompleteMembershipLoadedTeamId] = useState<string | null>(null)
 
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [loadingPlayers, setLoadingPlayers] = useState(false)
@@ -361,6 +363,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     if (!isManagementRoute || !selectedTeamId || !isConfigured || !userId || !supabaseClient) {
       setPlayers([])
       setRosterLoadedTeamId(null)
+      setCompleteMembershipPlayerIds([])
+      setCompleteMembershipLoadedTeamId(null)
       return
     }
 
@@ -368,12 +372,13 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     const loadPlayers = async () => {
       setLoadingPlayers(true)
       setRosterLoadedTeamId(null)
+      setCompleteMembershipPlayerIds([])
+      setCompleteMembershipLoadedTeamId(null)
       setError(null)
       const { data, error: queryError } = await supabaseClient
         .from('team_players')
-        .select('jersey_number,position,players!inner(id,created_by,first_name,last_name,nickname)')
+        .select('is_active,jersey_number,position,players!inner(id,created_by,first_name,last_name,nickname)')
         .eq('team_id', selectedTeamId)
-        .eq('is_active', true)
         .order('joined_at', { ascending: true })
 
       if (cancelled) return
@@ -383,8 +388,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         return
       }
 
-      type TeamPlayerJoin = { jersey_number: string | null; position: string | null; players: { id: string; created_by: string | null; first_name: string; last_name: string | null; nickname: string | null } }
-      setPlayers(((data ?? []) as unknown as TeamPlayerJoin[]).map(row => ({
+      type TeamPlayerJoin = { is_active: boolean; jersey_number: string | null; position: string | null; players: { id: string; created_by: string | null; first_name: string; last_name: string | null; nickname: string | null } }
+      const memberships = (data ?? []) as unknown as TeamPlayerJoin[]
+      setCompleteMembershipPlayerIds(memberships.map(row => row.players.id))
+      setCompleteMembershipLoadedTeamId(selectedTeamId)
+      setPlayers(memberships.filter(row => row.is_active).map(row => ({
         id: row.players.id,
         created_by: row.players.created_by,
         first_name: row.players.first_name,
@@ -1942,9 +1950,12 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                   id: player.id,
                   name: playerRosterSelectLabel(player),
                   number: player.jersey_number?.trim() || null,
+                  role: parseSoccerRosterRole(player.position),
                 }))}
                 rosterReady={rosterLoadedTeamId === selectedTeam.id}
                 rosterLoading={loadingPlayers}
+                completeMembershipPlayerIds={completeMembershipPlayerIds}
+                completeMembershipReady={completeMembershipLoadedTeamId === selectedTeam.id}
                 onAuditChange={() => setAuditRefresh(value => value + 1)}
               />
             </section>
