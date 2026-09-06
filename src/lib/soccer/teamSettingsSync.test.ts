@@ -7,12 +7,20 @@ import {
   validSoccerTeamSettingsCache,
 } from './teamSettingsSync'
 
-const settings = { rules: { maxOnFieldPlayers: 9 }, formation: null }
+const settings = {
+  rules: { maxOnFieldPlayers: 9 },
+  formation: null,
+  lineupDefaults: {
+    version: 1 as const,
+    starterPlayerIds: ['11111111-1111-4111-8111-111111111111'],
+  },
+}
 const legacySettings = { rules: { maxOnFieldPlayers: 9 } }
+const formationSettings = { rules: { maxOnFieldPlayers: 9 }, formation: null }
 const now = '2026-07-26T12:00:00.000Z'
 
 describe('soccer team settings synchronization', () => {
-  it('writes version two cache records and accepts current cloud records', () => {
+  it('writes version three cache records and accepts current cloud records', () => {
     const cache = createSoccerTeamSettingsCacheRecord(settings, {
       revision: 3,
       cloudUpdatedAt: now,
@@ -20,7 +28,7 @@ describe('soccer team settings synchronization', () => {
     })
     const cloud: SportSettingsCloudRecord = {
       sportId: 'soccer',
-      schemaVersion: 2,
+      schemaVersion: 3,
       revision: 3,
       settings,
       updatedAt: now,
@@ -28,7 +36,7 @@ describe('soccer team settings synchronization', () => {
     }
 
     expect(validSoccerTeamSettingsCache(cache)?.settings).toEqual(settings)
-    expect(cache.schemaVersion).toBe(2)
+    expect(cache.schemaVersion).toBe(3)
     expect(parseCloudSoccerTeamSettings(cloud)?.settings).toEqual(settings)
   })
 
@@ -52,9 +60,33 @@ describe('soccer team settings synchronization', () => {
       updatedBy: 'admin-1',
     }
 
-    expect(validSoccerTeamSettingsCache(legacyCache)?.settings).toEqual(settings)
+    expect(validSoccerTeamSettingsCache(legacyCache)?.settings).toEqual({
+      rules: legacySettings.rules,
+      formation: null,
+      lineupDefaults: { version: 1, starterPlayerIds: [] },
+    })
     expect(validSoccerTeamSettingsCache(legacyCache)?.schemaVersion).toBe(1)
-    expect(parseCloudSoccerTeamSettings(legacyCloud)?.settings).toEqual(settings)
+    expect(parseCloudSoccerTeamSettings(legacyCloud)?.settings).toEqual({
+      rules: legacySettings.rules,
+      formation: null,
+      lineupDefaults: { version: 1, starterPlayerIds: [] },
+    })
+  })
+
+  it('normalizes version-two formation records with empty lineup defaults', () => {
+    const cloud: SportSettingsCloudRecord = {
+      sportId: 'soccer',
+      schemaVersion: 2,
+      revision: 3,
+      settings: formationSettings,
+      updatedAt: now,
+      updatedBy: 'admin-1',
+    }
+
+    expect(parseCloudSoccerTeamSettings(cloud)?.settings).toEqual({
+      ...formationSettings,
+      lineupDefaults: { version: 1, starterPlayerIds: [] },
+    })
   })
 
   it('rejects unsupported schemas and invalid whole payloads', () => {
@@ -65,12 +97,12 @@ describe('soccer team settings synchronization', () => {
     })
     expect(validSoccerTeamSettingsCache({
       ...cache,
-      schemaVersion: 3,
+      schemaVersion: 4,
     } as SportSettingsCacheRecord)).toBeNull()
 
     expect(parseCloudSoccerTeamSettings({
       sportId: 'soccer',
-      schemaVersion: 2,
+      schemaVersion: 3,
       revision: 4,
       settings: {
         rules: {
@@ -78,6 +110,7 @@ describe('soccer team settings synchronization', () => {
           unknownRule: true,
         },
         formation: null,
+        lineupDefaults: { version: 1, starterPlayerIds: [] },
       },
       updatedAt: now,
       updatedBy: 'admin-1',

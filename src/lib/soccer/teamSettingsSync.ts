@@ -4,15 +4,18 @@ import type {
   SportSettingsCacheScope,
 } from '../sportSettingsStorage'
 import {
+  SOCCER_FORMATION_TEAM_SETTINGS_SCHEMA_VERSION,
   SOCCER_LEGACY_TEAM_SETTINGS_SCHEMA_VERSION,
   SOCCER_TEAM_SETTINGS_SCHEMA_VERSION,
   parseSoccerTeamSettings,
   type SoccerTeamSettings,
 } from './settings'
+import { emptySoccerTeamLineupDefaults } from './lineupDefaults'
 
 export const EMPTY_SOCCER_TEAM_SETTINGS: SoccerTeamSettings = {
   rules: {},
   formation: null,
+  lineupDefaults: emptySoccerTeamLineupDefaults(),
 }
 
 export function soccerTeamSettingsCacheScope(
@@ -61,5 +64,6 @@ export function createSoccerTeamSettingsCacheRecord(
 
 function isSupportedTeamSchema(schemaVersion: number): boolean {
   return schemaVersion === SOCCER_LEGACY_TEAM_SETTINGS_SCHEMA_VERSION ||
+    schemaVersion === SOCCER_FORMATION_TEAM_SETTINGS_SCHEMA_VERSION ||
     schemaVersion === SOCCER_TEAM_SETTINGS_SCHEMA_VERSION
 }

@@ -735,7 +735,8 @@ or events.
 
 ### S23 - Team-level default starter and bench status
 
-**Status:** approved plan; implementation pending - see
+**Status:** S23A settings foundation implemented; migration 068 and deployed
+verification pending; S23B/S23C pending - see
 [`PLAN_SOC_S23_LINEUP_STATUS_DEFAULTS.md`](PLAN_SOC_S23_LINEUP_STATUS_DEFAULTS.md)
 **Theme:** roster defaults / setup speed
 **Where:** Soccer team settings, Team Manage roster, Soccer Player Setup
@@ -950,7 +951,7 @@ Use these labels before turning an item into an implementation plan:
 | State | Items | Next action |
 |---|---|---|
 | Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16`, `S24` | Short Q&A where choices remain, then a focused phase plan |
-| Approved focused plan; implementation pending | `S23` | Implement S23A settings foundation, S23B Team Manage editor, then S23C setup prefill |
+| Approved focused plan; implementation in progress | `S23` | Apply/verify migration 068, then implement S23B Team Manage editor and S23C setup prefill |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
 | Confirmed cross-sport naming request | `S26` | Inventory setup/name authority, then plan additive match display labels |
 | Implemented; owner functional verification complete | `S17`, `S20` | Keep the post-fix cloud completion replay in the focused regression record; proceed to `S7` planning when prioritized |
@@ -982,9 +983,9 @@ exercise those constraints rather than bypass them.
   catalog and versioned team-settings foundation, `S19B` provides the Team
   Manage editor, and `S19C` applies matching defaults once to editable setup
   drafts. Migration 065 is applied; verify current team-setting round trips and
-  setup prefill in the deployed app. `S23` is approved as three focused slices
-  for standalone starter/bench defaults; `S24` is a later live batch transition
-  and should not be folded into the team-settings schema slice.
+  setup prefill in the deployed app. `S23A` implements the schema-v3 standalone
+  starter/bench settings foundation with migration 068; S23B/S23C remain. `S24`
+  is a later live batch transition and should not be folded into this setup flow.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` are implemented through

@@ -18,10 +18,18 @@ import {
   type SoccerFormationTemplateId,
   type SoccerTeamFormationV1,
 } from './formation'
+import {
+  emptySoccerTeamLineupDefaults,
+  parseSoccerTeamLineupDefaults,
+  prepareSoccerLineupDefaultsForSave,
+  unavailableSoccerLineupDefaultPlayerIds,
+  type SoccerTeamLineupDefaultsV1,
+} from './lineupDefaults'
 
 export const SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION = 1
-export const SOCCER_TEAM_SETTINGS_SCHEMA_VERSION = 2
+export const SOCCER_TEAM_SETTINGS_SCHEMA_VERSION = 3
 export const SOCCER_LEGACY_TEAM_SETTINGS_SCHEMA_VERSION = 1
+export const SOCCER_FORMATION_TEAM_SETTINGS_SCHEMA_VERSION = 2
 const MAX_STORED_INTEGER = 2_147_483_647
 
 export type SoccerSettingsLayer = 'personal' | 'team' | 'match'
@@ -39,6 +47,7 @@ export interface SoccerPersonalSettings {
 export interface SoccerTeamSettings {
   rules: SoccerMatchRulesOverride
   formation: SoccerTeamFormationV1 | null
+  lineupDefaults: SoccerTeamLineupDefaultsV1
 }
 
 export interface SoccerSettingsDiagnostic {
@@ -154,6 +163,7 @@ export function soccerTeamSettingsFingerprint(
   return stableJson({
     rules: JSON.parse(soccerRulesOverrideFingerprint(settings.rules)) as unknown,
     formation: settings.formation,
+    lineupDefaults: settings.lineupDefaults,
   })
 }
 
@@ -164,6 +174,7 @@ export function copySoccerTeamRules(
   return {
     rules: structuredClone(source?.rules ?? {}),
     formation: structuredClone(target.formation),
+    lineupDefaults: structuredClone(target.lineupDefaults),
   }
 }
 
@@ -181,46 +192,71 @@ export function applySoccerFormationTemplateToTeamSettings(
     formation: settings.formation
       ? switchSoccerFormationTemplate(settings.formation, templateId)
       : createSoccerTeamFormation(templateId),
+    lineupDefaults: structuredClone(settings.lineupDefaults),
   }
 }
 
 export interface SoccerTeamSettingsSavePreparation {
   settings: SoccerTeamSettings
   removedUnavailableCount: number
+  removedUnavailableLineupDefaultCount: number
 }
 
-export function prepareSoccerTeamSettingsSave(
-  settings: SoccerTeamSettings,
-  options: {
-    cleanUnavailableAssignments: boolean
+export type SoccerTeamSettingsCleanup =
+  | { mode: 'none' }
+  | {
+    mode: 'formation'
     rosterReady: boolean
     activePlayerIds: Iterable<string>
   }
-): SoccerTeamSettingsSavePreparation {
-  const activePlayerIds = [...options.activePlayerIds]
-  if (
-    !options.cleanUnavailableAssignments ||
-    !options.rosterReady ||
-    !settings.formation
-  ) {
-    return {
-      settings: structuredClone(settings),
-      removedUnavailableCount: 0,
-    }
+  | {
+    mode: 'lineup'
+    rosterReady: boolean
+    completeMembershipReady: boolean
+    completeTeamPlayerIds: Iterable<string>
   }
-  const removedUnavailableCount = unavailableSoccerFormationPlayerIds(
-    settings.formation,
-    activePlayerIds
-  ).length
+
+export function prepareSoccerTeamSettingsSave(
+  settings: SoccerTeamSettings,
+  cleanup: SoccerTeamSettingsCleanup
+): SoccerTeamSettingsSavePreparation {
+  const activePlayerIds = cleanup.mode === 'formation'
+    ? [...cleanup.activePlayerIds]
+    : []
+  const cleanFormation = cleanup.mode === 'formation' &&
+    cleanup.rosterReady &&
+    settings.formation !== null
+  const completeTeamPlayerIds = cleanup.mode === 'lineup'
+    ? [...cleanup.completeTeamPlayerIds]
+    : []
+  const cleanLineupDefaults = cleanup.mode === 'lineup' &&
+    cleanup.rosterReady &&
+    cleanup.completeMembershipReady
+  const removedUnavailableCount = cleanFormation
+    ? unavailableSoccerFormationPlayerIds(settings.formation!, activePlayerIds).length
+    : 0
+  const removedUnavailableLineupDefaultCount = cleanLineupDefaults
+    ? unavailableSoccerLineupDefaultPlayerIds(
+      settings.lineupDefaults,
+      completeTeamPlayerIds
+    ).length
+    : 0
+
   return {
     settings: {
       rules: structuredClone(settings.rules),
-      formation: prepareSoccerFormationForSave(
-        settings.formation,
-        activePlayerIds
-      ),
+      formation: cleanFormation
+        ? prepareSoccerFormationForSave(settings.formation!, activePlayerIds)
+        : structuredClone(settings.formation),
+      lineupDefaults: cleanLineupDefaults
+        ? prepareSoccerLineupDefaultsForSave(
+          settings.lineupDefaults,
+          completeTeamPlayerIds
+        )
+        : structuredClone(settings.lineupDefaults),
     },
     removedUnavailableCount,
+    removedUnavailableLineupDefaultCount,
   }
 }
 
@@ -260,23 +296,76 @@ export function parseSoccerTeamSettings(
     }
     const rules = parseSoccerConfigurableRules(value.rules, false)
     return rules.ok
-      ? { ok: true, value: { rules: rules.value, formation: null } }
+      ? {
+        ok: true,
+        value: {
+          rules: rules.value,
+          formation: null,
+          lineupDefaults: emptySoccerTeamLineupDefaults(),
+        },
+      }
       : rules
+  }
+  if (schemaVersion === SOCCER_FORMATION_TEAM_SETTINGS_SCHEMA_VERSION) {
+    if (!hasExactKeys(value, ['rules', 'formation'])) {
+      return invalid('Team soccer settings must contain only rules and formation.')
+    }
+    const rules = parseSoccerConfigurableRules(value.rules, false)
+    if (!rules.ok) return rules
+    if (value.formation === null) {
+      return {
+        ok: true,
+        value: {
+          rules: rules.value,
+          formation: null,
+          lineupDefaults: emptySoccerTeamLineupDefaults(),
+        },
+      }
+    }
+    const formation = parseSoccerTeamFormation(value.formation)
+    return formation.ok
+      ? {
+        ok: true,
+        value: {
+          rules: rules.value,
+          formation: formation.value,
+          lineupDefaults: emptySoccerTeamLineupDefaults(),
+        },
+      }
+      : formation
   }
   if (schemaVersion !== SOCCER_TEAM_SETTINGS_SCHEMA_VERSION) {
     return invalid('Team soccer settings use an unsupported schema.')
   }
-  if (!hasExactKeys(value, ['rules', 'formation'])) {
-    return invalid('Team soccer settings must contain only rules and formation.')
+  if (!hasExactKeys(value, ['rules', 'formation', 'lineupDefaults'])) {
+    return invalid(
+      'Team soccer settings must contain only rules, formation, and lineupDefaults.'
+    )
   }
   const rules = parseSoccerConfigurableRules(value.rules, false)
   if (!rules.ok) return rules
+  const lineupDefaults = parseSoccerTeamLineupDefaults(value.lineupDefaults)
+  if (!lineupDefaults.ok) return lineupDefaults
   if (value.formation === null) {
-    return { ok: true, value: { rules: rules.value, formation: null } }
+    return {
+      ok: true,
+      value: {
+        rules: rules.value,
+        formation: null,
+        lineupDefaults: lineupDefaults.value,
+      },
+    }
   }
   const formation = parseSoccerTeamFormation(value.formation)
   return formation.ok
-    ? { ok: true, value: { rules: rules.value, formation: formation.value } }
+    ? {
+      ok: true,
+      value: {
+        rules: rules.value,
+        formation: formation.value,
+        lineupDefaults: lineupDefaults.value,
+      },
+    }
     : formation
 }
 

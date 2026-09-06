@@ -18,10 +18,14 @@ import {
   soccerTeamSettingsFingerprint,
 } from './settings'
 
+const EMPTY_LINEUP_DEFAULTS = { version: 1 as const, starterPlayerIds: [] }
+const PLAYER_1 = '11111111-1111-4111-8111-111111111111'
+const PLAYER_2 = '22222222-2222-4222-8222-222222222222'
+
 describe('soccer settings schema', () => {
-  it('keeps personal version one separate from current team version two', () => {
+  it('keeps personal version one separate from current team version three', () => {
     expect(SOCCER_PERSONAL_SETTINGS_SCHEMA_VERSION).toBe(1)
-    expect(SOCCER_TEAM_SETTINGS_SCHEMA_VERSION).toBe(2)
+    expect(SOCCER_TEAM_SETTINGS_SCHEMA_VERSION).toBe(3)
   })
 
   it('stores only match fields that differ from inherited rules', () => {
@@ -80,6 +84,7 @@ describe('soccer settings schema', () => {
     expect(parseSoccerTeamSettings({
       rules: { shootoutAvailable: true },
       formation: null,
+      lineupDefaults: EMPTY_LINEUP_DEFAULTS,
     })).toEqual({
       ok: false,
       error: 'shootoutAvailable is derived from tieResolution and cannot be stored.',
@@ -94,25 +99,49 @@ describe('soccer settings schema', () => {
     expect(parseSoccerTeamSettings({
       rules: { maxOnFieldPlayers: 7 },
       formation: null,
+      lineupDefaults: EMPTY_LINEUP_DEFAULTS,
     })).toEqual({
       ok: true,
-      value: { rules: { maxOnFieldPlayers: 7 }, formation: null },
+      value: {
+        rules: { maxOnFieldPlayers: 7 },
+        formation: null,
+        lineupDefaults: EMPTY_LINEUP_DEFAULTS,
+      },
     })
   })
 
-  it('normalizes legacy team version one and round-trips team version two', () => {
+  it('normalizes team versions one and two and round-trips version three', () => {
     expect(parseSoccerTeamSettings({
       rules: { maxOnFieldPlayers: 7 },
     }, 1)).toEqual({
       ok: true,
-      value: { rules: { maxOnFieldPlayers: 7 }, formation: null },
+      value: {
+        rules: { maxOnFieldPlayers: 7 },
+        formation: null,
+        lineupDefaults: EMPTY_LINEUP_DEFAULTS,
+      },
+    })
+    expect(parseSoccerTeamSettings({
+      rules: { maxOnFieldPlayers: 7 },
+      formation: null,
+    }, 2)).toEqual({
+      ok: true,
+      value: {
+        rules: { maxOnFieldPlayers: 7 },
+        formation: null,
+        lineupDefaults: EMPTY_LINEUP_DEFAULTS,
+      },
     })
     expect(parseSoccerTeamSettings({
       rules: { maxOnFieldPlayers: 7 },
       formation: {
         version: 1,
         templateId: '7v7-2-3-1',
-        assignments: { gk: '11111111-1111-4111-8111-111111111111' },
+        assignments: { gk: PLAYER_1 },
+      },
+      lineupDefaults: {
+        version: 1,
+        starterPlayerIds: [PLAYER_2, PLAYER_1],
       },
     })).toEqual({
       ok: true,
@@ -121,7 +150,11 @@ describe('soccer settings schema', () => {
         formation: {
           version: 1,
           templateId: '7v7-2-3-1',
-          assignments: { gk: '11111111-1111-4111-8111-111111111111' },
+          assignments: { gk: PLAYER_1 },
+        },
+        lineupDefaults: {
+          version: 1,
+          starterPlayerIds: [PLAYER_1, PLAYER_2],
         },
       },
     })
@@ -130,7 +163,17 @@ describe('soccer settings schema', () => {
   it('rejects team payloads that do not match their declared schema', () => {
     expect(parseSoccerTeamSettings({ rules: {} })).toMatchObject({ ok: false })
     expect(parseSoccerTeamSettings({ rules: {}, formation: null }, 1)).toMatchObject({ ok: false })
-    expect(parseSoccerTeamSettings({ rules: {}, formation: null }, 3)).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({ rules: {} }, 2)).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({
+      rules: {},
+      formation: null,
+      lineupDefaults: EMPTY_LINEUP_DEFAULTS,
+    }, 2)).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({
+      rules: {},
+      formation: null,
+      lineupDefaults: EMPTY_LINEUP_DEFAULTS,
+    }, 4)).toMatchObject({ ok: false })
     expect(parseSoccerTeamSettings({
       rules: {},
       formation: {
@@ -141,10 +184,19 @@ describe('soccer settings schema', () => {
           st: '11111111-1111-4111-8111-111111111111',
         },
       },
+      lineupDefaults: EMPTY_LINEUP_DEFAULTS,
+    })).toMatchObject({ ok: false })
+    expect(parseSoccerTeamSettings({
+      rules: {},
+      formation: null,
+      lineupDefaults: {
+        version: 1,
+        starterPlayerIds: [PLAYER_1, PLAYER_1],
+      },
     })).toMatchObject({ ok: false })
   })
 
-  it('fingerprints formation changes and copies only rules across teams', () => {
+  it('fingerprints lineup changes and copies only rules across teams', () => {
     const target = {
       rules: { maxOnFieldPlayers: 7 },
       formation: {
@@ -152,6 +204,7 @@ describe('soccer settings schema', () => {
         templateId: '7v7-2-3-1' as const,
         assignments: { gk: '11111111-1111-4111-8111-111111111111' },
       },
+      lineupDefaults: { version: 1 as const, starterPlayerIds: [PLAYER_1] },
     }
     const source = {
       rules: { maxOnFieldPlayers: 9 },
@@ -160,20 +213,32 @@ describe('soccer settings schema', () => {
         templateId: '9v9-3-3-2' as const,
         assignments: { gk: '22222222-2222-4222-8222-222222222222' },
       },
+      lineupDefaults: { version: 1 as const, starterPlayerIds: [PLAYER_2] },
     }
 
     expect(soccerTeamSettingsFingerprint(target)).not.toBe(
       soccerTeamSettingsFingerprint({ ...target, formation: null })
     )
+    expect(soccerTeamSettingsFingerprint(target)).not.toBe(
+      soccerTeamSettingsFingerprint({
+        ...target,
+        lineupDefaults: EMPTY_LINEUP_DEFAULTS,
+      })
+    )
     expect(copySoccerTeamRules(target, source)).toEqual({
       rules: source.rules,
       formation: target.formation,
+      lineupDefaults: target.lineupDefaults,
     })
     expect(copySoccerTeamRules(target, null)).toEqual({
       rules: {},
       formation: target.formation,
+      lineupDefaults: target.lineupDefaults,
     })
     expect(copySoccerTeamRules(target, source).formation).not.toBe(target.formation)
+    expect(copySoccerTeamRules(target, source).lineupDefaults).not.toBe(
+      target.lineupDefaults
+    )
   })
 
   it('wires both Team Manage copy branches through rules-only copying', () => {
@@ -198,6 +263,7 @@ describe('soccer settings schema', () => {
           rw: '22222222-2222-4222-8222-222222222222',
         },
       },
+      lineupDefaults: { version: 1 as const, starterPlayerIds: [PLAYER_2] },
     }
 
     const next = applySoccerFormationTemplateToTeamSettings(
@@ -214,6 +280,8 @@ describe('soccer settings schema', () => {
       templateId: '9v9-3-3-2',
       assignments: { gk: '11111111-1111-4111-8111-111111111111' },
     })
+    expect(next.lineupDefaults).toEqual(current.lineupDefaults)
+    expect(next.lineupDefaults).not.toBe(current.lineupDefaults)
     expect(current.formation.templateId).toBe('11v11-4-3-3')
   })
 
@@ -228,27 +296,29 @@ describe('soccer settings schema', () => {
           st: '22222222-2222-4222-8222-222222222222',
         },
       },
+      lineupDefaults: {
+        version: 1 as const,
+        starterPlayerIds: [PLAYER_1, PLAYER_2],
+      },
     }
     const activePlayerIds = ['11111111-1111-4111-8111-111111111111']
 
     expect(prepareSoccerTeamSettingsSave(current, {
-      cleanUnavailableAssignments: true,
+      mode: 'formation',
       rosterReady: false,
       activePlayerIds,
     })).toEqual({
       settings: current,
       removedUnavailableCount: 0,
+      removedUnavailableLineupDefaultCount: 0,
     })
-    expect(prepareSoccerTeamSettingsSave(current, {
-      cleanUnavailableAssignments: false,
-      rosterReady: true,
-      activePlayerIds,
-    })).toEqual({
+    expect(prepareSoccerTeamSettingsSave(current, { mode: 'none' })).toEqual({
       settings: current,
       removedUnavailableCount: 0,
+      removedUnavailableLineupDefaultCount: 0,
     })
     expect(prepareSoccerTeamSettingsSave(current, {
-      cleanUnavailableAssignments: true,
+      mode: 'formation',
       rosterReady: true,
       activePlayerIds,
     })).toEqual({
@@ -259,12 +329,58 @@ describe('soccer settings schema', () => {
           templateId: '7v7-2-3-1',
           assignments: { gk: activePlayerIds[0] },
         },
+        lineupDefaults: current.lineupDefaults,
       },
       removedUnavailableCount: 1,
+      removedUnavailableLineupDefaultCount: 0,
     })
     expect(current.formation.assignments.st).toBe(
       '22222222-2222-4222-8222-222222222222'
     )
+  })
+
+  it('cleans lineup defaults only after both roster datasets are ready', () => {
+    const current = {
+      rules: {},
+      formation: null,
+      lineupDefaults: {
+        version: 1 as const,
+        starterPlayerIds: [PLAYER_1, PLAYER_2],
+      },
+    }
+    expect(prepareSoccerTeamSettingsSave(current, {
+      mode: 'lineup',
+      rosterReady: false,
+      completeMembershipReady: true,
+      completeTeamPlayerIds: [PLAYER_1],
+    })).toEqual({
+      settings: current,
+      removedUnavailableCount: 0,
+      removedUnavailableLineupDefaultCount: 0,
+    })
+    expect(prepareSoccerTeamSettingsSave(current, {
+      mode: 'lineup',
+      rosterReady: true,
+      completeMembershipReady: false,
+      completeTeamPlayerIds: [PLAYER_1],
+    })).toEqual({
+      settings: current,
+      removedUnavailableCount: 0,
+      removedUnavailableLineupDefaultCount: 0,
+    })
+    expect(prepareSoccerTeamSettingsSave(current, {
+      mode: 'lineup',
+      rosterReady: true,
+      completeMembershipReady: true,
+      completeTeamPlayerIds: [PLAYER_1],
+    })).toEqual({
+      settings: {
+        ...current,
+        lineupDefaults: { version: 1, starterPlayerIds: [PLAYER_1] },
+      },
+      removedUnavailableCount: 0,
+      removedUnavailableLineupDefaultCount: 1,
+    })
   })
 
   it('rejects unknown nested segment fields', () => {
@@ -291,6 +407,7 @@ describe('soccer settings schema', () => {
     expect(parseSoccerTeamSettings({
       rules: { unknownRule: true },
       formation: null,
+      lineupDefaults: EMPTY_LINEUP_DEFAULTS,
     })).toEqual({
       ok: false,
       error: 'Unknown soccer rule: unknownRule.',
