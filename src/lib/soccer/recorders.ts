@@ -150,7 +150,9 @@ export async function loadSoccerRecorderProjection(
       eventStream: loaded.eventStream,
       sportGameState:
         baseState.sportGameState?.sportId === 'soccer'
-          ? createSoccerSportGameState(baseState.sportGameState.setup)
+          ? createSoccerSportGameState(baseState.sportGameState.setup, {
+              setupSnapshotVersion: baseState.sportGameState.setupSnapshotVersion,
+            })
           : baseState.sportGameState,
     },
     gameEventRegistry,
@@ -313,7 +315,7 @@ async function loadSoccerCloudShell(gameId: string): Promise<SoccerCloudShell> {
       teamStatsConfig: null,
       shotChart: [],
       eventStream: null,
-      sportGameState: createSoccerSportGameState(normalized.setup),
+      sportGameState: normalized,
       cloudSync: {
         ...createInitialCloudSyncState('idle'),
         seasonId: game.season_id,

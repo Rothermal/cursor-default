@@ -244,9 +244,11 @@ export default function SoccerPlayerSetup() {
     if (validateSoccerMatchSetup(nextSetup)) return
     dispatch({
       type: 'SET_SPORT_GAME_STATE',
-      sportGameState: createSoccerSportGameState(nextSetup),
+      sportGameState: createSoccerSportGameState(nextSetup, {
+        setupSnapshotVersion: soccerState?.setupSnapshotVersion,
+      }),
     })
-  }, [dispatch, drafts, setup, state.eventStream?.events.length, teamDefaultLineup])
+  }, [dispatch, drafts, setup, soccerState?.setupSnapshotVersion, state.eventStream?.events.length, teamDefaultLineup])
 
   if (invalidRoute || !state.gameInfo || !setup) return null
 

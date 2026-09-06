@@ -315,6 +315,7 @@ export interface SoccerSportGameState {
   sportId: 'soccer'
   version: typeof SOCCER_GAME_STATE_VERSION
   setup: SoccerMatchSetupV2
+  setupSnapshotVersion: 1 | 2
   projection: SoccerMatchProjection
   capturePreferences: SoccerCapturePreferences
 }

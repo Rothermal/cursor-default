@@ -164,16 +164,20 @@ lineup. Do not persist the full team settings record, formation template,
 formation slots, stale team ids, cache metadata, or settings revision.
 
 The one-time S23 Player Setup decision must produce both its editable draft
-and, when team settings resolved coherently, an independent frozen preset.
+and, when team settings resolve to at least one starter, an independent frozen
+preset. An unconfigured or all-Bench team stores `teamDefaultLineup: null` so a
+future Team Default action can never empty the field.
 Later recorder edits change the opening lineup but not Team Default. Removing
 a participant from the match removes that participant from the persisted
 preset before kickoff and surfaces the reduced preset during final setup
 review. Local/personal games store `teamDefaultLineup: null`.
 
 Existing setup version 1 normalizes in memory with `teamDefaultLineup: null`
-without rewriting raw cloud history. Increment `SOCCER_GAME_STATE_VERSION`
-and explicitly continue accepting every previously supported Soccer state
-version; do not accidentally drop state version 2 while adding the new one.
+without rewriting raw cloud history. A durable `setupSnapshotVersion` keeps a
+bound v1 game's transport shape pinned to v1 while runtime consumers use the
+normalized v2 setup. Increment `SOCCER_GAME_STATE_VERSION` and explicitly
+continue accepting every previously supported Soccer state version; do not
+accidentally drop state version 2 while adding the new one.
 
 The setup snapshot remains immutable after first cloud binding and remains in
 the game fingerprint, parking, export/import, finalization, and recovery paths.

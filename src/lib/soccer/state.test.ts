@@ -4,6 +4,7 @@ import {
   createSoccerSportGameState,
   normalizeSoccerMatchSetup,
   normalizeSoccerSportGameState,
+  soccerSetupSnapshotForTransport,
   validateSoccerMatchSetup,
 } from './state'
 import type { SoccerMatchParticipant, SoccerMatchSetupV2 } from './types'
@@ -62,6 +63,7 @@ describe('Soccer setup version 2', () => {
         setup: legacySetup,
       })).toMatchObject({
         version: 3,
+        setupSnapshotVersion: 1,
         setup: { version: 2, teamDefaultLineup: null },
       })
     }
@@ -80,6 +82,7 @@ describe('Soccer setup version 2', () => {
         role: { group: 'goalkeeper', label: null },
       }],
     })
+    expect(state.setupSnapshotVersion).toBe(2)
   })
 
   it('rejects unknown fields and invalid preset membership, roles, duplicates, or size', () => {
@@ -134,5 +137,17 @@ describe('Soccer setup version 2', () => {
     expect(normalizeSoccerSportGameState({ sportId: 'soccer', version: '3', setup })).toBeNull()
     expect(normalizeSoccerSportGameState({ sportId: 'soccer', version: 4, setup })).toBeNull()
     expect(normalizeSoccerSportGameState({ sportId: 'soccer', version: 2, setup })).not.toBeNull()
+  })
+
+  it('preserves a legacy transport version while allowing local preset metadata', () => {
+    const setup = setupV2()
+    const legacyTransport = createSoccerSportGameState(setup, { setupSnapshotVersion: 1 })
+
+    expect(normalizeSoccerSportGameState(structuredClone(legacyTransport)))
+      .toMatchObject({
+        setupSnapshotVersion: 1,
+        setup: { teamDefaultLineup: setup.teamDefaultLineup },
+      })
+    expect(soccerSetupSnapshotForTransport(legacyTransport)).not.toHaveProperty('teamDefaultLineup')
   })
 })

@@ -249,6 +249,40 @@ describe('soccer event cloud sync helpers', () => {
     expect(buildGameSyncFingerprint(changed)).not.toBe(buildGameSyncFingerprint(state))
   })
 
+  it('keeps a bound setup-v1 snapshot byte-for-byte compatible after normalization', () => {
+    const storedSetup = setup('team-1')
+    const state = startedState(storedSetup)
+
+    expect(state.sportGameState).toMatchObject({
+      sportId: 'soccer',
+      setup: { version: 2, teamDefaultLineup: null },
+      setupSnapshotVersion: 1,
+    })
+    expect(soccerEventCloudTransportAdapter.prepare(state).setupSnapshot)
+      .toEqual(storedSetup)
+  })
+
+  it('sends the original setup-v1 shape when syncing an existing cloud binding', async () => {
+    const storedSetup = setup('team-1')
+    const state = startedState(storedSetup)
+    state.cloudSync.gameId = 'cloud-game-1'
+
+    await syncSoccerEventGameToCloud({
+      state,
+      userId: 'user-1',
+      localGameId: '20000000-0000-4000-8000-000000000001',
+    })
+
+    expect(cloudMock.rpc).toHaveBeenNthCalledWith(
+      1,
+      'bind_soccer_event_game_v5',
+      expect.objectContaining({
+        p_existing_game_id: 'cloud-game-1',
+        p_setup_snapshot: storedSetup,
+      })
+    )
+  })
+
   it('sends deleted-source recovery only after an explicit local choice', async () => {
     const state = startedState(setup('team-1'))
     state.cloudSync.allowDeletedSourcePlayerRecovery = true

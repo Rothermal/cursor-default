@@ -33,16 +33,17 @@ export function soccerMatchLineupPresetFromPrefill<
   TDraft extends SoccerFormationParticipantDraft & { id: string },
 >(
   result: SoccerTeamLineupPrefillResult<TDraft>
-): SoccerMatchLineupPresetV1 {
-  return {
+): SoccerMatchLineupPresetV1 | null {
+  const entries = result.drafts.flatMap(draft =>
+    draft.selected && draft.initialStatus === 'starter'
+      ? [{ participantId: draft.id, role: structuredClone(draft.initialRole) }]
+      : []
+  )
+  return entries.length > 0 ? {
     version: 1,
     source: result.source,
-    entries: result.drafts.flatMap(draft =>
-      draft.selected && draft.initialStatus === 'starter'
-        ? [{ participantId: draft.id, role: structuredClone(draft.initialRole) }]
-        : []
-    ),
-  }
+    entries,
+  } : null
 }
 
 export function pruneSoccerMatchLineupPreset(
@@ -51,12 +52,13 @@ export function pruneSoccerMatchLineupPreset(
 ): SoccerMatchLineupPresetV1 | null {
   if (!preset) return null
   const retained = new Set(participantIds)
-  return {
+  const entries = preset.entries
+    .filter(entry => retained.has(entry.participantId))
+    .map(entry => structuredClone(entry))
+  return entries.length > 0 ? {
     ...structuredClone(preset),
-    entries: preset.entries
-      .filter(entry => retained.has(entry.participantId))
-      .map(entry => structuredClone(entry)),
-  }
+    entries,
+  } : null
 }
 
 export function applySoccerTeamLineupPrefill<

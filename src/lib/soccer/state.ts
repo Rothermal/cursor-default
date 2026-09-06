@@ -48,15 +48,20 @@ export function createSoccerMatchProjection(setup: SoccerMatchSetup): SoccerMatc
   }
 }
 
-export function createSoccerSportGameState(setup: SoccerMatchSetup): SoccerSportGameState {
+export function createSoccerSportGameState(
+  setup: SoccerMatchSetup,
+  options: { setupSnapshotVersion?: 1 | 2 } = {}
+): SoccerSportGameState {
   const normalizedSetup = normalizeSoccerMatchSetup(setup)
   if (!normalizedSetup) {
     throw new Error(validateSoccerMatchSetup(setup) ?? 'Soccer setup is invalid.')
   }
+  const setupSnapshotVersion = options.setupSnapshotVersion ?? setup.version
   return {
     sportId: 'soccer',
     version: SOCCER_GAME_STATE_VERSION,
     setup: normalizedSetup,
+    setupSnapshotVersion,
     projection: createSoccerMatchProjection(normalizedSetup),
     capturePreferences: {
       teamSide: 'tracked',
@@ -71,13 +76,22 @@ export function normalizeSoccerSportGameState(value: unknown): SoccerSportGameSt
   if (
     !isPlainObject(value) ||
     value.sportId !== 'soccer' ||
-    value.version !== 1 &&
-    value.version !== 2 &&
-    value.version !== SOCCER_GAME_STATE_VERSION
+    (
+      value.version !== 1 &&
+      value.version !== 2 &&
+      value.version !== SOCCER_GAME_STATE_VERSION
+    )
   ) return null
+  if (!isPlainObject(value.setup)) return null
+  const setupSnapshotVersion = value.setupSnapshotVersion === 1 || value.setupSnapshotVersion === 2
+    ? value.setupSnapshotVersion
+    : value.setup.version === 1 || value.setup.version === 2
+      ? value.setup.version
+      : null
+  if (setupSnapshotVersion === null) return null
   const setup = normalizeSoccerMatchSetup(value.setup)
   if (!setup) return null
-  const normalized = createSoccerSportGameState(setup)
+  const normalized = createSoccerSportGameState(setup, { setupSnapshotVersion })
   if (isPlainObject(value.capturePreferences)) {
     const preferences = value.capturePreferences
     if (preferences.teamSide === 'tracked' || preferences.teamSide === 'opponent') {
@@ -94,6 +108,21 @@ export function normalizeSoccerSportGameState(value: unknown): SoccerSportGameSt
     }
   }
   return normalized
+}
+
+export function soccerSetupSnapshotForTransport(
+  state: SoccerSportGameState
+): SoccerMatchSetup {
+  if (state.setupSnapshotVersion === 2) return structuredClone(state.setup)
+  return {
+    version: 1,
+    trackedTeamDesignation: state.setup.trackedTeamDesignation,
+    firstPeriodAttackingDirection: state.setup.firstPeriodAttackingDirection,
+    sourceTeamId: state.setup.sourceTeamId,
+    sourceSeasonId: state.setup.sourceSeasonId,
+    rulesSnapshot: structuredClone(state.setup.rulesSnapshot),
+    participants: structuredClone(state.setup.participants),
+  }
 }
 
 export function normalizeSoccerMatchSetup(value: unknown): SoccerMatchSetupV2 | null {

@@ -20,7 +20,8 @@ The focused contracts cover:
 - exact setup-v2 validation, cloned preset storage, and setup-v1 normalization;
 - continued Soccer state-version 1/2 reads and strict rejection of unknown versions;
 - formation-first and lineup-default preset derivation plus deselection pruning;
-- fingerprint and cloud transport preservation of the exact preset;
+- fingerprint and cloud transport preservation of the exact preset and its
+  immutable v1/v2 binding version;
 - migration 069's Soccer/Basketball setup-v1/v2 allow-list and private binder;
 - exact account-scoped release contract v2 parsing; and
 - unchanged historical migration 049 and migration 052 definitions.
@@ -34,13 +35,14 @@ The focused contracts cover:
 
 Without migration 069, new cloud-team Soccer setup fails before local game
 mutation. Local setup plus existing game, history, sync, recovery, finalization,
-and reopen access remain available.
+and reopen access remain available. Existing setup-v1 games normalize to the
+v2 runtime model but continue transmitting the exact v1 binding shape.
 
 ## Operator smoke
 
 | # | Scenario | Expected |
 |---|---|---|
-| 1 | Open an existing setup-v1 Soccer game | It loads normally; no Team Default is invented |
+| 1 | Open, edit, and sync an existing setup-v1 Soccer cloud game | It loads normally, no Team Default is invented, and sync retains the exact v1 binding snapshot |
 | 2 | Start a cloud-team match with a valid saved formation | Player Setup uses the formation once; recorder edits do not change the frozen Team Default |
 | 3 | Start a cloud-team match without an applicable formation but with lineup defaults | Active saved starters and roster roles form the frozen Team Default |
 | 4 | Deselect a default participant before kickoff, park, reload, and export/import | The participant stays absent from both match roster and frozen preset |

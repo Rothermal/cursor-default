@@ -108,6 +108,33 @@ describe('Soccer team lineup prefill', () => {
     })
   })
 
+  it('does not freeze an empty Team Default for an unconfigured team', () => {
+    const result = applySoccerTeamLineupPrefill(
+      drafts.map((draft, index) => ({
+        ...structuredClone(draft),
+        id: `participant-${index + 1}`,
+      })),
+      {
+        formation: null,
+        lineupDefaults: { version: 1, starterPlayerIds: [] },
+        maxOnFieldPlayers: 7,
+      }
+    )
+
+    expect(soccerMatchLineupPresetFromPrefill(result)).toBeNull()
+  })
+
+  it('removes a Team Default when none of its participants remain', () => {
+    expect(pruneSoccerMatchLineupPreset({
+      version: 1,
+      source: 'lineup_defaults',
+      entries: [{
+        participantId: 'participant-1',
+        role: { group: 'goalkeeper', label: null },
+      }],
+    }, ['participant-2'])).toBeNull()
+  })
+
   it('applies active starter ids and preserves roster roles when no formation applies', () => {
     const result = applySoccerTeamLineupPrefill(drafts, {
       formation: null,

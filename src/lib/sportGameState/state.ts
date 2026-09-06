@@ -25,5 +25,8 @@ export function sportGameStateForFingerprint(value: SportGameState | null): unkn
     sportId: value.sportId,
     version: value.version,
     setup: value.setup,
+    ...(value.sportId === 'soccer'
+      ? { setupSnapshotVersion: value.setupSnapshotVersion }
+      : {}),
   }
 }
