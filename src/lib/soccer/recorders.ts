@@ -8,7 +8,7 @@ import { createInitialCloudSyncState } from '../gameReducer'
 import { supabase } from '../supabase'
 import { prepareSoccerKickoff } from './kickoff'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
-import type { SoccerMatchSetup } from './types'
+import { SOCCER_GAME_STATE_VERSION, type SoccerMatchSetup } from './types'
 
 interface SoccerCloudGameRow {
   id: string
@@ -265,7 +265,7 @@ async function loadSoccerCloudShell(gameId: string): Promise<SoccerCloudShell> {
   const game = gameData as SoccerCloudGameRow
   const normalized = normalizeSoccerSportGameState({
     sportId: 'soccer',
-    version: 2,
+    version: SOCCER_GAME_STATE_VERSION,
     setup: setupData.setup_snapshot,
   })
   if (!normalized || normalized.sportId !== 'soccer') {

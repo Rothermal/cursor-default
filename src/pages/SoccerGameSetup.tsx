@@ -306,6 +306,16 @@ export default function SoccerGameSetup() {
 
     const sourceTeamId = teamSource === 'cloud' ? selectedTeam!.id : null
     const sourceChanged = Boolean(existingSetup && existingSetup.sourceTeamId !== sourceTeamId)
+    const preservedParticipants = sourceChanged
+      ? []
+      : structuredClone(existingSetup?.participants ?? [])
+    const preservedParticipantIds = new Set(preservedParticipants.map(participant => participant.id))
+    const preservedTeamDefault = !sourceChanged && existingSetup?.version === 2 &&
+      existingSetup.teamDefaultLineup &&
+      existingSetup.teamDefaultLineup.entries.length <= normalizedRules.maxOnFieldPlayers &&
+      existingSetup.teamDefaultLineup.entries.every(entry => preservedParticipantIds.has(entry.participantId))
+      ? structuredClone(existingSetup.teamDefaultLineup)
+      : null
     if (sourceChanged) dispatch({ type: 'SET_PLAYERS', players: [] })
     dispatch({
       type: 'SET_CLOUD_SYNC_STATE',
@@ -334,13 +344,14 @@ export default function SoccerGameSetup() {
     dispatch({
       type: 'SET_SPORT_GAME_STATE',
       sportGameState: createSoccerSportGameState({
-        version: 1,
+        version: 2,
         trackedTeamDesignation: designation,
         firstPeriodAttackingDirection: direction,
         sourceTeamId,
         sourceSeasonId: teamSource === 'cloud' ? selectedTeam!.season_id : null,
         rulesSnapshot: normalizedRules,
-        participants: sourceChanged ? [] : structuredClone(existingSetup?.participants ?? []),
+        participants: preservedParticipants,
+        teamDefaultLineup: preservedTeamDefault,
       }),
     })
     navigate('/players')

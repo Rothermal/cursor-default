@@ -136,11 +136,12 @@ The dev server starts at `http://localhost:5173`.
 - `supabase/migrations/057_basketball_recorder_finalization_contracts.sql` - BKE-4C1 fixed Basketball recorder/readiness preparation wrappers and private terminal/score policy
 - `supabase/migrations/058_basketball_canonical_finalization.sql` - BKE-4C3 fixed schema-gated Basketball finalization wrapper and trusted shared-transaction policy dispatch
 - `supabase/migrations/059_basketball_reopen_republication.sql` - BKE-4C4 manager publication-history reader, fixed reason-required Basketball reopen wrapper, and append-only republication path
+- `supabase/migrations/069_soccer_setup_v2_compatibility.sql` - S24A explicit Soccer/Basketball setup-v1/v2 first-bind compatibility and Soccer setup-v2 release capability
    > Apply **`059`** after **`058`** for Basketball reopen and republication.
    > Apply **`057`** for BKE-4C2 recorder/readiness UI.
    > Apply **`056`** before running BKE-4B2 Basketball event sync; the client fails closed when the binder is unavailable.
    > Apply **`054` and `055` separately and in order** so the staged constraint add commits before validation and replacement.
-   > Apply **`049`** before enabling Soccer for cloud-team starts. Missing or stale capability contracts fail closed while local-only Soccer and existing/history access remain available.
+   > Apply **`069`** before deploying S24A Soccer setup-v2 creation. The exact capability fails new cloud-team setup closed while local games and existing/history access remain available.
    > Before **`047`**, run `supabase/scripts/audit_soccer_participant_sources_pre_047.sql` and review the repairable/unprovable participant counts.
    > If you already applied earlier migrations, run only the new ones (e.g. only `018` for the seasons data model redesign).
    > Before **`019`**, run `supabase/scripts/audit_data_integrity_pre_019.sql` in the SQL Editor if you have existing data; migration `019` aborts if duplicate teams, invalid `seasons.sport`, duplicate active jersey numbers, or bad `games.tournament_id` links exist.
@@ -463,7 +464,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 - [ ] **Soccer release hardening sign-off (SOC-6E2)** - automated release contracts, fail-closed legacy settings, stale-PWA recovery guidance, and the consolidated operator matrix are implemented; development/staging and unreleased-production evidence remains to be recorded ([plan](docs/PLAN_SOC_6E_RELEASE_HARDENING.md), [release matrix](docs/REGRESSION_SOC_6E_RELEASE.md))
 - [x] **Soccer production enablement (SOC-6E3)** - owner-only rollout approved; the centralized production policy offers Soccer as a device-local opt-in while preserving existing records when disabled, with post-deployment iteration evidence tracked in the release matrix ([plan](docs/PLAN_SOC_6E_RELEASE_HARDENING.md), [release matrix](docs/REGRESSION_SOC_6E_RELEASE.md))
 - [x] **Soccer team lineup defaults (S23)** - S23A-S23C implement sparse stable-player starter ids, team settings schema-v3 compatibility, migration 068 validation, the role-ordered Team Manage editor, dual-readiness stale cleanup, read-only review, and one-time formation-first Player Setup prefill ([plan](docs/PLAN_SOC_S23_LINEUP_STATUS_DEFAULTS.md), [S23A regression](docs/REGRESSION_SOC_S23A_LINEUP_SETTINGS.md), [S23B regression](docs/REGRESSION_SOC_S23B_LINEUP_EDITOR.md), [S23C regression](docs/REGRESSION_SOC_S23C_SETUP_PREFILL.md))
-- [ ] **Soccer live lineup manager (S24)** - approved S24A-S24D plan for frozen Opening/Team Default presets, a two-column target-lineup editor, one atomic lineup-transition event, and grouped Timeline correction ([plan](docs/PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md))
+- [ ] **Soccer live lineup manager (S24)** - S24A implements exact setup v2, a frozen formation-first Team Default, legacy normalization, migration 069 setup-v1/v2 compatibility, and exact cloud preflight; S24B-S24D remain for the atomic transition domain, two-column manager, and grouped Timeline correction ([plan](docs/PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md), [S24A regression](docs/REGRESSION_SOC_S24A_FROZEN_PRESET.md))
 
 - [x] **Basketball shared event engine (BKE-1A)** - sport-neutral state dispatch/fingerprints, fail-closed aggregate-sync capabilities, definition-scoped neutral event sides, and atomic final-candidate multi-event revisions with unchanged Soccer behavior ([plan](docs/PLAN_BKE_1A_SHARED_EVENT_ENGINE.md))
 - [x] **Basketball state and lifecycle foundation (BKE-1B1)** - immutable rules/setup snapshots, stable tracked/opponent participants, defensive state normalization, lifecycle event projection, and parking/fingerprint coverage without production runtime registration ([plan](docs/PLAN_BKE_1B_BASKETBALL_EVENT_FOUNDATION.md))
@@ -475,7 +476,7 @@ See [`docs/INTEGRATION_PLAN.md`](docs/INTEGRATION_PLAN.md) for the full architec
 
 ### What's Next
 
-- [ ] **Soccer post-deployment validation** - exercise the owner-only opt-in release against migration 049 and retain the broader role/device/failure matrix before access expands ([release matrix](docs/REGRESSION_SOC_6E_RELEASE.md), [SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md))
+- [ ] **Soccer post-deployment validation** - exercise the owner-only opt-in release against the current migration 069 capability and retain the broader role/device/failure matrix before access expands ([release matrix](docs/REGRESSION_SOC_6E_RELEASE.md), [SOC-6 plan](docs/PLAN_SOC_6_SUMMARY_AND_RELEASE.md))
 - [x] **Basketball lifecycle and participants (BKE-2A)** - sequential regulation/overtime transitions, local completion, late participants, generalized capture units, and non-undoable lifecycle boundaries ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))
 - [x] **Basketball direct stats, score, and minutes (BKE-2B)** - event-backed grid/score controls, optional steal-turnover pairing, unlocated direct shots, and safe decrements ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))
 - [x] **Basketball foul and free-throw domain (BKE-2C1)** - checked foul/trip/attempt commands, one-and-one enforcement, consequential corrections, and reload-safe exact restore ([plan](docs/PLAN_BKE_2_COMPLETE_EVENT_CAPTURE.md))

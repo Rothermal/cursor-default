@@ -7,14 +7,15 @@ import {
 } from './releaseCapabilities'
 
 const validCapabilities = {
-  contractVersion: 1,
-  migration: 49,
+  contractVersion: 2,
+  migration: 69,
   eventTransportVersion: 4,
   recoveryVersion: 1,
   recorderResolutionVersion: 1,
   canonicalFinalizationVersion: 1,
   aggregateSourceVersion: 1,
   settingsSchemaVersion: 1,
+  setupSnapshotVersion: 2,
 }
 
 function clientWith(
@@ -45,10 +46,10 @@ describe('loadSoccerReleaseCapabilities', () => {
 
   it('classifies older and newer contract versions before parsing their fields', async () => {
     await expect(
-      loadSoccerReleaseCapabilities(clientWith({ contractVersion: 0 }))
+      loadSoccerReleaseCapabilities(clientWith({ contractVersion: 1 }))
     ).resolves.toMatchObject({ status: 'backend_update_required' })
     const staleClient = await loadSoccerReleaseCapabilities(
-      clientWith({ contractVersion: 2 })
+      clientWith({ contractVersion: 3 })
     )
     expect(staleClient).toMatchObject({
       status: 'client_update_required',

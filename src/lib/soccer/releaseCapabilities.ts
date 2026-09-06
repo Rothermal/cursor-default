@@ -1,16 +1,17 @@
 import { supabase } from '../supabase'
 
-export const SOCCER_RELEASE_CONTRACT_VERSION = 1
+export const SOCCER_RELEASE_CONTRACT_VERSION = 2
 
 export interface SoccerReleaseCapabilities {
-  contractVersion: 1
-  migration: 49
+  contractVersion: 2
+  migration: 69
   eventTransportVersion: 4
   recoveryVersion: 1
   recorderResolutionVersion: 1
   canonicalFinalizationVersion: 1
   aggregateSourceVersion: 1
   settingsSchemaVersion: 1
+  setupSnapshotVersion: 2
 }
 
 export type SoccerReleaseCapabilityResult =
@@ -42,14 +43,15 @@ export interface SoccerReleaseCapabilityClient {
 }
 
 const expectedCapabilities: SoccerReleaseCapabilities = {
-  contractVersion: 1,
-  migration: 49,
+  contractVersion: 2,
+  migration: 69,
   eventTransportVersion: 4,
   recoveryVersion: 1,
   recorderResolutionVersion: 1,
   canonicalFinalizationVersion: 1,
   aggregateSourceVersion: 1,
   settingsSchemaVersion: 1,
+  setupSnapshotVersion: 2,
 }
 
 let activeUserId: string | null = null

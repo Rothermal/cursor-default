@@ -8,6 +8,7 @@ import {
   unavailableSoccerLineupDefaultPlayerIds,
   type SoccerTeamLineupDefaultsV1,
 } from './lineupDefaults'
+import type { SoccerMatchLineupPresetV1 } from './types'
 
 export type SoccerTeamLineupPrefillSource = 'formation' | 'lineup_defaults'
 export type SoccerTeamLineupPrefillFormationStatus =
@@ -26,6 +27,36 @@ export interface SoccerTeamLineupPrefillResult<TDraft> {
 export interface SoccerTeamLineupPrefillNotice {
   tone: 'info' | 'warning'
   message: string
+}
+
+export function soccerMatchLineupPresetFromPrefill<
+  TDraft extends SoccerFormationParticipantDraft & { id: string },
+>(
+  result: SoccerTeamLineupPrefillResult<TDraft>
+): SoccerMatchLineupPresetV1 {
+  return {
+    version: 1,
+    source: result.source,
+    entries: result.drafts.flatMap(draft =>
+      draft.selected && draft.initialStatus === 'starter'
+        ? [{ participantId: draft.id, role: structuredClone(draft.initialRole) }]
+        : []
+    ),
+  }
+}
+
+export function pruneSoccerMatchLineupPreset(
+  preset: SoccerMatchLineupPresetV1 | null,
+  participantIds: Iterable<string>
+): SoccerMatchLineupPresetV1 | null {
+  if (!preset) return null
+  const retained = new Set(participantIds)
+  return {
+    ...structuredClone(preset),
+    entries: preset.entries
+      .filter(entry => retained.has(entry.participantId))
+      .map(entry => structuredClone(entry)),
+  }
 }
 
 export function applySoccerTeamLineupPrefill<

@@ -40,6 +40,7 @@ vi.mock('../gameEvents/cloud', () => ({
 import {
   assertHealthySoccerEventGame,
   soccerCloudParticipants,
+  soccerEventCloudTransportAdapter,
   soccerEventRevisionCheckpoint,
   soccerEventStreamFingerprint,
   SoccerCloudRecoveryError,
@@ -222,6 +223,30 @@ describe('soccer event cloud sync helpers', () => {
   it('retains source player links only for a selected cloud team', () => {
     const participants = soccerCloudParticipants(createSoccerSportGameState(setup('team-1')))
     expect(participants[0]?.source_player_id).toBe('player-keeper')
+  })
+
+  it('binds the exact frozen setup-v2 Team Default snapshot', () => {
+    const legacy = setup('team-1')
+    const setupV2: SoccerMatchSetup = {
+      ...legacy,
+      version: 2,
+      teamDefaultLineup: {
+        version: 1,
+        source: 'formation',
+        entries: [{
+          participantId: 'participant-keeper',
+          role: { group: 'goalkeeper', label: null },
+        }],
+      },
+    }
+
+    const state = startedState(setupV2)
+    expect(soccerEventCloudTransportAdapter.prepare(state).setupSnapshot).toEqual(setupV2)
+
+    const changed = structuredClone(state)
+    if (changed.sportGameState?.sportId !== 'soccer') throw new Error('missing soccer state')
+    changed.sportGameState.setup.teamDefaultLineup!.entries[0]!.role.group = 'forward'
+    expect(buildGameSyncFingerprint(changed)).not.toBe(buildGameSyncFingerprint(state))
   })
 
   it('sends deleted-source recovery only after an explicit local choice', async () => {

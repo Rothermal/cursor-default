@@ -19,7 +19,11 @@ import {
   gameEventSyncConflictFromRow,
 } from '../gameEvents/cloudConflicts'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
-import type { SoccerMatchParticipant, SoccerSportGameState } from './types'
+import {
+  SOCCER_GAME_STATE_VERSION,
+  type SoccerMatchParticipant,
+  type SoccerSportGameState,
+} from './types'
 
 interface SoccerCloudParticipant extends EventCloudParticipant {
   client_participant_id: string
@@ -187,7 +191,7 @@ export async function loadSoccerCloudGameById(
   const gameRow = gameData as SoccerCloudGameRow
   const normalizedSportState = normalizeSoccerSportGameState({
     sportId: 'soccer',
-    version: 2,
+    version: SOCCER_GAME_STATE_VERSION,
     setup: setupData.setup_snapshot,
   })
   if (!normalizedSportState || normalizedSportState.sportId !== 'soccer') {
