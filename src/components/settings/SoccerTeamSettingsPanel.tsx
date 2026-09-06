@@ -104,8 +104,10 @@ export default function SoccerTeamSettingsPanel({
       cleanupMode: 'lineup',
     },
   ] as const
-  const activeTabDefinition = tabDefinitions.find(tab => tab.selected) ??
-    tabDefinitions[0]
+  const tabDefinitionsByIdentity = Object.fromEntries(
+    tabDefinitions.map(tab => [tab.identity, tab])
+  ) as Record<SoccerTeamSettingsTabId, (typeof tabDefinitions)[number]>
+  const activeTabDefinition = tabDefinitionsByIdentity[activeTab]
   const previousSavedFingerprint = useRef(
     soccerTeamSettingsFingerprint(team.settings)
   )
@@ -378,10 +380,10 @@ export default function SoccerTeamSettingsPanel({
 
           {activeTab === 'rules' ? (
             <div
-              id={tabDefinitions[0].panelId}
+              id={tabDefinitionsByIdentity.rules.panelId}
               className="space-y-4"
               role="tabpanel"
-              aria-labelledby={tabDefinitions[0].tabId}
+              aria-labelledby={tabDefinitionsByIdentity.rules.tabId}
             >
               {sharedWritable && copyOptions.length > 0 && (
                 <div className="border-y border-slate-200 py-3 space-y-2">
@@ -424,9 +426,9 @@ export default function SoccerTeamSettingsPanel({
             </div>
           ) : activeTab === 'formation' ? (
             <div
-              id={tabDefinitions[1].panelId}
+              id={tabDefinitionsByIdentity.formation.panelId}
               role="tabpanel"
-              aria-labelledby={tabDefinitions[1].tabId}
+              aria-labelledby={tabDefinitionsByIdentity.formation.tabId}
             >
               <SoccerFormationEditor
                 formation={draft.formation}
@@ -451,9 +453,9 @@ export default function SoccerTeamSettingsPanel({
             </div>
           ) : (
             <div
-              id={tabDefinitions[2].panelId}
+              id={tabDefinitionsByIdentity.lineup.panelId}
               role="tabpanel"
-              aria-labelledby={tabDefinitions[2].tabId}
+              aria-labelledby={tabDefinitionsByIdentity.lineup.tabId}
             >
               <SoccerLineupDefaultsEditor
                 defaults={draft.lineupDefaults}

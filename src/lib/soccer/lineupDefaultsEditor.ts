@@ -46,7 +46,7 @@ export function deriveSoccerLineupDefaultsEditorState(
       `${starters.length} starters are selected for ${maxOnFieldPlayers} on-field places.`
     )
   }
-  if (goalkeeperCount !== 1) {
+  if (starters.length > 0 && goalkeeperCount !== 1) {
     warnings.push(
       `Default starters need exactly one goalkeeper; currently ${goalkeeperCount}.`
     )

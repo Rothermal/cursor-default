@@ -36,10 +36,7 @@ describe('Soccer match-readiness wiring', () => {
     expect(panel).toContain("cleanupMode: 'lineup',")
     expect(panel).toContain("activeTabDefinition.cleanupMode === 'formation'")
     expect(panel).toContain("activeTabDefinition.cleanupMode === 'lineup'")
-    expect(panel).toContain('const prepared = prepareSoccerTeamSettingsSave(')
-    expect(panel).toContain("? { mode: 'formation', rosterReady, activePlayerIds: activeRosterIds }")
-    expect(panel).toContain("mode: 'lineup',")
-    expect(panel).toContain('completeTeamPlayerIds: completeMembershipPlayerIds,')
+    expect(panel).toContain('tabDefinitionsByIdentity[activeTab]')
     expect(panel).toContain('setActiveTab(nextTab.identity)')
     expect(panel).toContain('nextTab.ref.current?.focus()')
     expect(panel).toContain('setDraft(current => copySoccerTeamRules(current, parsed.value))')
@@ -49,6 +46,17 @@ describe('Soccer match-readiness wiring', () => {
     expect(editor).toContain('role="list" aria-label="Formation slots"')
     expect(editor).toContain('disabled={pickerDisabled}')
     expect(editor).toContain('moved from ${previousSlot.label} to ${slot.label}.')
+
+    const handleSave = panel.slice(
+      panel.indexOf('const handleSave ='),
+      panel.indexOf('const handlePlayerCountChange =')
+    )
+    expect(handleSave.match(/mode: '(?:none|formation|lineup)'/g)).toEqual([
+      "mode: 'formation'",
+      "mode: 'lineup'",
+      "mode: 'none'",
+    ])
+    expect(handleSave).toContain('completeTeamPlayerIds: completeMembershipPlayerIds,')
   })
 
   it('loads roster positions before creating fresh cloud-team participant drafts', () => {

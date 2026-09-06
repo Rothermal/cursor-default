@@ -78,7 +78,6 @@ describe('Soccer lineup defaults editor', () => {
       starterPlayerIds: [],
     }, roster, 1).warnings).toEqual([
       'No default starters are selected.',
-      'Default starters need exactly one goalkeeper; currently 0.',
     ])
 
     expect(deriveSoccerLineupDefaultsEditorState({
