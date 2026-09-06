@@ -118,7 +118,7 @@ describe('Soccer team lineup prefill', () => {
     ])
     expect(soccerTeamLineupPrefillNotice(result, 1)).toEqual({
       tone: 'warning',
-      message: 'The saved team formation includes 1 unavailable player. Team lineup defaults were used instead.',
+      message: 'The saved team formation includes 1 unavailable player. Team lineup defaults were used instead. Repair the shared formation in Team Manage.',
     })
   })
 
@@ -143,7 +143,11 @@ describe('Soccer team lineup prefill', () => {
     ])
     expect(soccerTeamLineupPrefillNotice(mismatched, 1)).toEqual({
       tone: 'warning',
-      message: 'The saved 7-player formation does not match this 9-player match. Team lineup defaults were used instead.',
+      message: 'The saved 7-player formation does not match this 9-player match. Team lineup defaults were used instead. Repair the shared formation in Team Manage.',
+    })
+    expect(soccerTeamLineupPrefillNotice(mismatched, 0)).toEqual({
+      tone: 'warning',
+      message: 'The saved 7-player formation does not match this 9-player match. Roster role defaults were used instead. Repair the shared formation in Team Manage.',
     })
 
     const empty = applySoccerTeamLineupPrefill(drafts, {

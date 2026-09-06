@@ -103,7 +103,7 @@ export function soccerTeamLineupPrefillNotice(
   if (result.formationStatus !== 'no_formation') {
     return {
       tone: 'warning',
-      message: `${result.formationError ?? 'The saved team formation is invalid.'} ${savedStarterCount > 0 ? 'Team lineup defaults' : 'Roster role defaults'} were used instead.${unavailableMessage}`,
+      message: `${result.formationError ?? 'The saved team formation is invalid.'} ${savedStarterCount > 0 ? 'Team lineup defaults' : 'Roster role defaults'} were used instead.${unavailableMessage} Repair the shared formation in Team Manage.`,
     }
   }
   return savedStarterCount > 0
