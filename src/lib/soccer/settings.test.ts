@@ -304,7 +304,7 @@ describe('soccer settings schema', () => {
     const activePlayerIds = ['11111111-1111-4111-8111-111111111111']
 
     expect(prepareSoccerTeamSettingsSave(current, {
-      cleanUnavailableAssignments: true,
+      mode: 'formation',
       rosterReady: false,
       activePlayerIds,
     })).toEqual({
@@ -312,17 +312,13 @@ describe('soccer settings schema', () => {
       removedUnavailableCount: 0,
       removedUnavailableLineupDefaultCount: 0,
     })
-    expect(prepareSoccerTeamSettingsSave(current, {
-      cleanUnavailableAssignments: false,
-      rosterReady: true,
-      activePlayerIds,
-    })).toEqual({
+    expect(prepareSoccerTeamSettingsSave(current, { mode: 'none' })).toEqual({
       settings: current,
       removedUnavailableCount: 0,
       removedUnavailableLineupDefaultCount: 0,
     })
     expect(prepareSoccerTeamSettingsSave(current, {
-      cleanUnavailableAssignments: true,
+      mode: 'formation',
       rosterReady: true,
       activePlayerIds,
     })).toEqual({
@@ -352,41 +348,31 @@ describe('soccer settings schema', () => {
         starterPlayerIds: [PLAYER_1, PLAYER_2],
       },
     }
-    const options = {
-      cleanUnavailableAssignments: false,
-      rosterReady: true,
-      activePlayerIds: [PLAYER_1],
-    }
-
     expect(prepareSoccerTeamSettingsSave(current, {
-      ...options,
+      mode: 'lineup',
       rosterReady: false,
-      lineupCleanup: {
-        completeMembershipReady: true,
-        completeTeamPlayerIds: [PLAYER_1],
-      },
+      completeMembershipReady: true,
+      completeTeamPlayerIds: [PLAYER_1],
     })).toEqual({
       settings: current,
       removedUnavailableCount: 0,
       removedUnavailableLineupDefaultCount: 0,
     })
     expect(prepareSoccerTeamSettingsSave(current, {
-      ...options,
-      lineupCleanup: {
-        completeMembershipReady: false,
-        completeTeamPlayerIds: [PLAYER_1],
-      },
+      mode: 'lineup',
+      rosterReady: true,
+      completeMembershipReady: false,
+      completeTeamPlayerIds: [PLAYER_1],
     })).toEqual({
       settings: current,
       removedUnavailableCount: 0,
       removedUnavailableLineupDefaultCount: 0,
     })
     expect(prepareSoccerTeamSettingsSave(current, {
-      ...options,
-      lineupCleanup: {
-        completeMembershipReady: true,
-        completeTeamPlayerIds: [PLAYER_1],
-      },
+      mode: 'lineup',
+      rosterReady: true,
+      completeMembershipReady: true,
+      completeTeamPlayerIds: [PLAYER_1],
     })).toEqual({
       settings: {
         ...current,

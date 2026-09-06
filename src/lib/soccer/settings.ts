@@ -202,28 +202,36 @@ export interface SoccerTeamSettingsSavePreparation {
   removedUnavailableLineupDefaultCount: number
 }
 
-export function prepareSoccerTeamSettingsSave(
-  settings: SoccerTeamSettings,
-  options: {
-    cleanUnavailableAssignments: boolean
+export type SoccerTeamSettingsCleanup =
+  | { mode: 'none' }
+  | {
+    mode: 'formation'
     rosterReady: boolean
     activePlayerIds: Iterable<string>
-    lineupCleanup?: {
-      completeMembershipReady: boolean
-      completeTeamPlayerIds: Iterable<string>
-    }
   }
+  | {
+    mode: 'lineup'
+    rosterReady: boolean
+    completeMembershipReady: boolean
+    completeTeamPlayerIds: Iterable<string>
+  }
+
+export function prepareSoccerTeamSettingsSave(
+  settings: SoccerTeamSettings,
+  cleanup: SoccerTeamSettingsCleanup
 ): SoccerTeamSettingsSavePreparation {
-  const activePlayerIds = [...options.activePlayerIds]
-  const cleanFormation = options.cleanUnavailableAssignments &&
-    options.rosterReady &&
+  const activePlayerIds = cleanup.mode === 'formation'
+    ? [...cleanup.activePlayerIds]
+    : []
+  const cleanFormation = cleanup.mode === 'formation' &&
+    cleanup.rosterReady &&
     settings.formation !== null
-  const completeTeamPlayerIds = [
-    ...(options.lineupCleanup?.completeTeamPlayerIds ?? []),
-  ]
-  const cleanLineupDefaults = options.lineupCleanup !== undefined &&
-    options.rosterReady &&
-    options.lineupCleanup.completeMembershipReady
+  const completeTeamPlayerIds = cleanup.mode === 'lineup'
+    ? [...cleanup.completeTeamPlayerIds]
+    : []
+  const cleanLineupDefaults = cleanup.mode === 'lineup' &&
+    cleanup.rosterReady &&
+    cleanup.completeMembershipReady
   const removedUnavailableCount = cleanFormation
     ? unavailableSoccerFormationPlayerIds(settings.formation!, activePlayerIds).length
     : 0

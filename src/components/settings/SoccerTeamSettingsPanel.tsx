@@ -106,11 +106,12 @@ export default function SoccerTeamSettingsPanel({
 
   const handleSave = async () => {
     if (!mayEdit) return
-    const prepared = prepareSoccerTeamSettingsSave(draft, {
-      cleanUnavailableAssignments: activeTab === 'formation',
-      rosterReady,
-      activePlayerIds: activeRosterIds,
-    })
+    const prepared = prepareSoccerTeamSettingsSave(
+      draft,
+      activeTab === 'formation'
+        ? { mode: 'formation', rosterReady, activePlayerIds: activeRosterIds }
+        : { mode: 'none' }
+    )
     const candidate = prepared.settings
     const cleanupCount = prepared.removedUnavailableCount
     if (await team.save(candidate, baseRevision)) {

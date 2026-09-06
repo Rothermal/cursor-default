@@ -129,12 +129,14 @@ membership-id set for retention. No player identity is fabricated from a stale
 settings id.
 
 Cleanup is allowed only when both datasets are positively loaded for the same
-selected team. Extend the existing `prepareSoccerTeamSettingsSave` /
-`rosterReady` contract with separate active-roster and complete-membership
-readiness plus the complete membership-id set. A Rules or Formation save never
-cleans lineup ids. A Lineup Defaults save made before either dataset is ready
-must preserve the stored list and keep cleanup unavailable; it must never
-interpret an empty loading-state collection as proof that every id is stale.
+selected team. `prepareSoccerTeamSettingsSave` accepts one discriminated
+`none | formation | lineup` cleanup mode, making simultaneous formation and
+lineup cleanup unrepresentable. The lineup mode requires separate active-roster
+and complete-membership readiness plus the complete membership-id set. A Rules
+or Formation save never cleans lineup ids. A Lineup Defaults save made before
+either dataset is ready must preserve the stored list and keep cleanup
+unavailable; it must never interpret an empty loading-state collection as proof
+that every id is stale.
 
 ### 4.3 Fingerprints, copy, and audit
 

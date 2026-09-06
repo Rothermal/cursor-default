@@ -17,7 +17,7 @@ The focused suite covers:
   only missing ids;
 - team settings v1 and v2 normalization into the current v3 model;
 - exact v3 parsing, fingerprints, rules-only copy, formation transitions, and
-  dual-readiness save preparation;
+  discriminated cleanup modes with dual-readiness lineup preparation;
 - current v3 cache/cloud writes plus v1/v2 cache/cloud reads;
 - SQL parity for schema versions, lineup validation, manager CAS authority,
   coarse audit metadata, and private helper permissions.
