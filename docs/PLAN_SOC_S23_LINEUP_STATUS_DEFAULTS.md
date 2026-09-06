@@ -369,7 +369,7 @@ See [`REGRESSION_SOC_S23C_SETUP_PREFILL.md`](REGRESSION_SOC_S23C_SETUP_PREFILL.m
 
 ## 12. Deferred follow-ups
 
-- S24 in-match saved-formation application
+- [S24 in-match lineup manager and frozen presets](PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md)
 - multiple named formation or lineup presets
 - opponent lineup defaults
 - team-level DNP defaults
