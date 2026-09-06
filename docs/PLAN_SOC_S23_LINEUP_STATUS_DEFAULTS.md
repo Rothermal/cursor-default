@@ -1,6 +1,7 @@
 # SOC-S23 - Team lineup status defaults
 
-**Status:** S23A and S23B implemented; migration 068 applied; S23C pending
+**Status:** Implemented across S23A-S23C; migration 068 applied; deployed
+functional verification pending
 **Scope:** Soccer team settings, Team Manage, and fresh Soccer Player Setup drafts
 **Depends on:** SOC-6D team settings, S11 roster roles, and S19 team formations
 
@@ -220,7 +221,7 @@ S23B  Team Manage editor [implemented]
       inactive retention, explicit stale-id cleanup, read-only role behavior,
       focused UI/controller regression
 
-S23C  Player Setup prefill
+S23C  Player Setup prefill [implemented]
       One-time formation-first precedence, standalone fallback, stale/mismatch
       notices, editable kickoff validation, docs and final regression coverage
 ```
@@ -247,6 +248,13 @@ role-ordered active-roster groups, non-blocking count/goalkeeper warnings,
 read-only status presentation, complete-membership retention, and positively
 selected cleanup modes. See
 [`REGRESSION_SOC_S23B_LINEUP_EDITOR.md`](REGRESSION_SOC_S23B_LINEUP_EDITOR.md).
+
+S23C is implemented with one formation-first prefill transform inside the
+existing one-time setup effect. Applicable formations remain complete
+authority; otherwise active saved starter ids apply while roster roles remain
+unchanged. Fallback and unavailable-id notices are derived with the same pure
+result, and existing saved/edit/readiness/kickoff guards remain authoritative.
+See [`REGRESSION_SOC_S23C_SETUP_PREFILL.md`](REGRESSION_SOC_S23C_SETUP_PREFILL.md).
 
 ## 8. File map
 

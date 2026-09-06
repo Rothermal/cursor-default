@@ -1387,12 +1387,14 @@ operator record, cached/PWA compatibility rule, and failure handling.
 
 ## 11zb. Soccer team lineup defaults
 
-S23A/S23B provide the schema-v3 settings foundation and Team Manage editor.
+S23A-S23C provide the schema-v3 settings foundation, Team Manage editor, and
+one-time formation-first Player Setup prefill.
 Use [the S23A settings matrix](REGRESSION_SOC_S23A_LINEUP_SETTINGS.md) for
 migration/schema coverage and
 [the S23B editor matrix](REGRESSION_SOC_S23B_LINEUP_EDITOR.md) for roster,
-access, keyboard, warning, cleanup, and round-trip checks. Saved defaults do
-not prefill Player Setup until S23C.
+access, keyboard, warning, cleanup, and round-trip checks, and
+[the S23C setup matrix](REGRESSION_SOC_S23C_SETUP_PREFILL.md) for precedence,
+fallback, stale-id, one-time authority, and kickoff checks.
 
 ---
 
