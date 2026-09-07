@@ -46,7 +46,11 @@ export function prepareSoccerKickoff(
 
   const configuredState: GameState = {
     ...state,
-    sportGameState: createSoccerSportGameState(setup),
+    sportGameState: createSoccerSportGameState(setup, {
+      setupSnapshotVersion: state.sportGameState?.sportId === 'soccer'
+        ? state.sportGameState.setupSnapshotVersion
+        : setup.version,
+    }),
   }
   const initialized = initializeGameEventStream(
     configuredState,

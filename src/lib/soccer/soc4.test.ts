@@ -31,6 +31,7 @@ import {
 } from './live'
 import { resolveSoccerMatchRules, type SoccerMatchRulesOverride } from './rules'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
+import { SOCCER_GAME_STATE_VERSION } from './types'
 import type { SoccerMatchParticipant, SoccerMatchSetup } from './types'
 
 const soccer: SportConfig = {
@@ -209,7 +210,7 @@ function activeShootoutState(): SoccerEventGameState {
 }
 
 describe('SOC-4A rules, state, and schemas', () => {
-  it('normalizes legacy v1 soccer state into resolved v2 rules and capture defaults', () => {
+  it('normalizes legacy v1 soccer state into current rules, setup, and capture defaults', () => {
     const legacy = structuredClone(createSoccerSportGameState(setup())) as unknown as Record<string, unknown>
     legacy.version = 1
     const legacySetup = legacy.setup as Record<string, unknown>
@@ -225,7 +226,8 @@ describe('SOC-4A rules, state, and schemas', () => {
 
     const normalized = normalizeSoccerSportGameState(legacy)
 
-    expect(normalized?.version).toBe(2)
+    expect(normalized?.version).toBe(SOCCER_GAME_STATE_VERSION)
+    expect(normalized?.setup).toMatchObject({ version: 2, teamDefaultLineup: null })
     expect(normalized?.setup.rulesSnapshot.tieResolution).toBe('extra_time_then_shootout')
     expect(normalized?.setup.rulesSnapshot.shootoutInitialKicksPerSide).toBe(5)
     expect(normalized?.setup.rulesSnapshot.yellowCardExitPolicy).toBe('stay_on')

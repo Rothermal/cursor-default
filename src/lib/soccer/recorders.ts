@@ -8,7 +8,7 @@ import { createInitialCloudSyncState } from '../gameReducer'
 import { supabase } from '../supabase'
 import { prepareSoccerKickoff } from './kickoff'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
-import type { SoccerMatchSetup } from './types'
+import { SOCCER_GAME_STATE_VERSION, type SoccerMatchSetup } from './types'
 
 interface SoccerCloudGameRow {
   id: string
@@ -150,7 +150,9 @@ export async function loadSoccerRecorderProjection(
       eventStream: loaded.eventStream,
       sportGameState:
         baseState.sportGameState?.sportId === 'soccer'
-          ? createSoccerSportGameState(baseState.sportGameState.setup)
+          ? createSoccerSportGameState(baseState.sportGameState.setup, {
+              setupSnapshotVersion: baseState.sportGameState.setupSnapshotVersion,
+            })
           : baseState.sportGameState,
     },
     gameEventRegistry,
@@ -265,7 +267,7 @@ async function loadSoccerCloudShell(gameId: string): Promise<SoccerCloudShell> {
   const game = gameData as SoccerCloudGameRow
   const normalized = normalizeSoccerSportGameState({
     sportId: 'soccer',
-    version: 2,
+    version: SOCCER_GAME_STATE_VERSION,
     setup: setupData.setup_snapshot,
   })
   if (!normalized || normalized.sportId !== 'soccer') {
@@ -313,7 +315,7 @@ async function loadSoccerCloudShell(gameId: string): Promise<SoccerCloudShell> {
       teamStatsConfig: null,
       shotChart: [],
       eventStream: null,
-      sportGameState: createSoccerSportGameState(normalized.setup),
+      sportGameState: normalized,
       cloudSync: {
         ...createInitialCloudSyncState('idle'),
         seasonId: game.season_id,

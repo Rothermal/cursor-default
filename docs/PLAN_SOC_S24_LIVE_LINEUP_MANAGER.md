@@ -1,6 +1,6 @@
 # SOC-S24 - Live lineup manager and match presets
 
-**Status:** Approved product plan; implementation pending across S24A-S24D
+**Status:** S24A implemented; S24B-S24D approved and pending
 **Scope:** Soccer match setup authority, live tracked-team lineup changes,
 Timeline correction, and a reusable cross-sport interaction pattern
 **Depends on:** Soccer event authority, anchored clock, S11 roster roles, S19
@@ -164,16 +164,25 @@ lineup. Do not persist the full team settings record, formation template,
 formation slots, stale team ids, cache metadata, or settings revision.
 
 The one-time S23 Player Setup decision must produce both its editable draft
-and, when team settings resolved coherently, an independent frozen preset.
+and, when team settings resolve to at least one starter, an independent frozen
+preset. An unconfigured or all-Bench team stores `teamDefaultLineup: null` so a
+future Team Default action can never empty the field.
 Later recorder edits change the opening lineup but not Team Default. Removing
 a participant from the match removes that participant from the persisted
 preset before kickoff and surfaces the reduced preset during final setup
 review. Local/personal games store `teamDefaultLineup: null`.
 
 Existing setup version 1 normalizes in memory with `teamDefaultLineup: null`
-without rewriting raw cloud history. Increment `SOCCER_GAME_STATE_VERSION`
-and explicitly continue accepting every previously supported Soccer state
-version; do not accidentally drop state version 2 while adding the new one.
+without rewriting raw cloud history. A durable `setupSnapshotVersion` keeps a
+bound v1 game's transport shape pinned to v1 while runtime consumers use the
+normalized v2 setup. An unbound legacy game still in Player Setup promotes its
+transport version to v2 when a pregame edit or resolved Team Default is saved,
+so its first cloud binding cannot silently discard the new preset. Canonical
+publication stores the same immutable v1/v2 setup shape used by the binding,
+then normalizes it only for review projection. Increment
+`SOCCER_GAME_STATE_VERSION` and explicitly
+continue accepting every previously supported Soccer state version; do not
+accidentally drop state version 2 while adding the new one.
 
 The setup snapshot remains immutable after first cloud binding and remains in
 the game fingerprint, parking, export/import, finalization, and recovery paths.
@@ -295,19 +304,19 @@ reinterpret a legacy substitution event's recorded halftime flag.
 ## 5. Implementation slices
 
 ```text
-S24A  Frozen preset and compatibility foundation
+[x] S24A  Frozen preset and compatibility foundation
       Setup v2 + old-state normalization, formation-first preset derivation,
       migration 069, exact capability/preflight, cloud/parking/recovery tests
 
-S24B  Target transition domain
+[ ] S24B  Target transition domain
       Pure draft/diff/preview helpers, one lineup_transition event, atomic
       projection, limits/halftime/interval semantics, correction primitives
 
-S24C  Live Manage Lineup experience
+[ ] S24C  Live Manage Lineup experience
       Full-screen two-column editor, direct movement, role controls, presets,
       stale revalidation, short-handed confirmation, Field/Lineup entry points
 
-S24D  Timeline, regression, and portability notes
+[ ] S24D  Timeline, regression, and portability notes
       Grouped live/Summary presentation, historical edit/remove/restore,
       narrow/keyboard/PWA checks, deployed cloud matrix, cross-sport contract
 ```
@@ -316,6 +325,13 @@ Each slice uses its own feature branch and PR. S24B may be developed after the
 S24A TypeScript contracts are fixed, but setup-v2 cloud creation must not ship
 before migration 069 and the capability parser are deployed. S24C does not
 ship before the one-event transition projector is authoritative.
+
+S24A now writes exact Soccer setup version 2, freezes a clone-safe Team Default
+from the one-time formation-first prefill, removes deselected participants from
+that preset, and normalizes setup version 1 plus Soccer state versions 1/2 into
+the current in-memory shape. Migration 069 and release contract version 2 must
+be deployed before the setup-v2 client reaches cloud-team creation. See
+`REGRESSION_SOC_S24A_FROZEN_PRESET.md`.
 
 ## 6. File map
 

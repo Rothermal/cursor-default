@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { SoccerFormationParticipantDraft } from './formation'
 import {
   applySoccerTeamLineupPrefill,
+  soccerMatchLineupPresetFromPrefill,
+  pruneSoccerMatchLineupPreset,
   soccerTeamLineupPrefillNotice,
 } from './teamLineupPrefill'
 
@@ -59,6 +61,78 @@ describe('Soccer team lineup prefill', () => {
       tone: 'info',
       message: 'Team formation applied. Review the opening lineup before kickoff.',
     })
+  })
+
+  it('freezes only selected starters and clones their resolved match roles', () => {
+    const matchDrafts = drafts.map((draft, index) => ({
+      ...structuredClone(draft),
+      id: `participant-${index + 1}`,
+    }))
+    const result = applySoccerTeamLineupPrefill(matchDrafts, {
+      formation: null,
+      lineupDefaults: { version: 1, starterPlayerIds: [PLAYER_2] },
+      maxOnFieldPlayers: 7,
+    })
+    const preset = soccerMatchLineupPresetFromPrefill(result)
+    result.drafts[1]!.initialRole.group = 'defender'
+
+    expect(preset).toEqual({
+      version: 1,
+      source: 'lineup_defaults',
+      entries: [{
+        participantId: 'participant-2',
+        role: { group: 'forward', label: null },
+      }],
+    })
+  })
+
+  it('permanently prunes deselected participants from a cloned preset', () => {
+    const preset = {
+      version: 1 as const,
+      source: 'formation' as const,
+      entries: [
+        { participantId: 'participant-1', role: { group: 'goalkeeper' as const, label: null } },
+        { participantId: 'participant-2', role: { group: 'forward' as const, label: null } },
+      ],
+    }
+    const pruned = pruneSoccerMatchLineupPreset(preset, ['participant-2'])
+    preset.entries[1]!.role.group = 'goalkeeper'
+
+    expect(pruned).toEqual({
+      version: 1,
+      source: 'formation',
+      entries: [{
+        participantId: 'participant-2',
+        role: { group: 'forward', label: null },
+      }],
+    })
+  })
+
+  it('does not freeze an empty Team Default for an unconfigured team', () => {
+    const result = applySoccerTeamLineupPrefill(
+      drafts.map((draft, index) => ({
+        ...structuredClone(draft),
+        id: `participant-${index + 1}`,
+      })),
+      {
+        formation: null,
+        lineupDefaults: { version: 1, starterPlayerIds: [] },
+        maxOnFieldPlayers: 7,
+      }
+    )
+
+    expect(soccerMatchLineupPresetFromPrefill(result)).toBeNull()
+  })
+
+  it('removes a Team Default when none of its participants remain', () => {
+    expect(pruneSoccerMatchLineupPreset({
+      version: 1,
+      source: 'lineup_defaults',
+      entries: [{
+        participantId: 'participant-1',
+        role: { group: 'goalkeeper', label: null },
+      }],
+    }, ['participant-2'])).toBeNull()
   })
 
   it('applies active starter ids and preserves roster roles when no formation applies', () => {

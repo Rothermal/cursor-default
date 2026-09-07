@@ -14,9 +14,13 @@ import {
   applySoccerTeamLineupPrefill,
   decideSoccerFormationPrefill,
   soccerTeamLineupPrefillNotice,
+  soccerMatchLineupPresetFromPrefill,
+  soccerSetupSnapshotVersionForPregameEdit,
+  pruneSoccerMatchLineupPreset,
   prepareSoccerKickoff,
   validateSoccerMatchSetup,
   type SoccerMatchParticipant,
+  type SoccerMatchLineupPresetV1,
   type SoccerRoleGroup,
   type SoccerRosterStatus,
   type SoccerTeamLineupPrefillNotice,
@@ -63,6 +67,9 @@ export default function SoccerPlayerSetup() {
   const [rosterLoadAttempt, setRosterLoadAttempt] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [teamDefaultsNotice, setTeamDefaultsNotice] = useState<SoccerTeamLineupPrefillNotice | null>(null)
+  const [teamDefaultLineup, setTeamDefaultLineup] = useState<SoccerMatchLineupPresetV1 | null>(
+    () => setup?.version === 2 ? structuredClone(setup.teamDefaultLineup) : null
+  )
   const [confirmShortHanded, setConfirmShortHanded] = useState(false)
   const cloudRosterLoaded = useRef(false)
   const teamDefaultsPrefillResolved = useRef(false)
@@ -210,22 +217,42 @@ export default function SoccerPlayerSetup() {
       }
     )
     teamDefaultsPrefillResolved.current = true
+    setTeamDefaultLineup(soccerMatchLineupPresetFromPrefill(result))
     setDrafts(result.drafts)
     const savedStarterCount = teamSettings.settings.lineupDefaults.starterPlayerIds.length
     setTeamDefaultsNotice(soccerTeamLineupPrefillNotice(result, savedStarterCount))
   }, [drafts, rosterReady, setup, state.players, teamSettings.error, teamSettings.scopeTeamId, teamSettings.settings.formation, teamSettings.settings.lineupDefaults, teamSettings.status])
 
   useEffect(() => {
-    if (!setup || state.eventStream?.events.length) return
+    if (!setup || !soccerState || state.eventStream?.events.length) return
     const participants = selectedParticipants(drafts)
-    if (JSON.stringify(participants) === JSON.stringify(setup.participants)) return
-    const nextSetup = { ...setup, participants }
+    const filteredTeamDefault = pruneSoccerMatchLineupPreset(
+      teamDefaultLineup,
+      participants.map(participant => participant.id)
+    )
+    const participantsUnchanged = JSON.stringify(participants) === JSON.stringify(setup.participants)
+    const presetUnchanged = JSON.stringify(filteredTeamDefault) === JSON.stringify(setup.teamDefaultLineup)
+    if (participantsUnchanged && presetUnchanged) return
+    if (JSON.stringify(filteredTeamDefault) !== JSON.stringify(teamDefaultLineup)) {
+      setTeamDefaultLineup(filteredTeamDefault)
+    }
+    const nextSetup = {
+      ...setup,
+      version: 2 as const,
+      participants,
+      teamDefaultLineup: filteredTeamDefault,
+    }
     if (validateSoccerMatchSetup(nextSetup)) return
     dispatch({
       type: 'SET_SPORT_GAME_STATE',
-      sportGameState: createSoccerSportGameState(nextSetup),
+      sportGameState: createSoccerSportGameState(nextSetup, {
+        setupSnapshotVersion: soccerSetupSnapshotVersionForPregameEdit(
+          soccerState.setupSnapshotVersion,
+          state.cloudSync.gameId
+        ),
+      }),
     })
-  }, [dispatch, drafts, setup, state.eventStream?.events.length])
+  }, [dispatch, drafts, setup, soccerState, state.cloudSync.gameId, state.eventStream?.events.length, teamDefaultLineup])
 
   if (invalidRoute || !state.gameInfo || !setup) return null
 

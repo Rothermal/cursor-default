@@ -1,6 +1,6 @@
 import type { GameEvent, JsonObject } from '../gameEvents/types'
 
-export const SOCCER_GAME_STATE_VERSION = 2
+export const SOCCER_GAME_STATE_VERSION = 3
 export const SOCCER_EVENT_SCHEMA_VERSION = 1
 
 export type SoccerTrackedTeamDesignation = 'home' | 'away' | 'neutral'
@@ -91,7 +91,7 @@ export interface SoccerMatchParticipant extends JsonObject {
   initialRole: SoccerRole
 }
 
-export interface SoccerMatchSetup {
+export interface SoccerMatchSetupV1 {
   version: 1
   trackedTeamDesignation: SoccerTrackedTeamDesignation
   firstPeriodAttackingDirection: SoccerAttackingDirection
@@ -100,6 +100,25 @@ export interface SoccerMatchSetup {
   rulesSnapshot: SoccerMatchRules
   participants: SoccerMatchParticipant[]
 }
+
+export interface SoccerMatchLineupPresetV1 extends JsonObject {
+  version: 1
+  source: 'formation' | 'lineup_defaults'
+  entries: SoccerLineupEntry[]
+}
+
+export interface SoccerMatchSetupV2 {
+  version: 2
+  trackedTeamDesignation: SoccerTrackedTeamDesignation
+  firstPeriodAttackingDirection: SoccerAttackingDirection
+  sourceTeamId: string | null
+  sourceSeasonId: string | null
+  rulesSnapshot: SoccerMatchRules
+  participants: SoccerMatchParticipant[]
+  teamDefaultLineup: SoccerMatchLineupPresetV1 | null
+}
+
+export type SoccerMatchSetup = SoccerMatchSetupV1 | SoccerMatchSetupV2
 
 export type SoccerMatchStatus =
   | 'not_started'
@@ -294,8 +313,9 @@ export interface SoccerMatchProjection {
 
 export interface SoccerSportGameState {
   sportId: 'soccer'
-  version: 2
-  setup: SoccerMatchSetup
+  version: typeof SOCCER_GAME_STATE_VERSION
+  setup: SoccerMatchSetupV2
+  setupSnapshotVersion: 1 | 2
   projection: SoccerMatchProjection
   capturePreferences: SoccerCapturePreferences
 }

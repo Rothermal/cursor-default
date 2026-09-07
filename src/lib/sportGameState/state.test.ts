@@ -43,6 +43,7 @@ describe('sport game state dispatch', () => {
       sportId: 'soccer',
       version: soccer.version,
       setup: soccer.setup,
+      setupSnapshotVersion: 1,
     })
   })
 

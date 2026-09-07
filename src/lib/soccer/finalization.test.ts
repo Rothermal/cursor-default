@@ -164,6 +164,11 @@ describe('soccer finalization repository', () => {
     )
     expect(rebuilt.eventStream.events).toEqual(projection.eventStream.events)
     expect(snapshot.sportGameState).not.toHaveProperty('projection')
+    expect(snapshot.sportGameState.setup).toEqual(setup)
+    expect(rebuilt.state.sportGameState).toMatchObject({
+      setupSnapshotVersion: 1,
+      setup: { version: 2, teamDefaultLineup: null },
+    })
   })
 
   it('rejects canonical events that do not rebuild to a final match', () => {

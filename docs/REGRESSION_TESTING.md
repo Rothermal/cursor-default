@@ -1398,6 +1398,18 @@ fallback, stale-id, one-time authority, and kickoff checks.
 
 ---
 
+## 11zc. Soccer frozen Team Default foundation
+
+S24A adds exact Soccer setup v2, preserves legacy setup/state reads, freezes the
+formation-first Team Default independently from Opening Lineup edits, and stages
+cloud creation behind migration 069's exact capability. Use
+[the S24A matrix](REGRESSION_SOC_S24A_FROZEN_PRESET.md) for setup parsing,
+prefill/pruning, fingerprint, cloud binding, migration order, and compatibility
+checks. S24A adds no live preset button or lineup-transition event; those begin
+in S24B/S24C.
+
+---
+
 ## 12. GitHub Pages deploy
 
 **Precondition:** Repo has Actions workflow; Pages source = GitHub Actions; secrets set.
