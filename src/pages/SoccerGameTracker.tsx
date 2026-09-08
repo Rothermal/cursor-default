@@ -77,6 +77,7 @@ import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameSideDisplayName } from '../lib/display'
 import { canOfferDeletedSourcePlayerRecovery } from '../lib/gameEvents/deletedSourceRecovery'
 import { useTeamRole } from '../hooks/useTeamRole'
+import { canTrackGames } from '../lib/teamPermissions'
 import {
   loadSoccerGameRecorders,
   primarySoccerRecorder,
@@ -270,6 +271,8 @@ export default function SoccerGameTracker() {
     healthy && projection.status === 'in_progress' && !isApplying && !cloudFinal
   const substitutionActionEnabled =
     healthy &&
+    (!state.cloudSync.teamId || (!teamAccess.loading && canTrackGames(teamAccess.role))) &&
+    !projection.clock.running &&
     soccerMatchActionsAvailable(projection) &&
     !isApplying &&
     !cloudFinal
@@ -692,7 +695,7 @@ export default function SoccerGameTracker() {
                     className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md border border-emerald-700 bg-emerald-50 px-3 text-sm font-bold text-emerald-800 disabled:border-slate-300 disabled:bg-slate-50 disabled:text-slate-500 disabled:opacity-50"
                   >
                     <Repeat2 size={18} />
-                    <span className="truncate">Substitution</span>
+                    <span className="text-center leading-tight">{projection.clock.running ? 'Pause clock to manage lineup' : 'Manage Lineup'}</span>
                   </button>
                   <button
                     type="button"
@@ -747,6 +750,10 @@ export default function SoccerGameTracker() {
             </div>
           ) : mainTab === 'lineup' ? (
             <>
+              <button type="button" onClick={() => openDialog('substitution')} disabled={!substitutionActionEnabled}
+                className="mb-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-emerald-700 bg-emerald-50 px-3 text-sm font-bold text-emerald-800 disabled:opacity-50">
+                <Repeat2 size={18} />{projection.clock.running ? 'Pause clock to manage lineup' : 'Manage Lineup'}
+              </button>
               <div className="grid grid-cols-3 gap-2 text-center mb-4">
                 <Metric label="On field" value={`${onField.length}/${projection.currentRules.maxOnFieldPlayers}`} />
                 <Metric label="Subs" value={limitValue(projection.substitutionCount, projection.currentRules.substitutionLimit)} />
@@ -764,6 +771,7 @@ export default function SoccerGameTracker() {
                     projection={projection}
                     nowMs={nowMs}
                     disabled={!healthy || ended || cloudFinal}
+                    roleDisabled={!substitutionActionEnabled}
                     canResolve={participant.playerId === null && state.players.some(player => !participants.some(item => item.playerId === player.id))}
                     onRole={() => openDialog('roles', participant.participantId)}
                     onResolve={() => openDialog('resolve', participant.participantId)}
@@ -802,6 +810,7 @@ export default function SoccerGameTracker() {
 
       <SoccerLiveActionDialog
         kind={dialogKind}
+        lineupDisabled={!substitutionActionEnabled}
         state={state}
         recorderUserId={user?.id ?? null}
         initialParticipantId={dialogParticipantId}
@@ -959,11 +968,12 @@ function soccerCloudStatusLabel(state: GameState): string {
   return 'Local'
 }
 
-function ParticipantRow({ participant, projection, nowMs, disabled, canResolve, onRole, onResolve }: {
+function ParticipantRow({ participant, projection, nowMs, disabled, roleDisabled, canResolve, onRole, onResolve }: {
   participant: SoccerProjectedParticipant
   projection: SoccerMatchProjection
   nowMs: number
   disabled: boolean
+  roleDisabled: boolean
   canResolve: boolean
   onRole: () => void
   onResolve: () => void
@@ -983,7 +993,7 @@ function ParticipantRow({ participant, projection, nowMs, disabled, canResolve, 
       {!disabled && (
         <div className="flex gap-1">
           {canResolve && <button type="button" onClick={onResolve} className="h-9 px-2 text-xs font-bold text-blue-600" title="Resolve participant">Resolve</button>}
-          {participant.status !== 'left' && <button type="button" onClick={onRole} className="h-9 px-2 text-xs font-bold text-slate-600">Role</button>}
+          {participant.status !== 'left' && <button type="button" disabled={roleDisabled} onClick={onRole} className="h-9 px-2 text-xs font-bold text-slate-600 disabled:opacity-40">Role</button>}
         </div>
       )}
     </div>
@@ -997,8 +1007,6 @@ function ActionSheet({ status, onClose, onAction, onDirection }: {
   onDirection: () => void
 }) {
   const standardActions: Array<{ kind: SoccerLiveDialogKind; label: string; icon: ReactNode }> = [
-    { kind: 'substitution', label: 'Substitutions', icon: <Repeat2 size={20} /> },
-    { kind: 'roles', label: 'Roles', icon: <Users size={20} /> },
     { kind: 'clock', label: 'Correct clock', icon: <TimerReset size={20} /> },
     { kind: 'participant', label: 'Add participant', icon: <UserPlus size={20} /> },
     { kind: 'rules', label: 'Match rules', icon: <SlidersHorizontal size={20} /> },
