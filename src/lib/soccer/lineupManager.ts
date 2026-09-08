@@ -1,10 +1,12 @@
 import type { GameState } from '../../types'
 import { inspectSoccerHistory } from './live'
-import { currentSoccerTargetLineup } from './targetLineup'
+import { currentSoccerTargetLineup, diffSoccerTargetLineup } from './targetLineup'
+import { projectSoccerMatchEvents } from './projector'
 import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventRegistry, gameEventProjectors } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
-import type { GameEvent } from '../gameEvents/types'
+import type { GameEvent, GameEventInspection } from '../gameEvents/types'
+import type { SoccerMatchEvent } from './types'
 import type { SoccerLineupEntry, SoccerLineupTransitionSource, SoccerMatchProjection, SoccerRole } from './types'
 
 export interface SoccerLineupDraft {
@@ -71,21 +73,29 @@ export function soccerLineupHistoryContext(state: GameState, eventId: string): G
 }
 
 export function soccerLineupHistoryDetail(state: GameState, event: GameEvent): string {
+  return soccerLineupHistoryDetails(state, inspectSoccerHistory(state))[event.id] ?? 'Earlier lineup unavailable'
+}
+
+export function soccerLineupHistoryDetails(state: GameState, inspection: GameEventInspection): Record<string, string> {
+  const details: Record<string, string> = {}
+  const rows = [...inspection.activeEvents, ...inspection.deletedEvents].filter(event => event.eventType === 'soccer.lineup_transition')
+  if (!rows.length) return details
+  rows.forEach(event => { details[event.id] = `${lineupSourceLabel(event)} · Earlier lineup unavailable` })
+  projectSoccerMatchEvents(state, inspection.activeEvents, {
+    removed: inspection.deletedEvents.filter(event => event.eventType === 'soccer.lineup_transition') as SoccerMatchEvent[],
+    before: (event, projection) => {
+      if (event.eventType !== 'soccer.lineup_transition') return
+      const diff = diffSoccerTargetLineup(projection, event.payload.onField, event.payload.halftime)
+      details[event.id] = `${lineupSourceLabel(event)} · ${diff.enteringParticipantIds.length} entering · ${diff.leavingParticipantIds.length} leaving · ${diff.roleChanges.length} role changes${event.payload.halftime ? ' · Halftime' : ''}`
+    },
+  })
+  return details
+}
+
+function lineupSourceLabel(event: GameEvent): string {
   const source = event.payload.source === 'opening_lineup' ? 'Opening Lineup'
     : event.payload.source === 'team_default' ? 'Team Default' : 'Manual lineup'
-  const context = soccerLineupHistoryContext(state, event.id)
-  const target = event.payload.onField as SoccerLineupEntry[]
-  if (context?.sportGameState?.sportId !== 'soccer' || !Array.isArray(target)) return `${source} · Earlier lineup unavailable`
-  const previous = currentSoccerTargetLineup(context.sportGameState.projection)
-  const old = new Map(previous.map(entry => [entry.participantId, entry.role]))
-  const ids = new Set(target.map(entry => entry.participantId))
-  const entering = target.filter(entry => !old.has(entry.participantId)).length
-  const leaving = previous.filter(entry => !ids.has(entry.participantId)).length
-  const roles = target.filter(entry => {
-    const prior = old.get(entry.participantId)
-    return prior && (prior.group !== entry.role.group || prior.label !== entry.role.label)
-  }).length
-  return `${source} · ${entering} entering · ${leaving} leaving · ${roles} role changes${event.payload.halftime ? ' · Halftime' : ''}`
+  return source
 }
 
 export function soccerLineupPreset(state: GameState, source: SoccerLineupTransitionSource): {

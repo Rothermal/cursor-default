@@ -128,21 +128,9 @@ export function analyzeSoccerTargetLineup(
     return { ok: false, message: 'The tracked lineup must have exactly one goalkeeper.' }
   }
 
-  const current = new Map(currentSoccerTargetLineup(projection).map(entry => [entry.participantId, entry]))
-  const desired = new Map(target.map(entry => [entry.participantId, entry]))
-  const enteringParticipantIds = targetIds.filter(participantId => !current.has(participantId))
-  const leavingParticipantIds = [...current.keys()].filter(participantId => !desired.has(participantId))
-  const retainedParticipantIds = targetIds.filter(participantId => current.has(participantId))
-  const roleChanges = retainedParticipantIds.flatMap(participantId => {
-    const from = current.get(participantId)!.role
-    const to = desired.get(participantId)!.role
-    return sameRole(from, to)
-      ? []
-      : [{ participantId, from: structuredClone(from), to: structuredClone(to) }]
-  })
+  const diff = diffSoccerTargetLineup(projection, target, options.halftime)
+  const { enteringParticipantIds, leavingParticipantIds, retainedParticipantIds, roleChanges, substitutionCountDelta, substitutionWindowCountDelta } = diff
   const membershipChanged = enteringParticipantIds.length > 0 || leavingParticipantIds.length > 0
-  const substitutionCountDelta = enteringParticipantIds.length
-  const substitutionWindowCountDelta = membershipChanged && !options.halftime ? 1 : 0
   const nextSubstitutionCount = projection.substitutionCount + substitutionCountDelta
   const nextWindowCount = projection.substitutionWindowCount + substitutionWindowCountDelta
   if (
@@ -180,6 +168,25 @@ export function analyzeSoccerTargetLineup(
       },
     },
   }
+}
+
+export function diffSoccerTargetLineup(projection: SoccerMatchProjection, target: SoccerLineupEntry[], halftime: boolean): SoccerLineupTransitionDiff {
+  const current = new Map(currentSoccerTargetLineup(projection).map(entry => [entry.participantId, entry]))
+  const desired = new Map(target.map(entry => [entry.participantId, entry]))
+  const enteringParticipantIds = target.map(entry => entry.participantId).filter(participantId => !current.has(participantId))
+  const leavingParticipantIds = [...current.keys()].filter(participantId => !desired.has(participantId))
+  const retainedParticipantIds = target.map(entry => entry.participantId).filter(participantId => current.has(participantId))
+  const roleChanges = retainedParticipantIds.flatMap(participantId => {
+    const from = current.get(participantId)!.role
+    const to = desired.get(participantId)!.role
+    return sameRole(from, to)
+      ? []
+      : [{ participantId, from: structuredClone(from), to: structuredClone(to) }]
+  })
+  const membershipChanged = enteringParticipantIds.length > 0 || leavingParticipantIds.length > 0
+  const substitutionCountDelta = enteringParticipantIds.length
+  const substitutionWindowCountDelta = membershipChanged && !halftime ? 1 : 0
+  return { enteringParticipantIds, leavingParticipantIds, retainedParticipantIds, roleChanges, substitutionCountDelta, substitutionWindowCountDelta }
 }
 
 export function applySoccerTargetLineup(

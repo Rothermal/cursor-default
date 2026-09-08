@@ -6,7 +6,8 @@ import { applySoccerLineupTransition, previewSoccerLineupTransition, type Soccer
 import { currentSoccerTargetLineup } from '../../lib/soccer/targetLineup'
 import { soccerLineupDraftReducer, soccerLineupEntryUnavailable, soccerLineupHistoryContext, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep } from '../../lib/soccer/lineupManager'
 import type { SoccerLineupTransitionEvent, SoccerLineupTransitionSource, SoccerRole, SoccerRoleGroup } from '../../lib/soccer/types'
-import { formatSoccerDuration } from '../../lib/soccer/live'
+import { soccerEventTimeLabel } from '../../lib/soccer/timeline'
+import { soccerPeriodTimings } from '../../lib/soccer/live'
 
 const roles: Array<[SoccerRoleGroup, string]> = [['forward', 'FWD'], ['midfielder', 'MID'], ['defender', 'DEF'], ['goalkeeper', 'GK'], ['custom', 'CUSTOM']]
 const sourceNames = { manual: 'Manual lineup', opening_lineup: 'Opening Lineup', team_default: 'Team Default' }
@@ -76,7 +77,7 @@ export default function SoccerLineupManager({ state, recorderUserId, initialPart
         <button type="button" onClick={reset} disabled={busy} title={eventId ? 'Reset to recorded target' : 'Reset to current lineup'} aria-label={eventId ? 'Reset to recorded target' : 'Reset to current lineup'} className="grid h-9 w-9 place-items-center rounded-md border border-slate-300"><RotateCcw size={17} /></button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
-        {original && <p className="mb-2 text-xs text-slate-600">{original.period.id} · Match time {formatSoccerDuration(original.elapsedMs ?? 0)} · Revision {original.revision}</p>}
+        {original && <p className="mb-2 text-xs text-slate-600">{soccerEventTimeLabel(original, soccerPeriodTimings(base))} · Revision {original.revision}</p>}
         <div className="grid grid-cols-2 gap-2 sm:gap-4">
           {[true, false].map(onField => <section key={String(onField)} className="min-w-0">
             <h3 className="sticky top-0 z-10 border-b border-slate-300 bg-white py-2 text-xs font-bold">{onField ? `ON FIELD ${target.length}/${projection.currentRules.maxOnFieldPlayers}` : `BENCH ${participants.length - target.length}`}</h3>

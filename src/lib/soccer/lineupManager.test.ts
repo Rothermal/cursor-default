@@ -1,12 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import * as soccerProjector from './projector'
 import { createInitialState } from '../gameReducer'
 import { createSoccerSportGameState } from './state'
 import { resolveSoccerMatchRules } from './rules'
 import { prepareSoccerKickoff } from './kickoff'
-import { soccerLineupDraftReducer, soccerLineupHistoryContext, soccerLineupHistoryDetail, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep, type SoccerLineupDraft } from './lineupManager'
+import { soccerLineupDraftReducer, soccerLineupHistoryContext, soccerLineupHistoryDetail, soccerLineupHistoryDetails, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep, type SoccerLineupDraft } from './lineupManager'
 import { soccerEventMatchesTimelineFilter } from './timeline'
 import { soccerSummaryEventMatchesFilter } from './summaryTimeline'
-import { applySoccerLineupTransition, previewSoccerLineupTransition, toggleSoccerClock } from './live'
+import { applySoccerLineupTransition, previewSoccerLineupTransition, toggleSoccerClock, inspectSoccerHistory, deleteSoccerHistoryEvent } from './live'
 import type { SoccerMatchSetup } from './types'
 
 function fixture() {
@@ -30,6 +31,34 @@ function fixture() {
 }
 
 describe('lineup manager presets', () => {
+  it('collects all active and removed details in one pass and counts custom-role relabels', () => {
+    const paused = toggleSoccerClock(fixture(), { recorderUserId: null, nowMs: Date.parse('2026-09-08T12:01:00Z') })
+    if (!paused.ok) throw new Error(paused.message)
+    let state = paused.state
+    const target = soccerLineupPreset(state, 'opening_lineup')!.onField
+    for (const label of ['Wing', 'Striker', 'Wide']) {
+      target[1].role = { group: 'custom', label }
+      const preview = previewSoccerLineupTransition(state, target)
+      if (!preview.ok) throw new Error(preview.message)
+      const result = applySoccerLineupTransition(state, preview.preview, { recorderUserId: null })
+      if (!result.ok) throw new Error(result.message)
+      state = result.state
+    }
+    const events = inspectSoccerHistory(state).activeEvents.filter(event => event.eventType === 'soccer.lineup_transition')
+    const removed = deleteSoccerHistoryEvent(state, events[2].id)
+    if (!removed.ok) throw new Error(removed.message)
+    const inspection = inspectSoccerHistory(removed.state)
+    const baseline = soccerProjector.projectSoccerMatchEvents(removed.state, inspection.activeEvents)
+    const spy = vi.spyOn(soccerProjector, 'projectSoccerMatchEvents')
+    try {
+      const details = soccerLineupHistoryDetails(removed.state, inspection)
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spy.mock.results[0].value).toEqual(baseline)
+      expect(Object.keys(details)).toHaveLength(3)
+      for (const event of events) expect(details[event.id]).toContain('0 entering · 0 leaving · 1 role changes')
+    } finally { spy.mockRestore() }
+  })
+
   it('reviews and corrects one transition against its preceding lineup after reload', () => {
     const paused = toggleSoccerClock(fixture(), { recorderUserId: null, nowMs: Date.parse('2026-09-08T12:01:00Z') })
     if (!paused.ok) throw new Error(paused.message)

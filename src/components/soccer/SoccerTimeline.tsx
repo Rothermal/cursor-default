@@ -12,7 +12,7 @@ import SoccerShotCaptureDialog, {
 } from './SoccerShotCaptureDialog'
 import SoccerLocatedEventEditor from './SoccerLocatedEventEditor'
 import SoccerLineupManager from './SoccerLineupManager'
-import { soccerLineupHistoryDetail, soccerLineupManagerBlocked } from '../../lib/soccer/lineupManager'
+import { soccerLineupHistoryDetails, soccerLineupManagerBlocked } from '../../lib/soccer/lineupManager'
 import {
   deleteSoccerHistoryEvent,
   formatSoccerInputTime,
@@ -126,6 +126,9 @@ export default function SoccerTimeline({
     ? allEventsReview?.removedCount ?? 0
     : inspection.deletedEvents.length
 
+  const lineupDetails = useMemo(() => soccerLineupHistoryDetails(state, inspection), [state, inspection])
+  const lineupReview = { details: lineupDetails, locked: soccerLineupManagerBlocked(state, busy) }
+
   const restoreEvent = (event: GameEvent) => {
     if (readOnly || (event.eventType === 'soccer.lineup_transition' && soccerLineupManagerBlocked(state, busy))) return
     const result = restoreSoccerHistoryEvent(state, event.id)
@@ -200,7 +203,7 @@ export default function SoccerTimeline({
               onChange={setReviewFilter}
             />
             <ReviewSections
-              state={state}
+              lineupReview={lineupReview}
               sections={review?.activeSections ?? []}
               readOnly={readOnly}
               onEdit={editEvent}
@@ -226,7 +229,7 @@ export default function SoccerTimeline({
             <div className="divide-y divide-slate-200 border-y border-slate-200">
               {active.map(event => (
                 <HistoryRow
-                  state={state}
+                  lineupReview={lineupReview}
                   key={event.id}
                   event={event}
                   timeLabel={soccerEventTimeLabel(event, timings)}
@@ -249,7 +252,7 @@ export default function SoccerTimeline({
           {removedOpen && (
             presentation === 'review' ? (
               <ReviewSections
-                state={state}
+                lineupReview={lineupReview}
                 sections={review?.removedSections ?? []}
                 readOnly={readOnly}
                 removed
@@ -259,7 +262,7 @@ export default function SoccerTimeline({
               <div className="divide-y divide-slate-200 border-b border-slate-200 opacity-70">
                 {deleted.map(event => (
                   <HistoryRow
-                    state={state}
+                    lineupReview={lineupReview}
                     key={event.id}
                     event={event}
                     timeLabel={soccerEventTimeLabel(event, timings)}
@@ -426,7 +429,7 @@ function TimelineFilterChips({
 }
 
 function ReviewSections({
-  state,
+  lineupReview,
   sections,
   readOnly,
   removed = false,
@@ -434,7 +437,7 @@ function ReviewSections({
   onDelete,
   onRestore,
 }: {
-  state: GameState
+  lineupReview: { details: Record<string, string>; locked: boolean }
   sections: SoccerSummaryTimelineSection[]
   readOnly: boolean
   removed?: boolean
@@ -459,7 +462,7 @@ function ReviewSections({
           <div className="divide-y divide-slate-200 bg-white">
             {section.rows.map(row => (
               <HistoryRow
-                state={state}
+                lineupReview={lineupReview}
                 key={row.event.id}
                 event={row.event}
                 timeLabel={row.timeLabel}
@@ -478,7 +481,7 @@ function ReviewSections({
 }
 
 function HistoryRow({
-  state,
+  lineupReview,
   event,
   timeLabel,
   deleted = false,
@@ -487,7 +490,7 @@ function HistoryRow({
   onDelete,
   onRestore,
 }: {
-  state: GameState
+  lineupReview: { details: Record<string, string>; locked: boolean }
   event: GameEvent
   timeLabel: string
   deleted?: boolean
@@ -498,8 +501,8 @@ function HistoryRow({
 }) {
   const [metadataOpen, setMetadataOpen] = useState(false)
   const contextDetail = eventContextDetail(event)
-  const lineupDetail = useMemo(() => event.eventType === 'soccer.lineup_transition' ? soccerLineupHistoryDetail(state, event) : null, [state, event])
-  const lineupLocked = event.eventType === 'soccer.lineup_transition' && soccerLineupManagerBlocked(state, false)
+  const lineupDetail = lineupReview.details[event.id]
+  const lineupLocked = event.eventType === 'soccer.lineup_transition' && lineupReview.locked
   return (
     <div className="min-h-16 px-3 py-3">
       <div className="flex items-center gap-3">
@@ -526,13 +529,13 @@ function HistoryRow({
             </button>
           )}
         </div>
-        <div className={lineupLocked ? 'hidden' : 'flex shrink-0 gap-1'}>
+        <div className="flex shrink-0 gap-1">
           {deleted ? (
-            onRestore && <button type="button" onClick={onRestore} className="grid h-9 w-9 place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
+            onRestore && <button type="button" onClick={onRestore} disabled={lineupLocked} className="disabled:opacity-40 grid h-9 w-9 place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
           ) : (
             <>
-              {onEdit && <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event)}`} title="Correct"><Pencil size={17} /></button>}
-              {onDelete && <button type="button" onClick={onDelete} className="grid h-9 w-9 place-items-center text-red-600" aria-label={`Remove ${eventTitle(event)}`} title="Remove"><Trash2 size={17} /></button>}
+              {onEdit && <button type="button" onClick={onEdit} disabled={lineupLocked} className="disabled:opacity-40 grid h-9 w-9 place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event)}`} title="Correct"><Pencil size={17} /></button>}
+              {onDelete && <button type="button" onClick={onDelete} disabled={lineupLocked} className="disabled:opacity-40 grid h-9 w-9 place-items-center text-red-600" aria-label={`Remove ${eventTitle(event)}`} title="Remove"><Trash2 size={17} /></button>}
             </>
           )}
         </div>

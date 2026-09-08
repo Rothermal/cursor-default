@@ -42,7 +42,11 @@ export const soccerGameEventProjector: SportGameEventProjector<GameEvent> = {
 
 export function projectSoccerMatchEvents(
   state: GameState,
-  events: GameEvent[]
+  events: GameEvent[],
+  lineupReview?: {
+    removed: SoccerMatchEvent[]
+    before: (event: SoccerMatchEvent, projection: SoccerMatchProjection) => void
+  }
 ): SportGameEventProjectionResult {
   const sportState = state.sportGameState
   if (!sportState || sportState.sportId !== 'soccer') {
@@ -63,14 +67,18 @@ export function projectSoccerMatchEvents(
   let failedEvent: SoccerMatchEvent | null = null
   let failureMessage: string | null = null
 
-  for (const event of soccerEvents) {
+  const reviewEvents = lineupReview
+    ? [...soccerEvents, ...lineupReview.removed].sort(compareGameEventCaptureOrder)
+    : soccerEvents
+  for (const event of reviewEvents) {
+    const removedReview = Boolean(lineupReview && event.deletedAt)
     const sequenceKey = `${event.recorderUserId ?? 'local'}\u0000${event.sequence}`
-    if (seenSequences.has(sequenceKey)) {
+    if (!removedReview && seenSequences.has(sequenceKey)) {
       failedEvent = event
       failureMessage = `Capture sequence ${event.sequence} is duplicated for this recorder.`
       break
     }
-    seenSequences.add(sequenceKey)
+    if (!removedReview) seenSequences.add(sequenceKey)
 
     if (isNormalStatEvent(event)) {
       pendingIncidents.push(event)
@@ -90,6 +98,8 @@ export function projectSoccerMatchEvents(
       failureMessage = flushed.message
       break
     }
+    if (event.eventType === 'soccer.lineup_transition') lineupReview?.before(event, projection)
+    if (removedReview) continue
     const next = structuredClone(projection)
     const error = applySoccerEvent(next, sportState, event, state, soc4Context)
     if (error) {
