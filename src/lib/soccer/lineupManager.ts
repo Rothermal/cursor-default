@@ -25,6 +25,9 @@ export function soccerLineupDraftReducer(draft: SoccerLineupDraft, action: Socce
   }
   const role = structuredClone(action.role)
   const included = draft.target.some(entry => entry.participantId === action.participantId)
+  if (action.type === 'role' && !included) return {
+    ...draft, benchRoles: { ...draft.benchRoles, [action.participantId]: role }, confirmShort: false,
+  }
   const target = action.type === 'role'
     ? draft.target.map(entry => entry.participantId === action.participantId ? { ...entry, role } : entry)
     : included ? draft.target.filter(entry => entry.participantId !== action.participantId)

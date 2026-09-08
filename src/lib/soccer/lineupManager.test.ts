@@ -28,6 +28,28 @@ function fixture() {
 }
 
 describe('lineup manager presets', () => {
+  it('preserves preset attribution and vacancy warnings while preparing a bench entry role', () => {
+    const draft: SoccerLineupDraft = {
+      target: [{ participantId: 'keeper', role: { group: 'goalkeeper', label: null } }],
+      source: 'team_default', benchRoles: {}, confirmShort: true,
+      unavailable: [{ participantId: 'ejected', name: 'Ejected starter', reason: 'Ejected' }],
+    }
+    const edited = soccerLineupDraftReducer(draft, {
+      type: 'role', participantId: 'forward', role: { group: 'midfielder', label: null },
+    })
+    expect(edited.target).toBe(draft.target)
+    expect(edited.source).toBe('team_default')
+    expect(edited.unavailable).toEqual(draft.unavailable)
+    expect(edited.confirmShort).toBe(false)
+    expect(edited.benchRoles.forward.group).toBe('midfielder')
+    const moved = soccerLineupDraftReducer(edited, {
+      type: 'move', participantId: 'forward', role: edited.benchRoles.forward,
+    })
+    expect(moved.source).toBe('manual')
+    expect(moved.unavailable).toEqual([])
+    expect(moved.target).toHaveLength(2)
+  })
+
   it.each(['role', 'move'] as const)('marks an edited preset manual through %s and persists that source', type => {
     const paused = toggleSoccerClock(fixture(), { recorderUserId: null, nowMs: Date.parse('2026-09-08T12:01:00Z') })
     if (!paused.ok) throw new Error(paused.message)
