@@ -98,7 +98,7 @@ export function analyzeSoccerTargetLineup(
     return { ok: false, message: 'A target lineup must include at least one participant.' }
   }
 
-  if (target.some(entry => !entry || typeof entry.participantId !== 'string' || !validateSoccerRole(entry.role))) {
+  if (target.some(entry => !entry || typeof entry.participantId !== 'string' || !entry.participantId || !validateSoccerRole(entry.role))) {
     return { ok: false, message: 'Every target-lineup entry requires a participant and valid role.' }
   }
   const targetIds = target.map(entry => entry.participantId)
@@ -106,9 +106,6 @@ export function analyzeSoccerTargetLineup(
     return { ok: false, message: 'A target lineup cannot repeat a participant.' }
   }
   for (const entry of target) {
-    if (!entry.participantId || !validateSoccerRole(entry.role)) {
-      return { ok: false, message: 'Every target-lineup entry requires a participant and valid role.' }
-    }
     const participant = projection.participants[entry.participantId]
     if (!participant) {
       return { ok: false, message: `Target lineup references unknown participant ${entry.participantId}.` }
@@ -171,7 +168,7 @@ export function analyzeSoccerTargetLineup(
         participantId: entry.participantId,
         role: structuredClone(entry.role),
       })),
-      halftime: derivedHalftime,
+      halftime: options.halftime,
       elapsedMs: options.elapsedMs ?? projection.clock.elapsedMs,
       diff: {
         enteringParticipantIds,

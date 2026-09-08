@@ -1000,7 +1000,12 @@ function lineupTransitionFingerprint(state: GameState): string {
   return JSON.stringify({
     setup: state.sportGameState?.sportId === 'soccer' ? state.sportGameState.setup : null,
     stream: canonicalGameEventStreamForFingerprint(state.eventStream),
-    cloudSync: state.cloudSync,
+    cloudBinding: {
+      gameId: state.cloudSync.gameId,
+      teamId: state.cloudSync.teamId,
+      seasonId: state.cloudSync.seasonId,
+      gameStatus: state.cloudSync.gameStatus,
+    },
   })
 }
 

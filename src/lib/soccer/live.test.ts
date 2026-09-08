@@ -178,6 +178,7 @@ describe('soccer live match actions', () => {
     expect(analyzeSoccerTargetLineup(projection, [keeper, keeper], options).ok).toBe(false)
     expect(analyzeSoccerTargetLineup(projection, [keeper, { ...forward, participantId: 'missing' }], options).ok).toBe(false)
     expect(analyzeSoccerTargetLineup(projection, [forward], options).ok).toBe(false)
+    expect(analyzeSoccerTargetLineup(projection, [keeper, { ...forward, role: keeper.role }], options).ok).toBe(false)
     expect(analyzeSoccerTargetLineup(projection, [...currentSoccerTargetLineup(projection), forward], options).ok).toBe(false)
     const outgoing = analyzeSoccerTargetLineup(projection, [keeper], options)
     expect(outgoing).toMatchObject({ ok: true, value: { diff: { substitutionCountDelta: 0, substitutionWindowCountDelta: 1 } } })
@@ -238,6 +239,21 @@ describe('soccer live match actions', () => {
       enteringParticipantIds: ['match-forward'], leavingParticipantIds: ['match-defender'],
       substitutionCountDelta: 1, substitutionWindowCountDelta: 1,
     })
+    const syncTick = { ...paused.state, cloudSync: {
+      ...paused.state.cloudSync, lastSyncedAt: new Date().toISOString(),
+      lastSyncedGameFingerprint: 'synced', lastError: null,
+    } }
+    expect(applySoccerLineupTransition(syncTick, preview.preview, {
+      recorderUserId, eventIds: [uuid(5)],
+    }).ok).toBe(true)
+    for (const binding of [
+      { gameId: 'different-game' }, { teamId: 'different-team' },
+      { seasonId: 'different-season' }, { gameStatus: 'final' },
+    ]) {
+      expect(applySoccerLineupTransition({ ...paused.state, cloudSync: {
+        ...paused.state.cloudSync, ...binding,
+      } }, preview.preview, { recorderUserId }).ok).toBe(false)
+    }
     const applied = applySoccerLineupTransition(paused.state, preview.preview, {
       recorderUserId, nowMs: kickoffAt + 70_000, eventIds: [uuid(5)],
     })
