@@ -18,7 +18,8 @@ rejects stale drafts, and asks separately before playing short-handed.
   and disabled-return vacancies, and old games with no Team Default.
 - Existing S24B tests cover transition limits, halftime, intervals, stale
   previews, dependent history, and one-event changes.
-- Playwright against an isolated real-component match fixture: 320px, 390px,
+- One-off manual verification using Playwright and a temporary isolated
+  real-component match fixture (not a committed, runnable suite): 320px, 390px,
   and 1280px widths, no horizontal overflow; short-handed confirmation causes
   no mutation before confirmation; a batch swap records exactly one event.
 - Browser screenshot reviewed at 320px; both columns and Apply/Cancel remain

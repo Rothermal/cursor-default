@@ -3,7 +3,8 @@ import { createInitialState } from '../gameReducer'
 import { createSoccerSportGameState } from './state'
 import { resolveSoccerMatchRules } from './rules'
 import { prepareSoccerKickoff } from './kickoff'
-import { soccerLineupPreset } from './lineupManager'
+import { soccerLineupDraftReducer, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep, type SoccerLineupDraft } from './lineupManager'
+import { applySoccerLineupTransition, previewSoccerLineupTransition, toggleSoccerClock } from './live'
 import type { SoccerMatchSetup } from './types'
 
 function fixture() {
@@ -27,6 +28,60 @@ function fixture() {
 }
 
 describe('lineup manager presets', () => {
+  it.each(['role', 'move'] as const)('marks an edited preset manual through %s and persists that source', type => {
+    const paused = toggleSoccerClock(fixture(), { recorderUserId: null, nowMs: Date.parse('2026-09-08T12:01:00Z') })
+    if (!paused.ok) throw new Error(paused.message)
+    const preset = soccerLineupPreset(paused.state, 'opening_lineup')!
+    const original: SoccerLineupDraft = { target: [], benchRoles: {}, source: 'manual', unavailable: [], confirmShort: false }
+    let draft = soccerLineupDraftReducer(original, { type: 'replace', target: preset.onField, source: 'opening_lineup' })
+    expect(draft.source).toBe('opening_lineup')
+    draft = soccerLineupDraftReducer(draft, { type, participantId: 'defender', role: { group: 'midfielder', label: null } })
+    expect(draft.source).toBe('manual')
+    const preview = previewSoccerLineupTransition(paused.state, draft.target, draft.source)
+    if (!preview.ok) throw new Error(preview.message)
+    const result = applySoccerLineupTransition(paused.state, preview.preview, { recorderUserId: null })
+    if (!result.ok) throw new Error(result.message)
+    const events = result.state.eventStream.events
+    expect(events[events.length - 1]).toMatchObject({ payload: { source: 'manual' } })
+    expect(original.target).toEqual([])
+  })
+
+  it('replaces rather than supplements drafts and clears confirmation/warnings on edits and reset', () => {
+    const preset = soccerLineupPreset(fixture(), 'team_default')!
+    const initial: SoccerLineupDraft = { target: [], benchRoles: {}, source: 'manual', unavailable: [], confirmShort: false }
+    let draft = soccerLineupDraftReducer(initial, { type: 'replace', target: preset.onField, source: 'team_default', unavailable: [{ participantId: 'absent', name: 'Absent', reason: 'Ejected' }] })
+    draft = soccerLineupDraftReducer(draft, { type: 'confirm', value: true })
+    draft = soccerLineupDraftReducer(draft, { type: 'move', participantId: 'forward', role: { group: 'forward', label: null } })
+    expect(draft).toMatchObject({ source: 'manual', confirmShort: false, unavailable: [] })
+    expect(draft.target.map(entry => entry.participantId)).toEqual(['keeper'])
+    draft = soccerLineupDraftReducer(draft, { type: 'role', participantId: 'forward', role: { group: 'defender', label: null } })
+    expect(draft.target).toHaveLength(1)
+    draft = soccerLineupDraftReducer(draft, { type: 'move', participantId: 'forward', role: draft.benchRoles.forward })
+    expect(draft.target[1].role.group).toBe('defender')
+    draft = soccerLineupDraftReducer(draft, { type: 'replace', target: [preset.onField[0]], source: 'manual' })
+    expect(draft).toMatchObject({ target: [preset.onField[0]], benchRoles: {}, unavailable: [], confirmShort: false })
+  })
+
+  it('requires short-handed confirmation only for a valid target', () => {
+    expect(soccerLineupSubmitStep(false, 1, 2, false)).toBe('blocked')
+    expect(soccerLineupSubmitStep(false, 1, 2, true)).toBe('blocked')
+    expect(soccerLineupSubmitStep(true, 1, 2, false)).toBe('confirm')
+    expect(soccerLineupSubmitStep(true, 1, 2, true)).toBe('apply')
+    expect(soccerLineupSubmitStep(true, 2, 2, false)).toBe('apply')
+  })
+
+  it('blocks running, final, terminal and externally disabled editors', () => {
+    const state = fixture()
+    expect(soccerLineupManagerBlocked(state, false)).toBe(true)
+    state.sportGameState.projection.clock.running = false
+    expect(soccerLineupManagerBlocked(state, false)).toBe(false)
+    expect(soccerLineupManagerBlocked(state, true)).toBe(true)
+    for (const status of ['ended', 'shootout', 'suspended', 'not_started'] as const) {
+      expect(soccerLineupManagerBlocked({ ...state, sportGameState: { ...state.sportGameState, projection: { ...state.sportGameState.projection, status } } }, false)).toBe(true)
+    }
+    expect(soccerLineupManagerBlocked({ ...state, cloudSync: { ...state.cloudSync, gameStatus: 'final' } }, false)).toBe(true)
+  })
+
   it('keeps opening and frozen team defaults distinct and clone-safe', () => {
     const state = fixture()
     expect(soccerLineupPreset(state, 'opening_lineup')?.onField.map(e => e.participantId)).toEqual(['keeper', 'defender'])
