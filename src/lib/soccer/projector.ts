@@ -25,6 +25,7 @@ import {
 } from './soc4'
 import type {
   SoccerAttackingDirection,
+  SoccerLineupTransitionEvent,
   SoccerMatchEvent,
   SoccerMatchProjection,
   SoccerMatchRules,
@@ -44,8 +45,8 @@ export function projectSoccerMatchEvents(
   state: GameState,
   events: GameEvent[],
   lineupReview?: {
-    removed: SoccerMatchEvent[]
-    before: (event: SoccerMatchEvent, projection: SoccerMatchProjection) => void
+    removed: SoccerLineupTransitionEvent[]
+    before: (event: SoccerLineupTransitionEvent, projection: SoccerMatchProjection) => void
   }
 ): SportGameEventProjectionResult {
   const sportState = state.sportGameState
@@ -68,7 +69,7 @@ export function projectSoccerMatchEvents(
   let failureMessage: string | null = null
 
   const reviewEvents = lineupReview
-    ? [...soccerEvents, ...lineupReview.removed].sort(compareGameEventCaptureOrder)
+    ? [...soccerEvents, ...lineupReview.removed.filter(event => event.eventType === 'soccer.lineup_transition' && event.deletedAt)].sort(compareGameEventCaptureOrder)
     : soccerEvents
   for (const event of reviewEvents) {
     const removedReview = Boolean(lineupReview && event.deletedAt)
@@ -98,7 +99,9 @@ export function projectSoccerMatchEvents(
       failureMessage = flushed.message
       break
     }
-    if (event.eventType === 'soccer.lineup_transition') lineupReview?.before(event, projection)
+    if (event.eventType === 'soccer.lineup_transition' && lineupReview) {
+      lineupReview.before(structuredClone(event), structuredClone(projection))
+    }
     if (removedReview) continue
     const next = structuredClone(projection)
     const error = applySoccerEvent(next, sportState, event, state, soc4Context)

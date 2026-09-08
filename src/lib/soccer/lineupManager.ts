@@ -6,7 +6,7 @@ import { rebuildGameEventProjection } from '../gameEvents/projection'
 import { gameEventRegistry, gameEventProjectors } from '../gameEvents/runtime'
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import type { GameEvent, GameEventInspection } from '../gameEvents/types'
-import type { SoccerMatchEvent } from './types'
+import type { SoccerLineupTransitionEvent } from './types'
 import type { SoccerLineupEntry, SoccerLineupTransitionSource, SoccerMatchProjection, SoccerRole } from './types'
 
 export interface SoccerLineupDraft {
@@ -72,17 +72,13 @@ export function soccerLineupHistoryContext(state: GameState, eventId: string): G
   return rebuilt.inspection.complete ? rebuilt.state : null
 }
 
-export function soccerLineupHistoryDetail(state: GameState, event: GameEvent): string {
-  return soccerLineupHistoryDetails(state, inspectSoccerHistory(state))[event.id] ?? 'Earlier lineup unavailable'
-}
-
 export function soccerLineupHistoryDetails(state: GameState, inspection: GameEventInspection): Record<string, string> {
   const details: Record<string, string> = {}
   const rows = [...inspection.activeEvents, ...inspection.deletedEvents].filter(event => event.eventType === 'soccer.lineup_transition')
   if (!rows.length) return details
   rows.forEach(event => { details[event.id] = `${lineupSourceLabel(event)} · Earlier lineup unavailable` })
   projectSoccerMatchEvents(state, inspection.activeEvents, {
-    removed: inspection.deletedEvents.filter(event => event.eventType === 'soccer.lineup_transition') as SoccerMatchEvent[],
+    removed: inspection.deletedEvents.filter(event => event.eventType === 'soccer.lineup_transition') as SoccerLineupTransitionEvent[],
     before: (event, projection) => {
       if (event.eventType !== 'soccer.lineup_transition') return
       const diff = diffSoccerTargetLineup(projection, event.payload.onField, event.payload.halftime)

@@ -4,7 +4,7 @@ import { createInitialState } from '../gameReducer'
 import { createSoccerSportGameState } from './state'
 import { resolveSoccerMatchRules } from './rules'
 import { prepareSoccerKickoff } from './kickoff'
-import { soccerLineupDraftReducer, soccerLineupHistoryContext, soccerLineupHistoryDetail, soccerLineupHistoryDetails, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep, type SoccerLineupDraft } from './lineupManager'
+import { soccerLineupDraftReducer, soccerLineupHistoryContext, soccerLineupHistoryDetails, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep, type SoccerLineupDraft } from './lineupManager'
 import { soccerEventMatchesTimelineFilter } from './timeline'
 import { soccerSummaryEventMatchesFilter } from './summaryTimeline'
 import { applySoccerLineupTransition, previewSoccerLineupTransition, toggleSoccerClock, inspectSoccerHistory, deleteSoccerHistoryEvent } from './live'
@@ -57,6 +57,20 @@ describe('lineup manager presets', () => {
       expect(Object.keys(details)).toHaveLength(3)
       for (const event of events) expect(details[event.id]).toContain('0 entering · 0 leaving · 1 role changes')
     } finally { spy.mockRestore() }
+    const before = vi.fn((event, projection) => {
+      event.payload.onField.length = 0
+      projection.participants = {}
+    })
+    const untrustedRemoved = [
+      ...inspection.deletedEvents,
+      { ...events[0], eventType: 'soccer.shot', deletedAt: '2026-09-08T12:02:00Z', payload: {} },
+      events[0],
+    ] as unknown as import('./types').SoccerLineupTransitionEvent[]
+    expect(soccerProjector.projectSoccerMatchEvents(removed.state, inspection.activeEvents, {
+      removed: untrustedRemoved, before,
+    })).toEqual(baseline)
+    expect(before).toHaveBeenCalledTimes(3)
+    expect(events[0].payload.onField).toHaveLength(2)
   })
 
   it('reviews and corrects one transition against its preceding lineup after reload', () => {
@@ -73,7 +87,7 @@ describe('lineup manager presets', () => {
     if (context?.sportGameState?.sportId !== 'soccer') throw new Error('Missing historical Soccer projection')
     expect(context.sportGameState.projection.participants.defender.status).toBe('on_field')
     expect(state.sportGameState.projection.participants.defender.status).toBe('left')
-    expect(soccerLineupHistoryDetail(state, event)).toBe('Team Default · 1 entering · 1 leaving · 0 role changes')
+    expect(soccerLineupHistoryDetails(state, inspectSoccerHistory(state))[event.id]).toBe('Team Default · 1 entering · 1 leaving · 0 role changes')
     expect(soccerEventMatchesTimelineFilter(event, 'lineup')).toBe(true)
     expect(soccerSummaryEventMatchesFilter(event, 'lineup')).toBe(true)
     const target = structuredClone(event.payload.onField)
