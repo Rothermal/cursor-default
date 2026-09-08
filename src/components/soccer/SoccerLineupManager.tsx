@@ -4,29 +4,35 @@ import type { GameState } from '../../types'
 import { useModalFocus } from '../../hooks/useModalFocus'
 import { applySoccerLineupTransition, previewSoccerLineupTransition, type SoccerLiveResult } from '../../lib/soccer/live'
 import { currentSoccerTargetLineup } from '../../lib/soccer/targetLineup'
-import { soccerLineupDraftReducer, soccerLineupEntryUnavailable, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep } from '../../lib/soccer/lineupManager'
-import type { SoccerLineupTransitionSource, SoccerRole, SoccerRoleGroup } from '../../lib/soccer/types'
+import { soccerLineupDraftReducer, soccerLineupEntryUnavailable, soccerLineupHistoryContext, soccerLineupManagerBlocked, soccerLineupPreset, soccerLineupSubmitStep } from '../../lib/soccer/lineupManager'
+import type { SoccerLineupTransitionEvent, SoccerLineupTransitionSource, SoccerRole, SoccerRoleGroup } from '../../lib/soccer/types'
+import { soccerEventTimeLabel } from '../../lib/soccer/timeline'
+import { soccerPeriodTimings } from '../../lib/soccer/live'
 
 const roles: Array<[SoccerRoleGroup, string]> = [['forward', 'FWD'], ['midfielder', 'MID'], ['defender', 'DEF'], ['goalkeeper', 'GK'], ['custom', 'CUSTOM']]
 const sourceNames = { manual: 'Manual lineup', opening_lineup: 'Opening Lineup', team_default: 'Team Default' }
 
-export default function SoccerLineupManager({ state, recorderUserId, initialParticipantId, busy, onApply, onClose }: {
+export default function SoccerLineupManager({ state, recorderUserId, initialParticipantId, busy, onApply, onClose, eventId = null }: {
   state: GameState; recorderUserId: string | null; initialParticipantId: string | null; busy: boolean
   onApply: (result: SoccerLiveResult) => boolean; onClose: () => void
+  eventId?: string | null
 }) {
   const [base, setBase] = useState(state)
-  const projection = base.sportGameState?.sportId === 'soccer' ? base.sportGameState.projection : null
+  const context = useMemo(() => eventId ? soccerLineupHistoryContext(base, eventId) : base, [base, eventId])
+  const projection = context?.sportGameState?.sportId === 'soccer' ? context.sportGameState.projection : null
+  const original = useMemo(() => eventId ? base.eventStream?.events.find((value): value is SoccerLineupTransitionEvent =>
+    !!value && typeof value === 'object' && 'id' in value && value.id === eventId && 'eventType' in value && value.eventType === 'soccer.lineup_transition') : null, [base, eventId])
   const [{ target, benchRoles, source, unavailable, confirmShort }, editDraft] = useReducer(soccerLineupDraftReducer, {
-    target: projection ? currentSoccerTargetLineup(projection) : [], benchRoles: {},
-    source: 'manual', unavailable: [], confirmShort: false,
+    target: original ? structuredClone(original.payload.onField) : projection ? currentSoccerTargetLineup(projection) : [], benchRoles: {},
+    source: original?.payload.source ?? 'manual', unavailable: [], confirmShort: false,
   })
   const [error, setError] = useState<string | null>(null)
   const setConfirmShort = (value: boolean) => editDraft({ type: 'confirm', value })
-  const preview = useMemo(() => previewSoccerLineupTransition(base, target, source), [base, target, source])
+  const preview = useMemo(() => previewSoccerLineupTransition(base, target, source, eventId), [base, target, source, eventId])
   const dialogRef = useRef<HTMLDivElement>(null)
   const focusRef = useRef<HTMLSelectElement>(null)
   useModalFocus({ enabled: true, dialogRef, initialFocusRef: focusRef, onClose })
-  if (!projection) return null
+  if (!projection) return <div role="alert" className="fixed inset-0 z-50 bg-white p-4">Earlier lineup history is unavailable.<button type="button" onClick={onClose} className="ml-3 underline">Close</button></div>
   const latestProjection = state.sportGameState?.sportId === 'soccer' ? state.sportGameState.projection : null
   const blocked = soccerLineupManagerBlocked(state, busy)
   const participants = Object.values(projection.participants).sort((a, b) =>
@@ -34,11 +40,16 @@ export default function SoccerLineupManager({ state, recorderUserId, initialPart
   const targetIds = new Set(target.map(entry => entry.participantId))
   const reset = () => {
     if (state.sportGameState?.sportId !== 'soccer') return
+    if (eventId) {
+      if (original) editDraft({ type: 'replace', target: original.payload.onField, source: original.payload.source })
+      setError(null)
+      return
+    }
     setBase(state); editDraft({ type: 'replace', target: currentSoccerTargetLineup(state.sportGameState.projection), source: 'manual' })
     setError(null)
   }
   const preset = (nextSource: SoccerLineupTransitionSource) => {
-    const value = soccerLineupPreset(base, nextSource)
+    const value = context ? soccerLineupPreset(context, nextSource) : null
     if (!value) return
     editDraft({ type: 'replace', target: value.onField, unavailable: value.unavailable, source: nextSource }); setError(null)
   }
@@ -53,19 +64,20 @@ export default function SoccerLineupManager({ state, recorderUserId, initialPart
     if (onApply(result)) onClose()
   }
   const names = (ids: string[]) => ids.map(id => projection.participants[id]?.displayName ?? id).join(', ')
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-3">
+  return <div style={{ margin: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-3">
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="lineup-manager-title" tabIndex={-1}
       className="flex h-[100dvh] w-full max-w-3xl flex-col bg-white text-slate-900 sm:h-[94dvh] sm:rounded-lg">
       <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2">
-        <h2 id="lineup-manager-title" className="text-lg font-bold">Manage Lineup</h2>
+        <h2 id="lineup-manager-title" className="text-lg font-bold">{eventId ? 'Correct Lineup Change' : 'Manage Lineup'}</h2>
         <button type="button" onClick={onClose} title="Close" aria-label="Close lineup manager" className="grid h-11 w-11 place-items-center"><X size={20} /></button>
       </header>
       <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 p-3">
         <button type="button" disabled={blocked} onClick={() => preset('opening_lineup')} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-40">Opening Lineup</button>
-        {soccerLineupPreset(base, 'team_default') && <button type="button" disabled={blocked} onClick={() => preset('team_default')} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-40">Team Default</button>}
-        <button type="button" onClick={reset} disabled={busy} title="Reset to current lineup" aria-label="Reset to current lineup" className="grid h-9 w-9 place-items-center rounded-md border border-slate-300"><RotateCcw size={17} /></button>
+        {context && soccerLineupPreset(context, 'team_default') && <button type="button" disabled={blocked} onClick={() => preset('team_default')} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-40">Team Default</button>}
+        <button type="button" onClick={reset} disabled={busy} title={eventId ? 'Reset to recorded target' : 'Reset to current lineup'} aria-label={eventId ? 'Reset to recorded target' : 'Reset to current lineup'} className="grid h-9 w-9 place-items-center rounded-md border border-slate-300"><RotateCcw size={17} /></button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
+        {original && <p className="mb-2 text-xs text-slate-600">{soccerEventTimeLabel(original, soccerPeriodTimings(base))} · Revision {original.revision}</p>}
         <div className="grid grid-cols-2 gap-2 sm:gap-4">
           {[true, false].map(onField => <section key={String(onField)} className="min-w-0">
             <h3 className="sticky top-0 z-10 border-b border-slate-300 bg-white py-2 text-xs font-bold">{onField ? `ON FIELD ${target.length}/${projection.currentRules.maxOnFieldPlayers}` : `BENCH ${participants.length - target.length}`}</h3>

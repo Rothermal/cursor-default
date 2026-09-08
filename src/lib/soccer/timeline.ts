@@ -10,6 +10,7 @@ export type SoccerTimelineFilter =
   | 'discipline'
   | 'team_events'
   | 'match_control'
+  | 'lineup'
 
 export interface SoccerTeamEventReviewPresentation {
   actorLabel: string
@@ -57,6 +58,7 @@ export function soccerEventMatchesTimelineFilter(
   filter: SoccerTimelineFilter
 ): boolean {
   if (filter === 'all') return true
+  if (filter === 'lineup') return ['soccer.lineup_transition', 'soccer.substitution_window', 'soccer.role_changed', 'soccer.opening_lineup', 'soccer.match_roster_added', 'soccer.participant_resolved'].includes(event.eventType)
   if (filter === 'attacking') return isSoccerAttackingEventType(event.eventType)
   if (filter === 'defensive') return event.eventType === 'soccer.defensive_action'
   if (filter === 'discipline') {

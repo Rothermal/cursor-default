@@ -133,6 +133,7 @@ export function soccerSummaryEventMatchesFilter(
     if (
       event.eventType === 'soccer.opening_lineup' ||
       event.eventType === 'soccer.substitution_window' ||
+      event.eventType === 'soccer.lineup_transition' ||
       event.eventType === 'soccer.role_changed' ||
       event.eventType === 'soccer.match_roster_added' ||
       event.eventType === 'soccer.participant_resolved'

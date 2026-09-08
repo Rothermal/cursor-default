@@ -782,6 +782,7 @@ export default function SoccerGameTracker() {
             </>
           ) : (
             <SoccerTimeline
+              readOnly={cloudFinal || (!!state.cloudSync.teamId && (teamAccess.loading || !canTrackGames(teamAccess.role)))}
               state={state}
               inspection={inspection}
               busy={isApplying}
@@ -789,7 +790,6 @@ export default function SoccerGameTracker() {
               recorderUserId={user?.id ?? null}
               defaultTeamSide={capturePreferences.teamSide}
               allowAddEvent={!projection.shootout}
-              readOnly={cloudFinal}
             />
           )}
         </div>
