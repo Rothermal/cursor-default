@@ -11,6 +11,7 @@ import type {
 import { compareGameEventCaptureOrder } from '../gameEvents/stream'
 import { normalizeSoccerMatchRules, orderedSoccerSegments, validateSoccerMatchRules } from './rules'
 import { createSoccerMatchProjection, emptyParticipantStats } from './state'
+import { applySoccerTargetLineup, currentSoccerTargetLineup } from './targetLineup'
 import {
   applySoccerBlockedShotTotals,
   applySoccerNormalIncident,
@@ -181,6 +182,14 @@ function applySoccerEvent(
       return applyRulesChanged(projection, event.payload.rules)
     case 'soccer.substitution_window':
       return applySubstitutionWindow(projection, event.payload.changes, event.payload.halftime, event.elapsedMs)
+    case 'soccer.lineup_transition':
+      return applySoccerTargetLineup(projection, event.payload.onField, {
+        elapsedMs: event.elapsedMs,
+        halftime: event.payload.halftime,
+        requireStoppedClock: true,
+        requireDerivedHalftime: true,
+        rejectNoOp: true,
+      })
     case 'soccer.role_changed':
       return applyRoleChanges(projection, event.payload.changes, event.elapsedMs)
     case 'soccer.attacking_direction_changed':
@@ -444,54 +453,30 @@ function applySubstitutionWindow(
   }
   const ids = changes.flatMap(change => [change.playerOutParticipantId, change.playerInParticipantId]).filter(Boolean)
   if (new Set(ids).size !== ids.length) return 'A participant can appear only once in a substitution window.'
-  const incomingCount = changes.filter(change => change.playerInParticipantId !== null).length
-  const nextSubstitutionCount = projection.substitutionCount + incomingCount
-  const nextWindowCount = projection.substitutionWindowCount + (halftime ? 0 : 1)
-  if (projection.currentRules.substitutionLimit !== null && nextSubstitutionCount > projection.currentRules.substitutionLimit) {
-    return 'This substitution exceeds the configured match limit.'
-  }
-  if (projection.currentRules.substitutionWindowLimit !== null && nextWindowCount > projection.currentRules.substitutionWindowLimit) {
-    return 'This substitution exceeds the configured window limit.'
-  }
-
+  const targetById = new Map(currentSoccerTargetLineup(projection).map(entry => [entry.participantId, entry]))
   for (const change of changes) {
     if (change.playerOutParticipantId) {
       const outgoing = projection.participants[change.playerOutParticipantId]
       if (!outgoing || outgoing.status !== 'on_field') return 'Every outgoing participant must be on field.'
-      closeParticipantInterval(outgoing, elapsedMs ?? projection.clock.elapsedMs)
-      closeOnFieldParticipantInterval(
-        outgoing,
-        projection.currentPeriodId,
-        elapsedMs ?? projection.clock.elapsedMs
-      )
-      closeRoleInterval(outgoing, projection.currentPeriodId, elapsedMs ?? projection.clock.elapsedMs)
-      outgoing.status = 'left'
-      outgoing.hasExited = true
+      targetById.delete(change.playerOutParticipantId)
     }
     if (change.playerInParticipantId) {
       const incoming = projection.participants[change.playerInParticipantId]
       if (!incoming || incoming.status === 'on_field') return 'Every incoming participant must be off field.'
-      if (incoming.hasExited && !projection.currentRules.allowReturnSubstitutions) {
-        return 'Return substitutions are disabled for this match.'
-      }
-      incoming.status = 'on_field'
-      incoming.role = structuredClone(change.playerInRole ?? incoming.role)
-      incoming.appearances = Math.max(1, incoming.appearances)
-      incoming.activeSinceElapsedMs = projection.clock.running ? elapsedMs : null
-      if (projection.currentPeriodId) {
-        openOnFieldParticipantInterval(incoming, projection.currentPeriodId, elapsedMs ?? projection.clock.elapsedMs)
-        openRoleInterval(incoming, projection.currentPeriodId, elapsedMs ?? projection.clock.elapsedMs)
-      }
+      targetById.set(change.playerInParticipantId, {
+        participantId: change.playerInParticipantId,
+        role: structuredClone(change.playerInRole ?? incoming.role),
+      })
     }
   }
-  if (onFieldParticipants(projection).length > projection.currentRules.maxOnFieldPlayers) {
-    return 'Substitution leaves too many players on field.'
-  }
-  const goalkeeperError = validateOnFieldGoalkeeper(projection)
-  if (goalkeeperError) return goalkeeperError
-  projection.substitutionCount = nextSubstitutionCount
-  projection.substitutionWindowCount = nextWindowCount
-  return null
+  const error = applySoccerTargetLineup(projection, [...targetById.values()], {
+    elapsedMs,
+    halftime,
+    requireStoppedClock: false,
+    requireDerivedHalftime: false,
+    rejectNoOp: false,
+  })
+  return error
 }
 
 function applyRoleChanges(

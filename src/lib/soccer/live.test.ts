@@ -6,6 +6,8 @@ import { createInitialState, gameReducer } from '../gameReducer'
 import { prepareSoccerKickoff } from './kickoff'
 import {
   adjustSoccerClock,
+  applySoccerLineupTransition,
+  previewSoccerLineupTransition,
   addSoccerMatchParticipant,
   deleteSoccerHistoryEvent,
   endSoccerMatch,
@@ -36,6 +38,7 @@ import {
   updateSoccerHistoryEvent,
 } from './live'
 import { resolveSoccerMatchRules } from './rules'
+import { analyzeSoccerTargetLineup, currentSoccerTargetLineup } from './targetLineup'
 import { createSoccerSportGameState, normalizeSoccerSportGameState, participantActiveMs } from './state'
 import type { SoccerMatchSetup, SoccerMatchStatus } from './types'
 
@@ -121,6 +124,182 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it('supports batch entry, outgoing-only, incoming-only, and dependent removal guards', () => {
+    const match = setup()
+    match.rulesSnapshot.maxOnFieldPlayers = 3
+    match.rulesSnapshot.allowReturnSubstitutions = true
+    match.participants.push({
+      ...match.participants[2], id: 'match-backup', playerId: null, kind: 'anonymous', displayName: 'Backup',
+    })
+    const paused = toggleSoccerClock(kickedOffState(match), {
+      recorderUserId, nowMs: kickoffAt + 10_000, eventIds: [uuid(4)],
+    })
+    if (!paused.ok) throw new Error(paused.message)
+    const keeper = { participantId: 'match-keeper', role: { group: 'goalkeeper' as const, label: null } }
+    const forward = { participantId: 'match-forward', role: { group: 'forward' as const, label: null } }
+    const backup = { participantId: 'match-backup', role: { group: 'defender' as const, label: null } }
+    const preview = previewSoccerLineupTransition(paused.state, [keeper, forward, backup])
+    if (!preview.ok) throw new Error(preview.message)
+    expect(preview.preview.analysis.diff).toMatchObject({ substitutionCountDelta: 2, substitutionWindowCountDelta: 1 })
+    const batch = applySoccerLineupTransition(paused.state, preview.preview, { recorderUserId, eventIds: [uuid(5)] })
+    if (!batch.ok) throw new Error(batch.message)
+    const outgoing = previewSoccerLineupTransition(batch.state, [keeper, forward])
+    if (!outgoing.ok) throw new Error(outgoing.message)
+    const removed = applySoccerLineupTransition(batch.state, outgoing.preview, { recorderUserId, eventIds: [uuid(6)] })
+    if (!removed.ok) throw new Error(removed.message)
+    expect(removed.state.sportGameState.projection).toMatchObject({ substitutionCount: 2, substitutionWindowCount: 2 })
+    const incoming = previewSoccerLineupTransition(removed.state, [keeper, forward, backup])
+    if (!incoming.ok) throw new Error(incoming.message)
+    const returned = applySoccerLineupTransition(removed.state, incoming.preview, { recorderUserId, eventIds: [uuid(7)] })
+    if (!returned.ok) throw new Error(returned.message)
+    expect(returned.state.sportGameState.projection).toMatchObject({ substitutionCount: 3, substitutionWindowCount: 3 })
+    const deleted = deleteSoccerHistoryEvent(returned.state, uuid(7))
+    if (!deleted.ok) throw new Error(deleted.message)
+    const restored = restoreSoccerHistoryEvent(deleted.state, uuid(7))
+    expect(restored.ok).toBe(true)
+    const shot = recordSoccerShot(batch.state, {
+      teamSide: 'tracked', outcome: 'goal', situation: 'open_play', location: null,
+      shooter: { kind: 'participant', participantId: 'match-forward' },
+    }, { recorderUserId, eventIds: [uuid(8)] })
+    if (!shot.ok) throw new Error(shot.message)
+    expect(deleteSoccerHistoryEvent(shot.state, uuid(5)).ok).toBe(false)
+    expect(previewSoccerLineupTransition({ ...batch.state, cloudSync: { ...batch.state.cloudSync, gameStatus: 'final' } }, [keeper]).ok).toBe(false)
+  })
+
+  it('validates target eligibility, final goalkeeper roles, counts, and no-op without mutations', () => {
+    const state = kickedOffState()
+    if (state.sportGameState?.sportId !== 'soccer') throw new Error('Missing projection')
+    const projection = structuredClone(state.sportGameState.projection)
+    projection.clock.running = false
+    const options = { elapsedMs: 0, halftime: false, requireStoppedClock: true, requireDerivedHalftime: true, rejectNoOp: true }
+    const keeper = { participantId: 'match-keeper', role: { group: 'goalkeeper' as const, label: null } }
+    const forward = { participantId: 'match-forward', role: { group: 'forward' as const, label: null } }
+    expect(analyzeSoccerTargetLineup(projection, currentSoccerTargetLineup(projection), options).ok).toBe(false)
+    expect(analyzeSoccerTargetLineup(projection, [keeper, keeper], options).ok).toBe(false)
+    expect(analyzeSoccerTargetLineup(projection, [keeper, { ...forward, participantId: 'missing' }], options).ok).toBe(false)
+    expect(analyzeSoccerTargetLineup(projection, [forward], options).ok).toBe(false)
+    expect(analyzeSoccerTargetLineup(projection, [keeper, { ...forward, role: keeper.role }], options).ok).toBe(false)
+    expect(analyzeSoccerTargetLineup(projection, [...currentSoccerTargetLineup(projection), forward], options).ok).toBe(false)
+    const outgoing = analyzeSoccerTargetLineup(projection, [keeper], options)
+    expect(outgoing).toMatchObject({ ok: true, value: { diff: { substitutionCountDelta: 0, substitutionWindowCountDelta: 1 } } })
+    const roles = analyzeSoccerTargetLineup(projection, [
+      { ...keeper, role: { group: 'defender', label: null } },
+      { participantId: 'match-defender', role: { group: 'goalkeeper', label: null } },
+    ], options)
+    expect(roles).toMatchObject({ ok: true, value: { diff: { substitutionCountDelta: 0, substitutionWindowCountDelta: 0 } } })
+    projection.currentRules.substitutionLimit = 0
+    expect(analyzeSoccerTargetLineup(projection, [keeper, forward], options).ok).toBe(false)
+    projection.currentRules.substitutionLimit = null
+    projection.currentRules.substitutionWindowLimit = 0
+    expect(analyzeSoccerTargetLineup(projection, [keeper], options).ok).toBe(false)
+    projection.currentRules.substitutionWindowLimit = null
+    projection.participants['match-forward'].hasExited = true
+    projection.currentRules.allowReturnSubstitutions = false
+    expect(analyzeSoccerTargetLineup(projection, [keeper, forward], options).ok).toBe(false)
+    projection.currentRules.allowReturnSubstitutions = true
+    projection.participantDiscipline['match-forward'] = { normalYellowCards: 0, shootoutYellowCards: 0, redCards: 1, shootoutRedCards: 0, ejected: true }
+    expect(analyzeSoccerTargetLineup(projection, [keeper, forward], options).ok).toBe(false)
+    expect(projection.substitutionCount).toBe(0)
+    expect(projection.participants['match-defender'].status).toBe('on_field')
+  })
+
+  it('uses only the exact even regulation midpoint as halftime', () => {
+    const state = kickedOffState()
+    if (state.sportGameState?.sportId !== 'soccer') throw new Error('Missing projection')
+    const projection = structuredClone(state.sportGameState.projection)
+    projection.status = 'period_break'
+    projection.currentPeriodId = null
+    projection.currentRules.regulationSegments = [1, 2, 3, 4].map(order => ({
+      id: `q${order}`, label: `Quarter ${order}`, kind: 'regulation', order, durationMs: 600_000,
+    }))
+    for (const [completed, expected] of [
+      [['q1'], false], [['q1', 'q2'], true], [['q2', 'q1'], false],
+      [['q1', 'q2', 'q3'], false], [['q1', 'q2', 'q3', 'q4', 'extra-1'], false],
+    ] as Array<[string[], boolean]>) {
+      projection.completedPeriodIds = completed
+      expect(isSoccerHalftimeBreak(projection)).toBe(expected)
+    }
+    projection.currentRules.regulationSegments.pop()
+    projection.completedPeriodIds = ['q1']
+    expect(isSoccerHalftimeBreak(projection)).toBe(false)
+  })
+
+  it('applies one paused target transition with intervals and rejects stale previews', () => {
+    const running = kickedOffState()
+    const target = [
+      { participantId: 'match-keeper', role: { group: 'goalkeeper' as const, label: null } },
+      { participantId: 'match-forward', role: { group: 'forward' as const, label: null } },
+    ]
+    expect(previewSoccerLineupTransition(running, target).ok).toBe(false)
+    const paused = toggleSoccerClock(running, { recorderUserId, nowMs: kickoffAt + 60_000, eventIds: [uuid(4)] })
+    if (!paused.ok) throw new Error(paused.message)
+    const preview = previewSoccerLineupTransition(paused.state, target)
+    if (!preview.ok) throw new Error(preview.message)
+    expect(preview.preview.analysis.diff).toMatchObject({
+      enteringParticipantIds: ['match-forward'], leavingParticipantIds: ['match-defender'],
+      substitutionCountDelta: 1, substitutionWindowCountDelta: 1,
+    })
+    const syncTick = { ...paused.state, cloudSync: {
+      ...paused.state.cloudSync, lastSyncedAt: new Date().toISOString(),
+      lastSyncedGameFingerprint: 'synced', lastError: null,
+    } }
+    expect(applySoccerLineupTransition(syncTick, preview.preview, {
+      recorderUserId, eventIds: [uuid(5)],
+    }).ok).toBe(true)
+    for (const binding of [
+      { gameId: 'different-game' }, { teamId: 'different-team' },
+      { seasonId: 'different-season' }, { gameStatus: 'final' },
+    ]) {
+      expect(applySoccerLineupTransition({ ...paused.state, cloudSync: {
+        ...paused.state.cloudSync, ...binding,
+      } }, preview.preview, { recorderUserId }).ok).toBe(false)
+    }
+    const applied = applySoccerLineupTransition(paused.state, preview.preview, {
+      recorderUserId, nowMs: kickoffAt + 70_000, eventIds: [uuid(5)],
+    })
+    if (!applied.ok) throw new Error(applied.message)
+    expect(applied.state.eventStream.events).toHaveLength(5)
+    expect(applied.state.sportGameState.projection.participants['match-defender']).toMatchObject({
+      status: 'left', totalActiveMs: 60_000,
+      onFieldIntervals: [{ periodId: 'regulation-1', startElapsedMs: 0, endElapsedMs: 60_000 }],
+    })
+    expect(applied.state.sportGameState.projection.participants['match-forward']).toMatchObject({
+      status: 'on_field', activeSinceElapsedMs: null,
+      onFieldIntervals: [{ periodId: 'regulation-1', startElapsedMs: 60_000, endElapsedMs: null }],
+    })
+    expect(applySoccerLineupTransition(applied.state, preview.preview, { recorderUserId }).ok).toBe(false)
+    expect(previewSoccerLineupTransition(applied.state, target).ok).toBe(false)
+    const editedTarget = target.map(entry => entry.participantId === 'match-forward'
+      ? { ...entry, role: { group: 'midfielder' as const, label: null } } : entry)
+    const edit = previewSoccerLineupTransition(applied.state, editedTarget, 'manual', uuid(5))
+    if (!edit.ok) throw new Error(edit.message)
+    const corrected = applySoccerLineupTransition(applied.state, edit.preview, { recorderUserId })
+    if (!corrected.ok) throw new Error(corrected.message)
+    expect(corrected.state.eventStream.events).toHaveLength(5)
+    expect(corrected.state.eventStream.events[4]).toMatchObject({ revision: 2 })
+    expect(corrected.state.sportGameState.projection.substitutionCount).toBe(1)
+  })
+
+  it.each(['manual', 'opening_lineup', 'team_default'] as const)('records halftime target source %s atomically', source => {
+    const ended = endSoccerPeriod(kickedOffState(), {
+      recorderUserId, nowMs: kickoffAt + 60_000, eventIds: [uuid(4), uuid(5)],
+    })
+    if (!ended.ok) throw new Error(ended.message)
+    const preview = previewSoccerLineupTransition(ended.state, [
+      { participantId: 'match-keeper', role: { group: 'goalkeeper', label: null } },
+      { participantId: 'match-forward', role: { group: 'forward', label: null } },
+    ], source)
+    if (!preview.ok) throw new Error(preview.message)
+    expect(preview.preview.payload.halftime).toBe(true)
+    const applied = applySoccerLineupTransition(ended.state, preview.preview, { recorderUserId, eventIds: [uuid(6)] })
+    if (!applied.ok) throw new Error(applied.message)
+    expect(applied.state.sportGameState.projection).toMatchObject({ substitutionCount: 1, substitutionWindowCount: 0 })
+    const tampered = updateSoccerHistoryEvent(applied.state, uuid(6), {
+      payload: { ...preview.preview.payload, halftime: false },
+    })
+    expect(tampered.ok).toBe(false)
+  })
+
   it.each<[SoccerMatchStatus, boolean]>([
     ['not_started', false],
     ['in_progress', true],

@@ -368,6 +368,14 @@ export interface SoccerSubstitutionWindowPayload extends JsonObject {
   halftime: boolean
 }
 
+export type SoccerLineupTransitionSource = 'manual' | 'opening_lineup' | 'team_default'
+
+export interface SoccerLineupTransitionPayload extends JsonObject {
+  source: SoccerLineupTransitionSource
+  onField: SoccerLineupEntry[]
+  halftime: boolean
+}
+
 export interface SoccerRoleChange extends JsonObject {
   participantId: string
   role: SoccerRole
@@ -480,6 +488,7 @@ export type SoccerClockPausedEvent = GameEvent<SoccerClockPausedPayload, 'soccer
 export type SoccerClockAdjustedEvent = GameEvent<SoccerClockAdjustedPayload, 'soccer.clock_adjusted', 'soccer', SoccerTeamSide>
 export type SoccerMatchRulesChangedEvent = GameEvent<SoccerMatchRulesChangedPayload, 'soccer.match_rules_changed', 'soccer', SoccerTeamSide>
 export type SoccerSubstitutionWindowEvent = GameEvent<SoccerSubstitutionWindowPayload, 'soccer.substitution_window', 'soccer', SoccerTeamSide>
+export type SoccerLineupTransitionEvent = GameEvent<SoccerLineupTransitionPayload, 'soccer.lineup_transition', 'soccer', SoccerTeamSide>
 export type SoccerRoleChangedEvent = GameEvent<SoccerRoleChangedPayload, 'soccer.role_changed', 'soccer', SoccerTeamSide>
 export type SoccerAttackingDirectionChangedEvent = GameEvent<SoccerAttackingDirectionChangedPayload, 'soccer.attacking_direction_changed', 'soccer', SoccerTeamSide>
 export type SoccerMatchRosterAddedEvent = GameEvent<SoccerMatchRosterAddedPayload, 'soccer.match_roster_added', 'soccer', SoccerTeamSide>
@@ -507,6 +516,7 @@ export type SoccerMatchEvent =
   | SoccerClockAdjustedEvent
   | SoccerMatchRulesChangedEvent
   | SoccerSubstitutionWindowEvent
+  | SoccerLineupTransitionEvent
   | SoccerRoleChangedEvent
   | SoccerAttackingDirectionChangedEvent
   | SoccerMatchRosterAddedEvent

@@ -19,6 +19,7 @@ import type {
   SoccerFoulPayload,
   SoccerMatchEndedPayload,
   SoccerMatchEvent,
+  SoccerLineupTransitionPayload,
   SoccerMatchReopenedPayload,
   SoccerMatchRosterAddedPayload,
   SoccerMatchRulesChangedPayload,
@@ -49,6 +50,7 @@ export type SoccerEventPayloadByType = {
   'soccer.clock_adjusted': SoccerClockAdjustedPayload
   'soccer.match_rules_changed': SoccerMatchRulesChangedPayload
   'soccer.substitution_window': SoccerSubstitutionWindowPayload
+  'soccer.lineup_transition': SoccerLineupTransitionPayload
   'soccer.role_changed': SoccerRoleChangedPayload
   'soccer.attacking_direction_changed': SoccerAttackingDirectionChangedPayload
   'soccer.match_roster_added': SoccerMatchRosterAddedPayload
@@ -127,6 +129,7 @@ export const soccerEventDefinitions: GameEventDefinition<GameEvent>[] = [
   matchStateDefinition('soccer.clock_adjusted', validateClockAdjusted),
   matchStateDefinition('soccer.match_rules_changed', validateRulesChanged),
   matchStateDefinition('soccer.substitution_window', validateSubstitutionWindow),
+  matchStateDefinition('soccer.lineup_transition', validateLineupTransition),
   matchStateDefinition('soccer.role_changed', validateRoleChanged),
   matchStateDefinition('soccer.attacking_direction_changed', validateDirectionChanged),
   matchStateDefinition('soccer.match_roster_added', validateRosterAdded),
@@ -370,6 +373,22 @@ function validateSubstitutionWindow(payload: JsonObject): boolean {
         if (out !== null && out === incoming) return false
         return change.playerInRole === null || validateSoccerRole(change.playerInRole)
       })
+  )
+}
+
+function validateLineupTransition(payload: JsonObject): boolean {
+  return Boolean(
+    (payload.source === 'manual' ||
+      payload.source === 'opening_lineup' ||
+      payload.source === 'team_default') &&
+      Array.isArray(payload.onField) &&
+      payload.onField.length > 0 &&
+      typeof payload.halftime === 'boolean' &&
+      payload.onField.every(entry =>
+        isPlainObject(entry) && isId(entry.participantId) && validateSoccerRole(entry.role)
+      ) &&
+      new Set(payload.onField.map(entry => isPlainObject(entry) ? entry.participantId : null)).size ===
+        payload.onField.length
   )
 }
 
