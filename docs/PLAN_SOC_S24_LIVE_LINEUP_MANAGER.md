@@ -1,6 +1,6 @@
 # SOC-S24 - Live lineup manager and match presets
 
-**Status:** S24A-S24C implemented; S24D approved and pending
+**Status:** S24A-S24D implemented; deployed owner regression pending
 **Scope:** Soccer match setup authority, live tracked-team lineup changes,
 Timeline correction, and a reusable cross-sport interaction pattern
 **Depends on:** Soccer event authority, anchored clock, S11 roster roles, S19
@@ -316,7 +316,7 @@ reinterpret a legacy substitution event's recorded halftime flag.
       Full-screen two-column editor, direct movement, role controls, presets,
       stale revalidation, short-handed confirmation, Field/Lineup entry points
 
-[ ] S24D  Timeline, regression, and portability notes
+[x] S24D  Timeline, regression, and portability notes (deployed owner matrix pending)
       Grouped live/Summary presentation, historical edit/remove/restore,
       narrow/keyboard/PWA checks, deployed cloud matrix, cross-sport contract
 ```

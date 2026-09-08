@@ -11,6 +11,8 @@ import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from './SoccerShotCaptureDialog'
 import SoccerLocatedEventEditor from './SoccerLocatedEventEditor'
+import SoccerLineupManager from './SoccerLineupManager'
+import { soccerLineupHistoryDetail, soccerLineupManagerBlocked } from '../../lib/soccer/lineupManager'
 import {
   deleteSoccerHistoryEvent,
   formatSoccerInputTime,
@@ -72,6 +74,7 @@ const LIVE_TIMELINE_FILTERS: ReadonlyArray<{
   { id: 'discipline', label: 'Discipline' },
   { id: 'team_events', label: 'Restarts' },
   { id: 'match_control', label: 'Match Control' },
+  { id: 'lineup', label: 'Lineup' },
 ]
 
 export default function SoccerTimeline({
@@ -124,6 +127,7 @@ export default function SoccerTimeline({
     : inspection.deletedEvents.length
 
   const restoreEvent = (event: GameEvent) => {
+    if (readOnly || (event.eventType === 'soccer.lineup_transition' && soccerLineupManagerBlocked(state, busy))) return
     const result = restoreSoccerHistoryEvent(state, event.id)
     if (!result.ok) {
       setTimelineError(result.message)
@@ -133,6 +137,7 @@ export default function SoccerTimeline({
   }
 
   const editEvent = (event: GameEvent) => {
+    if (readOnly || (event.eventType === 'soccer.lineup_transition' && soccerLineupManagerBlocked(state, busy))) return
     if (isSoccerLocatedEditableEvent(event)) return setLocatedEditing(event)
     if (event.eventType === 'soccer.score_adjustment') {
       setScoreAdjustmentEdit(event as SoccerScoreAdjustmentEvent)
@@ -195,6 +200,7 @@ export default function SoccerTimeline({
               onChange={setReviewFilter}
             />
             <ReviewSections
+              state={state}
               sections={review?.activeSections ?? []}
               readOnly={readOnly}
               onEdit={editEvent}
@@ -220,6 +226,7 @@ export default function SoccerTimeline({
             <div className="divide-y divide-slate-200 border-y border-slate-200">
               {active.map(event => (
                 <HistoryRow
+                  state={state}
                   key={event.id}
                   event={event}
                   timeLabel={soccerEventTimeLabel(event, timings)}
@@ -242,6 +249,7 @@ export default function SoccerTimeline({
           {removedOpen && (
             presentation === 'review' ? (
               <ReviewSections
+                state={state}
                 sections={review?.removedSections ?? []}
                 readOnly={readOnly}
                 removed
@@ -251,6 +259,7 @@ export default function SoccerTimeline({
               <div className="divide-y divide-slate-200 border-b border-slate-200 opacity-70">
                 {deleted.map(event => (
                   <HistoryRow
+                    state={state}
                     key={event.id}
                     event={event}
                     timeLabel={soccerEventTimeLabel(event, timings)}
@@ -269,7 +278,12 @@ export default function SoccerTimeline({
         </section>
       )}
 
-      {editing && (
+      {editing?.eventType === 'soccer.lineup_transition' && !readOnly && (
+        <SoccerLineupManager key={editing.id} eventId={editing.id} state={state}
+          recorderUserId={recorderUserId} initialParticipantId={null}
+          busy={busy || !inspection.complete} onApply={onApply} onClose={() => setEditing(null)} />
+      )}
+      {editing && editing.eventType !== 'soccer.lineup_transition' && (
         <SoccerEventCorrectionDialog
           key={`${editing.id}-${editing.revision}`}
           event={editing}
@@ -360,6 +374,10 @@ export default function SoccerTimeline({
         error={removeError}
         onConfirm={() => {
           if (!deleting) return
+          if (readOnly || (deleting.eventType === 'soccer.lineup_transition' && soccerLineupManagerBlocked(state, busy))) {
+            setRemoveError('Pause or reopen the match before changing lineup history.')
+            return
+          }
           const result = deleteSoccerHistoryEvent(state, deleting.id)
           if (!result.ok) {
             setRemoveError(result.message)
@@ -408,6 +426,7 @@ function TimelineFilterChips({
 }
 
 function ReviewSections({
+  state,
   sections,
   readOnly,
   removed = false,
@@ -415,6 +434,7 @@ function ReviewSections({
   onDelete,
   onRestore,
 }: {
+  state: GameState
   sections: SoccerSummaryTimelineSection[]
   readOnly: boolean
   removed?: boolean
@@ -439,6 +459,7 @@ function ReviewSections({
           <div className="divide-y divide-slate-200 bg-white">
             {section.rows.map(row => (
               <HistoryRow
+                state={state}
                 key={row.event.id}
                 event={row.event}
                 timeLabel={row.timeLabel}
@@ -457,6 +478,7 @@ function ReviewSections({
 }
 
 function HistoryRow({
+  state,
   event,
   timeLabel,
   deleted = false,
@@ -465,6 +487,7 @@ function HistoryRow({
   onDelete,
   onRestore,
 }: {
+  state: GameState
   event: GameEvent
   timeLabel: string
   deleted?: boolean
@@ -475,12 +498,14 @@ function HistoryRow({
 }) {
   const [metadataOpen, setMetadataOpen] = useState(false)
   const contextDetail = eventContextDetail(event)
+  const lineupDetail = useMemo(() => event.eventType === 'soccer.lineup_transition' ? soccerLineupHistoryDetail(state, event) : null, [state, event])
+  const lineupLocked = event.eventType === 'soccer.lineup_transition' && soccerLineupManagerBlocked(state, false)
   return (
     <div className="min-h-16 px-3 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-800">{eventTitle(event)}</p>
-          <p className="truncate text-xs text-slate-500">{eventDetail(event)}</p>
+          <p className={lineupDetail ? 'text-xs text-slate-500' : 'truncate text-xs text-slate-500'}>{lineupDetail ?? eventDetail(event)}</p>
           {contextDetail && <p className="truncate text-[11px] text-slate-500">{contextDetail}</p>}
           {!review && (
             <p className="mt-0.5 text-[11px] text-slate-400">
@@ -501,7 +526,7 @@ function HistoryRow({
             </button>
           )}
         </div>
-        <div className="flex shrink-0 gap-1">
+        <div className={lineupLocked ? 'hidden' : 'flex shrink-0 gap-1'}>
           {deleted ? (
             onRestore && <button type="button" onClick={onRestore} className="grid h-9 w-9 place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
           ) : (
@@ -794,6 +819,7 @@ function eventTitle(event: GameEvent): string {
     'soccer.clock_adjusted': 'Clock corrected',
     'soccer.match_rules_changed': 'Rules changed',
     'soccer.substitution_window': 'Substitution window',
+    'soccer.lineup_transition': 'Lineup change',
     'soccer.role_changed': 'Roles changed',
     'soccer.attacking_direction_changed': 'Direction changed',
     'soccer.match_roster_added': 'Participant added',
