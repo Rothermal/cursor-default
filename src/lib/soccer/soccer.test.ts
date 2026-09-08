@@ -195,7 +195,7 @@ describe('soccer rules and production schemas', () => {
   })
 
   it('registers the SOC-2 and SOC-3A schemas and rejects malformed payloads', () => {
-    expect(soccerEventDefinitions).toHaveLength(25)
+    expect(soccerEventDefinitions).toHaveLength(26)
     const malformed = matchEvent(
       0,
       'soccer.opening_lineup',

@@ -22,8 +22,14 @@ import { createSoccerUuid } from './id'
 import { orderedSoccerSegments } from './rules'
 import { soccerLifecycleAction, soccerShootoutPeriod } from './shootout'
 import { elapsedSoccerClockMs } from './state'
+import { canonicalGameEventStreamForFingerprint, compareGameEventCaptureOrder } from '../gameEvents/stream'
+import { analyzeSoccerTargetLineup, isSoccerHalftimeBreak, type SoccerTargetLineupAnalysis } from './targetLineup'
+export { isSoccerHalftimeBreak } from './targetLineup'
 import type {
   SoccerAttackingDirection,
+  SoccerLineupEntry,
+  SoccerLineupTransitionPayload,
+  SoccerLineupTransitionSource,
   SoccerMatchEndedPayload,
   SoccerMatchEvent,
   SoccerMatchParticipant,
@@ -913,14 +919,89 @@ export function inspectSoccerHistory(state: GameState): GameEventInspection<Socc
   ).inspection as GameEventInspection<SoccerMatchEvent>
 }
 
-export function isSoccerHalftimeBreak(projection: SoccerMatchProjection): boolean {
-  const firstRegulationId = projection.currentRules.regulationSegments[0]?.id
-  return Boolean(
-    firstRegulationId &&
-    projection.status === 'period_break' &&
-    projection.completedPeriodIds.length === 1 &&
-    projection.completedPeriodIds[0] === firstRegulationId
-  )
+export interface SoccerLineupTransitionPreview {
+  fingerprint: string
+  payload: SoccerLineupTransitionPayload
+  analysis: SoccerTargetLineupAnalysis
+  eventId: string | null
+}
+
+export function previewSoccerLineupTransition(
+  state: GameState,
+  onField: SoccerLineupEntry[],
+  source: SoccerLineupTransitionSource = 'manual',
+  eventId: string | null = null
+): { ok: true; preview: SoccerLineupTransitionPreview } | { ok: false; message: string } {
+  if (state.sport?.id !== 'soccer' || state.sportGameState?.sportId !== 'soccer' || !state.eventStream) {
+    return { ok: false, message: 'An initialized soccer match is required.' }
+  }
+  if (state.cloudSync.gameStatus === 'final') {
+    return { ok: false, message: 'Reopen the final game before changing its lineup.' }
+  }
+  const rebuilt = rebuildGameEventProjection(state, gameEventRegistry, gameEventProjectors)
+  if (!rebuilt.inspection.complete || rebuilt.state.sportGameState?.sportId !== 'soccer') {
+    return { ok: false, message: 'Repair the match history before changing its lineup.' }
+  }
+  if (!soccerMatchActionsAvailable(rebuilt.state.sportGameState.projection)) {
+    return { ok: false, message: 'Lineup changes require an active match or period break.' }
+  }
+  let projection = rebuilt.state.sportGameState.projection
+  if (eventId !== null) {
+    const event = rebuilt.inspection.activeEvents.find(item => item.id === eventId)
+    if (!event || event.eventType !== 'soccer.lineup_transition') {
+      return { ok: false, message: 'The lineup transition is no longer available.' }
+    }
+    const prior = rebuildGameEventProjection({
+      ...state,
+      eventStream: { ...state.eventStream, events: rebuilt.inspection.activeEvents.filter(
+        item => compareGameEventCaptureOrder(item, event) < 0
+      ) },
+    }, gameEventRegistry, gameEventProjectors)
+    if (!prior.inspection.complete || prior.state.sportGameState?.sportId !== 'soccer') {
+      return { ok: false, message: 'The preceding lineup history is incomplete.' }
+    }
+    projection = prior.state.sportGameState.projection
+  }
+  const halftime = isSoccerHalftimeBreak(projection)
+  const analyzed = analyzeSoccerTargetLineup(projection, onField, {
+    elapsedMs: projection.clock.elapsedMs, halftime,
+    requireStoppedClock: true, requireDerivedHalftime: true, rejectNoOp: true,
+  })
+  if (!analyzed.ok) return analyzed
+  return { ok: true, preview: {
+    fingerprint: lineupTransitionFingerprint(state), eventId,
+    payload: { source, onField: analyzed.value.target, halftime },
+    analysis: analyzed.value,
+  } }
+}
+
+export function applySoccerLineupTransition(
+  state: GameState,
+  preview: SoccerLineupTransitionPreview,
+  options: SoccerLiveOptions
+): SoccerLiveResult {
+  if (preview.fingerprint !== lineupTransitionFingerprint(state)) {
+    return failure(state, 'Match history changed. Review the lineup again before applying.')
+  }
+  const fresh = previewSoccerLineupTransition(state, preview.payload.onField, preview.payload.source, preview.eventId)
+  if (!fresh.ok) return failure(state, fresh.message)
+  if (preview.eventId !== null) {
+    return updateSoccerHistoryEvent(state, preview.eventId, {
+      payload: fresh.preview.payload,
+    }, new Date(options.nowMs ?? Date.now()).toISOString())
+  }
+  return appendSpecs(state, options, [{
+    eventType: 'soccer.lineup_transition', payload: fresh.preview.payload,
+    elapsedMs: fresh.preview.analysis.elapsedMs,
+  }])
+}
+
+function lineupTransitionFingerprint(state: GameState): string {
+  return JSON.stringify({
+    setup: state.sportGameState?.sportId === 'soccer' ? state.sportGameState.setup : null,
+    stream: canonicalGameEventStreamForFingerprint(state.eventStream),
+    cloudSync: state.cloudSync,
+  })
 }
 
 export function soccerMatchActionsAvailable(

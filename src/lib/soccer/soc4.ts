@@ -1055,6 +1055,8 @@ function eventReferencesParticipant(event: SoccerMatchEvent, participantId: stri
         change.playerOutParticipantId === participantId ||
         change.playerInParticipantId === participantId
       )
+    case 'soccer.lineup_transition':
+      return event.payload.onField.some(entry => entry.participantId === participantId)
     case 'soccer.role_changed':
       return event.payload.changes.some(change => change.participantId === participantId)
     case 'soccer.match_roster_added':
