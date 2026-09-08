@@ -1,5 +1,6 @@
-import { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { Plus, X } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { X } from 'lucide-react'
+import SoccerLineupManager from './SoccerLineupManager'
 import type { GameState } from '../../types'
 import {
   addSoccerMatchParticipant,
@@ -8,11 +9,8 @@ import {
   endSoccerMatch,
   soccerLifecycleAction,
   formatSoccerInputTime,
-  isSoccerHalftimeBreak,
   parseSoccerInputTime,
-  recordSoccerRoleChanges,
   recordSoccerRulesChange,
-  recordSoccerSubstitution,
   resolveSoccerParticipant,
   soccerClockDisplayValue,
   soccerTieResolutionFromAvailability,
@@ -39,22 +37,11 @@ interface SoccerLiveActionDialogProps {
   recorderUserId: string | null
   initialParticipantId?: string | null
   busy: boolean
+  lineupDisabled?: boolean
   onApply: (result: SoccerLiveResult) => boolean
   onClose: () => void
 }
 
-interface SubstitutionDraft {
-  id: string
-  outgoingId: string
-  incomingId: string
-  role: SoccerRole
-}
-
-interface RoleDraft {
-  id: string
-  participantId: string
-  role: SoccerRole
-}
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
   { value: 'goalkeeper', label: 'Goalkeeper' },
@@ -70,12 +57,16 @@ export default function SoccerLiveActionDialog({
   recorderUserId,
   initialParticipantId = null,
   busy,
+  lineupDisabled = false,
   onApply,
   onClose,
 }: SoccerLiveActionDialogProps) {
   const [mutationError, setMutationError] = useState<string | null>(null)
   useEffect(() => setMutationError(null), [kind])
   if (!kind || state.sportGameState?.sportId !== 'soccer') return null
+  if (kind === 'substitution' || kind === 'roles') return <SoccerLineupManager
+    state={state} recorderUserId={recorderUserId} initialParticipantId={initialParticipantId}
+    busy={busy || lineupDisabled} onApply={onApply} onClose={onClose} />
   const options: SoccerLiveOptions = { recorderUserId }
   const apply = (result: SoccerLiveResult) => {
     if (!result.ok) {
@@ -97,17 +88,6 @@ export default function SoccerLiveActionDialog({
   return (
     <Dialog title={titles[kind]} onClose={onClose}>
       <fieldset disabled={busy} className={busy ? 'contents opacity-60' : 'contents'}>
-      {kind === 'substitution' && (
-        <SubstitutionForm state={state} options={options} onApply={apply} />
-      )}
-      {kind === 'roles' && (
-        <RoleChangeForm
-          state={state}
-          options={options}
-          initialParticipantId={initialParticipantId}
-          onApply={apply}
-        />
-      )}
       {kind === 'clock' && (
         <ClockCorrectionForm state={state} options={options} onApply={apply} />
       )}
@@ -134,158 +114,6 @@ export default function SoccerLiveActionDialog({
   )
 }
 
-function SubstitutionForm({ state, options, onApply }: FormProps) {
-  const projection = soccerProjection(state)
-  const onField = Object.values(projection.participants).filter(item => item.status === 'on_field')
-  const available = Object.values(projection.participants).filter(item =>
-    item.status !== 'on_field' && (!item.hasExited || projection.currentRules.allowReturnSubstitutions)
-  )
-  const [halftime, setHalftime] = useState(isSoccerHalftimeBreak(projection))
-  const [drafts, setDrafts] = useState<SubstitutionDraft[]>([
-    substitutionDraft(onField[0]?.participantId ?? '', available[0]),
-  ])
-  const [error, setError] = useState<string | null>(null)
-
-  const submit = () => {
-    const changes = drafts.map(draft => ({
-      playerOutParticipantId: draft.outgoingId || null,
-      playerInParticipantId: draft.incomingId || null,
-      playerInRole: draft.incomingId ? draft.role : null,
-    }))
-    if (changes.some(change => !change.playerOutParticipantId && !change.playerInParticipantId)) {
-      setError('Each row needs a player leaving, entering, or both.')
-      return
-    }
-    if (drafts.some(draft => draft.role.group === 'custom' && !draft.role.label?.trim())) {
-      setError('Enter a label for every custom role.')
-      return
-    }
-    onApply(recordSoccerSubstitution(state, changes, halftime, options))
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <Metric label="On field" value={`${onField.length}/${projection.currentRules.maxOnFieldPlayers}`} />
-        <Metric label="Subs used" value={limitValue(projection.substitutionCount, projection.currentRules.substitutionLimit)} />
-        <Metric label="Windows" value={limitValue(projection.substitutionWindowCount, projection.currentRules.substitutionWindowLimit)} />
-      </div>
-      <div className="space-y-3">
-        {drafts.map((draft, index) => (
-          <div key={draft.id} className="border border-slate-200 rounded-md p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Change {index + 1}</span>
-              {drafts.length > 1 && (
-                <button type="button" onClick={() => setDrafts(current => current.filter(item => item.id !== draft.id))} className="h-7 w-7 grid place-items-center text-slate-400" aria-label={`Remove change ${index + 1}`} title="Remove">
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ParticipantSelect
-                label="Player out"
-                value={draft.outgoingId}
-                participants={onField}
-                emptyLabel="No player out"
-                onChange={outgoingId => updateById(setDrafts, draft.id, { outgoingId })}
-              />
-              <ParticipantSelect
-                label="Player in"
-                value={draft.incomingId}
-                participants={available}
-                emptyLabel="No player in"
-                onChange={incomingId => {
-                  const participant = available.find(item => item.participantId === incomingId)
-                  updateById(setDrafts, draft.id, {
-                    incomingId,
-                    role: participant?.role ?? draft.role,
-                  })
-                }}
-              />
-            </div>
-            {draft.incomingId && (
-              <RoleFields
-                role={draft.role}
-                onChange={role => updateById(setDrafts, draft.id, { role })}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-      <button type="button" onClick={() => setDrafts(current => [...current, substitutionDraft('', undefined)])} className="btn-secondary w-full flex items-center justify-center gap-2">
-        <Plus size={17} /> Add change
-      </button>
-      {projection.status === 'period_break' && (
-        <label className="flex items-center justify-between text-sm font-medium text-slate-700">
-          Halftime window
-          <input type="checkbox" checked={halftime} onChange={event => setHalftime(event.target.checked)} className="h-5 w-5 accent-emerald-600" />
-        </label>
-      )}
-      <FormError message={error} />
-      <SubmitButton label="Record Substitution" onClick={submit} />
-    </div>
-  )
-}
-
-function RoleChangeForm({ state, options, initialParticipantId, onApply }: FormProps & { initialParticipantId: string | null }) {
-  const projection = soccerProjection(state)
-  const participants = Object.values(projection.participants).filter(item => item.status !== 'left')
-  const initial = participants.find(item => item.participantId === initialParticipantId) ?? participants[0]
-  const [drafts, setDrafts] = useState<RoleDraft[]>([
-    { id: createSoccerUuid(), participantId: initial?.participantId ?? '', role: initial?.role ?? defaultRole() },
-  ])
-  const [error, setError] = useState<string | null>(null)
-
-  const submit = () => {
-    if (drafts.some(draft => !draft.participantId)) {
-      setError('Choose a participant for every role change.')
-      return
-    }
-    if (new Set(drafts.map(draft => draft.participantId)).size !== drafts.length) {
-      setError('Each participant can appear only once.')
-      return
-    }
-    if (drafts.some(draft => draft.role.group === 'custom' && !draft.role.label?.trim())) {
-      setError('Enter a label for every custom role.')
-      return
-    }
-    onApply(recordSoccerRoleChanges(
-      state,
-      drafts.map(draft => ({ participantId: draft.participantId, role: draft.role })),
-      options
-    ))
-  }
-
-  return (
-    <div className="space-y-3">
-      {drafts.map((draft, index) => (
-        <div key={draft.id} className="border border-slate-200 rounded-md p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">Role change {index + 1}</span>
-            {drafts.length > 1 && (
-              <button type="button" onClick={() => setDrafts(current => current.filter(item => item.id !== draft.id))} className="h-7 w-7 grid place-items-center text-slate-400" aria-label={`Remove role change ${index + 1}`} title="Remove"><X size={16} /></button>
-            )}
-          </div>
-          <ParticipantSelect
-            label="Participant"
-            value={draft.participantId}
-            participants={participants}
-            onChange={participantId => {
-              const participant = participants.find(item => item.participantId === participantId)
-              updateById(setDrafts, draft.id, { participantId, role: participant?.role ?? draft.role })
-            }}
-          />
-          <RoleFields role={draft.role} onChange={role => updateById(setDrafts, draft.id, { role })} />
-        </div>
-      ))}
-      <button type="button" onClick={() => setDrafts(current => [...current, { id: createSoccerUuid(), participantId: '', role: defaultRole() }])} className="btn-secondary w-full flex items-center justify-center gap-2">
-        <Plus size={17} /> Add role change
-      </button>
-      <FormError message={error} />
-      <SubmitButton label="Record Role Changes" onClick={submit} />
-    </div>
-  )
-}
 
 function ClockCorrectionForm({ state, options, onApply }: FormProps) {
   const projection = soccerProjection(state)
@@ -561,9 +389,6 @@ function RoleFields({ role, onChange }: { role: SoccerRole; onChange: (role: Soc
   )
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div className="border border-slate-200 rounded-md px-2 py-2"><p className="font-bold text-slate-800 tabular-nums">{value}</p><p className="text-[11px] text-slate-500">{label}</p></div>
-}
 
 function SubmitButton({ label, onClick, danger = false }: { label: string; onClick: () => void; danger?: boolean }) {
   return <button type="button" onClick={onClick} className={`w-full rounded-md px-4 py-3 text-sm font-bold text-white ${danger ? 'bg-red-600' : 'bg-emerald-700'}`}>{label}</button>
@@ -591,28 +416,4 @@ function FormError({ message }: { message: string | null }) {
 
 function defaultRole(): SoccerRole {
   return { group: 'midfielder', label: null }
-}
-
-function substitutionDraft(
-  outgoingId: string,
-  incoming: { participantId: string; role: SoccerRole } | undefined
-): SubstitutionDraft {
-  return {
-    id: createSoccerUuid(),
-    outgoingId,
-    incomingId: incoming?.participantId ?? '',
-    role: incoming?.role ?? defaultRole(),
-  }
-}
-
-function updateById<T extends { id: string }>(
-  setter: Dispatch<SetStateAction<T[]>>,
-  id: string,
-  patch: Partial<T>
-) {
-  setter(current => current.map(item => item.id === id ? { ...item, ...patch } : item))
-}
-
-function limitValue(used: number, limit: number | null): string {
-  return limit === null ? `${used}/-` : `${used}/${limit}`
 }
