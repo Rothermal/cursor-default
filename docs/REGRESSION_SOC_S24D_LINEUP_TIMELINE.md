@@ -5,7 +5,12 @@ migration is needed beyond the already-applied 069.
 
 ## Automated and local checks
 
-- Full suite: 201 files / 1,435 tests pass. Production build includes TypeScript.
+- Final PR #384 validation: 201 files / 1,436 tests pass. Production build
+  includes TypeScript; lint has zero errors and three existing warnings.
+- Review hardening verifies one projection pass for active and removed lineup
+  details, shared custom-role label diffs, defensive removed-row filtering,
+  and callback isolation from replay state. Locked controls remain visible
+  but disabled, including during apply; correction headers use period labels.
 - Shared live/Summary Lineup filters include the one-event transition. Review
   derives entrants, exits, and retained-player role changes from preceding
   capture history, with source, time, halftime, and revision context.

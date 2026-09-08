@@ -759,7 +759,7 @@ to team defaults.
 
 ### S24 - Live lineup manager and match presets
 
-**Status:** approved phased plan; implementation pending - see
+**Status:** S24A-S24D implemented; migration 069 applied; deployed owner regression pending - see
 [`PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md`](PLAN_SOC_S24_LIVE_LINEUP_MANAGER.md)
 **Theme:** live lineup / batch transition
 **Where:** tracker Lineup tab; S19 team formation catalog and assignments
@@ -914,7 +914,7 @@ S11 Default player role carried between games
 S21 Name the season when creating it
 S19 Team formation lineup on a pitch
 S23 Team-level default starter and bench status
-S24 Live lineup manager and match presets
+S24 Live lineup manager and match presets [implemented; deployed verification pending]
 S6  Explicit clock start and usable sideline correction
 S9  Persist and clarify field orientation
 S1  Faster shot and goal capture
@@ -940,7 +940,7 @@ extra goal metadata stays a skippable step, not another full attacking sheet.
 `S17` / `S20` have finished restart capture and owner functional verification;
 the shared completion-loop defect found during that run was fixed by PR #373.
 `S7` can now plan the next-shot link. `S23`
-extends setup defaults; the approved `S24A-S24D` plan owns the separate live
+extends setup defaults; the implemented `S24A-S24D` plan owns the separate live
 atomic-transition workflow.
 `M*` items stay behind a new phase name if promoted.
 
@@ -951,7 +951,7 @@ Use these labels before turning an item into an implementation plan:
 | State | Items | Next action |
 |---|---|---|
 | Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16` | Short Q&A where choices remain, then a focused phase plan |
-| Approved phased plan; implementation pending | `S24` | Implement S24A-S24D from the focused live-lineup plan |
+| Implemented; migration 069 applied; deployed verification pending | `S24` | Run the focused S24A-S24D regression records, including [grouped Timeline review](REGRESSION_SOC_S24D_LINEUP_TIMELINE.md) |
 | Implemented; pending deployed verification | `S23` | Run the S23A-S23C settings/editor/setup regression records against the deployed app |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
 | Implemented cross-sport live labels | `S26` | Keep internal side ids stable and include nickname fallback in later sport UI regression |
@@ -986,8 +986,9 @@ exercise those constraints rather than bypass them.
   drafts. Migration 065 is applied; verify current team-setting round trips and
   setup prefill in the deployed app. `S23A-S23C` implement the schema-v3
   standalone starter/bench settings, Team Manage editor, and formation-first
-  setup prefill with migration 068 applied. `S24A-S24D` now own the separate
-  frozen-preset, live target-lineup, and grouped-correction workflow.
+  setup prefill with migration 068 applied. `S24A-S24D` implement the separate
+  frozen-preset, live target-lineup, and grouped-correction workflow with
+  migration 069 applied; deployed owner verification remains pending.
 - **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
   steps so metadata never blocks the primary save.
 - **Restarts:** `S17` + `S20` are implemented through
