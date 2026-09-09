@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/SportSelect.tsx",
+  "src/pages/SportDashboard.tsx",
   "src/App.tsx",
   "src/components/ConfirmDialog.tsx",
   "src/components/AppShell.tsx",
@@ -24,12 +26,20 @@ const surfaces = [
 const rawColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeholder|caret|accent|outline|decoration|shadow)-(?:(?:[a-z]+-)+\d{2,3}\b|\[(?:#|(?:rgb|hsl|oklch|oklab|lab|lch|color)\())/
 const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeholder|caret|accent|outline|decoration|shadow)-(?:white|black)(?:[\s/'"\x60]|$)/
 
-describe('THM-2 shell and Settings color ownership', () => {
+const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
+
+describe('Converted application surface color ownership', () => {
   it.each(surfaces)('%s uses semantic utility colors', path => {
     const source = readFileSync(path, 'utf8')
     expect(source).not.toMatch(rawColor)
     expect(source).not.toMatch(fixedColor)
-    expect(source).not.toContain('transition-colors')
+    expect(source).not.toMatch(colorTransition)
+  })
+  it.each(['transition', 'transition-all', 'transition-colors', 'hover:transition-all', 'className="transition"', "'transition-colors'", '`transition-all`'])('rejects color transition %s', value => {
+    expect(value).toMatch(colorTransition)
+  })
+  it.each(['transition-transform', 'transition-opacity', 'transition-shadow', 'transition-none', 'hover:transition-transform'])('allows non-color transition %s', value => {
+    expect(value).not.toMatch(colorTransition)
   })
   it.each(['text-zinc-500', 'bg-sky-600', 'bg-[#ff0000]', 'bg-[rgb(255,0,0)]', 'ring-offset-slate-50', 'fill-rose-500', 'placeholder:text-teal-500', 'via-yellow-100'])('rejects raw color %s', value => {
     expect(value).toMatch(rawColor)

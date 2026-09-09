@@ -23,15 +23,15 @@ export default function SportSelect() {
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 px-4 py-8 max-w-lg mx-auto w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">StatKeeper</h1>
-          <p className="text-slate-500 mt-2">Choose a sport workspace</p>
+          <h1 className="text-3xl font-bold text-content">StatKeeper</h1>
+          <p className="text-content-muted mt-2">Choose a sport workspace</p>
         </div>
 
-        <h2 className="text-lg font-semibold text-slate-700 mb-3">Sports</h2>
+        <h2 className="text-lg font-semibold text-content mb-3">Sports</h2>
 
         {enabledSports.length === 0 ? (
           <div className="card text-center py-12">
-            <p className="text-slate-500 mb-4">No sports enabled yet.</p>
+            <p className="text-content-muted mb-4">No sports enabled yet.</p>
             <button
               type="button"
               onClick={() => navigate('/settings/app')}
@@ -59,24 +59,24 @@ export default function SportSelect() {
                   key={sport.id}
                   type="button"
                   onClick={() => navigate(sportDashboardPath(sport.id))}
-                  className="card text-left flex items-center gap-3 hover:border-blue-200 hover:shadow-md active:scale-[0.99] transition-all"
+                  className="card text-left flex items-center gap-3 hover:border-info-line hover:shadow-md active:scale-[0.99] transition-transform"
                 >
                   <span className="text-4xl w-12 text-center shrink-0">{sport.icon}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-semibold text-slate-800">{sport.name}</span>
-                    <span className="block text-xs text-slate-500">
+                    <span className="block font-semibold text-content">{sport.name}</span>
+                    <span className="block text-xs text-content-muted">
                       {releaseStage === 'preview' ? 'Match setup preview' : `${statCount} stats`}
                       {parkedForSport.length > 0 ? ` - ${parkedForSport.length} parked` : ''}
                     </span>
                   </span>
                   <span className="flex flex-col items-end gap-1 shrink-0">
                     {hasActiveGame && (
-                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                      <span className="rounded-full bg-info px-2 py-0.5 text-[11px] font-semibold text-info-content">
                         Active
                       </span>
                     )}
                     {needsSync && (
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                      <span className="rounded-full bg-warning px-2 py-0.5 text-[11px] font-semibold text-warning-content">
                         Sync
                       </span>
                     )}
@@ -87,7 +87,7 @@ export default function SportSelect() {
           </div>
         )}
 
-        <p className="text-center text-xs text-slate-400 mt-8">
+        <p className="text-center text-xs text-content-subtle mt-8">
           v0.1.0
         </p>
       </div>
