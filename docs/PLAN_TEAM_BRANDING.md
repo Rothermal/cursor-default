@@ -2,6 +2,9 @@
 
 Status: high-level product direction approved; detailed slice plans pending.
 
+Depends on: THM-1 through THM-6 for release; existing accepted team-membership
+permissions and revision-aware settings patterns for the later branding slices.
+
 ## 1. Purpose and sequence
 
 Team identity is a presentation layer on top of
@@ -57,8 +60,14 @@ server-side revocation until reconnection; define retention in detailed planning
 
 After THM-6, define versioned team-branding metadata, validated color input,
 server-enforced owner/admin writes, stale-edit protection, and explicit reset.
-Use a separate compact Branding tab in Team Manage to avoid extending scrolling
-settings pages. Read-only users see the current identity without save controls.
+Add a sport-neutral management view selector in `src/pages/Teams.tsx` under
+`isManagementRoute`, with the existing management content and a separate compact
+Branding view. This is new host work, not an existing tab: `TeamManage.tsx` only
+wraps `TeamsPage`. Do not put Branding inside Soccer/Basketball settings tabs or
+gate it on either sport panel. Preserve current management behavior and keep the
+branding editor off the long default page. Detailed TBR-1 planning must settle
+view routing and navigation state. Read-only users see identity without save
+controls.
 
 Define a narrow scoped token map with safe accent/foreground combinations for
 both appearance modes. Preserve original chosen colors as identity swatches;
@@ -103,11 +112,30 @@ These are not yet approved implementation contracts:
 
 - Exact metadata schema, revision/write API, audit scope, and cache lifetime.
 - Exact accent-bearing controls and contrast derivation/fallback rules.
-- Whether an existing authorized opponent link is available on each game route;
-  creating reusable opponent identities remains separate work.
+- Recheck the opponent-identity baseline before implementation; adding reusable
+  opponent identities remains separate work, not a TBR-1/TBR-2 prerequisite.
 - Logo format/byte/dimension limits, processing strategy, storage authorization,
   replacement cleanup, and bounded offline cache behavior.
 
 Next planning step: refine THM-1's runtime/token/shared-primitive scope. Do not
 block that work on logo storage decisions, and do not expand it into branding
 persistence. Cross-sport branding does not imply shared sport rules or layouts.
+
+## 7. Codebase grounding
+
+Verified during PR #386 review; these are reuse precedents, not a finalized schema.
+
+| Existing location | Planning consequence |
+|---|---|
+| `src/pages/TeamManage.tsx`, `src/pages/Teams.tsx` | Wrapper and actual management host; introduce the sport-neutral Branding view here rather than duplicating it inside sport panels. |
+| `src/components/settings/SoccerTeamSettingsPanel.tsx`, `src/components/settings/BasketballTeamSettingsPanel.tsx` | Sport-owned, conditional panels; keep their rules/formation/lineup tabs separate from branding. |
+| `src/lib/teamPermissions.ts` (`canManageTeam`) | Reuse accepted owner/admin UI permission semantics; enforce equivalent membership authority on the server, not just in the editor. |
+| `supabase/migrations/048_soccer_settings_foundation.sql`, `supabase/migrations/062_basketball_settings_foundation.sql` | Precedents for versioned settings, expected-revision writes, conflict results, and transactional audit. Prefer a sport-neutral sibling contract; do not place branding in sport rule JSON or widen existing sport RPCs. Exact schema and migration remain TBR-1 decisions. |
+| `src/hooks/useSoccerTeamSettings.ts`, `src/hooks/useBasketballTeamSettings.ts` | Follow account/team scope, stale-response protection, online saves, and explicit reload on revision conflict. Do not invent automatic merging of competing manager edits. |
+| `src/lib/sportSettingsCloud.ts`, `src/lib/sportSettingsStorage.ts` | Inspect transport/cache utilities before adding parallel infrastructure; reuse suitable mechanics without assigning branding a fake sport ID. Branding sign-out/revocation and image-cache cleanup must be explicitly verified, not assumed from these precedents. |
+| `src/types.ts` (`GameInfo.opponentName`) | Opponents are currently free-text identities. Repository search finds no `opponentTeamId` or `opponent_team_id` in source or migrations. |
+
+Therefore all current opponents use nickname/name plus neutral fallback. The
+approved opponent identity-area branding rule is future-facing: enable it only
+after separate opponent-link work provides an explicit authorized stable ID.
+Neither branding phase creates opponent links or matches teams by display name.
