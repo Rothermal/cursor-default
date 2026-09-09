@@ -1,6 +1,6 @@
 # Plan: App theming and dark mode
 
-Status: approved high-level direction; implementation phases not started
+Status: THM-1 foundation implemented; THM-2 through THM-6 pending
 
 This roadmap makes StatKeeper themeable across authentication, administration,
 team/game management, live sport workspaces, and review destinations. Light and
@@ -76,8 +76,9 @@ cards, low-contrast text, Light inputs, and mismatched dialogs throughout the ap
 ## 4. Settled product decisions
 
 1. First-release choices are exactly **Light** and **Dark**.
-2. Light is the compatibility default. Existing users do not change appearance
-   until they explicitly choose Dark.
+2. Light remains the default mode, but receives an intentional refreshed neutral
+   palette as surfaces convert. Compatibility means preserving behavior and
+   readability, not freezing the existing colors. Dark is an explicit choice.
 3. Appearance is a device-local App setting, not an account/team/sport setting.
 4. The control lives in **Settings -> App**, separate from sport settings.
 5. No quick header/footer theme toggle is required in the first release.
@@ -238,6 +239,10 @@ default migration path is token replacement.
 ### THM-1 - Runtime, tokens, and shared primitives
 
 Goal: establish the contract without exposing an incomplete Dark experience.
+
+Implemented scope and approved Q&A: [THM-1 foundation](PLAN_THM_1_FOUNDATION.md).
+Verification: [THM-1 regression](REGRESSION_THM_1_FOUNDATION.md). Production is
+explicitly Light-gated until THM-6, not merely missing a visible selector.
 
 - Add strict Light/Dark appearance-record parsing and defaults.
 - Add pre-React bootstrap and runtime document application helpers.
