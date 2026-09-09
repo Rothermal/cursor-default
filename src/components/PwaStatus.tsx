@@ -68,17 +68,17 @@ export default function PwaStatus() {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className="pointer-events-auto mx-auto flex max-w-lg items-start gap-3 rounded-md border border-slate-300 bg-white p-3 shadow-xl"
+        className="pointer-events-auto mx-auto flex max-w-lg items-start gap-3 rounded-md border border-line-strong bg-surface p-3 shadow-xl"
       >
         {needRefresh ? (
-          <Download className="mt-0.5 shrink-0 text-blue-700" size={20} aria-hidden />
+          <Download className="mt-0.5 shrink-0 text-info-content" size={20} aria-hidden />
         ) : !online ? (
-          <CloudOff className="mt-0.5 shrink-0 text-amber-700" size={20} aria-hidden />
+          <CloudOff className="mt-0.5 shrink-0 text-warning-content" size={20} aria-hidden />
         ) : (
-          <RefreshCw className="mt-0.5 shrink-0 text-emerald-700" size={20} aria-hidden />
+          <RefreshCw className="mt-0.5 shrink-0 text-success-content" size={20} aria-hidden />
         )}
         <div className="min-w-0 flex-1">
-          <p className="font-bold text-slate-900">
+          <p className="font-bold text-content">
             {needRefresh
               ? 'App update ready'
               : !online
@@ -87,7 +87,7 @@ export default function PwaStatus() {
                   ? 'Update check needs attention'
                   : 'Offline use is ready'}
           </p>
-          <p className="mt-0.5 text-sm text-slate-600">
+          <p className="mt-0.5 text-sm text-content-muted">
             {needRefresh
               ? `Build ${APP_BUILD_LABEL} stays active until you choose Update. Existing games remain saved.`
               : !online
@@ -119,7 +119,7 @@ export default function PwaStatus() {
           <button
             type="button"
             onClick={dismiss}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-muted hover:bg-surface-muted"
             aria-label="Dismiss app status"
           >
             <X size={18} aria-hidden />

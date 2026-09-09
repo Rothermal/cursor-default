@@ -54,28 +54,28 @@ export default function AuditTrailPanel({
       <div>
         <h2
           id={`audit-heading-${teamId ?? 'global'}`}
-          className="text-lg font-semibold text-slate-800"
+          className="text-lg font-semibold text-content"
         >
           {title}
         </h2>
       </div>
 
       {error && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+        <p className="text-sm text-danger-content bg-danger border border-danger-line rounded-md px-3 py-2">
           {error}
         </p>
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500 animate-pulse py-3">Loading activity...</p>
+        <p className="text-sm text-content-muted animate-pulse py-3">Loading activity...</p>
       ) : events.length === 0 ? (
-        <p className="text-sm text-slate-500 py-3">No access activity recorded yet.</p>
+        <p className="text-sm text-content-muted py-3">No access activity recorded yet.</p>
       ) : (
-        <ol className="border-y border-slate-200 max-h-96 overflow-y-auto">
+        <ol className="border-y border-line max-h-96 overflow-y-auto">
           {events.map(event => (
-            <li key={event.id} className="py-3 border-b border-slate-100 last:border-b-0">
-              <p className="text-sm text-slate-700">{formatAuditEvent(event)}</p>
-              <p className="text-xs text-slate-500 mt-1">
+            <li key={event.id} className="py-3 border-b border-line last:border-b-0">
+              <p className="text-sm text-content">{formatAuditEvent(event)}</p>
+              <p className="text-xs text-content-muted mt-1">
                 {new Date(event.createdAt).toLocaleString()}
                 {!teamId && event.teamName ? ` - ${event.teamName}` : ''}
               </p>

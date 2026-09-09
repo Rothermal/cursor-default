@@ -30,16 +30,16 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">📊 StatKeeper</h1>
-          <p className="text-slate-500 mb-6">Track game stats in real time</p>
-          <div className="card bg-amber-50 border-amber-200 text-amber-800 text-sm">
+          <h1 className="text-3xl font-bold text-content mb-2">📊 StatKeeper</h1>
+          <p className="text-content-muted mb-6">Track game stats in real time</p>
+          <div className="card bg-warning border-warning-line text-warning-content text-sm">
             <p className="font-semibold mb-1">Supabase not configured</p>
             <p>
-              Add <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code> and{' '}
-              <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_PUBLISHABLE_KEY</code> to your{' '}
-              <code className="bg-amber-100 px-1 rounded">.env</code> file to enable cloud features.
+              Add <code className="bg-warning px-1 rounded">VITE_SUPABASE_URL</code> and{' '}
+              <code className="bg-warning px-1 rounded">VITE_SUPABASE_PUBLISHABLE_KEY</code> to your{' '}
+              <code className="bg-warning px-1 rounded">.env</code> file to enable cloud features.
               <span className="block mt-1">
-                Legacy <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> still works.
+                Legacy <code className="bg-warning px-1 rounded">VITE_SUPABASE_ANON_KEY</code> still works.
               </span>
             </p>
           </div>
@@ -82,10 +82,10 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">📊 StatKeeper</h1>
-          <div className="card bg-emerald-50 border-emerald-200 mt-6">
-            <p className="text-emerald-800 font-semibold mb-1">Account created!</p>
-            <p className="text-emerald-700 text-sm">
+          <h1 className="text-3xl font-bold text-content mb-2">📊 StatKeeper</h1>
+          <div className="card bg-success border-success-line mt-6">
+            <p className="text-success-content font-semibold mb-1">Account created!</p>
+            <p className="text-success-content text-sm">
               Check your email to confirm your account, then sign in.
             </p>
           </div>
@@ -104,16 +104,16 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">📊 StatKeeper</h1>
-          <p className="text-slate-500 mt-2">Track game stats in real time</p>
+          <h1 className="text-3xl font-bold text-content">📊 StatKeeper</h1>
+          <p className="text-content-muted mt-2">Track game stats in real time</p>
         </div>
 
         <div className="card">
           {contextTitle && (
-            <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-              <p className="text-sm font-semibold text-blue-800">{contextTitle}</p>
+            <div className="mb-5 rounded-lg border border-info-line bg-info px-3 py-2">
+              <p className="text-sm font-semibold text-info-content">{contextTitle}</p>
               {contextMessage && (
-                <p className="mt-1 text-xs text-blue-700">{contextMessage}</p>
+                <p className="mt-1 text-xs text-info-content">{contextMessage}</p>
               )}
             </div>
           )}
@@ -121,7 +121,7 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
             type="button"
             onClick={() => void handleGoogleSignIn()}
             disabled={loading}
-            className="w-full min-h-12 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60 flex items-center justify-center gap-3"
+            className="w-full min-h-12 rounded-lg border border-line-strong bg-surface px-4 py-3 text-sm font-semibold text-content shadow-sm  hover:bg-canvas disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled flex items-center justify-center gap-3"
           >
             <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
               <path
@@ -145,26 +145,26 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
           </button>
 
           {error && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+            <div className="mt-4 bg-danger border border-danger-line rounded-xl p-3 text-sm text-danger-content">
               {error}
             </div>
           )}
 
           <div className="my-5 flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <div className="h-px flex-1 bg-surface-muted" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-content-subtle">
               Email fallback
             </span>
-            <div className="h-px flex-1 bg-slate-200" />
+            <div className="h-px flex-1 bg-surface-muted" />
           </div>
 
-          <div className="flex rounded-xl bg-slate-100 p-1 mb-6">
+          <div className="flex rounded-xl bg-surface-muted p-1 mb-6">
             <button
               type="button"
               disabled={loading}
               onClick={() => { setMode('signin'); setError(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                mode === 'signin' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold  ${
+                mode === 'signin' ? 'bg-surface shadow text-content' : 'text-content-muted'
               }`}
             >
               Sign In
@@ -173,8 +173,8 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
               type="button"
               disabled={loading}
               onClick={() => { setMode('signup'); setError(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                mode === 'signup' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold  ${
+                mode === 'signup' ? 'bg-surface shadow text-content' : 'text-content-muted'
               }`}
             >
               Sign Up
@@ -184,7 +184,7 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">
+                <label className="block text-sm font-medium text-content-muted mb-1">
                   Display Name
                 </label>
                 <input
@@ -199,7 +199,7 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Email</label>
+              <label className="block text-sm font-medium text-content-muted mb-1">Email</label>
               <input
                 type="email"
                 value={email}
@@ -211,7 +211,7 @@ export default function Auth({ contextTitle, contextMessage }: AuthProps = {}) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Password</label>
+              <label className="block text-sm font-medium text-content-muted mb-1">Password</label>
               <input
                 type="password"
                 value={password}

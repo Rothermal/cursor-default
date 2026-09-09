@@ -195,21 +195,21 @@ export default function MergePlayerWizard({
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-overlay/40 p-0 sm:p-4">
       <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-lg max-h-[min(92vh,720px)] flex flex-col"
+        className="bg-surface-elevated rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-lg max-h-[min(92vh,720px)] flex flex-col"
         role="dialog"
         aria-labelledby="merge-wizard-title"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
-          <h2 id="merge-wizard-title" className="text-lg font-semibold text-slate-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
+          <h2 id="merge-wizard-title" className="text-lg font-semibold text-content">
             Merge duplicate player
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-xl leading-none px-2"
+            className="text-content-subtle hover:text-content-muted text-xl leading-none px-2"
             aria-label="Close"
           >
             ×
@@ -218,17 +218,17 @@ export default function MergePlayerWizard({
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {error && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+            <div className="text-sm text-danger-content bg-danger border border-danger-line rounded-lg px-3 py-2">{error}</div>
           )}
 
           {step === 'intro' && (
-            <div className="space-y-3 text-sm text-slate-600">
+            <div className="space-y-3 text-sm text-content-muted">
               <p>
                 Combine two player profiles that represent the same person. The <strong>survivor</strong> keeps their
                 id; the <strong>duplicate</strong> is removed after all games, stats, and roster links move to the
                 survivor.
               </p>
-              <p className="text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <p className="text-warning-content bg-warning border border-warning-line rounded-lg px-3 py-2">
                 This cannot be undone. Avoid merging during an active tracked game.
               </p>
               <p>You must be a team owner or admin on every team either player is on.</p>
@@ -241,7 +241,7 @@ export default function MergePlayerWizard({
           {step === 'pick' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Player to keep (survivor)</label>
+                <label className="block text-xs font-medium text-content-muted mb-1">Player to keep (survivor)</label>
                 <select
                   value={survivorId}
                   onChange={e => setSurvivorId(e.target.value)}
@@ -256,7 +256,7 @@ export default function MergePlayerWizard({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Duplicate to remove</label>
+                <label className="block text-xs font-medium text-content-muted mb-1">Duplicate to remove</label>
                 <select
                   value={duplicateId}
                   onChange={e => setDuplicateId(e.target.value)}
@@ -280,7 +280,7 @@ export default function MergePlayerWizard({
               >
                 {loading ? 'Loading conflicts…' : 'Load conflicts'}
               </button>
-              <button type="button" className="text-sm text-slate-500 underline w-full" onClick={() => setStep('intro')}>
+              <button type="button" className="text-sm text-content-muted underline w-full" onClick={() => setStep('intro')}>
                 Back
               </button>
             </div>
@@ -288,18 +288,18 @@ export default function MergePlayerWizard({
 
           {step === 'resolve' && preview && (
             <div className="space-y-6">
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-content-muted">
                 Keep: <strong>{survivor ? playerRosterSelectLabel(survivor) : '—'}</strong> · Remove:{' '}
                 <strong>{duplicate ? playerRosterSelectLabel(duplicate) : '—'}</strong>
               </p>
 
               {preview.game_stats.length > 0 && (
                 <section className="space-y-3">
-                  <h3 className="font-semibold text-slate-700 text-sm">Conflicting stat lines</h3>
-                  <p className="text-xs text-slate-500">Same game, recorder, and stat recorded for both players.</p>
+                  <h3 className="font-semibold text-content text-sm">Conflicting stat lines</h3>
+                  <p className="text-xs text-content-muted">Same game, recorder, and stat recorded for both players.</p>
                   {preview.game_stats.map((row, i) => (
-                    <div key={`${row.game_id}-${row.recorded_by}-${row.stat_id}`} className="border border-slate-200 rounded-lg p-3 space-y-2">
-                      <p className="text-xs text-slate-500">
+                    <div key={`${row.game_id}-${row.recorded_by}-${row.stat_id}`} className="border border-line rounded-lg p-3 space-y-2">
+                      <p className="text-xs text-content-muted">
                         {row.game_date} vs {row.opponent_name} · {row.stat_id} · {row.recorder_display}
                       </p>
                       <div className="flex flex-col gap-2">
@@ -345,10 +345,10 @@ export default function MergePlayerWizard({
 
               {preview.stat_corrections.length > 0 && (
                 <section className="space-y-3">
-                  <h3 className="font-semibold text-slate-700 text-sm">Conflicting stat corrections</h3>
+                  <h3 className="font-semibold text-content text-sm">Conflicting stat corrections</h3>
                   {preview.stat_corrections.map((row, i) => (
-                    <div key={`${row.game_id}-${row.stat_id}`} className="border border-slate-200 rounded-lg p-3 space-y-2">
-                      <p className="text-xs text-slate-500">
+                    <div key={`${row.game_id}-${row.stat_id}`} className="border border-line rounded-lg p-3 space-y-2">
+                      <p className="text-xs text-content-muted">
                         {row.game_date} · {row.stat_id}
                       </p>
                       <div className="flex flex-col gap-2 text-sm">
@@ -385,12 +385,12 @@ export default function MergePlayerWizard({
 
               {preview.team_players.length > 0 && (
                 <section className="space-y-3">
-                  <h3 className="font-semibold text-slate-700 text-sm">Same team on both profiles</h3>
-                  <p className="text-xs text-slate-500">Set the single roster row to keep for each team.</p>
+                  <h3 className="font-semibold text-content text-sm">Same team on both profiles</h3>
+                  <p className="text-xs text-content-muted">Set the single roster row to keep for each team.</p>
                   {preview.team_players.map((row, i) => (
-                    <div key={row.team_id} className="border border-slate-200 rounded-lg p-3 space-y-2">
-                      <p className="text-sm font-medium text-slate-700">{row.team_name}</p>
-                      <p className="text-xs text-slate-500">
+                    <div key={row.team_id} className="border border-line rounded-lg p-3 space-y-2">
+                      <p className="text-sm font-medium text-content">{row.team_name}</p>
+                      <p className="text-xs text-content-muted">
                         Survivor: #{row.survivor.jersey_number ?? '—'} · active {row.survivor.is_active ? 'yes' : 'no'}
                         {row.survivor.position != null && row.survivor.position !== '' && (
                           ` · ${teamSportsById[row.team_id] === 'soccer'
@@ -398,7 +398,7 @@ export default function MergePlayerWizard({
                             : row.survivor.position}`
                         )}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-content-muted">
                         Duplicate: #{row.duplicate.jersey_number ?? '—'} · active{' '}
                         {row.duplicate.is_active ? 'yes' : 'no'}
                         {row.duplicate.position != null && row.duplicate.position !== '' && (
@@ -409,7 +409,7 @@ export default function MergePlayerWizard({
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-xs text-slate-500">Jersey</label>
+                          <label className="text-xs text-content-muted">Jersey</label>
                           <input
                             type="text"
                             value={tpResolutions[i]?.jersey_number ?? ''}
@@ -444,7 +444,7 @@ export default function MergePlayerWizard({
                       </div>
                       {teamSportsById[row.team_id] === 'soccer' ? (
                         <div>
-                          <label className="text-xs text-slate-500">Default role</label>
+                          <label className="text-xs text-content-muted">Default role</label>
                           <select
                             value={parseSoccerRosterRole(tpResolutions[i]?.position).group}
                             onChange={event => {
@@ -466,7 +466,7 @@ export default function MergePlayerWizard({
                         </div>
                       ) : (
                         <div>
-                          <label className="text-xs text-slate-500">Position (optional)</label>
+                          <label className="text-xs text-content-muted">Position (optional)</label>
                           <input
                             type="text"
                             value={tpResolutions[i]?.position ?? ''}
@@ -491,7 +491,7 @@ export default function MergePlayerWizard({
               {preview.game_stats.length === 0 &&
                 preview.stat_corrections.length === 0 &&
                 preview.team_players.length === 0 && (
-                  <p className="text-sm text-slate-500">No overlapping stat or roster conflicts. You can continue.</p>
+                  <p className="text-sm text-content-muted">No overlapping stat or roster conflicts. You can continue.</p>
                 )}
 
               <div className="flex gap-2">
@@ -507,7 +507,7 @@ export default function MergePlayerWizard({
                 </button>
                 <button
                   type="button"
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-600"
+                  className="border border-line-strong rounded-lg px-3 py-2 text-sm text-content-muted"
                   onClick={() => {
                     setPreview(null)
                     setStep('pick')
@@ -521,17 +521,17 @@ export default function MergePlayerWizard({
 
           {step === 'confirm' && preview && survivor && duplicate && (
             <div className="space-y-4">
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-content-muted">
                 Final check: <strong>{playerRosterSelectLabel(survivor)}</strong> remains;{' '}
                 <strong>{playerRosterSelectLabel(duplicate)}</strong> will be deleted.
               </p>
               {survivorFullName && (
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-content-muted">
                   Survivor full name (for reference): <strong>{survivorFullName}</strong>
                 </p>
               )}
               <div>
-                <label htmlFor="merge-confirm-input" className="block text-xs font-medium text-slate-500 mb-1">
+                <label htmlFor="merge-confirm-input" className="block text-xs font-medium text-content-muted mb-1">
                   Type <strong>MERGE</strong> to confirm
                 </label>
                 <input
@@ -546,7 +546,7 @@ export default function MergePlayerWizard({
               </div>
               <button
                 type="button"
-                className="btn-primary w-full bg-red-600 hover:bg-red-700 border-red-600"
+                className="btn-primary w-full bg-danger-action text-danger-action-content hover:bg-danger-action border-danger-line"
                 disabled={loading}
                 onClick={() => { void executeMerge() }}
               >
@@ -554,7 +554,7 @@ export default function MergePlayerWizard({
               </button>
               <button
                 type="button"
-                className="text-sm text-slate-500 underline w-full"
+                className="text-sm text-content-muted underline w-full"
                 onClick={() => setStep('resolve')}
               >
                 Back

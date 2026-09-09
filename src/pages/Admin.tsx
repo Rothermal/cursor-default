@@ -602,11 +602,11 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface text-content border-b border-line px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={() => navigate('/')}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
+            className="w-8 h-8 rounded-full bg-control flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
@@ -628,10 +628,10 @@ export default function Admin() {
               <Link
                 key={item.id}
                 to={item.path}
-                className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                className={`rounded-lg border px-3 py-2 text-sm font-semibold  ${
                   active
-                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 bg-white text-slate-600'
+                    ? 'border-info-line bg-info text-info-content'
+                    : 'border-line bg-surface text-content-muted'
                 }`}
               >
                 {item.label}
@@ -645,8 +645,8 @@ export default function Admin() {
         {settingsSection === 'app' && (
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-700">Enabled sports</h2>
-              <span className="text-sm text-slate-400">
+              <h2 className="text-lg font-semibold text-content">Enabled sports</h2>
+              <span className="text-sm text-content-subtle">
                 {enabledCount} of {sports.length} enabled
               </span>
             </div>
@@ -662,15 +662,15 @@ export default function Admin() {
                   <div
                     key={sport.id}
                     className={`
-                      card flex items-center justify-between py-3 transition-colors
-                      ${enabled ? '' : 'opacity-60'}
+                      card flex items-center justify-between py-3
+                      ${enabled ? '' : 'bg-surface-muted'}
                     `}
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{sport.icon}</span>
                       <div>
-                        <span className="font-medium text-slate-700">{sport.name}</span>
-                        <p className="text-xs text-slate-400">
+                        <span className="font-medium text-content">{sport.name}</span>
+                        <p className="text-xs text-content-subtle">
                           {availability.releaseStage
                             ? availability.releaseStage === 'preview'
                               ? 'Development preview'
@@ -687,8 +687,8 @@ export default function Admin() {
                       onClick={() => toggleSport(sport.id)}
                       disabled={!availability.toggleAvailable}
                       className={`
-                        relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
-                        ${enabled ? 'bg-blue-600' : 'bg-slate-300'}
+                        relative w-12 h-7 rounded-full  duration-200 flex-shrink-0
+                        ${enabled ? 'bg-accent' : 'bg-control'}
                         ${!availability.toggleAvailable ? 'cursor-not-allowed opacity-70' : ''}
                       `}
                       role="switch"
@@ -697,7 +697,8 @@ export default function Admin() {
                     >
                       <span
                         className={`
-                          absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow
+                          absolute top-0.5 left-0.5 w-6 h-6 rounded-full shadow
+                          ${enabled ? 'bg-accent-content' : 'bg-content'}
                           transition-transform duration-200
                           ${enabled ? 'translate-x-5' : 'translate-x-0'}
                         `}
@@ -709,7 +710,7 @@ export default function Admin() {
             </div>
 
             {enabledCount === 0 && (
-              <p className="text-center text-sm text-amber-600 mt-4 bg-amber-50 rounded-xl p-3">
+              <p className="text-center text-sm text-warning-content mt-4 bg-warning rounded-xl p-3">
                 Enable at least one sport to start tracking games.
               </p>
             )}
@@ -719,8 +720,8 @@ export default function Admin() {
         {settingsSection === 'sports' && (
           <section className="space-y-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-700">Sports</h2>
-              <p className="text-sm text-slate-500">Sport-specific settings and future configuration.</p>
+              <h2 className="text-lg font-semibold text-content">Sports</h2>
+              <p className="text-sm text-content-muted">Sport-specific settings and future configuration.</p>
             </div>
             <div className="space-y-2">
               {sports.map(sport => {
@@ -733,20 +734,20 @@ export default function Admin() {
                   <Link
                     key={sport.id}
                     to={sportSettingsPath(sport.id)}
-                    className={`card flex items-center justify-between py-3 transition-colors ${
-                      hasSettings ? 'hover:border-blue-200' : 'opacity-70'
+                    className={`card flex items-center justify-between py-3  ${
+                      hasSettings ? 'hover:border-info-line' : 'opacity-70'
                     }`}
                   >
                     <span className="flex items-center gap-3">
                       <span className="text-2xl">{sport.icon}</span>
                       <span>
-                        <span className="block font-medium text-slate-700">{sport.name}</span>
-                        <span className="block text-xs text-slate-400">
+                        <span className="block font-medium text-content">{sport.name}</span>
+                        <span className="block text-xs text-content-subtle">
                           {hasSettings ? 'Settings available' : 'No sport-specific settings yet'}
                         </span>
                       </span>
                     </span>
-                    <span className="text-xs font-semibold text-slate-400">
+                    <span className="text-xs font-semibold text-content-subtle">
                       {availability.releaseStage === 'preview'
                         ? 'Preview'
                         : availability.releaseStage === 'unreleased'
@@ -764,10 +765,10 @@ export default function Admin() {
           selectedSettingsSport?.id !== 'basketball' &&
           selectedSettingsSport?.id !== 'soccer' && (
           <section className="card space-y-2">
-            <p className="text-lg font-semibold text-slate-700">
+            <p className="text-lg font-semibold text-content">
               {selectedSettingsSport ? `${selectedSettingsSport.icon} ${selectedSettingsSport.name}` : 'Sport'} settings
             </p>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-content-muted">
               {selectedSettingsSport
                 ? 'No sport-specific settings are defined for this sport yet.'
                 : 'That sport settings route is not recognized.'}
@@ -789,18 +790,18 @@ export default function Admin() {
         {settingsSection === 'data' && (
           <>
         <section className="card">
-          <h2 className="text-lg font-semibold text-slate-700 mb-2">Local parked games</h2>
-          <p className="text-sm text-slate-500 mb-3">
+          <h2 className="text-lg font-semibold text-content mb-2">Local parked games</h2>
+          <p className="text-sm text-content-muted mb-3">
             {parkedStorageInfo.parkedCount} of {parkedStorageInfo.maxParkedGames} slots used ·{' '}
             {formatStorageBytes(parkedStorageInfo.estimatedBytes)} local storage
           </p>
           {localDataError && (
-            <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">
+            <p className="text-sm text-danger-content bg-danger border border-danger-line rounded-lg px-3 py-2 mb-3">
               {localDataError}
             </p>
           )}
           {localDataMessage && (
-            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mb-3">
+            <p className="text-sm text-success-content bg-success border border-success-line rounded-lg px-3 py-2 mb-3">
               {localDataMessage}
             </p>
           )}
@@ -827,8 +828,8 @@ export default function Admin() {
 
         {isConfigured && user && (
           <section className="card mt-6">
-            <h2 className="text-lg font-semibold text-slate-700 mb-2">Cloud Teams</h2>
-            <p className="text-sm text-slate-500 mb-4">
+            <h2 className="text-lg font-semibold text-content mb-2">Cloud Teams</h2>
+            <p className="text-sm text-content-muted mb-4">
               Create teams and manage player rosters saved to Supabase.
             </p>
             <div className="space-y-2">
@@ -853,8 +854,8 @@ export default function Admin() {
             <div className="card w-full text-left">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-700">Seasons</h2>
-                  <p className="text-sm text-slate-500">Create & manage seasons</p>
+                  <h2 className="text-lg font-semibold text-content">Seasons</h2>
+                  <p className="text-sm text-content-muted">Create & manage seasons</p>
                 </div>
               </div>
             </div>
@@ -862,11 +863,11 @@ export default function Admin() {
             {seasonsActive && (
               <div className="mt-3 space-y-3">
                 {seasonsError && (
-                  <div className="card bg-red-50 border-red-200 text-red-700 text-sm">{seasonsError}</div>
+                  <div className="card bg-danger border-danger-line text-danger-content text-sm">{seasonsError}</div>
                 )}
 
                 <div className="card space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-700">New Season</h3>
+                  <h3 className="text-sm font-semibold text-content">New Season</h3>
                   <input
                     type="text"
                     placeholder="Season name"
@@ -885,7 +886,7 @@ export default function Admin() {
                   </select>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">Start date</label>
+                      <label className="block text-xs text-content-muted mb-1">Start date</label>
                       <input
                         type="date"
                         value={newSeasonStartDate}
@@ -894,7 +895,7 @@ export default function Admin() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">End date</label>
+                      <label className="block text-xs text-content-muted mb-1">End date</label>
                       <input
                         type="date"
                         value={newSeasonEndDate}
@@ -914,13 +915,13 @@ export default function Admin() {
                 </div>
 
                 {loadingSeasons ? (
-                  <p className="text-sm text-slate-500 animate-pulse card">Loading…</p>
+                  <p className="text-sm text-content-muted animate-pulse card">Loading…</p>
                 ) : seasonsList.length === 0 ? (
-                  <p className="text-sm text-slate-500 card">No seasons yet.</p>
+                  <p className="text-sm text-content-muted card">No seasons yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {seasonsTeamStatsColumnMissing && (
-                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                      <p className="text-xs text-warning-content bg-warning border border-warning-line rounded-lg p-2">
                         Team stat rules need migration 030 (
                         <code className="text-[10px]">seasons.team_stats_config</code>). Season list still
                         loads without it.
@@ -943,7 +944,7 @@ export default function Admin() {
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="block text-xs text-slate-500 mb-1">Start date</label>
+                                <label className="block text-xs text-content-muted mb-1">Start date</label>
                                 <input
                                   type="date"
                                   value={editSeasonStartDate}
@@ -952,7 +953,7 @@ export default function Admin() {
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs text-slate-500 mb-1">End date</label>
+                                <label className="block text-xs text-content-muted mb-1">End date</label>
                                 <input
                                   type="date"
                                   value={editSeasonEndDate}
@@ -997,9 +998,9 @@ export default function Admin() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="text-lg">{sportCfg?.icon ?? '🏟️'}</span>
-                                <span className="font-medium text-slate-700 truncate">{season.name}</span>
+                                <span className="font-medium text-content truncate">{season.name}</span>
                               </div>
-                              <p className="text-xs text-slate-400 mt-0.5">
+                              <p className="text-xs text-content-subtle mt-0.5">
                                 {sportCfg?.name ?? season.sport}
                                 {(season.start_date || season.end_date) && ' · '}
                                 {season.start_date ?? ''}
@@ -1019,7 +1020,7 @@ export default function Admin() {
                                       openTeamStatsEditor(season)
                                     }
                                   }}
-                                  className="text-slate-400 hover:text-blue-500 p-1 text-xs font-medium px-2"
+                                  className="text-content-subtle hover:text-info-content p-1 text-xs font-medium px-2"
                                   title="Team stat rules"
                                 >
                                   🏀
@@ -1033,7 +1034,7 @@ export default function Admin() {
                                   setEditSeasonStartDate(season.start_date ?? '')
                                   setEditSeasonEndDate(season.end_date ?? '')
                                 }}
-                                className="text-slate-400 hover:text-blue-500 p-1"
+                                className="text-content-subtle hover:text-info-content p-1"
                                 title="Edit season"
                               >
                                 ✏️
@@ -1042,7 +1043,7 @@ export default function Admin() {
                                 type="button"
                                 onClick={() => setConfirmDeleteSeason(season)}
                                 disabled={deletingId === season.id}
-                                className="text-slate-400 hover:text-red-500 p-1"
+                                className="text-content-subtle hover:text-danger-content p-1"
                                 title="Delete season"
                               >
                                 🗑️
@@ -1050,14 +1051,14 @@ export default function Admin() {
                             </div>
                           </div>
                           {teamStatsOpen && (
-                            <div className="card space-y-3 border-blue-100 bg-slate-50/80">
+                            <div className="card space-y-3 border-info-line bg-canvas/80">
                               <div className="flex items-center justify-between gap-2">
-                                <h4 className="text-sm font-semibold text-slate-700">
+                                <h4 className="text-sm font-semibold text-content">
                                   Basketball team stat rules
                                 </h4>
                                 <button
                                   type="button"
-                                  className="text-xs text-slate-500 underline"
+                                  className="text-xs text-content-muted underline"
                                   onClick={() => {
                                     setTeamStatsSeasonId(null)
                                     setTeamStatsDraft(null)
@@ -1092,7 +1093,7 @@ export default function Admin() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn-secondary flex-1 text-red-700 border-red-100"
+                                  className="btn-secondary flex-1 text-danger-content border-danger-line"
                                   disabled={savingTeamStatsId === season.id}
                                   onClick={async () => {
                                     if (!supabaseClient) return
@@ -1171,11 +1172,11 @@ export default function Admin() {
 
         {settingsSection === 'advanced' && isConfigured && user && (
           <section className="mt-6">
-            <div className="card w-full text-left border-amber-100 bg-amber-50/40">
+            <div className="card w-full text-left border-warning-line bg-warning/40">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-700">Player merge (advanced)</h2>
-                  <p className="text-sm text-slate-500">
+                  <h2 className="text-lg font-semibold text-content">Player merge (advanced)</h2>
+                  <p className="text-sm text-content-muted">
                     Combine duplicate player profiles (same flow as Teams). View merges you performed.
                   </p>
                 </div>
@@ -1184,7 +1185,7 @@ export default function Admin() {
 
             {mergeToolsActive && (
               <div className="mt-3 space-y-4">
-                <p className="text-sm text-slate-600 card">
+                <p className="text-sm text-content-muted card">
                   You must be owner or admin on every team both players are on. Irreversible — use test data when
                   learning the flow.
                 </p>
@@ -1192,42 +1193,42 @@ export default function Admin() {
                   type="button"
                   onClick={() => setMergeWizardOpen(true)}
                   disabled={mergeCandidates.length < 2}
-                  className="btn-primary w-full disabled:opacity-50"
+                  className="btn-primary w-full disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
                 >
                   Open merge wizard
                 </button>
                 {mergeCandidates.length < 2 && (
-                  <p className="text-xs text-slate-500 px-1">
+                  <p className="text-xs text-content-muted px-1">
                     Need at least two players on teams where you are owner or admin. Add teams under Teams or become
                     admin on another team.
                   </p>
                 )}
 
                 <div className="card space-y-2">
-                  <h3 className="text-sm font-semibold text-slate-700">Your recent merges</h3>
+                  <h3 className="text-sm font-semibold text-content">Your recent merges</h3>
                   {loadingMergeAudit ? (
-                    <p className="text-sm text-slate-500 animate-pulse">Loading history…</p>
+                    <p className="text-sm text-content-muted animate-pulse">Loading history…</p>
                   ) : mergeAuditError ? (
-                    <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    <p className="text-sm text-warning-content bg-warning border border-warning-line rounded-lg px-3 py-2">
                       {mergeAuditError}
                     </p>
                   ) : mergeAuditRows.length === 0 ? (
-                    <p className="text-sm text-slate-500">No merge records yet (or none you performed).</p>
+                    <p className="text-sm text-content-muted">No merge records yet (or none you performed).</p>
                   ) : (
                     <ul className="space-y-2 text-sm max-h-64 overflow-y-auto">
                       {mergeAuditRows.map(row => (
                         <li
                           key={row.id}
-                          className="border border-slate-100 rounded-lg px-3 py-2 flex flex-col gap-0.5"
+                          className="border border-line rounded-lg px-3 py-2 flex flex-col gap-0.5"
                         >
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-content-subtle">
                             {new Date(row.merged_at).toLocaleString()}
                           </span>
-                          <span className="text-slate-700">
-                            Kept <code className="text-xs bg-slate-100 px-1 rounded">{row.survivor_player_id.slice(0, 8)}…</code>
+                          <span className="text-content">
+                            Kept <code className="text-xs bg-surface-muted px-1 rounded">{row.survivor_player_id.slice(0, 8)}…</code>
                             {' · '}
                             removed{' '}
-                            <code className="text-xs bg-slate-100 px-1 rounded">{row.duplicate_player_id.slice(0, 8)}…</code>
+                            <code className="text-xs bg-surface-muted px-1 rounded">{row.duplicate_player_id.slice(0, 8)}…</code>
                           </span>
                         </li>
                       ))}
@@ -1255,8 +1256,8 @@ export default function Admin() {
             <div className="card w-full text-left">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-700">Data Management</h2>
-                  <p className="text-sm text-slate-500">Delete teams, games, players, tournaments</p>
+                  <h2 className="text-lg font-semibold text-content">Data Management</h2>
+                  <p className="text-sm text-content-muted">Delete teams, games, players, tournaments</p>
                 </div>
               </div>
             </div>
@@ -1264,17 +1265,17 @@ export default function Admin() {
             {dataMgmtActive && (
               <div className="mt-3 space-y-3">
                 {adminError && (
-                  <div className="card bg-red-50 border-red-200 text-red-700 text-sm">{adminError}</div>
+                  <div className="card bg-danger border-danger-line text-danger-content text-sm">{adminError}</div>
                 )}
 
                 {loadingAdmin ? (
-                  <p className="text-sm text-slate-500 animate-pulse card">Loading...</p>
+                  <p className="text-sm text-content-muted animate-pulse card">Loading...</p>
                 ) : adminTeams.length === 0 ? (
-                  <p className="text-sm text-slate-500 card">No teams found.</p>
+                  <p className="text-sm text-content-muted card">No teams found.</p>
                 ) : (
                   <>
                     <div className="card space-y-2">
-                      <label className="block text-sm font-semibold text-slate-700">Select Team</label>
+                      <label className="block text-sm font-semibold text-content">Select Team</label>
                       <select
                         value={selectedAdminTeamId}
                         onChange={e => setSelectedAdminTeamId(e.target.value)}
@@ -1299,7 +1300,7 @@ export default function Admin() {
                             if (team) setConfirmDeleteTeam(team)
                           }}
                           disabled={!selectedAdminTeamId || deletingId === selectedAdminTeamId}
-                          className="text-sm text-red-600 font-semibold underline disabled:opacity-40"
+                          className="text-sm text-danger-content font-semibold underline disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
                         >
                           Delete this team (and all its data)
                         </button>
@@ -1310,21 +1311,21 @@ export default function Admin() {
                       <>
                         {adminGames.length > 0 && (
                           <div className="card space-y-2">
-                            <h3 className="text-sm font-semibold text-slate-700">
+                            <h3 className="text-sm font-semibold text-content">
                               Games ({adminGames.length})
                             </h3>
                             <div className="space-y-1 max-h-60 overflow-y-auto">
                               {adminGames.map(g => (
-                                <div key={g.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-2 py-1.5">
+                                <div key={g.id} className="flex items-center justify-between border border-line rounded-lg px-2 py-1.5">
                                   <div className="min-w-0">
-                                    <p className="text-sm text-slate-700 truncate">vs {g.opponent_name}</p>
-                                    <p className="text-xs text-slate-400">{g.game_date} · {g.status}</p>
+                                    <p className="text-sm text-content truncate">vs {g.opponent_name}</p>
+                                    <p className="text-xs text-content-subtle">{g.game_date} · {g.status}</p>
                                   </div>
                                   <button
                                     type="button"
                                     onClick={() => setConfirmDeleteGame(g)}
                                     disabled={deletingId === g.id}
-                                    className="text-slate-400 hover:text-red-500 p-1 shrink-0"
+                                    className="text-content-subtle hover:text-danger-content p-1 shrink-0"
                                     title="Delete game"
                                   >
                                     🗑️
@@ -1337,24 +1338,24 @@ export default function Admin() {
 
                         {adminPlayers.length > 0 && (
                           <div className="card space-y-2">
-                            <h3 className="text-sm font-semibold text-slate-700">
+                            <h3 className="text-sm font-semibold text-content">
                               Players ({adminPlayers.length})
                             </h3>
                             <div className="space-y-1 max-h-60 overflow-y-auto">
                               {adminPlayers.map(p => (
-                                <div key={p.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-2 py-1.5">
+                                <div key={p.id} className="flex items-center justify-between border border-line rounded-lg px-2 py-1.5">
                                   <div className="min-w-0">
-                                    <p className="text-sm text-slate-700 truncate">
+                                    <p className="text-sm text-content truncate">
                                       #{p.jersey_number || '—'} {[p.first_name, p.last_name].filter(Boolean).join(' ')}
                                     </p>
-                                    <p className="text-xs text-slate-400">{p.is_active ? 'Active' : 'Inactive'}</p>
+                                    <p className="text-xs text-content-subtle">{p.is_active ? 'Active' : 'Inactive'}</p>
                                   </div>
                                   {p.created_by === userId && (
                                     <button
                                       type="button"
                                       onClick={() => setConfirmDeletePlayer(p)}
                                       disabled={deletingId === p.id}
-                                      className="text-slate-400 hover:text-red-500 p-1 shrink-0"
+                                      className="text-content-subtle hover:text-danger-content p-1 shrink-0"
                                       title="Delete player"
                                     >
                                       🗑️
@@ -1368,18 +1369,18 @@ export default function Admin() {
 
                         {adminTournaments.length > 0 && (
                           <div className="card space-y-2">
-                            <h3 className="text-sm font-semibold text-slate-700">
+                            <h3 className="text-sm font-semibold text-content">
                               Tournaments ({adminTournaments.length})
                             </h3>
                             <div className="space-y-1 max-h-60 overflow-y-auto">
                               {adminTournaments.map(t => (
-                                <div key={t.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-2 py-1.5">
-                                  <p className="text-sm text-slate-700 truncate">{t.name}</p>
+                                <div key={t.id} className="flex items-center justify-between border border-line rounded-lg px-2 py-1.5">
+                                  <p className="text-sm text-content truncate">{t.name}</p>
                                   <button
                                     type="button"
                                     onClick={() => setConfirmDeleteTournament(t)}
                                     disabled={deletingId === t.id}
-                                    className="text-slate-400 hover:text-red-500 p-1 shrink-0"
+                                    className="text-content-subtle hover:text-danger-content p-1 shrink-0"
                                     title="Delete tournament"
                                   >
                                     🗑️
@@ -1464,8 +1465,8 @@ export default function Admin() {
 
         {settingsSection === 'advanced' && (!isConfigured || !user) && (
           <section className="card space-y-2">
-            <h2 className="text-lg font-semibold text-slate-700">Advanced</h2>
-            <p className="text-sm text-slate-500">
+            <h2 className="text-lg font-semibold text-content">Advanced</h2>
+            <p className="text-sm text-content-muted">
               Advanced cloud tools require a configured Supabase project and signed-in account.
             </p>
           </section>
