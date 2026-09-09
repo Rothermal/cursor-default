@@ -35,6 +35,8 @@ describe('appearance bootstrap/runtime contract', () => {
     expect(html.indexOf('appearance.js')).toBeLessThan(html.indexOf('/src/main.tsx'))
   })
   it('survives missing bootstrap with a stable, non-writing Light fallback', () => {
+    expect(readFileSync('src/context/AppearanceContext.tsx', 'utf8'))
+      .toContain('resolveAppearanceRuntime(window.statkeeperAppearance)')
     const runtime = resolveAppearanceRuntime(undefined)
     const snapshot = runtime.getSnapshot()
     runtime.setTheme('dark')
@@ -47,13 +49,19 @@ describe('appearance bootstrap/runtime contract', () => {
   })
   it('keeps palette text pairs readable in both modes', () => {
     const css = readFileSync('public/appearance.css', 'utf8')
-    const palettes = css.split(":root[data-theme='dark']")
+    const palettes = css.split(/:root\[data-theme=['"]dark['"]\]/)
+    expect(palettes).toHaveLength(2)
+    const config = runInNewContext(readFileSync('tailwind.config.js', 'utf8').replace('export default', 'globalThis.config ='))
+    const aliases = Object.keys(config.theme.extend.colors).sort()
+    expect(aliases.length).toBeGreaterThan(0)
     const luminance = (rgb: number[]) => rgb.map(value => {
       const s = value / 255
       return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
     }).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i], 0)
     for (const palette of palettes) {
       const tokens = Object.fromEntries([...palette.matchAll(/--([a-z-]+):\s*(\d+ \d+ \d+)/g)].map(match => [match[1], luminance(match[2].split(' ').map(Number))]))
+      expect(Object.keys(tokens).sort()).toEqual(aliases)
+      for (const name of aliases) expect(config.theme.extend.colors[name]).toBe(`rgb(var(--${name}) / <alpha-value>)`)
       for (const [foreground, background] of [
         ['content', 'canvas'], ['content', 'surface'], ['content-muted', 'surface'],
         ['content-subtle', 'surface'], ['content', 'surface-elevated'],

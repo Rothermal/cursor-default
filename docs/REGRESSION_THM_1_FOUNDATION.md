@@ -19,6 +19,9 @@ action, and semantic status foreground/background pairs in both modes.
 PR review coverage pins the real HTML meta, stylesheet/bootstrap ordering,
 build activation expression, Light splash and fixed theme chrome, plus a stable
 non-writing runtime fallback when the bootstrap is absent.
+Follow-up review coverage pins the provider's fallback call, requires exactly
+two palettes (accepting either CSS quote style), and compares each palette's
+token names and variable mappings against the evaluated Tailwind configuration.
 
 The Soccer release diagnostic inventory explicitly includes the new preview;
 no sport release policy is changed.
