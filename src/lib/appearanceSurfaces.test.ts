@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/App.tsx",
+  "src/components/ConfirmDialog.tsx",
   "src/components/AppShell.tsx",
   "src/pages/Auth.tsx",
   "src/pages/AppAccessGate.tsx",
@@ -19,12 +21,22 @@ const surfaces = [
   "src/components/SeasonTeamStatsEditor.tsx"
 ]
 
+const rawColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeholder|caret|accent|outline|decoration|shadow)-(?:(?:[a-z]+-)+\d{2,3}\b|\[(?:#|(?:rgb|hsl|oklch|oklab|lab|lch|color)\())/
+const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeholder|caret|accent|outline|decoration|shadow)-(?:white|black)(?:[\s/'"\x60]|$)/
+
 describe('THM-2 shell and Settings color ownership', () => {
   it.each(surfaces)('%s uses semantic utility colors', path => {
     const source = readFileSync(path, 'utf8')
-    expect(source).not.toMatch(/(?:bg|text|border|divide|ring|from|to)-(?:slate|gray|blue|red|amber|emerald|green|orange|purple|indigo)-\d+/)
-    expect(source).not.toMatch(/(?:bg|text|border)-(?:white|black)(?:[\s/'"\x60]|$)/)
+    expect(source).not.toMatch(rawColor)
+    expect(source).not.toMatch(fixedColor)
     expect(source).not.toContain('transition-colors')
+  })
+  it.each(['text-zinc-500', 'bg-sky-600', 'bg-[#ff0000]', 'bg-[rgb(255,0,0)]', 'ring-offset-slate-50', 'fill-rose-500', 'placeholder:text-teal-500', 'via-yellow-100'])('rejects raw color %s', value => {
+    expect(value).toMatch(rawColor)
+  })
+  it.each(['text-2xl', 'border-t-2', 'ring-offset-2', 'divide-y-2', 'shadow-md', 'grid-cols-12', 'w-1/2', 'text-content-muted', 'bg-surface/95'])('allows non-palette utility %s', value => {
+    expect(value).not.toMatch(rawColor)
+    expect(value).not.toMatch(fixedColor)
   })
   it('preserves Google brand paths while theming the auth controls', () => {
     const auth = readFileSync('src/pages/Auth.tsx', 'utf8')

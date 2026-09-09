@@ -4,9 +4,15 @@
 
 - 203 files / 1,470 tests pass; TypeScript/production build pass; lint has zero
   errors and the same three existing Fast Refresh warnings.
+- Review follow-up: 203 files / 1,489 tests pass; typecheck and lint pass with
+  the same warnings. Only tests/documentation changed; prior build evidence stands.
 - `src/lib/appearanceSurfaces.test.ts` inventories the 15 converted components,
   rejects raw utility palettes and color-transition classes, preserves Google's
   four brand colors, and verifies no production Settings theme control was added.
+- PR review extends the inventory to the inherited THM-1 App and ConfirmDialog
+  surfaces. The guard covers palette-shaped utilities across color families,
+  additional utility prefixes, arbitrary hex/function colors, and fixed white/
+  black. Positive/negative fixtures check detection without rejecting layout sizes.
 - One-off TypeScript AST comparison confirms only className attributes changed
   in the 15 existing components; no handlers, permissions, data, or markup changed.
 - Edge/Playwright visited all seven Settings destinations (Account, App, Sports,
