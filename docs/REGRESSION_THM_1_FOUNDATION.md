@@ -1,7 +1,11 @@
 # THM-1 verification
 
-Implementation validation: 202 files / 1,451 tests pass; TypeScript/production
+Initial implementation validation: 202 files / 1,451 tests pass; TypeScript/production
 build pass; lint has zero errors and the three existing Fast Refresh warnings.
+PR review validation: 202 files / 1,453 tests pass; build and lint remain clean
+apart from the same existing warnings. Edge with `appearance.js` deliberately
+blocked still renders the preview on the Light canvas, shows the unavailable
+controls notice, and reports no page errors.
 
 ## Automated contracts
 
@@ -12,6 +16,9 @@ subscriptions, cross-tab changes and clear/removal, unrelated storage isolation,
 and legacy settings/game preservation.
 Palette tests also verify normal-text contrast for the primary, supporting,
 action, and semantic status foreground/background pairs in both modes.
+PR review coverage pins the real HTML meta, stylesheet/bootstrap ordering,
+build activation expression, Light splash and fixed theme chrome, plus a stable
+non-writing runtime fallback when the bootstrap is absent.
 
 The Soccer release diagnostic inventory explicitly includes the new preview;
 no sport release policy is changed.

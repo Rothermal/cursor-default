@@ -1,17 +1,10 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react'
 
-type Theme = 'light' | 'dark'
-interface Snapshot { theme: Theme; error: string | null }
-interface AppearanceRuntime {
-  getSnapshot: () => Snapshot
-  subscribe: (listener: () => void) => () => void
-  setTheme: (theme: Theme) => void
-}
-declare global { interface Window { statkeeperAppearance: AppearanceRuntime } }
-const AppearanceContext = createContext<(Snapshot & { setTheme: AppearanceRuntime['setTheme'] }) | null>(null)
+import { resolveAppearanceRuntime, type AppearanceSnapshot, type AppearanceRuntime } from '../lib/appearanceRuntime'
+const AppearanceContext = createContext<(AppearanceSnapshot & { setTheme: AppearanceRuntime['setTheme'] }) | null>(null)
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
-  const runtime = window.statkeeperAppearance
+  const runtime = resolveAppearanceRuntime(window.statkeeperAppearance)
   const snapshot = useSyncExternalStore(runtime.subscribe, runtime.getSnapshot)
   return <AppearanceContext.Provider value={{ ...snapshot, setTheme: runtime.setTheme }}>{children}</AppearanceContext.Provider>
 }

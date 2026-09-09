@@ -31,10 +31,14 @@ THM-6. Parent: [App theming](PLAN_APP_THEMING.md).
   its classic-script/static-URL notices are expected. Both assets enter PWA
   precache through the existing JS/CSS glob.
 - `vite.config.ts`: development-only activation attribute; built HTML disables
-  Dark. Manifest chrome uses fixed neutral `#35383e`; dynamic HTML chrome derives
+  Dark. Manifest theme chrome uses fixed neutral `#35383e`; the splash background
+  stays Light canvas `#f4f5f7` until THM-6 revisits the release policy. Static HTML
+  theme-color also defaults to Light. Dynamic HTML chrome derives
   from the active CSS canvas token rather than another palette constant.
 - `src/context/AppearanceContext.tsx`, `src/main.tsx`: appearance subscription
   outside Auth/Settings/Game providers, shared by signed-out and signed-in UI.
+- `src/lib/appearanceRuntime.ts`: stable non-writing Light fallback when the
+  blocking script is unavailable; presentation failure cannot blank the app.
 - `tailwind.config.js`, `src/index.css`: semantic aliases, shared card/input/
   primary/secondary controls and focus styling. Existing dimensions remain.
 - `src/components/ConfirmDialog.tsx`: shared modal surface, scrim, semantic

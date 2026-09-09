@@ -25,7 +25,7 @@ export default defineConfig(({ command }) => ({
         short_name: 'StatKeeper',
         description: 'Track sports game stats in real time',
         theme_color: '#35383e',
-        background_color: '#35383e',
+        background_color: '#f4f5f7',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/cursor-default/',

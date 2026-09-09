@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
+import { resolveAppearanceRuntime } from './appearanceRuntime'
 
 const source = readFileSync('public/appearance.js', 'utf8')
 function boot(raw: string | null = null, enabled = true, blocked = false) {
@@ -16,12 +17,34 @@ function boot(raw: string | null = null, enabled = true, blocked = false) {
   const win = { addEventListener: (_: string, callback: typeof onStorage) => { onStorage = callback } } as unknown as Window
   runInNewContext(source, {
     window: win, localStorage: storage,
-    document: { documentElement: root, querySelector: () => meta },
+    document: { documentElement: root, querySelector: (selector: string) => selector === 'meta[name="theme-color"]' ? meta : null },
     getComputedStyle: () => ({ getPropertyValue: () => root.dataset.theme === 'dark' ? '24 25 28' : '244 245 247' }),
   })
-  return { runtime: win.statkeeperAppearance, values, root, meta, storage, event: (key: string | null, storageArea: unknown = storage) => onStorage({ key, storageArea }) }
+  return { runtime: win.statkeeperAppearance!, values, root, meta, storage, event: (key: string | null, storageArea: unknown = storage) => onStorage({ key, storageArea }) }
 }
 describe('appearance bootstrap/runtime contract', () => {
+  it('keeps the build gate, static meta and Light-only splash contract explicit', () => {
+    const config = readFileSync('vite.config.ts', 'utf8')
+    const html = readFileSync('index.html', 'utf8')
+    expect(config).toContain('data-appearance-preview="${command === \'serve\'}"')
+    expect(html).toContain('<html lang="en">')
+    expect(html).toContain('<meta name="theme-color" content="#f4f5f7" />')
+    expect(config).toContain("background_color: '#f4f5f7'")
+    expect(config).toContain("theme_color: '#35383e'")
+    expect(html.indexOf('appearance.css')).toBeLessThan(html.indexOf('appearance.js'))
+    expect(html.indexOf('appearance.js')).toBeLessThan(html.indexOf('/src/main.tsx'))
+  })
+  it('survives missing bootstrap with a stable, non-writing Light fallback', () => {
+    const runtime = resolveAppearanceRuntime(undefined)
+    const snapshot = runtime.getSnapshot()
+    runtime.setTheme('dark')
+    runtime.subscribe(() => { throw new Error('must not notify') })()
+    expect(runtime.getSnapshot()).toBe(snapshot)
+    expect(snapshot.theme).toBe('light')
+    expect(resolveAppearanceRuntime(undefined)).toBe(runtime)
+    const live = boot().runtime
+    expect(resolveAppearanceRuntime(live)).toBe(live)
+  })
   it('keeps palette text pairs readable in both modes', () => {
     const css = readFileSync('public/appearance.css', 'utf8')
     const palettes = css.split(":root[data-theme='dark']")
