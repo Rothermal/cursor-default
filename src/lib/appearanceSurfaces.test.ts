@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/SportSelect.tsx",
+  "src/pages/SportDashboard.tsx",
   "src/App.tsx",
   "src/components/ConfirmDialog.tsx",
   "src/components/AppShell.tsx",
@@ -24,7 +26,7 @@ const surfaces = [
 const rawColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeholder|caret|accent|outline|decoration|shadow)-(?:(?:[a-z]+-)+\d{2,3}\b|\[(?:#|(?:rgb|hsl|oklch|oklab|lab|lch|color)\())/
 const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeholder|caret|accent|outline|decoration|shadow)-(?:white|black)(?:[\s/'"\x60]|$)/
 
-describe('THM-2 shell and Settings color ownership', () => {
+describe('Converted application surface color ownership', () => {
   it.each(surfaces)('%s uses semantic utility colors', path => {
     const source = readFileSync(path, 'utf8')
     expect(source).not.toMatch(rawColor)

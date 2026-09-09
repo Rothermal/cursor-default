@@ -171,8 +171,8 @@ export default function SportDashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <section className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Sport not found</p>
-          <p className="text-sm text-slate-500 mb-4">Choose one of the enabled sport workspaces.</p>
+          <p className="font-semibold text-content mb-2">Sport not found</p>
+          <p className="text-sm text-content-muted mb-4">Choose one of the enabled sport workspaces.</p>
           <button type="button" onClick={() => navigate('/')} className="btn-primary w-full">
             Back to Sports
           </button>
@@ -186,8 +186,8 @@ export default function SportDashboard() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <section className="card max-w-md w-full text-center">
           <p className="text-4xl mb-3">{sport.icon}</p>
-          <p className="font-semibold text-slate-700 mb-2">{sport.name} is disabled</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">{sport.name} is disabled</p>
+          <p className="text-sm text-content-muted mb-4">
             Enable this sport in Settings before starting or managing games.
           </p>
           <button type="button" onClick={() => navigate('/settings/app')} className="btn-primary w-full">
@@ -204,12 +204,12 @@ export default function SportDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-5`}>
+      <header className="bg-surface text-content border-b border-line px-4 py-5">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="h-8 rounded-full bg-white/20 px-3 text-xs font-semibold flex items-center justify-center active:scale-90 transition-transform"
+            className="h-8 rounded-full bg-control px-3 text-xs font-semibold flex items-center justify-center active:scale-90 transition-transform"
             aria-label="Back to sports"
           >
             Back
@@ -225,20 +225,20 @@ export default function SportDashboard() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
         {!availability?.canStartNewGame && (
-          <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-900">
+          <section className="rounded-lg border border-warning-line bg-warning px-4 py-3">
+            <p className="text-sm font-semibold text-warning-content">
               {availability?.releaseStage === 'unreleased'
                 ? `${sport.name} is coming soon`
                 : `${sport.name} is disabled`}
             </p>
-            <p className="text-xs text-amber-800 mt-1">
+            <p className="text-xs text-warning-content mt-1">
               Existing local matches and cloud history remain available. New matches are disabled.
             </p>
             {availability?.toggleAvailable && (
               <button
                 type="button"
                 onClick={() => navigate('/settings/app')}
-                className="mt-2 text-xs font-semibold text-amber-900 underline"
+                className="mt-2 text-xs font-semibold text-warning-content underline"
               >
                 Open Settings
               </button>
@@ -247,17 +247,17 @@ export default function SportDashboard() {
         )}
 
         {(parkingError || dashboardError) && (
-          <div className="card bg-amber-50 border-amber-200 text-amber-800 text-sm">
+          <div className="card bg-warning border-warning-line text-warning-content text-sm">
             {dashboardError ?? parkingError}
           </div>
         )}
 
         {activeOtherSport && (
-          <section className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-            <p className="text-sm font-semibold text-slate-700">
+          <section className="rounded-lg border border-line bg-surface px-4 py-3">
+            <p className="text-sm font-semibold text-content">
               Active game: {activeOtherSport.icon} {activeOtherSport.name}
             </p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-content-muted mt-1">
               Starting a {sport.name} game will park the current active game first.
             </p>
           </section>
@@ -266,8 +266,8 @@ export default function SportDashboard() {
         <section className="card space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-slate-700">Current Game</h2>
-              <p className="text-sm text-slate-500">
+              <h2 className="font-semibold text-content">Current Game</h2>
+              <p className="text-sm text-content-muted">
                 {hasActiveForSport ? 'Continue the active local game.' : `Start a new ${sport.name} game.`}
               </p>
             </div>
@@ -275,32 +275,32 @@ export default function SportDashboard() {
               type="button"
               onClick={handleStartNew}
               disabled={!availability?.canStartNewGame}
-              className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
+              className="btn-primary py-2 px-4 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
             >
               New Game
             </button>
           </div>
 
           {hasActiveForSport && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 flex items-center justify-between gap-3">
+            <div className="rounded-xl border border-info-line bg-info px-3 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-semibold text-blue-800 truncate">
+                <p className="font-semibold text-info-content truncate">
                   {state.gameInfo ? gameSideDisplayName(state.gameInfo, 'tracked') : 'Setup in progress'}
                   {state.gameInfo?.opponentName ? ` vs ${gameSideDisplayName(state.gameInfo, 'opponent')}` : ''}
                 </p>
                 {liveScoreLine && (
-                  <p className="text-base font-bold text-blue-800 tabular-nums mt-0.5">
+                  <p className="text-base font-bold text-info-content tabular-nums mt-0.5">
                     {liveScoreLine}
                   </p>
                 )}
                 {activeSyncLabel && (
-                  <p className="text-xs text-blue-500 mt-1">{activeSyncLabel}</p>
+                  <p className="text-xs text-info-content mt-1">{activeSyncLabel}</p>
                 )}
               </div>
               <button
                 type="button"
                 onClick={() => navigate(routeForResumedGame(state))}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-transform"
+                className="bg-accent text-accent-content px-4 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-transform"
               >
                 Resume
               </button>
@@ -310,27 +310,27 @@ export default function SportDashboard() {
 
         <section className="card space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-700">Parked Games</h2>
-            <span className="text-xs text-slate-400">{parkedForSport.length}</span>
+            <h2 className="font-semibold text-content">Parked Games</h2>
+            <span className="text-xs text-content-subtle">{parkedForSport.length}</span>
           </div>
 
           {parkedForSport.length === 0 ? (
-            <p className="text-sm text-slate-500">No parked {sport.name} games.</p>
+            <p className="text-sm text-content-muted">No parked {sport.name} games.</p>
           ) : (
             <div className="space-y-2">
               {parkedForSport.map(game => (
                 <div
                   key={game.localGameId}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center justify-between gap-3"
+                  className="rounded-xl border border-line bg-surface px-3 py-2 flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-700 truncate">
+                    <p className="font-semibold text-content truncate">
                       {game.teamName} vs {game.opponentName}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-content-muted">
                       {game.gameDate ?? 'Date TBD'}
                     </p>
-                    <p className="text-xs text-slate-400 mt-0.5 truncate" title={parkedSyncLabel(game)}>
+                    <p className="text-xs text-content-subtle mt-0.5 truncate" title={parkedSyncLabel(game)}>
                       {parkedSyncLabel(game)}
                     </p>
                   </div>
@@ -338,14 +338,14 @@ export default function SportDashboard() {
                     <button
                       type="button"
                       onClick={() => handleResumeParked(game.localGameId)}
-                      className="bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-transform"
+                      className="bg-accent text-accent-content px-3 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-transform"
                     >
                       Resume
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDiscardParked(game.localGameId)}
-                      className="bg-white text-slate-600 px-3 py-2 rounded-lg text-sm font-semibold border border-slate-200 active:scale-95 transition-transform"
+                      className="bg-surface text-content-muted px-3 py-2 rounded-lg text-sm font-semibold border border-line active:scale-95 transition-transform"
                     >
                       Discard
                     </button>
@@ -357,13 +357,13 @@ export default function SportDashboard() {
         </section>
 
         <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Manage</h2>
+          <h2 className="font-semibold text-content">Manage</h2>
           <div className="grid grid-cols-1 gap-2">
             <button
               type="button"
               onClick={() => navigate(sportTeamsPath(sport.id))}
               disabled={!isConfigured}
-              className="btn-secondary py-3 text-sm disabled:opacity-50"
+              className="btn-secondary py-3 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
             >
               Teams
             </button>
@@ -371,7 +371,7 @@ export default function SportDashboard() {
               type="button"
               onClick={() => navigate(sportGamesPath(sport.id))}
               disabled={!isConfigured}
-              className="btn-secondary py-3 text-sm disabled:opacity-50"
+              className="btn-secondary py-3 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
             >
               Cloud Games
             </button>
@@ -379,13 +379,13 @@ export default function SportDashboard() {
               type="button"
               onClick={() => navigate(sportLeaderboardPath(sport.id))}
               disabled={!isConfigured}
-              className="btn-secondary py-3 text-sm disabled:opacity-50"
+              className="btn-secondary py-3 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
             >
               Season Stats
             </button>
           </div>
           {!isConfigured && (
-            <p className="text-xs text-slate-500">Cloud features are unavailable until Supabase is configured.</p>
+            <p className="text-xs text-content-muted">Cloud features are unavailable until Supabase is configured.</p>
           )}
         </section>
       </div>
