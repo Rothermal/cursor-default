@@ -12,6 +12,10 @@ export default defineConfig(({ command }) => ({
   // Keep local dev at "/" while ensuring production builds work on Pages.
   base: command === 'build' ? '/cursor-default/' : '/',
   plugins: [
+    {
+      name: 'appearance-preview-gate',
+      transformIndexHtml: html => html.replace('<html lang="en">', `<html lang="en" data-appearance-preview="${command === 'serve'}">`),
+    },
     react(),
     VitePWA({
       registerType: 'prompt',
@@ -20,8 +24,8 @@ export default defineConfig(({ command }) => ({
         name: 'StatKeeper',
         short_name: 'StatKeeper',
         description: 'Track sports game stats in real time',
-        theme_color: '#1e293b',
-        background_color: '#f8fafc',
+        theme_color: '#35383e',
+        background_color: '#f4f5f7',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/cursor-default/',

@@ -48,11 +48,12 @@ describe('SOC-6E1 release entry guards', () => {
     )
 
     expect(directChecks).toEqual({
-      'src/App.tsx': 2,
+      'src/App.tsx': 3,
       'src/lib/soccer/aggregateTransport.ts': 1,
       'src/lib/sportAvailability.ts': 1,
     })
     expect(source('src/App.tsx')).toContain('/dev/shot-chart')
+    expect(source('src/App.tsx')).toContain('#/dev/appearance')
     expect(source('src/lib/soccer/aggregateTransport.ts')).toContain(
       '[StatKeeper] Soccer aggregate load'
     )

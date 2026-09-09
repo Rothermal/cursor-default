@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { GameProvider, useGame } from './context/GameContext'
@@ -40,6 +40,7 @@ import { isSoccerSummaryRoute } from './lib/soccer/summary'
 import BasketballSummary from './pages/BasketballSummary'
 import { isBasketballSummaryRoute } from './lib/basketball/summary'
 import PwaStatus from './components/PwaStatus'
+const AppearancePreview = import.meta.env.DEV ? lazy(() => import('./pages/AppearancePreview')) : null
 
 function GameSetupRoute() {
   const { state } = useGame()
@@ -115,7 +116,7 @@ function AppRoutes() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-2">📊</div>
-          <p className="text-slate-500 animate-pulse">Loading...</p>
+          <p className="text-content-muted animate-pulse">Loading...</p>
         </div>
       </div>
     )
@@ -133,7 +134,7 @@ function AppRoutes() {
   if (isConfigured && user && appAccessLoading && !appAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500 animate-pulse">Checking account access...</p>
+        <p className="text-content-muted animate-pulse">Checking account access...</p>
       </div>
     )
   }
@@ -201,6 +202,9 @@ function AppRoutes() {
 }
 
 export default function App() {
+  if (AppearancePreview && window.location.hash.split('?')[0] === '#/dev/appearance') {
+    return <Suspense fallback={<div className="min-h-screen bg-canvas text-content p-4" role="status">Loading...</div>}><AppearancePreview /></Suspense>
+  }
   return (
     <AuthProvider>
       <AppRoutes />
