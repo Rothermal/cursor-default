@@ -108,7 +108,7 @@ export default function BasketballRulesSettingsFields({
   return (
     <div className="space-y-5">
       {!readOnly && (
-        <label className="block text-sm font-medium text-slate-700">
+        <label className="block text-sm font-medium text-content">
           Tracking profile
           <select
             value={`${pendingProfile?.profileId ?? settings.baseProfile.profileId}@${pendingProfile?.profileVersion ?? settings.baseProfile.profileVersion}`}
@@ -128,7 +128,7 @@ export default function BasketballRulesSettingsFields({
                   : next
               )
             }}
-            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-slate-900"
+            className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-content"
           >
             {profiles.map(profile => (
               <option
@@ -169,11 +169,11 @@ export default function BasketballRulesSettingsFields({
                 onChange={setPersonalFoulLimit}
               />
               {isBasketballMatchRulesV2(resolved.value.rules) ? (
-                <div className="space-y-3 border-y border-slate-200 py-3">
+                <div className="space-y-3 border-y border-line py-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">Event game clock</p>
-                      <p className="text-xs text-slate-500">Clockless compatibility rules</p>
+                      <p className="text-sm font-semibold text-content">Event game clock</p>
+                      <p className="text-xs text-content-muted">Clockless compatibility rules</p>
                     </div>
                     <button
                       type="button"
@@ -210,7 +210,7 @@ export default function BasketballRulesSettingsFields({
           />
         </>
       ) : (
-        <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
           {resolved.message}
         </p>
       )}
@@ -243,22 +243,22 @@ function ClockUpgradeReview({
     'equalPlayPolicy',
   ] as const
   return (
-    <div className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
+    <div className="space-y-3 border-y border-warning-line bg-warning px-3 py-3">
       <div>
-        <p className="text-sm font-semibold text-amber-950">Review anchored clock rules</p>
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="text-sm font-semibold text-warning-content">Review anchored clock rules</p>
+        <p className="mt-1 text-xs text-warning-content">
           Applying creates one complete version-3 clock and lineup rule bundle in this draft.
         </p>
       </div>
-      <div className="divide-y divide-amber-200 border-y border-amber-200">
+      <div className="divide-y divide-warning-line border-y border-warning-line">
         {fields.map(field => (
-          <div key={field} className="py-2 text-xs text-slate-700">
-            <p className="font-semibold text-slate-800">{basketballRuleFieldLabel(field)}</p>
+          <div key={field} className="py-2 text-xs text-content">
+            <p className="font-semibold text-content">{basketballRuleFieldLabel(field)}</p>
             <p className="mt-0.5">Current: Not available in version 2</p>
             <p className="mt-0.5 break-words">
               New: {formatBasketballRuleField(field, upgraded[field])}
             </p>
-            <p className="mt-0.5 text-amber-800">Source: {sourceLabel}</p>
+            <p className="mt-0.5 text-warning-content">Source: {sourceLabel}</p>
           </div>
         ))}
       </div>
@@ -305,7 +305,7 @@ function ClockRulesEditor({
   })
 
   return (
-    <div className="space-y-4 border-y border-slate-200 py-3">
+    <div className="space-y-4 border-y border-line py-3">
       <SelectField
         label="Event game clock"
         value={rules.clockModel}
@@ -370,7 +370,7 @@ function ClockRulesEditor({
       )}
       <button
         type="button"
-        className="inline-flex h-10 items-center text-sm font-semibold text-slate-600"
+        className="inline-flex h-10 items-center text-sm font-semibold text-content-muted"
         onClick={onReturnToClockless}
       >
         Return to compatible clockless rules
@@ -389,27 +389,27 @@ function ProfileChangeReview({
   onApply: () => void
 }) {
   return (
-    <div className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
+    <div className="space-y-3 border-y border-warning-line bg-warning px-3 py-3">
       <div>
-        <p className="text-sm font-semibold text-amber-950">Review profile change</p>
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="text-sm font-semibold text-warning-content">Review profile change</p>
+        <p className="mt-1 text-xs text-warning-content">
           Existing compatible overrides stay applied. The change is blocked when an override is
           incompatible with the selected profile.
         </p>
       </div>
       {preview.ok ? (
         <>
-          <p className="text-sm text-slate-800">
+          <p className="text-sm text-content">
             {preview.current.profile.label} v{preview.current.profile.profileVersion} to{' '}
             {preview.candidate.profile.label} v{preview.candidate.profile.profileVersion}
           </p>
           {preview.differences.length === 0 ? (
-            <p className="text-xs text-slate-600">No effective rule values change.</p>
+            <p className="text-xs text-content-muted">No effective rule values change.</p>
           ) : (
-            <div className="divide-y divide-amber-200 border-y border-amber-200">
+            <div className="divide-y divide-warning-line border-y border-warning-line">
               {preview.differences.map(diff => (
-                <div key={diff.field} className="py-2 text-xs text-slate-700">
-                  <p className="font-semibold text-slate-800">{basketballRuleFieldLabel(diff.field)}</p>
+                <div key={diff.field} className="py-2 text-xs text-content">
+                  <p className="font-semibold text-content">{basketballRuleFieldLabel(diff.field)}</p>
                   {diff.overridden ? (
                     <>
                       <p className="mt-0.5 break-words">
@@ -424,7 +424,7 @@ function ProfileChangeReview({
                           preview.targetBaseRules[diff.field]
                         )}
                       </p>
-                      <p className="mt-0.5 break-words text-amber-800">
+                      <p className="mt-0.5 break-words text-warning-content">
                         Your override stays{' '}
                         {formatBasketballRuleField(
                           diff.field,
@@ -446,7 +446,7 @@ function ProfileChangeReview({
                           preview.candidate.rules[diff.field]
                         )}
                       </p>
-                      <p className="mt-0.5 text-amber-800">Changed by selected profile</p>
+                      <p className="mt-0.5 text-warning-content">Changed by selected profile</p>
                     </>
                   )}
                 </div>
@@ -455,7 +455,7 @@ function ProfileChangeReview({
           )}
         </>
       ) : (
-        <p role="alert" className="text-sm text-red-700">{preview.message}</p>
+        <p role="alert" className="text-sm text-danger-content">{preview.message}</p>
       )}
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
@@ -493,7 +493,7 @@ export function BasketballRulesSummary({
   }
 
   return (
-    <div className="divide-y divide-slate-200 border-y border-slate-200">
+    <div className="divide-y divide-line border-y border-line">
       <SummaryRow
         label="Profile"
         value={`${profile.label} v${profile.profileVersion}${customized ? ' - Customized' : ''}`}
@@ -565,8 +565,8 @@ export function BasketballRulesSummary({
         </>
       )}
       <div className="py-3">
-        <p className="text-xs font-semibold uppercase text-slate-500">Sources</p>
-        <p className="mt-1 text-sm text-slate-700">{profile.effectiveRulesLabel}</p>
+        <p className="text-xs font-semibold uppercase text-content-muted">Sources</p>
+        <p className="mt-1 text-sm text-content">{profile.effectiveRulesLabel}</p>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
           {profile.sourceUrls.map((url, index) => (
             <a
@@ -574,7 +574,7 @@ export function BasketballRulesSummary({
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-semibold text-blue-700 underline"
+              className="text-sm font-semibold text-info-content underline"
             >
               Source {index + 1}
             </a>
@@ -596,10 +596,10 @@ function SummaryRow({
 }) {
   return (
     <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-3 text-sm">
-      <span className="font-semibold text-slate-500">{label}</span>
-      <span className="min-w-0 text-slate-800">
+      <span className="font-semibold text-content-muted">{label}</span>
+      <span className="min-w-0 text-content">
         <span className="block">{value}</span>
-        <span className="mt-0.5 block text-xs text-slate-500">{source}</span>
+        <span className="mt-0.5 block text-xs text-content-muted">{source}</span>
       </span>
     </div>
   )
@@ -613,7 +613,7 @@ function NumberField({ label, value, min, max, onChange }: {
   onChange: (value: number) => void
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}
       <input
         type="number"
@@ -624,7 +624,7 @@ function NumberField({ label, value, min, max, onChange }: {
           const next = Number(event.target.value)
           if (Number.isInteger(next)) onChange(Math.max(min, Math.min(max, next)))
         }}
-        className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
+        className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5"
       />
     </label>
   )
@@ -636,7 +636,7 @@ function OptionalNumberField({ label, value, onChange }: {
   onChange: (value: number | null) => void
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}
       <input
         type="number"
@@ -651,7 +651,7 @@ function OptionalNumberField({ label, value, onChange }: {
           const next = Number(event.target.value)
           if (Number.isInteger(next) && next > 0) onChange(next)
         }}
-        className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
+        className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5"
       />
     </label>
   )
@@ -665,13 +665,13 @@ function SelectField({ label, value, options, disabled = false, onChange }: {
   onChange: (value: string) => void
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}
       <select
         value={value}
         disabled={disabled}
         onChange={event => onChange(event.target.value)}
-        className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 disabled:bg-slate-100 disabled:text-slate-500"
+        className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 disabled:bg-surface-muted disabled:text-content-muted"
       >
         {options.map(option => (
           <option key={option.value} value={option.value}>{option.label}</option>

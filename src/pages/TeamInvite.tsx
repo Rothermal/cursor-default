@@ -92,8 +92,8 @@ export default function TeamInvite() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <section className="card max-w-md w-full text-center space-y-3">
-          <h1 className="font-semibold text-slate-800">Invite unavailable</h1>
-          <p className="text-sm text-slate-500">Cloud access is not configured.</p>
+          <h1 className="font-semibold text-content">Invite unavailable</h1>
+          <p className="text-sm text-content-muted">Cloud access is not configured.</p>
         </section>
       </div>
     )
@@ -103,7 +103,7 @@ export default function TeamInvite() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <section className="card max-w-md w-full text-center">
-          <p className="text-sm text-slate-500 animate-pulse">Checking invite...</p>
+          <p className="text-sm text-content-muted animate-pulse">Checking invite...</p>
         </section>
       </div>
     )
@@ -113,8 +113,8 @@ export default function TeamInvite() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <section className="card max-w-md w-full text-center space-y-3">
-          <h1 className="font-semibold text-slate-800">Invite unavailable</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="font-semibold text-content">Invite unavailable</h1>
+          <p className="text-sm text-content-muted">
             {error ?? 'This invite link is invalid, expired, revoked, or already used.'}
           </p>
           <button type="button" onClick={() => navigate('/')} className="btn-primary w-full">
@@ -141,26 +141,26 @@ export default function TeamInvite() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
+    <div className="min-h-screen bg-canvas px-4 py-8">
       <div className="max-w-lg mx-auto space-y-4">
         <section className="card space-y-4">
           <div>
-            <p className="text-xs font-semibold text-blue-600">{invite.sport}</p>
-            <h1 className="mt-1 text-xl font-bold text-slate-900">{displayName}</h1>
-            <p className="text-sm text-slate-500">{invite.season_name}</p>
+            <p className="text-xs font-semibold text-info-content">{invite.sport}</p>
+            <h1 className="mt-1 text-xl font-bold text-content">{displayName}</h1>
+            <p className="text-sm text-content-muted">{invite.season_name}</p>
           </div>
 
-          <div className="rounded-lg bg-slate-50 px-3 py-2">
-            <p className="text-xs text-slate-500">Team role</p>
-            <p className="font-semibold text-slate-800">{roleLabel(invite.role)}</p>
+          <div className="rounded-lg bg-canvas px-3 py-2">
+            <p className="text-xs text-content-muted">Team role</p>
+            <p className="font-semibold text-content">{roleLabel(invite.role)}</p>
           </div>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-content-muted">
             Expires {new Date(invite.expires_at).toLocaleString()}
           </p>
 
           {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
               {error}
             </p>
           )}
@@ -169,7 +169,7 @@ export default function TeamInvite() {
             type="button"
             onClick={() => { void handleJoin() }}
             disabled={joining}
-            className="btn-primary w-full disabled:opacity-60"
+            className="btn-primary w-full disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
           >
             {joining ? 'Joining...' : `Join as ${roleLabel(invite.role)}`}
           </button>
@@ -177,7 +177,7 @@ export default function TeamInvite() {
             type="button"
             onClick={() => navigate('/sports')}
             disabled={joining}
-            className="btn-secondary w-full disabled:opacity-60"
+            className="btn-secondary w-full disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
           >
             Not now
           </button>

@@ -26,40 +26,40 @@ function AccountEditor({ account, currentUserId, saving, onSave }: AccountEditor
   }, [account.appRole, account.status])
 
   return (
-    <li className="border-b border-slate-200 py-4 last:border-b-0 space-y-3">
+    <li className="border-b border-line py-4 last:border-b-0 space-y-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="font-semibold text-slate-800 break-words">{account.displayName}</p>
+          <p className="font-semibold text-content break-words">{account.displayName}</p>
           {isCurrentUser && (
-            <span className="text-xs font-semibold text-slate-600 bg-slate-100 rounded px-2 py-0.5">
+            <span className="text-xs font-semibold text-content-muted bg-surface-muted rounded px-2 py-0.5">
               Current account
             </span>
           )}
         </div>
-        <p className="text-sm text-slate-500 break-all">{account.email ?? 'No email available'}</p>
+        <p className="text-sm text-content-muted break-all">{account.email ?? 'No email available'}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs font-semibold text-slate-600">
+        <label className="text-xs font-semibold text-content-muted">
           Status
           <select
             value={status}
             onChange={event => setStatus(event.target.value as AppAccessStatus)}
             disabled={isCurrentUser}
-            className="input-field mt-1 text-sm disabled:bg-slate-100"
+            className="input-field mt-1 text-sm disabled:bg-surface-muted"
           >
             <option value="active">Active</option>
             <option value="pending">Pending</option>
             <option value="suspended">Suspended</option>
           </select>
         </label>
-        <label className="text-xs font-semibold text-slate-600">
+        <label className="text-xs font-semibold text-content-muted">
           App role
           <select
             value={appRole}
             onChange={event => setAppRole(event.target.value as AppRole)}
             disabled={isCurrentUser}
-            className="input-field mt-1 text-sm disabled:bg-slate-100"
+            className="input-field mt-1 text-sm disabled:bg-surface-muted"
           >
             <option value="user">User</option>
             <option value="app_admin">App admin</option>
@@ -72,7 +72,7 @@ function AccountEditor({ account, currentUserId, saving, onSave }: AccountEditor
           type="button"
           onClick={() => onSave(status, appRole)}
           disabled={!changed || saving}
-          className="btn-secondary w-full disabled:opacity-50"
+          className="btn-secondary w-full disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
         >
           {saving ? 'Saving...' : 'Save access'}
         </button>
@@ -143,8 +143,8 @@ export default function AppAccessPanel({
   return (
     <section className="mt-6 space-y-3" aria-labelledby="app-access-heading">
       <div>
-        <h2 id="app-access-heading" className="text-lg font-semibold text-slate-800">App access</h2>
-        <p className="text-sm text-slate-500">Approve, suspend, or assign app administrators.</p>
+        <h2 id="app-access-heading" className="text-lg font-semibold text-content">App access</h2>
+        <p className="text-sm text-content-muted">Approve, suspend, or assign app administrators.</p>
       </div>
 
       <form onSubmit={handleSearch} className="flex gap-2">
@@ -160,20 +160,20 @@ export default function AppAccessPanel({
       </form>
 
       {error && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
+        <p className="text-sm text-danger-content bg-danger border border-danger-line rounded-md px-3 py-2">{error}</p>
       )}
       {message && (
-        <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">
+        <p className="text-sm text-success-content bg-success border border-success-line rounded-md px-3 py-2">
           {message}
         </p>
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500 animate-pulse py-4">Loading accounts...</p>
+        <p className="text-sm text-content-muted animate-pulse py-4">Loading accounts...</p>
       ) : accounts.length === 0 ? (
-        <p className="text-sm text-slate-500 py-4">No matching accounts.</p>
+        <p className="text-sm text-content-muted py-4">No matching accounts.</p>
       ) : (
-        <ul className="border-y border-slate-200">
+        <ul className="border-y border-line">
           {accounts.map(account => (
             <AccountEditor
               key={account.userId}

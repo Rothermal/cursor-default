@@ -101,28 +101,28 @@ export default function PlayerGuardiansDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 px-4"
       onClick={onClose}
     >
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="player-guardians-title"
-        className="w-full max-w-sm bg-white rounded-lg shadow-xl p-5 space-y-4"
+        className="w-full max-w-sm bg-surface-elevated rounded-lg shadow-xl p-5 space-y-4"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="player-guardians-title" className="text-lg font-bold text-slate-800">
+            <h2 id="player-guardians-title" className="text-lg font-bold text-content">
               Player guardians
             </h2>
-            <p className="text-sm text-slate-500">{playerName}</p>
+            <p className="text-sm text-content-muted">{playerName}</p>
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-700 p-1"
+            className="text-content-muted hover:text-content p-1"
             title="Close"
             aria-label="Close guardian list"
           >
@@ -131,27 +131,27 @@ export default function PlayerGuardiansDialog({
         </div>
 
         {error && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
             {error}
           </p>
         )}
 
         {loading ? (
-          <p className="text-sm text-slate-500 animate-pulse">Loading guardians...</p>
+          <p className="text-sm text-content-muted animate-pulse">Loading guardians...</p>
         ) : guardians.length === 0 ? (
-          <p className="text-sm text-slate-500">No guardian relationships are recorded.</p>
+          <p className="text-sm text-content-muted">No guardian relationships are recorded.</p>
         ) : (
-          <div className="divide-y divide-slate-100 border-y border-slate-100">
+          <div className="divide-y divide-line border-y border-line">
             {guardians.map(guardian => (
               <div key={guardian.user_id} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-700 truncate">
+                  <p className="font-medium text-content truncate">
                     {guardian.display_name}
                     {guardian.is_current_user && (
-                      <span className="text-xs font-normal text-slate-400 ml-1">(you)</span>
+                      <span className="text-xs font-normal text-content-subtle ml-1">(you)</span>
                     )}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-content-muted">
                     {guardian.is_creator ? 'Player creator' : 'Guardian'}
                   </p>
                 </div>
@@ -160,7 +160,7 @@ export default function PlayerGuardiansDialog({
                     type="button"
                     onClick={() => { void handleRemove(guardian) }}
                     disabled={removingUserId === guardian.user_id}
-                    className="text-xs font-semibold text-red-600 disabled:opacity-50"
+                    className="text-xs font-semibold text-danger-content disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
                   >
                     {removingUserId === guardian.user_id ? 'Removing...' : 'Remove'}
                   </button>

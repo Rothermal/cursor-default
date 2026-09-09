@@ -39,17 +39,17 @@ export default function AppAccessGate({
   const content = copy[status]
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
-      <section className="w-full max-w-md bg-white border border-slate-200 rounded-lg p-6 space-y-5 shadow-sm">
+    <main className="min-h-screen bg-canvas flex items-center justify-center px-4 py-8">
+      <section className="w-full max-w-md bg-surface border border-line rounded-lg p-6 space-y-5 shadow-sm">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase text-slate-500">StatKeeper account</p>
-          <h1 className="text-2xl font-bold text-slate-800">{content.title}</h1>
-          <p className="text-sm text-slate-600">{content.message}</p>
-          {email && <p className="text-sm font-medium text-slate-700 break-all">{email}</p>}
+          <p className="text-xs font-semibold uppercase text-content-muted">StatKeeper account</p>
+          <h1 className="text-2xl font-bold text-content">{content.title}</h1>
+          <p className="text-sm text-content-muted">{content.message}</p>
+          {email && <p className="text-sm font-medium text-content break-all">{email}</p>}
         </div>
 
         {error && status === 'unavailable' && (
-          <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+          <p className="text-sm text-danger-content bg-danger border border-danger-line rounded-md px-3 py-2">
             {error}
           </p>
         )}
@@ -66,7 +66,7 @@ export default function AppAccessGate({
             type="button"
             onClick={onRefresh}
             disabled={checking}
-            className="btn-primary disabled:opacity-50"
+            className="btn-primary disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
           >
             {checking ? 'Checking...' : 'Check again'}
           </button>

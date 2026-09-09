@@ -19,25 +19,25 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur safe-top">
+    <div className="min-h-screen bg-canvas">
+      <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur safe-top">
         <div className="max-w-lg mx-auto px-4 py-2 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => navigate('/')}
             className="text-left min-w-0"
           >
-            <p className="flex items-center gap-1.5 text-sm font-bold leading-tight text-slate-800">
+            <p className="flex items-center gap-1.5 text-sm font-bold leading-tight text-content">
               <span>StatKeeper</span>
               <span
-                className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500"
+                className="rounded border border-line bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-content-muted"
                 title={`Build ${APP_BUILD_ID}`}
                 aria-label={`Build ${APP_BUILD_ID}`}
               >
                 {APP_BUILD_LABEL}
               </span>
             </p>
-            <p className="text-[11px] text-slate-500 leading-tight truncate">
+            <p className="text-[11px] text-content-muted leading-tight truncate">
               {user?.email ?? 'Local mode'}
             </p>
           </button>
@@ -45,13 +45,13 @@ export default function AppShell({ children }: AppShellProps) {
           <nav className="flex items-center gap-1 shrink-0" aria-label="Global navigation">
             <Link
               to="/sports"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-content-muted hover:bg-surface-muted"
             >
               Sports
             </Link>
             <Link
               to="/settings"
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-content-muted hover:bg-surface-muted"
             >
               Settings
             </Link>
@@ -59,7 +59,7 @@ export default function AppShell({ children }: AppShellProps) {
               <button
                 type="button"
                 onClick={() => { void signOut() }}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-content-muted hover:bg-surface-muted"
               >
                 Sign out
               </button>

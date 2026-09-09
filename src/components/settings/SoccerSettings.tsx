@@ -170,17 +170,17 @@ export default function SoccerSettings() {
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Soccer</h2>
+          <h2 className="text-lg font-semibold text-content">Soccer</h2>
           <div className="flex items-center gap-2" aria-live="polite">
             <SyncStatus status={soccerSettingsSync.status} />
-            {dirty && <span className="text-xs font-semibold text-amber-700">Unsaved changes</span>}
+            {dirty && <span className="text-xs font-semibold text-warning-content">Unsaved changes</span>}
           </div>
         </div>
         <button
           type="button"
           onClick={() => void refreshSoccerSettings()}
           disabled={soccerSettingsSync.status === 'checking' || soccerSettingsSync.status === 'saving'}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-line text-content-muted disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
           title="Refresh cloud settings"
           aria-label="Refresh cloud settings"
         >
@@ -191,7 +191,7 @@ export default function SoccerSettings() {
       <button
         type="button"
         onClick={() => navigate('/teams?sport=soccer')}
-        className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-blue-700"
+        className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-info-content"
       >
         <Users size={16} />
         Team shared defaults
@@ -202,16 +202,16 @@ export default function SoccerSettings() {
           soccerSettingsSync.status === 'backend_update_required' ||
           soccerSettingsSync.status === 'local' ||
           soccerSettingsSync.status === 'synced'
-            ? 'border-amber-200 bg-amber-50 text-amber-800'
-            : 'border-red-200 bg-red-50 text-red-700'
+            ? 'border-warning-line bg-warning text-warning-content'
+            : 'border-danger-line bg-danger text-danger-content'
         }`}>
           {soccerSettingsSync.error}
         </p>
       )}
 
       {soccerSettingsSync.conflict && (
-        <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-3">
-          <p className="text-sm font-semibold text-amber-900">Settings changed on another device.</p>
+        <div role="alert" className="rounded-md border border-warning-line bg-warning p-3 space-y-3">
+          <p className="text-sm font-semibold text-warning-content">Settings changed on another device.</p>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" className="btn-secondary text-sm px-3" onClick={useCloudSoccerSettings}>
               Use Cloud
@@ -223,12 +223,12 @@ export default function SoccerSettings() {
         </div>
       )}
 
-      <label className="block text-sm font-medium text-slate-700">
+      <label className="block text-sm font-medium text-content">
         Starting profile
         <select
           value={competitionProfile}
           onChange={event => applyCompetitionProfile(event.target.value as SoccerCompetitionProfile)}
-          className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-slate-900"
+          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-content"
         >
           <option value="ifab">IFAB</option>
           <option value="high_school">U.S. High School</option>
@@ -236,7 +236,7 @@ export default function SoccerSettings() {
         </select>
       </label>
 
-      <div className="overflow-x-auto border-b border-slate-200">
+      <div className="overflow-x-auto border-b border-line">
         <div className="flex min-w-max" role="tablist" aria-label="Soccer settings sections">
           {sections.map((section, index) => (
             <button
@@ -251,8 +251,8 @@ export default function SoccerSettings() {
               onKeyDown={event => handleSectionKeyDown(event, index)}
               className={`h-10 px-3 text-sm font-semibold border-b-2 ${
                 activeSection === section.id
-                  ? 'border-emerald-600 text-emerald-700'
-                  : 'border-transparent text-slate-500'
+                  ? 'border-success-line text-success-content'
+                  : 'border-transparent text-content-muted'
               }`}
             >
               {section.label}
@@ -308,12 +308,12 @@ export default function SoccerSettings() {
 
         {activeSection === 'match' && (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-content">
               Regulation format
               <select
                 value={regulationPreset}
                 onChange={event => applyRegulationPreset(event.target.value as SoccerRegulationPreset)}
-                className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
+                className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5"
               >
                 <option value="standard">2 x 45 minutes</option>
                 <option value="youth">2 x 30 minutes</option>
@@ -342,7 +342,7 @@ export default function SoccerSettings() {
               segments={draft.rules.regulationSegments}
               onChange={segments => updateRules(rules => ({ ...rules, regulationSegments: segments }))}
             />
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-content">
               Tie resolution
               <select
                 value={draft.rules.tieResolution}
@@ -350,7 +350,7 @@ export default function SoccerSettings() {
                   ...rules,
                   tieResolution: event.target.value as SoccerConfigurableRules['tieResolution'],
                 }))}
-                className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
+                className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5"
               >
                 <option value="draw_allowed">Draw allowed</option>
                 <option value="extra_time_then_shootout">Extra time, then shootout</option>
@@ -397,12 +397,12 @@ export default function SoccerSettings() {
               ]}
               onChange={value => updateRules(rules => ({ ...rules, yellowCardExitPolicy: value }))}
             />
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-content">
               Red-card replacement
               <select
                 value={draft.rules.redCardReplacementPolicy}
                 disabled
-                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2.5 text-slate-600"
+                className="mt-1 w-full rounded-md border border-line bg-surface-muted px-3 py-2.5 text-content-muted"
               >
                 <option value="play_short">Team plays short</option>
               </select>
@@ -461,21 +461,21 @@ export default function SoccerSettings() {
         )}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs font-bold uppercase text-slate-500">Effective Preview</p>
-        <p className="mt-1 text-sm text-slate-700">
+      <div className="rounded-md border border-line bg-canvas p-3">
+        <p className="text-xs font-bold uppercase text-content-muted">Effective Preview</p>
+        <p className="mt-1 text-sm text-content">
           {formatSegments(effective.regulationSegments)} · {effective.maxOnFieldPlayers} players ·{' '}
           {effective.clockDirection === 'count_up' ? 'Count up' : 'Count down'} ·{' '}
           {tieLabel(effective.tieResolution)}
         </p>
-        <p className="mt-1 text-xs text-slate-500">Source: Personal defaults</p>
+        <p className="mt-1 text-xs text-content-muted">Source: Personal defaults</p>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-3">
+      <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
         <button
           type="button"
           onClick={resetSection}
-          className="h-10 inline-flex items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-600"
+          className="h-10 inline-flex items-center gap-2 rounded-md px-2 text-sm font-semibold text-content-muted"
         >
           <RotateCcw size={16} />
           Reset Section
@@ -483,13 +483,13 @@ export default function SoccerSettings() {
         <button
           type="button"
           onClick={() => setConfirmResetAll(true)}
-          className="h-10 px-2 text-sm font-semibold text-slate-600"
+          className="h-10 px-2 text-sm font-semibold text-content-muted"
         >
           Reset All
         </button>
       </div>
 
-      <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50/95 p-4 backdrop-blur">
+      <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-line bg-canvas/95 p-4 backdrop-blur">
         <button
           type="button"
           className="btn-secondary"
@@ -549,7 +549,7 @@ function SyncStatus({ status }: {
     error: 'Cloud unavailable',
   } as const
   return (
-    <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-slate-500">
+    <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-content-muted">
       <Cloud size={13} />
       {labels[status]}
     </span>
@@ -564,8 +564,8 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
 }) {
   return (
     <fieldset>
-      <legend className="mb-1.5 text-sm font-medium text-slate-700">{label}</legend>
-      <div className="grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1">
+      <legend className="mb-1.5 text-sm font-medium text-content">{label}</legend>
+      <div className="grid grid-cols-2 gap-1 rounded-md bg-surface-muted p-1">
         {options.map(option => (
           <button
             key={option.value}
@@ -573,8 +573,8 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
             onClick={() => onChange(option.value)}
             className={`min-h-9 rounded px-2 text-sm font-semibold ${
               value === option.value
-                ? 'bg-white text-emerald-700 shadow-sm'
-                : 'text-slate-500'
+                ? 'bg-surface text-success-content shadow-sm'
+                : 'text-content-muted'
             }`}
           >
             {option.label}
@@ -591,18 +591,18 @@ function Toggle({ label, checked, onChange }: {
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-slate-700">
+    <label className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-content">
       {label}
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-          checked ? 'bg-emerald-600' : 'bg-slate-300'
+        className={`relative h-7 w-12 shrink-0 rounded-full  ${
+          checked ? 'bg-accent' : 'bg-control'
         }`}
       >
-        <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+        <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full shadow transition-transform ${checked ? 'bg-accent-content' : 'bg-content'} ${
           checked ? 'translate-x-5' : ''
         }`} />
       </button>
@@ -618,7 +618,7 @@ function NumberField({ label, value, min, max, onChange }: {
   onChange: (value: number) => void
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}
       <input
         type="number"
@@ -629,7 +629,7 @@ function NumberField({ label, value, min, max, onChange }: {
           const next = Number(event.target.value)
           if (Number.isInteger(next)) onChange(Math.max(min, Math.min(max, next)))
         }}
-        className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
+        className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5"
       />
     </label>
   )
@@ -653,7 +653,7 @@ function NullableNumberField({ label, value, onChange }: {
             const next = Number(event.target.value)
             if (Number.isInteger(next)) onChange(Math.max(0, next))
           }}
-          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5"
+          className="w-full rounded-md border border-line bg-surface px-3 py-2.5"
         />
       )}
     </div>
@@ -668,17 +668,17 @@ function SegmentRows({ segments, onChange }: {
     <div className="space-y-2">
       {segments.map((segment, index) => (
         <div key={segment.id} className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
-          <label className="min-w-0 text-xs font-medium text-slate-500">
+          <label className="min-w-0 text-xs font-medium text-content-muted">
             Period {index + 1}
             <input
               value={segment.label}
               onChange={event => onChange(segments.map(item =>
                 item.id === segment.id ? { ...item, label: event.target.value } : item
               ))}
-              className="mt-1 min-w-0 w-full rounded-md border border-slate-200 bg-white px-3 py-2"
+              className="mt-1 min-w-0 w-full rounded-md border border-line bg-surface px-3 py-2"
             />
           </label>
-          <label className="text-xs font-medium text-slate-500">
+          <label className="text-xs font-medium text-content-muted">
             Minutes
             <input
               type="number"
@@ -694,7 +694,7 @@ function SegmentRows({ segments, onChange }: {
                     : item
                 ))
               }}
-              className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2"
+              className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2"
             />
           </label>
         </div>

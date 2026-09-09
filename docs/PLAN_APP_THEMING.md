@@ -1,6 +1,6 @@
 # Plan: App theming and dark mode
 
-Status: THM-1 foundation implemented; THM-2 through THM-6 pending
+Status: THM-1 and THM-2 implemented; THM-3 through THM-6 pending
 
 This roadmap makes StatKeeper themeable across authentication, administration,
 team/game management, live sport workspaces, and review destinations. Light and
@@ -260,6 +260,10 @@ primitives and pre-auth roots render correctly; no domain/cloud contracts change
 ### THM-2 - Shell, authentication, access, and Settings
 
 Goal: complete the global framework around every workflow.
+
+Implemented inventory: [THM-2 shell and Settings](PLAN_THM_2_SHELL_SETTINGS.md).
+Local evidence and pending deployed checks:
+[THM-2 verification](REGRESSION_THM_2_SHELL_SETTINGS.md).
 
 - Convert AppShell, Auth, invite/auth-return, App Access, PWA status, and global
   loading/error states.

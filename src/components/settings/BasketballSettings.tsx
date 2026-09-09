@@ -166,15 +166,15 @@ export default function BasketballSettings() {
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Basketball</h2>
+          <h2 className="text-lg font-semibold text-content">Basketball</h2>
           <div className="flex items-center gap-2" aria-live="polite">
             {trackerTabActive ? (
-              <span className="text-xs text-slate-500">Saved on this device</span>
+              <span className="text-xs text-content-muted">Saved on this device</span>
             ) : (
               <SyncStatus status={basketballSettingsSync.status} />
             )}
             {dirty && (
-              <span className="text-xs font-semibold text-amber-700">
+              <span className="text-xs font-semibold text-warning-content">
                 Unsaved cloud settings
               </span>
             )}
@@ -185,7 +185,7 @@ export default function BasketballSettings() {
             type="button"
             onClick={() => void refreshBasketballSettings()}
             disabled={syncBusy}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line text-content-muted disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
             title="Refresh cloud settings"
             aria-label="Refresh cloud settings"
           >
@@ -202,16 +202,16 @@ export default function BasketballSettings() {
           basketballSettingsSync.status === 'backend_update_required' ||
           basketballSettingsSync.status === 'local' ||
           basketballSettingsSync.status === 'synced'
-            ? 'border-amber-200 bg-amber-50 text-amber-800'
-            : 'border-red-200 bg-red-50 text-red-700'
+            ? 'border-warning-line bg-warning text-warning-content'
+            : 'border-danger-line bg-danger text-danger-content'
         }`}>
           {basketballSettingsSync.error}
         </p>
       )}
 
       {!trackerTabActive && basketballSettingsSync.conflict && (
-        <div role="alert" className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <p className="text-sm font-semibold text-amber-900">
+        <div role="alert" className="space-y-3 rounded-md border border-warning-line bg-warning p-3">
+          <p className="text-sm font-semibold text-warning-content">
             Settings changed on another device.
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -233,7 +233,7 @@ export default function BasketballSettings() {
         </div>
       )}
 
-      <div className="overflow-x-auto border-b border-slate-200">
+      <div className="overflow-x-auto border-b border-line">
         <div className="flex min-w-max" role="tablist" aria-label="Basketball settings sections">
           {tabs.map((tab, index) => (
             <button
@@ -248,8 +248,8 @@ export default function BasketballSettings() {
               onKeyDown={event => handleTabKeyDown(event, index)}
               className={`h-10 px-4 text-sm font-semibold border-b-2 ${
                 activeTab === tab.id
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-slate-500'
+                  ? 'border-info-line text-info-content'
+                  : 'border-transparent text-content-muted'
               }`}
             >
               {tab.label}
@@ -267,16 +267,16 @@ export default function BasketballSettings() {
       >
         {activeTab === 'rules' && (
           <div className="space-y-5">
-            <div className="space-y-2 border-y border-blue-100 bg-blue-50 px-3 py-3 text-sm">
-              <p className="font-semibold text-blue-900">Which rules apply?</p>
-              <p className="text-blue-800">
+            <div className="space-y-2 border-y border-info-line bg-info px-3 py-3 text-sm">
+              <p className="font-semibold text-info-content">Which rules apply?</p>
+              <p className="text-info-content">
                 These personal defaults apply when setting up Basketball event-model games.
                 Current legacy games continue to use the team foul, timeout, and bonus rules
                 configured for their season.
               </p>
               <Link
                 to={settingsPath('data')}
-                className="inline-flex min-h-10 items-center gap-2 font-semibold text-blue-700"
+                className="inline-flex min-h-10 items-center gap-2 font-semibold text-info-content"
               >
                 Open Seasons
                 <ArrowRight size={16} aria-hidden="true" />
@@ -314,10 +314,10 @@ export default function BasketballSettings() {
                 display: { defaultCourtFlipped },
               }))}
             />
-            <div className="space-y-2 border-y border-slate-200 py-3">
+            <div className="space-y-2 border-y border-line py-3">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-slate-800">Live clock</h3>
-                <span className="text-xs text-slate-500">Saved on this device</span>
+                <h3 className="text-sm font-semibold text-content">Live clock</h3>
+                <span className="text-xs text-content-muted">Saved on this device</span>
               </div>
               <Toggle
                 label="Show tenths below one minute"
@@ -334,7 +334,7 @@ export default function BasketballSettings() {
                 )}
               />
               {!soundAvailable && (
-                <p role="status" className="text-xs text-slate-500">
+                <p role="status" className="text-xs text-content-muted">
                   Sound is unavailable in this browser.
                 </p>
               )}
@@ -348,7 +348,7 @@ export default function BasketballSettings() {
                 )}
               />
               {!vibrationAvailable && (
-                <p role="status" className="text-xs text-slate-500">
+                <p role="status" className="text-xs text-content-muted">
                   Vibration is unavailable on this device.
                 </p>
               )}
@@ -357,7 +357,7 @@ export default function BasketballSettings() {
         )}
 
         {activeTab === 'tracker' && (
-          <div className="space-y-3 border-y border-blue-100 bg-blue-50 px-3 py-3">
+          <div className="space-y-3 border-y border-info-line bg-info px-3 py-3">
             <Toggle
               label="New event tracker (preview)"
               checked={basketballEventTrackerPreviewEnabled}
@@ -365,7 +365,7 @@ export default function BasketballSettings() {
               onChange={setBasketballEventTrackerPreviewEnabled}
             />
             {!eventCreationPolicy.preferenceAvailable && (
-              <p role="status" className="text-xs font-medium text-blue-800">
+              <p role="status" className="text-xs font-medium text-info-content">
                 Unavailable in this build
               </p>
             )}
@@ -375,11 +375,11 @@ export default function BasketballSettings() {
 
       {!trackerTabActive && (
         <>
-          <div className="flex items-center justify-between border-t border-slate-200 pt-2">
+          <div className="flex items-center justify-between border-t border-line pt-2">
             <button
               type="button"
               onClick={resetActiveTab}
-              className="inline-flex h-10 items-center gap-2 px-2 text-sm font-semibold text-slate-600"
+              className="inline-flex h-10 items-center gap-2 px-2 text-sm font-semibold text-content-muted"
             >
               <RotateCcw size={16} />
               Reset Tab
@@ -387,13 +387,13 @@ export default function BasketballSettings() {
             <button
               type="button"
               onClick={() => setConfirmReset(true)}
-              className="h-10 px-2 text-sm font-semibold text-slate-600"
+              className="h-10 px-2 text-sm font-semibold text-content-muted"
             >
               Reset All
             </button>
           </div>
 
-          <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50/95 p-4 backdrop-blur">
+          <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-line bg-canvas/95 p-4 backdrop-blur">
             <button
               type="button"
               className="btn-secondary"
@@ -483,7 +483,7 @@ function SyncStatus({ status }: {
     error: 'Cloud unavailable',
   } as const
   return (
-    <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-slate-500">
+    <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-content-muted">
       <Cloud size={13} />
       {labels[status]}
     </span>
@@ -497,7 +497,7 @@ function Toggle({ label, checked, disabled = false, onChange }: {
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-slate-700">
+    <label className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium text-content">
       {label}
       <button
         type="button"
@@ -505,11 +505,11 @@ function Toggle({ label, checked, disabled = false, onChange }: {
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-          checked ? 'bg-blue-600' : 'bg-slate-300'
+        className={`relative h-7 w-12 shrink-0 rounded-full  disabled:cursor-not-allowed disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled ${
+          checked ? 'bg-accent' : 'bg-control'
         }`}
       >
-        <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+        <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full shadow transition-transform ${checked ? 'bg-accent-content' : 'bg-content'} ${
           checked ? 'translate-x-5' : ''
         }`} />
       </button>

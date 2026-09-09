@@ -65,13 +65,13 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-3 pt-2 border-t border-slate-100">
-      <p className="text-xs text-slate-500">
+    <div className="space-y-3 pt-2 border-t border-line">
+      <p className="text-xs text-content-muted">
         Used for team fouls, timeouts, and period controls during games in this season.
       </p>
 
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Rules preset</label>
+        <label className="block text-xs font-medium text-content-muted mb-1">Rules preset</label>
         <select
           key={presetSelectKey}
           className="input-field"
@@ -97,7 +97,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Regulation periods</label>
+        <label className="block text-xs font-medium text-content-muted mb-1">Regulation periods</label>
         <input
           type="number"
           min={1}
@@ -116,7 +116,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-slate-600">Period labels</p>
+        <p className="text-xs font-medium text-content-muted">Period labels</p>
         {value.periodLabels.map((label, i) => (
           <input
             key={i}
@@ -131,7 +131,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Bonus fouls</label>
+          <label className="block text-xs font-medium text-content-muted mb-1">Bonus fouls</label>
           <input
             type="number"
             min={1}
@@ -147,7 +147,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Double bonus</label>
+          <label className="block text-xs font-medium text-content-muted mb-1">Double bonus</label>
           <input
             type="number"
             min={1}
@@ -164,7 +164,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
+      <label className="flex items-center gap-2 text-sm text-content">
         <input
           type="checkbox"
           checked={value.hasOneAndOne}
@@ -174,7 +174,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
       </label>
 
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Overtime label</label>
+        <label className="block text-xs font-medium text-content-muted mb-1">Overtime label</label>
         <input
           type="text"
           className="input-field"
@@ -183,7 +183,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
+      <label className="flex items-center gap-2 text-sm text-content">
         <input
           type="checkbox"
           checked={value.overtimeFoulsReset}
@@ -194,7 +194,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Timeouts / period</label>
+          <label className="block text-xs font-medium text-content-muted mb-1">Timeouts / period</label>
           <input
             type="number"
             min={0}
@@ -209,10 +209,10 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
               })
             }}
           />
-          <p className="text-[10px] text-slate-400 mt-0.5">Blank = no limit</p>
+          <p className="text-[10px] text-content-subtle mt-0.5">Blank = no limit</p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Timeouts / OT</label>
+          <label className="block text-xs font-medium text-content-muted mb-1">Timeouts / OT</label>
           <input
             type="number"
             min={0}
@@ -227,7 +227,7 @@ export default function SeasonTeamStatsEditor({ value, onChange }: Props) {
               })
             }}
           />
-          <p className="text-[10px] text-slate-400 mt-0.5">Blank = same as regulation</p>
+          <p className="text-[10px] text-content-subtle mt-0.5">Blank = same as regulation</p>
         </div>
       </div>
     </div>

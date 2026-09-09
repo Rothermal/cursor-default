@@ -120,12 +120,12 @@ export default function AccountSettings() {
     return (
       <section className="space-y-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-700">Account</h2>
-          <p className="text-sm text-slate-500">Sign-in status and account controls.</p>
+          <h2 className="text-lg font-semibold text-content">Account</h2>
+          <p className="text-sm text-content-muted">Sign-in status and account controls.</p>
         </div>
 
         <div className="card">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-content-muted">
             Supabase is not configured. StatKeeper is running in local/offline mode.
           </p>
         </div>
@@ -137,12 +137,12 @@ export default function AccountSettings() {
     return (
       <section className="space-y-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-700">Account</h2>
-          <p className="text-sm text-slate-500">Sign-in status and account controls.</p>
+          <h2 className="text-lg font-semibold text-content">Account</h2>
+          <p className="text-sm text-content-muted">Sign-in status and account controls.</p>
         </div>
 
         <div className="card">
-          <p className="text-sm text-slate-500">No active account session.</p>
+          <p className="text-sm text-content-muted">No active account session.</p>
         </div>
       </section>
     )
@@ -151,16 +151,16 @@ export default function AccountSettings() {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-slate-700">Account</h2>
-        <p className="text-sm text-slate-500">Manage your StatKeeper identity.</p>
+        <h2 className="text-lg font-semibold text-content">Account</h2>
+        <p className="text-sm text-content-muted">Manage your StatKeeper identity.</p>
       </div>
 
       {(error || message) && (
         <div
           className={`rounded-lg border px-4 py-3 text-sm ${
             error
-              ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-danger-line bg-danger text-danger-content'
+              : 'border-success-line bg-success text-success-content'
           }`}
           role={error ? 'alert' : 'status'}
           aria-live="polite"
@@ -175,23 +175,23 @@ export default function AccountSettings() {
             <img
               src={profile.avatarUrl}
               alt=""
-              className="h-12 w-12 rounded-full border border-slate-200 object-cover"
+              className="h-12 w-12 rounded-full border border-line object-cover"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-lg font-bold text-slate-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted text-lg font-bold text-content-muted">
               {profileInitial(savedDisplayName, displayEmail)}
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-700">Signed in</p>
-            <p className="break-all text-sm text-slate-500">{displayEmail}</p>
+            <p className="text-sm font-semibold text-content">Signed in</p>
+            <p className="break-all text-sm text-content-muted">{displayEmail}</p>
           </div>
         </div>
 
         <form className="space-y-3" onSubmit={handleSaveDisplayName}>
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-slate-700">Display name</span>
+            <span className="mb-1 block text-sm font-semibold text-content">Display name</span>
             <input
               type="text"
               value={displayNameDraft}
@@ -200,13 +200,13 @@ export default function AccountSettings() {
                 setMessage(null)
               }}
               maxLength={80}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+              className="w-full rounded-lg border border-line-strong px-3 py-2 text-content outline-none focus:border-info-line focus:ring-2 focus:ring-focus/25 disabled:bg-canvas"
               disabled={loading || saving}
             />
           </label>
 
           {validationError && displayNameDraft.length > 0 && (
-            <p className="text-xs text-red-600">{validationError}</p>
+            <p className="text-xs text-danger-content">{validationError}</p>
           )}
 
           <button
@@ -222,13 +222,13 @@ export default function AccountSettings() {
       <div className="card space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-slate-700">Sign-in methods</h3>
-            <p className="text-xs text-slate-500">Connected ways to access this account.</p>
+            <h3 className="text-sm font-semibold text-content">Sign-in methods</h3>
+            <p className="text-xs text-content-muted">Connected ways to access this account.</p>
           </div>
           <button
             type="button"
             onClick={() => void refreshAccount()}
-            className="text-xs font-semibold text-blue-600 underline disabled:opacity-40"
+            className="text-xs font-semibold text-info-content underline disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
             disabled={loading}
           >
             Refresh
@@ -239,23 +239,23 @@ export default function AccountSettings() {
           {identities.map(identity => (
             <div
               key={identity.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2"
             >
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-700">
+                <p className="text-sm font-medium text-content">
                   {formatAuthProviderLabel(identity.provider)}
                 </p>
                 {identity.email && (
-                  <p className="break-all text-xs text-slate-500">{identity.email}</p>
+                  <p className="break-all text-xs text-content-muted">{identity.email}</p>
                 )}
               </div>
-              <span className="shrink-0 text-xs font-semibold text-emerald-700">Connected</span>
+              <span className="shrink-0 text-xs font-semibold text-success-content">Connected</span>
             </div>
           ))}
 
-          {loading && <p className="text-sm text-slate-500">Loading sign-in methods...</p>}
+          {loading && <p className="text-sm text-content-muted">Loading sign-in methods...</p>}
           {!loading && identities.length === 0 && (
-            <p className="text-sm text-slate-500">No connected sign-in methods were returned.</p>
+            <p className="text-sm text-content-muted">No connected sign-in methods were returned.</p>
           )}
         </div>
 
@@ -273,8 +273,8 @@ export default function AccountSettings() {
 
       <div className="card space-y-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-700">Session</h3>
-          <p className="text-xs text-slate-500">Sign out of this device.</p>
+          <h3 className="text-sm font-semibold text-content">Session</h3>
+          <p className="text-xs text-content-muted">Sign out of this device.</p>
         </div>
         <button type="button" onClick={signOut} className="btn-primary w-full">
           Sign Out
