@@ -19,17 +19,17 @@ export default function PlayerRow({ teamId, player }: PlayerRowProps) {
   return (
     <Link
       to={playerInfoPath(player.id, teamId)}
-      className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 hover:border-blue-200"
+      className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2 hover:border-info-line"
     >
       <div className="min-w-0">
-        <p className="font-medium text-slate-800 truncate">{playerDisplayName(player)}</p>
+        <p className="font-medium text-content truncate">{playerDisplayName(player)}</p>
         {player.nickname?.trim() && (
-          <p className="text-xs text-slate-500 truncate">
+          <p className="text-xs text-content-muted truncate">
             {[player.first_name, player.last_name].filter(Boolean).join(' ')}
           </p>
         )}
       </div>
-      <span className="shrink-0 text-sm font-semibold text-slate-500">
+      <span className="shrink-0 text-sm font-semibold text-content-muted">
         #{player.jersey_number || '-'}
       </span>
     </Link>

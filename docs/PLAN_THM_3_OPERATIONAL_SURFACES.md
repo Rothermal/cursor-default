@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A implemented; THM-3B through THM-3D pending.
+Status: THM-3A and THM-3B1 implemented; THM-3B2/B3 and THM-3C/D pending.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
 ## Delivery slices
@@ -25,6 +25,16 @@ schedule and SeasonInfo plus team-specific settings/formation/legacy-import
 components. Shared THM-2 audit/guardian/rules fields are already converted; do not
 duplicate that work. Verify both sport settings hosts and read-only destinations.
 Subdivide further if the concrete component inventory cannot be reviewed safely.
+
+- **THM-3B1 implemented:** TeamInfo, all twelve `team-info` render components,
+  and SegmentedControl. Overview, read-only roster/schedule, members, tournaments,
+  result badges, and loading/unavailable states use semantic colors. Grid panels
+  permit shrinking for long names; result badges stay on one line. No data or
+  permission changes. See [verification](REGRESSION_THM_3B1_TEAM_INFO.md).
+- **THM-3B2 pending:** Teams list/manage host and its team settings, formation,
+  and legacy-import components. Keep shared THM-2 fields unchanged.
+- **THM-3B3 pending:** SeasonInfo and remaining season management render components.
+  Audit imports before converting; shared B1 panels do not make these hosts done.
 
 ### THM-3C: Cloud games and operational review
 

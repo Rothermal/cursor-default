@@ -2,6 +2,20 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/TeamInfo.tsx",
+  "src/components/SegmentedControl.tsx",
+  "src/components/team-info/GameCard.tsx",
+  "src/components/team-info/PlayerRow.tsx",
+  "src/components/team-info/QuickStatsCard.tsx",
+  "src/components/team-info/RecentResultsCard.tsx",
+  "src/components/team-info/RecordBadge.tsx",
+  "src/components/team-info/ResultBadge.tsx",
+  "src/components/team-info/RosterPreviewCard.tsx",
+  "src/components/team-info/SchedulePreviewCard.tsx",
+  "src/components/team-info/TeamHero.tsx",
+  "src/components/team-info/TeamMembersCard.tsx",
+  "src/components/team-info/TeamOverviewCards.tsx",
+  "src/components/team-info/TournamentCard.tsx",
   "src/pages/SportSelect.tsx",
   "src/pages/SportDashboard.tsx",
   "src/App.tsx",
@@ -29,6 +43,14 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('keeps Team Info grid panels within their tracks for long names', () => {
+    for (const name of ['RosterPreviewCard', 'SchedulePreviewCard', 'TeamMembersCard', 'TournamentCard']) {
+      expect(readFileSync(`src/components/team-info/${name}.tsx`, 'utf8')).toContain('card min-w-0')
+    }
+  })
+  it('keeps result badges on one line beside truncated opponent names', () => {
+    expect(readFileSync('src/components/team-info/ResultBadge.tsx', 'utf8')).toContain('shrink-0 whitespace-nowrap')
+  })
   it.each(surfaces)('%s uses semantic utility colors', path => {
     const source = readFileSync(path, 'utf8')
     expect(source).not.toMatch(rawColor)

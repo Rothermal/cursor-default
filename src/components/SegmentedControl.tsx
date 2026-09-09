@@ -17,7 +17,7 @@ export default function SegmentedControl<T extends string>({
   label,
 }: SegmentedControlProps<T>) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-1" role="tablist" aria-label={label}>
+    <div className="rounded-xl border border-line bg-surface p-1" role="tablist" aria-label={label}>
       <div className="grid grid-cols-3 gap-1">
         {options.map(option => {
           const selected = option.value === value
@@ -28,10 +28,10 @@ export default function SegmentedControl<T extends string>({
               role="tab"
               aria-selected={selected}
               onClick={() => onChange(option.value)}
-              className={`min-h-10 rounded-lg px-2 text-sm font-semibold transition-colors ${
+              className={`min-h-10 rounded-lg px-2 text-sm font-semibold ${
                 selected
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-accent text-accent-content'
+                  : 'text-content-muted hover:bg-surface-muted'
               }`}
             >
               {option.label}

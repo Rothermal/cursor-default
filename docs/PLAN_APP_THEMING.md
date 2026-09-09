@@ -1,6 +1,6 @@
 # Plan: App theming and dark mode
 
-Status: THM-1, THM-2, and THM-3A implemented; remaining THM-3 slices and THM-4 through THM-6 pending
+Status: THM-1, THM-2, THM-3A, and THM-3B1 implemented; remaining THM-3 slices and THM-4 through THM-6 pending
 
 This roadmap makes StatKeeper themeable across authentication, administration,
 team/game management, live sport workspaces, and review destinations. Light and
