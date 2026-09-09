@@ -87,8 +87,9 @@ cards, low-contrast text, Light inputs, and mismatched dialogs throughout the ap
    game.
 8. Intermediate phases may merge, but the public Dark selector remains unavailable
    until the release phase.
-9. Existing sport header/accent colors remain sport-owned. Theme tokens own the
-   surrounding surfaces and content contrast.
+9. Existing sport header/accent colors remain the fallback. After the Light/Dark
+   release, scoped team branding may override approved identity/accent tokens;
+   theme tokens still own surrounding surfaces and content contrast.
 10. The Soccer pitch should normally remain green with light markings. The
     Basketball court should normally remain wood-toned. Both require marker,
     boundary, focus, and surrounding-panel contrast checks in Dark mode.
@@ -438,3 +439,20 @@ Before each phase:
 Recommended order: THM-1, THM-2, THM-3, THM-4, THM-5, THM-6. THM-4 and
 THM-5 may proceed independently after THM-1 through THM-3, but THM-6 requires
 both.
+
+## 13. Approved team-branding follow-on
+
+See [Team branding](PLAN_TEAM_BRANDING.md) for the separately approved product
+direction. Delivery order is THM-1 through THM-6, then team colors, then logo
+uploads. Branding is not part of the initial Light/Dark release gate.
+
+Light/Dark remains a device-local user preference. Team branding is shared team
+metadata and applies only within an explicitly resolved team context, including
+historical games. Multi-team and global pages stay neutral. Team primary and
+secondary colors must not override semantic text, surfaces, status colors, or
+sport markers. THM-1 should reserve a scoped accent-token boundary without
+implementing team persistence, uploads, or account-global team selection.
+
+The no-Supabase/no-game-payload rule above applies to the appearance preference.
+The later branding plan requires separately authorized team metadata and image
+storage, but neither branding nor appearance becomes event authority.
