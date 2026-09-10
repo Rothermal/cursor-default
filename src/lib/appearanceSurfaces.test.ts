@@ -2,6 +2,15 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/Teams.tsx",
+  "src/components/AccessUnavailable.tsx",
+  "src/components/TeamInviteLinksPanel.tsx",
+  "src/components/settings/BasketballTeamSettingsPanel.tsx",
+  "src/components/settings/SoccerTeamSettingsPanel.tsx",
+  "src/components/settings/BasketballLegacySeasonImport.tsx",
+  "src/components/soccer/SoccerFormationEditor.tsx",
+  "src/components/soccer/SoccerLineupDefaultsEditor.tsx",
+  "src/components/soccer/SoccerRulesOverrideEditor.tsx",
   "src/pages/TeamInfo.tsx",
   "src/components/SegmentedControl.tsx",
   "src/components/team-info/GameCard.tsx",
@@ -52,7 +61,19 @@ describe('Converted application surface color ownership', () => {
     expect(readFileSync('src/components/team-info/ResultBadge.tsx', 'utf8')).toContain('shrink-0 whitespace-nowrap')
   })
   it.each(surfaces)('%s uses semantic utility colors', path => {
-    const source = readFileSync(path, 'utf8')
+    let source = readFileSync(path, 'utf8')
+    if (path === 'src/components/soccer/SoccerFormationEditor.tsx') {
+      // Fixed field artwork, not application surfaces. Keep the exception exact.
+      for (const [literal, count] of [
+        ['border-emerald-800 bg-emerald-600', 1],
+        ['border-white/80', 4],
+        ['border-white bg-white text-slate-900', 1],
+        ['border-dashed border-white/90 bg-emerald-800/80 text-white', 1],
+      ] as const) {
+        expect(source.split(literal)).toHaveLength(count + 1)
+        source = source.split(literal).join('')
+      }
+    }
     expect(source).not.toMatch(rawColor)
     expect(source).not.toMatch(fixedColor)
     expect(source).not.toMatch(colorTransition)

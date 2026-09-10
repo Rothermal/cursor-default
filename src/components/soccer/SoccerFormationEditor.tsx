@@ -90,8 +90,8 @@ export default function SoccerFormationEditor({
       <p className="sr-only" aria-live="polite">{announcement}</p>
 
       <fieldset disabled={readOnly} className="space-y-2">
-        <legend className="text-sm font-semibold text-slate-700">Players on field</legend>
-        <div className="grid grid-cols-3 gap-1 rounded-md bg-slate-100 p-1" aria-label="Formation player count">
+        <legend className="text-sm font-semibold text-content">Players on field</legend>
+        <div className="grid grid-cols-3 gap-1 rounded-md bg-surface-muted p-1" aria-label="Formation player count">
           {PLAYER_COUNTS.map(count => (
             <button
               key={count}
@@ -99,8 +99,8 @@ export default function SoccerFormationEditor({
               onClick={() => onPlayerCountChange(count)}
               className={`h-9 rounded text-sm font-semibold ${
                 playerCount === count
-                  ? 'bg-white text-emerald-800 shadow-sm'
-                  : 'text-slate-600 hover:bg-white/70'
+                  ? 'bg-surface text-success-content shadow-sm'
+                  : 'text-content-muted hover:bg-surface/70'
               }`}
               aria-pressed={playerCount === count}
             >
@@ -111,7 +111,7 @@ export default function SoccerFormationEditor({
       </fieldset>
 
       <fieldset disabled={readOnly} className="space-y-2">
-        <legend className="text-sm font-semibold text-slate-700">Template</legend>
+        <legend className="text-sm font-semibold text-content">Template</legend>
         <div className="grid grid-cols-3 gap-2">
           {templates.map(option => (
             <button
@@ -120,8 +120,8 @@ export default function SoccerFormationEditor({
               onClick={() => onTemplateSelect(option.id)}
               className={`h-10 rounded-md border text-sm font-semibold ${
                 formation?.templateId === option.id
-                  ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300'
+                  ? 'border-success-line bg-success text-success-content'
+                  : 'border-line bg-surface text-content hover:border-success-line'
               }`}
               aria-pressed={formation?.templateId === option.id}
             >
@@ -132,7 +132,7 @@ export default function SoccerFormationEditor({
       </fieldset>
 
       {mismatch && template && (
-        <div role="alert" className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div role="alert" className="flex gap-2 rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
           <AlertTriangle size={17} className="mt-0.5 shrink-0" />
           <span>
             {template.label} is a {template.playerCount}-player formation, but team rules currently use {playerCount}.
@@ -141,8 +141,8 @@ export default function SoccerFormationEditor({
       )}
 
       {!formation || !template ? (
-        <div className="border-y border-slate-200 py-6 text-center">
-          <p className="text-sm font-semibold text-slate-700">No default formation</p>
+        <div className="border-y border-line py-6 text-center">
+          <p className="text-sm font-semibold text-content">No default formation</p>
         </div>
       ) : (
         <>
@@ -181,21 +181,21 @@ export default function SoccerFormationEditor({
                 <div
                   key={slot.id}
                   role="listitem"
-                  className="grid min-h-12 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-slate-100 py-2 last:border-b-0"
+                  className="grid min-h-12 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-line py-2 last:border-b-0"
                 >
-                  <span className="text-sm font-bold text-emerald-800">{slot.label}</span>
+                  <span className="text-sm font-bold text-success-content">{slot.label}</span>
                   <span className="min-w-0">
-                    <span className={`block truncate text-sm font-semibold ${player || !assignedPlayerId ? 'text-slate-800' : 'text-amber-700'}`}>
+                    <span className={`block truncate text-sm font-semibold ${player || !assignedPlayerId ? 'text-content' : 'text-warning-content'}`}>
                       {assignment}
                     </span>
-                    <span className="block text-xs capitalize text-slate-500">{slot.roleGroup}</span>
+                    <span className="block text-xs capitalize text-content-muted">{slot.roleGroup}</span>
                   </span>
                   {!readOnly && (
                     <button
                       type="button"
                       onClick={() => setSelectedSlotId(slot.id)}
                       disabled={!rosterReady}
-                      className="h-9 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-700 disabled:opacity-40"
+                      className="h-9 rounded-md border border-line px-3 text-sm font-semibold text-content disabled:text-content-disabled"
                       aria-label={`${assignedPlayerId ? 'Change' : 'Choose'} ${slot.label} player`}
                     >
                       {assignedPlayerId ? 'Change' : 'Choose'}
@@ -210,7 +210,7 @@ export default function SoccerFormationEditor({
             <button
               type="button"
               onClick={onRequestClear}
-              className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-red-700"
+              className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-danger-content"
             >
               <Trash2 size={16} />
               Clear Formation
@@ -220,7 +220,7 @@ export default function SoccerFormationEditor({
       )}
 
       {!rosterReady && (
-        <p className="text-sm text-slate-500" role="status">
+        <p className="text-sm text-content-muted" role="status">
           {rosterLoading ? 'Loading active roster...' : 'Active roster unavailable.'}
         </p>
       )}
@@ -263,7 +263,7 @@ function FormationSlotButton({
       disabled={disabled}
       className={`absolute h-11 w-[4.5rem] -translate-x-1/2 -translate-y-1/2 rounded-md border px-1 shadow-sm disabled:cursor-default ${
         assignedPlayerId && !player
-          ? 'border-amber-300 bg-amber-50 text-amber-900'
+          ? 'border-warning-line bg-warning text-warning-content'
           : assignedPlayerId
             ? 'border-white bg-white text-slate-900'
             : 'border-dashed border-white/90 bg-emerald-800/80 text-white'
@@ -307,7 +307,7 @@ function RosterPickerDialog({
   if (!open || !slot) return null
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-2 safe-bottom sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 p-2 safe-bottom sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
@@ -316,18 +316,18 @@ function RosterPickerDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="max-h-[calc(100dvh-1rem)] w-full max-w-sm overflow-y-auto rounded-md bg-white p-4 shadow-xl"
+        className="max-h-[calc(100dvh-1rem)] w-full max-w-sm overflow-y-auto rounded-md bg-surface p-4 shadow-xl"
         onClick={event => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 id={titleId} className="text-base font-bold text-slate-800">
+          <h3 id={titleId} className="text-base font-bold text-content">
             {slot.label} player
           </h3>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-md text-slate-600 hover:bg-slate-100"
+            className="grid h-9 w-9 place-items-center rounded-md text-content-muted hover:bg-surface-muted"
             aria-label="Close player picker"
             title="Close"
           >
@@ -343,18 +343,18 @@ function RosterPickerDialog({
               onClick={() => onAssign(player.id)}
               className={`grid min-h-12 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-left ${
                 assignedPlayerId === player.id
-                  ? 'bg-emerald-50 text-emerald-900'
-                  : 'text-slate-800 hover:bg-slate-50'
+                  ? 'bg-success text-success-content'
+                  : 'text-content hover:bg-surface-muted'
               }`}
             >
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-surface-muted text-xs font-bold text-content-muted">
                 {player.number ?? <UserRound size={16} />}
               </span>
               <span className="truncate text-sm font-semibold">{player.name}</span>
             </button>
           ))}
           {roster.length === 0 && (
-            <p className="py-4 text-center text-sm text-slate-500">No active players</p>
+            <p className="py-4 text-center text-sm text-content-muted">No active players</p>
           )}
         </div>
 
@@ -362,7 +362,7 @@ function RosterPickerDialog({
           <button
             type="button"
             onClick={onClear}
-            className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-red-200 text-sm font-semibold text-red-700"
+            className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-danger-line text-sm font-semibold text-danger-content"
           >
             <Trash2 size={16} />
             Clear Slot
