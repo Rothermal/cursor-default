@@ -151,8 +151,8 @@ export default function SeasonInfo() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
+          <p className="text-sm text-content-muted mb-4">
             Configure Supabase credentials to view cloud seasons.
           </p>
           <button type="button" onClick={() => navigate('/settings/data')} className="btn-primary w-full">
@@ -167,8 +167,8 @@ export default function SeasonInfo() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing season</p>
-          <p className="text-sm text-slate-500 mb-4">Choose a season before opening Season Info.</p>
+          <p className="font-semibold text-content mb-2">Missing season</p>
+          <p className="text-sm text-content-muted mb-4">Choose a season before opening Season Info.</p>
           <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
             Teams
           </button>
@@ -178,30 +178,30 @@ export default function SeasonInfo() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-canvas">
       <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <Link
             to={backHref}
-            className="text-sm font-semibold text-blue-600"
+            className="text-sm font-semibold text-accent"
           >
             {backLabel}
           </Link>
-          {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+          {loading && <span className="text-xs text-content-subtle animate-pulse">Loading...</span>}
         </div>
 
         {error ? (
           <section className="card text-center space-y-3">
-            <p className="font-semibold text-slate-700">Season Info unavailable</p>
-            <p className="text-sm text-slate-500">{error}</p>
+            <p className="font-semibold text-content">Season Info unavailable</p>
+            <p className="text-sm text-content-muted">{error}</p>
             <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
               Teams
             </button>
           </section>
         ) : season && !loading ? (
           <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-slate-500">
+            <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+              <p className="text-sm font-semibold text-content-muted">
                 {sport?.icon ? `${sport.icon} ` : ''}
                 {sport?.name ?? season.sport}
               </p>
@@ -252,7 +252,7 @@ export default function SeasonInfo() {
                 </div>
               ) : (
                 <div className="mt-1 flex items-start gap-2">
-                  <h1 className="min-w-0 flex-1 text-2xl font-bold text-slate-900 break-words">
+                  <h1 className="min-w-0 flex-1 text-2xl font-bold text-content break-words">
                     {season.name}
                   </h1>
                   {canRenameSeason(season.owner_id, user?.id) && (
@@ -265,7 +265,7 @@ export default function SeasonInfo() {
                       }}
                       aria-label="Rename season"
                       title="Rename season"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-muted hover:bg-control-hover hover:text-content"
                     >
                       <Pencil size={17} aria-hidden />
                     </button>
@@ -273,52 +273,52 @@ export default function SeasonInfo() {
                 </div>
               )}
               {nameError && (
-                <p role="alert" className="mt-2 text-sm text-red-600">{nameError}</p>
+                <p role="alert" className="mt-2 text-sm text-danger-content">{nameError}</p>
               )}
               {(season.start_date || season.end_date) && (
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-content-muted">
                   {[season.start_date, season.end_date].filter(Boolean).join(' to ')}
                 </p>
               )}
-              <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <div className="mt-4 rounded-lg bg-surface-muted px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">
                   Teams
                 </p>
-                <p className="text-lg font-bold text-slate-800">{teams.length}</p>
+                <p className="text-lg font-bold text-content">{teams.length}</p>
               </div>
             </section>
 
             <section className="card space-y-3">
               <div>
-                <h2 className="font-semibold text-slate-800">Teams</h2>
-                <p className="text-xs text-slate-500">{teams.length} teams in this season</p>
+                <h2 className="font-semibold text-content">Teams</h2>
+                <p className="text-xs text-content-muted">{teams.length} teams in this season</p>
               </div>
 
               {teams.length === 0 ? (
-                <p className="text-sm text-slate-500">No teams in this season yet.</p>
+                <p className="text-sm text-content-muted">No teams in this season yet.</p>
               ) : (
                 <div className="space-y-2">
                   {teams.map(team => (
                     <div
                       key={team.id}
-                      className="rounded-lg border border-slate-100 bg-white px-3 py-2"
+                      className="rounded-lg border border-line bg-surface px-3 py-2"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <Link
                           to={teamInfoPath(team.id)}
-                          className="min-w-0 flex-1 truncate font-medium text-slate-800 hover:text-blue-700"
+                          className="min-w-0 flex-1 truncate font-medium text-content hover:text-accent-hover"
                         >
                           {teamDisplayName(team)}
                         </Link>
                         <Link
                           to={teamLeaderboardPath(team.id, season.id, true)}
-                          className="shrink-0 text-xs font-semibold text-blue-600"
+                          className="shrink-0 text-xs font-semibold text-accent"
                         >
                           Season Stats
                         </Link>
                       </div>
                       {team.name !== teamDisplayName(team) && (
-                        <p className="mt-1 text-xs text-slate-500 truncate">{team.name}</p>
+                        <p className="mt-1 text-xs text-content-muted truncate">{team.name}</p>
                       )}
                     </div>
                   ))}
@@ -328,7 +328,7 @@ export default function SeasonInfo() {
           </>
         ) : loading ? (
           <section className="card">
-            <p className="text-sm text-slate-500 animate-pulse">Loading Season Info...</p>
+            <p className="text-sm text-content-muted animate-pulse">Loading Season Info...</p>
           </section>
         ) : null}
       </div>
