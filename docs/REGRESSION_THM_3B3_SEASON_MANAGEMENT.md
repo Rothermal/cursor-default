@@ -2,15 +2,21 @@
 
 ## Scope
 
-SeasonInfo only: page canvas, season identity, rename controls, team links,
+SeasonInfo: page canvas, season identity, rename controls, team links,
 loading, missing and unavailable states. No render-component imports beyond
 router links and existing icons. Season creation/edit/delete in Admin and
 SeasonTeamStatsEditor were covered by THM-2; the Teams season picker by THM-3B2.
 No data or permission changes, migrations, or public Dark selector.
 
+PR review identified two missed THM-3B hosts: TeamRoster and TeamSchedule.
+Both now use semantic canvas, surface, text, and link colors and are included
+in the guard inventory. Their only render children, RosterPreviewCard and
+GameCard, were converted in B1. Dedicated-route browser validation remains
+pending; the SeasonInfo browser evidence below does not cover those routes.
+
 ## Evidence
 
-- 203 files / 1,532 tests pass, including 79 appearance surface tests.
+- 203 files / 1,534 tests pass, including 81 appearance surface tests.
   TypeScript and production build pass.
 - Isolated Edge checks rendered the actual SeasonInfo page with intercepted
   synthetic auth/data modules. Long season/team names rendered at 390px and

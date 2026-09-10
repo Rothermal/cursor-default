@@ -41,7 +41,10 @@ Subdivide further if the concrete component inventory cannot be reviewed safely.
   those children now theme but do not complete their host routes (THM-4/5).
   See [verification](REGRESSION_THM_3B2_TEAM_MANAGEMENT.md).
 - **THM-3B3 implemented:** SeasonInfo header, team links, rename controls,
-  loading/unavailable states. It has no imported render components. Season
+  loading/unavailable states, plus dedicated TeamRoster and TeamSchedule hosts
+  identified in PR review. Their RosterPreviewCard and GameCard children were
+  converted in B1; both hosts are now included in the color inventory. SeasonInfo
+  has no imported render components. Season
   create/edit/delete and legacy configuration are already covered by THM-2's
   Admin, SeasonTeamStatsEditor, and ConfirmDialog inventory; the team creation
   season picker is THM-3B2. See [verification](REGRESSION_THM_3B3_SEASON_MANAGEMENT.md).
