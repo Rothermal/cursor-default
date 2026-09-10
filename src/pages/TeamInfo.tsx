@@ -324,8 +324,8 @@ export default function TeamInfo() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
+          <p className="text-sm text-content-muted mb-4">
             Configure Supabase credentials to view cloud team info.
           </p>
           <button type="button" onClick={() => navigate('/settings/data')} className="btn-primary w-full">
@@ -340,8 +340,8 @@ export default function TeamInfo() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing team</p>
-          <p className="text-sm text-slate-500 mb-4">Choose a team before opening Team Info.</p>
+          <p className="font-semibold text-content mb-2">Missing team</p>
+          <p className="text-sm text-content-muted mb-4">Choose a team before opening Team Info.</p>
           <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
             Teams
           </button>
@@ -351,13 +351,13 @@ export default function TeamInfo() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-canvas">
       <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => navigate('/teams')}
-            className="text-sm font-semibold text-blue-600"
+            className="text-sm font-semibold text-accent"
           >
             Back to Teams
           </button>
@@ -367,35 +367,35 @@ export default function TeamInfo() {
                 type="button"
                 onClick={() => void handleStartGame()}
                 disabled={startingGame}
-                className="btn-primary py-2 px-3 text-sm disabled:opacity-50"
+                className="btn-primary py-2 px-3 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 {startingGame ? 'Checking...' : 'Start Game'}
               </button>
             )}
             {(startGameError || parkingError) && (
               <div className="max-w-[14rem] text-right">
-                <p className="text-xs text-red-600">
+                <p className="text-xs text-danger-content">
                   {startGameError ?? parkingError}
                 </p>
                 {offerLocalSoccer && (
                   <button
                     type="button"
                     onClick={startLocalSoccerGame}
-                    className="mt-1 text-xs font-semibold text-blue-600 underline"
+                    className="mt-1 text-xs font-semibold text-accent underline"
                   >
                     Start Local Match
                   </button>
                 )}
               </div>
             )}
-            {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+            {loading && <span className="text-xs text-content-subtle animate-pulse">Loading...</span>}
           </div>
         </div>
 
         {error ? (
           <section className="card text-center space-y-3">
-            <p className="font-semibold text-slate-700">Team Info unavailable</p>
-            <p className="text-sm text-slate-500">{error}</p>
+            <p className="font-semibold text-content">Team Info unavailable</p>
+            <p className="text-sm text-content-muted">{error}</p>
             <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
               Teams
             </button>
@@ -456,7 +456,7 @@ export default function TeamInfo() {
           </>
         ) : loading ? (
           <section className="card">
-            <p className="text-sm text-slate-500 animate-pulse">Loading Team Info...</p>
+            <p className="text-sm text-content-muted animate-pulse">Loading Team Info...</p>
           </section>
         ) : null}
       </div>

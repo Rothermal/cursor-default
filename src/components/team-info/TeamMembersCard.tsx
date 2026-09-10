@@ -24,33 +24,33 @@ export default function TeamMembersCard({ members, error, limit }: TeamMembersCa
   const hiddenCount = Math.max(0, members.length - visibleMembers.length)
 
   return (
-    <section className="card space-y-3">
+    <section className="card min-w-0 space-y-3">
       <div>
-        <h2 className="font-semibold text-slate-800">Team Members</h2>
-        <p className="text-xs text-slate-500">{members.length} people with access</p>
+        <h2 className="font-semibold text-content">Team Members</h2>
+        <p className="text-xs text-content-muted">{members.length} people with access</p>
       </div>
 
       {error ? (
-        <p className="text-sm text-slate-500">{error}</p>
+        <p className="text-sm text-content-muted">{error}</p>
       ) : members.length === 0 ? (
-        <p className="text-sm text-slate-500">No members found.</p>
+        <p className="text-sm text-content-muted">No members found.</p>
       ) : (
         <div className="space-y-2">
           {visibleMembers.map(member => (
-            <div key={member.id} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+            <div key={member.id} className="rounded-xl border border-line bg-surface px-3 py-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-medium text-slate-800 truncate">{memberDisplayName(member)}</p>
-                <span className="shrink-0 text-xs font-semibold capitalize text-slate-500">
+                <p className="font-medium text-content truncate">{memberDisplayName(member)}</p>
+                <span className="shrink-0 text-xs font-semibold capitalize text-content-muted">
                   {member.role}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-content-muted">
                 {member.accepted_at ? 'Accepted' : 'Pending'}
               </p>
             </div>
           ))}
           {hiddenCount > 0 && (
-            <p className="text-xs text-slate-500">+{hiddenCount} more members</p>
+            <p className="text-xs text-content-muted">+{hiddenCount} more members</p>
           )}
         </div>
       )}
