@@ -623,8 +623,8 @@ export default function GameInfo() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
+          <p className="text-sm text-content-muted mb-4">
             Configure Supabase credentials to view cloud game info.
           </p>
           <button type="button" onClick={() => navigate('/settings/data')} className="btn-primary w-full">
@@ -639,8 +639,8 @@ export default function GameInfo() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing game</p>
-          <p className="text-sm text-slate-500 mb-4">Choose a game before opening Game Info.</p>
+          <p className="font-semibold text-content mb-2">Missing game</p>
+          <p className="text-sm text-content-muted mb-4">Choose a game before opening Game Info.</p>
           <button type="button" onClick={() => navigate('/games')} className="btn-primary w-full">
             Cloud Games
           </button>
@@ -661,75 +661,75 @@ export default function GameInfo() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-canvas">
       <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           {backTeamId ? (
-            <Link to={teamInfoPath(backTeamId)} className="text-sm font-semibold text-blue-600">
+            <Link to={teamInfoPath(backTeamId)} className="text-sm font-semibold text-accent">
               Back to Team
             </Link>
           ) : (
             <button
               type="button"
               onClick={() => navigate('/games')}
-              className="text-sm font-semibold text-blue-600"
+              className="text-sm font-semibold text-accent"
             >
               Cloud Games
             </button>
           )}
-          {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+          {loading && <span className="text-xs text-content-subtle animate-pulse">Loading...</span>}
         </div>
 
         {error && (!game || loading) ? (
           <section className="card text-center space-y-3">
-            <p className="font-semibold text-slate-700">Game Info unavailable</p>
-            <p className="text-sm text-slate-500">{error}</p>
+            <p className="font-semibold text-content">Game Info unavailable</p>
+            <p className="text-sm text-content-muted">{error}</p>
           </section>
         ) : game && !loading ? (
           <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-slate-500">
+            <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+              <p className="text-sm font-semibold text-content-muted">
                 {sport?.icon ? `${sport.icon} ` : ''}
                 {sport?.name ?? game.sport_id ?? 'Sport'} / {team?.seasons.name ?? 'Personal game'}
               </p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 break-words">
+              <h1 className="mt-1 text-2xl font-bold text-content break-words">
                 {trackedTeamName} vs {game.opponent_name}
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {game.status === 'final' ? (
                   <ResultBadge result={score.result} scoreLine={score.scoreLine} />
                 ) : (
-                  <span className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+                  <span className="rounded-lg bg-info px-2 py-1 text-xs font-semibold text-info-content">
                     {statusLabel(game.status)}
                   </span>
                 )}
-                <span className="text-sm text-slate-500">{game.game_date}</span>
+                <span className="text-sm text-content-muted">{game.game_date}</span>
               </div>
             </section>
 
             <section className="card space-y-3">
               <div>
-                <h2 className="font-semibold text-slate-800">Game Details</h2>
-                <p className="text-xs text-slate-500">{statusLabel(game.status)}</p>
+                <h2 className="font-semibold text-content">Game Details</h2>
+                <p className="text-xs text-content-muted">{statusLabel(game.status)}</p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <div className="rounded-lg bg-surface-muted px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">
                     Team
                   </p>
-                  <p className="font-semibold text-slate-800">{trackedTeamName}</p>
+                  <p className="font-semibold text-content">{trackedTeamName}</p>
                 </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <div className="rounded-lg bg-surface-muted px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">
                     Opponent
                   </p>
-                  <p className="font-semibold text-slate-800">{game.opponent_name}</p>
+                  <p className="font-semibold text-content">{game.opponent_name}</p>
                 </div>
               </div>
               {game.tournament_name && (
-                <p className="text-sm text-slate-600">{game.tournament_name}</p>
+                <p className="text-sm text-content-muted">{game.tournament_name}</p>
               )}
-              {game.notes?.trim() && <p className="text-sm text-slate-600">{game.notes}</p>}
+              {game.notes?.trim() && <p className="text-sm text-content-muted">{game.notes}</p>}
             </section>
 
             {sport?.id === 'basketball' && basketballDataAuthority === 'sport_events' && (
@@ -795,27 +795,27 @@ export default function GameInfo() {
 
             <section className="card space-y-3">
               <div>
-                <h2 className="font-semibold text-slate-800">Stat Leaders</h2>
-                <p className="text-xs text-slate-500">Resolved game stats</p>
+                <h2 className="font-semibold text-content">Stat Leaders</h2>
+                <p className="text-xs text-content-muted">Resolved game stats</p>
               </div>
               {statsError ? (
-                <p className="text-sm text-slate-500">{statsError}</p>
+                <p className="text-sm text-content-muted">{statsError}</p>
               ) : leaders.length === 0 ? (
-                <p className="text-sm text-slate-500">No stat leaders yet.</p>
+                <p className="text-sm text-content-muted">No stat leaders yet.</p>
               ) : (
                 <div className="space-y-2">
                   {leaders.map(leader => (
                     <div
                       key={leader.key}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                      className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted px-3 py-2"
                     >
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-800 truncate">
+                        <p className="font-medium text-content truncate">
                           {leader.playerName}
                         </p>
-                        <p className="text-xs text-slate-500">{leader.label}</p>
+                        <p className="text-xs text-content-muted">{leader.label}</p>
                       </div>
-                      <p className="text-lg font-bold text-slate-800">{leader.value}</p>
+                      <p className="text-lg font-bold text-content">{leader.value}</p>
                     </div>
                   ))}
                 </div>
@@ -823,8 +823,8 @@ export default function GameInfo() {
             </section>
 
             {(error || parkingError) && (
-              <section className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2">
-                <p className="text-sm font-medium text-rose-700">{error ?? parkingError}</p>
+              <section className="rounded-lg border border-danger-line bg-danger px-3 py-2">
+                <p className="text-sm font-medium text-danger-content">{error ?? parkingError}</p>
               </section>
             )}
 
@@ -836,7 +836,7 @@ export default function GameInfo() {
                 type="button"
                 onClick={openFullGame}
                 disabled={openingGame}
-                className="btn-primary w-full disabled:opacity-60"
+                className="btn-primary w-full disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 {openingGame
                   ? 'Opening...'
@@ -847,8 +847,8 @@ export default function GameInfo() {
                     : 'Open game'}
               </button>
             ) : (
-              <section className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <p className="text-sm font-medium text-slate-600">
+              <section className="rounded-lg border border-line bg-surface-muted px-3 py-2">
+                <p className="text-sm font-medium text-content-muted">
                   Viewer access is read-only. Live game tracking is available to scorers, admins, and owners.
                 </p>
               </section>
@@ -856,7 +856,7 @@ export default function GameInfo() {
           </>
         ) : loading ? (
           <section className="card">
-            <p className="text-sm text-slate-500 animate-pulse">Loading Game Info...</p>
+            <p className="text-sm text-content-muted animate-pulse">Loading Game Info...</p>
           </section>
         ) : null}
       </div>

@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A, THM-3B1/B2/B3, and THM-3C1 implemented; THM-3C2/C3 and THM-3D pending.
+Status: THM-3A, THM-3B1/B2/B3, and THM-3C1/C2 implemented; THM-3C3 and THM-3D pending.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
 ## Delivery slices
@@ -60,8 +60,12 @@ correction dialogs remain THM-4/THM-5, but record those dependencies explicitly.
   is the previously themed ConfirmDialog. Resume, delete, cloud readers, role
   checks, and source selection remain unchanged. See
   [verification](REGRESSION_THM_3C1_CLOUD_GAMES.md).
-- **THM-3C2 pending:** GameInfo host and its inline review/authority tables and
-  controls. Audit the full rendered dependency tree before implementation.
+- **THM-3C2 implemented:** GameInfo host identity/details, status, stat leaders,
+  loading/unavailable states and open-game actions use semantic tokens. ResultBadge
+  was converted in B1. BasketballRecorderManager and BasketballFinalizationPanel
+  are still C3, so event Basketball GameInfo is not fully themed by C2 alone.
+  All loading, authority, finalization callbacks and resume logic stay unchanged.
+  See [verification](REGRESSION_THM_3C2_GAME_INFO.md).
 - **THM-3C3 pending:** Imported recorder/finalization/recovery panels used by
   GameInfo. Audit shared Summary/tracker consumers and record incomplete hosts.
   These slices may be subdivided further if their concrete scope requires it.
