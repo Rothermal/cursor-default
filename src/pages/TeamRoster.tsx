@@ -109,8 +109,8 @@ export default function TeamRoster() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
+          <p className="text-sm text-content-muted mb-4">
             Configure Supabase credentials to view cloud team rosters.
           </p>
           <button type="button" onClick={() => navigate('/settings/data')} className="btn-primary w-full">
@@ -125,8 +125,8 @@ export default function TeamRoster() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing team</p>
-          <p className="text-sm text-slate-500 mb-4">Choose a team before opening the roster.</p>
+          <p className="font-semibold text-content mb-2">Missing team</p>
+          <p className="text-sm text-content-muted mb-4">Choose a team before opening the roster.</p>
           <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
             Teams
           </button>
@@ -136,41 +136,41 @@ export default function TeamRoster() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-canvas">
       <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <Link to={teamInfoPath(teamId)} className="text-sm font-semibold text-blue-600">
+          <Link to={teamInfoPath(teamId)} className="text-sm font-semibold text-accent">
             Back to Team
           </Link>
-          {loading && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+          {loading && <span className="text-xs text-content-subtle animate-pulse">Loading...</span>}
         </div>
 
         {error ? (
           <section className="card text-center space-y-3">
-            <p className="font-semibold text-slate-700">Team roster unavailable</p>
-            <p className="text-sm text-slate-500">{error}</p>
+            <p className="font-semibold text-content">Team roster unavailable</p>
+            <p className="text-sm text-content-muted">{error}</p>
             <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
               Teams
             </button>
           </section>
         ) : team && !loading ? (
           <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-slate-500">
+            <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+              <p className="text-sm font-semibold text-content-muted">
                 {sport?.icon ? `${sport.icon} ` : ''}
                 {sport?.name ?? team.seasons.sport} / {team.seasons.name}
               </p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 break-words">
+              <h1 className="mt-1 text-2xl font-bold text-content break-words">
                 {displayName}
               </h1>
               {team.name !== displayName && (
-                <p className="mt-1 text-sm text-slate-500 break-words">{team.name}</p>
+                <p className="mt-1 text-sm text-content-muted break-words">{team.name}</p>
               )}
-              <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <div className="mt-4 rounded-lg bg-surface-muted px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">
                   Active roster
                 </p>
-                <p className="text-lg font-bold text-slate-800">{players.length}</p>
+                <p className="text-lg font-bold text-content">{players.length}</p>
               </div>
             </section>
 
@@ -178,7 +178,7 @@ export default function TeamRoster() {
           </>
         ) : loading ? (
           <section className="card">
-            <p className="text-sm text-slate-500 animate-pulse">Loading Team Roster...</p>
+            <p className="text-sm text-content-muted animate-pulse">Loading Team Roster...</p>
           </section>
         ) : null}
       </div>

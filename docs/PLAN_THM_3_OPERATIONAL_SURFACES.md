@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A and THM-3B1/B2 implemented; THM-3B3 and THM-3C/D pending.
+Status: THM-3A and THM-3B1/B2/B3 implemented; THM-3C/D pending.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
 ## Delivery slices
@@ -40,8 +40,14 @@ Subdivide further if the concrete component inventory cannot be reviewed safely.
   SoccerGameSetup also uses the rules editor, and GameTracker uses AccessUnavailable;
   those children now theme but do not complete their host routes (THM-4/5).
   See [verification](REGRESSION_THM_3B2_TEAM_MANAGEMENT.md).
-- **THM-3B3 pending:** SeasonInfo and remaining season management render components.
-  Audit imports before converting; shared B1 panels do not make these hosts done.
+- **THM-3B3 implemented:** SeasonInfo header, team links, rename controls,
+  loading/unavailable states, plus dedicated TeamRoster and TeamSchedule hosts
+  identified in PR review. Their RosterPreviewCard and GameCard children were
+  converted in B1; both hosts are now included in the color inventory. SeasonInfo
+  has no imported render components. Season
+  create/edit/delete and legacy configuration are already covered by THM-2's
+  Admin, SeasonTeamStatsEditor, and ConfirmDialog inventory; the team creation
+  season picker is THM-3B2. See [verification](REGRESSION_THM_3B3_SEASON_MANAGEMENT.md).
 
 ### THM-3C: Cloud games and operational review
 

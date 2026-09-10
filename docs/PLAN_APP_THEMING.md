@@ -1,6 +1,6 @@
 # Plan: App theming and dark mode
 
-Status: THM-1, THM-2, THM-3A, and THM-3B1/B2 implemented; remaining THM-3 slices and THM-4 through THM-6 pending
+Status: THM-1, THM-2, THM-3A, and THM-3B implemented; THM-3C/D and THM-4 through THM-6 pending
 
 This roadmap makes StatKeeper themeable across authentication, administration,
 team/game management, live sport workspaces, and review destinations. Light and
@@ -280,9 +280,9 @@ Settings route are complete without Light-only islands.
 Goal: convert sport-neutral operational and review workflows.
 
 Delivered in reviewable slices: [THM-3 operational surfaces](PLAN_THM_3_OPERATIONAL_SURFACES.md).
-THM-3A and THM-3B1/B2 cover sport choice/dashboard, Team Info, and Teams
-list/manage. Season management (THM-3B3), cloud-game review (THM-3C), and
-statistics destinations (THM-3D) remain pending. This is not a THM-3 completion claim.
+THM-3A and THM-3B cover sport choice/dashboard, Team Info, Teams list/manage,
+dedicated team roster/schedule routes, and season management. Cloud-game review (THM-3C) and statistics destinations
+(THM-3D) remain pending. This is not a THM-3 completion claim.
 
 - Convert sport choice/dashboard, Teams, Team Info/Manage/Roster/Schedule, Seasons,
   Games, Game Info, Player Profile, Career, Leaderboard, Team Stats, and Tournament
