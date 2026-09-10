@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A and THM-3B1/B2/B3 implemented; THM-3C/D pending.
+Status: THM-3A, THM-3B1/B2/B3, and THM-3C1 implemented; THM-3C2/C3 and THM-3D pending.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
 ## Delivery slices
@@ -54,6 +54,17 @@ Subdivide further if the concrete component inventory cannot be reviewed safely.
 Inventory Games and GameInfo with their shared tables, filters, authority,
 publication, recovery, and conflict controls. Sport-owned Summary and live
 correction dialogs remain THM-4/THM-5, but record those dependencies explicitly.
+
+- **THM-3C1 implemented:** Games list, status/chart badges, opponent editor,
+  loading/error/empty states, and action controls. Its only imported UI component
+  is the previously themed ConfirmDialog. Resume, delete, cloud readers, role
+  checks, and source selection remain unchanged. See
+  [verification](REGRESSION_THM_3C1_CLOUD_GAMES.md).
+- **THM-3C2 pending:** GameInfo host and its inline review/authority tables and
+  controls. Audit the full rendered dependency tree before implementation.
+- **THM-3C3 pending:** Imported recorder/finalization/recovery panels used by
+  GameInfo. Audit shared Summary/tracker consumers and record incomplete hosts.
+  These slices may be subdivided further if their concrete scope requires it.
 
 ### THM-3D: Statistics destinations
 

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/Games.tsx",
   "src/pages/TeamRoster.tsx",
   "src/pages/TeamSchedule.tsx",
   "src/pages/SeasonInfo.tsx",
@@ -55,6 +56,15 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('keeps Cloud Games status badges single-line beside wrapping team names', () => {
+    const source = readFileSync('src/pages/Games.tsx', 'utf8')
+    const badges = [...source.matchAll(/<span className=\{`([^`]*\$\{statusBadge\(game\.status\)\}[^`]*)`\}>/g)]
+    expect(badges).toHaveLength(1)
+    expect(badges[0][1]).toContain('shrink-0 whitespace-nowrap')
+    const names = [...source.matchAll(/<p className="([^"]*)">\s*\{sport\?\.icon[^]*?\{team \? teamDisplayName\(team\)/g)]
+    expect(names).toHaveLength(1)
+    expect(names[0][1]).toContain('min-w-0 break-words')
+  })
   it.each([
     ['src/components/settings/BasketballTeamSettingsPanel.tsx', 'grid h-9 w-9 shrink-0'],
     ['src/components/settings/SoccerTeamSettingsPanel.tsx', 'h-9 w-9 shrink-0 grid'],

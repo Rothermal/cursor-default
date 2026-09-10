@@ -80,13 +80,13 @@ function statusLabel(status: string): string {
 function statusBadge(status: string): string {
   switch (status) {
     case 'final':
-      return 'bg-emerald-100 text-emerald-700'
+      return 'bg-success text-success-content'
     case 'in_progress':
-      return 'bg-blue-100 text-blue-700'
+      return 'bg-info text-info-content'
     case 'scheduled':
-      return 'bg-amber-100 text-amber-700'
+      return 'bg-warning text-warning-content'
     default:
-      return 'bg-slate-100 text-slate-600'
+      return 'bg-surface-muted text-content-muted'
   }
 }
 
@@ -354,7 +354,7 @@ export default function Games() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
           <button
             onClick={() => navigate(scopedSport ? sportDashboardPath(scopedSport.id) : '/')}
             className="btn-primary w-full mt-3"
@@ -741,18 +741,18 @@ export default function Games() {
 
     return (
       <div key={game.id} className="card">
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-semibold text-slate-700">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="min-w-0 break-words font-semibold text-content">
             {sport?.icon ?? '🏟️'}{' '}
             {team ? teamDisplayName(team) : game.tracked_team_name ?? 'Personal Game'}
           </p>
-          <span className={`text-[11px] px-2 py-1 rounded-full font-semibold ${statusBadge(game.status)}`}>
+          <span className={`shrink-0 whitespace-nowrap text-[11px] px-2 py-1 rounded-full font-semibold ${statusBadge(game.status)}`}>
             {statusLabel(game.status)}
           </span>
         </div>
         {editingGameId === game.id ? (
           <div className="flex gap-2 items-center mt-1">
-            <span className="text-sm text-slate-500 shrink-0">vs</span>
+            <span className="text-sm text-content-muted shrink-0">vs</span>
             <input
               type="text"
               value={editingOpponentName}
@@ -773,21 +773,21 @@ export default function Games() {
             </button>
             <button
               onClick={cancelEditOpponentName}
-              className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600 shrink-0"
+              className="border border-line rounded-lg px-2 py-1 text-sm text-content-muted shrink-0"
             >
               ✕
             </button>
           </div>
         ) : (
           <div className="flex items-center gap-1 mt-1 flex-wrap">
-            <p className="text-sm text-slate-600">vs {game.opponent_name}</p>
+            <p className="text-sm text-content-muted">vs {game.opponent_name}</p>
             {scoreHint && (
-              <span className="text-sm font-semibold text-slate-800 tabular-nums">{scoreHint}</span>
+              <span className="text-sm font-semibold text-content tabular-nums">{scoreHint}</span>
             )}
             {game.status !== 'final' && canTrackGames(teamRole) && (
               <button
                 onClick={() => startEditOpponentName(game)}
-                className="text-slate-300 hover:text-slate-500 transition-colors p-0.5"
+                className="text-content-subtle hover:text-content-muted p-0.5"
                 title="Edit opponent name"
                 aria-label="Edit opponent name"
               >
@@ -797,23 +797,23 @@ export default function Games() {
           </div>
         )}
         {game.tournament_name && (
-          <div className="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
+          <div className="text-xs text-content-subtle mt-0.5 flex flex-wrap items-center gap-2">
             <span>🏆 {game.tournament_name}</span>
             {game.tournament_id && team && game.team_id && (
               <Link
                 to={`/tournament-stats?tournamentId=${encodeURIComponent(game.tournament_id)}&teamId=${encodeURIComponent(game.team_id)}`}
-                className="text-blue-600 font-semibold underline"
+                className="text-accent font-semibold underline"
               >
                 Tournament stats
               </Link>
             )}
           </div>
         )}
-        <p className="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+        <p className="text-xs text-content-subtle mt-1 flex items-center gap-2 flex-wrap">
           <span>{game.game_date}</span>
           {chartGameIds.has(game.id) && (
             <span
-              className="text-[11px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 font-semibold"
+              className="text-[11px] px-2 py-0.5 rounded-full bg-warning text-warning-content font-semibold"
               title="This game has a shot chart"
             >
               🏀 chart
@@ -825,7 +825,7 @@ export default function Games() {
             <button
               onClick={() => { void handleOpenGame(game) }}
               disabled={loadingGameId === game.id}
-              className="btn-primary flex-1 py-2 disabled:opacity-50"
+              className="btn-primary flex-1 py-2 disabled:bg-control-disabled disabled:text-content-disabled"
             >
               {loadingGameId === game.id
                 ? 'Loading...'
@@ -854,8 +854,8 @@ export default function Games() {
             <button
               onClick={() => setConfirmDeleteGame(game)}
               disabled={deletingGameId === game.id}
-              className="border border-red-200 text-red-600 rounded-xl px-3 py-2 text-sm font-semibold
-                         hover:bg-red-50 active:scale-95 transition-all disabled:opacity-40"
+              className="border border-danger-line text-danger-content rounded-xl px-3 py-2 text-sm font-semibold
+                         hover:bg-danger active:scale-95 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
               title="Delete game"
               aria-label="Delete game"
             >
@@ -869,11 +869,11 @@ export default function Games() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface text-content border-b border-line px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={() => navigate(scopedSport ? sportDashboardPath(scopedSport.id) : '/')}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
+            className="w-8 h-8 rounded-full bg-control flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
@@ -889,17 +889,17 @@ export default function Games() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
         {(error || parkingError) && (
-          <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
+          <div className="card bg-danger border-danger-line text-danger-content text-sm">
             {error ?? parkingError}
           </div>
         )}
 
         {loading ? (
-          <div className="card text-sm text-slate-500 animate-pulse">Loading games...</div>
+          <div className="card text-sm text-content-muted animate-pulse">Loading games...</div>
         ) : visibleGames.length === 0 ? (
           <div className="card text-center py-10">
             <p className="text-3xl mb-2">📚</p>
-            <p className="text-slate-500">
+            <p className="text-content-muted">
               {scopedSport ? `No ${scopedSport.name} cloud games yet.` : 'No cloud games yet.'}
             </p>
           </div>
@@ -907,7 +907,7 @@ export default function Games() {
           <>
             {grouped.activeGames.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                <h2 className="text-sm font-semibold text-content-muted uppercase tracking-wide mb-2">
                   Active / Scheduled
                 </h2>
                 <div className="space-y-2">
@@ -918,7 +918,7 @@ export default function Games() {
 
             {grouped.finalGames.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                <h2 className="text-sm font-semibold text-content-muted uppercase tracking-wide mb-2">
                   Final Games
                 </h2>
                 <div className="space-y-2">
