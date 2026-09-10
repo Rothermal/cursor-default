@@ -9,9 +9,12 @@ handoff or navigation changes. No migration. Production Dark remains gated.
 
 ## Evidence
 
-- 203 test files / 1,559 tests pass, including 106 appearance surface tests.
+- 203 test files / 1,560 tests pass, including 107 appearance surface tests.
   TypeScript and production build pass; lint has zero errors and three existing
   context Fast Refresh warnings.
+- PR review added a unique loaded-header Career back-button guard requiring
+  `w-8`, `h-8` and `shrink-0`. Full tests and targeted lint pass again; runtime
+  source remains unchanged, so prior build/browser evidence still applies.
 - Both pages are in the semantic color inventory. Profile's player-name wrapping
   is guarded after an unbroken synthetic name exposed header overflow.
 - Actual page fixtures in Edge at 390px and 1280px in Light/Dark exercised loaded,
