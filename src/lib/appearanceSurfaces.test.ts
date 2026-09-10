@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/Games.tsx",
   "src/pages/TeamRoster.tsx",
   "src/pages/TeamSchedule.tsx",
   "src/pages/SeasonInfo.tsx",
