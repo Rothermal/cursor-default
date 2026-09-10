@@ -55,20 +55,20 @@ export function BasketballAggregateDestinationPage({
 }: BasketballAggregateDestinationPageProps) {
   const navigate = useNavigate()
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <header className="bg-slate-800 text-white px-4 py-4">
+    <div className="min-h-screen flex flex-col bg-canvas">
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(backPath)}
-            className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20"
+            className="w-9 h-9 shrink-0 rounded-lg bg-control flex items-center justify-center hover:bg-control-hover"
             aria-label="Back"
           >
             <ArrowLeft size={18} />
           </button>
           <div className="min-w-0">
             <h1 className="text-lg font-bold truncate">{title}</h1>
-            <p className="text-sm text-slate-300 truncate">{subtitle}</p>
+            <p className="text-sm text-content-muted truncate">{subtitle}</p>
           </div>
         </div>
       </header>
@@ -104,14 +104,14 @@ export function BasketballAggregateDestination({
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-semibold text-slate-800">
+          <p className="font-semibold text-content">
             {variant === 'season'
               ? 'Season leaderboard'
               : variant === 'team'
                 ? 'Team statistics'
                 : 'Tournament statistics'}
           </p>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-content-muted mt-0.5">
             Final legacy games and canonical event publications, one authority per game.
           </p>
         </div>
@@ -119,7 +119,7 @@ export function BasketballAggregateDestination({
           type="button"
           onClick={refresh}
           disabled={loading}
-          className="w-9 h-9 rounded-lg border border-slate-200 bg-white text-slate-600 flex items-center justify-center hover:bg-slate-50 disabled:opacity-50"
+          className="w-9 h-9 rounded-lg border border-line bg-surface text-content-muted flex items-center justify-center shrink-0 hover:bg-canvas disabled:bg-control-disabled disabled:text-content-disabled"
           aria-label="Refresh Basketball statistics"
           title="Refresh"
         >
@@ -139,7 +139,7 @@ export function BasketballAggregateDestination({
       {aggregate && (
         <>
           {refreshing && (
-            <p className="text-xs text-slate-500" role="status">
+            <p className="text-xs text-content-muted" role="status">
               Refreshing Basketball history...
             </p>
           )}
@@ -190,10 +190,10 @@ function LoadingState({
       ? `Loaded ${loaded} game sources`
       : 'Loading Basketball history'
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-5 text-center">
-      <RefreshCw size={20} className="animate-spin mx-auto text-sky-600 mb-2" />
-      <p className="text-sm font-medium text-slate-700">{label}</p>
-      <p className="text-xs text-slate-500 mt-1">Large scopes may take a moment.</p>
+    <div className="rounded-lg border border-line bg-surface px-4 py-5 text-center">
+      <RefreshCw size={20} className="animate-spin mx-auto text-accent mb-2" />
+      <p className="text-sm font-medium text-content">{label}</p>
+      <p className="text-xs text-content-muted mt-1">Large scopes may take a moment.</p>
     </div>
   )
 }
@@ -209,14 +209,14 @@ function ErrorState({ code, refresh }: { code: string; refresh: () => void }) {
           ? ['Statistics unavailable', 'The Basketball history response was not valid.']
           : ['Statistics could not load', 'Check your connection and try again.']
   return (
-    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-4">
+    <div className="rounded-lg border border-danger-line bg-danger px-4 py-4">
       <div className="flex gap-3">
-        <AlertTriangle size={19} className="text-rose-600 shrink-0 mt-0.5" />
+        <AlertTriangle size={19} className="text-danger-content shrink-0 mt-0.5" />
         <div>
-          <p className="font-semibold text-rose-900">{copy[0]}</p>
-          <p className="text-sm text-rose-800 mt-1">{copy[1]}</p>
+          <p className="font-semibold text-danger-content">{copy[0]}</p>
+          <p className="text-sm text-danger-content mt-1">{copy[1]}</p>
           {code !== 'access_denied' && (
-            <button type="button" onClick={refresh} className="text-sm font-semibold text-rose-800 underline mt-2">
+            <button type="button" onClick={refresh} className="text-sm font-semibold text-danger-content underline mt-2">
               Try again
             </button>
           )}
@@ -228,7 +228,7 @@ function ErrorState({ code, refresh }: { code: string; refresh: () => void }) {
 
 function Notice({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+    <div className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
       {children}
     </div>
   )
@@ -243,14 +243,14 @@ function Provenance({ aggregate }: { aggregate: BasketballAggregateResult }) {
         ? 'Legacy history'
         : 'No history'
   return (
-    <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-      <span className="rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold">
+    <div className="flex flex-wrap gap-2 text-xs text-content-muted">
+      <span className="rounded-md border border-line bg-surface px-2 py-1 font-semibold">
         {label}
       </span>
-      <span className="rounded-md border border-slate-200 bg-white px-2 py-1">
+      <span className="rounded-md border border-line bg-surface px-2 py-1">
         {aggregate.metrics.canonicalGameCount} canonical
       </span>
-      <span className="rounded-md border border-slate-200 bg-white px-2 py-1">
+      <span className="rounded-md border border-line bg-surface px-2 py-1">
         {aggregate.metrics.legacyGameCount} legacy
       </span>
     </div>
@@ -262,20 +262,20 @@ function QualityNotice({ aggregate }: { aggregate: BasketballAggregateResult }) 
   const managed = basketballAggregateManagedDiagnostics(aggregate)
   if (!generic) return null
   return (
-    <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+    <section className="rounded-lg border border-warning-line bg-warning px-4 py-3">
       <div className="flex gap-2">
-        <AlertTriangle size={17} className="text-amber-700 shrink-0 mt-0.5" />
+        <AlertTriangle size={17} className="text-warning-content shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-amber-900">Partial statistics</p>
-          <p className="text-sm text-amber-800 mt-0.5">{generic}</p>
+          <p className="text-sm font-semibold text-warning-content">Partial statistics</p>
+          <p className="text-sm text-warning-content mt-0.5">{generic}</p>
           {managed.length > 0 && (
             <details className="mt-2">
-              <summary className="text-xs font-semibold text-amber-900 cursor-pointer">
+              <summary className="text-xs font-semibold text-warning-content cursor-pointer">
                 Managed-team diagnostics ({managed.length})
               </summary>
               <ul className="mt-2 space-y-2">
                 {managed.map((item, index) => (
-                  <li key={`${item.sourceId}:${item.participantId ?? index}`} className="text-xs text-amber-900">
+                  <li key={`${item.sourceId}:${item.participantId ?? index}`} className="text-xs text-warning-content">
                     <span>{item.gameDate || 'Unknown date'}: {item.message}</span>
                     {item.gameId !== 'unknown' && (
                       <Link to={gameInfoPath(item.gameId)} className="font-semibold underline ml-1">
@@ -295,13 +295,13 @@ function QualityNotice({ aggregate }: { aggregate: BasketballAggregateResult }) 
 
 function Tabs({ value, onChange }: { value: DestinationTab; onChange: (value: DestinationTab) => void }) {
   return (
-    <div className="grid grid-cols-3 rounded-lg border border-slate-200 bg-slate-100 p-1">
+    <div className="grid grid-cols-3 rounded-lg border border-line bg-surface-muted p-1">
       {(['overview', 'players', 'games'] as const).map(tab => (
         <button
           key={tab}
           type="button"
           onClick={() => onChange(tab)}
-          className={`h-9 rounded-md text-sm font-semibold capitalize ${value === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`h-9 rounded-md text-sm font-semibold capitalize ${value === tab ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}
         >
           {tab}
         </button>
@@ -335,12 +335,12 @@ function RecordSummary({ team }: { team: BasketballAggregateTeam }) {
   ] as const
   return (
     <section>
-      <h2 className="font-semibold text-slate-800 mb-2">Overview</h2>
-      <div className="grid grid-cols-4 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200">
+      <h2 className="font-semibold text-content mb-2">Overview</h2>
+      <div className="grid grid-cols-4 gap-px overflow-hidden rounded-lg border border-line bg-line">
         {cells.map(([label, value]) => (
-          <div key={label} className="bg-white px-2 py-3 text-center">
-            <p className="font-bold text-slate-900 tabular-nums">{value}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">{label}</p>
+          <div key={label} className="bg-surface px-2 py-3 text-center">
+            <p className="font-bold text-content tabular-nums">{value}</p>
+            <p className="text-[11px] text-content-muted mt-0.5">{label}</p>
           </div>
         ))}
       </div>
@@ -356,19 +356,19 @@ function ForAgainstSummary({ team }: { team: BasketballAggregateTeam }) {
   ] as const
   return (
     <section>
-      <h2 className="font-semibold text-slate-800 mb-2">Official Team Totals</h2>
-      <p className="text-xs text-slate-500 mb-2">Includes player, team, and unknown-actor events.</p>
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <h2 className="font-semibold text-content mb-2">Official Team Totals</h2>
+      <p className="text-xs text-content-muted mb-2">Includes player, team, and unknown-actor events.</p>
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500">
+          <thead className="bg-canvas text-content-muted">
             <tr><th className="px-3 py-2 text-left font-semibold">Stat</th><th className="px-3 py-2 text-right font-semibold">For</th><th className="px-3 py-2 text-right font-semibold">Against</th></tr>
           </thead>
           <tbody>
             {rows.map(([label, key]) => (
-              <tr key={key} className="border-t border-slate-100">
-                <th className="px-3 py-2 text-left font-medium text-slate-700">{label}</th>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-900">{formatBasketballAggregateStat(key, team.trackedStats[key])}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatBasketballAggregateStat(key, team.opponentStats[key])}</td>
+              <tr key={key} className="border-t border-line">
+                <th className="px-3 py-2 text-left font-medium text-content">{label}</th>
+                <td className="px-3 py-2 text-right tabular-nums text-content">{formatBasketballAggregateStat(key, team.trackedStats[key])}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-content-muted">{formatBasketballAggregateStat(key, team.opponentStats[key])}</td>
               </tr>
             ))}
           </tbody>
@@ -408,21 +408,21 @@ function Players({
     <section className="space-y-3">
       <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Statistic categories">
         {BASKETBALL_AGGREGATE_DESTINATION_CATEGORIES.map(item => (
-          <button key={item.id} type="button" onClick={() => setCategoryId(item.id)} className={`h-9 px-3 rounded-lg text-sm font-semibold whitespace-nowrap border ${item.id === category.id ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
+          <button key={item.id} type="button" onClick={() => setCategoryId(item.id)} className={`h-9 px-3 rounded-lg text-sm font-semibold whitespace-nowrap border ${item.id === category.id ? 'bg-accent border-accent text-accent-content' : 'bg-surface border-line text-content-muted'}`}>
             {item.label}
           </button>
         ))}
       </div>
       {availableRankingMetrics.length > 0 && (
         <label className="block">
-          <span className="text-xs font-semibold text-slate-500">Rank by</span>
+          <span className="text-xs font-semibold text-content-muted">Rank by</span>
           <select value={metricId} onChange={event => setMetricId(event.target.value as BasketballAggregateMetricId)} className="input-field mt-1">
             {availableRankingMetrics.map(id => <option key={id} value={id}>{basketballAggregateMetricLabel(id).label}</option>)}
           </select>
         </label>
       )}
       {category.id === 'participation' && plusMinusCoverage && !plusMinusCoverage.complete && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
           Plus-minus comparison is unavailable: {plusMinusCoverage.includedGameCount} of{' '}
           {plusMinusCoverage.totalGameCount} games have complete lineup and scoring coverage.
         </div>
@@ -453,11 +453,11 @@ function PlayerTable({ aggregate, category, metricId, teamIdForLinks, seasonId }
   )
   const columns = basketballAggregateVisibleColumns(category, metricId, aggregate)
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-x-auto rounded-lg border border-line bg-surface">
       <table className="w-full min-w-[520px] text-sm">
-        <thead className="bg-slate-50 text-slate-500">
+        <thead className="bg-canvas text-content-muted">
           <tr>
-            <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-left font-semibold min-w-[150px]">Player</th>
+            <th className="sticky left-0 z-10 bg-canvas px-3 py-2 text-left font-semibold w-[180px] min-w-[180px] max-w-[180px]">Player</th>
             {columns.map(id => <th key={id} className="px-2 py-2 text-right font-semibold whitespace-nowrap">{basketballAggregateMetricLabel(id).shortLabel}</th>)}
           </tr>
         </thead>
@@ -467,10 +467,10 @@ function PlayerTable({ aggregate, category, metricId, teamIdForLinks, seasonId }
               ? teamIdForLinks
               : player.teamIds[0] ?? null
             return (
-            <tr key={player.playerId} className="border-t border-slate-100">
-              <th className="sticky left-0 z-10 bg-white px-3 py-2 text-left font-medium text-slate-800">
+            <tr key={player.playerId} className="border-t border-line">
+              <th className="sticky left-0 z-10 bg-surface px-3 py-2 text-left font-medium text-content w-[180px] min-w-[180px] max-w-[180px]">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-5 shrink-0 text-xs text-slate-400">{index + 1}</span>
+                  <span className="w-5 shrink-0 text-xs text-content-subtle">{index + 1}</span>
                   <div className="min-w-0 flex-1">
                     {teamId ? (
                       <Link
@@ -486,14 +486,14 @@ function PlayerTable({ aggregate, category, metricId, teamIdForLinks, seasonId }
                     )}
                     <Link
                       to={`/career?playerId=${encodeURIComponent(player.playerId)}&sport=basketball`}
-                      className="text-[11px] font-semibold text-sky-700 hover:underline"
+                      className="text-[11px] font-semibold text-accent hover:underline"
                     >
                       Career
                     </Link>
                   </div>
                 </div>
               </th>
-              {columns.map(id => <td key={id} className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${id === metricId ? 'font-bold text-slate-900' : 'text-slate-600'}`}>{formatBasketballAggregateMetric(player, id)}</td>)}
+              {columns.map(id => <td key={id} className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${id === metricId ? 'font-bold text-content' : 'text-content-muted'}`}>{formatBasketballAggregateMetric(player, id)}</td>)}
             </tr>
             )
           })}
@@ -518,15 +518,15 @@ function Games({ games, teamIdForLinks }: { games: BasketballAggregateGame[]; te
                 teamId: game.teamId ?? teamIdForLinks,
               })
             : gameInfoPath(game.gameId, game.teamId ?? teamIdForLinks)}
-          className="block rounded-lg border border-slate-200 bg-white px-3 py-3 hover:border-sky-300"
+          className="block rounded-lg border border-line bg-surface px-3 py-3 hover:border-accent"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-medium text-slate-800 truncate">{game.trackedTeamName}</p>
-              <p className="text-sm text-slate-500 truncate">{game.date} vs {game.opponentName}</p>
-              <p className="text-xs text-slate-400 capitalize mt-0.5">{game.authority} source</p>
+              <p className="font-medium text-content truncate">{game.trackedTeamName}</p>
+              <p className="text-sm text-content-muted truncate">{game.date} vs {game.opponentName}</p>
+              <p className="text-xs text-content-subtle capitalize mt-0.5">{game.authority} source</p>
             </div>
-            <span className={`font-bold shrink-0 ${game.result === 'win' ? 'text-emerald-700' : game.result === 'loss' ? 'text-rose-700' : 'text-slate-600'}`}>
+            <span className={`font-bold shrink-0 ${game.result === 'win' ? 'text-success-content' : game.result === 'loss' ? 'text-danger-content' : 'text-content-muted'}`}>
               {game.result === 'win' ? 'W' : game.result === 'loss' ? 'L' : 'T'} {game.trackedScore}-{game.opponentScore}
             </span>
           </div>
@@ -538,9 +538,9 @@ function Games({ games, teamIdForLinks }: { games: BasketballAggregateGame[]; te
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-5 text-center">
-      <p className="font-semibold text-slate-700">{title}</p>
-      <p className="text-sm text-slate-500 mt-1">{detail}</p>
+    <div className="rounded-lg border border-line bg-surface px-4 py-5 text-center">
+      <p className="font-semibold text-content">{title}</p>
+      <p className="text-sm text-content-muted mt-1">{detail}</p>
     </div>
   )
 }
