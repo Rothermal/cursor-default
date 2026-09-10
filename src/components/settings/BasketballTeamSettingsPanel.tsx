@@ -78,8 +78,8 @@ export default function BasketballTeamSettingsPanel({
     <section className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-slate-800">Basketball Rules</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="font-semibold text-content">Basketball Rules</h2>
+          <p className="text-xs text-content-muted">
             Shared by {teamName}. These defaults do not inherit from a recorder's personal rules.
           </p>
         </div>
@@ -87,7 +87,7 @@ export default function BasketballTeamSettingsPanel({
           type="button"
           onClick={() => void team.refresh()}
           disabled={team.status === 'loading' || team.status === 'saving'}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-line text-content-muted disabled:bg-control-disabled disabled:text-content-disabled"
           title="Refresh shared defaults"
           aria-label="Refresh shared defaults"
         >
@@ -99,23 +99,23 @@ export default function BasketballTeamSettingsPanel({
       </div>
 
       <div
-        className="flex flex-wrap items-center gap-2 text-xs text-slate-500"
+        className="flex flex-wrap items-center gap-2 text-xs text-content-muted"
         aria-live="polite"
       >
         <span>{statusLabel(team.status)}</span>
-        {dirty && <span className="font-semibold text-amber-700">Unsaved changes</span>}
-        {!mayEdit && <span className="font-semibold text-slate-600">Read only</span>}
+        {dirty && <span className="font-semibold text-warning-content">Unsaved changes</span>}
+        {!mayEdit && <span className="font-semibold text-content-muted">Read only</span>}
       </div>
 
       {team.error && (
-        <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p role="alert" className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
           {team.error}
         </p>
       )}
 
       {team.conflict && (
-        <div role="alert" className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <p className="text-sm font-semibold text-amber-900">
+        <div role="alert" className="space-y-2 rounded-md border border-warning-line bg-warning p-3">
+          <p className="text-sm font-semibold text-warning-content">
             Another manager changed these defaults.
           </p>
           <button
@@ -132,16 +132,16 @@ export default function BasketballTeamSettingsPanel({
         </div>
       )}
 
-      <div className="space-y-2 border-y border-blue-100 bg-blue-50 px-3 py-3 text-sm">
-        <p className="font-semibold text-blue-900">Which rules apply?</p>
-        <p className="text-blue-800">
+      <div className="space-y-2 border-y border-info-line bg-info px-3 py-3 text-sm">
+        <p className="font-semibold text-info-content">Which rules apply?</p>
+        <p className="text-info-content">
           These team defaults apply when setting up Basketball event-model games. Current legacy
           games continue to use the team foul, timeout, and bonus rules configured for the team's
           season.
         </p>
         <Link
           to={settingsPath('data')}
-          className="inline-flex min-h-10 items-center gap-2 font-semibold text-blue-700"
+          className="inline-flex min-h-10 items-center gap-2 font-semibold text-info-content"
         >
           Open Seasons
           <ArrowRight size={16} aria-hidden="true" />
@@ -151,7 +151,7 @@ export default function BasketballTeamSettingsPanel({
       <button
         type="button"
         onClick={() => navigate('/settings/sports/basketball')}
-        className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-blue-700"
+        className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-info-content"
       >
         <Settings2 size={16} />
         Personal Basketball defaults
@@ -171,7 +171,7 @@ export default function BasketballTeamSettingsPanel({
       {editorOpen && (
         <>
           {team.status === 'missing' && (
-            <p className="border-y border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <p className="border-y border-info-line bg-info px-3 py-2 text-sm text-info-content">
               No team defaults are saved. This preview uses the application default profile.
             </p>
           )}
@@ -201,7 +201,7 @@ export default function BasketballTeamSettingsPanel({
       )}
 
       {editorOpen && mayEdit && (
-        <div className="sticky bottom-0 -mx-4 grid grid-cols-1 gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:grid-cols-2">
+        <div className="sticky bottom-0 -mx-4 grid grid-cols-1 gap-2 border-t border-line bg-surface/95 p-4 backdrop-blur sm:grid-cols-2">
           <button
             type="button"
             className="btn-secondary"

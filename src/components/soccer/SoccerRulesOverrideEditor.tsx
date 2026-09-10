@@ -68,7 +68,7 @@ export default function SoccerRulesOverrideEditor({
       {overrideError && (
         <div
           role="alert"
-          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content"
         >
           Saved rules could not be applied and inherited values are shown instead. Reset this scope
           or edit a value to repair it. ({overrideError})
@@ -395,7 +395,7 @@ export default function SoccerRulesOverrideEditor({
             }))}
           />
         </RuleField>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-content-muted">
           Red-card replacement remains fixed to playing short.
         </p>
       </RuleGroup>
@@ -408,8 +408,8 @@ function RuleGroup({ title, children }: {
   children: ReactNode
 }) {
   return (
-    <section className="space-y-3 border-t border-slate-200 pt-4 first:border-t-0 first:pt-0">
-      <h3 className="text-xs font-bold uppercase text-slate-500">{title}</h3>
+    <section className="space-y-3 border-t border-line pt-4 first:border-t-0 first:pt-0">
+      <h3 className="text-xs font-bold uppercase text-content-muted">{title}</h3>
       {children}
     </section>
   )
@@ -423,10 +423,10 @@ function RuleField({ source, overridden, readOnly, onReset, children }: {
   children: ReactNode
 }) {
   return (
-    <div className="border-b border-slate-200 pb-3 last:border-b-0 space-y-2">
+    <div className="border-b border-line pb-3 last:border-b-0 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span className={`text-[11px] font-semibold ${
-          overridden ? 'text-emerald-700' : 'text-slate-500'
+          overridden ? 'text-success-content' : 'text-content-muted'
         }`}>
           {source}
         </span>
@@ -434,7 +434,7 @@ function RuleField({ source, overridden, readOnly, onReset, children }: {
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex h-7 items-center gap-1 text-xs font-semibold text-slate-600"
+            className="inline-flex h-7 items-center gap-1 text-xs font-semibold text-content-muted"
             title="Resume inherited value"
           >
             <RotateCcw size={13} />
@@ -455,13 +455,13 @@ function SelectField({ label, value, options, disabled, onChange }: {
   onChange: (value: string) => void
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}
       <select
         value={value}
         disabled={disabled}
         onChange={event => onChange(event.target.value)}
-        className="input-field mt-1 disabled:bg-slate-100"
+        className="input-field mt-1 disabled:bg-control-disabled"
       >
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>{optionLabel}</option>
@@ -480,7 +480,7 @@ function NumberField({ label, value, min, max, disabled, onChange }: {
   onChange: (value: number) => void
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}
       <input
         type="number"
@@ -491,7 +491,7 @@ function NumberField({ label, value, min, max, disabled, onChange }: {
         onChange={event => onChange(
           Math.max(min, Math.min(max, Number(event.target.value) || min))
         )}
-        className="input-field mt-1 disabled:bg-slate-100"
+        className="input-field mt-1 disabled:bg-control-disabled"
       />
     </label>
   )
@@ -504,7 +504,7 @@ function NullableNumberField({ label, value, disabled, onChange }: {
   onChange: (value: number | null) => void
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}
       <input
         type="number"
@@ -515,7 +515,7 @@ function NullableNumberField({ label, value, disabled, onChange }: {
         onChange={event => onChange(
           event.target.value === '' ? null : Math.max(0, Number(event.target.value) || 0)
         )}
-        className="input-field mt-1 disabled:bg-slate-100"
+        className="input-field mt-1 disabled:bg-control-disabled"
       />
     </label>
   )
@@ -528,14 +528,14 @@ function Toggle({ label, checked, disabled, onChange }: {
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className="flex min-h-10 items-center justify-between gap-3 text-sm font-medium text-slate-700">
+    <label className="flex min-h-10 items-center justify-between gap-3 text-sm font-medium text-content">
       {label}
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={event => onChange(event.target.checked)}
-        className="h-5 w-5 accent-emerald-600"
+        className="h-5 w-5 accent-accent"
       />
     </label>
   )
@@ -550,7 +550,7 @@ function SegmentRows({ segments, disabled, onChange }: {
     <div className="space-y-2">
       {segments.map((segment, index) => (
         <div key={segment.id} className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
-          <label className="min-w-0 text-xs font-medium text-slate-500">
+          <label className="min-w-0 text-xs font-medium text-content-muted">
             Label
             <SegmentLabelInput
               value={segment.label}
@@ -560,7 +560,7 @@ function SegmentRows({ segments, disabled, onChange }: {
               ))}
             />
           </label>
-          <label className="text-xs font-medium text-slate-500">
+          <label className="text-xs font-medium text-content-muted">
             Minutes
             <input
               type="number"
@@ -576,7 +576,7 @@ function SegmentRows({ segments, disabled, onChange }: {
                     }
                   : item
               ))}
-              className="input-field mt-1 px-3 py-2 text-sm disabled:bg-slate-100"
+              className="input-field mt-1 px-3 py-2 text-sm disabled:bg-control-disabled"
             />
           </label>
         </div>
@@ -614,7 +614,7 @@ function SegmentLabelInput({
         if (trimmed !== value) onCommit(trimmed)
         else if (draft !== value) setDraft(value)
       }}
-      className="input-field mt-1 min-w-0 w-full px-3 py-2 text-sm disabled:bg-slate-100"
+      className="input-field mt-1 min-w-0 w-full px-3 py-2 text-sm disabled:bg-control-disabled"
     />
   )
 }

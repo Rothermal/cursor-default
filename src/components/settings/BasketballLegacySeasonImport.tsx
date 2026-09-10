@@ -71,10 +71,10 @@ export default function BasketballLegacySeasonImport({
   }
 
   return (
-    <div className="space-y-3 border-y border-slate-200 py-3">
+    <div className="space-y-3 border-y border-line py-3">
       <div>
-        <p className="text-sm font-semibold text-slate-800">Legacy season rules</p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="text-sm font-semibold text-content">Legacy season rules</p>
+        <p className="mt-1 text-xs text-content-muted">
           Review rules from {seasonName} before applying them to this unsaved team draft.
           The season record is never changed.
         </p>
@@ -94,8 +94,8 @@ export default function BasketballLegacySeasonImport({
       </button>
 
       {open && (
-        <div className="space-y-4 bg-slate-50 px-3 py-3">
-          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        <div className="space-y-4 bg-surface-muted px-3 py-3">
+          {error && <p role="alert" className="text-sm text-danger-content">{error}</p>}
           {error && (
             <button type="button" className="btn-secondary w-full" onClick={() => void loadSeason()}>
               Retry
@@ -103,7 +103,7 @@ export default function BasketballLegacySeasonImport({
           )}
           {loaded && (
             <>
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-content">
                 Modern fallback profile
                 <select
                   value={fallbackKey}
@@ -113,7 +113,7 @@ export default function BasketballLegacySeasonImport({
                     setConfirmedDefaults(false)
                     setConfirmedMapping(false)
                   }}
-                  className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-slate-900"
+                  className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-content"
                 >
                   <option value="">Choose a profile</option>
                   {profiles.map(profile => (
@@ -126,13 +126,13 @@ export default function BasketballLegacySeasonImport({
                   ))}
                 </select>
               </label>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-content-muted">
                 The legacy season does not identify its governing rule set. This choice supplies
                 modern-only durations, lineup boundaries, and the player foul limit.
               </p>
 
               {preview?.ok && (
-                <div className="space-y-3 text-sm text-slate-700">
+                <div className="space-y-3 text-sm text-content">
                   <ReviewList title="Legacy values" items={preview.legacySummary} />
                   {preview.legacyDefaultedFields.length > 0 && (
                     <ReviewList
@@ -145,10 +145,10 @@ export default function BasketballLegacySeasonImport({
                 </div>
               )}
               {preview && !preview.ok && (
-                <p role="alert" className="text-sm text-red-700">{preview.error}</p>
+                <p role="alert" className="text-sm text-danger-content">{preview.error}</p>
               )}
 
-              <label className="flex items-start gap-2 text-sm text-slate-700">
+              <label className="flex items-start gap-2 text-sm text-content">
                 <input
                   type="checkbox"
                   disabled={disabled}
@@ -158,7 +158,7 @@ export default function BasketballLegacySeasonImport({
                 />
                 <span>The selected profile should supply the modern-only fields listed above.</span>
               </label>
-              <label className="flex items-start gap-2 text-sm text-slate-700">
+              <label className="flex items-start gap-2 text-sm text-content">
                 <input
                   type="checkbox"
                   disabled={disabled}
@@ -194,7 +194,7 @@ export default function BasketballLegacySeasonImport({
 function ReviewList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase text-slate-500">{title}</p>
+      <p className="text-xs font-semibold uppercase text-content-muted">{title}</p>
       <ul className="mt-1 list-disc space-y-1 pl-5">
         {items.map(item => <li key={item}>{item}</li>)}
       </ul>

@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A and THM-3B1 implemented; THM-3B2/B3 and THM-3C/D pending.
+Status: THM-3A and THM-3B1/B2 implemented; THM-3B3 and THM-3C/D pending.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
 ## Delivery slices
@@ -31,8 +31,15 @@ Subdivide further if the concrete component inventory cannot be reviewed safely.
   result badges, and loading/unavailable states use semantic colors. Grid panels
   permit shrinking for long names; result badges stay on one line. No data or
   permission changes. See [verification](REGRESSION_THM_3B1_TEAM_INFO.md).
-- **THM-3B2 pending:** Teams list/manage host and its team settings, formation,
-  and legacy-import components. Keep shared THM-2 fields unchanged.
+- **THM-3B2 implemented:** Teams list/manage host, AccessUnavailable, invite links,
+  both team settings hosts, Basketball legacy import, Soccer formation, lineup
+  defaults, and rules override editors. Shared THM-2 fields remain unchanged.
+  Formation pitch/markings and its assigned/open slot artwork retain exact fixed
+  colors; surrounding controls, warnings, and picker use semantic tokens. The
+  color inventory permits only those counted literal artwork strings.
+  SoccerGameSetup also uses the rules editor, and GameTracker uses AccessUnavailable;
+  those children now theme but do not complete their host routes (THM-4/5).
+  See [verification](REGRESSION_THM_3B2_TEAM_MANAGEMENT.md).
 - **THM-3B3 pending:** SeasonInfo and remaining season management render components.
   Audit imports before converting; shared B1 panels do not make these hosts done.
 

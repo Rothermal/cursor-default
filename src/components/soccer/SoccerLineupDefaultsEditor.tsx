@@ -39,7 +39,7 @@ export default function SoccerLineupDefaultsEditor({
 
   if (!rosterReady) {
     return (
-      <p className="text-sm text-slate-500" role="status">
+      <p className="text-sm text-content-muted" role="status">
         {rosterLoading ? 'Loading active roster...' : 'Active roster unavailable.'}
       </p>
     )
@@ -47,12 +47,12 @@ export default function SoccerLineupDefaultsEditor({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex items-center justify-between gap-3 border-b border-line pb-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800">Default match status</h3>
-          <p className="text-xs text-slate-500">Active roster players only</p>
+          <h3 className="text-sm font-semibold text-content">Default match status</h3>
+          <p className="text-xs text-content-muted">Active roster players only</p>
         </div>
-        <span className="shrink-0 text-sm font-bold text-emerald-800">
+        <span className="shrink-0 text-sm font-bold text-success-content">
           Starters {editorState.starters.length} / {maxOnFieldPlayers}
         </span>
       </div>
@@ -63,7 +63,7 @@ export default function SoccerLineupDefaultsEditor({
             <p
               key={warning}
               role="status"
-              className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+              className="flex gap-2 rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content"
             >
               <AlertTriangle size={17} className="mt-0.5 shrink-0" />
               <span>{warning}</span>
@@ -73,12 +73,12 @@ export default function SoccerLineupDefaultsEditor({
       )}
 
       {stalePlayerCountReady && stalePlayerCount > 0 && (
-        <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p role="status" className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
           {stalePlayerCount} saved {stalePlayerCount === 1 ? 'player is' : 'players are'} no longer on this team. Saving this tab will remove {stalePlayerCount === 1 ? 'that entry' : 'those entries'}.
         </p>
       )}
       {!stalePlayerCountReady && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-content-muted">
           Saved lineup cleanup is unavailable until team membership finishes loading.
         </p>
       )}
@@ -116,14 +116,14 @@ function LineupGroup({
 }) {
   return (
     <section aria-labelledby={`lineup-${title.toLowerCase()}-heading`}>
-      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-        <h3 id={`lineup-${title.toLowerCase()}-heading`} className="text-sm font-bold text-slate-800">
+      <div className="flex items-center justify-between border-b border-line pb-2">
+        <h3 id={`lineup-${title.toLowerCase()}-heading`} className="text-sm font-bold text-content">
           {title}
         </h3>
-        <span className="text-xs font-semibold text-slate-500">{players.length}</span>
+        <span className="text-xs font-semibold text-content-muted">{players.length}</span>
       </div>
       {players.length === 0 ? (
-        <p className="py-4 text-sm text-slate-500">No {title.toLowerCase()}.</p>
+        <p className="py-4 text-sm text-content-muted">No {title.toLowerCase()}.</p>
       ) : (
         <div role="list">
           {players.map(player => {
@@ -132,21 +132,21 @@ function LineupGroup({
               <div
                 key={player.id}
                 role="listitem"
-                className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-100 py-2 last:border-b-0"
+                className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-line py-2 last:border-b-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-800">{player.name}</p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-sm font-semibold text-content">{player.name}</p>
+                  <p className="truncate text-xs text-content-muted">
                     {roleLabel(player.role)}{player.number ? ` / #${player.number}` : ''}
                   </p>
                 </div>
                 {readOnly ? (
-                  <span className="text-xs font-bold text-slate-600">
+                  <span className="text-xs font-bold text-content-muted">
                     {status === 'starter' ? 'Starter' : 'Bench'}
                   </span>
                 ) : (
                   <div
-                    className="grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1"
+                    className="grid grid-cols-2 gap-1 rounded-md bg-surface-muted p-1"
                     role="group"
                     aria-label={`${player.name} default status`}
                   >
@@ -160,8 +160,8 @@ function LineupGroup({
                         aria-pressed={status === option}
                         className={`h-8 min-w-16 rounded px-2 text-xs font-bold ${
                           status === option
-                            ? 'bg-white text-emerald-800 shadow-sm'
-                            : 'text-slate-600'
+                            ? 'bg-surface text-success-content shadow-sm'
+                            : 'text-content-muted'
                         }`}
                       >
                         {option === 'starter' ? 'Starter' : 'Bench'}

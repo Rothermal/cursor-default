@@ -750,8 +750,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
+          <p className="text-sm text-content-muted mb-4">
             Configure Supabase credentials to manage cloud teams and rosters.
           </p>
           <button onClick={() => navigate('/settings/data')} className="btn-primary w-full">
@@ -1211,11 +1211,11 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface text-content border-b border-line px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={() => navigate(backPath)}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
+            className="w-8 h-8 rounded-full bg-control flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
@@ -1235,14 +1235,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
         {pendingInvitesList.length > 0 && (
-          <div className="card bg-blue-50 border-blue-200 space-y-2">
-            <p className="font-semibold text-blue-800">Pending invites</p>
+          <div className="card bg-info border-info-line space-y-2">
+            <p className="font-semibold text-info-content">Pending invites</p>
             {pendingInvitesList.map(inv => {
               const inviteTeamName = inv.team_nickname?.trim() || inv.team_name
               return (
                 <div key={inv.id} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-blue-700">
-                    {inviteTeamName} <span className="text-blue-500">({inv.role})</span>
+                  <span className="text-sm text-info-content">
+                    {inviteTeamName} <span className="text-info-content">({inv.role})</span>
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -1257,7 +1257,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       type="button"
                       onClick={() => handleDeclineInvite(inv.team_id)}
                       disabled={decliningTeamId === inv.team_id}
-                      className="border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-600"
+                      className="border border-line rounded-lg px-2 py-1 text-xs text-content-muted"
                     >
                       {decliningTeamId === inv.team_id ? 'Declining...' : 'Decline'}
                     </button>
@@ -1269,15 +1269,15 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         )}
 
         {error && (
-          <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
+          <div className="card bg-danger border-danger-line text-danger-content text-sm">
             {error}
           </div>
         )}
 
         {managementRouteMessage && (
           <section className="card space-y-3">
-            <p className="font-semibold text-slate-700">Team unavailable</p>
-            <p className="text-sm text-slate-500">{managementRouteMessage}</p>
+            <p className="font-semibold text-content">Team unavailable</p>
+            <p className="text-sm text-content-muted">{managementRouteMessage}</p>
             <button type="button" onClick={() => navigate('/teams')} className="btn-primary w-full">
               Back to Cloud Teams
             </button>
@@ -1287,7 +1287,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         {!isManagementRoute && (
           <>
             <section className="card space-y-3">
-              <h2 className="font-semibold text-slate-700">Create Team</h2>
+              <h2 className="font-semibold text-content">Create Team</h2>
               <input
                 type="text"
                 value={newTeamName}
@@ -1296,7 +1296,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 className="input-field"
               />
               {scopedSportDisabled && (
-                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center justify-between gap-2">
+                <div className="text-xs text-warning-content bg-warning border border-warning-line rounded-lg p-2 flex items-center justify-between gap-2">
                   <span>
                     {scopedAvailability?.releaseStage === 'unreleased'
                       ? `${scopedSport!.name} team creation is coming soon. Existing teams remain available.`
@@ -1314,7 +1314,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Season</label>
+                <label className="block text-xs font-medium text-content-muted mb-1">Season</label>
                 <select
                   value={seasonMode === 'existing' ? selectedSeasonId : '__new__'}
                   onChange={e => {
@@ -1338,7 +1338,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
               </div>
               {seasonMode === 'new' && (
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="block text-xs font-medium text-slate-500">
+                  <label className="block text-xs font-medium text-content-muted">
                     Sport
                     <select
                       value={newTeamSport}
@@ -1352,7 +1352,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       ))}
                     </select>
                   </label>
-                  <label className="block text-xs font-medium text-slate-500">
+                  <label className="block text-xs font-medium text-content-muted">
                     Season name
                     <input
                       type="text"
@@ -1384,12 +1384,12 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
             <section className="card space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-slate-700">Teams</h2>
-                {loadingTeams && <span className="text-xs text-slate-400 animate-pulse">Loading...</span>}
+                <h2 className="font-semibold text-content">Teams</h2>
+                {loadingTeams && <span className="text-xs text-content-subtle animate-pulse">Loading...</span>}
               </div>
 
           {visibleTeams.length === 0 && !loadingTeams ? (
-            <p className="text-sm text-slate-500">No teams yet. Create one above.</p>
+            <p className="text-sm text-content-muted">No teams yet. Create one above.</p>
           ) : (
             <div className="space-y-2">
               {visibleTeams.map(team => {
@@ -1400,12 +1400,12 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 return (
                   <div
                     key={team.id}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 transition-colors"
+                    className="rounded-xl border border-line bg-surface px-3 py-2"
                   >
                     {isEditing ? (
                       <div className="flex flex-col gap-2">
                         <div>
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Team name *</label>
+                          <label className="block text-xs font-medium text-content-muted mb-1">Team name *</label>
                           <input
                             type="text"
                             value={editingTeamName}
@@ -1416,7 +1416,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Display name (optional)</label>
+                          <label className="block text-xs font-medium text-content-muted mb-1">Display name (optional)</label>
                           <input
                             type="text"
                             value={editingTeamNickname}
@@ -1437,7 +1437,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           <button
                             type="button"
                             onClick={cancelEditTeam}
-                            className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600"
+                            className="border border-line rounded-lg px-2 py-1 text-sm text-content-muted"
                           >
                             Cancel
                           </button>
@@ -1450,15 +1450,15 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           onClick={() => navigate(teamInfoPath(team.id))}
                           className="flex-1 text-left"
                         >
-                          <p className="font-medium text-slate-700">
+                          <p className="font-medium text-content">
                             {sport?.icon ?? '🏟️'} {teamDisplayName(team)}
                             {team.nickname?.trim() && (
-                              <span className="text-slate-400 font-normal text-xs ml-1">
+                              <span className="text-content-subtle font-normal text-xs ml-1">
                                 ({team.name})
                               </span>
                             )}
                           </p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-content-muted">
                             {sport?.name ?? team.seasons.sport}{team.seasons.name ? ` • ${team.seasons.name}` : ''}
                           </p>
                         </button>
@@ -1469,7 +1469,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               e.stopPropagation()
                               navigate(teamManagementPath(team.id))
                             }}
-                            className="text-xs font-semibold text-blue-600 px-1.5 py-1"
+                            className="text-xs font-semibold text-info-content px-1.5 py-1"
                             title="Manage roster and members"
                           >
                             {mayManageThisTeam ? 'Manage' : 'View'}
@@ -1478,7 +1478,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                             <button
                               type="button"
                               onClick={e => { e.stopPropagation(); startEditTeam(team) }}
-                              className="text-slate-400 hover:text-slate-600 p-1"
+                              className="text-content-subtle hover:text-content-muted p-1"
                               title="Edit team name"
                               aria-label="Edit team name"
                             >
@@ -1490,7 +1490,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               type="button"
                               onClick={e => { e.stopPropagation(); setConfirmDeleteTeam(team) }}
                               disabled={deletingTeamId === team.id}
-                              className="text-slate-400 hover:text-red-500 p-1"
+                              className="text-content-subtle hover:text-danger-content p-1"
                               title="Delete team"
                               aria-label="Delete team"
                             >
@@ -1523,7 +1523,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
         {isManagementRoute && !managementRouteMessage && selectedTeam && (
           <section className="card space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-700">Roster</h2>
+            <h2 className="font-semibold text-content">Roster</h2>
             <div className="flex items-center gap-2">
               {selectedTeam && (
                 <>
@@ -1532,7 +1532,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     onClick={() =>
                       navigate(teamLeaderboardPath(selectedTeam.id, selectedTeam.season_id, true))
                     }
-                    className="text-xs text-blue-600 font-medium hover:underline"
+                    className="text-xs text-info-content font-medium hover:underline"
                   >
                     Season Stats
                   </button>
@@ -1540,14 +1540,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     <button
                       type="button"
                       onClick={() => setMergeWizardOpen(true)}
-                      className="text-xs text-amber-700 font-medium hover:underline"
+                      className="text-xs text-warning-content font-medium hover:underline"
                     >
                       Merge players
                     </button>
                   )}
                 </>
               )}
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-content-subtle">
                 {selectedTeam ? teamDisplayName(selectedTeam) : 'Select a team'}
               </span>
             </div>
@@ -1561,10 +1561,10 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 <button
                   type="button"
                   onClick={() => setPlayerAddMode('new')}
-                  className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-lg ${
                     playerAddMode === 'new'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
+                      ? 'bg-accent text-accent-content'
+                      : 'bg-surface-muted text-content-muted'
                   }`}
                 >
                   New Player
@@ -1572,10 +1572,10 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 <button
                   type="button"
                   onClick={() => setPlayerAddMode('existing')}
-                  className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-lg ${
                     playerAddMode === 'existing'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
+                      ? 'bg-accent text-accent-content'
+                      : 'bg-surface-muted text-content-muted'
                   }`}
                 >
                   Add Existing
@@ -1608,7 +1608,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     />
                   </div>
                   {isSoccerTeam && (
-                    <label className="block text-xs font-semibold text-slate-600">
+                    <label className="block text-xs font-semibold text-content-muted">
                       Default role
                       <select
                         value={newPlayerSoccerRole}
@@ -1656,7 +1656,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     </select>
                   </div>
                   {isSoccerTeam && (
-                    <label className="block text-xs font-semibold text-slate-600">
+                    <label className="block text-xs font-semibold text-content-muted">
                       Default role
                       <select
                         value={existingPlayerSoccerRole}
@@ -1683,9 +1683,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
               )}
 
               {loadingPlayers ? (
-                <p className="text-sm text-slate-500 animate-pulse">Loading roster...</p>
+                <p className="text-sm text-content-muted animate-pulse">Loading roster...</p>
               ) : players.length === 0 ? (
-                <p className="text-sm text-slate-500">No active players yet.</p>
+                <p className="text-sm text-content-muted">No active players yet.</p>
               ) : (
                 <div className="space-y-2">
                   {players.map(player => {
@@ -1701,7 +1701,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       Boolean(guardianMap[player.id])
                     )
                     return (
-                      <div key={player.id} className="border border-slate-100 rounded-xl px-3 py-2">
+                      <div key={player.id} className="border border-line rounded-xl px-3 py-2">
                         {isEditing ? (
                           <div className="flex flex-col gap-2">
                             <div className="grid grid-cols-12 gap-2">
@@ -1741,7 +1741,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               disabled={!mayEditIdentity}
                             />
                             {isSoccerTeam && mayManageRoster && (
-                              <label className="block text-xs font-semibold text-slate-600">
+                              <label className="block text-xs font-semibold text-content-muted">
                                 Default role
                                 <select
                                   value={editingPlayerSoccerRole}
@@ -1769,7 +1769,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               <button
                                 type="button"
                                 onClick={cancelEditPlayer}
-                                className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-600"
+                                className="border border-line rounded-lg px-2 py-1 text-sm text-content-muted"
                               >
                                 Cancel
                               </button>
@@ -1778,20 +1778,20 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                         ) : (
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-slate-500 shrink-0">
+                              <span className="text-content-muted shrink-0">
                                 #{player.jersey_number || '—'}
                               </span>
                               <div className="min-w-0">
-                                <p className="font-medium text-slate-700 truncate">
+                                <p className="font-medium text-content truncate">
                                   {playerDisplayName(player)}
                                   {player.nickname?.trim() && (
-                                    <span className="text-slate-400 font-normal text-xs ml-1">
+                                    <span className="text-content-subtle font-normal text-xs ml-1">
                                       ({[player.first_name, player.last_name].filter(Boolean).join(' ')})
                                     </span>
                                   )}
                                 </p>
                                 {isSoccerTeam && (
-                                  <p className="text-xs text-slate-500">{soccerRosterRoleLabel(player.position)}</p>
+                                  <p className="text-xs text-content-muted">{soccerRosterRoleLabel(player.position)}</p>
                                 )}
                               </div>
                             </div>
@@ -1804,7 +1804,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                       `/career?playerId=${encodeURIComponent(player.id)}&sport=${encodeURIComponent(selectedTeam.seasons.sport)}`
                                     )
                                   }
-                                  className="text-xs font-semibold text-blue-600 px-1.5 py-0.5"
+                                  className="text-xs font-semibold text-info-content px-1.5 py-0.5"
                                 >
                                   Career
                                 </button>
@@ -1813,7 +1813,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 <button
                                   type="button"
                                   onClick={() => startEditPlayer(player)}
-                                  className="text-slate-400 hover:text-slate-600 p-1"
+                                  className="text-content-subtle hover:text-content-muted p-1"
                                   title={
                                     mayManageRoster && mayEditIdentity
                                       ? 'Edit player identity and jersey number'
@@ -1838,7 +1838,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                     type="button"
                                     onClick={() => { void handleDeactivatePlayer(player.id) }}
                                     disabled={deletingPlayerId === player.id}
-                                    className="text-xs text-slate-500 underline disabled:opacity-40"
+                                    className="text-xs text-content-muted underline disabled:text-content-disabled"
                                   >
                                     {deletingPlayerId === player.id ? 'Removing...' : 'Remove'}
                                   </button>
@@ -1849,7 +1849,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                   type="button"
                                   onClick={() => setConfirmDeletePlayer(player)}
                                   disabled={deletingPlayerId === player.id}
-                                  className="text-slate-400 hover:text-red-500 p-1"
+                                  className="text-content-subtle hover:text-danger-content p-1"
                                   title="Delete player permanently"
                                   aria-label="Delete player permanently"
                                 >
@@ -1860,7 +1860,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 <button
                                   type="button"
                                   onClick={() => setGuardianPlayer(player)}
-                                  className="text-xs font-semibold text-green-700 ml-1"
+                                  className="text-xs font-semibold text-success-content ml-1"
                                   title="View guardian relationships"
                                 >
                                   Creator
@@ -1869,7 +1869,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                 <button
                                   type="button"
                                   onClick={() => setGuardianPlayer(player)}
-                                  className="text-xs font-semibold text-green-700 ml-1"
+                                  className="text-xs font-semibold text-success-content ml-1"
                                   title="View guardian relationships"
                                 >
                                   Guardian
@@ -1879,7 +1879,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                   type="button"
                                   onClick={() => { void handleClaimGuardian(player.id) }}
                                   disabled={claimingPlayerId === player.id}
-                                  className="text-xs text-blue-600 underline ml-1 disabled:opacity-40"
+                                  className="text-xs text-info-content underline ml-1 disabled:text-content-disabled"
                                   title="Claim guardianship"
                                 >
                                   {claimingPlayerId === player.id ? 'Claiming...' : 'Claim'}
@@ -1891,7 +1891,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                   <button
                                     type="button"
                                     onClick={() => setGuardianPlayer(player)}
-                                    className="text-xs font-semibold text-slate-600 ml-1"
+                                    className="text-xs font-semibold text-content-muted ml-1"
                                   >
                                     Guardians
                                   </button>
@@ -1906,7 +1906,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
               )}
             </>
           ) : (
-            <p className="text-sm text-slate-500">Select a team to manage its roster.</p>
+            <p className="text-sm text-content-muted">Select a team to manage its roster.</p>
           )}
           </section>
         )}
@@ -2006,9 +2006,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
         {isManagementRoute && selectedTeam && (
           <section className="card space-y-3">
-            <h2 className="font-semibold text-slate-700">Team Members</h2>
+            <h2 className="font-semibold text-content">Team Members</h2>
             {loadingMembers ? (
-              <p className="text-sm text-slate-500 animate-pulse">Loading...</p>
+              <p className="text-sm text-content-muted animate-pulse">Loading...</p>
             ) : (
               <>
                 <div className="space-y-2">
@@ -2020,16 +2020,16 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     return (
                       <div
                         key={m.id}
-                        className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2"
+                        className="flex items-center justify-between rounded-xl border border-line px-3 py-2"
                       >
                       <div>
-                        <p className="font-medium text-slate-700">
+                        <p className="font-medium text-content">
                           {memberDisplayName(m)}
                           {m.user_id === userId && (
-                            <span className="text-slate-400 font-normal text-xs ml-1">(you)</span>
+                            <span className="text-content-subtle font-normal text-xs ml-1">(you)</span>
                           )}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-content-muted">
                           {m.role}
                           {m.accepted_at ? ' · Accepted' : ' · Pending'}
                         </p>
@@ -2060,7 +2060,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                           type="button"
                           onClick={() => handleRemoveMember(m.id)}
                           disabled={removingMemberId === m.id}
-                          className="text-xs text-red-600 underline disabled:opacity-40"
+                          className="text-xs text-danger-content underline disabled:text-content-disabled"
                         >
                           {removingMemberId === m.id
                             ? m.accepted_at ? 'Removing...' : 'Canceling...'
@@ -2077,7 +2077,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                     type="button"
                     onClick={() => { void handleLeaveTeam() }}
                     disabled={leavingTeam}
-                    className="text-sm text-red-600 font-semibold underline disabled:opacity-40"
+                    className="text-sm text-danger-content font-semibold underline disabled:text-content-disabled"
                   >
                     {leavingTeam ? 'Leaving...' : 'Leave team'}
                   </button>
@@ -2085,8 +2085,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
 
                 {mayManageMembers && (
                   <>
-                    <div className="pt-2 border-t border-slate-100 space-y-2">
-                      <p className="text-sm font-medium text-slate-600">Invite by email</p>
+                    <div className="pt-2 border-t border-line space-y-2">
+                      <p className="text-sm font-medium text-content-muted">Invite by email</p>
                       <div className="flex gap-2">
                         <input
                           type="email"
@@ -2105,8 +2105,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                         </button>
                       </div>
                       {lookupResult && (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-2">
-                          <p className="text-sm text-slate-700">
+                        <div className="rounded-lg border border-line bg-surface-muted px-3 py-2 space-y-2">
+                          <p className="text-sm text-content">
                             Invite <strong>{lookupResult.display_name || inviteEmail}</strong> as
                           </p>
                           <div className="flex gap-2 items-center">

@@ -110,10 +110,10 @@ export default function TeamInviteLinksPanel({
   }
 
   return (
-    <div className="pt-3 border-t border-slate-100 space-y-3">
+    <div className="pt-3 border-t border-line space-y-3">
       <div>
-        <p className="text-sm font-medium text-slate-700">Invite links</p>
-        <p className="text-xs text-slate-500">Single-use links expire after 7 days.</p>
+        <p className="text-sm font-medium text-content">Invite links</p>
+        <p className="text-xs text-content-muted">Single-use links expire after 7 days.</p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -130,32 +130,32 @@ export default function TeamInviteLinksPanel({
           type="button"
           onClick={() => { void handleCreate() }}
           disabled={creating}
-          className="btn-primary flex-1 py-2 disabled:opacity-60"
+          className="btn-primary flex-1 py-2 disabled:text-content-disabled"
         >
           {creating ? 'Creating...' : 'Create Link'}
         </button>
       </div>
 
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <p className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-xs text-danger-content">
           {error}
         </p>
       )}
 
       {loading ? (
-        <p className="text-xs text-slate-400 animate-pulse">Loading active links...</p>
+        <p className="text-xs text-content-subtle animate-pulse">Loading active links...</p>
       ) : links.length === 0 ? (
-        <p className="text-xs text-slate-500">No active invite links.</p>
+        <p className="text-xs text-content-muted">No active invite links.</p>
       ) : (
         <div className="space-y-2">
           {links.map(link => (
             <div
               key={link.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2"
             >
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-700">{roleLabel(link.role)}</p>
-                <p className="text-xs text-slate-500 truncate">
+                <p className="text-sm font-semibold text-content">{roleLabel(link.role)}</p>
+                <p className="text-xs text-content-muted truncate">
                   Expires {new Date(link.expires_at).toLocaleString()}
                 </p>
               </div>
@@ -163,7 +163,7 @@ export default function TeamInviteLinksPanel({
                 <button
                   type="button"
                   onClick={() => { void handleCopy(link) }}
-                  className="text-xs font-semibold text-blue-600"
+                  className="text-xs font-semibold text-info-content"
                 >
                   {copiedId === link.id ? 'Copied' : 'Copy'}
                 </button>
@@ -171,7 +171,7 @@ export default function TeamInviteLinksPanel({
                   type="button"
                   onClick={() => { void handleRevoke(link) }}
                   disabled={revokingId === link.id}
-                  className="text-xs font-semibold text-red-600 disabled:opacity-50"
+                  className="text-xs font-semibold text-danger-content disabled:text-content-disabled"
                 >
                   {revokingId === link.id ? 'Revoking...' : 'Revoke'}
                 </button>

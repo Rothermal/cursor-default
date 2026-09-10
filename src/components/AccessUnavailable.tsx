@@ -12,10 +12,10 @@ export default function AccessUnavailable({
   onAction,
 }: AccessUnavailableProps) {
   return (
-    <section className="card border-slate-200 bg-slate-50 text-center space-y-3">
+    <section className="card border-line bg-surface-muted text-center space-y-3">
       <div>
-        <h2 className="font-semibold text-slate-700">{title}</h2>
-        <p className="text-sm text-slate-500 mt-1">{message}</p>
+        <h2 className="font-semibold text-content">{title}</h2>
+        <p className="text-sm text-content-muted mt-1">{message}</p>
       </div>
       {actionLabel && onAction && (
         <button type="button" onClick={onAction} className="btn-secondary w-full">

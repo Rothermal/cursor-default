@@ -275,8 +275,8 @@ export default function SoccerTeamSettingsPanel({
     <section className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-slate-800">Soccer Defaults</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="font-semibold text-content">Soccer Defaults</h2>
+          <p className="text-xs text-content-muted">
             Shared by {teamName}. Unset fields inherit each recorder's personal defaults.
           </p>
         </div>
@@ -284,7 +284,7 @@ export default function SoccerTeamSettingsPanel({
           type="button"
           onClick={() => void team.refresh()}
           disabled={team.status === 'loading' || team.status === 'saving'}
-          className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-slate-200 text-slate-600 disabled:opacity-40"
+          className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-line text-content-muted disabled:bg-control-disabled disabled:text-content-disabled"
           title="Refresh shared defaults"
           aria-label="Refresh shared defaults"
         >
@@ -296,31 +296,31 @@ export default function SoccerTeamSettingsPanel({
       </div>
 
       <div
-        className="flex flex-wrap items-center gap-2 text-xs text-slate-500"
+        className="flex flex-wrap items-center gap-2 text-xs text-content-muted"
         aria-live="polite"
       >
         <span>{statusLabel(team.status)}</span>
-        {dirty && <span className="font-semibold text-amber-700">Unsaved changes</span>}
+        {dirty && <span className="font-semibold text-warning-content">Unsaved changes</span>}
         {!mayEdit && (
-          <span className="font-semibold text-slate-600">Read only</span>
+          <span className="font-semibold text-content-muted">Read only</span>
         )}
       </div>
 
       {(team.error || copyError) && (
-        <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p role="alert" className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
           {copyError ?? team.error}
         </p>
       )}
 
       {saveNotice && (
-        <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <p role="status" className="rounded-md border border-success-line bg-success px-3 py-2 text-sm text-success-content">
           {saveNotice}
         </p>
       )}
 
       {team.conflict && (
-        <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
-          <p className="text-sm font-semibold text-amber-900">
+        <div role="alert" className="rounded-md border border-warning-line bg-warning p-3 space-y-2">
+          <p className="text-sm font-semibold text-warning-content">
             Another manager changed these defaults.
           </p>
           <button
@@ -341,7 +341,7 @@ export default function SoccerTeamSettingsPanel({
       <button
         type="button"
         onClick={() => navigate('/settings/sports/soccer')}
-        className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-blue-700"
+        className="inline-flex h-9 items-center gap-2 text-sm font-semibold text-info-content"
       >
         <Settings2 size={16} />
         Personal soccer defaults
@@ -358,7 +358,7 @@ export default function SoccerTeamSettingsPanel({
 
       {editorOpen && (
         <>
-          <div className="grid grid-cols-3 gap-1 rounded-md bg-slate-100 p-1" role="tablist" aria-label="Soccer default settings">
+          <div className="grid grid-cols-3 gap-1 rounded-md bg-surface-muted p-1" role="tablist" aria-label="Soccer default settings">
             {tabDefinitions.map(tab => (
               <button
                 key={tab.identity}
@@ -371,7 +371,7 @@ export default function SoccerTeamSettingsPanel({
                 tabIndex={tab.selected ? 0 : -1}
                 onClick={() => setActiveTab(tab.identity)}
                 onKeyDown={handleTabKeyDown}
-                className={`min-h-10 rounded px-1 text-xs font-semibold sm:text-sm ${tab.selected ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                className={`min-h-10 rounded px-1 text-xs font-semibold sm:text-sm ${tab.selected ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}
               >
                 {tab.label}
               </button>
@@ -386,8 +386,8 @@ export default function SoccerTeamSettingsPanel({
               aria-labelledby={tabDefinitionsByIdentity.rules.tabId}
             >
               {sharedWritable && copyOptions.length > 0 && (
-                <div className="border-y border-slate-200 py-3 space-y-2">
-                  <p className="text-sm font-semibold text-slate-700">Copy from another team</p>
+                <div className="border-y border-line py-3 space-y-2">
+                  <p className="text-sm font-semibold text-content">Copy from another team</p>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                     <select
                       value={copyTeamId}
@@ -404,7 +404,7 @@ export default function SoccerTeamSettingsPanel({
                       type="button"
                       onClick={() => void handleCopy()}
                       disabled={!copyTeamId || copying}
-                      className="btn-secondary inline-flex items-center justify-center gap-2 px-3 disabled:opacity-40"
+                      className="btn-secondary inline-flex items-center justify-center gap-2 px-3 disabled:text-content-disabled"
                     >
                       {copying ? <RefreshCw size={16} className="animate-spin" /> : <Copy size={16} />}
                       Copy
@@ -446,7 +446,7 @@ export default function SoccerTeamSettingsPanel({
                 onRequestClear={() => setConfirmClearFormation(true)}
               />
               {formationNeedsCleanup && (
-                <p role="status" className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <p role="status" className="mt-3 rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
                   Saving from this tab will remove {unavailablePlayerIds.length} unavailable {unavailablePlayerIds.length === 1 ? 'assignment' : 'assignments'}.
                 </p>
               )}
@@ -477,7 +477,7 @@ export default function SoccerTeamSettingsPanel({
       )}
 
       {editorOpen && mayEdit && (
-        <div className="sticky bottom-0 -mx-4 grid grid-cols-1 gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:grid-cols-2">
+        <div className="sticky bottom-0 -mx-4 grid grid-cols-1 gap-2 border-t border-line bg-surface/95 p-4 backdrop-blur sm:grid-cols-2">
           <button
             type="button"
             className="btn-secondary"
