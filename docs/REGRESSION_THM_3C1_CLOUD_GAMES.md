@@ -9,7 +9,8 @@ permission, routing, or game-state changes; production Dark stays gated.
 
 ## Evidence
 
-- 203 files / 1,535 tests pass, including the Games color/transition inventory.
+- 203 files / 1,536 tests pass, including the Games color/transition inventory
+  and a PR-review guard for the unique status span and wrapping team-name element.
   TypeScript and production build pass.
 - Isolated Edge actual-page fixture used synthetic auth, game context, and data
   modules with scheduled/in-progress/final Personal Basketball games. At 390px
