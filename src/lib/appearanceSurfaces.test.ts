@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/PlayerProfile.tsx",
+  "src/pages/CareerStats.tsx",
   "src/components/PlayerStatSummaryTables.tsx",
   "src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx",
   "src/components/soccer-aggregate/SoccerPlayerAggregateDestination.tsx",
@@ -64,6 +66,21 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('keeps the loaded Career header back button at its fixed size', () => {
+    const source = readFileSync('src/pages/CareerStats.tsx', 'utf8')
+    const headers = [...source.matchAll(/<header\b[^]*?<\/header>/g)]
+    expect(headers).toHaveLength(1)
+    const buttons = [...headers[0][0].matchAll(/<button\b[^]*?<\/button>/g)]
+    expect(buttons).toHaveLength(1)
+    const classes = buttons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+    for (const token of ['w-8', 'h-8', 'shrink-0']) expect(classes).toContain(token)
+  })
+  it('wraps the Profile header player name', () => {
+    const source = readFileSync('src/pages/PlayerProfile.tsx', 'utf8')
+    const labels = [...source.matchAll(/<p className="([^"]*)">\s*#\{player.jersey_number/g)]
+    expect(labels).toHaveLength(1)
+    expect(labels[0][1].split(/\s+/)).toContain('break-words')
+  })
   it('wraps long Basketball player history source labels', () => {
     const source = readFileSync('src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx', 'utf8')
     const labels = [...source.matchAll(/<p className="([^"]*)">\s*\{game.cloudScope === 'personal'/g)]
