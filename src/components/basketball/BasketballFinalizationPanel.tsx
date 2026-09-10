@@ -221,12 +221,12 @@ export default function BasketballFinalizationPanel({
     <>
       <section className="card space-y-4" aria-labelledby="basketball-finalization-title">
         <div className="flex items-start gap-3">
-          <LockKeyhole size={20} className="mt-0.5 shrink-0 text-emerald-700" />
+          <LockKeyhole size={20} className="mt-0.5 shrink-0 text-success-content" />
           <div className="min-w-0 flex-1">
-            <h2 id="basketball-finalization-title" className="font-semibold text-slate-800">
+            <h2 id="basketball-finalization-title" className="font-semibold text-content">
               {publication ? 'Canonical Result' : 'Cloud Finalization'}
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-content-muted">
               {loading
                 ? 'Checking primary recorder...'
                 : publication
@@ -240,7 +240,7 @@ export default function BasketballFinalizationPanel({
             type="button"
             onClick={() => { void refresh() }}
             disabled={loading || busy}
-            className="grid h-9 w-9 place-items-center text-slate-500 disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center text-content-muted disabled:bg-control-disabled disabled:text-content-disabled"
             aria-label="Refresh finalization status"
             title="Refresh"
           >
@@ -249,22 +249,22 @@ export default function BasketballFinalizationPanel({
         </div>
 
         {publication && (
-          <div className="border-y border-slate-200 py-3">
-            <div className="grid grid-cols-3 divide-x divide-slate-200 text-center">
+          <div className="border-y border-line py-3">
+            <div className="grid grid-cols-3 divide-x divide-line text-center">
               <div>
-                <p className="text-xl font-bold text-blue-800">{trackedScore ?? '-'}</p>
-                <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
+                <p className="text-xl font-bold text-info-content">{trackedScore ?? '-'}</p>
+                <p className="truncate text-[11px] text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
               </div>
               <div>
-                <CheckCircle2 size={20} className="mx-auto text-emerald-600" />
-                <p className="mt-1 text-[11px] font-bold text-emerald-700">Locked</p>
+                <CheckCircle2 size={20} className="mx-auto text-success-content" />
+                <p className="mt-1 text-[11px] font-bold text-success-content">Locked</p>
               </div>
               <div>
-                <p className="text-xl font-bold text-slate-800">{opponentScore ?? '-'}</p>
-                <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
+                <p className="text-xl font-bold text-content">{opponentScore ?? '-'}</p>
+                <p className="truncate text-[11px] text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-600">
+            <p className="mt-3 text-xs text-content-muted">
               Primary: <span className="font-semibold">{publication.primaryDisplayName}</span>
               {' | '}Finalized by {publication.finalizedByDisplayName}
               {' | '}{new Date(publication.finalizedAt).toLocaleString()}
@@ -273,7 +273,7 @@ export default function BasketballFinalizationPanel({
         )}
 
         {!publication && readiness?.nonPrimaryAttentionCount ? (
-          <div className="flex items-start gap-2 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="flex items-start gap-2 bg-warning px-3 py-2 text-xs text-warning-content">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             <span>
               {readiness.nonPrimaryAttentionCount}{' '}
@@ -285,7 +285,7 @@ export default function BasketballFinalizationPanel({
         ) : null}
 
         {error && (
-          <p className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="border border-danger-line bg-danger px-3 py-2 text-xs text-danger-content">
             {error}
           </p>
         )}
@@ -295,7 +295,7 @@ export default function BasketballFinalizationPanel({
             type="button"
             onClick={() => setReopenOpen(true)}
             disabled={busy}
-            className="flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 disabled:opacity-50"
+            className="flex min-h-11 w-full items-center justify-center gap-2 border border-line bg-surface px-3 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled"
           >
             <RotateCcw size={17} /> Reopen Cloud Game
           </button>
@@ -304,18 +304,18 @@ export default function BasketballFinalizationPanel({
         {canManage && (
           publicationHistory.length > 1 || publicationHistory.some(item => !item.isActive)
         ) && (
-          <section className="border-t border-slate-200 pt-3" aria-labelledby="basketball-publication-history-title">
-            <h3 id="basketball-publication-history-title" className="text-sm font-bold text-slate-800">
+          <section className="border-t border-line pt-3" aria-labelledby="basketball-publication-history-title">
+            <h3 id="basketball-publication-history-title" className="text-sm font-bold text-content">
               Publication History
             </h3>
-            <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200">
+            <div className="mt-2 divide-y divide-line border-y border-line">
               {publicationHistory.map(item => (
-                <div key={item.publicationId} className="py-3 text-xs text-slate-600">
+                <div key={item.publicationId} className="py-3 text-xs text-content-muted">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-bold text-slate-800">
+                    <span className="font-bold text-content">
                       Publication {item.publicationNumber}
                     </span>
-                    <span className={item.isActive ? 'font-bold text-emerald-700' : 'text-slate-500'}>
+                    <span className={item.isActive ? 'font-bold text-success-content' : 'text-content-muted'}>
                       {item.isActive ? 'Active' : 'Invalidated'}
                     </span>
                   </div>
@@ -325,7 +325,7 @@ export default function BasketballFinalizationPanel({
                     {new Date(item.finalizedAt).toLocaleString()}
                   </p>
                   {!item.isActive && (
-                    <p className="mt-1 text-slate-500">
+                    <p className="mt-1 text-content-muted">
                       {item.reopenMode
                         ? `${item.reopenMode === 'correct_records' ? 'Correct records' : 'Resume game'} | `
                         : ''}
@@ -346,7 +346,7 @@ export default function BasketballFinalizationPanel({
                 type="button"
                 onClick={() => { void openConflicts() }}
                 disabled={busy}
-                className="min-h-11 border border-amber-300 bg-amber-50 px-3 text-sm font-bold text-amber-800 disabled:opacity-50"
+                className="min-h-11 border border-warning-line bg-warning px-3 text-sm font-bold text-warning-content disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 Review {readiness.primaryConflictCount}{' '}
                 {readiness.primaryConflictCount === 1 ? 'Conflict' : 'Conflicts'}
@@ -364,7 +364,7 @@ export default function BasketballFinalizationPanel({
                 ) ||
                 readiness.primaryConflictCount > 0
               }
-              className="min-h-11 bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-40"
+              className="min-h-11 bg-accent px-3 text-sm font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled"
             >
               {busy
                 ? 'Preparing...'
@@ -377,58 +377,58 @@ export default function BasketballFinalizationPanel({
       </section>
 
       {preview && (
-        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 sm:items-center">
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-overlay/50 sm:items-center">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="basketball-finalization-review-title"
-            className="w-full bg-white p-4 sm:max-w-md"
+            className="w-full bg-surface-elevated text-content p-4 sm:max-w-md"
           >
             <div className="flex items-center gap-3">
-              <h2 id="basketball-finalization-review-title" className="min-w-0 flex-1 font-bold text-slate-900">
+              <h2 id="basketball-finalization-review-title" className="min-w-0 flex-1 font-bold text-content">
                 Finalize Cloud Result
               </h2>
               <button
                 type="button"
                 onClick={() => setPreview(null)}
                 disabled={busy}
-                className="grid h-9 w-9 place-items-center text-slate-500"
+                className="grid h-9 w-9 place-items-center text-content-muted"
                 aria-label="Close"
                 title="Close"
               >
                 <X size={20} />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-content-muted">
               This locks <span className="font-semibold">{preview.recorder.displayName}</span> as
               the canonical recorder and publishes this result.
             </p>
             {preview.score && (
-              <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
+              <div className="mt-4 grid grid-cols-2 divide-x divide-line border-y border-line py-3 text-center">
                 <div>
-                  <p className="text-3xl font-bold text-blue-800">{preview.score.tracked}</p>
-                  <p className="truncate text-xs text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
+                  <p className="text-3xl font-bold text-info-content">{preview.score.tracked}</p>
+                  <p className="truncate text-xs text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'tracked')}>{gameSideDisplayName(baseState.gameInfo, 'tracked')}</p>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-slate-800">{preview.score.opponent}</p>
-                  <p className="truncate text-xs text-slate-500" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
+                  <p className="text-3xl font-bold text-content">{preview.score.opponent}</p>
+                  <p className="truncate text-xs text-content-muted" title={gameSideDisplayName(baseState.gameInfo, 'opponent')}>{gameSideDisplayName(baseState.gameInfo, 'opponent')}</p>
                 </div>
               </div>
             )}
-            <p className="mt-3 text-xs font-semibold capitalize text-slate-600">
+            <p className="mt-3 text-xs font-semibold capitalize text-content-muted">
               {preview.endReason ?? 'Not ready'} | {preview.readiness.primaryCheckpointCurrent
                 ? 'checkpoint current'
                 : 'checkpoint pending'} | {preview.projection.eventStream.events.length} events
             </p>
             {preview.readiness.nonPrimaryAttentionCount > 0 && (
-              <p className="mt-3 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="mt-3 bg-warning px-3 py-2 text-xs text-warning-content">
                 {preview.readiness.nonPrimaryAttentionCount} non-primary stream
                 {preview.readiness.nonPrimaryAttentionCount === 1 ? '' : 's'} need attention and
                 will remain audit-only.
               </p>
             )}
             {preview.blockers.length > 0 && (
-              <div className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <div className="mt-3 border border-warning-line bg-warning px-3 py-2 text-xs text-warning-content">
                 <p className="font-bold">Finalization needs attention</p>
                 <ul className="mt-1 list-disc space-y-1 pl-4">
                   {preview.blockers.map(blocker => (
@@ -442,7 +442,7 @@ export default function BasketballFinalizationPanel({
                 type="button"
                 onClick={() => setPreview(null)}
                 disabled={busy}
-                className="min-h-11 border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 disabled:opacity-50"
+                className="min-h-11 border border-line bg-surface px-3 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 Cancel
               </button>
@@ -456,7 +456,7 @@ export default function BasketballFinalizationPanel({
                   !preview.score ||
                   !preview.endReason
                 }
-                className="min-h-11 bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50"
+                className="min-h-11 bg-accent px-3 text-sm font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 {busy ? 'Finalizing...' : 'Finalize and Lock'}
               </button>
@@ -467,44 +467,44 @@ export default function BasketballFinalizationPanel({
 
       {reopenOpen && (
         <div
-          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 sm:items-center"
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-overlay/50 sm:items-center"
           onClick={() => setReopenOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="basketball-cloud-reopen-title"
-            className="w-full bg-white p-4 sm:max-w-md"
+            className="w-full bg-surface-elevated text-content p-4 sm:max-w-md"
             onClick={event => event.stopPropagation()}
           >
             <div className="flex items-center gap-3">
-              <h2 id="basketball-cloud-reopen-title" className="min-w-0 flex-1 font-bold text-slate-900">
+              <h2 id="basketball-cloud-reopen-title" className="min-w-0 flex-1 font-bold text-content">
                 Reopen Cloud Game
               </h2>
               <button
                 type="button"
                 onClick={() => setReopenOpen(false)}
                 disabled={busy}
-                className="grid h-9 w-9 place-items-center text-slate-500"
+                className="grid h-9 w-9 place-items-center text-content-muted"
                 aria-label="Close"
                 title="Close"
               >
                 <X size={20} />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-content-muted">
               The current publication stays in history. Reopen the owned recorder stream to make
               corrections, sync it, and publish a new result.
             </p>
             {anchoredPublication && (
               <fieldset className="mt-4">
-                <legend className="text-xs font-bold text-slate-600">Mode</legend>
-                <div className="mt-1 grid h-11 grid-cols-2 border border-slate-300 bg-slate-100 p-1">
+                <legend className="text-xs font-bold text-content-muted">Mode</legend>
+                <div className="mt-1 grid h-11 grid-cols-2 border border-line bg-surface-muted p-1">
                   <button
                     type="button"
                     onClick={() => setReopenMode('correct_records')}
                     aria-pressed={reopenMode === 'correct_records'}
-                    className={`text-sm font-bold ${reopenMode === 'correct_records' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                    className={`text-sm font-bold ${reopenMode === 'correct_records' ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}
                   >
                     Correct records
                   </button>
@@ -512,14 +512,14 @@ export default function BasketballFinalizationPanel({
                     type="button"
                     onClick={() => setReopenMode('resume_game')}
                     aria-pressed={reopenMode === 'resume_game'}
-                    className={`text-sm font-bold ${reopenMode === 'resume_game' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                    className={`text-sm font-bold ${reopenMode === 'resume_game' ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}
                   >
                     Resume game
                   </button>
                 </div>
               </fieldset>
             )}
-            <label className="mt-4 block text-xs font-bold text-slate-600" htmlFor="basketball-cloud-reopen-reason">
+            <label className="mt-4 block text-xs font-bold text-content-muted" htmlFor="basketball-cloud-reopen-reason">
               Reason
             </label>
             <textarea
@@ -527,14 +527,14 @@ export default function BasketballFinalizationPanel({
               value={reopenReason}
               onChange={event => setReopenReason(event.target.value)}
               rows={3}
-              className="mt-1 w-full resize-none border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              className="mt-1 w-full resize-none border border-line bg-surface text-content px-3 py-2 text-sm outline-none focus:border-focus"
               autoFocus
             />
             <button
               type="button"
               onClick={() => { void handleReopen() }}
               disabled={busy || reopenReason.trim().length < 3}
-              className="mt-3 min-h-11 w-full bg-slate-800 px-3 text-sm font-bold text-white disabled:opacity-40"
+              className="mt-3 min-h-11 w-full bg-accent px-3 text-sm font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled"
             >
               {busy ? 'Reopening...' : 'Reopen Game'}
             </button>
@@ -543,38 +543,38 @@ export default function BasketballFinalizationPanel({
       )}
 
       {conflictsOpen && (
-        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 sm:items-center">
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-overlay/50 sm:items-center">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="basketball-finalization-conflicts-title"
-            className="max-h-[85vh] w-full overflow-y-auto bg-white p-4 sm:max-w-lg"
+            className="max-h-[85vh] w-full overflow-y-auto bg-surface-elevated text-content p-4 sm:max-w-lg"
           >
             <div className="flex items-center gap-3">
-              <h2 id="basketball-finalization-conflicts-title" className="min-w-0 flex-1 font-bold text-slate-900">
+              <h2 id="basketball-finalization-conflicts-title" className="min-w-0 flex-1 font-bold text-content">
                 Primary Stream Conflicts
               </h2>
               <button
                 type="button"
                 onClick={() => setConflictsOpen(false)}
                 disabled={busy}
-                className="grid h-9 w-9 place-items-center text-slate-500"
+                className="grid h-9 w-9 place-items-center text-content-muted"
                 aria-label="Close"
                 title="Close"
               >
                 <X size={20} />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-content-muted">
               Choose which revision should remain in the selected recorder stream.
             </p>
-            <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+            <div className="mt-4 divide-y divide-line border-y border-line">
               {conflicts.map(conflict => (
                 <div key={conflict.conflictId} className="py-4">
-                  <p className="text-sm font-bold text-slate-800">
+                  <p className="text-sm font-bold text-content">
                     {conflict.localEvent.eventType.replace('basketball.', '').replace(/_/g, ' ')}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-content-muted">
                     {conflict.recorderDisplayName} | detected {new Date(conflict.detectedAt).toLocaleString()}
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
@@ -582,7 +582,7 @@ export default function BasketballFinalizationPanel({
                       type="button"
                       onClick={() => { void resolveConflict(conflict, 'local') }}
                       disabled={busy}
-                      className="min-h-11 border border-blue-300 bg-blue-50 px-3 text-xs font-bold text-blue-800 disabled:opacity-50"
+                      className="min-h-11 border border-info-line bg-info px-3 text-xs font-bold text-info-content disabled:bg-control-disabled disabled:text-content-disabled"
                     >
                       Keep Device Revision {conflict.localEvent.revision}
                     </button>
@@ -590,7 +590,7 @@ export default function BasketballFinalizationPanel({
                       type="button"
                       onClick={() => { void resolveConflict(conflict, 'remote') }}
                       disabled={busy}
-                      className="min-h-11 border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 disabled:opacity-50"
+                      className="min-h-11 border border-line bg-surface px-3 text-xs font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled"
                     >
                       Keep Cloud Revision {conflict.remoteEvent.revision}
                     </button>

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/components/basketball/BasketballRecorderManager.tsx",
+  "src/components/basketball/BasketballFinalizationPanel.tsx",
   "src/pages/GameInfo.tsx",
   "src/pages/Games.tsx",
   "src/pages/TeamRoster.tsx",
@@ -70,7 +72,8 @@ describe('Converted application surface color ownership', () => {
     ['src/components/settings/BasketballTeamSettingsPanel.tsx', 'grid h-9 w-9 shrink-0'],
     ['src/components/settings/SoccerTeamSettingsPanel.tsx', 'h-9 w-9 shrink-0 grid'],
     ['src/components/soccer/SoccerFormationEditor.tsx', 'h-9 rounded-md border border-line px-3'],
-  ])('keeps disabled fill and text on standalone team controls in %s', (path, prefix) => {
+    ['src/components/basketball/BasketballFinalizationPanel.tsx', 'mt-3 min-h-11 w-full bg-accent'],
+  ])('keeps disabled fill and text on standalone controls in %s', (path, prefix) => {
     const source = readFileSync(path, 'utf8')
     const classes = source.match(/className="[^"]*"/g)?.filter(value => value.includes(prefix)) ?? []
     expect(classes).toHaveLength(1)

@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A, THM-3B1/B2/B3, and THM-3C1/C2 implemented; THM-3C3 and THM-3D pending.
+Status: THM-3A/B/C implemented; THM-3D pending. Deployed release checks remain open.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
 ## Delivery slices
@@ -63,12 +63,17 @@ correction dialogs remain THM-4/THM-5, but record those dependencies explicitly.
 - **THM-3C2 implemented:** GameInfo host identity/details, status, stat leaders,
   loading/unavailable states and open-game actions use semantic tokens. ResultBadge
   was converted in B1. BasketballRecorderManager and BasketballFinalizationPanel
-  are still C3, so event Basketball GameInfo is not fully themed by C2 alone.
+  were subsequently converted in C3; C2 alone did not complete those subtrees.
   All loading, authority, finalization callbacks and resume logic stay unchanged.
   See [verification](REGRESSION_THM_3C2_GAME_INFO.md).
-- **THM-3C3 pending:** Imported recorder/finalization/recovery panels used by
-  GameInfo. Audit shared Summary/tracker consumers and record incomplete hosts.
-  These slices may be subdivided further if their concrete scope requires it.
+- **THM-3C3 implemented:** BasketballRecorderManager and BasketballFinalizationPanel,
+  including their inline stream inspection, publication history, preview, conflict
+  and reopen dialogs. Both have only GameInfo as a consumer and import no further
+  UI panels. Mutating logic remains unchanged. Primary commands use accent tokens;
+  success/warning/error indications retain their semantic meaning. Dialog surfaces,
+  scrims, reason input and disabled controls use existing tokens. Shared Summary
+  and live tracker surfaces remain THM-4/5. See
+  [verification](REGRESSION_THM_3C3_REVIEW_PANELS.md).
 
 ### THM-3D: Statistics destinations
 
