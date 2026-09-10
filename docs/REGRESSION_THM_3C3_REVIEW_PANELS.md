@@ -10,8 +10,11 @@ No migrations; production Dark remains gated.
 
 ## Evidence
 
-- 203 files / 1,539 tests pass, including 86 appearance surface tests.
+- 203 files / 1,540 tests pass, including 87 appearance surface tests.
   TypeScript and production build pass.
+- PR review added a unique reopen-submit guard for disabled fill/text and the
+  absence of a disabled fade. Full tests, TypeScript and targeted lint passed
+  again; no runtime changes were needed.
 - Synthetic Edge fixture rendered actual panels with a primary recorder and
   canonical publication. At 390px and 1280px in Light/Dark, the reopen dialog
   opened and its reason input accepted text without page errors or document
