@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A/B/C and THM-3D1/2/3 implemented; THM-3D4 pending.
+Status: THM-3A/B/C and THM-3D1/2/3/4a implemented; THM-3D4b pending.
 Deployed release checks remain open.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
@@ -109,9 +109,15 @@ chart/marker colors only with explicit contrast evidence.
   history source names wrap. Profile/Career route shells remain 3D4. No data,
   authority, ranking or callback changes. See
   [verification](REGRESSION_THM_3D3_PLAYER_STATISTICS.md).
-- **THM-3D4 pending:** PlayerProfile, CareerStats, Leaderboard, TeamStats and
-  TournamentStats hosts, including legacy branches and any remaining imported
-  render helpers. Earlier renderer conversions do not complete these routes.
+- **THM-3D4a implemented:** PlayerProfile and CareerStats hosts, including legacy
+  branches and missing/loading/error states. All imported render components were
+  covered in 3D3. Neutral headers replace fixed gradients; Profile player names
+  wrap and Career's back control retains its size. Data loading, game handoff,
+  permissions and navigation stay unchanged. See
+  [verification](REGRESSION_THM_3D4A_PROFILE_CAREER.md).
+- **THM-3D4b pending:** Leaderboard, TeamStats and TournamentStats hosts, including
+  legacy branches, injected overview extras and remaining render helpers. This
+  split keeps the five substantial route hosts reviewable in two PRs.
 
 ## Completion rule
 

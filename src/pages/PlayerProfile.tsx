@@ -348,8 +348,8 @@ export default function PlayerProfile() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing parameters</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">Missing parameters</p>
+          <p className="text-sm text-content-muted mb-4">
             Open a player from the leaderboard to view their profile.
           </p>
           <button onClick={() => navigate('/leaderboard')} className="btn-primary w-full">
@@ -364,7 +364,7 @@ export default function PlayerProfile() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
           <button onClick={() => navigate('/')} className="btn-primary w-full mt-3">
             Back Home
           </button>
@@ -376,7 +376,7 @@ export default function PlayerProfile() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500 animate-pulse">Loading profile...</p>
+        <p className="text-content-muted animate-pulse">Loading profile...</p>
       </div>
     )
   }
@@ -385,7 +385,7 @@ export default function PlayerProfile() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Player not found</p>
+          <p className="font-semibold text-content mb-2">Player not found</p>
           <button onClick={() => navigate('/leaderboard')} className="btn-primary w-full mt-3">
             Back to Leaderboard
           </button>
@@ -406,28 +406,28 @@ export default function PlayerProfile() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={() => navigate(backHref)}
-            className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1.5 text-xs font-semibold
-                       hover:bg-white/30 active:scale-95 transition-transform"
+            className="shrink-0 rounded-lg bg-control px-2.5 py-1.5 text-xs font-semibold
+                       hover:bg-control-hover active:scale-95 transition-transform"
           >
             {backLabel}
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-bold">{pageTitle}</h1>
-            <p className="text-sm opacity-80">
+            <p className="text-sm text-content-muted break-words">
               #{player.jersey_number || '—'} {playerDisplayName(player)}
             </p>
-            <p className="text-xs opacity-70 truncate">
+            <p className="text-xs text-content-subtle truncate">
               {teamDisplayName(team)} · {team.seasons.name}
             </p>
           </div>
           <button
             type="button"
             onClick={() => navigate(`/career?${careerQuery}`)}
-            className="shrink-0 text-xs font-semibold bg-white/20 hover:bg-white/30 rounded-lg px-2 py-1.5"
+            className="shrink-0 text-xs font-semibold bg-control hover:bg-control-hover rounded-lg px-2 py-1.5"
           >
             Career →
           </button>
@@ -436,7 +436,7 @@ export default function PlayerProfile() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
         {(error || (!isAggregateDestination ? parkingError : null)) && (
-          <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
+          <div className="card bg-danger border-danger-line text-danger-content text-sm">
             {error ?? (!isAggregateDestination ? parkingError : null)}
           </div>
         )}
@@ -497,16 +497,16 @@ export default function PlayerProfile() {
           />
         ) : (
           <section className="card space-y-3">
-            <h2 className="font-semibold text-slate-700">Season totals</h2>
-            <p className="text-sm text-slate-500">No finalized games yet.</p>
+            <h2 className="font-semibold text-content">Season totals</h2>
+            <p className="text-sm text-content-muted">No finalized games yet.</p>
           </section>
         )}
 
         {!isAggregateDestination && (
           <section className="card space-y-3">
-            <h2 className="font-semibold text-slate-700">Game Log</h2>
+            <h2 className="font-semibold text-content">Game Log</h2>
             {gameLog.length === 0 ? (
-              <p className="text-sm text-slate-500">No games yet.</p>
+              <p className="text-sm text-content-muted">No games yet.</p>
             ) : (
               <div className="space-y-2">
                 {gameLog.map(game => {
@@ -518,13 +518,13 @@ export default function PlayerProfile() {
                   return (
                     <div
                       key={game.id}
-                      className="flex flex-col gap-1 rounded-xl border border-slate-200
-                                 bg-white px-3 py-2"
+                      className="flex flex-col gap-1 rounded-xl border border-line
+                                 bg-surface px-3 py-2"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-700">{game.game_date}</p>
-                          <p className="text-sm text-slate-500">vs {game.opponent_name}</p>
+                          <p className="font-medium text-content">{game.game_date}</p>
+                          <p className="text-sm text-content-muted">vs {game.opponent_name}</p>
                         </div>
                         <button
                           type="button"
@@ -536,7 +536,7 @@ export default function PlayerProfile() {
                         </button>
                       </div>
                       {line && (
-                        <p className="text-xs text-slate-500 pl-0.5">{line}</p>
+                        <p className="text-xs text-content-muted pl-0.5">{line}</p>
                       )}
                     </div>
                   )

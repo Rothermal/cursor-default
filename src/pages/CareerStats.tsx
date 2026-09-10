@@ -359,7 +359,7 @@ export default function CareerStats() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing player</p>
+          <p className="font-semibold text-content mb-2">Missing player</p>
           <button type="button" onClick={() => navigate('/leaderboard')} className="btn-primary w-full">
             Back to Leaderboard
           </button>
@@ -372,8 +372,8 @@ export default function CareerStats() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Cloud required</p>
-          <p className="text-sm text-slate-500 mb-4">Career stats need Supabase.</p>
+          <p className="font-semibold text-content mb-2">Cloud required</p>
+          <p className="text-sm text-content-muted mb-4">Career stats need Supabase.</p>
           <button type="button" onClick={() => navigate('/')} className="btn-primary w-full">
             Home
           </button>
@@ -385,7 +385,7 @@ export default function CareerStats() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500 animate-pulse">Loading career stats...</p>
+        <p className="text-content-muted animate-pulse">Loading career stats...</p>
       </div>
     )
   }
@@ -393,7 +393,7 @@ export default function CareerStats() {
   if (error) {
     return (
       <div className="min-h-screen flex flex-col px-4 py-6 max-w-lg mx-auto">
-        <div className="card bg-red-50 border-red-200 text-red-700 text-sm mb-4">{error}</div>
+        <div className="card bg-danger border-danger-line text-danger-content text-sm mb-4">{error}</div>
         <button type="button" onClick={() => navigate(-1)} className="btn-primary">
           Back
         </button>
@@ -403,19 +403,19 @@ export default function CareerStats() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
+            className="w-8 h-8 shrink-0 rounded-full bg-control flex items-center justify-center active:scale-90 transition-transform"
           >
             ←
           </button>
           <div className="min-w-0">
             <h1 className="text-lg font-bold truncate">Career Stats</h1>
             {player && (
-              <p className="text-sm opacity-80 truncate">{playerDisplayName(player)}</p>
+              <p className="text-sm text-content-muted truncate">{playerDisplayName(player)}</p>
             )}
           </div>
         </div>
@@ -423,14 +423,14 @@ export default function CareerStats() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
         {parkingError && !isAggregateDestination && (
-          <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
+          <div className="card bg-danger border-danger-line text-danger-content text-sm">
             {parkingError}
           </div>
         )}
 
         {sportsInData.length > 1 && (
           <section className="card space-y-2">
-            <h2 className="font-semibold text-slate-700 text-sm">Sport</h2>
+            <h2 className="font-semibold text-content text-sm">Sport</h2>
             <select
               value={selectedSport}
               onChange={e => {
@@ -478,7 +478,7 @@ export default function CareerStats() {
             }}
           />
         ) : filteredRows.length === 0 ? (
-          <p className="text-sm text-slate-500">No finalized career stats yet for this sport.</p>
+          <p className="text-sm text-content-muted">No finalized career stats yet for this sport.</p>
         ) : (
           <>
             {sportConfig && (
@@ -494,7 +494,7 @@ export default function CareerStats() {
                 description="Same layout as game summary. Per-game uses sum of GP per season/team stint. Tap Best game to open that game’s summary (migration 026 for links)."
                 footer={
                   <>
-                    <span className="font-medium text-slate-600">
+                    <span className="font-medium text-content-muted">
                       {computePlayerScore(sportConfig, statsRecord)} {sportConfig.scoreLabel}
                     </span>{' '}
                     (scoring actions) · ~{careerGamesApprox.gameSum} GP across {careerGamesApprox.stintCount} season
@@ -505,15 +505,15 @@ export default function CareerStats() {
             )}
 
             <section className="card space-y-3">
-              <h2 className="font-semibold text-slate-700">By season</h2>
+              <h2 className="font-semibold text-content">By season</h2>
               <div className="space-y-4">
                 {segments.map(seg =>
                   sportConfig ? (
-                    <div key={seg.key} className="rounded-xl border border-slate-200 bg-white px-3 py-3 space-y-2">
+                    <div key={seg.key} className="rounded-xl border border-line bg-surface px-3 py-3 space-y-2">
                       <div>
-                        <p className="font-medium text-slate-800">{seg.seasonName}</p>
-                        <p className="text-sm text-slate-500">{seg.teamName}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="font-medium text-content">{seg.seasonName}</p>
+                        <p className="text-sm text-content-muted">{seg.teamName}</p>
+                        <p className="text-xs text-content-muted mt-0.5">
                           {seg.gamesPlayed} GP
                           {sportConfig && (
                             <>
