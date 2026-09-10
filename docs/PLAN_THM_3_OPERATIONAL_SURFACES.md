@@ -1,6 +1,7 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A/B/C implemented; THM-3D pending. Deployed release checks remain open.
+Status: THM-3A/B/C and THM-3D1 implemented; remaining THM-3D slices pending.
+Deployed release checks remain open.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
 ## Delivery slices
@@ -81,6 +82,21 @@ Inventory PlayerProfile, CareerStats, Leaderboard, TeamStats, TournamentStats,
 and shared aggregate/provenance/pagination components. Test unavailable and
 partial authorities, long names, dense rows, and both sports. Preserve intentional
 chart/marker colors only with explicit contrast evidence.
+
+- **THM-3D1 implemented:** BasketballAggregateDestination and its Page wrapper,
+  inline overview/player/game tables, provenance, quality, loading/error/empty
+  states. No imported UI panels. TeamStats and TournamentStats use this wrapper;
+  Leaderboard embeds the renderer. Shared state/quality exports also improve
+  BasketballPlayerAggregateDestination, but do not complete that component.
+  Sticky player columns are bounded for long names; header buttons do not shrink.
+  Data, rankings, routing and authority are unchanged. See
+  [verification](REGRESSION_THM_3D1_BASKETBALL_STATISTICS.md).
+- **THM-3D2 pending:** SoccerAggregateDestination and its shared exports.
+- **THM-3D3 pending:** BasketballPlayerAggregateDestination,
+  SoccerPlayerAggregateDestination and PlayerStatSummaryTables.
+- **THM-3D4 pending:** PlayerProfile, CareerStats, Leaderboard, TeamStats and
+  TournamentStats hosts, including legacy branches and any remaining imported
+  render helpers. Earlier renderer conversions do not complete these routes.
 
 ## Completion rule
 
