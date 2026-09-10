@@ -15,9 +15,12 @@ and the player picker use semantic tokens. THM-5 still owns the live pitch audit
 
 ## Evidence
 
-- 203 files / 1,528 tests pass; the corrected appearance guard also passes its
-  focused rerun (75 tests). TypeScript/production build pass; lint has zero errors
+- 203 files / 1,531 tests pass; the appearance guard includes 78 passing tests.
+  TypeScript passes after review fixes; the original production build passed; lint has zero errors
   and the same three existing Fast Refresh warnings.
+- PR review added disabled fill to both team refresh controls and formation
+  Choose/Change, with three targeted guards, and corrected the parent plan status.
+  Invite role text intentionally retains full contrast and parenthesized hierarchy.
 - Normalized TypeScript AST comparison confirms all nine runtime files differ
   only in JSX className attributes, not handlers, markup or data logic.
 - Automated semantic and transition guards cover all nine changed components.

@@ -195,7 +195,7 @@ export default function SoccerFormationEditor({
                       type="button"
                       onClick={() => setSelectedSlotId(slot.id)}
                       disabled={!rosterReady}
-                      className="h-9 rounded-md border border-line px-3 text-sm font-semibold text-content disabled:text-content-disabled"
+                      className="h-9 rounded-md border border-line px-3 text-sm font-semibold text-content disabled:bg-control-disabled disabled:text-content-disabled"
                       aria-label={`${assignedPlayerId ? 'Change' : 'Choose'} ${slot.label} player`}
                     >
                       {assignedPlayerId ? 'Change' : 'Choose'}

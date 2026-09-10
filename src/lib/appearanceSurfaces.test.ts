@@ -52,6 +52,18 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it.each([
+    ['src/components/settings/BasketballTeamSettingsPanel.tsx', 'grid h-9 w-9 shrink-0'],
+    ['src/components/settings/SoccerTeamSettingsPanel.tsx', 'h-9 w-9 shrink-0 grid'],
+    ['src/components/soccer/SoccerFormationEditor.tsx', 'h-9 rounded-md border border-line px-3'],
+  ])('keeps disabled fill and text on standalone team controls in %s', (path, prefix) => {
+    const source = readFileSync(path, 'utf8')
+    const classes = source.match(/className="[^"]*"/g)?.filter(value => value.includes(prefix)) ?? []
+    expect(classes).toHaveLength(1)
+    expect(classes[0]).toContain('disabled:bg-control-disabled')
+    expect(classes[0]).toContain('disabled:text-content-disabled')
+    expect(classes[0]).not.toMatch(/disabled:opacity-(?!100\b)\d+/)
+  })
   it('keeps Team Info grid panels within their tracks for long names', () => {
     for (const name of ['RosterPreviewCard', 'SchedulePreviewCard', 'TeamMembersCard', 'TournamentCard']) {
       expect(readFileSync(`src/components/team-info/${name}.tsx`, 'utf8')).toContain('card min-w-0')

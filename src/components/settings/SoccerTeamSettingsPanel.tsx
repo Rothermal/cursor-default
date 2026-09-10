@@ -284,7 +284,7 @@ export default function SoccerTeamSettingsPanel({
           type="button"
           onClick={() => void team.refresh()}
           disabled={team.status === 'loading' || team.status === 'saving'}
-          className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-line text-content-muted disabled:text-content-disabled"
+          className="h-9 w-9 shrink-0 grid place-items-center rounded-md border border-line text-content-muted disabled:bg-control-disabled disabled:text-content-disabled"
           title="Refresh shared defaults"
           aria-label="Refresh shared defaults"
         >
