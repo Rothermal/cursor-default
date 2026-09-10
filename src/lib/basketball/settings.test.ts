@@ -165,6 +165,29 @@ describe('Basketball settings schema version 1', () => {
       })
     )
     expect(parseBasketballTeamSettings(teamLayer(tooManySegments))).toMatchObject({ ok: false })
+
+    const tooManyFoulWindows = structuralOverrides()
+    tooManyFoulWindows.foulWindows = Array.from(
+      { length: 21 },
+      (_, index) => ({
+        ...structuredClone(tooManyFoulWindows.foulWindows[0]),
+        id: `foul-window-${index + 1}`,
+        segmentIds: [tooManyFoulWindows.regulationSegments[0].id],
+      })
+    )
+    expect(parseBasketballTeamSettings(teamLayer(tooManyFoulWindows))).toMatchObject({ ok: false })
+
+    const tooManyTimeoutPools = structuralOverrides()
+    tooManyTimeoutPools.timeoutPools = Array.from(
+      { length: 21 },
+      (_, index) => ({
+        ...structuredClone(tooManyTimeoutPools.timeoutPools[0]),
+        id: `timeout-pool-${index + 1}`,
+        segmentIds: [tooManyTimeoutPools.regulationSegments[0].id],
+        carryoverToPoolId: null,
+      })
+    )
+    expect(parseBasketballTeamSettings(teamLayer(tooManyTimeoutPools))).toMatchObject({ ok: false })
   })
 })
 
