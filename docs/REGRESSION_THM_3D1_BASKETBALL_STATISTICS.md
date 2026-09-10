@@ -12,9 +12,12 @@ Those surrounding hosts remain pending in THM-3D3/4; no blanket route completion
 
 ## Evidence
 
-- 203 test files / 1,543 tests pass, including 90 appearance surface tests.
+- 203 test files / 1,544 tests pass, including 91 appearance surface tests.
   TypeScript and production build pass. Lint has no errors and the same three
   existing Fast Refresh warnings in context modules.
+- PR review added a uniquely identified Back/Refresh button guard requiring
+  `shrink-0` on each button. Full tests and targeted lint pass again; runtime
+  source is unchanged, so the existing build/browser evidence still applies.
 - Color ownership and disabled refresh fill/text guards cover the component.
   A layout guard bounds both sticky player header/body cells to 180px.
 - Synthetic local Edge fixture rendered the actual Page and component at 390px

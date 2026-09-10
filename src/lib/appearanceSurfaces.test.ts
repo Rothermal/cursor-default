@@ -60,6 +60,16 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('keeps Basketball aggregate header buttons from shrinking', () => {
+    const source = readFileSync('src/components/basketball-aggregate/BasketballAggregateDestination.tsx', 'utf8')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)].map(match => match[0])
+    for (const label of ['Back', 'Refresh Basketball statistics']) {
+      const matches = buttons.filter(button => button.includes(`aria-label="${label}"`))
+      expect(matches).toHaveLength(1)
+      const classes = matches[0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+      expect(classes).toContain('shrink-0')
+    }
+  })
   it('bounds the Basketball aggregate sticky player column', () => {
     const source = readFileSync('src/components/basketball-aggregate/BasketballAggregateDestination.tsx', 'utf8')
     const cells = [...source.matchAll(/<th className="(sticky left-0[^"]*)"/g)]
