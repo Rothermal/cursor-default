@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A/B/C and THM-3D1 implemented; remaining THM-3D slices pending.
+Status: THM-3A/B/C and THM-3D1/2 implemented; remaining THM-3D slices pending.
 Deployed release checks remain open.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
@@ -91,7 +91,15 @@ chart/marker colors only with explicit contrast evidence.
   Sticky player columns are bounded for long names; header buttons do not shrink.
   Data, rankings, routing and authority are unchanged. See
   [verification](REGRESSION_THM_3D1_BASKETBALL_STATISTICS.md).
-- **THM-3D2 pending:** SoccerAggregateDestination and its shared exports.
+- **THM-3D2 implemented:** SoccerAggregateDestination and its Page wrapper,
+  inline overview/player/game tables, quality diagnostics and loading/error/empty
+  exports. It imports no other UI panels. TeamStats/TournamentStats use the wrapper;
+  Leaderboard embeds the renderer. SoccerPlayerAggregateDestination consumes its
+  shared state/quality exports but remains otherwise pending in 3D3. Injected
+  `overviewExtra` content and route hosts remain 3D4. Existing semantic tokens,
+  bounded sticky player columns and nonshrinking header buttons mirror 3D1;
+  rankings, cloud readers and authority are unchanged. See
+  [verification](REGRESSION_THM_3D2_SOCCER_STATISTICS.md).
 - **THM-3D3 pending:** BasketballPlayerAggregateDestination,
   SoccerPlayerAggregateDestination and PlayerStatSummaryTables.
 - **THM-3D4 pending:** PlayerProfile, CareerStats, Leaderboard, TeamStats and
