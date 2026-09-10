@@ -30,7 +30,7 @@ function bestGameCell(
   loadingHigh: boolean,
   onOpenGame: (gameId: string) => void | Promise<void>
 ): ReactNode {
-  if (loadingHigh) return <span className="text-slate-400">…</span>
+  if (loadingHigh) return <span className="text-content-subtle">…</span>
 
   const miss = missByMadeId[action.id]
   const row = highGames[action.id]
@@ -52,7 +52,7 @@ function bestGameCell(
       <button
         type="button"
         onClick={open}
-        className="text-blue-600 hover:underline font-medium"
+        className="text-accent hover:underline font-medium"
       >
         {label}
       </button>
@@ -60,7 +60,7 @@ function bestGameCell(
   }
 
   return (
-    <button type="button" onClick={open} className="text-blue-600 hover:underline font-medium">
+    <button type="button" onClick={open} className="text-accent hover:underline font-medium">
       {row.value}
     </button>
   )
@@ -107,7 +107,7 @@ export default function PlayerStatSummaryTables({
         return (
           <span>
             {made}/{att}
-            {pct !== null && <span className="text-slate-400 ml-1">({pct}%)</span>}
+            {pct !== null && <span className="text-content-subtle ml-1">({pct}%)</span>}
           </span>
         )
       }
@@ -124,50 +124,50 @@ export default function PlayerStatSummaryTables({
         return (
           <>
             {(made / gp).toFixed(1)}/{(att / gp).toFixed(1)}
-            <span className="text-slate-400"> /g</span>
+            <span className="text-content-subtle"> /g</span>
           </>
         )
       }
       return (
         <>
           {(made / gp).toFixed(1)}
-          <span className="text-slate-400">/g</span>
+          <span className="text-content-subtle">/g</span>
         </>
       )
     }
 
     return (
       <div key={category.id} className="mb-6 last:mb-0">
-        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wide mb-2">
           {category.name}
           {category.showTotal && (
-            <span className="text-slate-400 ml-2 normal-case">— {category.totalLabel}</span>
+            <span className="text-content-subtle ml-2 normal-case">— {category.totalLabel}</span>
           )}
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-2 pr-2 font-semibold text-slate-600 w-24" />
+              <tr className="border-b border-line">
+                <th className="text-left py-2 pr-2 font-semibold text-content-muted w-24" />
                 {visibleActions.map(action => {
                   const hasMiss = !!missByMadeId[action.id]
                   return (
                     <th
                       key={action.id}
-                      className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[56px]"
+                      className="text-center py-2 px-2 font-semibold text-content-muted min-w-[56px]"
                     >
                       {hasMiss ? `${action.shortLabel} M/A` : action.shortLabel}
                     </th>
                   )
                 })}
                 {category.showTotal && catTotal !== null && (
-                  <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[52px]">TOT</th>
+                  <th className="text-center py-2 px-2 font-bold text-content min-w-[52px]">TOT</th>
                 )}
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-slate-100">
-                <td className="py-2 pr-2 text-slate-500 text-xs font-medium whitespace-nowrap align-top">
+              <tr className="border-b border-line">
+                <td className="py-2 pr-2 text-content-muted text-xs font-medium whitespace-nowrap align-top">
                   Total
                 </td>
                 {visibleActions.map(action => (
@@ -176,27 +176,27 @@ export default function PlayerStatSummaryTables({
                   </td>
                 ))}
                 {category.showTotal && catTotal !== null && (
-                  <td className="text-center py-2 px-2 font-semibold text-slate-800 align-top">{catTotal}</td>
+                  <td className="text-center py-2 px-2 font-semibold text-content align-top">{catTotal}</td>
                 )}
               </tr>
-              <tr className="border-b border-slate-100">
-                <td className="py-1.5 pr-2 text-slate-400 text-xs font-medium whitespace-nowrap align-top">
+              <tr className="border-b border-line">
+                <td className="py-1.5 pr-2 text-content-subtle text-xs font-medium whitespace-nowrap align-top">
                   Per game
                 </td>
                 {visibleActions.map(action => (
                   <td
                     key={`${action.id}-pg`}
-                    className="text-center py-1.5 px-2 text-xs text-slate-500 align-top"
+                    className="text-center py-1.5 px-2 text-xs text-content-muted align-top"
                   >
                     {cellPerGame(action)}
                   </td>
                 ))}
                 {category.showTotal && catTotal !== null && (
-                  <td className="text-center py-1.5 px-2 text-xs text-slate-500 align-top">
+                  <td className="text-center py-1.5 px-2 text-xs text-content-muted align-top">
                     {gp > 0 ? (
                       <>
                         {(catTotal / gp).toFixed(1)}
-                        <span className="text-slate-400">/g</span>
+                        <span className="text-content-subtle">/g</span>
                       </>
                     ) : (
                       '—'
@@ -205,19 +205,19 @@ export default function PlayerStatSummaryTables({
                 )}
               </tr>
               <tr>
-                <td className="py-1.5 pr-2 text-slate-400 text-xs font-medium whitespace-nowrap align-top">
+                <td className="py-1.5 pr-2 text-content-subtle text-xs font-medium whitespace-nowrap align-top">
                   Best game
                 </td>
                 {visibleActions.map(action => (
                   <td
                     key={`${action.id}-hi`}
-                    className="text-center py-1.5 px-2 text-xs text-slate-500 align-top"
+                    className="text-center py-1.5 px-2 text-xs text-content-muted align-top"
                   >
                     {bestGameCell(action, missByMadeId, highGames, resolvedByGame, loadingHigh, onOpenGame)}
                   </td>
                 ))}
                 {category.showTotal && (
-                  <td className="text-center py-1.5 px-2 text-xs text-slate-400 align-top">—</td>
+                  <td className="text-center py-1.5 px-2 text-xs text-content-subtle align-top">—</td>
                 )}
               </tr>
             </tbody>
@@ -229,10 +229,10 @@ export default function PlayerStatSummaryTables({
 
   return (
     <section className="card space-y-2">
-      <h2 className="font-semibold text-slate-700">{title}</h2>
-      {description && <p className="text-xs text-slate-500">{description}</p>}
+      <h2 className="font-semibold text-content">{title}</h2>
+      {description && <p className="text-xs text-content-muted">{description}</p>}
       {sport.categories.map(cat => renderCategory(cat))}
-      {footer && <div className="text-xs text-slate-500 pt-2 border-t border-slate-100">{footer}</div>}
+      {footer && <div className="text-xs text-content-muted pt-2 border-t border-line">{footer}</div>}
     </section>
   )
 }

@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/components/PlayerStatSummaryTables.tsx",
+  "src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx",
+  "src/components/soccer-aggregate/SoccerPlayerAggregateDestination.tsx",
   "src/components/soccer-aggregate/SoccerAggregateDestination.tsx",
   "src/components/basketball-aggregate/BasketballAggregateDestination.tsx",
   "src/components/basketball/BasketballRecorderManager.tsx",
@@ -61,6 +64,20 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('wraps long Basketball player history source labels', () => {
+    const source = readFileSync('src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx', 'utf8')
+    const labels = [...source.matchAll(/<p className="([^"]*)">\s*\{game.cloudScope === 'personal'/g)]
+    expect(labels).toHaveLength(1)
+    expect(labels[0][1].split(/\s+/)).toContain('break-words')
+  })
+  it.each(['Basketball', 'Soccer'])('keeps %s player refresh buttons from shrinking', sport => {
+    const source = readFileSync(`src/components/${sport.toLowerCase()}-aggregate/${sport}PlayerAggregateDestination.tsx`, 'utf8')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)].map(match => match[0])
+    const label = `Refresh ${sport === 'Soccer' ? 'soccer' : sport} statistics`
+    const matches = buttons.filter(button => button.includes(`aria-label="${label}"`))
+    expect(matches).toHaveLength(1)
+    expect(matches[0].match(/className="([^"]*)"/)?.[1].split(/\s+/)).toContain('shrink-0')
+  })
   it.each(['Basketball', 'Soccer'])('keeps %s aggregate header buttons from shrinking', sport => {
     const source = readFileSync(`src/components/${sport.toLowerCase()}-aggregate/${sport}AggregateDestination.tsx`, 'utf8')
     const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)].map(match => match[0])
@@ -87,6 +104,8 @@ describe('Converted application surface color ownership', () => {
     expect(names[0][1]).toContain('min-w-0 break-words')
   })
   it.each([
+    ['src/components/basketball-aggregate/BasketballPlayerAggregateDestination.tsx', 'w-9 h-9 rounded-lg border border-line'],
+    ['src/components/soccer-aggregate/SoccerPlayerAggregateDestination.tsx', 'w-9 h-9 rounded-lg border border-line'],
     ['src/components/soccer-aggregate/SoccerAggregateDestination.tsx', 'w-9 h-9 rounded-lg border border-line'],
     ['src/components/basketball-aggregate/BasketballAggregateDestination.tsx', 'w-9 h-9 rounded-lg border border-line'],
     ['src/components/settings/BasketballTeamSettingsPanel.tsx', 'grid h-9 w-9 shrink-0'],
