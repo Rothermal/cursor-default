@@ -119,7 +119,7 @@ export default function BasketballRecorderManager({
   if (loading && recorders.length === 0) {
     return (
       <section className="card">
-        <p className="text-sm text-slate-500 animate-pulse">Loading recorder streams...</p>
+        <p className="text-sm text-content-muted animate-pulse">Loading recorder streams...</p>
       </section>
     )
   }
@@ -128,57 +128,57 @@ export default function BasketballRecorderManager({
   return (
     <section className="card space-y-4" aria-labelledby="basketball-recorders-title">
       <div className="flex items-start gap-3">
-        <Users size={20} className="mt-0.5 shrink-0 text-blue-700" />
+        <Users size={20} className="mt-0.5 shrink-0 text-info-content" />
         <div className="min-w-0 flex-1">
-          <h2 id="basketball-recorders-title" className="font-semibold text-slate-800">
+          <h2 id="basketball-recorders-title" className="font-semibold text-content">
             Recorder Streams
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-content-muted">
             {primary ? `Primary: ${primary.displayName}` : 'Primary recorder pending'}
           </p>
         </div>
         {primaryNeedsAttention && (
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700">
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-warning-content">
             <AlertTriangle size={14} /> Needs Attention
           </span>
         )}
       </div>
 
       {(loadError || actionError) && (
-        <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
           {actionError ?? loadError}
         </div>
       )}
 
       {alternateAttentionCount > 0 && canManage && (
-        <div className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="border border-warning-line bg-warning px-3 py-2 text-xs text-warning-content">
           {alternateAttentionCount} non-primary {alternateAttentionCount === 1 ? 'stream needs' : 'streams need'} attention. A healthy primary remains usable.
         </div>
       )}
 
-      <div className="divide-y divide-slate-200 border-y border-slate-200">
+      <div className="divide-y divide-line border-y border-line">
         {recorders.map(recorder => (
           <div key={recorder.recorderId} className="flex min-h-16 items-center gap-3 py-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-bold text-slate-800">
+                <p className="truncate text-sm font-bold text-content">
                   {recorder.displayName}
                   {recorder.recorderId === currentUserId ? ' (You)' : ''}
                 </p>
                 {recorder.isPrimary && (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700">
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-warning-content">
                     <Star size={13} fill="currentColor" /> Primary
                     {recorder.primarySource === 'default' ? ' (automatic)' : ''}
                   </span>
                 )}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-content-muted">
                 {recorder.eventCount !== null && <span>{recorder.eventCount} events</span>}
                 <span className="inline-flex items-center gap-1">
                   {recorder.checkpointCurrent ? (
-                    <CheckCircle2 size={13} className="text-emerald-600" />
+                    <CheckCircle2 size={13} className="text-success-content" />
                   ) : (
-                    <AlertTriangle size={13} className="text-amber-600" />
+                    <AlertTriangle size={13} className="text-warning-content" />
                   )}
                   {recorder.checkpointCurrent ? 'Current' : 'Needs attention'}
                 </span>
@@ -197,7 +197,7 @@ export default function BasketballRecorderManager({
                 type="button"
                 onClick={() => setSelectedRecorderId(recorder.recorderId)}
                 className={`grid h-9 w-9 place-items-center ${
-                  selectedRecorderId === recorder.recorderId ? 'text-blue-700' : 'text-slate-500'
+                  selectedRecorderId === recorder.recorderId ? 'text-info-content' : 'text-content-muted'
                 }`}
                 aria-label={`View ${recorder.displayName}'s stream`}
                 title="View stream"
@@ -209,7 +209,7 @@ export default function BasketballRecorderManager({
             {canManage && recorder.canSelectPrimary && (
               <label
                 className={`grid h-9 w-9 place-items-center ${
-                  recorder.checkpointCurrent ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'
+                  recorder.checkpointCurrent ? 'cursor-pointer' : 'cursor-not-allowed text-content-disabled'
                 }`}
                 title={
                   recorder.checkpointCurrent
@@ -223,7 +223,7 @@ export default function BasketballRecorderManager({
                   checked={recorder.isPrimary}
                   disabled={!recorder.checkpointCurrent || savingPrimaryId !== null}
                   onChange={() => { void handlePrimary(recorder) }}
-                  className="h-4 w-4 accent-blue-700"
+                  className="h-4 w-4 accent-accent"
                   aria-label={`Select ${recorder.displayName} as primary recorder`}
                 />
               </label>
@@ -235,8 +235,8 @@ export default function BasketballRecorderManager({
       {canManage && (
         <label className="flex min-h-10 cursor-pointer items-center justify-between gap-4">
           <span>
-            <span className="block text-sm font-bold text-slate-800">Show stream details</span>
-            <span className="block text-xs text-slate-500">Read-only</span>
+            <span className="block text-sm font-bold text-content">Show stream details</span>
+            <span className="block text-xs text-content-muted">Read-only</span>
           </span>
           <input
             type="checkbox"
@@ -247,19 +247,19 @@ export default function BasketballRecorderManager({
                 setSelectedRecorderId(primary?.recorderId ?? recorders[0]?.recorderId ?? null)
               }
             }}
-            className="h-5 w-5 accent-blue-700"
+            className="h-5 w-5 accent-accent"
           />
         </label>
       )}
 
       {canManage && showDetails && (
-        <div className="border-t border-slate-200 pt-4">
+        <div className="border-t border-line pt-4">
           {loadingStream ? (
-            <p className="py-5 text-center text-sm text-slate-500">Loading stream...</p>
+            <p className="py-5 text-center text-sm text-content-muted">Loading stream...</p>
           ) : projection ? (
             <RecorderProjectionView projection={projection} />
           ) : (
-            <p className="py-5 text-center text-sm text-slate-500">
+            <p className="py-5 text-center text-sm text-content-muted">
               Choose a recorder to inspect their stream.
             </p>
           )}
@@ -267,14 +267,14 @@ export default function BasketballRecorderManager({
       )}
 
       {canManage && history.length > 0 && (
-        <div className="border-t border-slate-200 pt-4">
-          <h3 className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+        <div className="border-t border-line pt-4">
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase text-content-muted">
             <History size={14} /> Primary history
           </h3>
-          <div className="mt-2 divide-y divide-slate-100">
+          <div className="mt-2 divide-y divide-line">
             {history.slice(0, 8).map(entry => (
-              <p key={entry.id} className="py-2 text-xs text-slate-600">
-                <span className="font-semibold text-slate-800">{entry.displayName}</span>
+              <p key={entry.id} className="py-2 text-xs text-content-muted">
+                <span className="font-semibold text-content">{entry.displayName}</span>
                 {' selected by '}
                 {entry.changedByDisplayName}
                 {' | '}
@@ -304,50 +304,50 @@ function RecorderProjectionView({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Cloud size={18} className="text-blue-700" />
-        <h3 className="font-bold text-slate-900">{projection.recorder.displayName}</h3>
+        <Cloud size={18} className="text-info-content" />
+        <h3 className="font-bold text-content">{projection.recorder.displayName}</h3>
       </div>
-      <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
+      <div className="mt-3 grid grid-cols-3 divide-x divide-line border-y border-line py-3 text-center">
         <div>
-          <p className="text-2xl font-bold text-blue-800">{projection.state.homeTeamScore ?? 0}</p>
-          <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(projection.state.gameInfo, 'tracked')}>{gameSideDisplayName(projection.state.gameInfo, 'tracked')}</p>
+          <p className="text-2xl font-bold text-info-content">{projection.state.homeTeamScore ?? 0}</p>
+          <p className="truncate text-[11px] text-content-muted" title={gameSideDisplayName(projection.state.gameInfo, 'tracked')}>{gameSideDisplayName(projection.state.gameInfo, 'tracked')}</p>
         </div>
         <div>
-          <p className="text-sm font-bold capitalize text-slate-700">
+          <p className="text-sm font-bold capitalize text-content">
             {basketballState?.projection.status.replace(/_/g, ' ') ?? 'Unknown'}
           </p>
-          <p className="text-[11px] text-slate-500">Stream state</p>
+          <p className="text-[11px] text-content-muted">Stream state</p>
         </div>
         <div>
-          <p className="text-2xl font-bold text-slate-800">{projection.state.opponentScore}</p>
-          <p className="truncate text-[11px] text-slate-500" title={gameSideDisplayName(projection.state.gameInfo, 'opponent')}>{gameSideDisplayName(projection.state.gameInfo, 'opponent')}</p>
+          <p className="text-2xl font-bold text-content">{projection.state.opponentScore}</p>
+          <p className="truncate text-[11px] text-content-muted" title={gameSideDisplayName(projection.state.gameInfo, 'opponent')}>{gameSideDisplayName(projection.state.gameInfo, 'opponent')}</p>
         </div>
       </div>
 
       {!projection.inspection.complete && (
-        <div className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mt-3 border border-warning-line bg-warning px-3 py-2 text-xs text-warning-content">
           This stream has {projection.inspection.diagnostics.length} projection issue
           {projection.inspection.diagnostics.length === 1 ? '' : 's'} and is not eligible for a
           new primary selection until repaired.
         </div>
       )}
 
-      <div className="mt-4 divide-y divide-slate-100 border-t border-slate-200">
+      <div className="mt-4 divide-y divide-line border-t border-line">
         {events.slice(0, 30).map(event => (
           <div key={event.id} className="flex items-center gap-3 py-2 text-xs">
-            <span className="w-16 shrink-0 font-semibold tabular-nums text-slate-500">
+            <span className="w-16 shrink-0 font-semibold tabular-nums text-content-muted">
               P{event.period.order} {formatElapsed(event.elapsedMs)}
             </span>
-            <span className={`min-w-0 flex-1 truncate text-slate-700 ${
+            <span className={`min-w-0 flex-1 truncate text-content ${
               event.deletedAt ? 'line-through opacity-50' : ''
             }`}>
               {event.eventType.replace('basketball.', '').replace(/_/g, ' ')}
             </span>
-            <span className="capitalize text-slate-400">{event.teamSide}</span>
+            <span className="capitalize text-content-subtle">{event.teamSide}</span>
           </div>
         ))}
         {events.length === 0 && (
-          <p className="py-5 text-center text-sm text-slate-500">No events in this stream.</p>
+          <p className="py-5 text-center text-sm text-content-muted">No events in this stream.</p>
         )}
       </div>
     </>
