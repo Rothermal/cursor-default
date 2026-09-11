@@ -180,34 +180,34 @@ export default function BasketballFoulDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 pb-3 pt-12 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 px-3 pb-3 pt-12 sm:items-center sm:p-4" onClick={onClose}>
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-foul-title"
-        className="max-h-[calc(100dvh-3.75rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="max-h-[calc(100dvh-3.75rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-surface shadow-xl"
         onClick={event => event.stopPropagation()}
       >
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
           <div className="min-w-0">
-            <h2 id="basketball-foul-title" className="text-base font-bold text-slate-800">Record foul</h2>
-            <p className="truncate text-xs text-slate-500">{committingTeamName}</p>
+            <h2 id="basketball-foul-title" className="text-base font-bold text-content">Record foul</h2>
+            <p className="truncate text-xs text-content-muted">{committingTeamName}</p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500" aria-label="Close foul sheet">
+          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-content-muted" aria-label="Close foul sheet">
             <X size={18} aria-hidden />
           </button>
         </header>
 
         <form className="space-y-4 px-4 py-4" onSubmit={event => { event.preventDefault(); submit() }}>
-          <div className="grid grid-cols-2 rounded-lg bg-slate-100 p-1" role="group" aria-label="Committing team">
+          <div className="grid grid-cols-2 rounded-lg bg-surface-muted p-1" role="group" aria-label="Committing team">
             {([['tracked', trackedTeamName], ['opponent', opponentName]] as const).map(([side, name]) => (
-              <button key={side} type="button" onClick={() => chooseSide(side)} aria-pressed={teamSide === side} className={`min-h-11 rounded-md px-2 py-1 text-sm font-semibold ${teamSide === side ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>
+              <button key={side} type="button" onClick={() => chooseSide(side)} aria-pressed={teamSide === side} className={`min-h-11 rounded-md px-2 py-1 text-sm font-semibold ${teamSide === side ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>
                 <span className="line-clamp-2 break-words">{name}</span>
               </button>
             ))}
           </div>
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="block text-sm font-semibold text-content">
             Foul charged to
             <select value={offenderSelection} onChange={event => setOffenderSelection(event.target.value)} className="input-field mt-1">
               <option value="team">{committingTeamName} team</option>
@@ -217,20 +217,20 @@ export default function BasketballFoulDialog({
           </label>
 
           {offenderSelection === 'staff' && (
-            <label className="block text-sm font-semibold text-slate-700">
+            <label className="block text-sm font-semibold text-content">
               Staff label
               <input autoFocus value={staffLabel} onChange={event => setStaffLabel(event.target.value)} className="input-field mt-1" maxLength={80} placeholder="Coach or staff name" />
             </label>
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm font-semibold text-slate-700">
+            <label className="block text-sm font-semibold text-content">
               Class
               <select value={foulClass} onChange={event => setFoulClass(event.target.value as BasketballFoulClass)} className="input-field mt-1">
                 {FOUL_CLASSES.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <label className="block text-sm font-semibold text-slate-700">
+            <label className="block text-sm font-semibold text-content">
               Context
               <select value={context} onChange={event => setContext(event.target.value as BasketballFoulContext)} className="input-field mt-1">
                 {FOUL_CONTEXTS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -238,7 +238,7 @@ export default function BasketballFoulDialog({
             </label>
           </div>
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="block text-sm font-semibold text-content">
             Drawn by
             <select value={drawnBySelection} onChange={event => setDrawnBySelection(event.target.value)} className="input-field mt-1">
               <option value="none">Not recorded</option>
@@ -248,14 +248,14 @@ export default function BasketballFoulDialog({
           </label>
 
           {drawnBySelection === 'unknown' && (
-            <label className="block text-sm font-semibold text-slate-700">
+            <label className="block text-sm font-semibold text-content">
               Drawn-by label
               <input value={unknownDrawnByLabel} onChange={event => setUnknownDrawnByLabel(event.target.value)} className="input-field mt-1" maxLength={80} />
             </label>
           )}
 
           {context !== 'offensive' && (
-            <label className="block text-sm font-semibold text-slate-700">
+            <label className="block text-sm font-semibold text-content">
               Team control
               <select value={teamControlSide} onChange={event => setTeamControlSide(event.target.value as 'none' | BasketballTeamSide)} className="input-field mt-1">
                 <option value="none">Not recorded</option>
@@ -266,7 +266,7 @@ export default function BasketballFoulDialog({
           )}
 
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-            <label className="block text-sm font-semibold text-slate-700">
+            <label className="block text-sm font-semibold text-content">
               Awarded free throws
               <select value={awardSelection} onChange={event => setAwardSelection(event.target.value as AwardSelection)} className="input-field mt-1">
                 <option value="none">None</option>
@@ -276,14 +276,14 @@ export default function BasketballFoulDialog({
                 <option value="one_and_one">One-and-one</option>
               </select>
             </label>
-            <label className="flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-700">
+            <label className="flex min-h-11 items-center gap-2 text-sm font-semibold text-content">
               <input type="checkbox" checked={possessionRetained} onChange={event => setPossessionRetained(event.target.checked)} disabled={awardSelection === 'none'} />
               Retain ball
             </label>
           </div>
 
-          <div className="border-t border-slate-100 pt-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <div className="border-t border-line pt-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-content">
               <input
                 type="checkbox"
                 checked={advanced}
@@ -301,12 +301,12 @@ export default function BasketballFoulDialog({
             </label>
             {advanced && (
               <div className="mt-3 space-y-3">
-                <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-700">
+                <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-content">
                   <label className="flex items-center gap-2"><input type="checkbox" checked={personalFoul} onChange={event => setPersonalFoul(event.target.checked)} /> Personal</label>
                   <label className="flex items-center gap-2"><input type="checkbox" checked={teamFoul} onChange={event => setTeamFoul(event.target.checked)} /> Team</label>
                   <label className="flex items-center gap-2"><input type="checkbox" checked={technical} onChange={event => setTechnical(event.target.checked)} /> Technical</label>
                 </div>
-                <label className="block text-sm font-semibold text-slate-700">
+                <label className="block text-sm font-semibold text-content">
                   Override reason
                   <input value={overrideReason} onChange={event => setOverrideReason(event.target.value)} className="input-field mt-1" maxLength={160} placeholder="Official ruling" />
                 </label>
@@ -314,11 +314,11 @@ export default function BasketballFoulDialog({
             )}
           </div>
 
-          {errorMessage && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{errorMessage}</p>}
+          {errorMessage && <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">{errorMessage}</p>}
 
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+          <div className="flex justify-end gap-2 border-t border-line pt-3">
             <button type="button" onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-            <button type="submit" disabled={!valid || !drawnByValid || !overrideValid} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-40">
+            <button type="submit" disabled={!valid || !drawnByValid || !overrideValid} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled">
               <ShieldAlert size={16} aria-hidden />
               Record foul
             </button>

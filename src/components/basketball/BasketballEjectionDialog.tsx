@@ -106,34 +106,34 @@ export default function BasketballEjectionDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 pb-3 pt-12 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 px-3 pb-3 pt-12 sm:items-center sm:p-4" onClick={onClose}>
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-ejection-title"
-        className="max-h-[calc(100dvh-3.75rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="max-h-[calc(100dvh-3.75rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-surface shadow-xl"
         onClick={event => event.stopPropagation()}
       >
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
           <div className="min-w-0">
-            <h2 id="basketball-ejection-title" className="text-base font-bold text-slate-800">Official ejection</h2>
-            <p className="text-xs text-slate-500">Record the official ruling separately from foul-limit disqualification.</p>
+            <h2 id="basketball-ejection-title" className="text-base font-bold text-content">Official ejection</h2>
+            <p className="text-xs text-content-muted">Record the official ruling separately from foul-limit disqualification.</p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500" aria-label="Close ejection sheet">
+          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-content-muted" aria-label="Close ejection sheet">
             <X size={18} aria-hidden />
           </button>
         </header>
 
         <form className="space-y-4 px-4 py-4" onSubmit={event => { event.preventDefault(); submit() }}>
-          <div className="grid grid-cols-2 rounded-lg bg-slate-100 p-1" role="group" aria-label="Ejected side">
+          <div className="grid grid-cols-2 rounded-lg bg-surface-muted p-1" role="group" aria-label="Ejected side">
             {([['tracked', trackedTeamName], ['opponent', opponentName]] as const).map(([side, name]) => (
-              <button key={side} type="button" onClick={() => chooseSide(side)} aria-pressed={teamSide === side} className={`min-h-11 rounded-md px-2 py-1 text-sm font-semibold ${teamSide === side ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>
+              <button key={side} type="button" onClick={() => chooseSide(side)} aria-pressed={teamSide === side} className={`min-h-11 rounded-md px-2 py-1 text-sm font-semibold ${teamSide === side ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>
                 <span className="line-clamp-2 break-words">{name}</span>
               </button>
             ))}
           </div>
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="block text-sm font-semibold text-content">
             Ejected person
             <select value={subjectSelection} onChange={event => setSubjectSelection(event.target.value)} className="input-field mt-1">
               {sideCandidates.map(candidate => <option key={candidate.playerId} value={`player:${candidate.playerId}`}>{candidate.label}</option>)}
@@ -142,30 +142,30 @@ export default function BasketballEjectionDialog({
           </label>
 
           {subjectSelection === 'staff' && (
-            <label className="block text-sm font-semibold text-slate-700">
+            <label className="block text-sm font-semibold text-content">
               Staff label
               <input autoFocus value={staffLabel} onChange={event => setStaffLabel(event.target.value)} className="input-field mt-1" maxLength={80} placeholder="Coach or staff name" />
             </label>
           )}
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="block text-sm font-semibold text-content">
             Reason
             <textarea autoFocus={subjectSelection !== 'staff'} value={reason} onChange={event => setReason(event.target.value)} className="input-field mt-1 min-h-20 resize-y" maxLength={240} placeholder="Official ruling" />
           </label>
 
-          <label className="block text-sm font-semibold text-slate-700">
-            Related foul <span className="font-normal text-slate-500">(optional)</span>
+          <label className="block text-sm font-semibold text-content">
+            Related foul <span className="font-normal text-content-muted">(optional)</span>
             <select value={relatedFoulEventId} onChange={event => setRelatedFoulEventId(event.target.value)} className="input-field mt-1" disabled={matchingFouls.length === 0}>
               <option value="">No foul link</option>
               {matchingFouls.map(candidate => <option key={candidate.eventId} value={candidate.eventId}>{candidate.label}</option>)}
             </select>
           </label>
 
-          {errorMessage && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{errorMessage}</p>}
+          {errorMessage && <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">{errorMessage}</p>}
 
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+          <div className="flex justify-end gap-2 border-t border-line pt-3">
             <button type="button" onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-            <button type="submit" disabled={!valid} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-40">
+            <button type="submit" disabled={!valid} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled">
               <UserX size={16} aria-hidden />
               Record ejection
             </button>

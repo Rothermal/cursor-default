@@ -314,8 +314,15 @@ The clock/lineup batch also implements semantic colors for BasketballClockStrip,
 BasketballLineupSheet, BasketballBoundaryReviewDialog, BasketballLifecycleControls,
 and BasketballEventBonusPanel. See [clock/lineup verification](REGRESSION_THM_4_CLOCK_LINEUP.md).
 This is not completion of the live tracker host or its other imported controls:
-court capture, legacy controls, administrative/correction dialogs, recorder and
+court capture, legacy controls, remaining administrative/correction dialogs, recorder and
 recovery controls, Timeline, and Summary still require their remaining audit.
+
+The live-entry dialog batch covers foul, awarded free throws, ejection, timeout,
+score correction, linked steal/turnover, late participant, and reasoned reopen.
+All eight use semantic surfaces and disabled states, with distinct Made/Miss
+colors retained. See [live-entry dialog verification](REGRESSION_THM_4_LIVE_ENTRY_DIALOGS.md).
+Timeline's historical editors and cloud reopen/finalization paths are separate
+surfaces; this batch does not claim those or the overall tracker are complete.
 
 - Convert setup, player setup, checkout, tracker, Timeline, lineups, clock,
   administrative dialogs, finalization/reopen, Summary, and recovery/conflict UI.

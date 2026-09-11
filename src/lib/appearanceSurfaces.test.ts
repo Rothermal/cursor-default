@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+const liveEntryDialogs = ['Reopen', 'Timeout', 'Ejection', 'LateParticipant', 'ScoreCorrection', 'StealTurnover', 'Foul', 'FreeThrowTrip']
+  .map(name => `src/components/basketball/Basketball${name}Dialog.tsx`)
+
 const surfaces = [
+  ...liveEntryDialogs,
   'src/components/basketball/BasketballClockStrip.tsx',
   'src/components/basketball/BasketballLineupSheet.tsx',
   'src/components/basketball/BasketballBoundaryReviewDialog.tsx',
@@ -79,6 +83,29 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('preserves distinct free-throw outcome and disabled colors', () => {
+    const source = readFileSync('src/components/basketball/BasketballFreeThrowTripDialog.tsx', 'utf8')
+    for (const [made, token] of [['false', 'danger'], ['true', 'success']]) {
+      const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+        .filter(([button]) => button.includes(`onRecord(playerId, ${made})`))
+      expect(buttons).toHaveLength(1)
+      for (const value of [`bg-${token}`, `text-${token}-content`, 'disabled:bg-control-disabled', 'disabled:text-content-disabled']) {
+        expect(buttons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)).toContain(value)
+      }
+    }
+  })
+  it.each(liveEntryDialogs)('keeps %s overlays and close controls bounded', path => {
+    const source = readFileSync(path, 'utf8')
+    const overlays = [...source.matchAll(/className="([^"]*fixed inset-0[^"]*)"/g)]
+    expect(overlays).toHaveLength(1)
+    expect(overlays[0][1].split(/\s+/)).toContain('bg-overlay/40')
+    const closeButtons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+      .filter(([button]) => button.includes('aria-label="Close'))
+    expect(closeButtons).toHaveLength(1)
+    const classes = closeButtons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+    for (const token of ['h-9', 'w-9', 'shrink-0']) expect(classes).toContain(token)
+    expect(source).not.toMatch(/disabled:opacity-(?!100\b)\d+/)
+  })
   it.each(['BasketballLineupSheet', 'BasketballBoundaryReviewDialog'])('keeps %s backdrop translucent', name => {
     const source = readFileSync(`src/components/basketball/${name}.tsx`, 'utf8')
     const overlays = [...source.matchAll(/className="([^"]*fixed inset-0[^"]*)"/g)]
