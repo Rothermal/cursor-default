@@ -144,13 +144,13 @@ export default function GameCheckout() {
 
   if (!gameId) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50 items-center justify-center px-4">
-        <p className="text-slate-500 animate-pulse">Preparing game…</p>
-        <p className="text-xs text-slate-400 mt-2">Sync in progress</p>
+      <div className="min-h-screen flex flex-col bg-canvas items-center justify-center px-4">
+        <p className="text-content-muted animate-pulse">Preparing game…</p>
+        <p className="text-xs text-content-subtle mt-2">Sync in progress</p>
         <button
           type="button"
           onClick={() => navigate('/game')}
-          className="mt-4 text-sm text-blue-600"
+          className="mt-4 text-sm text-info-content"
         >
           Skip to Game →
         </button>
@@ -159,21 +159,21 @@ export default function GameCheckout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-4`}>
+    <div className="min-h-screen flex flex-col bg-canvas">
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto">
           <button
             onClick={() => navigate('/players')}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center mb-3
+            className="w-8 h-8 shrink-0 rounded-full bg-control flex items-center justify-center mb-3
                        active:scale-90 transition-transform"
           >
             ←
           </button>
           <h1 className="text-lg font-bold">Who are you tracking?</h1>
-          <p className="text-sm opacity-80 mt-1">
+          <p className="text-sm text-content-muted mt-1 break-words">
             {gameSideDisplayName(gameInfo, 'tracked')} vs {gameSideDisplayName(gameInfo, 'opponent')}
           </p>
-          <p className="text-xs opacity-60 mt-1">
+          <p className="text-xs text-content-subtle mt-1">
             Select the players you will record stats for. Others can track the same game.
           </p>
         </div>
@@ -181,18 +181,18 @@ export default function GameCheckout() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full">
         {error && (
-          <div className="card bg-red-50 border-red-200 text-red-700 text-sm mb-4">
+          <div className="card bg-danger border-danger-line text-danger-content text-sm mb-4">
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="card text-slate-500 animate-pulse">Loading...</div>
+          <div className="card text-content-muted animate-pulse">Loading...</div>
         ) : (
           <div className="space-y-2 mb-6">
             {teamCheckoutPlayers.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-0.5">
+                <p className="text-xs font-semibold text-content-muted uppercase tracking-wide px-0.5">
                   Team stats
                 </p>
                 {teamCheckoutPlayers.map(player => {
@@ -206,26 +206,26 @@ export default function GameCheckout() {
                       type="button"
                       onClick={() => { void handleToggle(player.id) }}
                       disabled={toggling === player.id}
-                      className={`card w-full flex items-center justify-between py-3 text-left transition-colors
-                        border-2 border-dashed border-slate-300/90
-                        bg-gradient-to-br from-slate-50 to-slate-100/70
-                        ${mine ? 'ring-2 ring-blue-400 bg-blue-50/80' : 'hover:from-slate-100 hover:to-slate-100'}`}
+                      className={`card w-full flex items-center justify-between gap-3 py-3 text-left disabled:bg-control-disabled disabled:text-content-disabled
+                        border-2 border-dashed border-line-strong
+                        bg-surface-muted
+                        ${mine ? 'ring-2 ring-accent bg-control' : 'hover:bg-control-hover'}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span
-                          className="shrink-0 w-10 h-10 rounded-full border-2 border-dashed border-slate-400
-                                     bg-white text-slate-600 flex items-center justify-center text-lg leading-none"
+                          className="shrink-0 w-10 h-10 rounded-full border-2 border-dashed border-line-strong
+                                     bg-surface text-content-muted flex items-center justify-center text-lg leading-none"
                           aria-hidden
                         >
                           ★
                         </span>
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-800 truncate">
+                          <p className="font-medium text-content truncate">
                             {player.name}
-                            <span className="font-normal text-slate-500"> (Team Stats)</span>
+                            <span className="font-normal text-content-muted"> (Team Stats)</span>
                           </p>
                           {other && (
-                            <p className="text-xs text-slate-500">Primary: {other}</p>
+                            <p className="text-xs text-content-muted break-words">Primary: {other}</p>
                           )}
                         </div>
                       </div>
@@ -242,11 +242,11 @@ export default function GameCheckout() {
                 role="separator"
                 aria-label="Roster players"
               >
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                <div className="h-px flex-1 bg-line" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-content-subtle">
                   Roster
                 </span>
-                <div className="h-px flex-1 bg-slate-200" />
+                <div className="h-px flex-1 bg-line" />
               </div>
             )}
 
@@ -261,24 +261,24 @@ export default function GameCheckout() {
                   type="button"
                   onClick={() => { void handleToggle(player.id) }}
                   disabled={toggling === player.id}
-                  className={`card w-full flex items-center justify-between py-3 text-left transition-colors
-                    ${mine ? 'ring-2 ring-blue-400 bg-blue-50/50' : 'hover:bg-slate-50'}`}
+                  className={`card w-full flex items-center justify-between gap-3 py-3 text-left disabled:bg-control-disabled disabled:text-content-disabled
+                    ${mine ? 'ring-2 ring-accent bg-control' : 'hover:bg-canvas'}`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <span className={`
-                      ${sport.theme.bg} text-white w-10 h-10 rounded-full
+                      bg-accent text-accent-content w-10 h-10 shrink-0 rounded-full
                       flex items-center justify-center font-bold text-sm
                     `}>
                       {player.number || '—'}
                     </span>
-                    <div>
-                      <p className="font-medium text-slate-700">{player.name}</p>
+                    <div className="min-w-0 break-words">
+                      <p className="font-medium text-content">{player.name}</p>
                       {other && (
-                        <p className="text-xs text-slate-500">Primary: {other}</p>
+                        <p className="text-xs text-content-muted">Primary: {other}</p>
                       )}
                     </div>
                   </div>
-                  <span className="text-2xl">{mine ? '✓' : '○'}</span>
+                  <span className="text-2xl shrink-0">{mine ? '✓' : '○'}</span>
                 </button>
               )
             })}

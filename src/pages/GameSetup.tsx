@@ -928,8 +928,8 @@ export default function GameSetup() {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center px-4">
           <div className="card max-w-md w-full text-center space-y-3">
-            <p className="font-semibold text-slate-700">Loading team setup</p>
-            <p className="text-sm text-slate-500">
+            <p className="font-semibold text-content">Loading team setup</p>
+            <p className="text-sm text-content-muted">
               {loadingRequestedTeamSport
                 ? 'Finding this team sport...'
                 : parkingError ?? requestedTeamSportError ?? 'Preparing game setup...'}
@@ -1309,18 +1309,18 @@ export default function GameSetup() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-4`}>
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={handleCancelSetup}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
+            className="w-8 h-8 shrink-0 rounded-full bg-control flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
           </button>
           <div>
             <h1 className="text-lg font-bold">{sport.icon} {sport.name}</h1>
-            <p className="text-sm opacity-80">Game Setup</p>
+            <p className="text-sm text-content-muted">Game Setup</p>
           </div>
         </div>
       </header>
@@ -1330,7 +1330,7 @@ export default function GameSetup() {
           {isCloudFlow ? (
             <div className="card space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-700">Team Source</p>
+                <p className="text-sm font-semibold text-content">Team Source</p>
                 <button
                   type="button"
                   onClick={() =>
@@ -1340,30 +1340,30 @@ export default function GameSetup() {
                         : sportTeamsPath(sport.id)
                     )
                   }
-                  className="text-xs text-blue-600 font-medium underline"
+                  className="text-xs text-info-content font-medium underline"
                 >
                   {requestedTeamId && selectedTeam ? 'Back to Team' : 'Manage Teams'}
                 </button>
               </div>
 
               {teamsError && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                <p className="text-xs text-danger-content bg-danger border border-danger-line rounded-lg p-2">
                   {teamsError}
                 </p>
               )}
               {(setupError || parkingError) && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                <p className="text-xs text-danger-content bg-danger border border-danger-line rounded-lg p-2">
                   {setupError ?? parkingError}
                 </p>
               )}
               {basketballCapabilityFailure && (
-                <div role="alert" className="space-y-3 border border-amber-300 bg-amber-50 p-3 text-amber-950">
+                <div role="alert" className="space-y-3 border border-warning-line bg-warning p-3 text-warning-content">
                   <div>
                     <p className="text-sm font-semibold">Basketball cloud check failed</p>
                     <p className="mt-1 text-xs">{basketballCapabilityFailure}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => { void handleNext(true) }} disabled={checkingBasketballCapabilities} className="btn-secondary min-h-10 text-xs disabled:opacity-50">
+                    <button type="button" onClick={() => { void handleNext(true) }} disabled={checkingBasketballCapabilities} className="btn-secondary min-h-10 text-xs disabled:bg-control-disabled disabled:text-content-disabled">
                       Retry Check
                     </button>
                     <button type="button" onClick={() => updateBasketballEventIntent(false)} className="btn-secondary min-h-10 text-xs">
@@ -1388,12 +1388,12 @@ export default function GameSetup() {
               )}
 
               {teams.length > 0 && (
-                <div className="flex rounded-xl bg-slate-100 p-1">
+                <div className="flex rounded-xl bg-surface-muted p-1">
                   <button
                     type="button"
                     onClick={() => updateTeamMode('existing')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      teamMode === 'existing' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold  ${
+                      teamMode === 'existing' ? 'bg-surface shadow text-content' : 'text-content-muted'
                     }`}
                   >
                     Existing Team
@@ -1401,8 +1401,8 @@ export default function GameSetup() {
                   <button
                     type="button"
                     onClick={() => updateTeamMode('new')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      teamMode === 'new' ? 'bg-white shadow text-slate-800' : 'text-slate-500'
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold  ${
+                      teamMode === 'new' ? 'bg-surface shadow text-content' : 'text-content-muted'
                     }`}
                   >
                     {isBasketballEventIntent ? 'Local Team' : 'New Team'}
@@ -1411,11 +1411,11 @@ export default function GameSetup() {
               )}
 
               {loadingTeams ? (
-                <p className="text-sm text-slate-500 animate-pulse">Loading teams...</p>
+                <p className="text-sm text-content-muted animate-pulse">Loading teams...</p>
               ) : requestedTeamUnavailable ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-sm font-semibold text-amber-900">Team unavailable</p>
-                  <p className="text-xs text-amber-800 mt-1">
+                <div className="rounded-xl border border-warning-line bg-warning p-3">
+                  <p className="text-sm font-semibold text-warning-content">Team unavailable</p>
+                  <p className="text-xs text-warning-content mt-1">
                     Choose another team from Cloud Teams before starting this game.
                   </p>
                 </div>
@@ -1423,7 +1423,7 @@ export default function GameSetup() {
                 <div className="space-y-2">
                   {availableSeasons.length > 1 && (
                     <>
-                      <label className="block text-sm font-medium text-slate-600 mb-1">
+                      <label className="block text-sm font-medium text-content-muted mb-1">
                         Season
                       </label>
                       <select
@@ -1447,7 +1447,7 @@ export default function GameSetup() {
                       </select>
                     </>
                   )}
-                  <label className="block text-sm font-medium text-slate-600 mb-1">
+                  <label className="block text-sm font-medium text-content-muted mb-1">
                     Select Team *
                   </label>
                   <select
@@ -1472,7 +1472,7 @@ export default function GameSetup() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-600 mb-1">
+                  <label className="block text-sm font-medium text-content-muted mb-1">
                     Your Team Name *
                   </label>
                   <input
@@ -1484,10 +1484,10 @@ export default function GameSetup() {
                     autoFocus
                   />
                   {!isBasketballEventIntent && loadingSeasonsForNewTeam ? (
-                    <p className="text-xs text-slate-400 animate-pulse">Loading seasons...</p>
+                    <p className="text-xs text-content-subtle animate-pulse">Loading seasons...</p>
                   ) : !isBasketballEventIntent && seasonsForNewTeam.length > 0 ? (
                     <div>
-                      <label className="block text-sm font-medium text-slate-600 mb-1">
+                      <label className="block text-sm font-medium text-content-muted mb-1">
                         Season for new team
                       </label>
                       <select
@@ -1500,7 +1500,7 @@ export default function GameSetup() {
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-content-muted mt-1">
                         Pick an existing season to match Teams you already created, or leave on Auto.
                       </p>
                     </div>
@@ -1510,7 +1510,7 @@ export default function GameSetup() {
             </div>
           ) : (
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">
+              <label className="block text-sm font-medium text-content-muted mb-1">
                 Your Team Name *
               </label>
               <input
@@ -1525,7 +1525,7 @@ export default function GameSetup() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">
+            <label className="block text-sm font-medium text-content-muted mb-1">
               Your Team Nickname
             </label>
             <input
@@ -1539,10 +1539,10 @@ export default function GameSetup() {
           </div>
 
           {showBasketballEventToggle && (
-            <section className="space-y-3 border-y border-amber-200 bg-amber-50 px-3 py-3">
+            <section className="space-y-3 border-y border-warning-line bg-warning px-3 py-3">
               <div>
-                <p className="text-sm font-semibold text-amber-950">Basketball tracker</p>
-                <p className="text-xs text-amber-800">
+                <p className="text-sm font-semibold text-warning-content">Basketball tracker</p>
+                <p className="text-xs text-warning-content">
                   {committedBasketballEventSetup
                     ? 'This existing setup uses the new tracker.'
                     : basketballEventCreationPolicy.canCreateNewEventGame
@@ -1550,13 +1550,13 @@ export default function GameSetup() {
                       : 'Enable New event tracker (preview) in Basketball settings to continue.'}
                 </p>
               </div>
-              <div className="grid grid-cols-2 rounded-md bg-amber-100 p-1" role="group" aria-label="Basketball tracker">
+              <div className="grid grid-cols-2 rounded-md bg-warning p-1" role="group" aria-label="Basketball tracker">
                 <button
                   type="button"
                   disabled={committedBasketballEventSetup}
                   onClick={() => updateBasketballEventIntent(false)}
-                  className={`rounded px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
-                    !isBasketballEventIntent ? 'bg-white text-slate-900 shadow-sm' : 'text-amber-900'
+                  className={`rounded px-3 py-2 text-sm font-semibold disabled:bg-control-disabled disabled:text-content-disabled ${
+                    !isBasketballEventIntent ? 'bg-surface text-content shadow-sm' : 'text-warning-content'
                   }`}
                 >
                   Classic tracker
@@ -1569,8 +1569,8 @@ export default function GameSetup() {
                       !committedBasketballEventSetup)
                   }
                   onClick={() => updateBasketballEventIntent(true)}
-                  className={`rounded px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
-                    isBasketballEventIntent ? 'bg-white text-slate-900 shadow-sm' : 'text-amber-900'
+                  className={`rounded px-3 py-2 text-sm font-semibold disabled:bg-control-disabled disabled:text-content-disabled ${
+                    isBasketballEventIntent ? 'bg-surface text-content shadow-sm' : 'text-warning-content'
                   }`}
                 >
                   New tracker
@@ -1578,11 +1578,11 @@ export default function GameSetup() {
               </div>
               {isBasketballEventIntent && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-amber-950">
+                  <p className="text-xs font-medium text-warning-content">
                     Cloud policy: {basketballCloudIntent === 'automatic' ? 'Automatic' : 'Local only'}
                   </p>
                   <div
-                    className="grid grid-cols-2 rounded-md bg-amber-100 p-1"
+                    className="grid grid-cols-2 rounded-md bg-warning p-1"
                     role="group"
                     aria-label="Basketball cloud policy"
                   >
@@ -1592,10 +1592,10 @@ export default function GameSetup() {
                           setBasketballCloudIntent('automatic')
                           setSetupError(null)
                         }}
-                        className={`rounded px-2 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                        className={`rounded px-2 py-1.5 text-xs font-semibold disabled:bg-control-disabled disabled:text-content-disabled ${
                           basketballCloudIntent === 'automatic'
-                            ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-amber-900'
+                            ? 'bg-surface text-content shadow-sm'
+                            : 'text-warning-content'
                         }`}
                       >
                         Automatic Cloud
@@ -1609,8 +1609,8 @@ export default function GameSetup() {
                         }}
                         className={`rounded px-2 py-1.5 text-xs font-semibold ${
                           basketballCloudIntent === 'local_only'
-                            ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-amber-900'
+                            ? 'bg-surface text-content shadow-sm'
+                            : 'text-warning-content'
                         }`}
                       >
                         Local only
@@ -1618,7 +1618,7 @@ export default function GameSetup() {
                   </div>
                 </div>
               )}
-              <p className="text-xs text-amber-900">
+              <p className="text-xs text-warning-content">
                 Initial court view: {basketballDisplayFlipped ? 'Flipped' : 'Standard'} · Personal display setting
               </p>
             </section>
@@ -1631,7 +1631,7 @@ export default function GameSetup() {
             />
           )}
           {isBasketballSetup && isBasketballEventIntent && !currentBasketballDraft?.event && (
-            <p role="status" className="border-y border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+            <p role="status" className="border-y border-line-strong bg-canvas px-3 py-3 text-sm text-content-muted">
               {teamMode === 'existing'
                 ? basketballTeamSettings.error ?? 'Loading shared Basketball defaults...'
                 : 'Loading personal Basketball defaults...'}
@@ -1639,7 +1639,7 @@ export default function GameSetup() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">
+            <label className="block text-sm font-medium text-content-muted mb-1">
               Opponent *
             </label>
             <input
@@ -1652,7 +1652,7 @@ export default function GameSetup() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">
+            <label className="block text-sm font-medium text-content-muted mb-1">
               Opponent Nickname
             </label>
             <input
@@ -1666,13 +1666,13 @@ export default function GameSetup() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">
+            <label className="block text-sm font-medium text-content-muted mb-1">
               Tournament / League
             </label>
             {isCloudFlow && teamMode === 'existing' && selectedTeamId ? (
               <div className="space-y-2">
                 {loadingTournaments ? (
-                  <p className="text-xs text-slate-400 animate-pulse">Loading tournaments...</p>
+                  <p className="text-xs text-content-subtle animate-pulse">Loading tournaments...</p>
                 ) : (
                   <>
                     <select
@@ -1697,7 +1697,7 @@ export default function GameSetup() {
                         <div>
                           <label
                             htmlFor="existing-tournament-url"
-                            className="block text-xs font-medium text-slate-500 mb-1"
+                            className="block text-xs font-medium text-content-muted mb-1"
                           >
                             Tournament URL (optional)
                           </label>
@@ -1713,7 +1713,7 @@ export default function GameSetup() {
                             disabled={!mayManageSelectedTeam}
                           />
                           {mayManageSelectedTeam && (
-                            <p className="text-xs text-slate-400 mt-1">
+                            <p className="text-xs text-content-subtle mt-1">
                               Saved when you continue to add players.
                             </p>
                           )}
@@ -1726,7 +1726,7 @@ export default function GameSetup() {
                               if (t) setConfirmDeleteTournament(t)
                             }}
                             disabled={deletingTournamentId === selectedTournamentId}
-                            className="text-xs text-red-600 underline disabled:opacity-40"
+                            className="text-xs text-danger-content underline disabled:text-content-disabled"
                           >
                             {deletingTournamentId === selectedTournamentId ? 'Deleting...' : 'Delete this tournament'}
                           </button>
@@ -1785,7 +1785,7 @@ export default function GameSetup() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">
+            <label className="block text-sm font-medium text-content-muted mb-1">
               Date
             </label>
             <input
