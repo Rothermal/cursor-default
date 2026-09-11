@@ -200,7 +200,7 @@ export default function BasketballLineupSheet({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-2 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/50 p-2 sm:items-center sm:p-4"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
     >
       <section
@@ -208,20 +208,20 @@ export default function BasketballLineupSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-lineup-sheet-title"
-        className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-xl"
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
-            <h2 id="basketball-lineup-sheet-title" className="truncate text-base font-bold text-slate-900">
+            <h2 id="basketball-lineup-sheet-title" className="truncate text-base font-bold text-content">
               {purpose === 'boundary' ? 'Boundary lineup review' : 'Lineup change'}
             </h2>
-            <p className="truncate text-xs font-medium text-slate-500">{sideName(teamSide)}</p>
+            <p className="truncate text-xs font-medium text-content-muted">{sideName(teamSide)}</p>
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-line text-content-muted"
             aria-label="Close lineup change"
           >
             <X size={18} aria-hidden />
@@ -229,7 +229,7 @@ export default function BasketballLineupSheet({
         </header>
 
         {availableSides.length > 1 && (
-          <div className="mx-4 mt-3 grid shrink-0 grid-cols-2 rounded-md bg-slate-100 p-1" role="tablist" aria-label="Lineup side">
+          <div className="mx-4 mt-3 grid shrink-0 grid-cols-2 rounded-md bg-surface-muted p-1" role="tablist" aria-label="Lineup side">
             {availableSides.map(side => (
               <button
                 key={side}
@@ -238,7 +238,7 @@ export default function BasketballLineupSheet({
                 aria-selected={teamSide === side}
                 onClick={() => changeSide(side)}
                 className={`min-h-10 rounded px-2 text-sm font-semibold ${
-                  teamSide === side ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
+                  teamSide === side ? 'bg-surface text-content shadow-sm' : 'text-content-muted'
                 }`}
               >
                 <span className="line-clamp-2 break-words">{sideName(side)}</span>
@@ -256,7 +256,7 @@ export default function BasketballLineupSheet({
           />
 
           {replacementCount > 0 && (
-            <p role="alert" className="mb-4 flex items-start gap-2 border-l-4 border-rose-500 bg-rose-50 px-3 py-3 text-sm font-semibold text-rose-800">
+            <p role="alert" className="mb-4 flex items-start gap-2 border-l-4 border-danger-line bg-danger px-3 py-3 text-sm font-semibold text-danger-content">
               <AlertTriangle size={17} className="mt-0.5 shrink-0" aria-hidden />
               Replace {replacementCount === 1 ? 'the unavailable player' : 'all unavailable players'} before starting the clock.
             </p>
@@ -279,11 +279,11 @@ export default function BasketballLineupSheet({
           />
 
           {model.unavailable.length > 0 && (
-            <div className="mt-4 border-t border-slate-200 pt-3">
-              <h3 className="text-xs font-bold uppercase text-slate-500">Unavailable</h3>
-              <div className="mt-2 divide-y divide-slate-100 border-y border-slate-200">
+            <div className="mt-4 border-t border-line pt-3">
+              <h3 className="text-xs font-bold uppercase text-content-muted">Unavailable</h3>
+              <div className="mt-2 divide-y divide-line border-y border-line">
                 {model.unavailable.map(row => (
-                  <div key={row.participantId} className="flex min-h-12 items-center justify-between gap-3 py-2 text-sm text-slate-500">
+                  <div key={row.participantId} className="flex min-h-12 items-center justify-between gap-3 py-2 text-sm text-content-muted">
                     <PlayerName row={row} />
                     <span className="shrink-0 text-xs font-semibold">{row.unavailableReason}</span>
                   </div>
@@ -292,18 +292,18 @@ export default function BasketballLineupSheet({
             </div>
           )}
 
-          <div className="mt-4 border-t border-slate-200 pt-3">
+          <div className="mt-4 border-t border-line pt-3">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xs font-bold uppercase text-slate-500">Result</h3>
-              <span className="text-xs font-semibold text-slate-600">
+              <h3 className="text-xs font-bold uppercase text-content-muted">Result</h3>
+              <span className="text-xs font-semibold text-content-muted">
                 {model.resultingParticipantIds.length}/5
               </span>
             </div>
             <div className="mt-2 flex min-h-10 flex-wrap items-center gap-1.5" aria-live="polite" aria-atomic="true">
               {model.resulting.length === 0 ? (
-                <span className="text-sm text-slate-500">No players selected</span>
+                <span className="text-sm text-content-muted">No players selected</span>
               ) : model.resulting.map(row => (
-                <span key={row.participantId} className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">
+                <span key={row.participantId} className="max-w-full break-words rounded border border-success-line bg-success px-2 py-1 text-xs font-semibold text-success-content">
                   {playerLabel(row)}
                 </span>
               ))}
@@ -311,12 +311,12 @@ export default function BasketballLineupSheet({
             {model.changed && (
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold">
                 {model.outgoingParticipantIds.length > 0 && (
-                  <span className="inline-flex items-center gap-1 text-rose-700">
+                  <span className="inline-flex items-center gap-1 text-danger-content">
                     <UserMinus size={14} aria-hidden /> {model.outgoingParticipantIds.length} out
                   </span>
                 )}
                 {model.incomingParticipantIds.length > 0 && (
-                  <span className="inline-flex items-center gap-1 text-emerald-700">
+                  <span className="inline-flex items-center gap-1 text-success-content">
                     <UserPlus size={14} aria-hidden /> {model.incomingParticipantIds.length} in
                   </span>
                 )}
@@ -325,10 +325,10 @@ export default function BasketballLineupSheet({
           </div>
 
           {purpose !== 'boundary' && (
-            <div className="mt-4 border-t border-slate-200 pt-3">
+            <div className="mt-4 border-t border-line pt-3">
               <button
                 type="button"
-                className="flex min-h-10 w-full items-center justify-between gap-3 text-left text-sm font-bold text-slate-800"
+                className="flex min-h-10 w-full items-center justify-between gap-3 text-left text-sm font-bold text-content"
                 aria-expanded={rolesOpen}
                 onClick={() => setRolesOpen(value => !value)}
               >
@@ -336,7 +336,7 @@ export default function BasketballLineupSheet({
                 <ChevronDown size={18} className={`transition-transform ${rolesOpen ? 'rotate-180' : ''}`} aria-hidden />
               </button>
               {rolesOpen && (
-                <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200">
+                <div className="mt-2 divide-y divide-line border-y border-line">
                   {Object.values(projection.participants)
                     .filter(participant => participant.teamSide === teamSide)
                     .map(participant => (
@@ -354,7 +354,7 @@ export default function BasketballLineupSheet({
                 </div>
               )}
               {!rolesValid && (
-                <p role="alert" className="mt-2 text-sm font-semibold text-rose-700">
+                <p role="alert" className="mt-2 text-sm font-semibold text-danger-content">
                   Enter a custom position within 80 characters, or choose None.
                 </p>
               )}
@@ -362,11 +362,11 @@ export default function BasketballLineupSheet({
           )}
 
           {purpose !== 'boundary' && (
-            <div className="mt-4 border-t border-slate-200 pt-3">
+            <div className="mt-4 border-t border-line pt-3">
               {!recoveryMode ? (
                 <button
                   type="button"
-                  className="min-h-10 text-sm font-semibold text-slate-600 underline underline-offset-4"
+                  className="min-h-10 text-sm font-semibold text-content-muted underline underline-offset-4"
                   onClick={() => {
                     setRecoveryMode(true)
                     setReasonCode(null)
@@ -376,7 +376,7 @@ export default function BasketballLineupSheet({
                   Recover current lineup
                 </button>
               ) : (
-                <div className="border-l-4 border-amber-500 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                <div className="border-l-4 border-warning-line bg-warning px-3 py-3 text-sm text-warning-content">
                   <p className="font-bold">Set current lineup from this clock time?</p>
                   <p className="mt-1">
                     Earlier lineup timing in {currentPeriodLabel} will become incomplete. The app will not estimate unknown intervals or minutes.
@@ -386,7 +386,7 @@ export default function BasketballLineupSheet({
                       type="checkbox"
                       checked={recoveryConfirmed}
                       onChange={event => setRecoveryConfirmed(event.target.checked)}
-                      className="mt-0.5 h-5 w-5 accent-amber-700"
+                      className="mt-0.5 h-5 w-5 accent-accent"
                     />
                     I understand this marks the current period incomplete.
                   </label>
@@ -408,8 +408,8 @@ export default function BasketballLineupSheet({
           )}
 
           {model.reasonRequired && (
-            <div className="mt-4 grid gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-slate-700">
+            <div className="mt-4 grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold text-content">
                 Reason
                 <select
                   value={reasonCode ?? ''}
@@ -425,7 +425,7 @@ export default function BasketballLineupSheet({
                   ))}
                 </select>
               </label>
-              <label className="text-sm font-semibold text-slate-700">
+              <label className="text-sm font-semibold text-content">
                 Note{model.noteRequired ? ' (required)' : ' (optional)'}
                 <input
                   value={reasonNote}
@@ -440,26 +440,26 @@ export default function BasketballLineupSheet({
           {boundaryReview && boundaryReview.violations.length > 0 && (
             <div className={`mt-4 border-l-4 px-3 py-3 ${
               boundaryReview.equalPlayMode === 'enforced'
-                ? 'border-rose-500 bg-rose-50'
-                : 'border-amber-500 bg-amber-50'
+                ? 'border-danger-line bg-danger'
+                : 'border-warning-line bg-warning'
             }`}>
-              <p className="text-sm font-bold text-slate-900">
+              <p className="text-sm font-bold text-content">
                 {boundaryReview.equalPlayMode === 'enforced'
                   ? 'Equal-play override required'
                   : 'Equal-play advisory'}
               </p>
-              <ul className="mt-1 space-y-1 text-sm text-slate-700">
+              <ul className="mt-1 space-y-1 text-sm text-content">
                 {boundaryReview.violations.map(violation => (
                   <li key={violation.code}>
                     {basketballEqualPlayViolationLabel(violation.code)} ({violation.participantIds.length})
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-xs text-slate-600">
+              <p className="mt-2 text-xs text-content-muted">
                 This review follows the match's snapshotted policy; it is not a universal league ruling.
               </p>
               {enforcedOverrideRequired && canOverrideEqualPlay && (
-                <label className="mt-3 block text-sm font-semibold text-slate-700">
+                <label className="mt-3 block text-sm font-semibold text-content">
                   Override reason
                   <input
                     value={overrideReason}
@@ -470,7 +470,7 @@ export default function BasketballLineupSheet({
                 </label>
               )}
               {enforcedOverrideRequired && !canOverrideEqualPlay && (
-                <p className="mt-2 text-sm font-semibold text-rose-700">
+                <p className="mt-2 text-sm font-semibold text-danger-content">
                   Your current role cannot record this override.
                 </p>
               )}
@@ -481,7 +481,7 @@ export default function BasketballLineupSheet({
             <p
               role={errorMessage ? 'alert' : 'status'}
               className={`mt-3 flex items-start gap-2 text-sm font-semibold ${
-                errorMessage ? 'text-rose-700' : 'text-slate-600'
+                errorMessage ? 'text-danger-content' : 'text-content-muted'
               }`}
             >
               <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
@@ -490,7 +490,7 @@ export default function BasketballLineupSheet({
           )}
         </div>
 
-        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 bg-white px-4 py-3">
+        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-line bg-surface px-4 py-3">
           <button type="button" className="btn-secondary min-h-11 rounded-md px-3 py-2 text-sm" onClick={onClose}>
             Cancel
           </button>
@@ -528,11 +528,11 @@ function RoleRow({
   return (
     <div className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_7rem] sm:items-end">
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-800">
+        <p className="truncate text-sm font-semibold text-content">
           {number ? `#${number} ` : ''}{displayName}
         </p>
         <div className="mt-1 grid grid-cols-2 gap-2">
-          <label className="text-xs font-semibold text-slate-600">
+          <label className="text-xs font-semibold text-content-muted">
             Position
             <select
               value={draft.choice}
@@ -548,7 +548,7 @@ function RoleRow({
             </select>
           </label>
           {draft.choice === 'custom' ? (
-            <label className="text-xs font-semibold text-slate-600">
+            <label className="text-xs font-semibold text-content-muted">
               Custom
               <input
                 value={draft.custom}
@@ -560,12 +560,12 @@ function RoleRow({
           ) : <span />}
         </div>
       </div>
-      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-700">
+      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-content">
         <input
           type="checkbox"
           checked={draft.captain}
           onChange={event => onChange({ ...draft, captain: event.target.checked })}
-          className="h-5 w-5 accent-slate-800"
+          className="h-5 w-5 accent-accent"
         />
         Captain
       </label>
@@ -619,11 +619,11 @@ function LineupGroup({
 }) {
   return (
     <div className="mb-4 last:mb-0">
-      <h3 className="text-xs font-bold uppercase text-slate-500">{title}</h3>
+      <h3 className="text-xs font-bold uppercase text-content-muted">{title}</h3>
       {rows.length === 0 ? (
-        <p className="mt-2 border-y border-slate-200 py-3 text-sm text-slate-500">{emptyLabel}</p>
+        <p className="mt-2 border-y border-line py-3 text-sm text-content-muted">{emptyLabel}</p>
       ) : (
-        <div className="mt-2 divide-y divide-slate-100 border-y border-slate-200">
+        <div className="mt-2 divide-y divide-line border-y border-line">
           {rows.map(row => {
             const disabled = Boolean(row.unavailableReason && !row.selected)
             return (
@@ -635,23 +635,23 @@ function LineupGroup({
                 aria-pressed={row.selected}
                 className={`flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left ${
                   row.leaving
-                    ? 'text-rose-800'
+                    ? 'text-danger-content'
                     : row.entering
-                      ? 'text-emerald-800'
+                      ? 'text-success-content'
                       : disabled
-                        ? 'text-slate-400'
-                        : 'text-slate-800'
+                        ? 'text-content-subtle'
+                        : 'text-content'
                 }`}
               >
                 <PlayerName row={row} />
                 <span className={`flex h-8 min-w-20 shrink-0 items-center justify-center gap-1 rounded border px-2 text-xs font-bold ${
                   row.leaving
-                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    ? 'border-danger-line bg-danger text-danger-content'
                     : row.entering
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      ? 'border-success-line bg-success text-success-content'
                       : row.selected
-                        ? 'border-slate-300 bg-slate-100 text-slate-700'
-                        : 'border-blue-200 bg-blue-50 text-blue-700'
+                        ? 'border-line-strong bg-surface-muted text-content'
+                        : 'border-info-line bg-info text-info-content'
                 }`}>
                   {row.leaving ? <UserMinus size={14} aria-hidden /> : row.entering ? <UserPlus size={14} aria-hidden /> : <ArrowRightLeft size={14} aria-hidden />}
                   {row.leaving ? 'Leaving' : row.entering ? 'Entering' : row.selected ? 'On court' : 'Add'}
@@ -670,7 +670,7 @@ function PlayerName({ row }: { row: BasketballLineupSheetRow }) {
     <span className="min-w-0">
       <span className="block truncate text-sm font-semibold">{playerLabel(row)}</span>
       {(row.replacementRequired || row.unavailableReason) && (
-        <span className="block text-xs font-semibold text-rose-600">
+        <span className="block text-xs font-semibold text-danger-content">
           {row.replacementRequired ? 'Replacement required' : row.unavailableReason}
         </span>
       )}

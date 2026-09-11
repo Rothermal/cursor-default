@@ -106,26 +106,26 @@ export default function BasketballBoundaryReviewDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-2 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/50 p-2 sm:items-center sm:p-4">
       <section
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-boundary-title"
-        className="flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-xl"
       >
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div>
-            <h2 id="basketball-boundary-title" className="text-base font-bold text-slate-900">
+            <h2 id="basketball-boundary-title" className="text-base font-bold text-content">
               Review lineup before Start
             </h2>
-            <p className="text-xs text-slate-500">Confirm each required side. The clock stays paused.</p>
+            <p className="text-xs text-content-muted">Confirm each required side. The clock stays paused.</p>
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-line text-content-muted"
             aria-label="Close boundary lineup review"
           >
             <X size={18} aria-hidden />
@@ -154,16 +154,16 @@ export default function BasketballBoundaryReviewDialog({
                   ? 'Enter an override reason before confirming.'
                   : null
               return (
-                <section key={side} className="border border-slate-200 p-3">
+                <section key={side} className="min-w-0 border border-line p-3">
                   <div className="flex items-center gap-2">
-                    <Users size={17} className="text-slate-500" aria-hidden />
-                    <h3 className="min-w-0 truncate text-sm font-bold text-slate-900">{sideName(side)}</h3>
+                    <Users size={17} className="text-content-muted" aria-hidden />
+                    <h3 className="min-w-0 truncate text-sm font-bold text-content">{sideName(side)}</h3>
                   </div>
                   <div className="mt-2 flex min-h-16 flex-wrap content-start gap-1.5">
                     {sideProjection.currentParticipantIds.map(participantId => {
                       const participant = sportState.projection.participants[participantId]
                       return (
-                        <span key={participantId} className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">
+                        <span key={participantId} className="max-w-full break-words rounded border border-line bg-surface-muted px-2 py-1 text-xs font-semibold text-content">
                           {participant?.number ? `#${participant.number} ` : ''}{participant?.displayName ?? 'Unknown'}
                         </span>
                       )
@@ -172,24 +172,24 @@ export default function BasketballBoundaryReviewDialog({
 
                   {review && review.violations.length > 0 && (
                     <div className={`mt-3 border-l-4 px-2 py-2 text-xs ${
-                      enforced ? 'border-rose-500 bg-rose-50' : 'border-amber-500 bg-amber-50'
+                      enforced ? 'border-danger-line bg-danger' : 'border-warning-line bg-warning'
                     }`}>
-                      <p className="font-bold text-slate-800">
+                      <p className="font-bold text-content">
                         {enforced ? 'Override required' : 'Equal-play advisory'}
                       </p>
                       {review.violations.map(violation => (
-                        <p key={violation.code} className="mt-1 text-slate-700">
+                        <p key={violation.code} className="mt-1 text-content">
                           {basketballEqualPlayViolationLabel(violation.code)} ({violation.participantIds.length})
                         </p>
                       ))}
-                      <p className="mt-2 text-slate-600">
+                      <p className="mt-2 text-content-muted">
                         Based on this match's snapshotted policy, not a universal league ruling.
                       </p>
                     </div>
                   )}
 
                   {enforced && canOverrideEqualPlay && (
-                    <label className="mt-3 block text-xs font-semibold text-slate-700">
+                    <label className="mt-3 block text-xs font-semibold text-content">
                       Override reason
                       <input
                         value={overrideReasons[side]}
@@ -203,7 +203,7 @@ export default function BasketballBoundaryReviewDialog({
                     </label>
                   )}
                   {enforced && !canOverrideEqualPlay && (
-                    <p className="mt-3 text-xs font-semibold text-rose-700">
+                    <p className="mt-3 text-xs font-semibold text-danger-content">
                       Your current role cannot record this equal-play override.
                     </p>
                   )}
@@ -240,7 +240,7 @@ export default function BasketballBoundaryReviewDialog({
               )
             })}
           </div>
-          {errorMessage && <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{errorMessage}</p>}
+          {errorMessage && <p role="alert" className="mt-3 text-sm font-semibold text-danger-content">{errorMessage}</p>}
         </div>
       </section>
     </div>

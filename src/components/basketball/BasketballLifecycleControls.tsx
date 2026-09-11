@@ -32,18 +32,18 @@ export default function BasketballLifecycleControls({
   const clockRunning = projection.clock?.running === true
 
   return (
-    <section aria-label="Basketball game lifecycle" className="mt-3 border-y border-slate-200 bg-white px-3 py-2.5">
+    <section aria-label="Basketball game lifecycle" className="mt-3 border-y border-line bg-surface px-3 py-2.5">
       <div className="flex min-h-10 items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-slate-500">Period</p>
-          <p className="truncate text-sm font-bold text-slate-800">{lifecycleStatusLabel(sportState)}</p>
+          <p className="text-xs font-semibold uppercase text-content-muted">Period</p>
+          <p className="truncate text-sm font-bold text-content">{lifecycleStatusLabel(sportState)}</p>
         </div>
 
         {projection.status === 'in_progress' && current && (
           <button
             type="button"
             onClick={onEndPeriod}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 active:scale-95"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-sm font-semibold text-content active:scale-95"
           >
             <Square size={15} aria-hidden />
             End {current.label}
@@ -54,7 +54,7 @@ export default function BasketballLifecycleControls({
           <button
             type="button"
             onClick={onStartNextPeriod}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white active:scale-95"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-content active:scale-95"
           >
             <Play size={16} aria-hidden />
             Start {nextLabel}
@@ -65,7 +65,7 @@ export default function BasketballLifecycleControls({
           <button
             type="button"
             onClick={onComplete}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white active:scale-95"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-content active:scale-95"
           >
             <Flag size={16} aria-hidden />
             End Game
@@ -76,7 +76,7 @@ export default function BasketballLifecycleControls({
           <button
             type="button"
             onClick={onReopen}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 active:scale-95"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-sm font-semibold text-content active:scale-95"
           >
             <RotateCcw size={16} aria-hidden />
             Reopen
@@ -85,13 +85,13 @@ export default function BasketballLifecycleControls({
       </div>
 
       {(projection.status === 'in_progress' || projection.status === 'period_break') && (
-        <div className="mt-2 flex justify-end gap-2 border-t border-slate-100 pt-2">
+        <div className="mt-2 flex justify-end gap-2 border-t border-line pt-2">
           <button
             type="button"
             onClick={onSuspend}
             disabled={clockRunning}
             title={clockRunning ? 'Pause the clock before suspending the game' : undefined}
-            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-xs font-semibold text-content disabled:cursor-not-allowed disabled:bg-control-disabled disabled:text-content-disabled"
           >
             <Pause size={15} aria-hidden />
             Suspend
@@ -101,7 +101,7 @@ export default function BasketballLifecycleControls({
             onClick={onAbandon}
             disabled={clockRunning}
             title={clockRunning ? 'Pause the clock before abandoning the game' : undefined}
-            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-danger-line bg-surface px-3 text-xs font-semibold text-danger-content disabled:cursor-not-allowed disabled:bg-control-disabled disabled:text-content-disabled"
           >
             <Ban size={15} aria-hidden />
             Abandon
@@ -110,7 +110,7 @@ export default function BasketballLifecycleControls({
       )}
 
       {projection.status === 'period_break' && (
-        <p className="mt-1 text-xs text-slate-500" role="status">
+        <p className="mt-1 text-xs text-content-muted" role="status">
           {regulationComplete && tied
             ? 'The score is tied. Start overtime to continue.'
             : regulationComplete
@@ -119,10 +119,10 @@ export default function BasketballLifecycleControls({
         </p>
       )}
       {(projection.status === 'ended' || projection.status === 'suspended') && (
-        <p className="mt-1 text-xs text-slate-500" role="status">{resultLabel(projection.result)}</p>
+        <p className="mt-1 text-xs text-content-muted" role="status">{resultLabel(projection.result)}</p>
       )}
       {errorMessage && (
-        <p role="alert" className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+        <p role="alert" className="mt-2 rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">
           {errorMessage}
         </p>
       )}
