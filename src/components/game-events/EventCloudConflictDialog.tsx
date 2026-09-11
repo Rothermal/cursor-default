@@ -22,25 +22,25 @@ export default function EventCloudConflictDialog({
   if (!conflict) return null
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-overlay/50 sm:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="event-conflict-title"
-        className="max-h-[94vh] w-full overflow-y-auto rounded-t-lg bg-white sm:max-w-2xl sm:rounded-lg"
+        className="max-h-[94vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-2xl sm:rounded-lg"
         onClick={event => event.stopPropagation()}
       >
-        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
+        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
-            <h2 id="event-conflict-title" className="font-bold text-slate-900">Event Conflict</h2>
-            <p className="text-xs text-slate-500">
+            <h2 id="event-conflict-title" className="font-bold text-content">Event Conflict</h2>
+            <p className="text-xs text-content-muted">
               {conflicts.length} {conflicts.length === 1 ? 'event needs' : 'events need'} review
             </p>
           </div>
-          <button type="button" onClick={onExport} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Export recovery file" title="Export recovery file">
+          <button type="button" onClick={onExport} className="grid h-9 w-9 shrink-0 place-items-center text-content-muted" aria-label="Export recovery file" title="Export recovery file">
             <Download size={19} />
           </button>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close">
+          <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center text-content-muted" aria-label="Close" title="Close">
             <X size={20} />
           </button>
         </header>
@@ -88,24 +88,24 @@ function ConflictChoice({
   onChoose: () => void
 }) {
   return (
-    <section className="min-w-0 border border-slate-200 bg-slate-50 p-3">
-      <div className="flex items-center gap-2 font-bold text-slate-800">{icon}{title}</div>
+    <section className="min-w-0 border border-line bg-surface-muted p-3">
+      <div className="flex items-center gap-2 font-bold text-content">{icon}{title}</div>
       <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-slate-500">Type</dt><dd className="truncate font-semibold text-slate-800">{eventTypeLabel(event)}</dd>
-        <dt className="text-slate-500">Revision</dt><dd className="font-semibold text-slate-800">{event.revision}</dd>
-        <dt className="text-slate-500">Side</dt><dd className="capitalize text-slate-700">{event.teamSide}</dd>
-        <dt className="text-slate-500">Time</dt><dd className="text-slate-700">{event.period.id} {event.elapsedMs === null ? '' : formatElapsed(event.elapsedMs)}</dd>
-        <dt className="text-slate-500">State</dt><dd className="text-slate-700">{event.deletedAt ? 'Removed' : 'Active'}</dd>
-        <dt className="text-slate-500">Updated</dt><dd className="truncate text-slate-700">{new Date(event.updatedAt).toLocaleString()}</dd>
+        <dt className="text-content-muted">Type</dt><dd className="truncate font-semibold text-content">{eventTypeLabel(event)}</dd>
+        <dt className="text-content-muted">Revision</dt><dd className="font-semibold text-content">{event.revision}</dd>
+        <dt className="text-content-muted">Side</dt><dd className="capitalize text-content">{event.teamSide}</dd>
+        <dt className="text-content-muted">Time</dt><dd className="min-w-0 break-words text-content">{event.period.id} {event.elapsedMs === null ? '' : formatElapsed(event.elapsedMs)}</dd>
+        <dt className="text-content-muted">State</dt><dd className="text-content">{event.deletedAt ? 'Removed' : 'Active'}</dd>
+        <dt className="text-content-muted">Updated</dt><dd className="truncate text-content">{new Date(event.updatedAt).toLocaleString()}</dd>
       </dl>
-      <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap break-words border-t border-slate-200 pt-3 text-[11px] text-slate-600">
+      <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap break-words border-t border-line pt-3 text-[11px] text-content-muted">
         {JSON.stringify(event.payload, null, 2)}
       </pre>
       <button
         type="button"
         onClick={onChoose}
         disabled={disabled}
-        className={`mt-3 min-h-11 w-full rounded-md px-3 text-sm font-bold text-white disabled:opacity-50 ${tone === 'local' ? 'bg-emerald-700' : 'bg-slate-800'}`}
+        className={`mt-3 min-h-11 w-full rounded-md px-3 text-sm font-bold disabled:bg-control-disabled disabled:text-content-disabled ${tone === 'local' ? 'bg-accent text-accent-content' : 'bg-control text-content'}`}
       >
         {action}
       </button>

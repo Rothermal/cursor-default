@@ -324,6 +324,13 @@ colors retained. See [live-entry dialog verification](REGRESSION_THM_4_LIVE_ENTR
 Timeline's historical editors and cloud reopen/finalization paths are separate
 surfaces; this batch does not claim those or the overall tracker are complete.
 
+The cloud-status batch covers BasketballRecorderStatus, BasketballEnableCloudPanel,
+and shared EventCloudConflictDialog (also used by Soccer). Recorder management
+and finalization panels were already converted in THM-3. See
+[cloud-status verification](REGRESSION_THM_4_CLOUD_STATUS.md). This does not finish
+the GameTracker host's inline sync/recovery notices or the remaining court,
+legacy, recent-event, Timeline, and Summary surfaces.
+
 - Convert setup, player setup, checkout, tracker, Timeline, lineups, clock,
   administrative dialogs, finalization/reopen, Summary, and recovery/conflict UI.
 - Audit BasketballCourt background, lines, made/miss markers, overlap counts,

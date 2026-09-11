@@ -31,7 +31,7 @@ export default function BasketballEnableCloudPanel({ state }: { state: GameState
 
   return (
     <>
-      <div className="mt-3 border border-blue-200 bg-blue-50 px-3 py-3 text-blue-900">
+      <div className="mt-3 border border-info-line bg-info px-3 py-3 text-info-content">
         <div className="flex items-center gap-3">
           <CloudUpload size={20} className="shrink-0" aria-hidden />
           <p className="min-w-0 flex-1 text-xs font-semibold">Local-only game</p>
@@ -39,13 +39,13 @@ export default function BasketballEnableCloudPanel({ state }: { state: GameState
             type="button"
             onClick={() => setConfirmOpen(true)}
             disabled={busy}
-            className="min-h-9 rounded-md bg-blue-700 px-3 text-xs font-bold text-white disabled:opacity-50"
+            className="min-h-9 shrink-0 rounded-md bg-accent px-3 text-xs font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled"
           >
             {busy ? 'Enabling...' : 'Enable Cloud Sync'}
           </button>
         </div>
         {error && (
-          <p role="alert" className="mt-2 border-t border-blue-200 pt-2 text-xs text-red-700">
+          <p role="alert" className="mt-2 break-words border-t border-info-line pt-2 text-xs text-danger-content">
             {error}
           </p>
         )}
