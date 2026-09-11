@@ -331,6 +331,15 @@ and finalization panels were already converted in THM-3. See
 the GameTracker host's inline sync/recovery notices or the remaining court,
 legacy, recent-event, Timeline, and Summary surfaces.
 
+The scoreboard/recent-event batch covers shared Scoreboard and RecentEventsPopup,
+BasketballRecentEventsPopup, PeriodToggle, and BasketballBonusIndicator. Score
+controls, period selection, status notices, and recent-event actions now use
+semantic colors. The shared scoreboard no longer uses the sport gradient;
+team branding remains separate. See
+[scoreboard/recent-event verification](REGRESSION_THM_4_SCOREBOARD_RECENT_EVENTS.md).
+Tracker host, player/stat controls, court, Timeline, and Summary remain pending;
+this batch does not enable the production Dark selector.
+
 - Convert setup, player setup, checkout, tracker, Timeline, lineups, clock,
   administrative dialogs, finalization/reopen, Summary, and recovery/conflict UI.
 - Audit BasketballCourt background, lines, made/miss markers, overlap counts,

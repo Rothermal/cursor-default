@@ -55,23 +55,23 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
   })()
 
   return (
-    <div className={`bg-gradient-to-r ${sport.theme.gradient} text-white rounded-2xl p-4 shadow-lg`}>
+    <div className="rounded-lg border border-line bg-surface p-4 text-content shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex-1 text-center">
-          <p className="text-xs font-medium uppercase tracking-wide opacity-80">
+        <div className="min-w-0 flex-1 text-center">
+          <p className="text-xs font-medium break-words text-content-muted">
             {trackedLabel}
           </p>
           <p className="text-4xl font-bold tabular-nums">{teamScore}</p>
           {!readOnly && <div className="flex justify-center gap-2 mt-1">
             <button
               onClick={() => dispatch({ type: 'DECREMENT_HOME_SCORE' })}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform"
             >
               −
             </button>
             <button
               onClick={() => dispatch({ type: 'INCREMENT_HOME_SCORE' })}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform"
             >
               +
             </button>
@@ -81,7 +81,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
               onClick={() => eventScoreControls.onAdjust('tracked', -1)}
               disabled={eventScoreControls.disabled || teamScore === 0}
               aria-label={`Decrease ${trackedLabel} score`}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
             >
               -
             </button>
@@ -89,7 +89,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
               onClick={() => eventScoreControls.onAdjust('tracked', 1)}
               disabled={eventScoreControls.disabled}
               aria-label={`Increase ${trackedLabel} score`}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
             >
               +
             </button>
@@ -97,27 +97,27 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
         </div>
 
         <div className="px-4">
-          <p className="text-xs font-medium uppercase tracking-wide opacity-60 text-center">
+          <p className="text-xs font-medium text-content-subtle text-center">
             {sport.scoreLabel}
           </p>
-          <p className="text-lg font-semibold opacity-60 text-center">vs</p>
+          <p className="text-lg font-semibold text-content-subtle text-center">vs</p>
         </div>
 
-        <div className="flex-1 text-center">
-          <p className="text-xs font-medium uppercase tracking-wide opacity-80">
+        <div className="min-w-0 flex-1 text-center">
+          <p className="text-xs font-medium break-words text-content-muted">
             {opponentLabel}
           </p>
           <p className="text-4xl font-bold tabular-nums">{opponentScore}</p>
           {!readOnly && <div className="flex justify-center gap-2 mt-1">
             <button
               onClick={() => dispatch({ type: 'DECREMENT_OPPONENT_SCORE' })}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform"
             >
               −
             </button>
             <button
               onClick={() => dispatch({ type: 'INCREMENT_OPPONENT_SCORE' })}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform"
             >
               +
             </button>
@@ -127,7 +127,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
               onClick={() => eventScoreControls.onAdjust('opponent', -1)}
               disabled={eventScoreControls.disabled || opponentScore === 0}
               aria-label={`Decrease ${opponentLabel} score`}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
             >
               -
             </button>
@@ -135,7 +135,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
               onClick={() => eventScoreControls.onAdjust('opponent', 1)}
               disabled={eventScoreControls.disabled}
               aria-label={`Increase ${opponentLabel} score`}
-              className="w-8 h-8 rounded-full bg-white/20 text-white text-sm font-bold active:scale-90 transition-transform disabled:opacity-30"
+              className="w-8 h-8 rounded-full bg-control text-content text-sm font-bold active:scale-90 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
             >
               +
             </button>
@@ -148,7 +148,7 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
           type="button"
           onClick={eventScoreControls.onOfficialCorrection}
           disabled={eventScoreControls.disabled}
-          className="mx-auto mt-3 flex min-h-9 items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/25 disabled:opacity-30"
+          className="mx-auto mt-3 flex min-h-9 items-center gap-2 rounded-lg bg-control text-content px-3 py-1.5 text-xs font-semibold hover:bg-control-hover disabled:bg-control-disabled disabled:text-content-disabled"
         >
           <FilePenLine size={15} aria-hidden="true" />
           Official correction
@@ -156,16 +156,16 @@ export default function Scoreboard({ readOnly = false, eventScoreControls }: Sco
       )}
 
       {gameInfo.tournamentName && (
-        <p className="text-center text-xs opacity-60 mt-2">{gameInfo.tournamentName}</p>
+        <p className="break-words text-center text-xs text-content-subtle mt-2">{gameInfo.tournamentName}</p>
       )}
       {cloudSync.repairedPlayerLinks && cloudSync.repairedPlayerLinks.length > 0 && (
-        <p role="alert" className="text-center text-[11px] mt-1 rounded bg-amber-500/25 px-2 py-1">
+        <p role="alert" className="break-words text-center text-[11px] mt-1 rounded bg-warning text-warning-content px-2 py-1">
           Fixed a duplicate cloud link for {cloudSync.repairedPlayerLinks.join(', ')}. Earlier
           syncs of this game merged their stats — check those totals in the cloud.
         </p>
       )}
       {syncLabel && (
-        <p className="text-center text-[11px] opacity-70 mt-1">{syncLabel}</p>
+        <p className="text-center text-[11px] text-content-muted mt-1">{syncLabel}</p>
       )}
     </div>
   )

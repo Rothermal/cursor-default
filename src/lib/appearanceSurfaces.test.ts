@@ -5,6 +5,11 @@ const liveEntryDialogs = ['Reopen', 'Timeout', 'Ejection', 'LateParticipant', 'S
   .map(name => `src/components/basketball/Basketball${name}Dialog.tsx`)
 
 const surfaces = [
+  'src/components/Scoreboard.tsx',
+  'src/components/RecentEventsPopup.tsx',
+  'src/components/basketball/BasketballRecentEventsPopup.tsx',
+  'src/components/team-stats/PeriodToggle.tsx',
+  'src/components/team-stats/BasketballBonusIndicator.tsx',
   'src/components/basketball/BasketballRecorderStatus.tsx',
   'src/components/basketball/BasketballEnableCloudPanel.tsx',
   'src/components/game-events/EventCloudConflictDialog.tsx',
@@ -86,6 +91,45 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('wraps both scoreboard names and gives every event score control disabled colors', () => {
+    const source = readFileSync('src/components/Scoreboard.tsx', 'utf8')
+    for (const label of ['trackedLabel', 'opponentLabel']) {
+      const rows = [...source.matchAll(new RegExp(`<p className="([^"]*)">\\s*\\{${label}\\}\\s*</p>`, 'g'))]
+      expect(rows).toHaveLength(1)
+      expect(rows[0][1].split(/\s+/)).toContain('break-words')
+    }
+    expect(source.match(/min-w-0 flex-1 text-center/g)).toHaveLength(2)
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+      .filter(([button]) => button.includes('disabled={eventScoreControls.disabled'))
+    expect(buttons).toHaveLength(5)
+    for (const [button] of buttons) {
+      expect(button).toContain('disabled:bg-control-disabled')
+      expect(button).toContain('disabled:text-content-disabled')
+    }
+    const alerts = [...source.matchAll(/<p role="alert" className="([^"]*)">/g)]
+    expect(alerts).toHaveLength(1)
+    for (const token of ['break-words', 'bg-warning', 'text-warning-content']) expect(alerts[0][1].split(/\s+/)).toContain(token)
+  })
+  it.each(['src/components/RecentEventsPopup.tsx', 'src/components/basketball/BasketballRecentEventsPopup.tsx'])('bounds recent-event dialog and close control in %s', path => {
+    const source = readFileSync(path, 'utf8')
+    expect(source).toContain('bg-overlay/40')
+    const sections = [...source.matchAll(/<section\b[^]*?className="([^"]*)"/g)]
+    expect(sections).toHaveLength(1)
+    for (const token of ['flex', 'max-h-full', 'flex-col']) expect(sections[0][1].split(/\s+/)).toContain(token)
+    expect(source).toContain('min-h-0 max-h-[55vh] overflow-y-auto')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+      .filter(([button]) => button.includes('aria-label="Close recent events"'))
+    expect(buttons).toHaveLength(1)
+    const classes = buttons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+    for (const token of ['h-9', 'w-9', 'shrink-0']) expect(classes).toContain(token)
+    expect(source).toContain('bg-control-disabled text-content-disabled')
+  })
+  it('wraps recent-event errors in their alert', () => {
+    const source = readFileSync('src/components/basketball/BasketballRecentEventsPopup.tsx', 'utf8')
+    const alerts = [...source.matchAll(/<p role="alert" className="([^"]*)">\s*\{errorMessage\}/g)]
+    expect(alerts).toHaveLength(1)
+    for (const token of ['break-words', 'bg-danger', 'text-danger-content']) expect(alerts[0][1].split(/\s+/)).toContain(token)
+  })
   it('keeps conflict recovery controls fixed-size and its overlay translucent', () => {
     const source = readFileSync('src/components/game-events/EventCloudConflictDialog.tsx', 'utf8')
     const overlays = [...source.matchAll(/className="([^"]*fixed inset-0[^"]*)"/g)]
