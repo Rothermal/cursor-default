@@ -1,6 +1,6 @@
 # THM-3: Operational surfaces
 
-Status: THM-3A/B/C and THM-3D1/2/3/4a implemented; THM-3D4b pending.
+Status: THM-3A through THM-3D implemented.
 Deployed release checks remain open.
 Parent: [App theming](PLAN_APP_THEMING.md). Requires THM-1 and THM-2.
 
@@ -115,9 +115,13 @@ chart/marker colors only with explicit contrast evidence.
   wrap and Career's back control retains its size. Data loading, game handoff,
   permissions and navigation stay unchanged. See
   [verification](REGRESSION_THM_3D4A_PROFILE_CAREER.md).
-- **THM-3D4b pending:** Leaderboard, TeamStats and TournamentStats hosts, including
-  legacy branches, injected overview extras and remaining render helpers. This
-  split keeps the five substantial route hosts reviewable in two PRs.
+- **THM-3D4b implemented:** Leaderboard, TeamStats and TournamentStats hosts,
+  including legacy branches, injected Explore links and Placement controls.
+  All imported renderers were covered in 3D1/2. Headers and state/selection/result
+  colors use semantic tokens; color transitions are removed. Header controls
+  retain fixed dimensions. Long team/tournament labels and legacy game text fit
+  their containers. No loading, authority, placement-write or navigation changes.
+  See [verification](REGRESSION_THM_3D4B_STATISTICS_SHELLS.md).
 
 ## Completion rule
 

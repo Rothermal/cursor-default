@@ -378,7 +378,7 @@ export default function TournamentStats() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing parameters</p>
+          <p className="font-semibold text-content mb-2">Missing parameters</p>
           <button type="button" onClick={() => navigate('/leaderboard')} className="btn-primary w-full">
             Leaderboard
           </button>
@@ -390,7 +390,7 @@ export default function TournamentStats() {
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
-        <p className="text-slate-600">Supabase required</p>
+        <p className="text-content-muted">Supabase required</p>
       </div>
     )
   }
@@ -398,7 +398,7 @@ export default function TournamentStats() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500 animate-pulse">Loading tournament…</p>
+        <p className="text-content-muted animate-pulse">Loading tournament…</p>
       </div>
     )
   }
@@ -406,7 +406,7 @@ export default function TournamentStats() {
   if (error || !team || !tournament) {
     return (
       <div className="min-h-screen flex flex-col px-4 py-6 max-w-lg mx-auto">
-        {error && <div className="card bg-red-50 text-red-700 text-sm mb-4">{error}</div>}
+        {error && <div className="card bg-danger text-danger-content text-sm mb-4">{error}</div>}
         <button type="button" onClick={() => navigate(teamStatsPath(teamId))} className="btn-primary">
           Back to team stats
         </button>
@@ -430,7 +430,7 @@ export default function TournamentStats() {
             <section className="flex flex-wrap gap-2">
               <Link
                 to={teamStatsPath(teamId)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
               >
                 Team stats
               </Link>
@@ -439,7 +439,7 @@ export default function TournamentStats() {
                   href={tournament.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
                 >
                   Tournament site
                 </a>
@@ -447,11 +447,11 @@ export default function TournamentStats() {
             </section>
             {(canEditPlacement || tournament.placement != null) && (
               <section>
-                <h2 className="font-semibold text-slate-800 mb-2">Placement</h2>
+                <h2 className="font-semibold text-content mb-2">Placement</h2>
                 {canEditPlacement ? (
                   <div className="flex flex-wrap items-end gap-2">
                     <label className="flex-1 min-w-[120px]">
-                      <span className="text-xs text-slate-500">Place</span>
+                      <span className="text-xs text-content-muted">Place</span>
                       <input
                         type="number"
                         min={1}
@@ -471,12 +471,12 @@ export default function TournamentStats() {
                     </button>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-content-muted">
                     {placementLabel(tournament.placement)}
                   </p>
                 )}
                 {placementError && (
-                  <p className="text-xs text-red-600 mt-1">{placementError}</p>
+                  <p className="text-xs text-danger-content mt-1">{placementError}</p>
                 )}
               </section>
             )}
@@ -502,7 +502,7 @@ export default function TournamentStats() {
             <section className="flex flex-wrap gap-2">
               <Link
                 to={teamStatsPath(teamId)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
               >
                 Team stats
               </Link>
@@ -511,7 +511,7 @@ export default function TournamentStats() {
                   href={tournament.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
                 >
                   Tournament site
                 </a>
@@ -519,11 +519,11 @@ export default function TournamentStats() {
             </section>
             {(canEditPlacement || tournament.placement != null) && (
               <section>
-                <h2 className="font-semibold text-slate-800 mb-2">Placement</h2>
+                <h2 className="font-semibold text-content mb-2">Placement</h2>
                 {canEditPlacement ? (
                   <div className="flex flex-wrap items-end gap-2">
                     <label className="flex-1 min-w-[120px]">
-                      <span className="text-xs text-slate-500">Place</span>
+                      <span className="text-xs text-content-muted">Place</span>
                       <input type="number" min={1} step={1} value={placementDraft} onChange={event => setPlacementDraft(event.target.value)} className="input-field mt-1" />
                     </label>
                     <button type="button" onClick={() => { void handleSavePlacement() }} disabled={savingPlacement} className="btn-primary py-2 px-4">
@@ -531,9 +531,9 @@ export default function TournamentStats() {
                     </button>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-600">{placementLabel(tournament.placement)}</p>
+                  <p className="text-sm text-content-muted">{placementLabel(tournament.placement)}</p>
                 )}
-                {placementError && <p className="text-xs text-red-600 mt-1">{placementError}</p>}
+                {placementError && <p className="text-xs text-danger-content mt-1">{placementError}</p>}
               </section>
             )}
           </div>
@@ -547,18 +547,18 @@ export default function TournamentStats() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(teamInfoPath(teamId))}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
+            className="w-8 h-8 shrink-0 rounded-full bg-control flex items-center justify-center active:scale-90 transition-transform"
           >
             ←
           </button>
           <div className="min-w-0">
             <h1 className="text-lg font-bold truncate">🏆 {tournament.name}</h1>
-            <p className="text-sm opacity-80 truncate">
+            <p className="text-sm text-content-muted truncate">
               {sport?.icon} {teamDisplayName(team)} · {team.seasons.name}
             </p>
             {tournament.url && (
@@ -566,7 +566,7 @@ export default function TournamentStats() {
                 href={tournament.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-white/90 underline mt-1 inline-block truncate max-w-full"
+                className="text-xs text-content-muted underline mt-1 inline-block truncate max-w-full"
               >
                 Tournament link ↗
               </a>
@@ -579,47 +579,47 @@ export default function TournamentStats() {
         <button
           type="button"
           onClick={() => navigate(teamStatsPath(teamId))}
-          className="text-sm font-semibold text-blue-600"
+          className="text-sm font-semibold text-accent"
         >
           Team stats →
         </button>
 
         <section className="card space-y-2">
-          <h2 className="font-semibold text-slate-700">Record</h2>
+          <h2 className="font-semibold text-content">Record</h2>
           <div className="flex gap-3 flex-wrap">
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-2 text-center flex-1 min-w-[72px]">
-              <p className="text-xl font-bold text-emerald-700">{wins}</p>
-              <p className="text-xs text-slate-500">W</p>
+            <div className="rounded-xl border border-line bg-canvas px-4 py-2 text-center flex-1 min-w-[72px]">
+              <p className="text-xl font-bold text-success-content">{wins}</p>
+              <p className="text-xs text-content-muted">W</p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-2 text-center flex-1 min-w-[72px]">
-              <p className="text-xl font-bold text-rose-700">{losses}</p>
-              <p className="text-xs text-slate-500">L</p>
+            <div className="rounded-xl border border-line bg-canvas px-4 py-2 text-center flex-1 min-w-[72px]">
+              <p className="text-xl font-bold text-danger-content">{losses}</p>
+              <p className="text-xs text-content-muted">L</p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-2 text-center flex-1 min-w-[72px]">
-              <p className="text-xl font-bold text-slate-800">{games.length}</p>
-              <p className="text-xs text-slate-500">Games</p>
+            <div className="rounded-xl border border-line bg-canvas px-4 py-2 text-center flex-1 min-w-[72px]">
+              <p className="text-xl font-bold text-content">{games.length}</p>
+              <p className="text-xs text-content-muted">Games</p>
             </div>
             {placementLabel(tournament.placement) && (
-              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-2 text-center flex-1 min-w-[72px]">
-                <p className="text-sm font-bold text-amber-900">{placementLabel(tournament.placement)}</p>
-                <p className="text-xs text-amber-800/80">Placement</p>
+              <div className="rounded-xl border border-warning-line bg-warning px-4 py-2 text-center flex-1 min-w-[72px]">
+                <p className="text-sm font-bold text-warning-content">{placementLabel(tournament.placement)}</p>
+                <p className="text-xs text-warning-content">Placement</p>
               </div>
             )}
           </div>
           {decided > 0 && (
-            <p className="text-xs text-slate-500">{((wins / decided) * 100).toFixed(0)}% wins</p>
+            <p className="text-xs text-content-muted">{((wins / decided) * 100).toFixed(0)}% wins</p>
           )}
         </section>
 
         {canEditPlacement && tournament && (
           <section className="card space-y-2">
-            <h2 className="font-semibold text-slate-700">Placement</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="font-semibold text-content">Placement</h2>
+            <p className="text-xs text-content-muted">
               Set finish place for this tournament (1 = 1st, 2 = 2nd, …). Leave blank to clear.
             </p>
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex-1 min-w-[100px]">
-                <label htmlFor="tournament-placement" className="text-xs text-slate-500 block mb-1">
+                <label htmlFor="tournament-placement" className="text-xs text-content-muted block mb-1">
                   Place
                 </label>
                 <input
@@ -643,24 +643,24 @@ export default function TournamentStats() {
               </button>
             </div>
             {placementError && (
-              <p className="text-xs text-red-600">{placementError}</p>
+              <p className="text-xs text-danger-content">{placementError}</p>
             )}
           </section>
         )}
 
         {sport && Object.keys(tournamentTotalsByStat).length > 0 && (
           <section className="card space-y-3">
-            <h2 className="font-semibold text-slate-700">Tournament totals</h2>
-            <p className="text-sm text-slate-600">
+            <h2 className="font-semibold text-content">Tournament totals</h2>
+            <p className="text-sm text-content-muted">
               {tourScore} {sport.scoreLabel} · {gpTournament} GP
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {Object.entries(tournamentTotalsByStat).map(([statId, total]) => (
-                <div key={statId} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                  <p className="text-xs text-slate-500">{shortLabel(statId)}</p>
-                  <p className="font-semibold text-slate-800">{total}</p>
+                <div key={statId} className="rounded-lg border border-line bg-canvas px-3 py-2">
+                  <p className="text-xs text-content-muted">{shortLabel(statId)}</p>
+                  <p className="font-semibold text-content">{total}</p>
                   {gpTournament > 0 && (
-                    <p className="text-xs text-slate-400">{(total / gpTournament).toFixed(1)}/g</p>
+                    <p className="text-xs text-content-subtle">{(total / gpTournament).toFixed(1)}/g</p>
                   )}
                 </div>
               ))}
@@ -669,42 +669,42 @@ export default function TournamentStats() {
         )}
 
         <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Leaderboard</h2>
+          <h2 className="font-semibold text-content">Leaderboard</h2>
           {leaderboardRows.length === 0 ? (
-            <p className="text-sm text-slate-500">No stats in this tournament yet.</p>
+            <p className="text-sm text-content-muted">No stats in this tournament yet.</p>
           ) : (
             <div className="space-y-2">
               {leaderboardRows.map((row, idx) => (
                 <div
                   key={row.player.id}
-                  className="flex items-stretch gap-1 rounded-xl border border-slate-200 bg-white overflow-hidden
-                             hover:border-blue-200 transition-colors"
+                  className="flex items-stretch gap-1 rounded-xl border border-line bg-surface overflow-hidden
+                             hover:border-accent "
                 >
                   <button
                     type="button"
                     onClick={() =>
                       navigate(playerInfoPath(row.player.id, teamId, team.season_id))
                     }
-                    className="flex-1 text-left px-3 py-2 hover:bg-blue-50/40 min-w-0"
+                    className="flex-1 text-left px-3 py-2 hover:bg-control-hover min-w-0"
                   >
                     <div className="flex justify-between gap-2">
-                      <span className="text-slate-500 w-6 shrink-0">{idx + 1}.</span>
+                      <span className="text-content-muted w-6 shrink-0">{idx + 1}.</span>
                       <div className="flex-1 min-w-0">
-                        <span className="text-slate-500 text-sm">#{row.player.jersey_number || '—'} </span>
-                        <span className="font-medium text-slate-800">{playerDisplayName(row.player)}</span>
+                        <span className="text-content-muted text-sm">#{row.player.jersey_number || '—'} </span>
+                        <span className="font-medium text-content">{playerDisplayName(row.player)}</span>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-semibold text-slate-800">
+                        <p className="font-semibold text-content">
                           {row.score} {sport?.scoreLabel}
                         </p>
-                        <p className="text-xs text-slate-500">{row.gp} GP</p>
+                        <p className="text-xs text-content-muted">{row.gp} GP</p>
                       </div>
                     </div>
                   </button>
                   {team && (
                     <Link
                       to={`/career?playerId=${encodeURIComponent(row.player.id)}&sport=${encodeURIComponent(team.seasons.sport)}`}
-                      className="shrink-0 flex items-center px-2.5 text-xs font-semibold text-blue-600 bg-slate-50 border-l border-slate-100 hover:bg-blue-50"
+                      className="shrink-0 flex items-center px-2.5 text-xs font-semibold text-accent bg-canvas border-l border-line hover:bg-control"
                     >
                       Career
                     </Link>
@@ -716,25 +716,25 @@ export default function TournamentStats() {
         </section>
 
         <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Games</h2>
+          <h2 className="font-semibold text-content">Games</h2>
           {gameLines.length === 0 ? (
-            <p className="text-sm text-slate-500">No finalized games in this tournament.</p>
+            <p className="text-sm text-content-muted">No finalized games in this tournament.</p>
           ) : (
             <div className="space-y-2">
               {gameLines.map(({ game, homeScore, won, compact }) => (
-                <div key={game.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <div key={game.id} className="rounded-xl border border-line bg-surface px-3 py-2">
                   <div className="flex justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-slate-800">{game.game_date}</p>
-                      <p className="text-sm text-slate-600">vs {game.opponent_name}</p>
+                    <div className="min-w-0 break-words">
+                      <p className="font-medium text-content">{game.game_date}</p>
+                      <p className="text-sm text-content-muted">vs {game.opponent_name}</p>
                     </div>
                     <span
-                      className={`text-sm font-semibold shrink-0 ${won ? 'text-emerald-700' : 'text-rose-700'}`}
+                      className={`text-sm font-semibold shrink-0 ${won ? 'text-success-content' : 'text-danger-content'}`}
                     >
                       {homeScore === game.opponent_score ? 'T' : won ? 'W' : 'L'} {homeScore}-{game.opponent_score}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">{compact}</p>
+                  <p className="text-xs text-content-muted mt-1">{compact}</p>
                 </div>
               ))}
             </div>

@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  "src/pages/Leaderboard.tsx",
+  "src/pages/TeamStats.tsx",
+  "src/pages/TournamentStats.tsx",
   "src/pages/PlayerProfile.tsx",
   "src/pages/CareerStats.tsx",
   "src/components/PlayerStatSummaryTables.tsx",
@@ -66,8 +69,34 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
-  it('keeps the loaded Career header back button at its fixed size', () => {
-    const source = readFileSync('src/pages/CareerStats.tsx', 'utf8')
+  it('wraps Leaderboard team shortcut and legacy heading names', () => {
+    const source = readFileSync('src/pages/Leaderboard.tsx', 'utf8')
+    for (const pattern of [
+      /<p className="([^"]*)">\s*\{s\?\.icon[^]*?\{teamDisplayName\(team\)\}/g,
+      /<h2 className="([^"]*)">\s*\{sport\?\.icon[^]*?\{teamDisplayName\(selectedTeam\)\}/g,
+    ]) {
+      const labels = [...source.matchAll(pattern)]
+      expect(labels).toHaveLength(1)
+      expect(labels[0][1].split(/\s+/)).toContain('break-words')
+    }
+  })
+  it('bounds both sports Team Stats tournament Explore links', () => {
+    const source = readFileSync('src/pages/TeamStats.tsx', 'utf8')
+    const links = [...source.matchAll(/className="([^"]*)"\s*>\s*\{tournament.name\}/g)]
+    expect(links).toHaveLength(2)
+    for (const link of links) {
+      expect(link[1].split(/\s+/)).toContain('max-w-full')
+      expect(link[1].split(/\s+/)).toContain('break-words')
+    }
+  })
+  it.each(['TeamStats', 'TournamentStats'])('bounds %s legacy game text beside scores', page => {
+    const source = readFileSync(`src/pages/${page}.tsx`, 'utf8')
+    const rows = [...source.matchAll(/<div className="([^"]*)">\s*<p className="[^"]*">\{game.game_date\}/g)]
+    expect(rows).toHaveLength(1)
+    expect(rows[0][1]).toBe('min-w-0 break-words')
+  })
+  it.each(['CareerStats', 'Leaderboard', 'TeamStats', 'TournamentStats'])('keeps the %s header back button at its fixed size', page => {
+    const source = readFileSync(`src/pages/${page}.tsx`, 'utf8')
     const headers = [...source.matchAll(/<header\b[^]*?<\/header>/g)]
     expect(headers).toHaveLength(1)
     const buttons = [...headers[0][0].matchAll(/<button\b[^]*?<\/button>/g)]

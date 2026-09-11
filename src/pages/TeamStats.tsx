@@ -264,7 +264,7 @@ export default function TeamStats() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Missing team</p>
+          <p className="font-semibold text-content mb-2">Missing team</p>
           <button type="button" onClick={() => navigate('/leaderboard')} className="btn-primary w-full">
             Leaderboard
           </button>
@@ -276,7 +276,7 @@ export default function TeamStats() {
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
-        <p className="text-slate-600">Supabase required</p>
+        <p className="text-content-muted">Supabase required</p>
       </div>
     )
   }
@@ -284,7 +284,7 @@ export default function TeamStats() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-slate-500 animate-pulse">Loading team stats...</p>
+        <p className="text-content-muted animate-pulse">Loading team stats...</p>
       </div>
     )
   }
@@ -292,7 +292,7 @@ export default function TeamStats() {
   if (!team || error) {
     return (
       <div className="min-h-screen flex flex-col px-4 py-6 max-w-lg mx-auto">
-        {error && <div className="card bg-red-50 text-red-700 text-sm mb-4">{error}</div>}
+        {error && <div className="card bg-danger text-danger-content text-sm mb-4">{error}</div>}
         <button type="button" onClick={() => navigate(teamInfoPath(teamId))} className="btn-primary">
           Back
         </button>
@@ -313,11 +313,11 @@ export default function TeamStats() {
         backPath={teamInfoPath(teamId)}
         overviewExtra={
           <section className="space-y-2">
-            <h2 className="font-semibold text-slate-800">Explore</h2>
+            <h2 className="font-semibold text-content">Explore</h2>
             <div className="flex flex-wrap gap-2">
               <Link
                 to={teamLeaderboardPath(teamId, team.season_id, true)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                className="max-w-full break-words rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
               >
                 Season leaderboard
               </Link>
@@ -325,7 +325,7 @@ export default function TeamStats() {
                 <Link
                   key={tournament.id}
                   to={`/tournament-stats?tournamentId=${encodeURIComponent(tournament.id)}&teamId=${encodeURIComponent(teamId)}`}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                  className="max-w-full break-words rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
                 >
                   {tournament.name}
                 </Link>
@@ -350,11 +350,11 @@ export default function TeamStats() {
         backPath={teamInfoPath(teamId)}
         overviewExtra={
           <section className="space-y-2">
-            <h2 className="font-semibold text-slate-800">Explore</h2>
+            <h2 className="font-semibold text-content">Explore</h2>
             <div className="flex flex-wrap gap-2">
               <Link
                 to={teamLeaderboardPath(teamId, team.season_id, true)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                className="max-w-full break-words rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
               >
                 Season leaderboard
               </Link>
@@ -362,7 +362,7 @@ export default function TeamStats() {
                 <Link
                   key={tournament.id}
                   to={`/tournament-stats?tournamentId=${encodeURIComponent(tournament.id)}&teamId=${encodeURIComponent(teamId)}`}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700"
+                  className="max-w-full break-words rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-accent"
                 >
                   {tournament.name}
                 </Link>
@@ -379,18 +379,18 @@ export default function TeamStats() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(teamInfoPath(teamId))}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
+            className="w-8 h-8 shrink-0 rounded-full bg-control flex items-center justify-center active:scale-90 transition-transform"
           >
             ←
           </button>
           <div className="min-w-0">
             <h1 className="text-lg font-bold truncate">Team stats</h1>
-            <p className="text-sm opacity-80 truncate">
+            <p className="text-sm text-content-muted truncate">
               {sport?.icon} {teamDisplayName(team)} · {team.seasons.name}
             </p>
           </div>
@@ -399,7 +399,7 @@ export default function TeamStats() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
         {!useRpc && logRows.length === 0 && games.length > 0 && (
-          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+          <p className="text-xs text-warning-content bg-warning border border-warning-line rounded-lg p-2">
             Apply migration <code className="text-[11px]">020_stat_tracking_ui_rpcs.sql</code> for
             faster team game lines. Per-game stats unavailable.
           </p>
@@ -408,29 +408,29 @@ export default function TeamStats() {
         <button
           type="button"
           onClick={() => navigate(teamLeaderboardPath(teamId, team.season_id, true))}
-          className="text-sm font-semibold text-blue-600"
+          className="text-sm font-semibold text-accent"
         >
           Season leaderboard →
         </button>
 
         <section className="card space-y-2">
-          <h2 className="font-semibold text-slate-700">Season record</h2>
+          <h2 className="font-semibold text-content">Season record</h2>
           <div className="flex gap-4">
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 flex-1 text-center">
-              <p className="text-2xl font-bold text-emerald-700">{wins}</p>
-              <p className="text-xs text-slate-500">Wins</p>
+            <div className="rounded-xl border border-line bg-canvas px-4 py-3 flex-1 text-center">
+              <p className="text-2xl font-bold text-success-content">{wins}</p>
+              <p className="text-xs text-content-muted">Wins</p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 flex-1 text-center">
-              <p className="text-2xl font-bold text-rose-700">{losses}</p>
-              <p className="text-xs text-slate-500">Losses</p>
+            <div className="rounded-xl border border-line bg-canvas px-4 py-3 flex-1 text-center">
+              <p className="text-2xl font-bold text-danger-content">{losses}</p>
+              <p className="text-xs text-content-muted">Losses</p>
             </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 flex-1 text-center">
-              <p className="text-2xl font-bold text-slate-800">{total}</p>
-              <p className="text-xs text-slate-500">Games</p>
+            <div className="rounded-xl border border-line bg-canvas px-4 py-3 flex-1 text-center">
+              <p className="text-2xl font-bold text-content">{total}</p>
+              <p className="text-xs text-content-muted">Games</p>
             </div>
           </div>
           {decided > 0 && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-content-muted">
               {((wins / decided) * 100).toFixed(0)}% in decided games ({wins}-{losses})
             </p>
           )}
@@ -438,14 +438,14 @@ export default function TeamStats() {
 
         {tournaments.length > 0 && (
           <section className="card space-y-2">
-            <h2 className="font-semibold text-slate-700">Tournaments</h2>
+            <h2 className="font-semibold text-content">Tournaments</h2>
             <ul className="space-y-2 text-sm">
               {tournaments.map(t => (
                 <li key={t.id} className="flex items-center justify-between gap-2">
                   <span className="truncate">🏆 {t.name}</span>
                   <div className="flex items-center gap-2 shrink-0">
                     {t.placement != null && (
-                      <span className="text-slate-500 text-xs">
+                      <span className="text-content-muted text-xs">
                         {t.placement === 1 ? '🥇 1st' : t.placement === 2 ? '🥈 2nd' : t.placement === 3 ? '🥉 3rd' : `#${t.placement}`}
                       </span>
                     )}
@@ -454,14 +454,14 @@ export default function TeamStats() {
                         href={t.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-semibold text-slate-600 underline"
+                        className="text-xs font-semibold text-content-muted underline"
                       >
                         Link ↗
                       </a>
                     )}
                     <Link
                       to={`/tournament-stats?tournamentId=${encodeURIComponent(t.id)}&teamId=${encodeURIComponent(team.id)}`}
-                      className="text-xs font-semibold text-blue-600 underline"
+                      className="text-xs font-semibold text-accent underline"
                     >
                       Stats →
                     </Link>
@@ -474,17 +474,17 @@ export default function TeamStats() {
 
         {opponentBreakdown.length > 0 && (
           <section className="card space-y-3">
-            <h2 className="font-semibold text-slate-700">By opponent</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="font-semibold text-content">By opponent</h2>
+            <p className="text-xs text-content-muted">
               Combined results when you played the same opponent more than once.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left">
-                    <th className="py-2 pr-2 font-semibold text-slate-600">Opponent</th>
-                    <th className="py-2 px-1 font-semibold text-slate-600 text-center">W-L-T</th>
-                    <th className="py-2 pl-2 font-semibold text-slate-600 text-right">PF-PA</th>
+                  <tr className="border-b border-line text-left">
+                    <th className="py-2 pr-2 font-semibold text-content-muted">Opponent</th>
+                    <th className="py-2 px-1 font-semibold text-content-muted text-center">W-L-T</th>
+                    <th className="py-2 pl-2 font-semibold text-content-muted text-right">PF-PA</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -492,24 +492,24 @@ export default function TeamStats() {
                     const decided = row.wins + row.losses
                     const plusMinus = row.pf - row.pa
                     return (
-                      <tr key={row.name} className="border-b border-slate-100">
-                        <td className="py-2 pr-2 font-medium text-slate-800 max-w-[140px] truncate">
+                      <tr key={row.name} className="border-b border-line">
+                        <td className="py-2 pr-2 font-medium text-content max-w-[140px] truncate">
                           {row.name}
                         </td>
-                        <td className="py-2 px-1 text-center tabular-nums text-slate-700">
+                        <td className="py-2 px-1 text-center tabular-nums text-content">
                           {row.wins}-{row.losses}-{row.ties}
                           {decided > 0 && (
-                            <span className="text-slate-400 text-xs block">
+                            <span className="text-content-subtle text-xs block">
                               {((row.wins / decided) * 100).toFixed(0)}%
                             </span>
                           )}
                         </td>
                         <td className="py-2 pl-2 text-right tabular-nums">
-                          <span className="text-slate-800">
+                          <span className="text-content">
                             {row.pf}-{row.pa}
                           </span>
                           <span
-                            className={`text-xs ml-1 ${plusMinus > 0 ? 'text-emerald-600' : plusMinus < 0 ? 'text-rose-600' : 'text-slate-400'}`}
+                            className={`text-xs ml-1 ${plusMinus > 0 ? 'text-success-content' : plusMinus < 0 ? 'text-danger-content' : 'text-content-subtle'}`}
                           >
                             ({plusMinus > 0 ? '+' : ''}{plusMinus})
                           </span>
@@ -524,34 +524,34 @@ export default function TeamStats() {
         )}
 
         <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Game by game</h2>
+          <h2 className="font-semibold text-content">Game by game</h2>
           {lines.length === 0 ? (
-            <p className="text-sm text-slate-500">No finalized games.</p>
+            <p className="text-sm text-content-muted">No finalized games.</p>
           ) : (
             <div className="space-y-2">
               {lines.map(({ game, homeScore, won, compact }) => (
                 <div
                   key={game.id}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  className="rounded-xl border border-line bg-surface px-3 py-2"
                 >
                   <div className="flex justify-between gap-2 items-start">
-                    <div>
-                      <p className="font-medium text-slate-800">{game.game_date}</p>
-                      <p className="text-sm text-slate-600">vs {game.opponent_name}</p>
+                    <div className="min-w-0 break-words">
+                      <p className="font-medium text-content">{game.game_date}</p>
+                      <p className="text-sm text-content-muted">vs {game.opponent_name}</p>
                     </div>
                     <span
                       className={`text-sm font-semibold shrink-0 ${
                         homeScore === game.opponent_score
-                          ? 'text-slate-600'
+                          ? 'text-content-muted'
                           : won
-                            ? 'text-emerald-700'
-                            : 'text-rose-700'
+                            ? 'text-success-content'
+                            : 'text-danger-content'
                       }`}
                     >
                       {homeScore === game.opponent_score ? 'T' : won ? 'W' : 'L'} {homeScore}-{game.opponent_score}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">{compact}</p>
+                  <p className="text-xs text-content-muted mt-1">{compact}</p>
                 </div>
               ))}
             </div>
