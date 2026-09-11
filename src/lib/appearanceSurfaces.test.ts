@@ -119,6 +119,12 @@ describe('Converted application surface color ownership', () => {
     const classes = buttons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
     for (const token of ['shrink-0', 'disabled:bg-control-disabled', 'disabled:text-content-disabled']) expect(classes).toContain(token)
   })
+  it('wraps the cloud enable error within its alert paragraph', () => {
+    const source = readFileSync('src/components/basketball/BasketballEnableCloudPanel.tsx', 'utf8')
+    const alerts = [...source.matchAll(/<p role="alert" className="([^"]*)">\s*\{error\}\s*<\/p>/g)]
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0][1].split(/\s+/)).toContain('break-words')
+  })
   it('preserves distinct free-throw outcome and disabled colors', () => {
     const source = readFileSync('src/components/basketball/BasketballFreeThrowTripDialog.tsx', 'utf8')
     for (const [made, token] of [['false', 'danger'], ['true', 'success']]) {
