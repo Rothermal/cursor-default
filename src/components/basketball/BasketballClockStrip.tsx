@@ -372,16 +372,16 @@ export default function BasketballClockStrip({
 
   return (
     <>
-      <section className="sticky top-0 z-30 border-y border-slate-300 bg-white/95 shadow-sm backdrop-blur safe-top" aria-label="Basketball game clock">
+      <section className="sticky top-0 z-30 border-y border-line-strong bg-surface/95 shadow-sm backdrop-blur safe-top" aria-label="Basketball game clock">
         <div className="mx-auto w-full max-w-lg px-3 py-2">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <div className="flex items-center gap-2 text-xs font-semibold text-content-muted">
               <Clock3 size={14} aria-hidden />
               <span className="truncate">{segment.label}</span>
               <span>{clock.running ? 'Running' : clock.expired ? 'Expired' : 'Paused'}</span>
             </div>
-            <p className="mt-0.5 tabular-nums text-3xl font-bold text-slate-950" aria-live="off">
+            <p className="mt-0.5 tabular-nums text-3xl font-bold text-content" aria-live="off">
               {formatClockDisplay(display.displayMs, showTenths)}
             </p>
           </div>
@@ -389,7 +389,7 @@ export default function BasketballClockStrip({
             type="button"
             onClick={clock.running ? handlePause : handleStart}
             disabled={Boolean(unsafeMessage)}
-            className="flex h-14 min-w-28 items-center justify-center gap-2 rounded-md bg-slate-900 px-4 text-base font-bold text-white disabled:bg-slate-300"
+            className="flex h-14 min-w-28 items-center justify-center gap-2 rounded-md bg-accent px-4 text-base font-bold text-accent-content disabled:bg-control-disabled disabled:text-content-disabled"
           >
             {clock.running ? <Pause size={20} aria-hidden /> : <Play size={20} aria-hidden />}
             {clock.running ? 'Pause' : 'Start'}
@@ -398,14 +398,14 @@ export default function BasketballClockStrip({
 
         {currentFive.length > 0 && (
           <div className="mt-2 flex min-h-8 items-center gap-1 overflow-x-auto" aria-label="Current lineup">
-            <Users size={15} className="mr-1 shrink-0 text-slate-500" aria-hidden />
+            <Users size={15} className="mr-1 shrink-0 text-content-muted" aria-hidden />
             {currentFive.map(player => (
               <span
                 key={player.id}
                 className={`shrink-0 rounded border px-2 py-1 text-xs font-semibold ${
                   player.side === 'tracked'
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                    : 'border-blue-200 bg-blue-50 text-blue-800'
+                    ? 'border-success-line bg-success text-success-content'
+                    : 'border-info-line bg-info text-info-content'
                 }`}
               >
                 {player.label}
@@ -415,12 +415,12 @@ export default function BasketballClockStrip({
         )}
 
         <div className="mt-2 grid grid-cols-3 gap-1.5 sm:gap-2">
-          <button type="button" className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-slate-200 px-1.5 py-2 text-xs font-semibold text-slate-700" onClick={openSetClock}>
+          <button type="button" className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-control px-1.5 py-2 text-xs font-semibold text-content" onClick={openSetClock}>
             <Settings2 size={15} aria-hidden /> Set Clock
           </button>
           <button
             type="button"
-            className="min-h-10 min-w-0 rounded-md bg-slate-200 px-1.5 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40"
+            className="min-h-10 min-w-0 rounded-md bg-control px-1.5 py-2 text-xs font-semibold text-content disabled:bg-control-disabled disabled:text-content-disabled"
             disabled={!clock.running || Boolean(unsafeMessage)}
             onClick={() => { setShowStoppage(value => !value); setShowSetClock(false) }}
           >
@@ -429,7 +429,7 @@ export default function BasketballClockStrip({
           <button
             ref={lineupButtonRef}
             type="button"
-            className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-slate-200 px-1.5 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40"
+            className="flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-md bg-control px-1.5 py-2 text-xs font-semibold text-content disabled:bg-control-disabled disabled:text-content-disabled"
             disabled={Boolean(lineupDisabledReason)}
             title={lineupDisabledReason ?? undefined}
             aria-label={lineupDisabledReason ? `Lineup unavailable. ${lineupDisabledReason}` : 'Lineup'}
@@ -450,9 +450,9 @@ export default function BasketballClockStrip({
         )}
 
         {showSetClock && (
-          <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+          <div className="mt-3 space-y-2 border-t border-line pt-3">
             <div className="grid grid-cols-[7rem_1fr] gap-2">
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-content">
                 Clock ({rules.clockDisplayDirection === 'count_down' ? 'remaining' : 'elapsed'})
                 <input
                   value={clockValue}
@@ -462,7 +462,7 @@ export default function BasketballClockStrip({
                   placeholder="8:00"
                 />
               </label>
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-content">
                 Reason
                 <input
                   value={clockReason}
@@ -481,8 +481,8 @@ export default function BasketballClockStrip({
         )}
 
         {showStoppage && (
-          <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
-            <label className="block text-xs font-semibold text-slate-700">
+          <div className="mt-3 space-y-2 border-t border-line pt-3">
+            <label className="block text-xs font-semibold text-content">
               Stoppage context
               <select
                 value={stoppageCategory}
@@ -492,7 +492,7 @@ export default function BasketballClockStrip({
                 {STOPPAGE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <label className="block text-xs font-semibold text-slate-700">
+            <label className="block text-xs font-semibold text-content">
               Note (optional)
               <input value={stoppageNote} onChange={event => setStoppageNote(event.target.value)} className="input-field mt-1 w-full" maxLength={240} />
             </label>
@@ -503,8 +503,8 @@ export default function BasketballClockStrip({
           </div>
         )}
 
-        {(unsafeMessage || error) && <p role="alert" className="mt-2 text-sm font-semibold text-red-700">{unsafeMessage ?? error}</p>}
-        {notice && !unsafeMessage && <p role="status" className="mt-2 text-sm text-emerald-700">{notice}</p>}
+        {(unsafeMessage || error) && <p role="alert" className="mt-2 text-sm font-semibold text-danger-content">{unsafeMessage ?? error}</p>}
+        {notice && !unsafeMessage && <p role="status" className="mt-2 text-sm text-success-content">{notice}</p>}
         </div>
       </section>
       {lineupSide && (

@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const surfaces = [
+  'src/components/basketball/BasketballClockStrip.tsx',
+  'src/components/basketball/BasketballLineupSheet.tsx',
+  'src/components/basketball/BasketballBoundaryReviewDialog.tsx',
+  'src/components/basketball/BasketballLifecycleControls.tsx',
+  'src/components/basketball/BasketballEventBonusPanel.tsx',
   "src/pages/GameSetup.tsx",
   "src/pages/PlayerSetup.tsx",
   "src/pages/GameCheckout.tsx",
@@ -74,6 +79,32 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it.each(['BasketballLineupSheet', 'BasketballBoundaryReviewDialog'])('keeps %s backdrop translucent', name => {
+    const source = readFileSync(`src/components/basketball/${name}.tsx`, 'utf8')
+    const overlays = [...source.matchAll(/className="([^"]*fixed inset-0[^"]*)"/g)]
+    expect(overlays).toHaveLength(1)
+    expect(overlays[0][1].split(/\s+/)).toContain('bg-overlay/50')
+  })
+  it.each(['BasketballClockStrip', 'BasketballLifecycleControls'])('keeps %s standalone disabled controls readable', name => {
+    const source = readFileSync(`src/components/basketball/${name}.tsx`, 'utf8')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+      .filter(match => match[0].includes('disabled='))
+    expect(buttons).toHaveLength(name === 'BasketballClockStrip' ? 3 : 2)
+    for (const [button] of buttons) {
+      expect(button).toContain('disabled:bg-control-disabled')
+      expect(button).toContain('disabled:text-content-disabled')
+    }
+  })
+  it.each([
+    ['BasketballLineupSheet', /<span key=\{row.participantId\} className="([^"]*)">/g],
+    ['BasketballBoundaryReviewDialog', /<span key=\{participantId\} className="([^"]*)">/g],
+    ['BasketballEventBonusPanel', /<span className=\{`([^`]*\$\{statusClass\})`\}>/g],
+  ] as const)('bounds long labels in %s', (name, pattern) => {
+    const source = readFileSync(`src/components/basketball/${name}.tsx`, 'utf8')
+    const labels = [...source.matchAll(pattern)]
+    expect(labels).toHaveLength(1)
+    for (const token of ['max-w-full', 'break-words']) expect(labels[0][1].split(/\s+/)).toContain(token)
+  })
   it('wraps Leaderboard team shortcut and legacy heading names', () => {
     const source = readFileSync('src/pages/Leaderboard.tsx', 'utf8')
     for (const pattern of [
