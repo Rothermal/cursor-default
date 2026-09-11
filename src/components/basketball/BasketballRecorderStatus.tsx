@@ -29,18 +29,18 @@ export default function BasketballRecorderStatus({
     <button
       type="button"
       onClick={() => navigate(gameInfoPath(gameId, teamId))}
-      className="mt-3 flex min-h-12 w-full items-center gap-3 border-y border-slate-200 bg-white px-1 text-left"
+      className="mt-3 flex min-h-12 w-full items-center gap-3 border-y border-line bg-surface px-1 text-left"
     >
-      <Users size={19} className="shrink-0 text-blue-700" />
+      <Users size={19} className="shrink-0 text-info-content" />
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold text-slate-800">
+        <span className="block text-sm font-bold text-content">
           {loading && recorders.length === 0
             ? 'Loading recorder streams...'
             : error && recorders.length === 0
               ? 'Recorder status unavailable'
               : `${recorders.length} ${recorders.length === 1 ? 'recorder' : 'recorders'}`}
         </span>
-        <span className="block truncate text-xs text-slate-500">
+        <span className="block truncate text-xs text-content-muted">
           {error
             ? error
             : primary
@@ -55,11 +55,11 @@ export default function BasketballRecorderStatus({
       {attentionCount > 0 && (
         <BadgeAlert
           size={17}
-          className="shrink-0 text-amber-600"
+          className="shrink-0 text-warning-content"
           aria-label={`${attentionCount} recorder streams need attention`}
         />
       )}
-      <ChevronRight size={18} className="shrink-0 text-slate-400" />
+      <ChevronRight size={18} className="shrink-0 text-content-subtle" />
     </button>
   )
 }

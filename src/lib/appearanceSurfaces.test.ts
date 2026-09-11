@@ -5,6 +5,9 @@ const liveEntryDialogs = ['Reopen', 'Timeout', 'Ejection', 'LateParticipant', 'S
   .map(name => `src/components/basketball/Basketball${name}Dialog.tsx`)
 
 const surfaces = [
+  'src/components/basketball/BasketballRecorderStatus.tsx',
+  'src/components/basketball/BasketballEnableCloudPanel.tsx',
+  'src/components/game-events/EventCloudConflictDialog.tsx',
   ...liveEntryDialogs,
   'src/components/basketball/BasketballClockStrip.tsx',
   'src/components/basketball/BasketballLineupSheet.tsx',
@@ -83,6 +86,39 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('keeps conflict recovery controls fixed-size and its overlay translucent', () => {
+    const source = readFileSync('src/components/game-events/EventCloudConflictDialog.tsx', 'utf8')
+    const overlays = [...source.matchAll(/className="([^"]*fixed inset-0[^"]*)"/g)]
+    expect(overlays).toHaveLength(1)
+    expect(overlays[0][1].split(/\s+/)).toContain('bg-overlay/50')
+    for (const label of ['Export recovery file', 'Close']) {
+      const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+        .filter(([button]) => button.includes(`aria-label="${label}"`))
+      expect(buttons).toHaveLength(1)
+      const classes = buttons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+      for (const token of ['h-9', 'w-9', 'shrink-0']) expect(classes).toContain(token)
+    }
+  })
+  it('wraps conflict period identifiers within the detail column', () => {
+    const source = readFileSync('src/components/game-events/EventCloudConflictDialog.tsx', 'utf8')
+    const rows = [...source.matchAll(/<dd className="([^"]*)">\{event.period.id\}/g)]
+    expect(rows).toHaveLength(1)
+    for (const token of ['min-w-0', 'break-words']) expect(rows[0][1].split(/\s+/)).toContain(token)
+  })
+  it('keeps both conflict choices readable while busy', () => {
+    const source = readFileSync('src/components/game-events/EventCloudConflictDialog.tsx', 'utf8')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+      .filter(([button]) => button.includes('onClick={onChoose}'))
+    expect(buttons).toHaveLength(1)
+    for (const token of ['disabled:bg-control-disabled', 'disabled:text-content-disabled', 'bg-accent text-accent-content', 'bg-control text-content']) expect(buttons[0][0]).toContain(token)
+  })
+  it('keeps the cloud enable action sized and readable while busy', () => {
+    const source = readFileSync('src/components/basketball/BasketballEnableCloudPanel.tsx', 'utf8')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+    expect(buttons).toHaveLength(1)
+    const classes = buttons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+    for (const token of ['shrink-0', 'disabled:bg-control-disabled', 'disabled:text-content-disabled']) expect(classes).toContain(token)
+  })
   it('preserves distinct free-throw outcome and disabled colors', () => {
     const source = readFileSync('src/components/basketball/BasketballFreeThrowTripDialog.tsx', 'utf8')
     for (const [made, token] of [['false', 'danger'], ['true', 'success']]) {
