@@ -121,7 +121,14 @@ describe('Converted application surface color ownership', () => {
     for (const page of ['PlayerSetup', 'GameCheckout']) {
       const source = readFileSync(`src/pages/${page}.tsx`, 'utf8')
       expect(source).toContain('bg-accent text-accent-content w-10 h-10 shrink-0 rounded-full')
-      expect(source).toContain('min-w-0 break-words')
+      const pattern = page === 'PlayerSetup'
+        ? /<span className="([^"]*)">\{player.name\}<\/span>/g
+        : /<div className="([^"]*)">\s*<p className="[^"]*">\{player.name\}<\/p>/g
+      const labels = [...source.matchAll(pattern)]
+      expect(labels).toHaveLength(1)
+      for (const token of ['min-w-0', 'break-words']) {
+        expect(labels[0][1].split(/\s+/)).toContain(token)
+      }
     }
   })
   it('wraps the Profile header player name', () => {
