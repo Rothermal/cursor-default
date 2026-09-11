@@ -296,8 +296,8 @@ export default function Leaderboard() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
         <div className="card max-w-md w-full text-center">
-          <p className="font-semibold text-slate-700 mb-2">Supabase not configured</p>
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="font-semibold text-content mb-2">Supabase not configured</p>
+          <p className="text-sm text-content-muted mb-4">
             Configure Supabase to view season stats and leaderboards.
           </p>
           <button onClick={() => navigate('/settings/data')} className="btn-primary w-full">
@@ -310,7 +310,7 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gradient-to-r from-slate-700 to-slate-600 text-white px-4 py-4">
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={() =>
@@ -322,7 +322,7 @@ export default function Leaderboard() {
                     : '/'
               )
             }
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
+            className="w-8 h-8 shrink-0 rounded-full bg-control flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
@@ -331,7 +331,7 @@ export default function Leaderboard() {
             <h1 className="text-lg font-bold">
               {scopedSport ? `${scopedSport.name} Season Stats` : 'Season Leaderboard'}
             </h1>
-            <p className="text-sm opacity-80">
+            <p className="text-sm text-content-muted">
               {isCanonicalAggregateDestination
                 ? 'Authority-aware statistics across completed games'
                 : 'Resolved stats across finalized games'}
@@ -342,17 +342,17 @@ export default function Leaderboard() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full space-y-4">
         {error && (
-          <div className="card bg-red-50 border-red-200 text-red-700 text-sm">
+          <div className="card bg-danger border-danger-line text-danger-content text-sm">
             {error}
           </div>
         )}
 
         <section className="card space-y-3">
-          <h2 className="font-semibold text-slate-700">Season</h2>
+          <h2 className="font-semibold text-content">Season</h2>
           {loadingTeams ? (
-            <p className="text-sm text-slate-500 animate-pulse">Loading...</p>
+            <p className="text-sm text-content-muted animate-pulse">Loading...</p>
           ) : seasonOptions.length === 0 ? (
-            <p className="text-sm text-slate-500">No teams yet.</p>
+            <p className="text-sm text-content-muted">No teams yet.</p>
           ) : (
             <select
               value={selectedSeasonId}
@@ -370,29 +370,29 @@ export default function Leaderboard() {
 
         <section className="card space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold text-slate-700">
+            <h2 className="font-semibold text-content">
               {isCanonicalAggregateDestination ? 'Team shortcuts' : 'Team'}
             </h2>
             {selectedTeamId && (
               <button
                 type="button"
                 onClick={() => navigate(`/team-stats?teamId=${selectedTeamId}`)}
-                className="text-sm font-semibold text-blue-600 underline"
+                className="text-sm font-semibold text-accent underline"
               >
                 Team stats →
               </button>
             )}
           </div>
           {isCanonicalAggregateDestination && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-content-muted">
               The leaderboard includes every readable team in this season. This selection controls
               Team Stats and player links only.
             </p>
           )}
           {loadingTeams ? (
-            <p className="text-sm text-slate-500 animate-pulse">Loading teams...</p>
+            <p className="text-sm text-content-muted animate-pulse">Loading teams...</p>
           ) : filteredTeams.length === 0 ? (
-            <p className="text-sm text-slate-500">No teams in this season.</p>
+            <p className="text-sm text-content-muted">No teams in this season.</p>
           ) : (
             <div className="space-y-2">
               {filteredTeams.map(team => {
@@ -402,16 +402,16 @@ export default function Leaderboard() {
                     key={team.id}
                     type="button"
                     onClick={() => handleSelectTeam(team.id)}
-                    className={`w-full text-left rounded-xl border px-3 py-2 transition-colors ${
+                    className={`w-full text-left rounded-xl border px-3 py-2  ${
                       team.id === selectedTeamId
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-slate-200 bg-white'
+                        ? 'border-accent bg-control'
+                        : 'border-line bg-surface'
                     }`}
                   >
-                    <p className="font-medium text-slate-700">
+                    <p className="font-medium text-content break-words">
                       {s?.icon ?? '🏟️'} {teamDisplayName(team)}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-content-muted">
                       {s?.name ?? team.seasons.sport}
                     </p>
                   </button>
@@ -444,7 +444,7 @@ export default function Leaderboard() {
         {selectedTeam && !isCanonicalAggregateDestination && (
           <section className="card space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold text-slate-700">
+              <h2 className="font-semibold text-content min-w-0 max-w-full break-words">
                 {sport?.icon ?? '🏟️'} {teamDisplayName(selectedTeam)}
               </h2>
               <select
@@ -461,9 +461,9 @@ export default function Leaderboard() {
             </div>
 
             {loadingStats ? (
-              <p className="text-sm text-slate-500 animate-pulse">Loading stats...</p>
+              <p className="text-sm text-content-muted animate-pulse">Loading stats...</p>
             ) : leaderboardRows.length === 0 ? (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-content-muted">
                 No finalized games yet. Finalize games to see season stats.
               </p>
             ) : (
@@ -471,8 +471,8 @@ export default function Leaderboard() {
                 {leaderboardRows.map((row, idx) => (
                   <div
                     key={row.player.id}
-                    className="flex items-stretch gap-1 rounded-xl border border-slate-200 bg-white overflow-hidden
-                               hover:border-blue-200 transition-colors"
+                    className="flex items-stretch gap-1 rounded-xl border border-line bg-surface overflow-hidden
+                               hover:border-accent "
                   >
                     <button
                       type="button"
@@ -483,27 +483,27 @@ export default function Leaderboard() {
                             : `/player?teamId=${selectedTeamId}&playerId=${row.player.id}&seasonId=${selectedSeasonId}`
                         )
                       }
-                      className="flex-1 text-left px-3 py-2 hover:bg-blue-50/50 active:scale-[0.99] min-w-0"
+                      className="flex-1 text-left px-3 py-2 hover:bg-control-hover active:scale-[0.99] min-w-0"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-slate-400 shrink-0 w-6">
+                          <span className="text-content-subtle shrink-0 w-6">
                             {idx + 1}.
                           </span>
-                          <span className="text-slate-500 shrink-0">
+                          <span className="text-content-muted shrink-0">
                             #{row.player.jersey_number || '—'}
                           </span>
-                          <p className="font-medium text-slate-700 truncate">
+                          <p className="font-medium text-content truncate">
                             {playerDisplayName(row.player)}
                           </p>
                         </div>
                         <div className="flex flex-col items-end shrink-0 text-right">
                           {sport?.scoreLabel && (
-                            <span className="font-semibold text-slate-800">
+                            <span className="font-semibold text-content">
                               {row.score} {sport.scoreLabel}
                             </span>
                           )}
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-content-muted">
                             {row.gamesPlayed} GP
                           </span>
                         </div>
@@ -511,7 +511,7 @@ export default function Leaderboard() {
                     </button>
                     <Link
                       to={`/career?playerId=${encodeURIComponent(row.player.id)}&sport=${encodeURIComponent(selectedTeam.seasons.sport)}`}
-                      className="shrink-0 flex items-center px-2.5 text-xs font-semibold text-blue-600 bg-slate-50 border-l border-slate-100 hover:bg-blue-50"
+                      className="shrink-0 flex items-center px-2.5 text-xs font-semibold text-accent bg-canvas border-l border-line hover:bg-control"
                     >
                       Career
                     </Link>
