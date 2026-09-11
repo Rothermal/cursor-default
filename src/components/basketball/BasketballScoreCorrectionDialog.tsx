@@ -38,19 +38,19 @@ export default function BasketballScoreCorrectionDialog({
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 pb-3 pt-16 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 px-3 pb-3 pt-16 sm:items-center sm:p-4" onClick={onClose}>
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-score-correction-title"
-        className="w-full max-w-lg overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="w-full max-w-lg overflow-hidden rounded-lg border border-line bg-surface shadow-xl"
         onClick={event => event.stopPropagation()}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-          <h2 id="basketball-score-correction-title" className="text-base font-bold text-slate-800">
+        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+          <h2 id="basketball-score-correction-title" className="text-base font-bold text-content">
             Official score correction
           </h2>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500" aria-label="Close score correction">
+          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-content-muted" aria-label="Close score correction">
             <X size={18} aria-hidden />
           </button>
         </header>
@@ -63,13 +63,13 @@ export default function BasketballScoreCorrectionDialog({
             onSubmit({ teamSide, delta: parsedDelta, note: note.trim() })
           }}
         >
-          <div className="grid grid-cols-2 rounded-lg bg-slate-100 p-1" role="group" aria-label="Team to correct">
+          <div className="grid grid-cols-2 rounded-lg bg-surface-muted p-1" role="group" aria-label="Team to correct">
             {([['tracked', trackedTeamName, trackedScore], ['opponent', opponentName, opponentScore]] as const).map(([side, name, score]) => (
               <button
                 key={side}
                 type="button"
                 onClick={() => setTeamSide(side)}
-                className={`min-h-12 rounded-md px-2 py-1 text-sm font-semibold ${teamSide === side ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                className={`min-h-12 rounded-md px-2 py-1 text-sm font-semibold ${teamSide === side ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}
                 aria-pressed={teamSide === side}
               >
                 <span className="block line-clamp-1 break-words">{name}</span>
@@ -78,7 +78,7 @@ export default function BasketballScoreCorrectionDialog({
             ))}
           </div>
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="block text-sm font-semibold text-content">
             Signed adjustment
             <input
               ref={deltaRef}
@@ -91,7 +91,7 @@ export default function BasketballScoreCorrectionDialog({
             />
           </label>
 
-          <label className="block text-sm font-semibold text-slate-700">
+          <label className="block text-sm font-semibold text-content">
             Reason
             <textarea
               value={note}
@@ -102,11 +102,11 @@ export default function BasketballScoreCorrectionDialog({
             />
           </label>
 
-          {errorMessage && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{errorMessage}</p>}
+          {errorMessage && <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">{errorMessage}</p>}
 
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+          <div className="flex justify-end gap-2 border-t border-line pt-3">
             <button type="button" onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-            <button type="submit" disabled={!validDelta || !note.trim()} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-40">
+            <button type="submit" disabled={!validDelta || !note.trim()} className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled">
               <FilePenLine size={16} aria-hidden />
               Apply
             </button>
