@@ -91,6 +91,12 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it('wraps the scoreboard tournament name in its own paragraph', () => {
+    const source = readFileSync('src/components/Scoreboard.tsx', 'utf8')
+    const rows = [...source.matchAll(/<p className="([^"]*)">\s*\{gameInfo\.tournamentName\}\s*<\/p>/g)]
+    expect(rows).toHaveLength(1)
+    expect(rows[0][1].split(/\s+/)).toContain('break-words')
+  })
   it('wraps both scoreboard names and gives every event score control disabled colors', () => {
     const source = readFileSync('src/components/Scoreboard.tsx', 'utf8')
     for (const label of ['trackedLabel', 'opponentLabel']) {
