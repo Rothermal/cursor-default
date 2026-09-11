@@ -516,18 +516,18 @@ export default function PlayerSetup() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-4`}>
+      <header className="bg-surface border-b border-line text-content px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
             onClick={() => navigate('/setup')}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
+            className="w-8 h-8 shrink-0 rounded-full bg-control flex items-center justify-center
                        active:scale-90 transition-transform"
           >
             ←
           </button>
-          <div>
+          <div className="min-w-0 break-words">
             <h1 className="text-lg font-bold">{sport.icon} {sport.name}</h1>
-            <p className="text-sm opacity-80">
+            <p className="text-sm text-content-muted">
               {gameSideDisplayName(state.gameInfo, 'tracked')} vs {gameSideDisplayName(state.gameInfo, 'opponent')}
             </p>
           </div>
@@ -536,7 +536,7 @@ export default function PlayerSetup() {
 
       <div className="flex-1 px-4 py-6 max-w-lg mx-auto w-full">
         {(!anchoredSetup || anchoredSetupStep === 'roster') && (
-          <h2 className="text-lg font-semibold text-slate-700 mb-4">Add Players</h2>
+          <h2 className="text-lg font-semibold text-content mb-4">Add Players</h2>
         )}
 
         {isBasketballEventIntent && basketballSetupDraft?.event &&
@@ -546,15 +546,15 @@ export default function PlayerSetup() {
           </div>
         )}
         {rulesNotice && (
-          <p role="status" className="mb-4 border-y border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <p role="status" className="mb-4 border-y border-info-line bg-info px-3 py-2 text-sm text-info-content">
             {rulesNotice}
           </p>
         )}
         {staleAuthority && basketballSetupDraft?.event && (
-          <section className="mb-5 space-y-3 border-y border-amber-300 bg-amber-50 px-3 py-3">
+          <section className="mb-5 space-y-3 border-y border-warning-line bg-warning px-3 py-3">
             <div>
-              <h3 className="text-sm font-semibold text-amber-950">Basketball defaults changed</h3>
-              <p className="mt-1 text-xs text-amber-800">
+              <h3 className="text-sm font-semibold text-warning-content">Basketball defaults changed</h3>
+              <p className="mt-1 text-xs text-warning-content">
                 {staleAuthority.differences.length > 0
                   ? `Changed fields: ${staleAuthority.differences.map(basketballRuleFieldLabel).join(', ')}.`
                   : 'The source revision changed, but the effective game rules are unchanged.'}
@@ -575,7 +575,7 @@ export default function PlayerSetup() {
           </section>
         )}
         {rosterError && (
-          <div className="card mb-3 bg-red-50 border-red-200 text-red-700 text-sm" role="alert">
+          <div className="card mb-3 bg-danger border-danger-line text-danger-content text-sm" role="alert">
             {rosterError}
           </div>
         )}
@@ -591,14 +591,14 @@ export default function PlayerSetup() {
         ) : (
           <>
         {canReadCloudRoster && (
-          <div className="card mb-3 bg-blue-50 border-blue-200 text-blue-800 text-xs">
+          <div className="card mb-3 bg-info border-info-line text-info-content text-xs">
             {cloudTeamId
               ? 'Roster is synced with your selected cloud team.'
               : 'Roster loaded from the selected team. Changes here stay with this local-only game.'}
           </div>
         )}
         {rosterLoading && (
-          <div className="card mb-3 text-sm text-slate-500 animate-pulse">
+          <div className="card mb-3 text-sm text-content-muted animate-pulse">
             Loading saved roster...
           </div>
         )}
@@ -632,7 +632,7 @@ export default function PlayerSetup() {
         </div>
 
         {displayedPlayers.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-content-subtle">
             <p className="text-4xl mb-2">👥</p>
             <p>Add at least one player to start</p>
           </div>
@@ -640,19 +640,19 @@ export default function PlayerSetup() {
           <div className="space-y-2">
             {displayedPlayers.map(player => (
               <div key={player.id} className="card flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <span className={`
-                    ${sport.theme.bg} text-white w-10 h-10 rounded-full
+                    bg-accent text-accent-content w-10 h-10 shrink-0 rounded-full
                     flex items-center justify-center font-bold text-sm
                   `}>
                     {player.number || '—'}
                   </span>
-                  <span className="font-medium text-slate-700">{player.name}</span>
+                  <span className="min-w-0 break-words font-medium text-content">{player.name}</span>
                 </div>
                 <button
                   onClick={() => { void handleRemovePlayer(player.id) }}
                   disabled={saving || rosterLoading}
-                  className="text-slate-400 hover:text-red-500 transition-colors px-2 py-1"
+                  className="shrink-0 text-content-subtle hover:text-danger-content disabled:text-content-disabled px-2 py-1"
                 >
                   ✕
                 </button>
@@ -663,7 +663,7 @@ export default function PlayerSetup() {
 
         <div className="mt-6 space-y-3">
           {starting && (
-            <p role="status" className="text-center text-sm font-semibold text-slate-600">
+            <p role="status" className="text-center text-sm font-semibold text-content-muted">
               Checking the latest Basketball rules...
             </p>
           )}
@@ -679,7 +679,7 @@ export default function PlayerSetup() {
               ? `Opening Lineup (${displayedPlayers.length})`
               : `Start Game (${displayedPlayers.length} player${displayedPlayers.length !== 1 ? 's' : ''})`} →
           </button>
-          <p className="text-center text-xs text-slate-400">
+          <p className="text-center text-xs text-content-subtle">
             {isBasketballEventIntent
               ? 'The event-game roster is fixed after start'
               : 'You can add more players during the game'}

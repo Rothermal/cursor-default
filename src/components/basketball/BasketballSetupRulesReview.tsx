@@ -31,14 +31,14 @@ export default function BasketballSetupRulesReview({
 
   if (!resolution.ok) {
     return (
-      <p role="alert" className="border-y border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <p role="alert" className="border-y border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
         {resolution.message}
       </p>
     )
   }
   if (!inherited.ok) {
     return (
-      <p role="alert" className="border-y border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <p role="alert" className="border-y border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
         {inherited.message}
       </p>
     )
@@ -53,16 +53,16 @@ export default function BasketballSetupRulesReview({
   }
 
   return (
-    <section className="space-y-4 border-y border-slate-200 py-4">
+    <section className="space-y-4 border-y border-line-strong py-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800">Rules Review</h3>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <h3 className="text-sm font-semibold text-content">Rules Review</h3>
+          <p className="mt-0.5 text-xs text-content-muted">
             {authorityLabel} - {revisionLabel}
           </p>
         </div>
         {Object.keys(event.matchOverrides).length > 0 && (
-          <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+          <span className="rounded border border-info-line bg-info px-2 py-1 text-xs font-semibold text-info-content">
             Match overrides
           </span>
         )}
@@ -70,7 +70,7 @@ export default function BasketballSetupRulesReview({
 
       {!readOnly && (
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-content">
             Match foul limit
             <input
               type="number"
@@ -85,11 +85,11 @@ export default function BasketballSetupRulesReview({
             />
           </label>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">Changes apply only to this game.</p>
+            <p className="text-xs text-content-muted">Changes apply only to this game.</p>
             {Object.keys(event.matchOverrides).length > 0 && (
               <button
                 type="button"
-                className="text-xs font-semibold text-blue-700 underline"
+                className="text-xs font-semibold text-info-content underline"
                 onClick={() => onMatchOverridesChange?.({})}
               >
                 Reset match overrides

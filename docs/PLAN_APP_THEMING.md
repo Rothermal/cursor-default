@@ -1,6 +1,6 @@
 # Plan: App theming and dark mode
 
-Status: THM-1 through THM-3 implemented; THM-4 through THM-6 pending
+Status: THM-1 through THM-3 implemented; THM-4 in progress; THM-5 and THM-6 pending
 
 This roadmap makes StatKeeper themeable across authentication, administration,
 team/game management, live sport workspaces, and review destinations. Light and
@@ -301,6 +301,14 @@ authority, provenance, warning, and unavailable states.
 ### THM-4 - Basketball surfaces
 
 Goal: theme legacy and event-model Basketball without changing game behavior.
+
+The setup batch is implemented together: Game Setup, Player Setup, Checkout,
+Basketball Rules Review, and Opening Lineup Setup. These shared route hosts
+also affect other sports; sport-specific Soccer setup remains THM-5 scope.
+See [THM-4 setup verification](REGRESSION_THM_4_SETUP_SURFACES.md) for evidence
+and untested release cases. Live tracking, court/corrections, and Summary are
+still pending. Group related remaining surfaces when their combined diff stays
+reviewable; no fixed number of implementation slices is required.
 
 - Convert setup, player setup, checkout, tracker, Timeline, lineups, clock,
   administrative dialogs, finalization/reopen, Summary, and recovery/conflict UI.

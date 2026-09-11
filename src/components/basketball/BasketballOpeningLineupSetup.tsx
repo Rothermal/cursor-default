@@ -82,16 +82,16 @@ export default function BasketballOpeningLineupSetup({
   if (draft.playerSetup.currentStep === 'review') {
     return (
       <section className="space-y-5" aria-labelledby="basketball-lineup-review-title">
-        <div className="flex items-start justify-between gap-4 border-y border-slate-200 py-3">
+        <div className="flex items-start justify-between gap-4 border-y border-line-strong py-3">
           <div>
-            <h2 id="basketball-lineup-review-title" className="text-lg font-semibold text-slate-800">
+            <h2 id="basketball-lineup-review-title" className="text-lg font-semibold text-content">
               Opening Lineup Review
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-content-muted">
               Period 1 will open paused with this lineup.
             </p>
           </div>
-          <span className="shrink-0 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm font-semibold text-emerald-800">
+          <span className="shrink-0 rounded border border-success-line bg-success px-2 py-1 text-sm font-semibold text-success-content">
             {starters.length} / 5
           </span>
         </div>
@@ -103,13 +103,13 @@ export default function BasketballOpeningLineupSetup({
         )}
 
         {lineup.shortHandedReason && (
-          <div className="border-y border-amber-200 bg-amber-50 px-3 py-3">
-            <p className="text-xs font-semibold uppercase text-amber-800">Short-handed reason</p>
-            <p className="mt-1 break-words text-sm text-amber-950">{lineup.shortHandedReason}</p>
+          <div className="border-y border-warning-line bg-warning px-3 py-3">
+            <p className="text-xs font-semibold uppercase text-warning-content">Short-handed reason</p>
+            <p className="mt-1 break-words text-sm text-warning-content">{lineup.shortHandedReason}</p>
           </div>
         )}
 
-        {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-content">{error}</p>}
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -136,19 +136,19 @@ export default function BasketballOpeningLineupSetup({
 
   return (
     <section className="space-y-5" aria-labelledby="basketball-opening-lineup-title">
-      <div className="flex items-start justify-between gap-4 border-y border-slate-200 py-3">
+      <div className="flex items-start justify-between gap-4 border-y border-line-strong py-3">
         <div>
-          <h2 id="basketball-opening-lineup-title" className="text-lg font-semibold text-slate-800">
+          <h2 id="basketball-opening-lineup-title" className="text-lg font-semibold text-content">
             Opening Lineup
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-content-muted">
             Assign every player as Starter, Bench, or DNP.
           </p>
         </div>
         <span className={`shrink-0 rounded border px-2 py-1 text-sm font-semibold ${
           starters.length === 5
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-            : 'border-amber-200 bg-amber-50 text-amber-800'
+            ? 'border-success-line bg-success text-success-content'
+            : 'border-warning-line bg-warning text-warning-content'
         }`} aria-live="polite">
           {starters.length} / 5
         </span>
@@ -158,13 +158,13 @@ export default function BasketballOpeningLineupSetup({
         {participants.map(participant => (
           <div key={participant.participantId} className="card space-y-3 py-3">
             <div className="min-w-0">
-              <p className="break-words font-semibold text-slate-800">{participant.displayName}</p>
+              <p className="break-words font-semibold text-content">{participant.displayName}</p>
               {participant.number && (
-                <p className="text-xs text-slate-500">#{participant.number}</p>
+                <p className="text-xs text-content-muted">#{participant.number}</p>
               )}
             </div>
             <div
-              className="grid grid-cols-3 rounded-md bg-slate-100 p-1"
+              className="grid grid-cols-3 rounded-md bg-surface-muted p-1"
               role="group"
               aria-label={`${participant.displayName} opening status`}
             >
@@ -175,10 +175,10 @@ export default function BasketballOpeningLineupSetup({
                   disabled={busy}
                   aria-pressed={participant.initialStatus === option.value}
                   onClick={() => updateStatus(participant.participantId, option.value)}
-                  className={`rounded px-2 py-2 text-xs font-semibold disabled:opacity-50 ${
+                  className={`rounded px-2 py-2 text-xs font-semibold disabled:bg-control-disabled disabled:text-content-disabled ${
                     participant.initialStatus === option.value
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600'
+                      ? 'bg-surface text-content shadow-sm'
+                      : 'text-content-muted'
                   }`}
                 >
                   {option.label}
@@ -190,7 +190,7 @@ export default function BasketballOpeningLineupSetup({
       </div>
 
       {starters.length > 0 && starters.length < 5 && (
-        <label className="block text-sm font-medium text-slate-700">
+        <label className="block text-sm font-medium text-content">
           Short-handed reason
           <textarea
             value={lineup.shortHandedReason ?? ''}
@@ -203,7 +203,7 @@ export default function BasketballOpeningLineupSetup({
         </label>
       )}
 
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-content">{error}</p>}
       <div className="grid grid-cols-2 gap-3">
         <button type="button" className="btn-secondary" disabled={busy} onClick={onBackToRoster}>
           Back to Roster
@@ -232,13 +232,13 @@ function LineupGroup({
 }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+      <h3 className="text-sm font-semibold text-content">{title}</h3>
       {participants.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-2">
           {participants.map(participant => (
             <span
               key={participant.participantId}
-              className="max-w-full rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700"
+              className="max-w-full rounded border border-line-strong bg-surface px-2 py-1 text-sm text-content"
             >
               <span className="break-words">{participant.displayName}</span>
               {participant.number ? ` #${participant.number}` : ''}
@@ -246,7 +246,7 @@ function LineupGroup({
           ))}
         </div>
       ) : (
-        <p className="mt-1 text-sm text-slate-400">{empty}</p>
+        <p className="mt-1 text-sm text-content-subtle">{empty}</p>
       )}
     </div>
   )
