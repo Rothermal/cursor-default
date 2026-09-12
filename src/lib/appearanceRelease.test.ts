@@ -20,8 +20,8 @@ describe('appearance release', () => {
     }
     expect(source).not.toMatch(/GameContext|SettingsContext|supabase|localStorage/)
   })
-  it('keeps all page and component utility colors semantic', () => {
-    for (const root of ['src/pages', 'src/components']) {
+  it('keeps all JSX surface utility colors semantic', () => {
+    for (const root of ['src']) {
       for (const path of readdirSync(root, { recursive: true }).map(String).filter(path => path.endsWith('.tsx'))) {
         const source = readFileSync(`${root}/${path}`, 'utf8')
         expect(source, path).not.toMatch(/(?:bg|text|border(?:-[xytrbl])?|ring(?:-offset)?|divide|fill|stroke|from|via|to|accent)-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|rose|orange|amber|yellow|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|pink)-\d+)\b/)

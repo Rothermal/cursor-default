@@ -62,3 +62,17 @@ to all users; it is not an app-admin permission or per-account allowlist.
 
 Keep these outstanding checks visible before expanding beyond the current user.
 Team branding remains the separate next roadmap, not part of appearance storage.
+
+## Review follow-up
+
+Rendered-control tests now cover the disabled missing-bootstrap state, hidden
+rollback state and distinct Light/Dark segments. The palette scan includes all
+`src/**/*.tsx` files. Disabled text/background and unselected control pairs are
+contrast-tested; Light disabled text was slightly darkened to meet 4.5:1.
+
+On the actual touch device, specifically check Soccer pitch single-tap capture,
+vertical scrolling, pinch zoom and double-tap behavior before and after zoom.
+Basketball currently uses `touch-action: pan-y`; Soccer does not. No broken Soccer
+capture has been demonstrated, so this release does not copy the Basketball
+restriction speculatively. Decide any pitch-specific gesture change using those
+results, preserving zoom elsewhere. This remains a post-deployment follow-up.

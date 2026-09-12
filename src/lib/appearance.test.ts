@@ -65,6 +65,8 @@ describe('appearance bootstrap/runtime contract', () => {
       for (const [foreground, background] of [
         ['content', 'canvas'], ['content', 'surface'], ['content-muted', 'surface'],
         ['content-subtle', 'surface'], ['content', 'surface-elevated'],
+        ['content-disabled', 'control-disabled'], ['content-muted', 'control'],
+        ['content-muted', 'control-hover'],
         ['accent-content', 'accent'], ['danger-action-content', 'danger-action'],
         ...['info', 'success', 'warning', 'danger'].map(name => [`${name}-content`, name]),
         ...['amber', 'sky', 'emerald', 'violet', 'rose', 'slate', 'orange', 'red', 'blue', 'green', 'indigo', 'teal', 'cyan', 'pink']
