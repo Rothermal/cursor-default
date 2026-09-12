@@ -1022,7 +1022,7 @@ function ActionSheet({ status, onClose, onAction, onDirection }: {
         <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-content">Match Actions</h2><button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
         <div className="grid grid-cols-2 gap-2">
           {actions.map(action => <button key={action.kind} type="button" onClick={() => onAction(action.kind)} className="min-h-16 rounded-md border border-line bg-surface px-3 py-2 text-sm font-bold text-content flex items-center gap-3">{action.icon}{action.label}</button>)}
-          {standardControls && <button type="button" onClick={onDirection} className="min-h-16 rounded-md border border-line bg-surface px-3 py-2 text-sm font-bold text-content flex items-center gap-3"><Compass size={20} />Switch direction</button>}
+          {standardControls && <button type="button" onClick={onDirection} className="min-h-16 min-w-0 rounded-md border border-line bg-surface px-3 py-2 text-sm font-bold text-content flex items-center gap-3"><Compass size={20} className="shrink-0" /><span>Switch attacking direction</span></button>}
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../../types'
 import { createInitialState } from '../gameReducer'
-import { prepareSoccerKickoff } from './kickoff'
+import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import { resolveSoccerMatchRules } from './rules'
 import { createSoccerSportGameState } from './state'
 import type { SoccerMatchSetup } from './types'
@@ -262,7 +262,8 @@ describe('soccer recorder resolution', () => {
     const state = await createSoccerIndependentRecorderState('recorder-b', 'game-1')
 
     expect(state.cloudSync.gameId).toBe('game-1')
-    expect(state.eventStream?.events).toHaveLength(3)
+    expect(state.eventStream?.events).toHaveLength(2)
+    expect(state.sportGameState?.projection).toMatchObject({ clock: { running: false, elapsedMs: 0 } })
     expect(state.eventStream?.events.every(event =>
       typeof event === 'object' &&
       event !== null &&

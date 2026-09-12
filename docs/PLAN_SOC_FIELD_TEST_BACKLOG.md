@@ -190,7 +190,8 @@ season merges (still forbidden).
 
 ### S6 - Sideline clock correction
 
-**Status:** confirmed product request; focused plan required
+**Status:** implemented; deployed mobile verification pending; see
+[`PLAN_SOC_S6_CLOCK_USABILITY.md`](PLAN_SOC_S6_CLOCK_USABILITY.md)
 **Theme:** clock  
 **Where:** `prepareSoccerKickoff`; scoreboard Start/Pause; overflow
 `Correct clock`
@@ -205,7 +206,7 @@ soon as setup navigates to the tracker. The exact correction field displays
 `MM:SS` but requests `inputMode="numeric"`; common mobile keypads therefore
 provide no colon even though the parser expects one.
 
-**Likely direction:** starting the match establishes the opening lineup and
+**Implemented direction:** starting the match establishes the opening lineup and
 first period with the clock paused at zero. The recorder explicitly presses
 Start, matching Basketball. Keep exact correction, but use separate minute and
 second controls or another keypad-safe input that does not require typing a
@@ -262,7 +263,7 @@ that reuse `SoccerLiveActionDialog`.
 
 ### S9 - Persist field orientation
 
-**Status:** confirmed product request plus field-coordinate diagnostic
+**Status:** coordinate bug closed as owner-confirmed user error; optional view persistence deferred
 **Theme:** settings / parked match / direction
 **Where:** `fieldFlipped` in `SoccerGameTracker`; `Switch direction` in the
 tracker action sheet; SOC-6D soccer settings
@@ -279,16 +280,15 @@ original unflipped view. These are separate concepts:
 - attacking direction is match history and changes which goal each side attacks
 - stored event coordinates remain canonical and do not rotate after capture
 
-The current field code maps flipped taps back to canonical coordinates and
-rotates existing markers with the pitch. The report therefore needs a focused
-reproduction, not a speculative coordinate rewrite.
+The owner confirmed the reported coordinate problem was user error. No coordinate
+repair is required. **Flip field view** rotates the view and existing markers
+without changing match history. **Switch attacking direction** records which
+goal the tracked team attacks; it does not rotate the view. Flipped taps are
+mapped back to canonical coordinates. These controls are intentionally distinct.
 
-**Likely direction:** persist display flip on the parked match and seed it from
-the personal Soccer setting. Make current attacking direction and its existing
-checked Switch direction action discoverable near the field. Add explicit
-round-trip tests for tracked/opponent capture before and after display flip,
-period direction changes, marker review, and edit. Only change coordinate math
-if one of those cases fails.
+**Optional follow-up, not an active bug:** persist display flip on the parked
+match and seed it from personal Soccer settings. The current view resets when
+the tracker remounts. Do not change coordinate math for this closed report.
 
 **Not this item:** automatic end-switch rules (already event-owned).
 Upside-down cluster counts after flip are `S18`.
@@ -916,7 +916,7 @@ S19 Team formation lineup on a pitch
 S23 Team-level default starter and bench status
 S24 Live lineup manager and match presets [implemented; deployed verification pending]
 S6  Explicit clock start and usable sideline correction
-S9  Persist and clarify field orientation
+S9  Coordinate report closed as user error; optional persistence deferred
 S1  Faster shot and goal capture
 S15 Mark a goal as a header
 S16 Optional goal-mouth placement after Goal
@@ -950,7 +950,9 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed product request with open data/UX choices | `S6`, `S7`, `S9`, `S15`, `S16` | Short Q&A where choices remain, then a focused phase plan |
+| Confirmed product request with open data/UX choices | `S7`, `S15`, `S16` | Short Q&A where choices remain, then a focused phase plan |
+| Implemented; deployed mobile verification pending | `S6` | Verify explicit Start and split Minutes/Seconds correction |
+| Closed as user error; optional enhancement deferred | `S9` | No coordinate repair; view flip and attacking-direction changes are distinct |
 | Implemented; migration 069 applied; deployed verification pending | `S24` | Run the focused S24A-S24D regression records, including [grouped Timeline review](REGRESSION_SOC_S24D_LINEUP_TIMELINE.md) |
 | Implemented; pending deployed verification | `S23` | Run the S23A-S23C settings/editor/setup regression records against the deployed app |
 | Soccer slice implemented; cross-sport direction remains | `S25` | Verify deployed Soccer capture, then inventory each later sport without removing selectors that have another visible job |
@@ -975,9 +977,9 @@ exercise those constraints rather than bypass them.
 - **Cross-sport live labels:** `S26` is implemented with immutable match labels,
   legacy fallbacks, and migration 066. Keep it separate from `S25` actor
   selection when reviewing later sport surfaces.
-- **Clock and orientation:** plan `S6` and `S9` independently. Clock changes
-  event lifecycle and minutes; orientation changes display persistence,
-  direction discoverability, and coordinate regression coverage.
+- **Clock and orientation:** `S6` implements paused kickoff and split numeric
+  correction fields. `S9`'s coordinate report is closed as user error; optional
+  view persistence is deferred. The larger timing redesign remains separate.
 - **Timeline correction:** `S12` is implemented; deployed live correction
   verification remains.
 - **Roster defaults:** `S11` is implemented; `S19A` provides the formation

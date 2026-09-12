@@ -3,6 +3,7 @@ import type { GameState, SportConfig } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { nextSoccerEventSequence } from './events'
 import { prepareSoccerKickoff } from './kickoff'
+import { toggleSoccerClock, soccerClockDisplayValue } from './live'
 import { resolveSoccerMatchRules } from './rules'
 import { createSoccerSportGameState } from './state'
 import type { SoccerMatchSetup } from './types'
@@ -76,7 +77,7 @@ function gameState(setup: SoccerMatchSetup): GameState {
 }
 
 describe('prepareSoccerKickoff', () => {
-  it('atomically starts a short-handed match with lineup, period, and clock events', () => {
+  it('atomically prepares a short-handed match with the clock paused', () => {
     const setup = matchSetup()
     const result = prepareSoccerKickoff(gameState(setup), setup, {
       recorderUserId: 'user-1',
@@ -84,17 +85,15 @@ describe('prepareSoccerKickoff', () => {
       eventIds: [
         '10000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000002',
-        '10000000-0000-4000-8000-000000000003',
       ],
     })
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.state.eventStream?.events).toHaveLength(3)
+    expect(result.state.eventStream?.events).toHaveLength(2)
     expect(result.state.eventStream?.events).toMatchObject([
       { eventType: 'soccer.opening_lineup', sequence: 0 },
       { eventType: 'soccer.period_started', sequence: 1 },
-      { eventType: 'soccer.clock_started', sequence: 2 },
     ])
     const projection = result.state.sportGameState?.projection
     expect(projection).toMatchObject({
@@ -102,14 +101,25 @@ describe('prepareSoccerKickoff', () => {
       openingLineupRecorded: true,
       currentPeriodId: 'regulation-1',
       clock: {
-        running: true,
+        running: false,
         elapsedMs: 0,
-        anchorOccurredAt: '2026-07-18T18:00:00.000Z',
+        anchorOccurredAt: null,
       },
     })
     expect(projection?.participants['participant-keeper'].status).toBe('on_field')
     expect(projection?.participants['participant-defender'].status).toBe('on_field')
     expect(projection?.participants['participant-bench'].status).toBe('bench')
+    expect(projection?.participants['participant-keeper']).toMatchObject({ totalActiveMs: 0, activeSinceElapsedMs: null })
+    const startAt = Date.parse('2026-07-18T18:05:00.000Z')
+    expect(soccerClockDisplayValue(result.state, startAt)?.canonicalElapsedMs).toBe(0)
+    const started = toggleSoccerClock(result.state, { recorderUserId: 'user-1', nowMs: startAt })
+    expect(started.ok).toBe(true)
+    if (!started.ok) return
+    expect(soccerClockDisplayValue(started.state, startAt + 10_000)?.canonicalElapsedMs).toBe(10_000)
+    const paused = toggleSoccerClock(started.state, { recorderUserId: 'user-1', nowMs: startAt + 10_000 })
+    expect(paused.ok).toBe(true)
+    if (!paused.ok) return
+    expect(paused.state.sportGameState?.projection.participants['participant-keeper'].totalActiveMs).toBe(10_000)
   })
 
   it('rejects an opening lineup without exactly one goalkeeper without mutating state', () => {
