@@ -26,7 +26,7 @@ describe('appearance bootstrap/runtime contract', () => {
   it('keeps the build gate, static meta and Light-only splash contract explicit', () => {
     const config = readFileSync('vite.config.ts', 'utf8')
     const html = readFileSync('index.html', 'utf8')
-    expect(config).toContain('data-appearance-preview="${command === \'serve\'}"')
+    expect(config).toContain('data-appearance-preview="${command === \'serve\' || APPEARANCE_RELEASE_ENABLED}"')
     expect(html).toContain('<html lang="en">')
     expect(html).toContain('<meta name="theme-color" content="#f4f5f7" />')
     expect(config).toContain("background_color: '#f4f5f7'")
@@ -92,7 +92,7 @@ describe('appearance bootstrap/runtime contract', () => {
     expect(app.meta.content).toBe('rgb(244 245 247)')
     expect(JSON.parse(app.values.get('statkeeper_appearance')!)).toEqual({ version: 1, theme: 'light' })
   })
-  it('keeps production Light without erasing a saved future Dark choice', () => {
+  it('supports rollback to Light without erasing a saved Dark choice', () => {
     const raw = '{"version":1,"theme":"dark"}'
     const app = boot(raw, false)
     app.runtime.setTheme('dark')
