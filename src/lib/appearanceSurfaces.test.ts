@@ -95,6 +95,25 @@ const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
   it.each([
+    ['Revised', ['bg-info', 'text-info-content']],
+    ['Removed', ['bg-surface-muted', 'text-content']],
+  ] as const)('preserves the shot %s badge colors', (label, tokens) => {
+    const source = readFileSync('src/components/basketball/BasketballShotDetailDialog.tsx', 'utf8')
+    const badges = [...source.matchAll(/<span className="([^"]*)">(Revised|Removed)<\/span>/g)]
+      .filter(row => row[2] === label && row[1].split(/\s+/).includes('rounded'))
+    expect(badges).toHaveLength(1)
+    for (const token of tokens) expect(badges[0][1].split(/\s+/)).toContain(token)
+  })
+  it('strikes through only the removed shot relationship label', () => {
+    const source = readFileSync('src/components/basketball/BasketballShotDetailDialog.tsx', 'utf8')
+    const labels = [...source.matchAll(/<span className=\{`([^]*?)`\}>\s*\{relationship.label\}/g)]
+    expect(labels).toHaveLength(1)
+    const branches = labels[0][1].match(/relationship\.removed\s*\?\s*'([^']*)'\s*:\s*'([^']*)'/)
+    expect(branches).not.toBeNull()
+    expect(branches![1].split(/\s+/)).toContain('line-through')
+    expect(branches![2].split(/\s+/)).not.toContain('line-through')
+  })
+  it.each([
     ['BasketballEventDetailDialog', '{review.periodLabel}'],
     ['BasketballEventDetailDialog', '{review.title}'],
     ['BasketballEventDetailDialog', '{captureLabel ?? formatRecordedAt(review.event.occurredAt)}'],
