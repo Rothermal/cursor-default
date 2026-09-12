@@ -376,13 +376,13 @@ export default function SoccerPlayerSetup() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-emerald-700 text-white px-4 py-4">
+    <div className="min-h-screen bg-canvas">
+      <header className="bg-control text-content px-4 py-4">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => step === 'lineup' ? setStep('roster') : navigate('/setup')}
-            className="h-9 w-9 grid place-items-center rounded-md bg-white/15 hover:bg-white/20"
+            className="h-9 w-9 grid place-items-center rounded-md bg-surface hover:bg-surface"
             aria-label={step === 'lineup' ? 'Back to match roster' : 'Back to match setup'}
             title="Back"
           >
@@ -390,11 +390,11 @@ export default function SoccerPlayerSetup() {
           </button>
           <div className="min-w-0">
             <h1 className="text-lg font-bold">{step === 'roster' ? 'Match Roster' : 'Opening Lineup'}</h1>
-            <p className="text-sm text-emerald-100 truncate">
+            <p className="text-sm text-success-content truncate">
               {gameSideDisplayName(state.gameInfo, 'tracked')} vs {gameSideDisplayName(state.gameInfo, 'opponent')}
             </p>
           </div>
-          <span className="ml-auto text-xs font-semibold bg-white/15 rounded px-2 py-1">
+          <span className="ml-auto text-xs font-semibold bg-surface rounded px-2 py-1">
             {step === 'roster' ? '1 of 2' : '2 of 2'}
           </span>
         </div>
@@ -402,18 +402,18 @@ export default function SoccerPlayerSetup() {
 
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-5">
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
             {error}
           </div>
         )}
 
         {rosterLoadError && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
             <p>Could not load the cloud roster: {rosterLoadError}</p>
             <button
               type="button"
               onClick={() => setRosterLoadAttempt(attempt => attempt + 1)}
-              className="mt-2 font-semibold underline disabled:opacity-50"
+              className="mt-2 font-semibold underline disabled:bg-control-disabled disabled:text-content-disabled"
               disabled={rosterLoading}
             >
               Retry roster
@@ -426,8 +426,8 @@ export default function SoccerPlayerSetup() {
             role={teamDefaultsNotice.tone === 'warning' ? 'alert' : 'status'}
             className={`rounded-md border px-3 py-2 text-sm ${
               teamDefaultsNotice.tone === 'warning'
-                ? 'border-amber-200 bg-amber-50 text-amber-900'
-                : 'border-blue-200 bg-blue-50 text-blue-800'
+                ? 'border-warning-line bg-warning text-warning-content'
+                : 'border-info-line bg-info text-info-content'
             }`}
           >
             <p>{teamDefaultsNotice.message}</p>
@@ -448,41 +448,41 @@ export default function SoccerPlayerSetup() {
           <>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-slate-800">Available players</p>
-                <p className="text-xs text-slate-500">{selected.length} selected</p>
+                <p className="text-sm font-bold text-content">Available players</p>
+                <p className="text-xs text-content-muted">{selected.length} selected</p>
               </div>
               {setup.sourceTeamId && (
-                <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+                <span className="inline-flex items-center gap-1 rounded bg-info px-2 py-1 text-xs font-semibold text-info-content">
                   <Shield size={14} /> Cloud roster
                 </span>
               )}
             </div>
 
             {rosterLoading ? (
-              <div className="py-10 text-center text-sm text-slate-500 animate-pulse">Loading roster...</div>
+              <div className="py-10 text-center text-sm text-content-muted animate-pulse">Loading roster...</div>
             ) : drafts.length === 0 ? (
-              <div className="py-10 text-center text-sm text-slate-500">No players available.</div>
+              <div className="py-10 text-center text-sm text-content-muted">No players available.</div>
             ) : (
-              <div className="divide-y divide-slate-200 border-y border-slate-200">
+              <div className="divide-y divide-line border-y border-line">
                 {drafts.map(draft => (
                   <label key={draft.id} className="min-h-14 flex items-center gap-3 py-2 cursor-pointer">
-                    <input type="checkbox" checked={draft.selected} onChange={event => updateDraft(draft.id, { selected: event.target.checked })} className="h-5 w-5 accent-emerald-600" />
-                    <span className="w-9 text-center text-sm font-bold text-slate-500">{draft.number ?? '-'}</span>
-                    <span className="min-w-0 flex-1 font-medium text-slate-800 truncate">{draft.displayName}</span>
-                    {draft.kind === 'anonymous' && <span className="text-xs text-slate-400">Game only</span>}
+                    <input type="checkbox" checked={draft.selected} onChange={event => updateDraft(draft.id, { selected: event.target.checked })} className="bg-surface h-5 w-5 accent-accent" />
+                    <span className="w-9 text-center text-sm font-bold text-content-muted">{draft.number ?? '-'}</span>
+                    <span className="min-w-0 flex-1 font-medium text-content truncate">{draft.displayName}</span>
+                    {draft.kind === 'anonymous' && <span className="text-xs text-content-subtle">Game only</span>}
                   </label>
                 ))}
               </div>
             )}
 
-            <section className="border-t border-slate-200 pt-4 space-y-3">
-              <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <section className="border-t border-line pt-4 space-y-3">
+              <h2 className="text-sm font-bold text-content flex items-center gap-2">
                 <UserPlus size={17} /> {setup.sourceTeamId ? 'Game-only participant' : 'Local roster player'}
               </h2>
               <div className="grid grid-cols-[5rem_1fr_auto] gap-2">
                 <input value={number} onChange={event => setNumber(event.target.value)} placeholder="#" className="input-field px-3" />
                 <input value={name} onChange={event => setName(event.target.value)} placeholder="Name" className="input-field px-3" />
-                <button type="button" onClick={addParticipant} disabled={!name.trim()} className="h-12 w-12 grid place-items-center rounded-md bg-emerald-600 text-white disabled:opacity-40" aria-label="Add participant" title="Add participant">
+                <button type="button" onClick={addParticipant} disabled={!name.trim()} className="h-12 w-12 grid place-items-center rounded-md bg-accent text-accent-content disabled:bg-control-disabled disabled:text-content-disabled" aria-label="Add participant" title="Add participant">
                   <Plus size={20} />
                 </button>
               </div>
@@ -502,16 +502,16 @@ export default function SoccerPlayerSetup() {
 
             <div className="space-y-2">
               {selected.map(draft => (
-                <div key={draft.id} className="rounded-md border border-slate-200 bg-white p-3 space-y-3">
+                <div key={draft.id} className="rounded-md border border-line bg-surface p-3 space-y-3">
                   <div className="flex items-center gap-3">
-                    <span className="w-8 text-center text-sm font-bold text-slate-500">{draft.number ?? '-'}</span>
-                    <span className="min-w-0 flex-1 font-semibold text-slate-800 truncate">{draft.displayName}</span>
-                    {draft.initialRole.group === 'goalkeeper' && <Shield size={17} className="text-emerald-700" />}
+                    <span className="w-8 text-center text-sm font-bold text-content-muted">{draft.number ?? '-'}</span>
+                    <span className="min-w-0 flex-1 font-semibold text-content truncate">{draft.displayName}</span>
+                    {draft.initialRole.group === 'goalkeeper' && <Shield size={17} className="text-success-content" />}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                    <div className="grid grid-cols-2 rounded-md bg-control p-1">
                       {(['starter', 'bench'] as SoccerRosterStatus[]).map(status => (
-                        <button key={status} type="button" onClick={() => updateDraft(draft.id, { initialStatus: status })} className={`h-9 rounded text-xs font-semibold capitalize ${draft.initialStatus === status ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>
+                        <button key={status} type="button" onClick={() => updateDraft(draft.id, { initialStatus: status })} className={`h-9 rounded text-xs font-semibold capitalize ${draft.initialStatus === status ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>
                           {status}
                         </button>
                       ))}
@@ -560,9 +560,9 @@ function Metric({ label, value, alert = false }: {
   alert?: boolean
 }) {
   return (
-    <div className={`rounded-md border px-2 py-2 ${alert ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-      <p className={`text-lg font-bold tabular-nums ${alert ? 'text-amber-800' : 'text-slate-800'}`}>{value}</p>
-      <p className="text-[11px] text-slate-500">{label}</p>
+    <div className={`rounded-md border px-2 py-2 ${alert ? 'border-warning-line bg-warning' : 'border-line bg-surface'}`}>
+      <p className={`text-lg font-bold tabular-nums ${alert ? 'text-warning-content' : 'text-content'}`}>{value}</p>
+      <p className="text-[11px] text-content-muted">{label}</p>
     </div>
   )
 }

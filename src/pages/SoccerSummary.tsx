@@ -408,7 +408,7 @@ export default function SoccerSummary() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-canvas">
       <SoccerSummaryHeader
         source={source}
         result={result}
@@ -433,7 +433,7 @@ export default function SoccerSummary() {
       />
 
       {refreshError && (
-        <section className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+        <section className="border-b border-warning-line bg-warning px-4 py-3 text-warning-content">
           <div className="mx-auto flex max-w-2xl items-start gap-3">
             <AlertTriangle size={18} className="mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
@@ -445,7 +445,7 @@ export default function SoccerSummary() {
             <button
               type="button"
               onClick={() => { void refresh() }}
-              className="min-h-9 shrink-0 border border-amber-400 bg-white px-3 text-xs font-bold"
+              className="min-h-9 shrink-0 border border-warning-line bg-surface px-3 text-xs font-bold"
             >
               Retry
             </button>
@@ -454,7 +454,7 @@ export default function SoccerSummary() {
       )}
 
       {!healthy && (
-        <section className="border-b border-amber-300 bg-amber-50 px-4 py-4 text-amber-900">
+        <section className="border-b border-warning-line bg-warning px-4 py-4 text-warning-content">
           <div className="mx-auto flex max-w-2xl items-start gap-3">
             <AlertTriangle size={20} className="mt-0.5 shrink-0" />
             <div>
@@ -508,12 +508,12 @@ export default function SoccerSummary() {
             {source.kind === 'local' &&
               source.editable &&
               soccerState.projection.status === 'ended' && (
-                <section className="border-b border-slate-200 bg-white px-4 py-4">
+                <section className="border-b border-line bg-surface px-4 py-4">
                   <div className="mx-auto max-w-2xl">
                     <button
                       type="button"
                       onClick={reopenLocal}
-                      className="flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700"
+                      className="flex min-h-11 w-full items-center justify-center gap-2 border border-line-strong bg-surface px-3 text-sm font-bold text-content"
                     >
                       <RotateCcw size={17} /> Reopen Match
                     </button>
@@ -562,12 +562,12 @@ export default function SoccerSummary() {
             )}
 
             {(canOpenReopenedStream || canOpenSelectedRecording) && (
-              <section className="border-b border-slate-200 bg-emerald-50 px-4 py-4">
+              <section className="border-b border-line bg-success px-4 py-4">
                 <div className="mx-auto max-w-2xl">
                   <button
                     type="button"
                     onClick={() => { void openOwnedStream() }}
-                    className="flex min-h-11 w-full items-center justify-center gap-2 bg-emerald-700 px-3 text-sm font-bold text-white"
+                    className="flex min-h-11 w-full items-center justify-center gap-2 bg-success px-3 text-sm font-bold text-content"
                   >
                     <Play size={17} />
                     {matchingParked ? 'Resume Tracker' : 'Open Tracker'}
@@ -594,12 +594,12 @@ export default function SoccerSummary() {
 
 function SoccerSummarySkeleton() {
   return (
-    <div className="min-h-screen animate-pulse bg-slate-50">
-      <div className="h-44 bg-emerald-900" />
-      <div className="h-12 border-b border-slate-200 bg-white" />
+    <div className="min-h-screen animate-pulse bg-canvas">
+      <div className="h-44 bg-success" />
+      <div className="h-12 border-b border-line bg-surface" />
       <div className="mx-auto max-w-2xl px-4 py-5">
-        <div className="h-4 w-32 bg-slate-200" />
-        <div className="mt-4 h-64 border-y border-slate-200 bg-white" />
+        <div className="h-4 w-32 bg-control" />
+        <div className="mt-4 h-64 border-y border-line bg-surface" />
       </div>
     </div>
   )
@@ -624,13 +624,13 @@ function SoccerSummaryError({
       ? 'Synced primary'
       : 'Local match'
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-emerald-900 px-3 py-3 text-white">
+    <div className="min-h-screen bg-canvas">
+      <header className="bg-success px-3 py-3 text-content">
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="grid h-10 w-10 place-items-center rounded-md hover:bg-white/10"
+            className="grid h-10 w-10 place-items-center rounded-md hover:bg-surface"
             aria-label="Back"
             title="Back"
           >
@@ -638,20 +638,20 @@ function SoccerSummaryError({
           </button>
           <div>
             <h1 className="text-sm font-bold">Match Summary</h1>
-            <p className="text-xs text-emerald-100">{sourceLabel}</p>
+            <p className="text-xs text-success-content">{sourceLabel}</p>
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-10">
-        <AlertTriangle size={26} className="text-amber-600" />
-        <h2 className="mt-3 text-lg font-bold text-slate-900">
+        <AlertTriangle size={26} className="text-warning-content" />
+        <h2 className="mt-3 text-lg font-bold text-content">
           {sourceLabel} unavailable
         </h2>
-        <p className="mt-2 text-sm text-slate-600">{message}</p>
+        <p className="mt-2 text-sm text-content-muted">{message}</p>
         <button
           type="button"
           onClick={onRetry}
-          className="mt-5 flex min-h-11 items-center justify-center gap-2 bg-slate-800 px-4 text-sm font-bold text-white"
+          className="mt-5 flex min-h-11 items-center justify-center gap-2 bg-control-hover px-4 text-sm font-bold text-content"
         >
           <RefreshCw size={17} /> Retry
         </button>

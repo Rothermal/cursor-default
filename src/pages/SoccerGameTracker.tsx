@@ -391,24 +391,24 @@ export default function SoccerGameTracker() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50 pb-8" aria-busy={isApplying}>
+    <div className="min-h-screen overflow-x-hidden bg-canvas pb-8" aria-busy={isApplying}>
       {isApplying && <div className="fixed inset-0 z-[70] cursor-wait" aria-hidden="true" />}
-      <header className="bg-emerald-800 text-white px-4 py-3">
+      <header className="bg-control text-content px-4 py-3">
         <div className="mx-auto flex w-full min-w-0 max-w-2xl items-center gap-3">
-          <button type="button" onClick={() => navigate(sportDashboardPath('soccer'))} className="h-9 w-9 grid place-items-center rounded-md bg-white/15" aria-label="Back to soccer dashboard" title="Back">
+          <button type="button" onClick={() => navigate(sportDashboardPath('soccer'))} className="h-9 w-9 grid place-items-center rounded-md bg-surface" aria-label="Back to soccer dashboard" title="Back">
             <ChevronLeft size={20} />
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="font-bold truncate">{trackedLabel} vs {opponentLabel}</h1>
-            <p className="flex min-w-0 items-center gap-2 text-xs text-emerald-100">
+            <p className="flex min-w-0 items-center gap-2 text-xs text-success-content">
               <span className="truncate">{currentSegment?.label ?? (ended ? 'Match ended' : nextSegment ? `${nextSegment.label} next` : 'Periods complete')}</span>
-              <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-semibold">
+              <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 font-semibold">
                 {soccerCloudStatusLabel(state)}
               </span>
             </p>
           </div>
           {!ended && (
-            <button type="button" onClick={() => setActionsOpen(true)} disabled={!healthy || isApplying || cloudFinal} className="h-9 w-9 grid place-items-center rounded-md bg-white/15 disabled:opacity-40" aria-label="Match actions" title="Match actions">
+            <button type="button" onClick={() => setActionsOpen(true)} disabled={!healthy || isApplying || cloudFinal} className="h-9 w-9 grid place-items-center rounded-md bg-surface disabled:bg-control-disabled disabled:text-content-disabled" aria-label="Match actions" title="Match actions">
               <MoreHorizontal size={21} />
             </button>
           )}
@@ -416,110 +416,110 @@ export default function SoccerGameTracker() {
       </header>
 
       <main className="mx-auto w-full min-w-0 max-w-2xl">
-        <section className="px-4 py-4 text-center border-b border-slate-200 bg-white">
+        <section className="px-4 py-4 text-center border-b border-line bg-surface">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${trackedLabel} scoring timeline`}>
-              <p className="truncate text-xs font-semibold text-slate-500">{trackedLabel}</p>
-              <p className="text-4xl font-bold tabular-nums text-emerald-800">{state.homeTeamScore ?? 0}</p>
+            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-canvas" aria-label={`Open ${trackedLabel} scoring timeline`}>
+              <p className="truncate text-xs font-semibold text-content-muted">{trackedLabel}</p>
+              <p className="text-4xl font-bold tabular-nums text-success-content">{state.homeTeamScore ?? 0}</p>
             </button>
             <div className="min-w-24">
-              <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase text-slate-500">
+              <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase text-content-muted">
                 <span>{currentSegment?.label ?? (ended ? 'Final' : 'Break')}</span>
-                <span className={`h-2 w-2 rounded-full ${projection.clock.running ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                <span className={`h-2 w-2 rounded-full ${projection.clock.running ? 'bg-success' : 'bg-control'}`} />
               </div>
               <div className="mt-1 flex min-h-9 items-baseline justify-center gap-1">
-                <p className="text-3xl font-bold text-slate-900 tabular-nums leading-none">{clockValue.primary}</p>
-                {clockValue.overrun && <span className="text-sm font-bold text-amber-600 tabular-nums">{clockValue.overrun}</span>}
+                <p className="text-3xl font-bold text-content tabular-nums leading-none">{clockValue.primary}</p>
+                {clockValue.overrun && <span className="text-sm font-bold text-warning-content tabular-nums">{clockValue.overrun}</span>}
               </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-500">{projection.clock.running ? 'Running' : 'Stopped'}</p>
+              <p className="mt-1 text-[11px] font-medium text-content-muted">{projection.clock.running ? 'Running' : 'Stopped'}</p>
             </div>
-            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-slate-50" aria-label={`Open ${opponentLabel} scoring timeline`}>
-              <p className="truncate text-xs font-semibold text-slate-500">{opponentLabel}</p>
-              <p className="text-4xl font-bold tabular-nums text-slate-800">{state.opponentScore}</p>
+            <button type="button" onClick={() => { setScoreAdjustmentEdit(null); setScoreTimelineOpen(true) }} className="min-w-0 rounded-md px-1 py-1 hover:bg-canvas" aria-label={`Open ${opponentLabel} scoring timeline`}>
+              <p className="truncate text-xs font-semibold text-content-muted">{opponentLabel}</p>
+              <p className="text-4xl font-bold tabular-nums text-content">{state.opponentScore}</p>
             </button>
           </div>
 
           {!healthy ? (
-            <button type="button" onClick={() => setMainTab('timeline')} className="mt-5 w-full rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            <button type="button" onClick={() => setMainTab('timeline')} className="mt-5 w-full rounded-md border border-danger-line bg-danger px-4 py-3 text-sm font-bold text-danger-content">
               Review Timeline Issues
             </button>
           ) : ended ? (
             <div className="mt-5 space-y-2">
-              <p className="text-sm font-bold text-slate-700">{matchResultLabel(projection, trackedLabel, opponentLabel)}</p>
+              <p className="text-sm font-bold text-content">{matchResultLabel(projection, trackedLabel, opponentLabel)}</p>
               <button
                 type="button"
                 onClick={() => navigate(soccerSummaryPath({ from: 'tracker' }))}
-                className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-success px-4 py-3 text-sm font-bold text-content"
               >
                 <Flag size={18} /> View Summary
               </button>
               {cloudFinal ? (
-                <p className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <p className="border border-line bg-canvas px-3 py-2 text-xs text-content-muted">
                   This cloud result is locked. Reopen it from Match Summary.
                 </p>
               ) : (
-                <button type="button" onClick={() => setReopenOpen(true)} className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setReopenOpen(true)} className="w-full rounded-md border border-line-strong bg-surface px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2">
                   <RotateCcw size={18} /> Reopen Match
                 </button>
               )}
             </div>
           ) : projection.status === 'suspended' ? (
             <div className="mt-5 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => applyResult(reopenSoccerMatch(state, 'Match resumed', options))} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+              <button type="button" onClick={() => applyResult(reopenSoccerMatch(state, 'Match resumed', options))} className="rounded-md bg-success px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2">
                 <Play size={18} /> Resume Match
               </button>
-              <button type="button" onClick={() => openDialog('end')} className="rounded-md border border-red-300 bg-white px-4 py-3 text-sm font-bold text-red-700">Abandon</button>
+              <button type="button" onClick={() => openDialog('end')} className="rounded-md border border-danger-line bg-surface px-4 py-3 text-sm font-bold text-danger-content">Abandon</button>
             </div>
           ) : projection.status === 'period_break' ? (
             <div className="mt-5 grid grid-cols-2 gap-2">
               {lifecycleAction.kind === 'start_period' ? (
-                <button type="button" onClick={() => applyResult(startNextSoccerPeriod(state, options))} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                <button type="button" onClick={() => applyResult(startNextSoccerPeriod(state, options))} className="rounded-md bg-success px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2">
                   <Play size={18} /> Start {lifecycleAction.segment.label}
                 </button>
               ) : lifecycleAction.kind === 'start_shootout' ? (
-                <button type="button" onClick={() => setShootoutSetupOpen(true)} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setShootoutSetupOpen(true)} className="rounded-md bg-success px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2">
                   <Goal size={18} /> Start Shootout
                 </button>
               ) : lifecycleAction.kind === 'complete' ? (
-                <button type="button" onClick={() => applyResult(endSoccerMatch(state, 'completed', options))} className="rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2">
+                <button type="button" onClick={() => applyResult(endSoccerMatch(state, 'completed', options))} className="rounded-md bg-success px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2">
                   <Flag size={18} /> {lifecycleAction.label}
                 </button>
               ) : <span />}
-              <button type="button" onClick={() => openDialog('end')} className="rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 flex items-center justify-center gap-2">
+              <button type="button" onClick={() => openDialog('end')} className="rounded-md border border-line-strong bg-surface px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2">
                 <MoreHorizontal size={18} /> Match Status
               </button>
             </div>
           ) : shootoutActive ? null : (
             <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
-              <button type="button" onClick={primaryClockAction} className={`rounded-md px-4 py-3 text-sm font-bold text-white flex items-center justify-center gap-2 ${projection.clock.running ? 'bg-amber-600' : 'bg-emerald-700'}`}>
+              <button type="button" onClick={primaryClockAction} className={`rounded-md px-4 py-3 text-sm font-bold text-content flex items-center justify-center gap-2 ${projection.clock.running ? 'bg-warning' : 'bg-success'}`}>
                 {projection.clock.running ? <Pause size={19} /> : <Play size={19} />}
                 {projection.clock.running ? 'Pause Clock' : 'Start Clock'}
               </button>
-              <button type="button" onClick={() => setConfirmEndPeriod(true)} className="rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700">End Period</button>
+              <button type="button" onClick={() => setConfirmEndPeriod(true)} className="rounded-md border border-line-strong bg-surface px-4 py-3 text-sm font-bold text-content">End Period</button>
             </div>
           )}
         </section>
 
-        {error && <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+        {error && <div className="mx-4 mt-4 rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</div>}
 
         {cloudConflicts.length > 0 ? (
-          <div className="mx-4 mt-4 flex items-center gap-3 border border-amber-300 bg-amber-50 px-3 py-3 text-amber-900">
+          <div className="mx-4 mt-4 flex items-center gap-3 border border-warning-line bg-warning px-3 py-3 text-warning-content">
             <BadgeAlert size={20} className="shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">Needs Attention</p>
               <p className="text-xs">{cloudConflicts.length} {cloudConflicts.length === 1 ? 'event needs' : 'events need'} review</p>
             </div>
-            <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white">Review</button>
+            <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-warning px-3 text-xs font-bold text-content">Review</button>
           </div>
         ) : state.cloudSync.status === 'error' ? (
-          <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
+          <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 border border-danger-line bg-danger px-3 py-3 text-danger-content">
             <BadgeAlert size={20} className="shrink-0" />
             <p className="min-w-0 flex-1 truncate text-xs" title={state.cloudSync.lastError ?? undefined}>{state.cloudSync.lastError ?? 'Cloud sync needs attention.'}</p>
             {canRecoverDeletedPlayer && (
-              <button type="button" onClick={() => setDeletedPlayerRecoveryOpen(true)} disabled={syncBusy} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white disabled:opacity-50">Preserve History</button>
+              <button type="button" onClick={() => setDeletedPlayerRecoveryOpen(true)} disabled={syncBusy} className="min-h-9 rounded-md bg-warning px-3 text-xs font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">Preserve History</button>
             )}
-            <button type="button" onClick={() => { void retrySync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-red-700 px-3 text-xs font-bold text-white disabled:opacity-50">{syncBusy ? 'Retrying...' : 'Retry'}</button>
-            <button type="button" onClick={exportRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
+            <button type="button" onClick={() => { void retrySync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-danger px-3 text-xs font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">{syncBusy ? 'Retrying...' : 'Retry'}</button>
+            <button type="button" onClick={exportRecovery} className="min-h-9 rounded-md border border-danger-line bg-surface px-3 text-xs font-bold text-danger-content">Export</button>
           </div>
         ) : null}
 
@@ -530,35 +530,35 @@ export default function SoccerGameTracker() {
               setRecordersOpen(true)
               void refreshRecorders()
             }}
-            className="mx-4 mt-4 flex min-h-12 items-center gap-3 border-y border-slate-200 bg-white px-1 text-left"
+            className="mx-4 mt-4 flex min-h-12 items-center gap-3 border-y border-line bg-surface px-1 text-left"
           >
-            <Users size={19} className="shrink-0 text-emerald-700" />
+            <Users size={19} className="shrink-0 text-success-content" />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-slate-800">
+              <span className="block text-sm font-bold text-content">
                 {recordersLoading
                   ? 'Loading recorder streams...'
                   : `${recorders.length} ${recorders.length === 1 ? 'recorder' : 'recorders'}`}
               </span>
-              <span className="block truncate text-xs text-slate-500">
+              <span className="block truncate text-xs text-content-muted">
                 {primaryRecorder
                   ? `Primary: ${primaryRecorder.displayName}`
                   : 'Primary recorder pending'}
               </span>
             </span>
             {recorders.some(recorder => !recorder.checkpointCurrent) && (
-              <BadgeAlert size={17} className="shrink-0 text-amber-600" />
+              <BadgeAlert size={17} className="shrink-0 text-warning-content" />
             )}
           </button>
         )}
 
         {!healthy && mainTab !== 'timeline' && (
-          <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-3">
-            <p className="text-sm font-bold text-red-800">Live controls are locked</p>
-            <p className="text-xs text-red-700 mt-1">Correct the diagnosed match timeline before recording more events.</p>
+          <div className="mx-4 mt-4 rounded-md border border-danger-line bg-danger px-3 py-3">
+            <p className="text-sm font-bold text-danger-content">Live controls are locked</p>
+            <p className="text-xs text-danger-content mt-1">Correct the diagnosed match timeline before recording more events.</p>
           </div>
         )}
 
-        <nav className="grid grid-cols-3 border-b border-slate-200 bg-white" aria-label="Soccer tracker views">
+        <nav className="grid grid-cols-3 border-b border-line bg-surface" aria-label="Soccer tracker views">
           <TabButton active={mainTab === 'field'} label={shootoutActive ? 'Shootout' : 'Field'} icon={shootoutActive ? <Goal size={17} /> : <Map size={17} />} onClick={() => setMainTab('field')} />
           <TabButton active={mainTab === 'lineup'} label="Lineup" icon={<Users size={17} />} onClick={() => setMainTab('lineup')} />
           <TabButton active={mainTab === 'timeline'} label="Timeline" icon={<History size={17} />} onClick={() => setMainTab('timeline')} />
@@ -578,7 +578,7 @@ export default function SoccerGameTracker() {
                 onEligibility={() => setShootoutManagement('eligibility')}
               />
               <section>
-                <h2 className="mb-2 text-xs font-bold uppercase text-slate-500">Normal match field review</h2>
+                <h2 className="mb-2 text-xs font-bold uppercase text-content-muted">Normal match field review</h2>
                 <SoccerField
                   trackedDirection={projection.attackingDirection}
                   captureSide={capturePreferences.teamSide}
@@ -599,14 +599,14 @@ export default function SoccerGameTracker() {
             </div>
           ) : mainTab === 'field' ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+              <div className="grid grid-cols-2 rounded-md bg-control p-1">
                 <ModeButton active={capturePreferences.teamSide === 'tracked'} label={trackedLabel} onClick={() => setCaptureSide('tracked')} />
                 <ModeButton active={capturePreferences.teamSide === 'opponent'} label={opponentLabel} onClick={() => setCaptureSide('opponent')} />
               </div>
 
               <div>
-                <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Field capture</p>
-                <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
+                <p className="mb-1 text-[11px] font-bold uppercase text-content-muted">Field capture</p>
+                <div className="grid grid-cols-3 rounded-md bg-control p-1">
                   <ModeButton active={capturePreferences.captureMode === 'shot'} label="Shot" onClick={() => setCaptureMode('shot')} />
                   <ModeButton active={capturePreferences.captureMode === 'defense'} label="Defense" onClick={() => setCaptureMode('defense')} />
                   <ModeButton active={capturePreferences.captureMode === 'foul'} label="Foul" onClick={() => setCaptureMode('foul')} />
@@ -692,7 +692,7 @@ export default function SoccerGameTracker() {
                     type="button"
                     onClick={() => openDialog('substitution')}
                     disabled={!substitutionActionEnabled}
-                    className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md border border-emerald-700 bg-emerald-50 px-3 text-sm font-bold text-emerald-800 disabled:border-slate-300 disabled:bg-slate-50 disabled:text-slate-500 disabled:opacity-50"
+                    className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md border border-success-line bg-success px-3 text-sm font-bold text-success-content disabled:border-line-strong disabled:bg-canvas disabled:text-content-muted disabled:bg-control-disabled disabled:text-content-disabled"
                   >
                     <Repeat2 size={18} />
                     <span className="text-center leading-tight">{projection.clock.running ? 'Pause clock to manage lineup' : 'Manage Lineup'}</span>
@@ -704,7 +704,7 @@ export default function SoccerGameTracker() {
                       setActionsOpen(true)
                     }}
                     disabled={!healthy || isApplying || cloudFinal}
-                    className="grid min-h-12 w-12 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 disabled:opacity-40"
+                    className="grid min-h-12 w-12 place-items-center rounded-md border border-line-strong bg-surface text-content disabled:bg-control-disabled disabled:text-content-disabled"
                     aria-label="More match actions"
                     title="More match actions"
                   >
@@ -713,14 +713,14 @@ export default function SoccerGameTracker() {
                 </div>
               )}
 
-              <details className="border-y border-slate-200 py-2">
-                <summary className="cursor-pointer text-sm font-semibold text-slate-600">
-                  Marker filters <span className="font-normal text-slate-500">· {markerFilterSummary}</span>
+              <details className="border-y border-line py-2">
+                <summary className="cursor-pointer text-sm font-semibold text-content-muted">
+                  Marker filters <span className="font-normal text-content-muted">· {markerFilterSummary}</span>
                 </summary>
                 <div className="mt-3 space-y-3">
                   <div>
-                    <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker family</p>
-                    <div className="grid grid-cols-4 rounded-md bg-slate-200 p-1">
+                    <p className="mb-1 text-[11px] font-bold uppercase text-content-muted">Marker family</p>
+                    <div className="grid grid-cols-4 rounded-md bg-control p-1">
                       <ModeButton active={markerFamilyFilter === 'all'} label="All" onClick={() => setMarkerFamilyFilter('all')} />
                       <ModeButton active={markerFamilyFilter === 'shots'} label="Shots" onClick={() => setMarkerFamilyFilter('shots')} />
                       <ModeButton active={markerFamilyFilter === 'defense'} label="Defense" onClick={() => setMarkerFamilyFilter('defense')} />
@@ -730,16 +730,16 @@ export default function SoccerGameTracker() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker side</p>
-                      <div className="grid grid-cols-3 rounded-md bg-slate-200 p-1">
+                      <p className="mb-1 text-[11px] font-bold uppercase text-content-muted">Marker side</p>
+                      <div className="grid grid-cols-3 rounded-md bg-control p-1">
                         <ModeButton active={markerSideFilter === 'all'} label="All" onClick={() => setMarkerSideFilter('all')} />
                         <ModeButton active={markerSideFilter === 'tracked'} label={trackedLabel} onClick={() => setMarkerSideFilter('tracked')} />
                         <ModeButton active={markerSideFilter === 'opponent'} label={opponentLabel} onClick={() => setMarkerSideFilter('opponent')} />
                       </div>
                     </div>
                     <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Marker period</p>
-                      <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                      <p className="mb-1 text-[11px] font-bold uppercase text-content-muted">Marker period</p>
+                      <div className="grid grid-cols-2 rounded-md bg-control p-1">
                         <ModeButton active={markerScope === 'current'} label="Current" onClick={() => setMarkerScope('current')} />
                         <ModeButton active={markerScope === 'match'} label="Match" onClick={() => setMarkerScope('match')} />
                       </div>
@@ -751,7 +751,7 @@ export default function SoccerGameTracker() {
           ) : mainTab === 'lineup' ? (
             <>
               <button type="button" onClick={() => openDialog('substitution')} disabled={!substitutionActionEnabled}
-                className="mb-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-emerald-700 bg-emerald-50 px-3 text-sm font-bold text-emerald-800 disabled:opacity-50">
+                className="mb-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-success-line bg-success px-3 text-sm font-bold text-success-content disabled:bg-control-disabled disabled:text-content-disabled">
                 <Repeat2 size={18} />{projection.clock.running ? 'Pause clock to manage lineup' : 'Manage Lineup'}
               </button>
               <div className="grid grid-cols-3 gap-2 text-center mb-4">
@@ -759,11 +759,11 @@ export default function SoccerGameTracker() {
                 <Metric label="Subs" value={limitValue(projection.substitutionCount, projection.currentRules.substitutionLimit)} />
                 <Metric label="Windows" value={limitValue(projection.substitutionWindowCount, projection.currentRules.substitutionWindowLimit)} />
               </div>
-              <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1 mb-3">
+              <div className="grid grid-cols-2 rounded-md bg-control p-1 mb-3">
                 <ModeButton active={lineupTab === 'on_field'} label={`On Field (${onField.length})`} onClick={() => setLineupTab('on_field')} />
                 <ModeButton active={lineupTab === 'bench'} label={`Bench (${bench.length})`} onClick={() => setLineupTab('bench')} />
               </div>
-              <div className="divide-y divide-slate-200 border-y border-slate-200">
+              <div className="divide-y divide-line border-y border-line">
                 {visibleParticipants.map(participant => (
                   <ParticipantRow
                     key={participant.participantId}
@@ -778,7 +778,7 @@ export default function SoccerGameTracker() {
                   />
                 ))}
               </div>
-              {visibleParticipants.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No participants in this view.</p>}
+              {visibleParticipants.length === 0 && <p className="py-8 text-center text-sm text-content-muted">No participants in this view.</p>}
             </>
           ) : (
             <SoccerTimeline
@@ -981,19 +981,19 @@ function ParticipantRow({ participant, projection, nowMs, disabled, roleDisabled
   const activeMs = participantActiveMs(participant, projection, nowMs)
   return (
     <div className="min-h-16 py-2 flex items-center gap-3">
-      <span className="w-8 text-center text-sm font-bold text-slate-500">{participant.number ?? '-'}</span>
+      <span className="w-8 text-center text-sm font-bold text-content-muted">{participant.number ?? '-'}</span>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-slate-800 truncate">{participant.displayName}</p>
-        <p className="text-xs text-slate-500 capitalize truncate">
+        <p className="font-semibold text-content truncate">{participant.displayName}</p>
+        <p className="text-xs text-content-muted capitalize truncate">
           {participant.role.label ?? participant.role.group.replace('_', ' ')} · {formatSoccerDuration(activeMs)}
           {participant.status === 'left' ? ' · Left match' : ''}
         </p>
       </div>
-      {participant.role.group === 'goalkeeper' && <Shield size={16} className="text-emerald-700 shrink-0" />}
+      {participant.role.group === 'goalkeeper' && <Shield size={16} className="text-success-content shrink-0" />}
       {!disabled && (
         <div className="flex gap-1">
-          {canResolve && <button type="button" onClick={onResolve} className="h-9 px-2 text-xs font-bold text-blue-600" title="Resolve participant">Resolve</button>}
-          {participant.status !== 'left' && <button type="button" disabled={roleDisabled} onClick={onRole} className="h-9 px-2 text-xs font-bold text-slate-600 disabled:opacity-40">Role</button>}
+          {canResolve && <button type="button" onClick={onResolve} className="h-9 px-2 text-xs font-bold text-info-content" title="Resolve participant">Resolve</button>}
+          {participant.status !== 'left' && <button type="button" disabled={roleDisabled} onClick={onRole} className="h-9 px-2 text-xs font-bold text-content-muted disabled:bg-control-disabled disabled:text-content-disabled">Role</button>}
         </div>
       )}
     </div>
@@ -1017,12 +1017,12 @@ function ActionSheet({ status, onClose, onAction, onDirection }: {
     ? standardActions
     : [{ kind: 'end' as const, label: 'Match status', icon: <Flag size={20} /> }]
   return (
-    <div className="fixed inset-0 z-40 bg-black/45 flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-lg sm:rounded-lg p-4" onClick={event => event.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-slate-800">Match Actions</h2><button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></div>
+    <div className="fixed inset-0 z-40 bg-overlay/[0.45] flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-surface w-full sm:max-w-md rounded-t-lg sm:rounded-lg p-4" onClick={event => event.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3"><h2 className="font-bold text-content">Match Actions</h2><button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
         <div className="grid grid-cols-2 gap-2">
-          {actions.map(action => <button key={action.kind} type="button" onClick={() => onAction(action.kind)} className="min-h-16 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 flex items-center gap-3">{action.icon}{action.label}</button>)}
-          {standardControls && <button type="button" onClick={onDirection} className="min-h-16 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 flex items-center gap-3"><Compass size={20} />Switch direction</button>}
+          {actions.map(action => <button key={action.kind} type="button" onClick={() => onAction(action.kind)} className="min-h-16 rounded-md border border-line bg-surface px-3 py-2 text-sm font-bold text-content flex items-center gap-3">{action.icon}{action.label}</button>)}
+          {standardControls && <button type="button" onClick={onDirection} className="min-h-16 rounded-md border border-line bg-surface px-3 py-2 text-sm font-bold text-content flex items-center gap-3"><Compass size={20} />Switch direction</button>}
         </div>
       </div>
     </div>
@@ -1030,16 +1030,16 @@ function ActionSheet({ status, onClose, onAction, onDirection }: {
 }
 
 function TabButton({ active, label, icon, onClick }: { active: boolean; label: string; icon: ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`h-12 flex items-center justify-center gap-2 text-sm font-bold border-b-2 ${active ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-slate-500'}`}>{icon}{label}</button>
+  return <button type="button" onClick={onClick} className={`h-12 flex items-center justify-center gap-2 text-sm font-bold border-b-2 ${active ? 'border-success-line text-success-content' : 'border-transparent text-content-muted'}`}>{icon}{label}</button>
 }
 
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
+  return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>{label}</button>
 }
 
 function QuickCaptureButton({ label, icon, disabled, pressed, onClick }: { label: string; icon: ReactNode; disabled: boolean; pressed?: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-1 text-[11px] font-bold disabled:opacity-40 ${pressed ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-300' : 'border-slate-300 bg-white text-slate-700'}`}>
+    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-1 text-[11px] font-bold disabled:bg-control-disabled disabled:text-content-disabled ${pressed ? 'border-warning-line bg-warning text-warning-content ring-2 ring-warning-line' : 'border-line-strong bg-surface text-content'}`}>
       {icon}
       <span className="truncate">{label}</span>
     </button>
@@ -1047,7 +1047,7 @@ function QuickCaptureButton({ label, icon, disabled, pressed, onClick }: { label
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md border border-slate-200 bg-white px-2 py-2"><p className="font-bold text-slate-800 tabular-nums">{value}</p><p className="text-[11px] text-slate-500">{label}</p></div>
+  return <div className="rounded-md border border-line bg-surface px-2 py-2"><p className="font-bold text-content tabular-nums">{value}</p><p className="text-[11px] text-content-muted">{label}</p></div>
 }
 
 function limitValue(used: number, limit: number | null): string {
@@ -1056,7 +1056,7 @@ function limitValue(used: number, limit: number | null): string {
 
 function ReopenMatchDialog({ abandoned, busy, onClose, onReopen }: { abandoned: boolean; busy: boolean; onClose: () => void; onReopen: (reason: string | null) => void }) {
   const [reason, setReason] = useState('')
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center" onClick={onClose}><div role="dialog" aria-modal="true" aria-label="Reopen match" className="w-full rounded-t-lg bg-white p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}><div className="mb-3 flex items-center gap-3"><h2 className="flex-1 font-bold text-slate-900">Reopen Match</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></div><p className="mb-3 text-sm text-slate-600">Reopening returns the match to its last valid correction point.</p><label className="block text-xs font-bold uppercase text-slate-500">Reason {abandoned ? '(required)' : '(optional)'}<textarea value={reason} onChange={event => setReason(event.target.value)} rows={3} className="input-field mt-1 resize-none" /></label><button type="button" disabled={busy || (abandoned && !reason.trim())} onClick={() => onReopen(reason.trim() || null)} className="mt-4 min-h-12 w-full rounded-md bg-slate-800 text-sm font-bold text-white disabled:opacity-40">Reopen Match</button></div></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}><div role="dialog" aria-modal="true" aria-label="Reopen match" className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}><div className="mb-3 flex items-center gap-3"><h2 className="flex-1 font-bold text-content">Reopen Match</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div><p className="mb-3 text-sm text-content-muted">Reopening returns the match to its last valid correction point.</p><label className="block text-xs font-bold uppercase text-content-muted">Reason {abandoned ? '(required)' : '(optional)'}<textarea value={reason} onChange={event => setReason(event.target.value)} rows={3} className="input-field mt-1 resize-none" /></label><button type="button" disabled={busy || (abandoned && !reason.trim())} onClick={() => onReopen(reason.trim() || null)} className="mt-4 min-h-12 w-full rounded-md bg-control-hover text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">Reopen Match</button></div></div>
 }
 
 function matchResultLabel(projection: SoccerMatchProjection, trackedName: string, opponentName: string): string {
@@ -1124,11 +1124,11 @@ function incidentKind(event: SoccerIncidentEvent): SoccerIncidentKind {
 
 function ClusterSheet({ events, onSelect, onClose }: { events: GameEvent[]; onSelect: (event: GameEvent) => void; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 sm:items-center" onClick={onClose}>
-      <div className="w-full rounded-t-lg bg-white p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-slate-800">Events at this location</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></div>
-        <div className="divide-y divide-slate-200 border-y border-slate-200">
-          {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="truncate text-sm font-semibold text-slate-800">{markerLabel(event)}</span><span className="text-xs font-bold text-emerald-700">Edit</span></button>)}
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}>
+      <div className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-content">Events at this location</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
+        <div className="divide-y divide-line border-y border-line">
+          {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="truncate text-sm font-semibold text-content">{markerLabel(event)}</span><span className="text-xs font-bold text-success-content">Edit</span></button>)}
         </div>
       </div>
     </div>

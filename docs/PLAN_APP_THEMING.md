@@ -1,6 +1,6 @@
 # Plan: App theming and dark mode
 
-Status: THM-1 through THM-4 implemented; THM-5 and THM-6 pending
+Status: THM-1 through THM-5 implemented; THM-6 release audit and App setting pending
 
 This roadmap makes StatKeeper themeable across authentication, administration,
 team/game management, live sport workspaces, and review destinations. Light and
@@ -370,6 +370,15 @@ meanings are unchanged.
 ### THM-5 - Soccer surfaces
 
 Goal: theme the complete Soccer match workspace and review stack.
+
+Implemented in one consolidated Soccer batch. The 38-component inventory covers
+setup, tracking, capture/corrections, lineup, shootout, recorder/finalization,
+Summary, settings, and aggregate destinations (including already-converted
+management surfaces). The pitch and formation artwork now use dedicated tokens;
+green turf, yellow/blue sides, and card colors remain stable across both themes.
+See [Soccer theming verification](REGRESSION_THM_5_SOCCER_SURFACES.md).
+Implementation completion is not full real-game/cloud/PWA release signoff. Those
+checks remain THM-6, and the production Dark selector is still hidden.
 
 - Convert setup, player setup, tracker tabs, clock, lineup/role controls, event
   sheets, Timeline, restart/formation surfaces present at implementation time,

@@ -63,8 +63,8 @@ export default function SoccerPlayers({
 
   return (
     <main className="mx-auto max-w-2xl pb-10">
-      <section className="border-b border-slate-200 bg-white px-4 py-4">
-        <div className="grid grid-cols-2 border border-slate-300 p-0.5">
+      <section className="border-b border-line bg-surface px-4 py-4">
+        <div className="grid grid-cols-2 border border-line-strong p-0.5">
           {([
             ['tracked', source.state.gameInfo?.teamName ?? 'Tracked'],
             ['opponent', source.state.gameInfo?.opponentName ?? 'Opponent'],
@@ -78,8 +78,8 @@ export default function SoccerPlayers({
               }}
               className={`min-h-10 px-2 text-sm font-bold ${
                 side === id
-                  ? 'bg-emerald-700 text-white'
-                  : 'bg-white text-slate-600'
+                  ? 'bg-accent text-accent-content'
+                  : 'bg-surface text-content-muted'
               }`}
               aria-pressed={side === id}
             >
@@ -87,8 +87,8 @@ export default function SoccerPlayers({
             </button>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
-          <ShieldCheck size={15} className="shrink-0 text-emerald-700" />
+        <div className="mt-3 flex items-center gap-2 text-xs text-content-muted">
+          <ShieldCheck size={15} className="shrink-0 text-success-content" />
           <span>
             {side === 'tracked'
               ? review.tracked.cleanSheet.label
@@ -98,18 +98,18 @@ export default function SoccerPlayers({
       </section>
 
       {side === 'opponent' ? (
-        <section className="bg-white px-4 py-10 text-center">
-          <h2 className="text-base font-bold text-slate-900">
+        <section className="bg-surface px-4 py-10 text-center">
+          <h2 className="text-base font-bold text-content">
             Opponent player detail unavailable
           </h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-600">
+          <p className="mx-auto mt-2 max-w-sm text-sm text-content-muted">
             This match has team-level opponent statistics but no complete opponent lineup,
             role, or minutes record.
           </p>
         </section>
       ) : (
         <>
-          <section className="sticky top-12 z-20 border-b border-slate-200 bg-white px-4">
+          <section className="sticky top-12 z-20 border-b border-line bg-surface px-4">
             <div className="flex h-11 items-stretch overflow-x-auto">
               {CATEGORIES.map(item => (
                 <button
@@ -118,8 +118,8 @@ export default function SoccerPlayers({
                   onClick={() => onCategoryChange(item.id)}
                   className={`shrink-0 border-b-2 px-3 text-xs font-bold ${
                     category === item.id
-                      ? 'border-emerald-700 text-emerald-800'
-                      : 'border-transparent text-slate-500'
+                      ? 'border-success-line text-success-content'
+                      : 'border-transparent text-content-muted'
                   }`}
                   aria-pressed={category === item.id}
                 >
@@ -129,9 +129,9 @@ export default function SoccerPlayers({
             </div>
           </section>
 
-          <section className="bg-white">
+          <section className="bg-surface">
             <div
-              className="grid min-h-9 items-center gap-1 border-b border-slate-200 bg-slate-50 px-3 text-[10px] font-bold uppercase text-slate-500"
+              className="grid min-h-9 items-center gap-1 border-b border-line bg-canvas px-3 text-[10px] font-bold uppercase text-content-muted"
               style={{ gridTemplateColumns: tableColumns(columns.length) }}
             >
               <span>Player</span>
@@ -143,21 +143,21 @@ export default function SoccerPlayers({
               <span aria-hidden="true" />
             </div>
 
-            <div className="divide-y divide-slate-200">
+            <div className="divide-y divide-line">
               {review.tracked.rows.map(player => (
                 <button
                   key={player.participantId}
                   type="button"
                   onClick={() => setSelected(player)}
-                  className="grid min-h-[4.25rem] w-full items-center gap-1 px-3 text-left hover:bg-slate-50"
+                  className="grid min-h-[4.25rem] w-full items-center gap-1 px-3 text-left hover:bg-canvas"
                   style={{ gridTemplateColumns: tableColumns(columns.length) }}
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-900">
-                      <span className="mr-1.5 text-slate-400">{player.number ?? '-'}</span>
+                    <p className="truncate text-sm font-bold text-content">
+                      <span className="mr-1.5 text-content-subtle">{player.number ?? '-'}</span>
                       {player.displayName}
                     </p>
-                    <p className="truncate text-[11px] capitalize text-slate-500">
+                    <p className="truncate text-[11px] capitalize text-content-muted">
                       {lineupLabel(player)}
                       {' - '}
                       {player.role.label ?? player.role.group.replace(/_/g, ' ')}
@@ -173,7 +173,7 @@ export default function SoccerPlayers({
                       value={column.value(player)}
                     />
                   ))}
-                  <ChevronRight size={17} className="text-slate-400" />
+                  <ChevronRight size={17} className="text-content-subtle" />
                 </button>
               ))}
             </div>
@@ -291,15 +291,15 @@ function categoryColumns(category: SoccerPlayerCategory): CategoryColumn[] {
 
 function StatCell({ value }: { value: number | SoccerReviewRate | null }) {
   if (typeof value === 'number') {
-    return <span className="text-center text-sm font-bold tabular-nums text-slate-800">{value}</span>
+    return <span className="text-center text-sm font-bold tabular-nums text-content">{value}</span>
   }
-  if (!value) return <span className="text-center text-sm text-slate-400">-</span>
+  if (!value) return <span className="text-center text-sm text-content-subtle">-</span>
   return (
     <span className="text-center tabular-nums">
-      <span className="block text-xs font-bold text-slate-800">
+      <span className="block text-xs font-bold text-content">
         {Math.round(value.value * 100)}%
       </span>
-      <span className="block text-[9px] text-slate-500">
+      <span className="block text-[9px] text-content-muted">
         {value.numerator}/{value.denominator}
       </span>
     </span>

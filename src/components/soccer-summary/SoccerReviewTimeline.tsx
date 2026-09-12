@@ -25,7 +25,7 @@ export default function SoccerReviewTimeline({
 
   return (
     <main className="mx-auto max-w-2xl pb-10">
-      <section className="bg-white px-4 py-4">
+      <section className="bg-surface px-4 py-4">
         <SoccerTimeline
           state={source.state}
           inspection={source.inspection}

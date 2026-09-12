@@ -180,7 +180,7 @@ export default function SoccerSettings() {
           type="button"
           onClick={() => void refreshSoccerSettings()}
           disabled={soccerSettingsSync.status === 'checking' || soccerSettingsSync.status === 'saving'}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-line text-content-muted disabled:opacity-100 disabled:bg-control-disabled disabled:text-content-disabled"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-line text-content-muted disabled:bg-control-disabled disabled:text-content-disabled disabled:bg-control-disabled disabled:text-content-disabled"
           title="Refresh cloud settings"
           aria-label="Refresh cloud settings"
         >

@@ -148,13 +148,13 @@ export default function SoccerFormationEditor({
         <>
           <div className="mx-auto w-full max-w-sm">
             <div
-              className="relative aspect-[68/100] overflow-hidden rounded-md border-2 border-emerald-800 bg-emerald-600"
+              className="relative aspect-[68/100] overflow-hidden rounded-md border-2 border-pitch-line bg-pitch-surface"
               aria-label={`${template.label} formation pitch`}
             >
-              <div className="absolute inset-x-0 top-1/2 border-t border-white/80" />
-              <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/80" />
-              <div className="absolute inset-x-[27%] top-0 h-[13%] border-x border-b border-white/80" />
-              <div className="absolute inset-x-[27%] bottom-0 h-[13%] border-x border-t border-white/80" />
+              <div className="absolute inset-x-0 top-1/2 border-t border-pitch-line" />
+              <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-pitch-line" />
+              <div className="absolute inset-x-[27%] top-0 h-[13%] border-x border-b border-pitch-line" />
+              <div className="absolute inset-x-[27%] bottom-0 h-[13%] border-x border-t border-pitch-line" />
               {template.slots.map(slot => (
                 <FormationSlotButton
                   key={slot.id}
@@ -265,8 +265,8 @@ function FormationSlotButton({
         assignedPlayerId && !player
           ? 'border-warning-line bg-warning text-warning-content'
           : assignedPlayerId
-            ? 'border-white bg-white text-slate-900'
-            : 'border-dashed border-white/90 bg-emerald-800/80 text-white'
+            ? 'border-line bg-surface text-content'
+            : 'border-dashed border-line bg-success text-content'
       }`}
       style={{ left: `${slot.x * 100}%`, top: `${slot.y * 100}%` }}
       aria-label={`${slot.label}: ${assignedPlayerId ? player?.name ?? 'Player unavailable' : 'Unassigned'}`}

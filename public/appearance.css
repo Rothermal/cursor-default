@@ -16,6 +16,13 @@
   --content-disabled: 103 110 120;
   --focus: 37 99 235;
   --overlay: 0 0 0;
+  --pitch-surface: 35 132 90;
+  --pitch-line: 248 250 252;
+  --pitch-tracked: 250 204 21;
+  --pitch-opponent: 56 189 248;
+  --pitch-ink: 15 23 42;
+  --pitch-yellow-card: 253 224 71;
+  --pitch-red-card: 239 68 68;
   --accent: 29 78 216;
   --accent-hover: 30 64 175;
   --accent-content: 255 255 255;
@@ -104,6 +111,13 @@
   --court-opponent: 146 64 14;
 }
 :root[data-theme='dark'] {
+  --pitch-surface: 35 132 90;
+  --pitch-line: 248 250 252;
+  --pitch-tracked: 250 204 21;
+  --pitch-opponent: 56 189 248;
+  --pitch-ink: 15 23 42;
+  --pitch-yellow-card: 253 224 71;
+  --pitch-red-card: 239 68 68;
   color-scheme: dark;
   --canvas: 24 25 28;
   --surface: 33 35 39;

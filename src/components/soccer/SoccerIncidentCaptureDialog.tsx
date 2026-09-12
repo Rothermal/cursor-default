@@ -516,14 +516,14 @@ export default function SoccerIncidentCaptureDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-labelledby="soccer-incident-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-white sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
-        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-labelledby="soccer-incident-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
+        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
-            <h2 id="soccer-incident-title" className="font-bold text-slate-900">{dialogTitle(draft.kind, mode)}</h2>
-            <p className="truncate text-xs text-slate-500">{location ? 'Located event' : 'Location unknown'}</p>
+            <h2 id="soccer-incident-title" className="font-bold text-content">{dialogTitle(draft.kind, mode)}</h2>
+            <p className="truncate text-xs text-content-muted">{location ? 'Located event' : 'Location unknown'}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button>
         </header>
 
         <div className="space-y-5 p-4">
@@ -544,7 +544,7 @@ export default function SoccerIncidentCaptureDialog({
 
           {mode === 'live' && draft.kind === 'team_event' && (
             <FieldGroup label="Side">
-              <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+              <div className="grid grid-cols-2 rounded-md bg-control p-1">
                 <ChoiceButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => changeTeamSide('tracked')} compact />
                 <ChoiceButton active={teamSide === 'opponent'} label={opponentTeamLabel} onClick={() => changeTeamSide('opponent')} compact />
               </div>
@@ -556,13 +556,13 @@ export default function SoccerIncidentCaptureDialog({
               <div className="grid grid-cols-2 gap-2">
                 {DEFENSIVE_ACTIONS.map(option => <ChoiceButton key={option.value} active={action === option.value} label={option.label} onClick={() => setAction(option.value)} />)}
               </div>
-              {action === 'tackle' && <div className="mt-2 grid grid-cols-2 rounded-md bg-slate-200 p-1"><ChoiceButton active={tackleOutcome === 'won'} label="Won" onClick={() => setTackleOutcome('won')} compact /><ChoiceButton active={tackleOutcome === 'lost'} label="Lost" onClick={() => setTackleOutcome('lost')} compact /></div>}
+              {action === 'tackle' && <div className="mt-2 grid grid-cols-2 rounded-md bg-control p-1"><ChoiceButton active={tackleOutcome === 'won'} label="Won" onClick={() => setTackleOutcome('won')} compact /><ChoiceButton active={tackleOutcome === 'lost'} label="Lost" onClick={() => setTackleOutcome('lost')} compact /></div>}
             </FieldGroup>
           )}
 
           {draft.kind === 'team_event' && (
             <FieldGroup label="Restart type">
-              <div className="grid grid-cols-2 gap-1 rounded-md bg-slate-200 p-1">
+              <div className="grid grid-cols-2 gap-1 rounded-md bg-control p-1">
                 {TEAM_EVENTS.map(option => (
                   <ChoiceButton
                     key={option.value}
@@ -660,13 +660,13 @@ export default function SoccerIncidentCaptureDialog({
           )}
 
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setLocationEditorOpen(value => !value)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><MapPin size={16} /> Set location</button>
-            <button type="button" onClick={() => setLocation(null)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><MapPinOff size={16} /> Clear location</button>
+            <button type="button" onClick={() => setLocationEditorOpen(value => !value)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-content"><MapPin size={16} /> Set location</button>
+            <button type="button" onClick={() => setLocation(null)} className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-content"><MapPinOff size={16} /> Clear location</button>
           </div>
           {locationEditorOpen && <SoccerField trackedDirection={trackedDirection} captureSide={teamSide} trackedLabel={trackedLabel} opponentLabel={opponentTeamLabel} flipped={fieldFlipped} disabled={false} onFlip={() => setFieldFlipped(value => !value)} onLocation={next => { setLocation(next); setLocationEditorOpen(false) }} />}
 
-          {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-          <button type="button" onClick={save} disabled={saveDisabled} className="min-h-12 w-full rounded-md bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-40">{mode === 'edit' ? 'Save Correction' : `Log ${kindLabel(draft.kind)}`}</button>
+          {error && <p className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>}
+          <button type="button" onClick={save} disabled={saveDisabled} className="min-h-12 w-full rounded-md bg-success px-4 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">{mode === 'edit' ? 'Save Correction' : `Log ${kindLabel(draft.kind)}`}</button>
         </div>
         <datalist id="soccer-incident-opponents">{recentLabels.map(label => <option key={label} value={label} />)}</datalist>
       </div>
@@ -675,11 +675,11 @@ export default function SoccerIncidentCaptureDialog({
 }
 
 function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
-  return <section><h3 className="mb-2 text-xs font-bold uppercase text-slate-500">{label}</h3>{children}</section>
+  return <section><h3 className="mb-2 text-xs font-bold uppercase text-content-muted">{label}</h3>{children}</section>
 }
 
 function ChoiceButton({ active, label, onClick, compact = false }: { active: boolean; label: string; onClick: () => void; compact?: boolean }) {
-  return <button type="button" onClick={onClick} title={label} className={`${compact ? 'min-h-8' : 'min-h-10'} min-w-0 truncate rounded-md px-2 text-xs font-bold ${active ? 'bg-emerald-700 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}>{label}</button>
+  return <button type="button" onClick={onClick} title={label} className={`${compact ? 'min-h-8' : 'min-h-10'} min-w-0 truncate rounded-md px-2 text-xs font-bold ${active ? 'bg-accent text-accent-content' : 'border border-line-strong bg-surface text-content'}`}>{label}</button>
 }
 
 function MomentEditor({ teamSide, onTeamSide, timings, selectedPeriodId, onSelectedPeriodId, periodElapsedMs, onPeriodElapsedMs, invalid, trackedLabel, opponentLabel }: {
@@ -694,7 +694,7 @@ function MomentEditor({ teamSide, onTeamSide, timings, selectedPeriodId, onSelec
   trackedLabel: string
   opponentLabel: string
 }) {
-  return <div className="space-y-4"><FieldGroup label="Side"><div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><ChoiceButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => onTeamSide('tracked')} compact /><ChoiceButton active={teamSide === 'opponent'} label={opponentLabel} onClick={() => onTeamSide('opponent')} compact /></div></FieldGroup><FieldGroup label="Match time"><div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem] gap-2"><select value={selectedPeriodId} onChange={event => { const next = timings.find(item => item.period.id === event.target.value); onSelectedPeriodId(event.target.value); onPeriodElapsedMs(next ? next.endElapsedMs - next.startElapsedMs : 0) }} className="input-field">{timings.map(item => <option key={item.period.id} value={item.period.id}>{item.label}</option>)}</select><label className="text-[11px] font-bold uppercase text-slate-500">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => onPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000)} className="input-field mt-1" /></label><label className="text-[11px] font-bold uppercase text-slate-500">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => onPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000)} className="input-field mt-1" /></label></div>{invalid && <p className="mt-2 text-xs font-medium text-amber-700">Choose a time inside the recorded period.</p>}</FieldGroup></div>
+  return <div className="space-y-4"><FieldGroup label="Side"><div className="grid grid-cols-2 rounded-md bg-control p-1"><ChoiceButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => onTeamSide('tracked')} compact /><ChoiceButton active={teamSide === 'opponent'} label={opponentLabel} onClick={() => onTeamSide('opponent')} compact /></div></FieldGroup><FieldGroup label="Match time"><div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem] gap-2"><select value={selectedPeriodId} onChange={event => { const next = timings.find(item => item.period.id === event.target.value); onSelectedPeriodId(event.target.value); onPeriodElapsedMs(next ? next.endElapsedMs - next.startElapsedMs : 0) }} className="input-field">{timings.map(item => <option key={item.period.id} value={item.period.id}>{item.label}</option>)}</select><label className="text-[11px] font-bold uppercase text-content-muted">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => onPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000)} className="input-field mt-1" /></label><label className="text-[11px] font-bold uppercase text-content-muted">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => onPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000)} className="input-field mt-1" /></label></div>{invalid && <p className="mt-2 text-xs font-medium text-warning-content">Choose a time inside the recorded period.</p>}</FieldGroup></div>
 }
 
 function ActorEditor({ label, side, allowStaff, attribution, onAttribution, participantId, onParticipantId, participants, actorLabel, onActorLabel, recentLabels }: {
@@ -714,7 +714,7 @@ function ActorEditor({ label, side, allowStaff, attribution, onAttribution, part
     ? [{ value: 'participant', label: 'Player' }, { value: 'team', label: 'Team' }, { value: 'unknown', label: 'Unknown' }]
     : [{ value: 'unknown', label: 'Player / unknown' }, { value: 'team', label: 'Team' }]
   if (allowStaff) options.push({ value: 'staff', label: 'Staff' })
-  return <FieldGroup label={label}><div className={`grid gap-1 rounded-md bg-slate-200 p-1 ${options.length === 2 ? 'grid-cols-2' : options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>{options.map(option => <ChoiceButton key={option.value} active={attribution === option.value} label={option.label} onClick={() => onAttribution(option.value)} compact />)}</div>{attribution === 'participant' && <select value={participantId} onChange={event => onParticipantId(event.target.value)} className="input-field mt-2"><option value="">Select player</option>{participants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select>}{(attribution === 'unknown' || attribution === 'staff') && <input value={actorLabel} onChange={event => onActorLabel(event.target.value)} list={side === 'opponent' && recentLabels.length ? 'soccer-incident-opponents' : undefined} placeholder={attribution === 'staff' ? 'Coach or staff name' : 'Player label'} className="input-field mt-2" />}</FieldGroup>
+  return <FieldGroup label={label}><div className={`grid gap-1 rounded-md bg-control p-1 ${options.length === 2 ? 'grid-cols-2' : options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>{options.map(option => <ChoiceButton key={option.value} active={attribution === option.value} label={option.label} onClick={() => onAttribution(option.value)} compact />)}</div>{attribution === 'participant' && <select value={participantId} onChange={event => onParticipantId(event.target.value)} className="input-field mt-2"><option value="">Select player</option>{participants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select>}{(attribution === 'unknown' || attribution === 'staff') && <input value={actorLabel} onChange={event => onActorLabel(event.target.value)} list={side === 'opponent' && recentLabels.length ? 'soccer-incident-opponents' : undefined} placeholder={attribution === 'staff' ? 'Coach or staff name' : 'Player label'} className="input-field mt-2" />}</FieldGroup>
 }
 
 function TeamEventActorEditor({ kind, side, recorded, onRecorded, attribution, onAttribution, participantId, onParticipantId, participants, actorLabel, onActorLabel, recentLabels }: {
@@ -759,7 +759,7 @@ function TeamEventActorEditor({ kind, side, recorded, onRecorded, attribution, o
   }
   return (
     <FieldGroup label={kind === 'offside' ? 'Offside player' : 'Taker'}>
-      <div className={`grid gap-1 rounded-md bg-slate-200 p-1 ${choices.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      <div className={`grid gap-1 rounded-md bg-control p-1 ${choices.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {choices.map(choice => (
           <ChoiceButton
             key={choice.value}
@@ -829,11 +829,11 @@ function LineupResolutionEditor({ sanction, yellowPolicy, goalkeeper, choice, on
   bench: SoccerProjectedParticipant[]
   fieldPlayers: SoccerProjectedParticipant[]
 }) {
-  if (sanction === 'yellow' && yellowPolicy === 'stay_on') return <p className="rounded-md bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Player remains on the field under this match's yellow-card rule.</p>
-  if (sanction === 'yellow' && goalkeeper) return <FieldGroup label="Goalkeeper yellow card"><p className="mb-2 text-xs text-slate-600">Choose the goalkeeper entering immediately while the cautioned goalkeeper leaves.</p><select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field"><option value="">Goalkeeper in</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select></FieldGroup>
-  if (sanction !== 'yellow' && !goalkeeper) return <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">Player is ejected and the team plays short.</p>
-  if (sanction !== 'yellow' && goalkeeper) return <FieldGroup label="Goalkeeper ejection"><p className="mb-2 text-xs text-slate-600">Choose the field player leaving and the goalkeeper entering. The team remains one player short.</p><select value={replacementOutId} onChange={event => onReplacementOutId(event.target.value)} className="input-field"><option value="">Field player out</option>{fieldPlayers.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select><select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field mt-2"><option value="">Goalkeeper in</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select></FieldGroup>
-  return <FieldGroup label="Yellow-card lineup"><div className="grid grid-cols-2 rounded-md bg-slate-200 p-1"><ChoiceButton active={choice === 'short'} label="Play short" onClick={() => onChoice('short')} compact /><ChoiceButton active={choice === 'replace'} label="Replace now" onClick={() => onChoice('replace')} compact /></div>{choice === 'replace' && <select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field mt-2"><option value="">Player entering</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select>}</FieldGroup>
+  if (sanction === 'yellow' && yellowPolicy === 'stay_on') return <p className="rounded-md bg-warning px-3 py-2 text-xs font-semibold text-warning-content">Player remains on the field under this match's yellow-card rule.</p>
+  if (sanction === 'yellow' && goalkeeper) return <FieldGroup label="Goalkeeper yellow card"><p className="mb-2 text-xs text-content-muted">Choose the goalkeeper entering immediately while the cautioned goalkeeper leaves.</p><select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field"><option value="">Goalkeeper in</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select></FieldGroup>
+  if (sanction !== 'yellow' && !goalkeeper) return <p className="rounded-md bg-danger px-3 py-2 text-xs font-semibold text-danger-content">Player is ejected and the team plays short.</p>
+  if (sanction !== 'yellow' && goalkeeper) return <FieldGroup label="Goalkeeper ejection"><p className="mb-2 text-xs text-content-muted">Choose the field player leaving and the goalkeeper entering. The team remains one player short.</p><select value={replacementOutId} onChange={event => onReplacementOutId(event.target.value)} className="input-field"><option value="">Field player out</option>{fieldPlayers.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select><select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field mt-2"><option value="">Goalkeeper in</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select></FieldGroup>
+  return <FieldGroup label="Yellow-card lineup"><div className="grid grid-cols-2 rounded-md bg-control p-1"><ChoiceButton active={choice === 'short'} label="Play short" onClick={() => onChoice('short')} compact /><ChoiceButton active={choice === 'replace'} label="Replace now" onClick={() => onChoice('replace')} compact /></div>{choice === 'replace' && <select value={replacementInId} onChange={event => onReplacementInId(event.target.value)} className="input-field mt-2"><option value="">Player entering</option>{bench.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}</select>}</FieldGroup>
 }
 
 function createActor(participants: Record<string, SoccerProjectedParticipant>, role: string, attribution: Attribution | 'none', participantId: string, label: string, teamLabel: string | undefined): GameEventActor | null {

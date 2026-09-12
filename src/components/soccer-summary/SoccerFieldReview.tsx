@@ -99,14 +99,14 @@ export default function SoccerFieldReview({
 
   return (
     <main className={busy ? 'pointer-events-none opacity-60' : ''} aria-busy={busy}>
-      <section className="border-b border-slate-200 bg-white px-4 py-4">
+      <section className="border-b border-line bg-surface px-4 py-4">
         <div className="mx-auto max-w-2xl space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-sm font-bold uppercase text-slate-500">
+              <h2 className="text-sm font-bold uppercase text-content-muted">
                 Field Review
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-content-muted">
                 {review.locatedEvents.length} located event{review.locatedEvents.length === 1 ? '' : 's'}
               </p>
             </div>
@@ -133,7 +133,7 @@ export default function SoccerFieldReview({
           />
 
           <div>
-            <p className="mb-2 text-xs font-bold uppercase text-slate-500">
+            <p className="mb-2 text-xs font-bold uppercase text-content-muted">
               Event families
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -146,8 +146,8 @@ export default function SoccerFieldReview({
                     onClick={() => toggleFamily(item.id)}
                     className={`min-h-9 shrink-0 border px-3 text-xs font-bold ${
                       active
-                        ? 'border-emerald-700 bg-emerald-700 text-white'
-                        : 'border-slate-300 bg-white text-slate-600'
+                        ? 'border-success-line bg-accent text-accent-content'
+                        : 'border-line-strong bg-surface text-content-muted'
                     }`}
                     aria-pressed={active}
                   >
@@ -175,7 +175,7 @@ export default function SoccerFieldReview({
         </div>
       </section>
 
-      <section className="border-b border-slate-200 bg-slate-100 px-3 py-4">
+      <section className="border-b border-line bg-surface-muted px-3 py-4">
         <div className="mx-auto max-w-2xl">
           <SoccerField
             trackedDirection="left_to_right"
@@ -195,7 +195,7 @@ export default function SoccerFieldReview({
             legendFamilies={families}
           />
           {markers.length === 0 && (
-            <p className="py-5 text-center text-sm text-slate-500">
+            <p className="py-5 text-center text-sm text-content-muted">
               No located events match these filters.
             </p>
           )}
@@ -203,7 +203,7 @@ export default function SoccerFieldReview({
       </section>
 
       {review.unknownLocationCount > 0 && (
-        <section className="border-b border-amber-200 bg-amber-50 px-4 py-3">
+        <section className="border-b border-warning-line bg-warning px-4 py-3">
           <div className="mx-auto max-w-2xl">
             <button
               type="button"
@@ -212,7 +212,7 @@ export default function SoccerFieldReview({
                   .filter(item => item.displayLocation === null)
                   .map(item => item.event.id)
               )}
-              className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-amber-900"
+              className="flex min-h-11 w-full items-center justify-between gap-3 text-left text-warning-content"
             >
               <span className="flex min-w-0 items-center gap-2 text-sm font-bold">
                 <MapPinOff size={17} className="shrink-0" />
@@ -261,7 +261,7 @@ function Segmented<TValue extends string>({
 }) {
   return (
     <div>
-      <div className="inline-flex border border-slate-300 bg-white" role="group" aria-label={label}>
+      <div className="inline-flex border border-line-strong bg-surface" role="group" aria-label={label}>
         {options.map(option => (
           <button
             key={option.id}
@@ -269,8 +269,8 @@ function Segmented<TValue extends string>({
             onClick={() => onChange(option.id)}
             className={`min-h-9 px-3 text-xs font-bold ${
               value === option.id
-                ? 'bg-slate-800 text-white'
-                : 'text-slate-600'
+                ? 'bg-accent text-accent-content'
+                : 'text-content-muted'
             }`}
             aria-pressed={value === option.id}
           >
@@ -294,7 +294,7 @@ function FilterSelect({
   onChange: (value: string) => void
 }) {
   return (
-    <label className="block text-xs font-bold uppercase text-slate-500">
+    <label className="block text-xs font-bold uppercase text-content-muted">
       {label}
       <select
         value={value}
@@ -324,52 +324,52 @@ function FieldEventSheet({
 }) {
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/[0.45] sm:items-center"
       onClick={onClose}
     >
       <div
-        className="max-h-[82vh] w-full overflow-y-auto rounded-t-lg bg-white p-4 sm:max-w-md sm:rounded-lg"
+        className="max-h-[82vh] w-full overflow-y-auto rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg"
         onClick={event => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold text-slate-800">
+            <h2 className="font-bold text-content">
               {unlocated
                 ? 'Events without a location'
                 : events.length === 1 ? 'Field Event' : 'Events at this location'}
             </h2>
             {events.length > 1 && (
-              <p className="text-xs text-slate-500">Oldest first</p>
+              <p className="text-xs text-content-muted">Oldest first</p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center text-slate-500"
+            className="grid h-9 w-9 place-items-center text-content-muted"
             aria-label="Close"
             title="Close"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="divide-y divide-slate-200 border-y border-slate-200">
+        <div className="divide-y divide-line border-y border-line">
           {events.map(item => (
             <article key={item.event.id} className="py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-800">{item.title}</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <h3 className="text-sm font-bold text-content">{item.title}</h3>
+                  <p className="mt-0.5 text-xs text-content-muted">
                     {item.timeLabel} - {item.participantLabel}
                   </p>
                   {item.detail && (
-                    <p className="mt-1 text-xs text-slate-600">{item.detail}</p>
+                    <p className="mt-1 text-xs text-content-muted">{item.detail}</p>
                   )}
                 </div>
                 {editable && (
                   <button
                     type="button"
                     onClick={() => onEdit(item.event)}
-                    className="grid h-9 w-9 shrink-0 place-items-center text-emerald-700"
+                    className="grid h-9 w-9 shrink-0 place-items-center text-success-content"
                     aria-label={`Edit ${item.title}`}
                     title="Edit"
                   >
