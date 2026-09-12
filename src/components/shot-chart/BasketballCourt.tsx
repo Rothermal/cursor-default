@@ -51,9 +51,9 @@ interface BasketballCourtProps {
   flipped?: boolean
 }
 
-const LINE_COLOR = '#8B6914'
+const LINE_COLOR = 'rgb(var(--court-line))'
 const LINE_WIDTH = 0.3
-const COURT_BG = '#e8d5b7'
+const COURT_BG = 'rgb(var(--court-surface))'
 
 /** Radians: trim dashed FT arc so first/last dashes sit inside the key, off the solid junctions. */
 const FT_DASH_ARC_END_INSET_RAD = 0.14
@@ -297,14 +297,14 @@ export default function BasketballCourt({
         const tone = markerTone?.(shot) ?? null
         const label = markerLabel?.(shot) ?? `View ${shot.made ? 'made' : 'missed'} shot detail`
         const madeFill = tone === 'tracked'
-          ? 'rgba(37,99,235,0.95)'
-          : tone === 'opponent' ? 'rgba(217,119,6,0.95)' : 'rgba(34,197,94,0.95)'
+          ? 'rgb(var(--court-tracked))'
+          : tone === 'opponent' ? 'rgb(var(--court-opponent))' : 'rgb(var(--court-made))'
         const madeStroke = tone === 'tracked'
-          ? 'rgba(29,78,216,0.95)'
-          : tone === 'opponent' ? 'rgba(180,83,9,0.95)' : 'rgba(21,128,61,0.95)'
+          ? 'rgb(var(--court-tracked))'
+          : tone === 'opponent' ? 'rgb(var(--court-opponent))' : 'rgb(var(--court-made))'
         const missStroke = tone === 'tracked'
-          ? 'rgba(29,78,216,0.95)'
-          : tone === 'opponent' ? 'rgba(180,83,9,0.95)' : 'rgba(220,38,38,0.95)'
+          ? 'rgb(var(--court-tracked))'
+          : tone === 'opponent' ? 'rgb(var(--court-opponent))' : 'rgb(var(--court-miss))'
         return shot.made ? (
           <g
             key={shot.id}
@@ -404,7 +404,7 @@ export default function BasketballCourt({
             x={0}
             y={(svgCourtTop + svgCourtBottom) / 2 - 0.9}
             textAnchor="middle"
-            fill="rgba(71,85,105,0.9)"
+            fill="rgb(var(--court-hint))"
             fontSize="1.15"
             fontWeight="600"
           >
@@ -414,7 +414,7 @@ export default function BasketballCourt({
             x={0}
             y={(svgCourtTop + svgCourtBottom) / 2 + 0.85}
             textAnchor="middle"
-            fill="rgba(71,85,105,0.75)"
+            fill="rgb(var(--court-hint))"
             fontSize="1.05"
             fontWeight="500"
           >

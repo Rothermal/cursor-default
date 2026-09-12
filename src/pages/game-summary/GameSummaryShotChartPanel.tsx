@@ -47,23 +47,23 @@ export default function GameSummaryShotChartPanel({
         allActive={shotViewSelection.kind === 'all'}
       />
       <div className="flex items-baseline justify-between gap-2 px-1">
-        <p className="text-sm font-semibold text-slate-600 truncate">
+        <p className="text-sm font-semibold text-content-muted truncate">
           Shot chart — {shotViewLabel(shotViewSelection, players)}
         </p>
-        <p className="text-sm font-bold text-slate-700 shrink-0">
+        <p className="text-sm font-bold text-content shrink-0">
           {shootingLine(visibleShots)}
         </p>
       </div>
       {isReviewShotChart && (
-        <p className="text-xs text-slate-400 px-1">
+        <p className="text-xs text-content-subtle px-1">
           Combined from all recorders — each player&apos;s shots come from their
           primary recorder&apos;s chart.
         </p>
       )}
-      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="rounded-xl border border-line bg-surface p-3 shadow-sm">
         <BasketballCourt shots={visibleShots} flipped={flipped} className="w-full" />
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="rounded-xl border border-line bg-surface p-3 shadow-sm">
         <ShootingSummary
           shots={visibleShots}
           emptyMessage={shotViewEmptyCopy(shotViewSelection, players)}

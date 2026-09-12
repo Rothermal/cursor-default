@@ -130,14 +130,14 @@ export default function BasketballAdministrationEditor(props: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <ul className="space-y-2">
             {preview.consequenceLines.map(line => (
-              <li key={line} className="flex gap-2 text-sm text-slate-700">
-                <Check className="mt-0.5 shrink-0 text-emerald-600" size={16} aria-hidden />
-                <span>{line}</span>
+              <li key={line} className="flex gap-2 text-sm text-content">
+                <Check className="mt-0.5 shrink-0 text-success-content" size={16} aria-hidden />
+                <span className="min-w-0 break-words">{line}</span>
               </li>
             ))}
           </ul>
         </div>
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+        <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
           <button type="button" onClick={() => setPreview(null)} className="btn-secondary min-h-11">Back</button>
           <button type="button" onClick={apply} className="btn-primary min-h-11">
             {props.mode === 'edit' ? 'Save changes' : 'Add event'}
@@ -182,7 +182,7 @@ export default function BasketballAdministrationEditor(props: Props) {
 
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
-      <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+      <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
         <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
         <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
           {props.mode === 'edit' ? <Pencil size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
@@ -326,13 +326,13 @@ function TextAreaField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
+      <span className="mb-1 block text-sm font-semibold text-content">{label}</span>
       <textarea
         value={value}
         onChange={event => onChange(event.target.value)}
         maxLength={240}
         rows={rows}
-        className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800"
+        className="bg-surface w-full resize-none rounded-md border border-line-strong px-3 py-2 text-sm font-semibold text-content"
       />
     </label>
   )

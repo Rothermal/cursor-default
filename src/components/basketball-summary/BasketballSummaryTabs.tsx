@@ -15,7 +15,7 @@ const TABS: Array<{ id: BasketballSummaryTab; label: string }> = [
 
 export default function BasketballSummaryTabs({ activeTab, onChange }: Props) {
   return (
-    <nav className="sticky top-0 z-10 border-b border-slate-200 bg-white" aria-label="Summary views">
+    <nav className="sticky top-0 z-10 border-b border-line bg-surface" aria-label="Summary views">
       <div className="mx-auto flex h-12 max-w-5xl items-stretch overflow-x-auto px-4">
         {TABS.map(tab => (
           <button
@@ -25,8 +25,8 @@ export default function BasketballSummaryTabs({ activeTab, onChange }: Props) {
             onClick={() => onChange(tab.id)}
             className={`shrink-0 border-b-2 px-3 text-sm font-bold ${
               activeTab === tab.id
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-slate-500'
+                ? 'border-info-line text-info-content'
+                : 'border-transparent text-content-subtle'
             }`}
             aria-current={activeTab === tab.id ? 'page' : undefined}
           >

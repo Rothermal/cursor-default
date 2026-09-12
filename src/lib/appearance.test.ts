@@ -67,6 +67,13 @@ describe('appearance bootstrap/runtime contract', () => {
         ['content-subtle', 'surface'], ['content', 'surface-elevated'],
         ['accent-content', 'accent'], ['danger-action-content', 'danger-action'],
         ...['info', 'success', 'warning', 'danger'].map(name => [`${name}-content`, name]),
+        ...['amber', 'sky', 'emerald', 'violet', 'rose', 'slate', 'orange', 'red', 'blue', 'green', 'indigo', 'teal', 'cyan', 'pink']
+          .flatMap(color => [
+            [`stat-${color}-content`, `stat-${color}-surface`],
+            [`stat-${color}-content`, `stat-${color}-active`],
+            [`stat-${color}-badge-content`, `stat-${color}-badge`],
+          ]),
+        ['court-hint', 'court-surface'],
       ]) {
         const a = tokens[foreground], b = tokens[background]
         expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${foreground}/${background}`).toBeGreaterThanOrEqual(4.5)

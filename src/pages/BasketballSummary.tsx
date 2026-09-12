@@ -202,7 +202,7 @@ export default function BasketballSummary() {
   const quality = healthy ? basketballSummaryQualityReview(source.state) : null
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-surface-muted">
       <BasketballSummaryHeader
         source={source}
         healthy={healthy}
@@ -231,22 +231,22 @@ export default function BasketballSummary() {
           <BasketballEnableCloudPanel state={state} />
         )}
         {refreshError && (
-          <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <div className="mt-4 flex items-start gap-2 rounded-md border border-warning-line bg-warning p-3 text-sm text-warning-content">
             <AlertTriangle size={18} className="mt-0.5 shrink-0" />
             <p>Showing the last loaded source. Refresh failed: {refreshError}</p>
           </div>
         )}
         {!healthy && (
-          <section className="my-5 rounded-md border border-red-300 bg-red-50 p-4">
+          <section className="my-5 rounded-md border border-danger-line bg-danger p-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle size={20} className="mt-0.5 shrink-0 text-red-700" />
+              <AlertTriangle size={20} className="mt-0.5 shrink-0 text-danger-content" />
               <div>
-                <h2 className="font-bold text-red-900">Official output is unavailable</h2>
-                <p className="mt-1 text-sm text-red-800">
+                <h2 className="font-bold text-danger-content">Official output is unavailable</h2>
+                <p className="mt-1 text-sm text-danger-content">
                   This source has event diagnostics. Scores, comparisons, and leaders are hidden until the source is repaired.
                 </p>
                 {source.inspection.diagnostics[0] && (
-                  <p className="mt-2 text-sm font-semibold text-red-900">
+                  <p className="mt-2 text-sm font-semibold text-danger-content">
                     {source.inspection.diagnostics[0].message}
                   </p>
                 )}
@@ -255,14 +255,14 @@ export default function BasketballSummary() {
           </section>
         )}
         {healthy && quality && quality.warnings.length > 0 && (
-          <section className="my-4 flex items-start gap-3 border-y border-amber-300 bg-amber-50 px-3 py-3">
-            <AlertTriangle size={19} className="mt-0.5 shrink-0 text-amber-700" />
+          <section className="my-4 flex items-start gap-3 border-y border-warning-line bg-warning px-3 py-3">
+            <AlertTriangle size={19} className="mt-0.5 shrink-0 text-warning-content" />
             <div>
-              <h2 className="font-bold text-amber-950">Lineup detail is incomplete</h2>
-              <ul className="mt-1 space-y-1 text-sm text-amber-900">
+              <h2 className="font-bold text-warning-content">Lineup detail is incomplete</h2>
+              <ul className="mt-1 space-y-1 text-sm text-warning-content">
                 {quality.warnings.map(warning => <li key={warning}>{warning}</li>)}
               </ul>
-              <p className="mt-2 text-xs text-amber-800">
+              <p className="mt-2 text-xs text-warning-content">
                 Valid scores and recorded facts remain visible; affected minutes and plus-minus are labeled separately.
               </p>
             </div>
@@ -326,12 +326,12 @@ function summaryPath(
 
 function SummarySkeleton() {
   return (
-    <div className="min-h-screen animate-pulse bg-slate-50">
-      <div className="h-48 bg-slate-950" />
+    <div className="min-h-screen animate-pulse bg-surface-muted">
+      <div className="h-48 bg-control" />
       <div className="mx-auto max-w-5xl space-y-4 px-4 py-6">
-        <div className="h-8 w-40 rounded bg-slate-200" />
-        <div className="h-44 rounded bg-slate-200" />
-        <div className="h-64 rounded bg-slate-200" />
+        <div className="h-8 w-40 rounded bg-control" />
+        <div className="h-44 rounded bg-control" />
+        <div className="h-64 rounded bg-control" />
       </div>
     </div>
   )
@@ -354,14 +354,14 @@ function SummaryError({
 }) {
   const navigate = useNavigate()
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-12">
-      <section className="mx-auto max-w-lg rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-        <AlertTriangle size={28} className="text-amber-600" />
-        <p className="mt-3 text-xs font-semibold uppercase text-slate-500">
+    <div className="min-h-screen bg-surface-muted px-4 py-12">
+      <section className="mx-auto max-w-lg rounded-md border border-line bg-surface p-5 shadow-sm">
+        <AlertTriangle size={28} className="text-warning-content" />
+        <p className="mt-3 text-xs font-semibold uppercase text-content-subtle">
           {authority.replace('_', ' ')} source
         </p>
-        <h1 className="mt-1 text-xl font-bold text-slate-900">Basketball summary unavailable</h1>
-        <p className="mt-2 text-sm text-slate-600">{message}</p>
+        <h1 className="mt-1 text-xl font-bold text-content">Basketball summary unavailable</h1>
+        <p className="mt-2 text-sm text-content-muted">{message}</p>
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
           <button type="button" onClick={onRetry} className="btn-primary inline-flex items-center justify-center gap-2">
             <RefreshCw size={16} /> Retry

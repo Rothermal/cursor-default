@@ -20,9 +20,9 @@ export default function BasketballRecordingSelector({
   }
 
   return (
-    <div className="border-b border-slate-200 bg-sky-50">
+    <div className="border-b border-line bg-info">
       <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <label htmlFor="basketball-recording" className="text-sm font-semibold text-slate-700">
+        <label htmlFor="basketball-recording" className="text-sm font-semibold text-content">
           Recording source
         </label>
         <select
@@ -32,7 +32,7 @@ export default function BasketballRecordingSelector({
           onChange={event => {
             onChange(event.target.value === primary.recorderId ? null : event.target.value)
           }}
-          className="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 sm:w-72"
+          className="min-h-10 w-full rounded-md border border-line-strong bg-surface px-3 text-sm text-content sm:w-72"
         >
           <option value={primary.recorderId}>Primary: {primary.displayName}</option>
           {alternatives.map(recorder => (

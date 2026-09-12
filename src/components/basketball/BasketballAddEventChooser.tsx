@@ -36,11 +36,11 @@ export default function BasketballAddEventChooser({ onClose, onShot, onRelated, 
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/45 sm:items-center sm:p-4" onClick={onClose}>
-      <section role="dialog" aria-modal="true" aria-labelledby="basketball-add-event-title" className="flex max-h-[calc(100dvh-1rem)] w-full flex-col rounded-t-lg bg-white shadow-2xl sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
-        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 id="basketball-add-event-title" className="text-base font-bold text-slate-900">Add event</h2>
-          <button ref={closeRef} type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-600" aria-label="Close add event"><X size={19} aria-hidden /></button>
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-overlay/[0.45] sm:items-center sm:p-4" onClick={onClose}>
+      <section role="dialog" aria-modal="true" aria-labelledby="basketball-add-event-title" className="flex max-h-[calc(100dvh-1rem)] w-full flex-col rounded-t-lg bg-surface shadow-2xl sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
+        <header className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+          <h2 id="basketball-add-event-title" className="text-base font-bold text-content">Add event</h2>
+          <button ref={closeRef} type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-line text-content-muted" aria-label="Close add event"><X size={19} aria-hidden /></button>
         </header>
         <div className="grid min-h-0 grid-cols-2 gap-2 overflow-y-auto p-4">
           <button type="button" onClick={onShot} className="btn-secondary flex min-h-14 items-center justify-center gap-2"><CircleDot size={18} aria-hidden />Shot</button>

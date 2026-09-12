@@ -591,8 +591,8 @@ export default function GameSummary() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <header className={`bg-gradient-to-r ${sport.theme.gradient} text-white px-4 py-6`}>
+    <div className="min-h-screen flex flex-col bg-surface-muted">
+      <header className={`border-b border-line bg-surface text-content px-4 py-6`}>
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <button
@@ -600,8 +600,8 @@ export default function GameSummary() {
               onClick={() => navigate(isFinalCloudGame ? '/games' : '/game')}
               disabled={finalizing}
               aria-label={isFinalCloudGame ? 'Back to Cloud Games' : 'Back to Game'}
-              className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center
-                         active:scale-90 transition-transform disabled:opacity-50 disabled:pointer-events-none"
+              className="w-8 h-8 shrink-0 rounded-full bg-surface flex items-center justify-center
+                         active:scale-90 transition-transform disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none"
             >
               ←
             </button>
@@ -609,45 +609,45 @@ export default function GameSummary() {
           </div>
 
           <div className="flex items-center justify-center gap-6">
-            <div className="text-center">
-              <p className="text-sm opacity-80">{gameInfo.teamName}</p>
+            <div className="min-w-0 flex-1 text-center">
+              <p className="break-words text-sm text-content-muted">{gameInfo.teamName}</p>
               <p className="text-4xl font-bold">{teamScore}</p>
             </div>
             <p className="text-xl opacity-60">vs</p>
             <div className="text-center">
-              <p className="text-sm opacity-80">{gameInfo.opponentName}</p>
+              <p className="break-words text-sm text-content-muted">{gameInfo.opponentName}</p>
               <p className="text-4xl font-bold">{opponentScore}</p>
             </div>
           </div>
 
           {gameInfo.tournamentName && (
-            <p className="text-center text-sm opacity-60 mt-2">{gameInfo.tournamentName}</p>
+            <p className="break-words text-center text-sm text-content-muted mt-2">{gameInfo.tournamentName}</p>
           )}
-          <p className="text-center text-xs opacity-40 mt-1">{gameInfo.date}</p>
+          <p className="text-center text-xs text-content-subtle mt-1">{gameInfo.date}</p>
         </div>
       </header>
 
       <div className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
         {finalizeError && (
-          <div className="card bg-red-50 border-red-200 text-red-700 text-sm mb-4">
+          <div className="card bg-danger border-danger-line text-danger-content text-sm mb-4">
             {finalizeError}
           </div>
         )}
 
         {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && reviewItems.length > 0 && (
-          <div className="card mb-4 border-amber-200 bg-amber-50/50">
-            <h3 className="text-sm font-semibold text-amber-800 mb-1">Stats needing review</h3>
-            <p className="text-xs text-amber-700/80 mb-3">Multiple recorders or averaged values. Correct the stat or set primary recorder below.</p>
+          <div className="card mb-4 border-warning-line bg-warning">
+            <h3 className="text-sm font-semibold text-warning-content mb-1">Stats needing review</h3>
+            <p className="text-xs text-warning-content mb-3">Multiple recorders or averaged values. Correct the stat or set primary recorder below.</p>
             <ul className="space-y-2">
               {reviewItems.map(item => (
                 <li key={`${item.playerId}-${item.statId}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="text-slate-700">
+                  <span className="text-content">
                     {item.playerName} — {item.statLabel}: {item.value}
                     {item.source === 'averaged' && (
-                      <span className="text-amber-600 ml-1">(averaged)</span>
+                      <span className="text-warning-content ml-1">(averaged)</span>
                     )}
                     {item.source !== 'averaged' && item.recorder_count > 1 && (
-                      <span className="text-amber-600 ml-1">({item.recorder_count} recorders)</span>
+                      <span className="text-warning-content ml-1">({item.recorder_count} recorders)</span>
                     )}
                   </span>
                   <span className="flex gap-2">
@@ -662,13 +662,13 @@ export default function GameSummary() {
                           item.value
                         )
                       }
-                      className="text-xs font-medium text-blue-600 hover:text-blue-700 underline"
+                      className="text-xs font-medium text-info-content hover:text-info-content underline"
                     >
                       Correct
                     </button>
                     <a
                       href="#primary-recorder-section"
-                      className="text-xs font-medium text-slate-600 hover:text-slate-700 underline"
+                      className="text-xs font-medium text-content-muted hover:text-content underline"
                       onClick={e => {
                         e.preventDefault()
                         document.getElementById('primary-recorder-section')?.scrollIntoView({ behavior: 'smooth' })
@@ -686,13 +686,13 @@ export default function GameSummary() {
         {isFinalCloudGame && isTeamAdmin && viewMode === 'primary' && checkoutsByPlayer && Object.keys(checkoutsByPlayer).length > 0 && (
           <>
             {primaryError && (
-              <div className="card bg-red-50 border-red-200 text-red-700 text-sm mb-4">
+              <div className="card bg-danger border-danger-line text-danger-content text-sm mb-4">
                 {primaryError}
               </div>
             )}
             <div id="primary-recorder-section" className="card mb-4">
-            <h3 className="text-sm font-semibold text-slate-600 mb-2">Primary recorder</h3>
-            <p className="text-xs text-slate-500 mb-3">Whose stats count as official for each player. Change to fix discrepancies.</p>
+            <h3 className="text-sm font-semibold text-content-muted mb-2">Primary recorder</h3>
+            <p className="text-xs text-content-subtle mb-3">Whose stats count as official for each player. Change to fix discrepancies.</p>
             <div className="space-y-2">
               {summaryPlayers.map(player => {
                 const remoteId = playerIdMap[player.id] ?? player.id
@@ -701,13 +701,13 @@ export default function GameSummary() {
 
                 return (
                   <div key={player.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="font-medium text-slate-700 truncate">
+                    <span className="font-medium text-content truncate">
                       #{player.number || '?'} {player.name}
                     </span>
                     {options.length === 0 ? (
-                      <span className="text-slate-400 text-xs">No checkouts</span>
+                      <span className="text-content-subtle text-xs">No checkouts</span>
                     ) : options.length === 1 ? (
-                      <span className="text-slate-600">{options[0].display_name}</span>
+                      <span className="text-content-muted">{options[0].display_name}</span>
                     ) : (
                       <select
                         value={primaryOption?.user_id ?? options[0]?.user_id ?? ''}
@@ -716,7 +716,7 @@ export default function GameSummary() {
                           if (uid) void handleSetPrimaryRecorder(remoteId, uid)
                         }}
                         disabled={settingPrimaryFor === remoteId}
-                        className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-700 text-sm min-w-0 max-w-[140px]"
+                        className="rounded border border-line-strong bg-surface px-2 py-1 text-content text-sm min-w-0 max-w-[140px]"
                       >
                         {options.map(opt => (
                           <option key={opt.user_id} value={opt.user_id}>
@@ -730,19 +730,19 @@ export default function GameSummary() {
               })}
             </div>
             {settingPrimaryFor && (
-              <p className="text-xs text-slate-500 mt-2">Updating…</p>
+              <p className="text-xs text-content-subtle mt-2">Updating…</p>
             )}
             </div>
           </>
         )}
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 flex-wrap">
+          <div className="flex rounded-lg border border-line bg-surface p-0.5 flex-wrap">
             <button
               type="button"
               onClick={() => setSummaryTab('players')}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                summaryTab === 'players' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-transform ${
+                summaryTab === 'players' ? 'bg-control text-content' : 'text-content-muted hover:bg-control'
               }`}
             >
               Players
@@ -750,8 +750,8 @@ export default function GameSummary() {
             <button
               type="button"
               onClick={() => setSummaryTab('team')}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                summaryTab === 'team' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-transform ${
+                summaryTab === 'team' ? 'bg-control text-content' : 'text-content-muted hover:bg-control'
               }`}
             >
               Scores
@@ -760,8 +760,8 @@ export default function GameSummary() {
               <button
                 type="button"
                 onClick={() => setSummaryTab('team_stats')}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  summaryTab === 'team_stats' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-transform ${
+                  summaryTab === 'team_stats' ? 'bg-control text-content' : 'text-content-muted hover:bg-control'
                 }`}
               >
                 Team stats
@@ -771,8 +771,8 @@ export default function GameSummary() {
               <button
                 type="button"
                 onClick={() => setSummaryTab('shot_chart')}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  summaryTab === 'shot_chart' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-transform ${
+                  summaryTab === 'shot_chart' ? 'bg-control text-content' : 'text-content-muted hover:bg-control'
                 }`}
               >
                 Shot chart
@@ -781,12 +781,12 @@ export default function GameSummary() {
           </div>
         {isFinalCloudGame && summaryTab === 'players' && (
           <>
-            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <div className="flex rounded-lg border border-line bg-surface p-0.5">
               <button
                 type="button"
                 onClick={() => setViewMode('primary')}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  viewMode === 'primary' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-transform ${
+                  viewMode === 'primary' ? 'bg-control text-content' : 'text-content-muted hover:bg-control'
                 }`}
               >
                 Primary
@@ -794,8 +794,8 @@ export default function GameSummary() {
               <button
                 type="button"
                 onClick={() => setViewMode('all')}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  viewMode === 'all' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-transform ${
+                  viewMode === 'all' ? 'bg-control text-content' : 'text-content-muted hover:bg-control'
                 }`}
               >
                 All submissions
@@ -811,7 +811,7 @@ export default function GameSummary() {
                   {reviewMode ? 'Done reviewing' : 'Review / Correct stats'}
                 </button>
                 {reviewMode && (
-                  <span className="text-xs text-slate-500">Tap a stat to correct it</span>
+                  <span className="text-xs text-content-subtle">Tap a stat to correct it</span>
                 )}
               </>
             )}
@@ -828,32 +828,32 @@ export default function GameSummary() {
             isReviewShotChart={isReviewShotChart}
             shotViewSelection={shotViewSelection}
             onShotViewSelectionChange={setShotViewSelection}
-            activeBgClass={sport?.theme.bg ?? 'bg-orange-500'}
+            activeBgClass="bg-accent"
             flipped={basketballCourtOrientationForState(state) === 'flipped'}
           />
         )}
 
         {summaryTab === 'team' && (
-          <div className="card mb-6 border-slate-200">
-            <h3 className="text-sm font-semibold text-slate-600 mb-3">Team vs opponent</h3>
+          <div className="card mb-6 border-line">
+            <h3 className="text-sm font-semibold text-content-muted mb-3">Team vs opponent</h3>
             <div className="flex items-center justify-center gap-6 mb-4">
               <div className="text-center">
-                <p className="text-xs text-slate-500">{gameInfo.teamName}</p>
-                <p className="text-2xl font-bold text-slate-800">{teamScore}</p>
+                <p className="text-xs text-content-subtle">{gameInfo.teamName}</p>
+                <p className="text-2xl font-bold text-content">{teamScore}</p>
               </div>
-              <span className="text-slate-400">vs</span>
+              <span className="text-content-subtle">vs</span>
               <div className="text-center">
-                <p className="text-xs text-slate-500">{gameInfo.opponentName}</p>
-                <p className="text-2xl font-bold text-slate-800">{opponentScore}</p>
+                <p className="text-xs text-content-subtle">{gameInfo.opponentName}</p>
+                <p className="text-2xl font-bold text-content">{opponentScore}</p>
               </div>
             </div>
             {homeTeamScore != null && (
-              <p className="text-xs text-slate-500 text-center mb-2">
+              <p className="text-xs text-content-subtle text-center mb-2">
                 Scoreboard total (not from player stats)
               </p>
             )}
             {homeTeamScore == null && homeScoreAdjustment !== 0 && (
-              <p className="text-xs text-slate-500 text-center mb-2">
+              <p className="text-xs text-content-subtle text-center mb-2">
                 Score adjustment: {homeScoreAdjustment >= 0 ? '+' : ''}{homeScoreAdjustment}
               </p>
             )}
@@ -886,7 +886,7 @@ export default function GameSummary() {
               <>
                 <span>{made}/{total}</span>
                 {pct !== null && (
-                  <span className="text-slate-400 ml-1 text-xs">({pct}%)</span>
+                  <span className="text-content-subtle ml-1 text-xs">({pct}%)</span>
                 )}
                 {extra}
               </>
@@ -895,10 +895,10 @@ export default function GameSummary() {
 
           return (
             <div key={category.id} className="mb-6">
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              <h3 className="text-sm font-semibold text-content-subtle uppercase tracking-wide mb-2">
                 {category.name}
                 {category.showTotal && (
-                  <span className="text-slate-400 ml-2 normal-case">
+                  <span className="text-content-subtle ml-2 normal-case">
                     — {category.totalLabel}
                   </span>
                 )}
@@ -906,21 +906,21 @@ export default function GameSummary() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-2 pr-3 font-semibold text-slate-600">Player</th>
+                    <tr className="border-b border-line">
+                      <th className="text-left py-2 pr-3 font-semibold text-content-muted">Player</th>
                       {visibleActions.map(action => {
                         const hasMiss = !!missActionMap[action.id]
                         return (
                           <th
                             key={action.id}
-                            className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[48px]"
+                            className="text-center py-2 px-2 font-semibold text-content-muted min-w-[48px]"
                           >
                             {hasMiss ? `${action.shortLabel} M/A` : action.shortLabel}
                           </th>
                         )
                       })}
                       {category.showTotal && (
-                        <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[50px]">
+                        <th className="text-center py-2 px-2 font-bold text-content min-w-[50px]">
                           TOT
                         </th>
                       )}
@@ -939,9 +939,9 @@ export default function GameSummary() {
                         : null
 
                       return (
-                        <tr key={player.id} className="border-b border-slate-100">
+                        <tr key={player.id} className="border-b border-line">
                           <td className="py-2 pr-3 whitespace-nowrap">
-                            <span className="text-slate-400 mr-1">#{player.number || '?'}</span>
+                            <span className="text-content-subtle mr-1">#{player.number || '?'}</span>
                             <span className="font-medium">{player.name}</span>
                           </td>
                           {visibleActions.map(action => {
@@ -966,7 +966,7 @@ export default function GameSummary() {
                                       <>
                                         {isFinalCloudGame && needsReview && (
                                           <span
-                                            className="text-amber-600"
+                                            className="text-warning-content"
                                             title="Multiple recorders – review"
                                             aria-label="Multiple recorders"
                                           >
@@ -985,7 +985,7 @@ export default function GameSummary() {
                                                 stats[action.id] || 0
                                               )
                                             }
-                                            className="text-slate-400 hover:text-blue-600 p-0.5"
+                                            className="text-content-subtle hover:text-info-content p-0.5"
                                             title="Correct this stat"
                                             aria-label="Correct stat"
                                           >
@@ -1020,7 +1020,7 @@ export default function GameSummary() {
                         </tr>
                       )
                     })}
-                    <tr className="bg-slate-50 font-semibold">
+                    <tr className="bg-surface-muted font-semibold">
                       <td className="py-2 pr-3">Team</td>
                       {visibleActions.map(action => {
                         const missAction = missActionMap[action.id]
@@ -1032,7 +1032,7 @@ export default function GameSummary() {
                               <>
                                 {made}/{made + missVal}
                                 {(made + missVal) > 0 && (
-                                  <span className="text-slate-400 ml-1 text-xs">
+                                  <span className="text-content-subtle ml-1 text-xs">
                                     ({Math.round((made / (made + missVal)) * 100)}%)
                                   </span>
                                 )}
@@ -1075,37 +1075,37 @@ export default function GameSummary() {
 
             return (
               <div key={`team-${category.id}`} className="mb-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                <h3 className="text-sm font-semibold text-content-subtle uppercase tracking-wide mb-2">
                   {category.name}
                   {category.showTotal && (
-                    <span className="text-slate-400 ml-2 normal-case">— {category.totalLabel}</span>
+                    <span className="text-content-subtle ml-2 normal-case">— {category.totalLabel}</span>
                   )}
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="text-left py-2 pr-3 font-semibold text-slate-600">Team</th>
+                      <tr className="border-b border-line">
+                        <th className="text-left py-2 pr-3 font-semibold text-content-muted">Team</th>
                         {visibleActions.map(action => {
                           const hasMiss = !!missActionMap[action.id]
                           return (
                             <th
                               key={action.id}
-                              className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[48px]"
+                              className="text-center py-2 px-2 font-semibold text-content-muted min-w-[48px]"
                             >
                               {hasMiss ? `${action.shortLabel} M/A` : action.shortLabel}
                             </th>
                           )
                         })}
                         {category.showTotal && (
-                          <th className="text-center py-2 px-2 font-bold text-slate-700 min-w-[50px]">
+                          <th className="text-center py-2 px-2 font-bold text-content min-w-[50px]">
                             TOT
                           </th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="bg-slate-50 font-semibold border-b border-slate-100">
+                      <tr className="bg-surface-muted font-semibold border-b border-line">
                         <td className="py-2 pr-3">Totals</td>
                         {visibleActions.map(action => {
                           const missAction = missActionMap[action.id]
@@ -1117,7 +1117,7 @@ export default function GameSummary() {
                                 <>
                                   {made}/{made + missVal}
                                   {made + missVal > 0 && (
-                                    <span className="text-slate-400 ml-1 text-xs">
+                                    <span className="text-content-subtle ml-1 text-xs">
                                       ({Math.round((made / (made + missVal)) * 100)}%)
                                     </span>
                                   )}
@@ -1148,10 +1148,10 @@ export default function GameSummary() {
 
         {state.notes && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <h3 className="text-sm font-semibold text-content-subtle uppercase tracking-wide mb-2">
               Game Notes
             </h3>
-            <div className="card bg-slate-50 text-sm text-slate-700 whitespace-pre-wrap">
+            <div className="card bg-surface-muted text-sm text-content whitespace-pre-wrap">
               {state.notes}
             </div>
           </div>
@@ -1171,7 +1171,7 @@ export default function GameSummary() {
             <button
               onClick={() => navigate('/games')}
               disabled={finalizing}
-              className="btn-secondary w-full disabled:opacity-50"
+              className="btn-secondary w-full disabled:bg-control-disabled disabled:text-content-disabled"
             >
               ← Back to Cloud Games
             </button>
@@ -1179,7 +1179,7 @@ export default function GameSummary() {
             <button
               onClick={() => navigate('/game')}
               disabled={finalizing}
-              className="btn-primary w-full disabled:opacity-50"
+              className="btn-primary w-full disabled:bg-control-disabled disabled:text-content-disabled"
             >
               ← Back to Game
             </button>
@@ -1187,12 +1187,12 @@ export default function GameSummary() {
           <button
             onClick={handleNewGame}
             disabled={finalizing}
-            className="btn-secondary w-full disabled:opacity-50"
+            className="btn-secondary w-full disabled:bg-control-disabled disabled:text-content-disabled"
           >
             New Game
           </button>
           {(newGameError || parkingError) && (
-            <p className="text-sm text-red-600 text-center">{newGameError ?? parkingError}</p>
+            <p className="text-sm text-danger-content text-center">{newGameError ?? parkingError}</p>
           )}
         </div>
 

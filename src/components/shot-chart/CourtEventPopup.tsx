@@ -213,8 +213,8 @@ export default function CourtEventPopup({
             title={player.name}
             className={`flex-shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-left active:scale-95 transition-transform ${
               active
-                ? 'bg-slate-800 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                ? 'bg-accent text-accent-content shadow-sm'
+                : 'bg-control text-content border border-line'
             }`}
           >
             {playerPickerLabel(player)}
@@ -234,16 +234,16 @@ export default function CourtEventPopup({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/[0.4] px-4"
       onPointerDownCapture={handlePointerDownCapture}
       onClick={cancel}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-4 space-y-3"
+        className="bg-surface rounded-2xl shadow-xl max-w-sm w-full p-4 space-y-3"
         onClick={e => e.stopPropagation()}
       >
         {errorMessage && (
-          <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+          <p role="alert" className="rounded-xl border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">
             {errorMessage}
           </p>
         )}
@@ -252,28 +252,28 @@ export default function CourtEventPopup({
             type="button"
             onClick={togglePlayerPicker}
             disabled={isFollowUpStep}
-            className="w-full flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2
-                       text-left active:bg-slate-100 active:scale-[0.99] transition-transform
-                       disabled:cursor-default disabled:opacity-90"
+            className="w-full flex items-center justify-between gap-2 rounded-xl border border-line bg-surface-muted px-3 py-2
+                       text-left active:bg-control active:scale-[0.99] transition-transform
+                       disabled:cursor-default disabled:bg-control-disabled disabled:text-content-disabled"
             aria-expanded={pickerOpen}
           >
             <span className="min-w-0">
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-content-subtle">
                 Log for
               </span>
-              <span className="block text-base font-bold text-slate-800 truncate">{playerLabel}</span>
+              <span className="block text-base font-bold text-content truncate">{playerLabel}</span>
               {playerStatLine && (
-                <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+                <span className="mt-0.5 block truncate text-xs font-semibold text-content-subtle">
                   {playerStatLine}
                 </span>
               )}
             </span>
-            <span className="text-slate-400 text-sm" aria-hidden>
+            <span className="text-content-subtle text-sm" aria-hidden>
               {pickerOpen ? '^' : 'v'}
             </span>
           </button>
           {pickerOpen && (
-            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2">
+            <div className="mt-2 rounded-xl border border-line bg-surface p-2">
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {sortTeamPlayersFirst(players).map(player => {
                   const active = player.id === activePlayerId
@@ -285,8 +285,8 @@ export default function CourtEventPopup({
                       title={player.name}
                       className={`flex-shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-left active:scale-95 transition-transform ${
                         active
-                          ? 'bg-slate-800 text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          ? 'bg-accent text-accent-content shadow-sm'
+                          : 'bg-control text-content border border-line'
                       }`}
                     >
                       {playerPickerLabel(player)}
@@ -297,18 +297,18 @@ export default function CourtEventPopup({
             </div>
           )}
           <div className="mt-2 flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-slate-500">Shot value</span>
-            <div className="grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-100 p-1">
+            <span className="text-xs font-semibold text-content-subtle">Shot value</span>
+            <div className="grid grid-cols-2 rounded-xl border border-line bg-control p-1">
               {(['2pt', '3pt'] as const).map(value => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => chooseShotType(value)}
                   disabled={isFollowUpStep}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-transform ${
                     selectedShotType === value
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 active:text-slate-800'
+                      ? 'bg-surface text-content shadow-sm'
+                      : 'text-content-subtle active:text-content'
                   }`}
                   aria-pressed={selectedShotType === value}
                 >
@@ -321,9 +321,9 @@ export default function CourtEventPopup({
 
         {pendingMadeShotType ? (
           <div className="space-y-3">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-              <p className="text-sm font-bold text-emerald-900">Assisted by?</p>
-              <p className="text-xs text-emerald-700">Optional. The shooter stays active.</p>
+            <div className="rounded-xl border border-success-line bg-success px-3 py-2">
+              <p className="text-sm font-bold text-success-content">Assisted by?</p>
+              <p className="text-xs text-success-content">Optional. The shooter stays active.</p>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
               {assistCandidates.map(player => (
@@ -332,8 +332,8 @@ export default function CourtEventPopup({
                   type="button"
                   onClick={() => finishMadeShot(player.id)}
                   title={player.name}
-                  className="flex-shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2
-                             text-sm font-semibold text-slate-700 active:bg-slate-100 active:scale-95
+                  className="flex-shrink-0 rounded-lg border border-line bg-surface px-3 py-2
+                             text-sm font-semibold text-content active:bg-control active:scale-95
                              transition-transform"
                 >
                   {playerPickerLabel(player)}
@@ -343,8 +343,8 @@ export default function CourtEventPopup({
             <button
               type="button"
               onClick={() => finishMadeShot()}
-              className="w-full py-3 rounded-xl text-sm font-bold text-slate-700 bg-slate-100
-                         border border-slate-200 active:bg-slate-200 active:scale-95
+              className="w-full py-3 rounded-xl text-sm font-bold text-content bg-control
+                         border border-line active:bg-control active:scale-95
                          transition-transform"
             >
               No assist
@@ -352,16 +352,16 @@ export default function CourtEventPopup({
           </div>
         ) : pendingMissedShotType ? (
           <div className="space-y-3">
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
-              <p className="text-sm font-bold text-rose-900">Rebound?</p>
-              <p className="text-xs text-rose-700">Optional. The missed shot stays with {playerLabel}.</p>
+            <div className="rounded-xl border border-danger-line bg-danger px-3 py-2">
+              <p className="text-sm font-bold text-danger-content">Rebound?</p>
+              <p className="text-xs text-danger-content">Optional. The missed shot stays with {playerLabel}.</p>
             </div>
 
             {missReboundOptions && (
               <div className="space-y-3">
-                <div className="rounded-xl border border-slate-200 bg-white p-2 space-y-2">
+                <div className="rounded-xl border border-line bg-surface p-2 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <p className="text-xs font-bold uppercase tracking-wide text-content-subtle">
                       Offensive rebound
                     </p>
                     <button
@@ -371,8 +371,8 @@ export default function CourtEventPopup({
                         if (!offensiveReboundPlayerId) return
                         finishMissedShot({ statId: 'oreb', playerId: offensiveReboundPlayerId })
                       }}
-                      className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-bold text-white
-                                 disabled:opacity-40 disabled:pointer-events-none active:bg-sky-700
+                      className="rounded-lg bg-info px-3 py-2 text-sm font-bold text-content
+                                 disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none active:bg-info
                                  active:scale-95 transition-transform"
                     >
                       Off Reb
@@ -385,9 +385,9 @@ export default function CourtEventPopup({
                   )}
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-2 space-y-2">
+                <div className="rounded-xl border border-line bg-surface p-2 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <p className="text-xs font-bold uppercase tracking-wide text-content-subtle">
                       Defensive rebound
                     </p>
                     <button
@@ -397,8 +397,8 @@ export default function CourtEventPopup({
                         if (!defensiveReboundPlayerId) return
                         finishMissedShot({ statId: 'dreb', playerId: defensiveReboundPlayerId })
                       }}
-                      className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white
-                                 disabled:opacity-40 disabled:pointer-events-none active:bg-indigo-700
+                      className="rounded-lg bg-info px-3 py-2 text-sm font-bold text-content
+                                 disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none active:bg-info
                                  active:scale-95 transition-transform"
                     >
                       Def Reb
@@ -416,8 +416,8 @@ export default function CourtEventPopup({
             <button
               type="button"
               onClick={() => finishMissedShot()}
-              className="w-full py-3 rounded-xl text-sm font-bold text-slate-700 bg-slate-100
-                         border border-slate-200 active:bg-slate-200 active:scale-95
+              className="w-full py-3 rounded-xl text-sm font-bold text-content bg-control
+                         border border-line active:bg-control active:scale-95
                          transition-transform"
             >
               No rebound
@@ -429,16 +429,16 @@ export default function CourtEventPopup({
               <button
                 type="button"
                 onClick={continueMadeShot}
-                className="py-4 rounded-xl text-base font-bold text-white bg-emerald-600
-                           active:bg-emerald-700 active:scale-95 transition-transform"
+                className="py-4 rounded-xl text-base font-bold text-success-content bg-success
+                           active:bg-success active:scale-95 transition-transform"
               >
                 Made
               </button>
               <button
                 type="button"
                 onClick={continueMissedShot}
-                className="py-4 rounded-xl text-base font-bold text-white bg-rose-600
-                           active:bg-rose-700 active:scale-95 transition-transform"
+                className="py-4 rounded-xl text-base font-bold text-danger-content bg-danger
+                           active:bg-danger active:scale-95 transition-transform"
               >
                 Missed
               </button>
@@ -450,14 +450,14 @@ export default function CourtEventPopup({
                   key={statId}
                   type="button"
                   onClick={() => pick({ kind: 'stat', statId })}
-                  className="py-3 px-1 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100
-                             border border-slate-200 active:bg-slate-200 active:scale-95 transition-transform"
+                  className="py-3 px-1 rounded-xl text-sm font-semibold text-content bg-control
+                             border border-line active:bg-control active:scale-95 transition-transform"
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 leading-snug">
+            <p className="text-[11px] text-content-subtle leading-snug">
               Shots save the tapped court location. The other events only add the stat — same as
               tapping its button below the court.
             </p>
@@ -467,7 +467,7 @@ export default function CourtEventPopup({
         <button
           type="button"
           onClick={cancel}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-300
+          className="w-full py-2.5 rounded-xl text-sm font-semibold text-content-muted border border-line-strong
                      active:scale-95 transition-transform"
         >
           Cancel

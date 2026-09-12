@@ -2,20 +2,20 @@ import { useState } from 'react'
 import type { StatColor } from '../types'
 
 const colorStyles: Record<StatColor, { bg: string; activeBg: string; text: string; badge: string }> = {
-  amber:   { bg: 'bg-amber-50',   activeBg: 'bg-amber-100',   text: 'text-amber-800',   badge: 'bg-amber-500' },
-  sky:     { bg: 'bg-sky-50',     activeBg: 'bg-sky-100',     text: 'text-sky-800',     badge: 'bg-sky-500' },
-  emerald: { bg: 'bg-emerald-50', activeBg: 'bg-emerald-100', text: 'text-emerald-800', badge: 'bg-emerald-500' },
-  violet:  { bg: 'bg-violet-50',  activeBg: 'bg-violet-100',  text: 'text-violet-800',  badge: 'bg-violet-500' },
-  rose:    { bg: 'bg-rose-50',    activeBg: 'bg-rose-100',    text: 'text-rose-800',    badge: 'bg-rose-500' },
-  slate:   { bg: 'bg-slate-100',  activeBg: 'bg-slate-200',   text: 'text-slate-700',   badge: 'bg-slate-500' },
-  orange:  { bg: 'bg-orange-50',  activeBg: 'bg-orange-100',  text: 'text-orange-800',  badge: 'bg-orange-500' },
-  red:     { bg: 'bg-red-50',     activeBg: 'bg-red-100',     text: 'text-red-800',     badge: 'bg-red-500' },
-  blue:    { bg: 'bg-blue-50',    activeBg: 'bg-blue-100',    text: 'text-blue-800',    badge: 'bg-blue-500' },
-  green:   { bg: 'bg-green-50',   activeBg: 'bg-green-100',   text: 'text-green-800',   badge: 'bg-green-500' },
-  indigo:  { bg: 'bg-indigo-50',  activeBg: 'bg-indigo-100',  text: 'text-indigo-800',  badge: 'bg-indigo-500' },
-  teal:    { bg: 'bg-teal-50',    activeBg: 'bg-teal-100',    text: 'text-teal-800',    badge: 'bg-teal-500' },
-  cyan:    { bg: 'bg-cyan-50',    activeBg: 'bg-cyan-100',    text: 'text-cyan-800',    badge: 'bg-cyan-500' },
-  pink:    { bg: 'bg-pink-50',    activeBg: 'bg-pink-100',    text: 'text-pink-800',    badge: 'bg-pink-500' },
+  amber: { bg: 'bg-stat-amber-surface', activeBg: 'bg-stat-amber-active', text: 'text-stat-amber-content', badge: 'bg-stat-amber-badge text-stat-amber-badge-content' },
+  sky: { bg: 'bg-stat-sky-surface', activeBg: 'bg-stat-sky-active', text: 'text-stat-sky-content', badge: 'bg-stat-sky-badge text-stat-sky-badge-content' },
+  emerald: { bg: 'bg-stat-emerald-surface', activeBg: 'bg-stat-emerald-active', text: 'text-stat-emerald-content', badge: 'bg-stat-emerald-badge text-stat-emerald-badge-content' },
+  violet: { bg: 'bg-stat-violet-surface', activeBg: 'bg-stat-violet-active', text: 'text-stat-violet-content', badge: 'bg-stat-violet-badge text-stat-violet-badge-content' },
+  rose: { bg: 'bg-stat-rose-surface', activeBg: 'bg-stat-rose-active', text: 'text-stat-rose-content', badge: 'bg-stat-rose-badge text-stat-rose-badge-content' },
+  slate: { bg: 'bg-stat-slate-surface', activeBg: 'bg-stat-slate-active', text: 'text-stat-slate-content', badge: 'bg-stat-slate-badge text-stat-slate-badge-content' },
+  orange: { bg: 'bg-stat-orange-surface', activeBg: 'bg-stat-orange-active', text: 'text-stat-orange-content', badge: 'bg-stat-orange-badge text-stat-orange-badge-content' },
+  red: { bg: 'bg-stat-red-surface', activeBg: 'bg-stat-red-active', text: 'text-stat-red-content', badge: 'bg-stat-red-badge text-stat-red-badge-content' },
+  blue: { bg: 'bg-stat-blue-surface', activeBg: 'bg-stat-blue-active', text: 'text-stat-blue-content', badge: 'bg-stat-blue-badge text-stat-blue-badge-content' },
+  green: { bg: 'bg-stat-green-surface', activeBg: 'bg-stat-green-active', text: 'text-stat-green-content', badge: 'bg-stat-green-badge text-stat-green-badge-content' },
+  indigo: { bg: 'bg-stat-indigo-surface', activeBg: 'bg-stat-indigo-active', text: 'text-stat-indigo-content', badge: 'bg-stat-indigo-badge text-stat-indigo-badge-content' },
+  teal: { bg: 'bg-stat-teal-surface', activeBg: 'bg-stat-teal-active', text: 'text-stat-teal-content', badge: 'bg-stat-teal-badge text-stat-teal-badge-content' },
+  cyan: { bg: 'bg-stat-cyan-surface', activeBg: 'bg-stat-cyan-active', text: 'text-stat-cyan-content', badge: 'bg-stat-cyan-badge text-stat-cyan-badge-content' },
+  pink: { bg: 'bg-stat-pink-surface', activeBg: 'bg-stat-pink-active', text: 'text-stat-pink-content', badge: 'bg-stat-pink-badge text-stat-pink-badge-content' },
 }
 
 interface StatButtonProps {
@@ -84,31 +84,31 @@ export default function StatButton({
       className={`
         ${flash ? styles.activeBg : styles.bg}
         ${styles.text}
-        rounded-xl border border-slate-200 p-3
-        transition-colors duration-150 select-none
+        rounded-xl border border-line p-3
+        transition-transform duration-150 select-none
       `}
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium truncate" title={label}>
           {shortLabel}
-          {pointValue ? <span className="opacity-60 ml-1">(+{pointValue})</span> : null}
+          {pointValue ? <span className="ml-1">(+{pointValue})</span> : null}
         </span>
         <span
-          className={`${styles.badge} text-white text-xs font-bold rounded-full px-1.5 min-w-[1.5rem] h-6 flex items-center justify-center`}
+          className={`${styles.badge} text-xs font-bold rounded-full px-1.5 min-w-[1.5rem] h-6 flex items-center justify-center`}
         >
           {hasAttempt ? `${value}/${totalAttempts}` : value}
         </span>
       </div>
       {subtitle ? (
-        <p className="text-[11px] text-slate-500 mb-2 leading-tight">{subtitle}</p>
+        <p className="text-[11px] mb-2 leading-tight">{subtitle}</p>
       ) : null}
       <div className="flex gap-1.5">
         <button
           onClick={(e) => { e.stopPropagation(); onDecrement() }}
           disabled={disabled || decrementDisabled || value === 0}
           aria-label={`Decrease ${label}`}
-          className="flex-1 h-10 rounded-lg bg-white/60 border border-slate-200 text-lg font-bold
-                     active:scale-95 transition-transform disabled:opacity-30"
+          className="flex-1 h-10 rounded-lg bg-control text-content border border-line text-lg font-bold
+                     active:scale-95 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
         >
           −
         </button>
@@ -118,8 +118,8 @@ export default function StatButton({
               onClick={(e) => { e.stopPropagation(); onAttemptDecrement() }}
               disabled={disabled || attemptDecrementDisabled || attemptCount === 0}
               aria-label={`Decrease missed ${label} attempt`}
-              className="flex-1 h-10 rounded-lg bg-white/60 border border-slate-200 text-xs font-bold
-                         active:scale-95 transition-transform disabled:opacity-30"
+              className="flex-1 h-10 rounded-lg bg-surface border border-line text-xs font-bold
+                         active:scale-95 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
             >
               -M
             </button>
@@ -130,9 +130,9 @@ export default function StatButton({
             onClick={(e) => { e.stopPropagation(); handleAttempt() }}
             disabled={disabled || attemptIncrementDisabled}
             aria-label={`Record missed ${label} attempt`}
-            className={`flex-1 h-10 rounded-lg text-white text-sm font-bold
-                        active:scale-95 transition-transform shadow-sm disabled:opacity-30
-                        ${attemptFlash ? 'bg-slate-600' : 'bg-slate-500'}`}
+            className={`flex-1 h-10 rounded-lg text-content text-sm font-bold
+                        active:scale-95 transition-transform shadow-sm disabled:bg-control-disabled disabled:text-content-disabled
+                        ${attemptFlash ? 'bg-control-hover' : 'bg-control'}`}
             title="Record missed attempt"
           >
             {onAttemptDecrement ? '+M' : 'A'}
@@ -142,8 +142,8 @@ export default function StatButton({
           onClick={handleIncrement}
           disabled={disabled || incrementDisabled || (maxValue !== undefined && value >= maxValue)}
           aria-label={`Increase ${label}`}
-          className={`${hasAttempt ? 'flex-1' : 'flex-[2]'} h-10 rounded-lg ${styles.badge} text-white text-lg font-bold
-                      active:scale-95 transition-transform shadow-sm disabled:opacity-30 disabled:pointer-events-none`}
+          className={`${hasAttempt ? 'flex-1' : 'flex-[2]'} h-10 rounded-lg ${styles.badge} text-lg font-bold
+                      active:scale-95 transition-transform shadow-sm disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none`}
         >
           +
         </button>

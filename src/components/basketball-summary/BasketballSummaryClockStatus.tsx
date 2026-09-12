@@ -39,21 +39,21 @@ export default function BasketballSummaryClockStatus({ source }: Props) {
   if (!clock || !display) return null
   const remote = source.kind !== 'local'
   return (
-    <section className="border-b border-slate-200 bg-white px-4 py-3" aria-label="Summary clock status">
+    <section className="border-b border-line bg-surface px-4 py-3" aria-label="Summary clock status">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-1">
-        <Clock3 size={18} className="text-blue-700" />
-        <strong className="text-sm text-slate-900">{display.segment.label}</strong>
-        <span className="text-lg font-bold tabular-nums text-slate-950">
+        <Clock3 size={18} className="text-info-content" />
+        <strong className="text-sm text-content">{display.segment.label}</strong>
+        <span className="text-lg font-bold tabular-nums text-content">
           {formatBasketballDurationMs(display.value.displayMs)}
         </span>
-        <span className="text-xs font-semibold uppercase text-slate-500">
+        <span className="text-xs font-semibold uppercase text-content-subtle">
           {clock.running ? 'Running' : 'Paused'}{remote ? ' / remote display' : ''}
         </span>
         {display.value.reachedExpiration && (
-          <span className="text-xs font-bold text-amber-700">Expiration awaiting an authoritative pause</span>
+          <span className="text-xs font-bold text-warning-content">Expiration awaiting an authoritative pause</span>
         )}
         {display.value.backwardClockWarning && (
-          <span className="text-xs font-bold text-amber-700">Device time moved behind the clock anchor</span>
+          <span className="text-xs font-bold text-warning-content">Device time moved behind the clock anchor</span>
         )}
       </div>
     </section>

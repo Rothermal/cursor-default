@@ -29,12 +29,12 @@ function ZoneCell({
   attempts: number
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-2 text-center">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 truncate">{label}</p>
-      <p className="text-sm font-bold text-slate-800 mt-0.5">
+    <div className="rounded-lg border border-line bg-surface-muted/80 px-2 py-2 text-center">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle truncate">{label}</p>
+      <p className="text-sm font-bold text-content mt-0.5">
         {made}/{attempts}
       </p>
-      <p className="text-xs text-slate-600">{pct(made, attempts)}</p>
+      <p className="text-xs text-content-muted">{pct(made, attempts)}</p>
     </div>
   )
 }
@@ -67,7 +67,7 @@ export default function ShootingSummary({
 
   if (shots.length === 0) {
     return (
-      <p className={`text-sm text-slate-500 ${className ?? ''}`.trim()}>{emptyMessage}</p>
+      <p className={`text-sm text-content-subtle ${className ?? ''}`.trim()}>{emptyMessage}</p>
     )
   }
 
@@ -75,7 +75,7 @@ export default function ShootingSummary({
 
   return (
     <div className={className}>
-      <h3 className="text-sm font-semibold text-slate-600 mb-2">Shooting by zone</h3>
+      <h3 className="text-sm font-semibold text-content-muted mb-2">Shooting by zone</h3>
       <div className="grid grid-cols-3 gap-2 mb-2">
         {ROW1_ZONES.map(({ zone, shortLabel }) => (
           <ZoneCell

@@ -177,11 +177,11 @@ export default function BasketballTimeline({
       aria-labelledby="basketball-timeline-tab"
       className="mx-auto w-full max-w-lg pb-24"
     >
-      <div className="border-y border-slate-200 bg-white px-3 py-3">
+      <div className="border-y border-line bg-surface px-3 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 id="basketball-timeline-title" className="text-base font-bold text-slate-900">Timeline</h2>
-            <p className="text-xs font-medium text-slate-500">
+            <h2 id="basketball-timeline-title" className="text-base font-bold text-content">Timeline</h2>
+            <p className="text-xs font-medium text-content-subtle">
               {activeGroups.length} {activeGroups.length === 1 ? 'capture' : 'captures'}
             </p>
           </div>
@@ -209,7 +209,7 @@ export default function BasketballTimeline({
             </button>
           )}
           {!review.complete && !correctionsEnabled && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
+            <span className="inline-flex items-center gap-1 rounded-md bg-warning px-2 py-1 text-xs font-semibold text-warning-content">
               <AlertTriangle size={14} aria-hidden />
               Diagnostics
             </span>
@@ -261,9 +261,9 @@ export default function BasketballTimeline({
       </div>
 
       {review.globalWarnings.length > 0 && (
-        <div className="border-b border-amber-200 bg-amber-50 px-3 py-3" role="status">
+        <div className="border-b border-warning-line bg-warning px-3 py-3" role="status">
           {review.globalWarnings.map(warning => (
-            <p key={warning} className="flex gap-2 text-sm font-medium text-amber-900">
+            <p key={warning} className="flex gap-2 text-sm font-medium text-warning-content">
               <AlertTriangle className="mt-0.5 shrink-0" size={16} aria-hidden />
               <span>{warning}</span>
             </p>
@@ -273,9 +273,9 @@ export default function BasketballTimeline({
 
       <div className="px-3 py-3">
         {activeGroups.length === 0 ? (
-          <div className="border-y border-slate-200 bg-white px-4 py-10 text-center">
-            <CircleDot className="mx-auto text-slate-300" size={28} aria-hidden />
-            <p className="mt-2 text-sm font-semibold text-slate-700">No matching events</p>
+          <div className="border-y border-line bg-surface px-4 py-10 text-center">
+            <CircleDot className="mx-auto text-content" size={28} aria-hidden />
+            <p className="mt-2 text-sm font-semibold text-content">No matching events</p>
           </div>
         ) : summaryMode ? (
           <TimelinePeriodGroups
@@ -308,14 +308,14 @@ export default function BasketballTimeline({
         )}
 
         {review.removedGroups.length > 0 && (
-          <details className="mt-4 border-y border-slate-200 bg-white">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-bold text-slate-700">
+          <details className="mt-4 border-y border-line bg-surface">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-bold text-content">
               <span>Removed events ({removedEventCount})</span>
               <ChevronDown size={17} aria-hidden />
             </summary>
-            <ol className="space-y-2 border-t border-slate-100 p-2">
+            <ol className="space-y-2 border-t border-line p-2">
               {removedGroups.length === 0 ? (
-                <li className="px-3 py-5 text-center text-sm text-slate-500">No removed events match these filters.</li>
+                <li className="px-3 py-5 text-center text-sm text-content-subtle">No removed events match these filters.</li>
               ) : summaryMode ? (
                 <li>
                   <TimelinePeriodGroups
@@ -685,23 +685,23 @@ function TimelineGroup({
   }
 
   return (
-    <details className={`overflow-hidden rounded-lg border bg-white ${removed ? 'border-slate-200 opacity-80' : 'border-slate-200'}`}>
+    <details className={`overflow-hidden rounded-lg border bg-surface ${removed ? 'border-line opacity-80' : 'border-line'}`}>
       <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3">
-        <Layers3 className="mt-0.5 shrink-0 text-slate-500" size={18} aria-hidden />
+        <Layers3 className="mt-0.5 shrink-0 text-content-subtle" size={18} aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className={`text-sm font-bold ${removed ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+            <p className={`text-sm font-bold ${removed ? 'text-content-subtle line-through' : 'text-content'}`}>
               {group.title}
             </p>
             <StatusBadges group={group} removed={removed} />
           </div>
-          <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
+          <p className="mt-0.5 truncate text-xs font-medium text-content-muted">
             {group.actorLabel} | {group.periodLabel} | {summaryMode ? group.sequenceLabel : formatTimelineTime(group.occurredAt)}
           </p>
         </div>
-        <ChevronDown className="mt-0.5 shrink-0 text-slate-400" size={17} aria-hidden />
+        <ChevronDown className="mt-0.5 shrink-0 text-content-subtle" size={17} aria-hidden />
       </summary>
-      <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50 p-2">
+      <div className="divide-y divide-line border-t border-line bg-surface-muted p-2">
         {group.events.map(review => (
           <TimelineEventRow
             key={review.id}
@@ -726,7 +726,7 @@ function TimelineGroup({
               eventId: group.events[0].id,
               scope: 'capture_group',
             })}
-            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-rose-200 bg-white text-sm font-bold text-rose-800"
+            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-danger-line bg-surface text-sm font-bold text-danger-content"
           >
             <Trash2 size={16} aria-hidden />
             Remove capture
@@ -740,7 +740,7 @@ function TimelineGroup({
               eventId: group.events[0].id,
               scope: 'capture_group',
             })}
-            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-blue-200 bg-white text-sm font-bold text-blue-800"
+            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-info-line bg-surface text-sm font-bold text-info-content"
           >
             <RotateCcw size={16} aria-hidden />
             Restore capture
@@ -782,25 +782,25 @@ function TimelineEventRow({
     <>
       <div className="min-w-0 flex-1 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
-          <p className={`text-sm font-bold ${removed ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+          <p className={`text-sm font-bold ${removed ? 'text-content-subtle line-through' : 'text-content'}`}>
             {review.title}
           </p>
           {!nested && <StatusBadges group={group} removed={removed} />}
           {review.revised && nested && (
-            <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Revised</span>
+            <span className="rounded bg-info px-1.5 py-0.5 text-[10px] font-bold text-info-content">Revised</span>
           )}
           {review.recordedLater && nested && (
-            <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">Recorded later</span>
+            <span className="rounded bg-info px-1.5 py-0.5 text-[10px] font-bold text-info-content">Recorded later</span>
           )}
         </div>
-        <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
+        <p className="mt-0.5 truncate text-xs font-medium text-content-muted">
           {review.actorLabel} | {review.periodLabel} | {summaryMode ? review.sequenceLabel : formatTimelineTime(review.event.occurredAt)}
         </p>
         {review.relationshipLabels.length > 0 && (
-          <p className="mt-1 text-xs text-slate-500">{review.relationshipLabels.join(' | ')}</p>
+          <p className="mt-1 text-xs text-content-subtle">{review.relationshipLabels.join(' | ')}</p>
         )}
         {review.warnings.map(warning => (
-          <p key={warning} className="mt-1 flex gap-1.5 text-xs font-medium text-amber-800">
+          <p key={warning} className="mt-1 flex gap-1.5 text-xs font-medium text-warning-content">
             <AlertTriangle className="mt-0.5 shrink-0" size={13} aria-hidden />
             <span>{warning}</span>
           </p>
@@ -811,7 +811,7 @@ function TimelineEventRow({
           <button
             type="button"
             onClick={() => onOpenShot(review.id)}
-            className="flex h-10 w-10 items-center justify-center rounded-md text-blue-700 active:bg-blue-50"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-info-content active:bg-info"
             aria-label={`View ${review.title}`}
             title="View details"
           >
@@ -822,7 +822,7 @@ function TimelineEventRow({
           <button
             type="button"
             onClick={() => onOpenEvent(review.id)}
-            className="flex h-10 w-10 items-center justify-center rounded-md text-blue-700 active:bg-blue-50"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-info-content active:bg-info"
             aria-label={`View ${review.title}`}
             title="View details"
           >
@@ -835,8 +835,8 @@ function TimelineEventRow({
             onClick={() => onCorrect(removed
               ? { kind: 'restore', eventId: review.id }
               : { kind: 'remove', eventId: review.id, scope: 'event' })}
-            className={`flex h-10 w-10 items-center justify-center rounded-md ${
-              removed ? 'text-blue-700 active:bg-blue-50' : 'text-rose-700 active:bg-rose-50'
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${
+              removed ? 'text-info-content active:bg-info' : 'text-danger-content active:bg-danger'
             }`}
             aria-label={`${removed ? 'Restore' : 'Remove'} ${review.title}`}
             title={removed ? 'Restore event' : 'Remove event'}
@@ -847,8 +847,8 @@ function TimelineEventRow({
       </div>
     </>
   )
-  const className = `${nested ? 'rounded-md px-2.5 py-2' : 'rounded-lg border border-slate-200 bg-white px-3 py-3'} ${
-    highlighted ? 'ring-2 ring-emerald-400 ring-offset-1' : ''
+  const className = `${nested ? 'rounded-md px-2.5 py-2' : 'rounded-lg border border-line bg-surface px-3 py-3'} ${
+    highlighted ? 'ring-2 ring-success-line ring-offset-1 ring-offset-surface' : ''
   } flex w-full items-start gap-3`
 
   return <div className={className}>{content}</div>
@@ -881,7 +881,7 @@ function TimelinePeriodGroups({
         <section key={section.periodId} aria-labelledby={`basketball-timeline-period-${removed ? 'removed-' : ''}${section.periodId}`}>
           <h3
             id={`basketball-timeline-period-${removed ? 'removed-' : ''}${section.periodId}`}
-            className="mb-2 text-xs font-bold uppercase text-slate-500"
+            className="mb-2 text-xs font-bold uppercase text-content-subtle"
           >
             {section.periodLabel}
           </h3>
@@ -911,12 +911,12 @@ function TimelinePeriodGroups({
 function StatusBadges({ group, removed }: { group: BasketballTimelineGroup; removed: boolean }) {
   return (
     <>
-      {removed && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">Removed</span>}
-      {group.revised && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Revised</span>}
-      {group.recordedLater && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">Recorded later</span>}
-      {group.boundary && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">Boundary</span>}
+      {removed && <span className="rounded bg-control px-1.5 py-0.5 text-[10px] font-bold text-content">Removed</span>}
+      {group.revised && <span className="rounded bg-info px-1.5 py-0.5 text-[10px] font-bold text-info-content">Revised</span>}
+      {group.recordedLater && <span className="rounded bg-info px-1.5 py-0.5 text-[10px] font-bold text-info-content">Recorded later</span>}
+      {group.boundary && <span className="rounded bg-warning px-1.5 py-0.5 text-[10px] font-bold text-warning-content">Boundary</span>}
       {!removed && group.removedCompanionCount > 0 && (
-        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+        <span className="rounded bg-control px-1.5 py-0.5 text-[10px] font-bold text-content-muted">
           {group.removedCompanionCount} removed
         </span>
       )}
@@ -937,11 +937,11 @@ function FilterSelect({
 }) {
   return (
     <label className="min-w-0">
-      <span className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">{label}</span>
+      <span className="mb-1 block text-[11px] font-semibold uppercase text-content-subtle">{label}</span>
       <select
         value={value}
         onChange={event => onChange(event.target.value)}
-        className="h-10 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700"
+        className="h-10 w-full rounded-md border border-line-strong bg-surface px-2 text-sm font-semibold text-content"
       >
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
