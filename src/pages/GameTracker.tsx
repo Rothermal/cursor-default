@@ -472,7 +472,7 @@ export default function GameTracker() {
     authoritativeDiagnostics.length > 0
   ) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-8">
+      <div className="min-h-screen bg-surface-muted px-4 py-8">
         <div className="max-w-lg mx-auto">
           <AccessUnavailable
             title="Event game unavailable"
@@ -488,7 +488,7 @@ export default function GameTracker() {
   if (state.cloudSync.teamId && !canTrackGames(teamAccess.role)) {
     const checkingAccess = teamAccess.loading && !teamAccess.error
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-8">
+      <div className="min-h-screen bg-surface-muted px-4 py-8">
         <div className="max-w-lg mx-auto">
           <AccessUnavailable
             title={checkingAccess ? 'Checking game access' : 'Game tracking unavailable'}
@@ -1076,12 +1076,12 @@ export default function GameTracker() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-surface-muted">
       <div className="px-3 pt-3 pb-2 max-w-lg mx-auto w-full">
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => navigate(sportDashboardPath(sport.id))}
-            className="text-sm text-slate-500 font-medium active:scale-95 transition-transform"
+            className="text-sm text-content-subtle font-medium active:scale-95 transition-transform"
           >
             Dashboard
           </button>
@@ -1089,7 +1089,7 @@ export default function GameTracker() {
             onClick={() => navigate(isBasketballEventMode
               ? basketballSummaryPath({ from: 'tracker' })
               : '/summary')}
-            className="text-sm text-blue-600 font-semibold active:scale-95 transition-transform"
+            className="text-sm text-info-content font-semibold active:scale-95 transition-transform"
           >
             Summary →
           </button>
@@ -1107,34 +1107,34 @@ export default function GameTracker() {
           } : undefined}
         />
         {parkingError && (
-          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="mt-3 rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
             {parkingError}
           </div>
         )}
         {cloudRecoveryError && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mt-3 rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
             {cloudRecoveryError}
           </div>
         )}
         <BasketballEnableCloudPanel state={state} />
         {cloudConflicts.length > 0 ? (
-          <div className="mt-3 flex items-center gap-3 border border-amber-300 bg-amber-50 px-3 py-3 text-amber-900">
+          <div className="mt-3 flex items-center gap-3 border border-warning-line bg-warning px-3 py-3 text-warning-content">
             <BadgeAlert size={20} className="shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">Needs Attention</p>
               <p className="text-xs">{cloudConflicts.length} {cloudConflicts.length === 1 ? 'event needs' : 'events need'} review</p>
             </div>
-            <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white">Review</button>
+            <button type="button" onClick={() => setConflictOpen(true)} className="min-h-9 rounded-md bg-warning px-3 text-xs font-bold text-content">Review</button>
           </div>
         ) : isBasketballEventMode && state.cloudSync.status === 'error' ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3 border border-red-200 bg-red-50 px-3 py-3 text-red-800">
+          <div className="mt-3 flex flex-wrap items-center gap-3 border border-danger-line bg-danger px-3 py-3 text-danger-content">
             <BadgeAlert size={20} className="shrink-0" />
             <p className="min-w-0 flex-1 truncate text-xs" title={state.cloudSync.lastError ?? undefined}>{state.cloudSync.lastError ?? 'Cloud sync needs attention.'}</p>
             {canRecoverDeletedPlayer && (
-              <button type="button" onClick={() => setDeletedPlayerRecoveryOpen(true)} disabled={syncBusy} className="min-h-9 rounded-md bg-amber-700 px-3 text-xs font-bold text-white disabled:opacity-50">Preserve History</button>
+              <button type="button" onClick={() => setDeletedPlayerRecoveryOpen(true)} disabled={syncBusy} className="min-h-9 rounded-md bg-warning px-3 text-xs font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">Preserve History</button>
             )}
-            <button type="button" onClick={() => { void retryBasketballSync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-red-700 px-3 text-xs font-bold text-white disabled:opacity-50">{syncBusy ? 'Retrying...' : 'Retry'}</button>
-            <button type="button" onClick={exportBasketballRecovery} className="min-h-9 rounded-md border border-red-300 bg-white px-3 text-xs font-bold text-red-700">Export</button>
+            <button type="button" onClick={() => { void retryBasketballSync() }} disabled={syncBusy} className="min-h-9 rounded-md bg-danger px-3 text-xs font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">{syncBusy ? 'Retrying...' : 'Retry'}</button>
+            <button type="button" onClick={exportBasketballRecovery} className="min-h-9 rounded-md border border-danger-line bg-surface px-3 text-xs font-bold text-danger-content">Export</button>
           </div>
         ) : null}
         {isBasketballEventMode && state.cloudSync.gameId && (
@@ -1201,7 +1201,7 @@ export default function GameTracker() {
 
       {isBasketballEventMode && !basketballCorrectionMode && (
         <div className="mx-auto w-full max-w-lg px-3 pb-2">
-          <div className="grid h-11 grid-cols-2 rounded-lg border border-slate-300 bg-slate-100 p-1" role="tablist" aria-label="Basketball game workspace">
+          <div className="grid h-11 grid-cols-2 rounded-lg border border-line-strong bg-control p-1" role="tablist" aria-label="Basketball game workspace">
             <button
               ref={basketballTrackTabRef}
               type="button"
@@ -1214,8 +1214,8 @@ export default function GameTracker() {
               onKeyDown={handleBasketballWorkspaceKeyDown}
               className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${
                 basketballWorkspace === 'track'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600'
+                  ? 'bg-surface text-content shadow-sm'
+                  : 'text-content-muted'
               }`}
             >
               <Target size={16} aria-hidden />
@@ -1233,8 +1233,8 @@ export default function GameTracker() {
               onKeyDown={handleBasketballWorkspaceKeyDown}
               className={`flex min-w-0 items-center justify-center gap-2 rounded-md text-sm font-bold ${
                 basketballWorkspace === 'timeline'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600'
+                  ? 'bg-surface text-content shadow-sm'
+                  : 'text-content-muted'
               }`}
             >
               <List size={16} aria-hidden />
@@ -1246,7 +1246,7 @@ export default function GameTracker() {
 
       {basketballCorrectionMode ? (
         <div className="mx-auto w-full max-w-lg space-y-3 px-3 pb-28">
-          <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+          <p className="border border-warning-line bg-warning px-3 py-2 text-sm font-semibold text-warning-content">
             Correct records mode. Live capture remains locked until this result is republished.
           </p>
           <BasketballTimeline />
@@ -1262,7 +1262,7 @@ export default function GameTracker() {
         players={players}
         activePlayerId={activePlayer.id}
         onSelectPlayer={handleSelectPlayer}
-        activeBgClass={sport.theme.bg}
+        activeBgClass="bg-accent"
         onAddPlayer={isBasketballEventMode
           ? basketballMatchOpen
             ? () => {
@@ -1286,7 +1286,7 @@ export default function GameTracker() {
               value={newNumber}
               onChange={e => setNewNumber(e.target.value)}
               placeholder="#"
-              className="input-field w-14 text-center text-sm py-2"
+              className="bg-surface input-field w-14 text-center text-sm py-2"
               inputMode="numeric"
             />
             <input
@@ -1294,7 +1294,7 @@ export default function GameTracker() {
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Player name"
-              className="input-field flex-1 text-sm py-2"
+              className="bg-surface input-field flex-1 text-sm py-2"
               autoFocus
               onKeyDown={e => { if (e.key === 'Enter') handleAddPlayer() }}
             />
@@ -1318,7 +1318,7 @@ export default function GameTracker() {
             captureDisabledMessage={basketballCaptureDisabledMessage}
           />
           {!isBasketballEventMode && (
-            <p className="mt-2 text-[11px] text-slate-400 leading-snug px-1">
+            <p className="mt-2 text-[11px] text-content-subtle leading-snug px-1">
               The court popup and the buttons below adjust the same player stats — the popup is
               fast in-play entry (shots keep their location); the buttons are for direct entry
               and corrections.
@@ -1384,11 +1384,11 @@ export default function GameTracker() {
               <div key={category.id}>
                 {!category.hideHeader && (
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+                    <h3 className="text-sm font-semibold text-content-subtle uppercase tracking-wide">
                       {category.name}
                     </h3>
                     {displayTotal !== null && (
-                      <span className="text-sm font-bold text-slate-700">
+                      <span className="text-sm font-bold text-content">
                         {category.totalLabel}: {displayTotal}
                       </span>
                     )}
@@ -1396,7 +1396,7 @@ export default function GameTracker() {
                 )}
                 {category.hideHeader && displayTotal !== null && (
                   <div className="flex justify-end mb-2">
-                    <span className="text-sm font-bold text-slate-700">
+                    <span className="text-sm font-bold text-content">
                       {category.totalLabel}: {displayTotal}
                     </span>
                   </div>
@@ -1550,18 +1550,18 @@ export default function GameTracker() {
                 setShowStealTurnover(true)
               }}
               disabled={!basketballPeriodActive || activePlayerUnavailable}
-              className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2 text-sm disabled:opacity-40"
+              className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
             >
               <Link2 size={16} aria-hidden />
               Steal + Turnover
             </button>
           )}
           {isBasketballEventMode && timeoutInventory && (
-            <section className="border-y border-sky-200 bg-sky-50 px-3 py-3" aria-labelledby="basketball-timeouts-title">
+            <section className="border-y border-info-line bg-info px-3 py-3" aria-labelledby="basketball-timeouts-title">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 id="basketball-timeouts-title" className="text-sm font-bold text-sky-950">Timeouts</h3>
-                  <p className="text-xs text-sky-800">{timeoutInventory.scopeLabel}</p>
+                  <h3 id="basketball-timeouts-title" className="text-sm font-bold text-info-content">Timeouts</h3>
+                  <p className="text-xs text-info-content">{timeoutInventory.scopeLabel}</p>
                 </div>
                 <button
                   type="button"
@@ -1570,13 +1570,13 @@ export default function GameTracker() {
                     setShowTimeoutDialog(true)
                   }}
                   disabled={!basketballPeriodActive}
-                  className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:opacity-40"
+                  className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
                 >
                   <Clock3 size={16} aria-hidden />
                   Record
                 </button>
               </div>
-              <div className="mt-3 divide-y divide-sky-200 border-t border-sky-200">
+              <div className="mt-3 divide-y divide-info-line border-t border-info-line">
                 <TimeoutInventoryRow
                   label={trackedTeamLabel}
                   detail={formatBasketballTimeoutInventory(timeoutInventory.tracked)}
@@ -1605,11 +1605,11 @@ export default function GameTracker() {
             </section>
           )}
           {isBasketballEventMode && (
-            <section className="border-y border-rose-200 bg-rose-50 px-3 py-3" aria-labelledby="basketball-ejections-title">
+            <section className="border-y border-danger-line bg-danger px-3 py-3" aria-labelledby="basketball-ejections-title">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 id="basketball-ejections-title" className="text-sm font-bold text-rose-950">Official ejections</h3>
-                  <p className="text-xs text-rose-800">{basketballEjectionStatuses.length > 0 ? countLabel(basketballEjectionStatuses.length, 'recorded ruling') : 'No recorded rulings'}</p>
+                  <h3 id="basketball-ejections-title" className="text-sm font-bold text-danger-content">Official ejections</h3>
+                  <p className="text-xs text-danger-content">{basketballEjectionStatuses.length > 0 ? countLabel(basketballEjectionStatuses.length, 'recorded ruling') : 'No recorded rulings'}</p>
                 </div>
                 <button
                   type="button"
@@ -1618,19 +1618,19 @@ export default function GameTracker() {
                     setShowEjectionDialog(true)
                   }}
                   disabled={!basketballPeriodActive}
-                  className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:opacity-40"
+                  className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
                 >
                   <UserX size={16} aria-hidden />
                   Record
                 </button>
               </div>
               {basketballEjectionStatuses.length > 0 && (
-                <div className="mt-3 divide-y divide-rose-200 border-t border-rose-200">
+                <div className="mt-3 divide-y divide-danger-line border-t border-danger-line">
                   {basketballEjectionStatuses.map(ejection => (
                     <div key={ejection.eventId} className="flex items-center justify-between gap-3 py-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-800">{ejection.subjectLabel}</p>
-                        <p className="line-clamp-2 text-xs text-slate-600">
+                        <p className="truncate text-sm font-semibold text-content">{ejection.subjectLabel}</p>
+                        <p className="line-clamp-2 text-xs text-content-muted">
                           {ejection.teamSide === 'tracked' ? trackedTeamLabel : opponentTeamLabel} - {ejection.reason}
                         </p>
                       </div>
@@ -1638,7 +1638,7 @@ export default function GameTracker() {
                         type="button"
                         onClick={() => handleEjectionRemoval(ejection.eventId)}
                         disabled={!ejection.removable}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-700 disabled:opacity-30"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-danger-line bg-surface text-danger-content disabled:bg-control-disabled disabled:text-content-disabled"
                         aria-label={`Remove ejection for ${ejection.subjectLabel}`}
                         title={ejection.removable ? 'Remove official ejection' : 'Only current-period ejections can be corrected'}
                       >
@@ -1651,12 +1651,12 @@ export default function GameTracker() {
             </section>
           )}
           {isBasketballEventMode && reviewableFreeThrowTrips.length > 0 && (
-            <section className="border-y border-amber-200 bg-amber-50 px-3 py-3" aria-labelledby="basketball-open-trips-title">
+            <section className="border-y border-warning-line bg-warning px-3 py-3" aria-labelledby="basketball-open-trips-title">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <h3 id="basketball-open-trips-title" className="text-sm font-bold text-amber-950">
+                <h3 id="basketball-open-trips-title" className="text-sm font-bold text-warning-content">
                   Awarded free throws
                 </h3>
-                <span className="text-xs font-semibold text-amber-800">
+                <span className="text-xs font-semibold text-warning-content">
                   {openFreeThrowTripCount > 0
                     ? `${openFreeThrowTripCount} open`
                     : 'Review corrections'}
@@ -1671,8 +1671,8 @@ export default function GameTracker() {
                   return (
                     <div key={trip.eventId} className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-800">{teamName}</p>
-                        <p className="text-xs text-slate-600">
+                        <p className="truncate text-sm font-semibold text-content">{teamName}</p>
+                        <p className="text-xs text-content-muted">
                           {trip.open
                             ? `Attempt ${trip.nextAttemptNumber} of ${trip.maximumAttempts}`
                             : 'Closed · removed position retained'}
@@ -1687,7 +1687,7 @@ export default function GameTracker() {
                           setActiveFreeThrowTrip({ eventId: trip.eventId, suggestedPlayerId: lastShooter })
                         }}
                         disabled={!basketballPeriodActive}
-                        className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:opacity-40"
+                        className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
                       >
                         <ReceiptText size={16} aria-hidden />
                         {trip.open ? 'Record' : 'Review'}
@@ -1699,12 +1699,12 @@ export default function GameTracker() {
             </section>
           )}
           {isBasketballEventMode && (directCaptureError || directDecrementError || administrativeCorrectionError) && (
-            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+            <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">
               {directCaptureError ?? directDecrementError ?? administrativeCorrectionError}
             </p>
           )}
           <div className="mt-2">
-            <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <label className="block text-sm font-semibold text-content-subtle uppercase tracking-wide mb-2">
               Game Notes
             </label>
             <textarea
@@ -1713,8 +1713,8 @@ export default function GameTracker() {
               onBlur={() => dispatch({ type: 'SET_NOTES', notes: localNotes })}
               placeholder="Add notes about the game…"
               rows={3}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
-                         placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300
+              className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-content
+                         placeholder:text-content-subtle focus:outline-none focus:ring-2 focus:ring-info-line
                          resize-none"
             />
           </div>
@@ -1725,11 +1725,11 @@ export default function GameTracker() {
         <BasketballTimeline />
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 px-4 py-3 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur border-t border-line px-4 py-3 safe-bottom">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="min-w-0 pr-3 text-xs text-slate-400">
+          <div className="min-w-0 pr-3 text-xs text-content-subtle">
             {(isBasketballEventMode ? eventLastActionLabel : lastActionLabel) && (
-              <span className="block truncate">Last: <span className="font-medium text-slate-600">{isBasketballEventMode ? eventLastActionLabel : lastActionLabel}</span></span>
+              <span className="block truncate">Last: <span className="font-medium text-content-muted">{isBasketballEventMode ? eventLastActionLabel : lastActionLabel}</span></span>
             )}
           </div>
           <button
@@ -1737,7 +1737,7 @@ export default function GameTracker() {
             disabled={isBasketballEventMode
               ? basketballCorrectionMode || (basketballCaptureUnits.length === 0 && !canRestoreBasketball)
               : actionLog.length === 0}
-            className="btn-secondary py-2 px-4 text-sm disabled:opacity-30"
+            className="btn-secondary py-2 px-4 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
           >
             ↩ Undo
           </button>
@@ -2117,14 +2117,14 @@ function TimeoutInventoryRow({
   return (
     <div className="flex min-h-12 items-center justify-between gap-3 py-2">
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-800">{label}</p>
-        <p className="text-xs text-slate-600">{detail}</p>
+        <p className="truncate text-sm font-semibold text-content">{label}</p>
+        <p className="text-xs text-content-muted">{detail}</p>
       </div>
       <button
         type="button"
         onClick={onRemove}
         disabled={removeDisabled}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sky-200 bg-white text-sky-800 disabled:opacity-30"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-info-line bg-surface text-info-content disabled:bg-control-disabled disabled:text-content-disabled"
         aria-label={`Remove latest ${label} timeout`}
         title={removeDisabled ? 'No matching current-period timeout to remove' : 'Remove latest timeout'}
       >

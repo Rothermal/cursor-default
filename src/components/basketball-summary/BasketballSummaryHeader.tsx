@@ -25,23 +25,23 @@ export default function BasketballSummaryHeader({
     : source.recorder?.checkpointSyncedAt ?? null
 
   return (
-    <header className="bg-slate-950 text-white">
+    <header className="bg-control text-content">
       <div className="mx-auto max-w-5xl px-4 pb-5 pt-3">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-content hover:bg-control hover:text-content"
             aria-label="Back"
           >
             <ChevronLeft size={22} />
           </button>
           <div className="min-w-0 text-center">
-            <p className="truncate text-xs font-semibold uppercase text-amber-300">
+            <p className="truncate text-xs font-semibold uppercase text-warning-content">
               {authority}
             </p>
             {freshness && (
-              <p className="mt-0.5 text-[11px] text-slate-400">
+              <p className="mt-0.5 text-[11px] text-content-subtle">
                 Updated {formatTimestamp(freshness)}
               </p>
             )}
@@ -50,7 +50,7 @@ export default function BasketballSummaryHeader({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-content hover:bg-control hover:text-content disabled:bg-control-disabled disabled:text-content-disabled"
             aria-label="Refresh summary"
           >
             <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
@@ -62,7 +62,7 @@ export default function BasketballSummaryHeader({
             name={source.state.gameInfo?.teamName || 'Tracked team'}
             score={healthy && projection ? projection.score.tracked : null}
           />
-          <span className="text-sm font-semibold text-slate-500">vs</span>
+          <span className="text-sm font-semibold text-content-subtle">vs</span>
           <TeamScore
             name={source.state.gameInfo?.opponentName || 'Opponent'}
             score={healthy && projection ? projection.score.opponent : null}
@@ -84,8 +84,8 @@ function TeamScore({
   align?: 'left' | 'right'
 }) {
   return (
-    <div className={align === 'right' ? 'text-right' : 'text-left'}>
-      <p className="break-words text-sm font-semibold text-slate-200">{name}</p>
+    <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      <p className="break-words text-sm font-semibold text-content">{name}</p>
       <p className="mt-1 text-4xl font-bold tabular-nums">{score ?? '--'}</p>
     </div>
   )

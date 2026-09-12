@@ -26,7 +26,7 @@ export default function BasketballPlayerDetail({ player, onClose }: Props) {
   const line = player.line
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 sm:items-center"
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-overlay/[0.5] sm:items-center"
       onMouseDown={event => {
         if (event.target === event.currentTarget) onClose()
       }}
@@ -35,17 +35,17 @@ export default function BasketballPlayerDetail({ player, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-player-detail-title"
-        className="max-h-[94vh] w-full overflow-y-auto rounded-t-lg bg-white sm:max-w-lg sm:rounded-lg"
+        className="max-h-[94vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg"
       >
-        <header className="sticky top-0 z-10 flex min-h-16 items-center gap-3 border-b border-slate-200 bg-white px-4">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded bg-blue-100 text-sm font-bold text-blue-800">
+        <header className="sticky top-0 z-10 flex min-h-16 items-center gap-3 border-b border-line bg-surface px-4">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded bg-info text-sm font-bold text-info-content">
             {player.number ?? '-'}
           </div>
           <div className="min-w-0 flex-1">
-            <h2 id="basketball-player-detail-title" className="truncate font-bold text-slate-900">
+            <h2 id="basketball-player-detail-title" className="truncate font-bold text-content">
               {player.displayName}
             </h2>
-            <p className="truncate text-xs text-slate-500">
+            <p className="truncate text-xs text-content-subtle">
               {player.rosterStatus} roster{player.lateAdded ? ' / added during game' : ''}
             </p>
           </div>
@@ -53,7 +53,7 @@ export default function BasketballPlayerDetail({ player, onClose }: Props) {
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded text-slate-500 hover:bg-slate-100"
+            className="grid h-9 w-9 place-items-center rounded text-content-subtle hover:bg-control"
             aria-label="Close player detail"
             title="Close"
           >
@@ -69,43 +69,43 @@ export default function BasketballPlayerDetail({ player, onClose }: Props) {
           ['Plus-minus', formatPlusMinus(player.participation.plusMinus)],
         ]} />
         {player.participation.qualityReason && (
-          <p className="mx-4 mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="mx-4 mt-4 rounded-md border border-warning-line bg-warning p-3 text-sm text-warning-content">
             {player.participation.qualityReason}
           </p>
         )}
         {player.participation.plusMinus === null && player.participation.plusMinusUnavailableReason && (
-          <p className="mx-4 mt-3 text-xs text-slate-500">
+          <p className="mx-4 mt-3 text-xs text-content-subtle">
             Plus-minus unavailable: {player.participation.plusMinusUnavailableReason}
           </p>
         )}
         {player.participation.intervals.length > 0 && (
-          <section className="border-b border-slate-200 px-4 py-4">
-            <h3 className="text-xs font-bold uppercase text-slate-500">Stints</h3>
-            <div className="mt-2 divide-y divide-slate-100">
+          <section className="border-b border-line px-4 py-4">
+            <h3 className="text-xs font-bold uppercase text-content-subtle">Stints</h3>
+            <div className="mt-2 divide-y divide-line">
               {player.participation.intervals.map((interval, index) => (
                 <div key={`${interval.periodId}:${index}`} className="flex items-start justify-between gap-4 py-2 text-sm">
                   <div>
-                    <p className="font-semibold text-slate-800">{interval.periodLabel}</p>
-                    <p className="text-xs tabular-nums text-slate-500">
+                    <p className="font-semibold text-content">{interval.periodLabel}</p>
+                    <p className="text-xs tabular-nums text-content-subtle">
                       {formatBasketballDurationMs(interval.startElapsedMs)} to {formatBasketballDurationMs(interval.endElapsedMs)} elapsed
                     </p>
                   </div>
-                  <strong className="tabular-nums text-slate-900">{interval.displayDuration}</strong>
+                  <strong className="tabular-nums text-content">{interval.displayDuration}</strong>
                 </div>
               ))}
             </div>
           </section>
         )}
         {player.roleHistory.length > 0 && (
-          <section className="border-b border-slate-200 px-4 py-4">
-            <h3 className="text-xs font-bold uppercase text-slate-500">Role history</h3>
-            <div className="mt-2 divide-y divide-slate-100">
+          <section className="border-b border-line px-4 py-4">
+            <h3 className="text-xs font-bold uppercase text-content-subtle">Role history</h3>
+            <div className="mt-2 divide-y divide-line">
               {player.roleHistory.map(role => (
                 <div key={role.eventId} className="flex items-center justify-between gap-4 py-2 text-sm">
-                  <span className="text-slate-600">
+                  <span className="text-content-muted">
                     {role.periodLabel} at {formatBasketballDurationMs(role.elapsedMs)}
                   </span>
-                  <strong className="text-right text-slate-900">
+                  <strong className="text-right text-content">
                     {role.position ?? 'No position'}{role.captain ? ' / Captain' : ''}
                   </strong>
                 </div>
@@ -173,13 +173,13 @@ function StatSection({
   rows: Array<[string, string | number]>
 }) {
   return (
-    <section className="border-b border-slate-200 px-4 py-4 last:border-b-0">
-      <h3 className="text-xs font-bold uppercase text-slate-500">{title}</h3>
-      <dl className="mt-2 divide-y divide-slate-100">
+    <section className="border-b border-line px-4 py-4 last:border-b-0">
+      <h3 className="text-xs font-bold uppercase text-content-subtle">{title}</h3>
+      <dl className="mt-2 divide-y divide-line">
         {rows.map(([label, value]) => (
           <div key={label} className="flex min-h-9 items-center justify-between gap-4 py-1.5">
-            <dt className="text-sm text-slate-600">{label}</dt>
-            <dd className="shrink-0 text-sm font-bold tabular-nums text-slate-900">{value}</dd>
+            <dt className="text-sm text-content-muted">{label}</dt>
+            <dd className="shrink-0 text-sm font-bold tabular-nums text-content">{value}</dd>
           </div>
         ))}
       </dl>

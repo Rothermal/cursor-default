@@ -98,9 +98,9 @@ export default function BasketballRelatedEventEditor({ eventId, onClose, onAppli
     return (
       <BasketballEditorFrame title="Review event changes" onClose={() => setPreview(null)} closeRef={closeRef}>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <ul className="space-y-2">{preview.consequenceLines.map(line => <li key={line} className="flex gap-2 text-sm text-slate-700"><Check className="mt-0.5 shrink-0 text-emerald-600" size={16} aria-hidden /><span>{line}</span></li>)}</ul>
+          <ul className="space-y-2">{preview.consequenceLines.map(line => <li key={line} className="flex gap-2 text-sm text-content"><Check className="mt-0.5 shrink-0 text-success-content" size={16} aria-hidden /><span className="min-w-0 break-words">{line}</span></li>)}</ul>
         </div>
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3"><button type="button" onClick={() => setPreview(null)} className="btn-secondary min-h-11">Back</button><button type="button" onClick={apply} className="btn-primary min-h-11">Save changes</button></footer>
+        <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3"><button type="button" onClick={() => setPreview(null)} className="btn-secondary min-h-11">Back</button><button type="button" onClick={apply} className="btn-primary min-h-11">Save changes</button></footer>
       </BasketballEditorFrame>
     )
   }
@@ -118,16 +118,16 @@ export default function BasketballRelatedEventEditor({ eventId, onClose, onAppli
             const option = actorOptions.find(candidate => candidate.key === key)
             if (option) update({ actor: option.selection })
           }} />
-          {draft.actor.kind === 'unknown' && <label className="block"><span className="mb-1 block text-sm font-semibold text-slate-700">Unknown player label</span><input value={draft.actor.label} onChange={event => update({ actor: { kind: 'unknown', label: event.target.value } })} maxLength={80} className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-800" /></label>}
+          {draft.actor.kind === 'unknown' && <label className="block"><span className="mb-1 block text-sm font-semibold text-content">Unknown player label</span><input value={draft.actor.label} onChange={event => update({ actor: { kind: 'unknown', label: event.target.value } })} maxLength={80} className="bg-surface h-11 w-full rounded-md border border-line-strong px-3 text-sm font-semibold text-content" /></label>}
           {draft.eventType === 'basketball.rebound' && <BasketballEditorSegmentedControl label="Rebound" value={draft.reboundKind} options={[{ value: 'offensive', label: 'Offensive' }, { value: 'defensive', label: 'Defensive' }]} onChange={value => update({ reboundKind: value as 'offensive' | 'defensive' })} />}
         </BasketballEditorSection>
         <BasketballEditorSection title="Relationship">
           <BasketballEditorSelectField label="Linked event" value={effectiveDraft.relatedEventId ?? 'none'} options={targetOptions.map(option => ({ value: option.eventId ?? 'none', label: option.label }))} onChange={value => update({ relatedEventId: value === 'none' ? null : value })} />
-          <p className="text-xs text-slate-500">Standalone stats keep their totals.</p>
+          <p className="text-xs text-content-subtle">Standalone stats keep their totals.</p>
         </BasketballEditorSection>
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
-      <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3"><button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button><button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2"><Pencil size={16} aria-hidden />Review</button></footer>
+      <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3"><button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button><button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2"><Pencil size={16} aria-hidden />Review</button></footer>
     </BasketballEditorFrame>
   )
 }

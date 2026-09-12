@@ -30,7 +30,7 @@ export default function BasketballHistoricalTimeField({
 
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-700">
+      <span className="mb-1 block text-sm font-semibold text-content">
         Game time ({countDown ? 'remaining' : 'elapsed'})
       </span>
       <input
@@ -49,9 +49,9 @@ export default function BasketballHistoricalTimeField({
         inputMode="numeric"
         placeholder="8:00"
         aria-describedby="basketball-historical-time-help"
-        className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm font-semibold tabular-nums text-slate-800"
+        className="bg-surface h-11 w-full rounded-md border border-line-strong px-3 text-sm font-semibold tabular-nums text-content"
       />
-      <span id="basketball-historical-time-help" className="mt-1 block text-xs text-slate-500">
+      <span id="basketball-historical-time-help" className="mt-1 block text-xs text-content-subtle">
         Enter minutes and seconds from 0:00 through {formatTime(durationMs)}.
       </span>
     </label>

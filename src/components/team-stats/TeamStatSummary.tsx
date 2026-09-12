@@ -73,15 +73,15 @@ export default function TeamStatSummary({
 
   return (
     <div className="space-y-6">
-      <div className="card border-slate-200">
-        <h3 className="text-sm font-semibold text-slate-600 mb-3">Team fouls by period</h3>
+      <div className="card border-line">
+        <h3 className="text-sm font-semibold text-content-muted mb-3">Team fouls by period</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-2 pr-3 font-semibold text-slate-600">Period</th>
-                <th className="text-center py-2 px-2 font-semibold text-slate-600">{homeTeamName}</th>
-                <th className="text-center py-2 px-2 font-semibold text-slate-600">{oppTeamName}</th>
+              <tr className="border-b border-line">
+                <th className="text-left py-2 pr-3 font-semibold text-content-muted">Period</th>
+                <th className="text-center py-2 px-2 font-semibold text-content-muted">{homeTeamName}</th>
+                <th className="text-center py-2 px-2 font-semibold text-content-muted">{oppTeamName}</th>
               </tr>
             </thead>
             <tbody>
@@ -90,31 +90,31 @@ export default function TeamStatSummary({
                 const h = foulCountForPeriod(homeStats, foulBaseStatId, p)
                 const o = foulCountForPeriod(oppStats, foulBaseStatId, p)
                 return (
-                  <tr key={p} className="border-b border-slate-100">
-                    <td className="py-2 pr-3 text-slate-700">{periodLabels[i] ?? `Period ${p}`}</td>
+                  <tr key={p} className="border-b border-line">
+                    <td className="py-2 pr-3 text-content">{periodLabels[i] ?? `Period ${p}`}</td>
                     <td className="text-center py-2 px-2 tabular-nums">
-                      {homeTracked ? h : <span className="text-slate-400 italic">—</span>}
+                      {homeTracked ? h : <span className="text-content-subtle italic">—</span>}
                     </td>
                     <td className="text-center py-2 px-2 tabular-nums">
-                      {oppTracked ? o : <span className="text-slate-400 italic">—</span>}
+                      {oppTracked ? o : <span className="text-content-subtle italic">—</span>}
                     </td>
                   </tr>
                 )
               })}
-              <tr className="bg-slate-50 font-semibold">
+              <tr className="bg-surface-muted font-semibold">
                 <td className="py-2 pr-3">Total</td>
                 <td className="text-center py-2 px-2 tabular-nums">
                   {homeTracked ? (
                     homeFoulTotal
                   ) : (
-                    <span className="text-slate-400 italic font-normal">Not tracked</span>
+                    <span className="text-content-subtle italic font-normal">Not tracked</span>
                   )}
                 </td>
                 <td className="text-center py-2 px-2 tabular-nums">
                   {oppTracked ? (
                     oppFoulTotal
                   ) : (
-                    <span className="text-slate-400 italic font-normal">Not tracked</span>
+                    <span className="text-content-subtle italic font-normal">Not tracked</span>
                   )}
                 </td>
               </tr>
@@ -124,10 +124,10 @@ export default function TeamStatSummary({
       </div>
 
       {allBonus.length > 0 && (
-        <div className="card border-slate-200">
-          <h3 className="text-sm font-semibold text-slate-600 mb-2">Bonus events</h3>
-          <p className="text-xs text-slate-500 mb-2">Derived from foul counts and season rules.</p>
-          <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
+        <div className="card border-line">
+          <h3 className="text-sm font-semibold text-content-muted mb-2">Bonus events</h3>
+          <p className="text-xs text-content-subtle mb-2">Derived from foul counts and season rules.</p>
+          <ul className="list-disc list-inside text-sm text-content space-y-1">
             {allBonus.map((e, idx) => (
               <li key={`${e.teamLabel}-${e.periodIndex}-${e.type}-${idx}`}>{bonusEventLabel(e)}</li>
             ))}
@@ -136,15 +136,15 @@ export default function TeamStatSummary({
       )}
 
       {otherActions.length > 0 && (
-        <div className="card border-slate-200">
-          <h3 className="text-sm font-semibold text-slate-600 mb-3">Timeouts / other</h3>
+        <div className="card border-line">
+          <h3 className="text-sm font-semibold text-content-muted mb-3">Timeouts / other</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 pr-3 font-semibold text-slate-600">Stat</th>
-                  <th className="text-center py-2 px-2 font-semibold text-slate-600">{homeTeamName}</th>
-                  <th className="text-center py-2 px-2 font-semibold text-slate-600">{oppTeamName}</th>
+                <tr className="border-b border-line">
+                  <th className="text-left py-2 pr-3 font-semibold text-content-muted">Stat</th>
+                  <th className="text-center py-2 px-2 font-semibold text-content-muted">{homeTeamName}</th>
+                  <th className="text-center py-2 px-2 font-semibold text-content-muted">{oppTeamName}</th>
                 </tr>
               </thead>
               <tbody>
@@ -152,20 +152,20 @@ export default function TeamStatSummary({
                   const hv = valueForTeamAction(homeStats, action)
                   const ov = valueForTeamAction(oppStats, action)
                   return (
-                    <tr key={action.id} className="border-b border-slate-100">
+                    <tr key={action.id} className="border-b border-line">
                       <td className="py-2 pr-3">{action.shortLabel}</td>
                       <td className="text-center py-2 px-2 tabular-nums">
                         {homeTracked ? (
                           hv
                         ) : (
-                          <span className="text-slate-400 italic">Not tracked</span>
+                          <span className="text-content-subtle italic">Not tracked</span>
                         )}
                       </td>
                       <td className="text-center py-2 px-2 tabular-nums">
                         {oppTracked ? (
                           ov
                         ) : (
-                          <span className="text-slate-400 italic">Not tracked</span>
+                          <span className="text-content-subtle italic">Not tracked</span>
                         )}
                       </td>
                     </tr>

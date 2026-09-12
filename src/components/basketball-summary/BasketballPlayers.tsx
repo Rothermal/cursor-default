@@ -42,8 +42,8 @@ export default function BasketballPlayers({ source }: Props) {
 
   return (
     <main className="mx-auto max-w-3xl pb-10">
-      <section className="border-b border-slate-200 bg-white px-4 py-4">
-        <div className="grid grid-cols-2 rounded-md border border-slate-300 p-0.5">
+      <section className="border-b border-line bg-surface px-4 py-4">
+        <div className="grid grid-cols-2 rounded-md border border-line-strong p-0.5">
           {([['tracked', source.state.gameInfo?.teamName ?? 'Tracked'],
             ['opponent', source.state.gameInfo?.opponentName ?? 'Opponent']] as const)
             .map(([id, label]) => (
@@ -55,7 +55,7 @@ export default function BasketballPlayers({ source }: Props) {
                   setSelected(null)
                 }}
                 className={`min-h-10 rounded px-2 text-sm font-bold ${
-                  side === id ? 'bg-blue-700 text-white' : 'bg-white text-slate-600'
+                  side === id ? 'bg-info text-content' : 'bg-surface text-content-muted'
                 }`}
                 aria-pressed={side === id}
               >
@@ -63,15 +63,15 @@ export default function BasketballPlayers({ source }: Props) {
               </button>
             ))}
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-content-subtle">
           Rows represent only recorded match participants. Team and unknown activity remains in Team Stats.
         </p>
-        <label className="mt-3 flex items-center justify-end gap-2 text-xs font-semibold text-slate-600">
+        <label className="mt-3 flex items-center justify-end gap-2 text-xs font-semibold text-content-muted">
           Sort
           <select
             value={sort}
             onChange={event => setSort(event.target.value as typeof sort)}
-            className="min-h-9 rounded border border-slate-300 bg-white px-2 text-sm text-slate-800"
+            className="min-h-9 rounded border border-line-strong bg-surface px-2 text-sm text-content"
           >
             <option value="roster">Roster order</option>
             <option value="name">Name</option>
@@ -82,22 +82,22 @@ export default function BasketballPlayers({ source }: Props) {
       </section>
 
       {rows.length === 0 ? (
-        <section className="bg-white px-4 py-10 text-center">
-          <h2 className="font-bold text-slate-900">No opponent players recorded</h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-600">
+        <section className="bg-surface px-4 py-10 text-center">
+          <h2 className="font-bold text-content">No opponent players recorded</h2>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-content-muted">
             Opponent team totals remain authoritative. Player rows appear only when an opponent participant was explicitly added.
           </p>
         </section>
       ) : (
-        <section className="bg-white">
-          <div className="grid grid-cols-[minmax(0,1fr)_3.75rem_3rem_3rem_1.25rem] items-center gap-1 border-b border-slate-200 bg-slate-100 px-3 py-2 text-[10px] font-bold uppercase text-slate-500">
+        <section className="bg-surface">
+          <div className="grid grid-cols-[minmax(0,1fr)_3.75rem_3rem_3rem_1.25rem] items-center gap-1 border-b border-line bg-control px-3 py-2 text-[10px] font-bold uppercase text-content-subtle">
             <span>Player</span>
             <span className="text-center">MIN</span>
             <span className="text-center">PTS</span>
             <span className="text-center">+/-</span>
             <span aria-hidden="true" />
           </div>
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-line">
             {rows.map(player => (
               <button
                 key={player.participantId}
@@ -106,14 +106,14 @@ export default function BasketballPlayers({ source }: Props) {
                   triggerRef.current = event.currentTarget
                   setSelected(player)
                 }}
-                className="grid min-h-[4.5rem] w-full grid-cols-[minmax(0,1fr)_3.75rem_3rem_3rem_1.25rem] items-center gap-1 px-3 text-left hover:bg-slate-50"
+                className="grid min-h-[4.5rem] w-full grid-cols-[minmax(0,1fr)_3.75rem_3rem_3rem_1.25rem] items-center gap-1 px-3 text-left hover:bg-surface-muted"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-slate-900">
-                    <span className="mr-1.5 text-slate-400">{player.number ?? '-'}</span>
+                  <p className="truncate text-sm font-bold text-content">
+                    <span className="mr-1.5 text-content-subtle">{player.number ?? '-'}</span>
                     {player.displayName}
                   </p>
-                  <p className="truncate text-[11px] text-slate-500">
+                  <p className="truncate text-[11px] text-content-subtle">
                     {rosterLabel(player)}
                     {player.participation.basis === 'interval_derived'
                       ? ` / ${player.participation.stintCount} stint${player.participation.stintCount === 1 ? '' : 's'}`
@@ -127,7 +127,7 @@ export default function BasketballPlayers({ source }: Props) {
                 <Stat value={player.participation.displayTime} />
                 <Stat value={player.line.points} />
                 <Stat value={formatPlusMinus(player.participation.plusMinus)} muted={player.participation.plusMinus === null} />
-                <ChevronRight size={17} className="text-slate-400" />
+                <ChevronRight size={17} className="text-content-subtle" />
               </button>
             ))}
           </div>
@@ -141,7 +141,7 @@ export default function BasketballPlayers({ source }: Props) {
 
 function Stat({ value, muted = false }: { value: string | number; muted?: boolean }) {
   return (
-    <span className={`text-center text-sm font-bold tabular-nums ${muted ? 'text-slate-400' : 'text-slate-800'}`}>
+    <span className={`text-center text-sm font-bold tabular-nums ${muted ? 'text-content-subtle' : 'text-content'}`}>
       {value}
     </span>
   )

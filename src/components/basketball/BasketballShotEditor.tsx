@@ -81,7 +81,7 @@ export default function BasketballShotEditor({
   if (!draft) {
     return (
       <BasketballEditorFrame title="Edit shot" onClose={onClose} closeRef={closeRef}>
-        <p role="alert" className="m-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm font-semibold text-rose-800">
+        <p role="alert" className="m-4 break-words rounded-md border border-danger-line bg-danger px-3 py-3 text-sm font-semibold text-danger-content">
           {error ?? 'This shot is unavailable for editing.'}
         </p>
       </BasketballEditorFrame>
@@ -140,8 +140,8 @@ export default function BasketballShotEditor({
   if (placingLocation) {
     return (
       <BasketballEditorFrame title="Place shot" onClose={() => setPlacingLocation(false)} closeRef={closeRef}>
-        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-3 py-3">
-          <div className="border-y border-slate-200 bg-white">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-surface-muted px-3 py-3">
+          <div className="border-y border-line bg-surface">
             <BasketballCourt
               shots={marker}
               onCourtTap={(x, y) => update({ location: { x, y } })}
@@ -150,18 +150,18 @@ export default function BasketballShotEditor({
               emptyHint="Tap to place"
             />
           </div>
-          <p className="mt-3 text-center text-sm font-medium text-slate-600">
+          <p className="mt-3 text-center text-sm font-medium text-content-muted">
             {draft.location
               ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft`
               : 'Tap the court to place the shot.'}
           </p>
         </div>
-        <footer className="border-t border-slate-200 bg-white px-4 py-3">
+        <footer className="shrink-0 border-t border-line bg-surface px-4 py-3">
           <button
             type="button"
             onClick={() => setPlacingLocation(false)}
             disabled={!draft.location}
-            className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 disabled:opacity-40"
+            className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 disabled:bg-control-disabled disabled:text-content-disabled"
           >
             <Check size={17} aria-hidden />
             Done
@@ -175,18 +175,18 @@ export default function BasketballShotEditor({
     return (
       <BasketballEditorFrame title="Review shot changes" onClose={() => setPreview(null)} closeRef={closeRef}>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <p className="text-sm font-semibold text-slate-800">This save will update:</p>
+          <p className="text-sm font-semibold text-content">This save will update:</p>
           <ul className="mt-3 space-y-2">
             {preview.consequenceLines.map(line => (
-              <li key={line} className="flex gap-2 text-sm text-slate-700">
-                <Check className="mt-0.5 shrink-0 text-emerald-600" size={16} aria-hidden />
-                <span>{line}</span>
+              <li key={line} className="flex gap-2 text-sm text-content">
+                <Check className="mt-0.5 shrink-0 text-success-content" size={16} aria-hidden />
+                <span className="min-w-0 break-words">{line}</span>
               </li>
             ))}
           </ul>
           {error && <BasketballEditorErrorMessage message={error} />}
         </div>
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-white px-4 py-3">
+        <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line bg-surface px-4 py-3">
           <button type="button" onClick={() => setPreview(null)} className="btn-secondary min-h-11">Back</button>
           <button type="button" onClick={apply} className="btn-primary min-h-11">Save changes</button>
         </footer>
@@ -234,7 +234,7 @@ export default function BasketballShotEditor({
 
         {draft.attempt === 'field_goal' && (
           <BasketballEditorSection title="Court location">
-            <p className="text-sm font-medium text-slate-700">
+            <p className="text-sm font-medium text-content">
               {draft.location
                 ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft`
                 : 'No court location'}
@@ -252,21 +252,21 @@ export default function BasketballShotEditor({
                 type="button"
                 onClick={() => setConfirmRemoveLocation(true)}
                 disabled={!draft.location}
-                className="btn-secondary flex min-h-11 items-center justify-center gap-2 text-rose-700 disabled:opacity-35"
+                className="btn-secondary flex min-h-11 items-center justify-center gap-2 text-danger-content disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 <MapPinOff size={17} aria-hidden />
                 Remove
               </button>
             </div>
             {confirmRemoveLocation && draft.location && (
-              <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3">
-                <p className="text-sm font-semibold text-rose-900">Return this field goal to unlocated?</p>
+              <div className="mt-3 rounded-md border border-danger-line bg-danger p-3">
+                <p className="text-sm font-semibold text-danger-content">Return this field goal to unlocated?</p>
                 <div className="mt-2 flex gap-2">
                   <button type="button" onClick={() => setConfirmRemoveLocation(false)} className="btn-secondary min-h-10 flex-1">Keep</button>
                   <button type="button" onClick={() => {
                     update({ location: null })
                     setConfirmRemoveLocation(false)
-                  }} className="min-h-10 flex-1 rounded-md bg-rose-700 text-sm font-bold text-white">Remove</button>
+                  }} className="min-h-10 flex-1 rounded-md bg-danger text-sm font-bold text-content">Remove</button>
                 </div>
               </div>
             )}
@@ -291,12 +291,12 @@ export default function BasketballShotEditor({
               />
             )
           })}
-          <p className="text-xs text-slate-500">Unlinked stats keep their totals.</p>
+          <p className="text-xs text-content-subtle">Unlinked stats keep their totals.</p>
         </BasketballEditorSection>
 
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
-      <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-white px-4 py-3">
+      <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line bg-surface px-4 py-3">
         <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
         <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
           <Pencil size={16} aria-hidden />
@@ -319,21 +319,21 @@ export function BasketballEditorFrame({
   children: React.ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex justify-center bg-black/45 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex justify-center bg-overlay/[0.45] sm:items-center sm:p-4" onClick={onClose}>
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-shot-editor-title"
-        className="flex h-full w-full flex-col bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-slate-200"
+        className="flex h-full w-full flex-col bg-surface shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-line"
         onClick={event => event.stopPropagation()}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <h2 id="basketball-shot-editor-title" className="text-base font-bold text-slate-900">{title}</h2>
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
+          <h2 id="basketball-shot-editor-title" className="min-w-0 break-words text-base font-bold text-content">{title}</h2>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-600"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-line text-content-muted"
             aria-label={`Close ${title.toLowerCase()}`}
             title="Close"
           >
@@ -348,8 +348,8 @@ export function BasketballEditorFrame({
 
 export function BasketballEditorSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-3 border-b border-slate-200 px-4 py-4">
-      <h3 className="text-xs font-semibold uppercase text-slate-500">{title}</h3>
+    <section className="space-y-3 border-b border-line px-4 py-4">
+      <h3 className="text-xs font-semibold uppercase text-content-subtle">{title}</h3>
       {children}
     </section>
   )
@@ -368,11 +368,11 @@ export function BasketballEditorSelectField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
+      <span className="mb-1 block text-sm font-semibold text-content">{label}</span>
       <select
         value={value}
         onChange={event => onChange(event.target.value)}
-        className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800"
+        className="h-11 w-full rounded-md border border-line-strong bg-surface px-3 text-sm font-semibold text-content"
       >
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
@@ -398,16 +398,16 @@ export function BasketballEditorSegmentedControl({
   }[options.length] ?? 'grid-cols-2'
   return (
     <fieldset>
-      <legend className="mb-1 text-sm font-semibold text-slate-700">{label}</legend>
-      <div className={`grid gap-1 rounded-md bg-slate-100 p-1 ${columnClass}`}>
+      <legend className="mb-1 text-sm font-semibold text-content">{label}</legend>
+      <div className={`grid gap-1 rounded-md bg-control p-1 ${columnClass}`}>
         {options.map(option => (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`min-h-10 rounded text-sm font-bold ${value === option.value
-              ? 'bg-white text-blue-800 shadow-sm'
-              : 'text-slate-600'}`}
+            className={`min-h-10 min-w-0 break-words rounded text-sm font-bold ${value === option.value
+              ? 'bg-accent text-accent-content shadow-sm'
+              : 'text-content-muted'}`}
           >
             {option.label}
           </button>
@@ -419,9 +419,9 @@ export function BasketballEditorSegmentedControl({
 
 export function BasketballEditorErrorMessage({ message }: { message: string }) {
   return (
-    <p role="alert" className="flex gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm font-semibold text-rose-800">
+    <p role="alert" className="flex gap-2 rounded-md border border-danger-line bg-danger px-3 py-3 text-sm font-semibold text-danger-content">
       <AlertTriangle className="mt-0.5 shrink-0" size={16} aria-hidden />
-      <span>{message}</span>
+      <span className="min-w-0 break-words">{message}</span>
     </p>
   )
 }

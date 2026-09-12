@@ -163,14 +163,14 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <ul className="space-y-2">
             {preview.consequenceLines.map(line => (
-              <li key={line} className="flex gap-2 text-sm text-slate-700">
-                <Check className="mt-0.5 shrink-0 text-emerald-600" size={16} aria-hidden />
-                <span>{line}</span>
+              <li key={line} className="flex gap-2 text-sm text-content">
+                <Check className="mt-0.5 shrink-0 text-success-content" size={16} aria-hidden />
+                <span className="min-w-0 break-words">{line}</span>
               </li>
             ))}
           </ul>
         </div>
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+        <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
           <button type="button" onClick={() => setPreview(null)} className="btn-secondary min-h-11">Back</button>
           <button type="button" onClick={apply} className="btn-primary min-h-11">
             {props.mode === 'edit' ? 'Save changes' : 'Add event'}
@@ -235,7 +235,7 @@ export default function BasketballFoulFreeThrowEditor(props: Props) {
 
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
-      <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+      <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
         <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
         <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
           {props.mode === 'edit' ? <Pencil size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
@@ -328,8 +328,8 @@ function FoulFields({
           technical: draft.addLinkedTrip ? draft.foulClass === 'technical' : draft.technical,
         })} />
         {draft.countingOverride && (
-          <div className="space-y-3 border-t border-slate-100 pt-3">
-            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-700">
+          <div className="space-y-3 border-t border-line pt-3">
+            <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-content">
               {([
                 ['personalFoul', 'Personal'],
                 ['teamFoul', 'Team'],
@@ -346,7 +346,7 @@ function FoulFields({
             })} />
           </div>
         )}
-        {!draft.countingOverride && <p className="text-xs text-slate-500">Default: {draft.offender.kind === 'participant' ? 'personal, ' : ''}team{technical ? ', technical' : ''}.</p>}
+        {!draft.countingOverride && <p className="text-xs text-content-subtle">Default: {draft.offender.kind === 'participant' ? 'personal, ' : ''}team{technical ? ', technical' : ''}.</p>}
       </BasketballEditorSection>
 
       {addMode && (
@@ -454,8 +454,8 @@ function AttemptFields({
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
-      <input value={value} onChange={event => onChange(event.target.value)} maxLength={160} className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-800" />
+      <span className="mb-1 block text-sm font-semibold text-content">{label}</span>
+      <input value={value} onChange={event => onChange(event.target.value)} maxLength={160} className="bg-surface h-11 w-full rounded-md border border-line-strong px-3 text-sm font-semibold text-content" />
     </label>
   )
 }
@@ -472,7 +472,7 @@ function CheckField({
   disabled?: boolean
 }) {
   return (
-    <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-700">
+    <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-content">
       <input type="checkbox" checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)} />
       <span>{label}</span>
     </label>

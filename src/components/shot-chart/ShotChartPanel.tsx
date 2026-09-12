@@ -436,15 +436,15 @@ export default function ShotChartPanel({
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2 px-1">
-        <p className="text-sm font-semibold text-slate-600 truncate">
+        <p className="text-sm font-semibold text-content-muted truncate">
           Shot chart — {shotViewLabel(selection, players)}
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          <p className="text-sm font-bold text-slate-700">{shootingLine(visibleShots)}</p>
+          <p className="text-sm font-bold text-content">{shootingLine(visibleShots)}</p>
           <button
             type="button"
             onClick={flipCourt}
-            className="grid h-8 w-8 place-items-center rounded border border-slate-200 bg-white text-slate-600"
+            className="grid h-8 w-8 place-items-center rounded border border-line bg-surface text-content-muted"
             title="Flip court"
             aria-label="Flip court"
           >
@@ -453,7 +453,7 @@ export default function ShotChartPanel({
         </div>
       </div>
 
-      <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
+      <div className="rounded-xl bg-surface border border-line p-3 shadow-sm">
         <BasketballCourt
           shots={visibleShots}
           onCourtTap={eventCaptureOpen && !captureDisabled ? onCourtTap : undefined}
@@ -468,17 +468,17 @@ export default function ShotChartPanel({
       </div>
 
       {captureDisabled && captureDisabledMessage && (
-        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+        <p role="status" className="rounded-lg border border-warning-line bg-warning px-3 py-2 text-sm font-semibold text-warning-content">
           {captureDisabledMessage}
         </p>
       )}
 
-      <div className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
+      <div className="rounded-xl bg-surface border border-line p-3 shadow-sm">
         <ShootingSummary shots={visibleShots} emptyMessage={shotViewEmptyCopy(selection, players)} />
       </div>
 
       {correctionError && (
-        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+        <p role="alert" className="rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">
           {correctionError}
         </p>
       )}
@@ -487,8 +487,8 @@ export default function ShotChartPanel({
         type="button"
         disabled={!canUndoShot}
         onClick={() => dispatch({ type: 'UNDO_LAST_SHOT' })}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white text-slate-800
-                   disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
+        className="w-full py-2.5 rounded-xl text-sm font-semibold border border-line bg-surface text-content
+                   disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none active:scale-[0.99] transition-transform"
       >
         ↩ Undo last shot
       </button>}
@@ -496,21 +496,21 @@ export default function ShotChartPanel({
         type="button"
         disabled={!canUndoEventShot}
         onClick={handleEventShotUndo}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white text-slate-800
-                   disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
+        className="w-full py-2.5 rounded-xl text-sm font-semibold border border-line bg-surface text-content
+                   disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none active:scale-[0.99] transition-transform"
         title={canUndoEventShot ? 'Undo the newest court capture' : 'A newer non-shot capture must be undone first'}
       >
         ↩ Undo last shot
       </button>}
       {!isEventBasketball && undoShotSubtitle && (
-        <p className="text-center text-xs text-slate-500 -mt-1">{undoShotSubtitle}</p>
+        <p className="text-center text-xs text-content-subtle -mt-1">{undoShotSubtitle}</p>
       )}
       {!isEventBasketball && <button
         type="button"
         disabled={!canClearShots}
         onClick={() => setShowClearConfirm(true)}
-        className="w-full py-2 rounded-xl text-sm font-medium border border-rose-200 bg-rose-50 text-rose-800
-                   disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
+        className="w-full py-2 rounded-xl text-sm font-medium border border-danger-line bg-danger text-danger-content
+                   disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none active:scale-[0.99] transition-transform"
       >
         Clear all chart shots
       </button>}
@@ -518,8 +518,8 @@ export default function ShotChartPanel({
         type="button"
         disabled={!eventCaptureOpen || !clearPreview || clearPreview.shotCount === 0}
         onClick={() => setShowClearConfirm(true)}
-        className="w-full py-2 rounded-xl text-sm font-medium border border-rose-200 bg-rose-50 text-rose-800
-                   disabled:opacity-40 disabled:pointer-events-none active:scale-[0.99] transition-transform"
+        className="w-full py-2 rounded-xl text-sm font-medium border border-danger-line bg-danger text-danger-content
+                   disabled:bg-control-disabled disabled:text-content-disabled disabled:pointer-events-none active:scale-[0.99] transition-transform"
       >
         Clear all chart shots
       </button>}
@@ -565,7 +565,7 @@ export default function ShotChartPanel({
 
       {overlapChoices.length > 1 && (
         <div
-          className="fixed inset-0 z-[55] flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-4"
+          className="fixed inset-0 z-[55] flex items-end justify-center bg-overlay/[0.4] p-3 sm:items-center sm:p-4"
           onClick={closeOverlapChooser}
         >
           <section
@@ -573,13 +573,13 @@ export default function ShotChartPanel({
             role="dialog"
             aria-modal="true"
             aria-labelledby="overlapping-shots-title"
-            className="w-full max-w-md overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+            className="w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface shadow-xl"
             onClick={event => event.stopPropagation()}
           >
-            <header className="border-b border-slate-200 px-4 py-3">
-              <h2 id="overlapping-shots-title" className="text-base font-bold text-slate-900">Select shot</h2>
+            <header className="border-b border-line px-4 py-3">
+              <h2 id="overlapping-shots-title" className="text-base font-bold text-content">Select shot</h2>
             </header>
-            <div className="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto">
+            <div className="max-h-[55vh] divide-y divide-line overflow-y-auto">
               {overlapChoices.map((shot, index) => {
                 const detail = detailForShot(shot)
                 return (
@@ -587,26 +587,26 @@ export default function ShotChartPanel({
                     key={shot.id}
                     ref={index === 0 ? overlapFirstChoiceRef : undefined}
                     type="button"
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-blue-50"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-info"
                     onClick={() => {
                       closeOverlapChooser()
                       openShotDetail(shot)
                     }}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-slate-900">
+                      <span className="block truncate text-sm font-bold text-content">
                         {detail?.ordinalLabel ?? 'Shot'} | {detail?.shooterLabel ?? 'Unknown shooter'}
                       </span>
-                      <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                      <span className="mt-0.5 block text-xs font-medium text-content-subtle">
                         {detail ? `${detail.resultLabel} ${detail.valueLabel}` : shot.made ? 'Made' : 'Missed'}
                       </span>
                     </span>
-                    <span className={`h-3 w-3 shrink-0 rounded-full ${shot.made ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                    <span className={`h-3 w-3 shrink-0 rounded-full ${shot.made ? 'bg-success' : 'bg-danger'}`} />
                   </button>
                 )
               })}
             </div>
-            <footer className="border-t border-slate-200 px-4 py-3">
+            <footer className="shrink-0 border-t border-line px-4 py-3">
               <button type="button" className="btn-secondary w-full py-2.5" onClick={closeOverlapChooser}>
                 Cancel
               </button>

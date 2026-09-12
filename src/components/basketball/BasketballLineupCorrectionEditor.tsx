@@ -130,14 +130,14 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <ul className="space-y-2" aria-live="polite">
             {preview.consequenceLines.map(line => (
-              <li key={line} className="flex gap-2 text-sm text-slate-700">
-                <Check className="mt-0.5 shrink-0 text-emerald-600" size={16} aria-hidden />
-                <span>{line}</span>
+              <li key={line} className="flex gap-2 text-sm text-content">
+                <Check className="mt-0.5 shrink-0 text-success-content" size={16} aria-hidden />
+                <span className="min-w-0 break-words">{line}</span>
               </li>
             ))}
           </ul>
         </div>
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+        <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
           <button type="button" onClick={() => setPreview(null)} className="btn-secondary min-h-11">Back</button>
           <button type="button" onClick={apply} className="btn-primary min-h-11">Save changes</button>
         </footer>
@@ -160,17 +160,17 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
         {participantIds && (
           <BasketballEditorSection title="Resulting lineup">
             <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-slate-700">
+              <legend className="mb-2 text-sm font-semibold text-content">
                 Select one through five players
               </legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {participants.map(participant => (
-                  <label key={participant.participantId} className="flex min-h-11 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800">
+                  <label key={participant.participantId} className="flex min-h-11 items-center gap-3 rounded-md border border-line px-3 py-2 text-sm font-semibold text-content">
                     <input
                       type="checkbox"
                       checked={participantIds.includes(participant.participantId)}
                       onChange={() => toggleParticipant(participant.participantId)}
-                      className="h-5 w-5"
+                      className="bg-surface h-5 w-5"
                     />
                     <span>{participant.number ? `#${participant.number} ` : ''}{participant.displayName}</span>
                   </label>
@@ -202,7 +202,7 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
             />
             {draft.reasonCode && (
               <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-slate-700">
+                <span className="mb-1 block text-sm font-semibold text-content">
                   {draft.reasonCode === 'other' ? 'Reason note (required)' : 'Reason note'}
                 </span>
                 <textarea
@@ -210,7 +210,7 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
                   onChange={event => update({ reasonNote: event.target.value.trim() ? event.target.value : null })}
                   maxLength={240}
                   rows={3}
-                  className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800"
+                  className="bg-surface w-full resize-none rounded-md border border-line-strong px-3 py-2 text-sm font-semibold text-content"
                 />
               </label>
             )}
@@ -223,26 +223,26 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
               {draft.changes.map((change, index) => {
                 const participant = sportState?.projection.participants[change.participantId]
                 return (
-                  <div key={change.participantId} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                    <p className="mb-2 text-sm font-bold text-slate-800">
+                  <div key={change.participantId} className="border-b border-line pb-3 last:border-0 last:pb-0">
+                    <p className="mb-2 text-sm font-bold text-content">
                       {participant?.number ? `#${participant.number} ` : ''}{participant?.displayName ?? 'Unknown participant'}
                     </p>
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
                       <label className="block">
-                        <span className="mb-1 block text-sm font-semibold text-slate-700">Position</span>
+                        <span className="mb-1 block text-sm font-semibold text-content">Position</span>
                         <input
                           value={change.position ?? ''}
                           maxLength={80}
                           onChange={event => updateRole(index, { position: event.target.value.trim() ? event.target.value : null })}
-                          className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-800"
+                          className="bg-surface h-11 w-full rounded-md border border-line-strong px-3 text-sm font-semibold text-content"
                         />
                       </label>
-                      <label className="flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-700">
+                      <label className="flex min-h-11 items-center gap-2 text-sm font-semibold text-content">
                         <input
                           type="checkbox"
                           checked={change.captain}
                           onChange={event => updateRole(index, { captain: event.target.checked })}
-                          className="h-5 w-5"
+                          className="bg-surface h-5 w-5"
                         />
                         Captain
                       </label>
@@ -258,29 +258,29 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
           draft.eventType === 'basketball.lineup_confirmed' && draft.violationCodes) && (
           <BasketballEditorSection title="Equal-play authority">
             <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-slate-700">Violation codes</legend>
+              <legend className="mb-2 text-sm font-semibold text-content">Violation codes</legend>
               <div className="space-y-2">
                 {VIOLATION_OPTIONS.filter(option =>
                   (draft.violationCodes ?? []).includes(option.value)
                 ).map(option => (
-                  <div key={option.value} className="flex min-h-11 items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                  <div key={option.value} className="flex min-h-11 items-center rounded-md border border-line bg-surface-muted px-3 py-2 text-sm font-semibold text-content">
                     {option.label}
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-content-subtle">
                 Derived from the game&apos;s snapshotted equal-play policy.
               </p>
             </fieldset>
             {draft.eventType === 'basketball.equal_play_override' && (
               <label className="block">
-                <span className="mb-1 block text-sm font-semibold text-slate-700">Override reason</span>
+                <span className="mb-1 block text-sm font-semibold text-content">Override reason</span>
                 <textarea
                   value={draft.reason}
                   onChange={event => update({ reason: event.target.value })}
                   maxLength={240}
                   rows={3}
-                  className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800"
+                  className="bg-surface w-full resize-none rounded-md border border-line-strong px-3 py-2 text-sm font-semibold text-content"
                 />
               </label>
             )}
@@ -289,7 +289,7 @@ export default function BasketballLineupCorrectionEditor({ eventId, onClose, onA
 
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
-      <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+      <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
         <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
         <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
           <Pencil size={16} aria-hidden />

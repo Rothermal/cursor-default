@@ -6,7 +6,7 @@ interface PlayerSelectorStripProps {
   players: Player[]
   activePlayerId: string | null
   onSelectPlayer: (playerId: string) => void
-  /** Tailwind bg class for the active individual-player chip (sport theme). */
+  /** Compatibility prop; selected chips now use the application accent. */
   activeBgClass: string
   /** When provided, renders a trailing "+" button that calls this handler. */
   onAddPlayer?: () => void
@@ -28,7 +28,6 @@ export default function PlayerSelectorStrip({
   players,
   activePlayerId,
   onSelectPlayer,
-  activeBgClass,
   onAddPlayer,
   sticky = false,
   onSelectAll,
@@ -49,17 +48,17 @@ export default function PlayerSelectorStrip({
               title="Show every shot on the chart"
               className={`
                 flex-shrink-0 px-3 py-2 rounded-xl text-sm font-semibold
-                transition-all duration-150 active:scale-95
+                transition-transform duration-150 active:scale-95
                 ${allActive
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-slate-600 border border-slate-200'
+                  ? 'bg-accent text-accent-content shadow-md'
+                  : 'bg-surface text-content-muted border border-line'
                 }
               `}
             >
               All
             </button>
             <div
-              className="w-px self-stretch min-h-[2.5rem] bg-slate-300 shrink-0"
+              className="w-px self-stretch min-h-[2.5rem] bg-line-strong shrink-0"
               aria-hidden
             />
           </div>
@@ -78,14 +77,14 @@ export default function PlayerSelectorStrip({
                 title={player.name}
                 className={`
                   flex-shrink-0 px-3 py-2 rounded-xl text-sm font-semibold max-w-[10.5rem]
-                  transition-all duration-150 active:scale-95 text-left
+                  transition-transform duration-150 active:scale-95 text-left
                   ${isTeam
                     ? isActive
-                      ? `bg-gradient-to-br from-slate-600 to-slate-800 text-white shadow-md ring-2 ring-white/30`
-                      : `bg-gradient-to-br from-slate-100 to-slate-200/90 text-slate-800 border border-slate-300/80 shadow-sm`
+                      ? `bg-accent text-accent-content shadow-md ring-2 ring-focus`
+                      : `bg-surface-muted text-content border border-line shadow-sm`
                     : isActive
-                      ? `${activeBgClass} text-white shadow-md`
-                      : 'bg-white text-slate-600 border border-slate-200'
+                      ? `bg-accent text-accent-content shadow-md`
+                      : 'bg-surface text-content-muted border border-line'
                   }
                 `}
               >
@@ -96,14 +95,14 @@ export default function PlayerSelectorStrip({
                   {isTeam ? player.name : player.name.split(' ')[0]}
                 </span>
                 {statusLabel && (
-                  <span className={`block text-[10px] font-bold uppercase ${isActive ? 'text-white/85' : 'text-rose-700'}`}>
+                  <span className={`block text-[10px] font-bold uppercase ${isActive ? 'text-accent-content' : 'text-danger-content'}`}>
                     {statusLabel}
                   </span>
                 )}
               </button>
               {showDivider && (
                 <div
-                  className="w-px self-stretch min-h-[2.5rem] bg-slate-300 shrink-0"
+                  className="w-px self-stretch min-h-[2.5rem] bg-line-strong shrink-0"
                   aria-hidden
                 />
               )}
@@ -114,8 +113,8 @@ export default function PlayerSelectorStrip({
           <button
             type="button"
             onClick={onAddPlayer}
-            className="flex-shrink-0 w-10 h-10 rounded-xl bg-white border-2 border-dashed
-                       border-slate-300 text-slate-400 text-xl font-bold
+            className="flex-shrink-0 w-10 h-10 rounded-xl bg-surface border-2 border-dashed
+                       border-line-strong text-content-subtle text-xl font-bold
                        active:scale-95 transition-transform flex items-center justify-center"
           >
             +
@@ -128,7 +127,7 @@ export default function PlayerSelectorStrip({
   if (!sticky) return strip
 
   return (
-    <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200/60">
+    <div className="sticky top-0 z-30 bg-surface-muted/95 backdrop-blur border-b border-line/60">
       {strip}
     </div>
   )

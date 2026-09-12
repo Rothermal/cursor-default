@@ -132,24 +132,24 @@ export default function BasketballShotReview({ source }: Props) {
       aria-labelledby="basketball-shots-tab"
       className="mx-auto w-full max-w-5xl pb-24"
     >
-      <section className="border-b border-slate-200 bg-white px-4 py-4">
+      <section className="border-b border-line bg-surface px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Shot Chart</h2>
-            <p className="mt-0.5 text-sm font-semibold text-slate-600">
+            <h2 className="text-base font-bold text-content">Shot Chart</h2>
+            <p className="mt-0.5 text-sm font-semibold text-content-muted">
               {made}/{filteredShots.length} field goals
             </p>
           </div>
           {!correctionsEnabled && (
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+            <span className="rounded-md bg-control px-2 py-1 text-xs font-bold text-content-muted">
               Read only
             </span>
           )}
         </div>
 
         <div className="mt-4" aria-label="Shot side filter">
-          <span className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">Side</span>
-          <div className="grid grid-cols-3 rounded-md border border-slate-300 bg-slate-100 p-0.5">
+          <span className="mb-1 block text-[11px] font-semibold uppercase text-content-subtle">Side</span>
+          <div className="grid grid-cols-3 rounded-md border border-line-strong bg-control p-0.5">
             {([
               ['all', 'All'],
               ['tracked', source.state.gameInfo?.teamName || 'Tracked'],
@@ -160,7 +160,7 @@ export default function BasketballShotReview({ source }: Props) {
                 type="button"
                 onClick={() => setFilters(current => ({ ...current, teamSide: value }))}
                 className={`min-h-10 truncate rounded px-2 text-xs font-bold ${
-                  filters.teamSide === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
+                  filters.teamSide === value ? 'bg-surface text-content shadow-sm' : 'text-content-muted'
                 }`}
                 aria-pressed={filters.teamSide === value}
               >
@@ -221,10 +221,10 @@ export default function BasketballShotReview({ source }: Props) {
         </div>
       </section>
 
-      <section className="border-b border-slate-200 bg-white px-3 py-4" aria-label="Filtered shot court">
-        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-xs font-semibold text-slate-600">
-          <LegendMark color="bg-blue-600" label={source.state.gameInfo?.teamName || 'Tracked'} />
-          <LegendMark color="bg-amber-600" label={source.state.gameInfo?.opponentName || 'Opponent'} />
+      <section className="border-b border-line bg-surface px-3 py-4" aria-label="Filtered shot court">
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-xs font-semibold text-content-muted">
+          <LegendMark color="bg-court-tracked" label={source.state.gameInfo?.teamName || 'Tracked'} />
+          <LegendMark color="bg-court-opponent" label={source.state.gameInfo?.opponentName || 'Opponent'} />
           <span>Circle = made</span>
           <span>X = missed</span>
         </div>
@@ -242,8 +242,8 @@ export default function BasketballShotReview({ source }: Props) {
           className="w-full"
         />
         {markers.length === 0 && (
-          <div className="py-5 text-center text-sm text-slate-500">
-            <CircleDot className="mx-auto text-slate-300" size={24} aria-hidden />
+          <div className="py-5 text-center text-sm text-content-subtle">
+            <CircleDot className="mx-auto text-content" size={24} aria-hidden />
             <p className="mt-2 font-semibold">No located shots match these filters.</p>
           </div>
         )}
@@ -264,20 +264,20 @@ export default function BasketballShotReview({ source }: Props) {
       />
 
       {overlapChoices.length > 1 && (
-        <div className="fixed inset-0 z-[55] flex items-end justify-center bg-black/45 p-3 sm:items-center sm:p-4" onClick={closeOverlap}>
+        <div className="fixed inset-0 z-[55] flex items-end justify-center bg-overlay/[0.45] p-3 sm:items-center sm:p-4" onClick={closeOverlap}>
           <section
             ref={overlapDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="basketball-summary-overlap-title"
-            className="w-full max-w-md overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+            className="w-full max-w-md overflow-hidden rounded-lg border border-line bg-surface shadow-xl"
             onClick={event => event.stopPropagation()}
           >
-            <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-              <h2 id="basketball-summary-overlap-title" className="font-bold text-slate-900">Select shot</h2>
-              <button type="button" onClick={closeOverlap} className="flex h-10 w-10 items-center justify-center rounded-md text-slate-600" aria-label="Close overlapping shots"><X size={18} /></button>
+            <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <h2 id="basketball-summary-overlap-title" className="font-bold text-content">Select shot</h2>
+              <button type="button" onClick={closeOverlap} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-content-muted" aria-label="Close overlapping shots"><X size={18} /></button>
             </header>
-            <div className="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto">
+            <div className="max-h-[55vh] divide-y divide-line overflow-y-auto">
               {overlapChoices.map((shot, index) => (
                 <button
                   key={shot.id}
@@ -287,7 +287,7 @@ export default function BasketballShotReview({ source }: Props) {
                     setOverlapChoices([])
                     setDetail(shot.detail)
                   }}
-                  className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-blue-50"
+                  className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-info"
                 >
                   <ShotRowContent shot={shot} />
                 </button>
@@ -357,29 +357,29 @@ function ShotList({
   unlocated?: boolean
 }) {
   return (
-    <section className="border-b border-slate-200 bg-white px-4 py-4">
+    <section className="border-b border-line bg-surface px-4 py-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-        <span className="text-xs font-bold text-slate-500">{shots.length}</span>
+        <h3 className="text-sm font-bold text-content">{title}</h3>
+        <span className="text-xs font-bold text-content-subtle">{shots.length}</span>
       </div>
       {unlocated && shots.length > 0 && (
-        <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-800">
+        <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-warning-content">
           <MapPinOff size={14} aria-hidden /> These attempts count in totals but have no court marker.
         </p>
       )}
       {shots.length === 0 ? (
-        <p className="py-5 text-center text-sm text-slate-500">{emptyMessage}</p>
+        <p className="py-5 text-center text-sm text-content-subtle">{emptyMessage}</p>
       ) : (
-        <ol className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+        <ol className="mt-3 divide-y divide-line border-y border-line">
           {shots.map(shot => (
             <li key={shot.id}>
               <button
                 type="button"
                 onClick={event => onOpen(shot, event.currentTarget)}
-                className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left active:bg-blue-50"
+                className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left active:bg-info"
               >
                 <ShotRowContent shot={shot} />
-                <Eye size={16} className="shrink-0 text-slate-400" aria-hidden />
+                <Eye size={16} className="shrink-0 text-content-subtle" aria-hidden />
               </button>
             </li>
           ))}
@@ -393,14 +393,14 @@ function ShotRowContent({ shot }: { shot: BasketballSummaryShot }) {
   return (
     <span className="min-w-0 flex-1">
       <span className="flex flex-wrap items-center gap-1.5">
-        <span className="font-bold text-slate-900">{shot.detail.ordinalLabel}</span>
+        <span className="font-bold text-content">{shot.detail.ordinalLabel}</span>
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-          shot.teamSide === 'tracked' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-900'
+          shot.teamSide === 'tracked' ? 'bg-info text-info-content' : 'bg-warning text-warning-content'
         }`}>
           {shot.teamSide === 'tracked' ? 'Tracked' : 'Opponent'}
         </span>
       </span>
-      <span className="mt-0.5 block truncate text-xs font-semibold text-slate-600">
+      <span className="mt-0.5 block truncate text-xs font-semibold text-content-muted">
         {shot.participantLabel} | {shot.periodLabel} | {shot.made ? 'Made' : 'Missed'} {shot.value}PT
       </span>
     </span>
@@ -420,8 +420,8 @@ function FilterSelect({
 }) {
   return (
     <label className="min-w-0">
-      <span className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">{label}</span>
-      <select value={value} onChange={event => onChange(event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700">
+      <span className="mb-1 block text-[11px] font-semibold uppercase text-content-subtle">{label}</span>
+      <select value={value} onChange={event => onChange(event.target.value)} className="h-10 w-full rounded-md border border-line-strong bg-surface px-2 text-sm font-semibold text-content">
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>

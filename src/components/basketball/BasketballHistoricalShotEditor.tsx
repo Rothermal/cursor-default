@@ -147,8 +147,8 @@ export default function BasketballHistoricalShotEditor({
   if (placingLocation) {
     return (
       <BasketballEditorFrame title="Place shot" onClose={() => setPlacingLocation(false)} closeRef={closeRef}>
-        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-3 py-3">
-          <div className="border-y border-slate-200 bg-white">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-surface-muted px-3 py-3">
+          <div className="border-y border-line bg-surface">
             <BasketballCourt
               shots={marker}
               onCourtTap={(x, y) => update({ location: { x, y } })}
@@ -157,12 +157,12 @@ export default function BasketballHistoricalShotEditor({
               emptyHint="Tap to place"
             />
           </div>
-          <p className="mt-3 text-center text-sm font-medium text-slate-600">
+          <p className="mt-3 text-center text-sm font-medium text-content-muted">
             {draft.location ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft` : 'Tap to place the shot.'}
           </p>
         </div>
-        <footer className="border-t border-slate-200 px-4 py-3">
-          <button type="button" onClick={() => setPlacingLocation(false)} disabled={!draft.location} className="btn-primary min-h-11 w-full disabled:opacity-40">Done</button>
+        <footer className="shrink-0 border-t border-line px-4 py-3">
+          <button type="button" onClick={() => setPlacingLocation(false)} disabled={!draft.location} className="btn-primary min-h-11 w-full disabled:bg-control-disabled disabled:text-content-disabled">Done</button>
         </footer>
       </BasketballEditorFrame>
     )
@@ -174,14 +174,14 @@ export default function BasketballHistoricalShotEditor({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <ul className="space-y-2">
             {preview.consequenceLines.map(line => (
-              <li key={line} className="flex gap-2 text-sm text-slate-700">
-                <Check className="mt-0.5 shrink-0 text-emerald-600" size={16} aria-hidden />
-                <span>{line}</span>
+              <li key={line} className="flex gap-2 text-sm text-content">
+                <Check className="mt-0.5 shrink-0 text-success-content" size={16} aria-hidden />
+                <span className="min-w-0 break-words">{line}</span>
               </li>
             ))}
           </ul>
         </div>
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+        <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
           <button type="button" onClick={() => setPreview(null)} className="btn-secondary min-h-11">Back</button>
           <button type="button" onClick={apply} className="btn-primary min-h-11">Add shot</button>
         </footer>
@@ -242,14 +242,14 @@ export default function BasketballHistoricalShotEditor({
         </BasketballEditorSection>
 
         <BasketballEditorSection title="Court location">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-content">
             {draft.location ? `${draft.location.x.toFixed(1)}, ${draft.location.y.toFixed(1)} ft` : 'No court location'}
           </p>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={() => setPlacingLocation(true)} className="btn-secondary flex min-h-11 items-center justify-center gap-2">
               <LocateFixed size={17} aria-hidden /> {draft.location ? 'Move' : 'Locate'}
             </button>
-            <button type="button" onClick={() => update({ location: null })} disabled={!draft.location} className="btn-secondary flex min-h-11 items-center justify-center gap-2 text-rose-700 disabled:opacity-35">
+            <button type="button" onClick={() => update({ location: null })} disabled={!draft.location} className="btn-secondary flex min-h-11 items-center justify-center gap-2 text-danger-content disabled:bg-control-disabled disabled:text-content-disabled">
               <MapPinOff size={17} aria-hidden /> Remove
             </button>
           </div>
@@ -274,7 +274,7 @@ export default function BasketballHistoricalShotEditor({
         </BasketballEditorSection>
         {error && <div className="px-4 pb-4"><BasketballEditorErrorMessage message={error} /></div>}
       </div>
-      <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+      <footer className="shrink-0 grid grid-cols-2 gap-2 border-t border-line px-4 py-3">
         <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
         <button type="button" onClick={requestPreview} className="btn-primary flex min-h-11 items-center justify-center gap-2">
           <Plus size={17} aria-hidden /> Review
