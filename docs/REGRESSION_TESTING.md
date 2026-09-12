@@ -25,10 +25,15 @@ High-level test scripts for features built so far. Use these to sanity-check aft
 
 **Precondition:** App loaded (signed in if Supabase configured).
 
+Appearance release, rollback and remaining device/cloud checks:
+[THM-6 matrix](REGRESSION_THM_6_APPEARANCE_RELEASE.md).
+
 | Step | Action | Expected |
 |------|--------|----------|
 | 2.1 | From sport choice or a sport dashboard, tap Settings in the app shell | `/#/settings` opens the Account section with profile/session controls |
-| 2.2 | Open `/#/settings/app` | App/general settings show enabled sport toggles |
+| 2.2 | Open `/#/settings/app` | Appearance (Light/Dark) appears above enabled sport toggles |
+| 2.2a | Select Dark, reload, then select Light | Selected segment and app colors update; choice survives reload without dirtying any game |
+| 2.2b | Sign out and back in after selecting Dark | Sign-in and app retain the device's appearance choice |
 | 2.3 | Disable a sport (e.g. Basketball) | Toggle off |
 | 2.4 | Return to sport choice | Disabled sport no longer in grid |
 | 2.5 | Re-enable sport | Sport reappears on sport choice |
