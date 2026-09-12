@@ -11,6 +11,32 @@ describe('Soccer appearance inventory', () => {
   it('covers the complete Soccer workspace and review inventory', () => {
     expect(surfaces.length).toBeGreaterThanOrEqual(38)
   })
+  it('keeps Tracker tabs selected and inactive colors distinct', () => {
+    const path = 'src/pages/SoccerGameTracker.tsx'
+    const tree = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const tab = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'TabButton')
+    expect(tab).toBeDefined()
+    const branches: string[][] = []
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxAttribute(node) && node.name.getText(tree) === 'className') {
+        const findSelection = (child: ts.Node) => {
+          if (ts.isConditionalExpression(child) && child.condition.getText(tree) === 'active' &&
+            ts.isStringLiteral(child.whenTrue) && ts.isStringLiteral(child.whenFalse)) {
+            branches.push([child.whenTrue.text, child.whenFalse.text])
+          }
+          ts.forEachChild(child, findSelection)
+        }
+        findSelection(node)
+      } else {
+        ts.forEachChild(node, visit)
+      }
+    }
+    if (tab) visit(tab)
+    expect(branches).toEqual([[
+      'border-success-line text-success-content',
+      'border-transparent text-content-muted',
+    ]])
+  })
   it.each(surfaces)('%s uses semantic presentation colors', path => {
     const source = readFileSync(path, 'utf8')
     expect(source).not.toMatch(/(?:bg|text|border|divide|ring|accent|from|to)-(?:slate|gray|emerald|green|blue|indigo|amber|yellow|red|rose|sky|orange)-\d+/)
