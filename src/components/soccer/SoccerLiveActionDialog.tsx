@@ -9,7 +9,7 @@ import {
   endSoccerMatch,
   soccerLifecycleAction,
   formatSoccerInputTime,
-  parseSoccerInputTime,
+  parseSoccerClockFields,
   recordSoccerRulesChange,
   resolveSoccerParticipant,
   soccerClockDisplayValue,
@@ -118,24 +118,32 @@ export default function SoccerLiveActionDialog({
 function ClockCorrectionForm({ state, options, onApply }: FormProps) {
   const projection = soccerProjection(state)
   const displayValue = soccerClockDisplayValue(state)
-  const [value, setValue] = useState(formatSoccerInputTime(
+  const [initialValue] = useState(formatSoccerInputTime(
     displayValue?.canonicalElapsedMs ?? projection.clock.elapsedMs
   ))
+  const [minutes, setMinutes] = useState(initialValue.split(':')[0])
+  const [seconds, setSeconds] = useState(initialValue.split(':')[1])
   const [error, setError] = useState<string | null>(null)
   const submit = () => {
-    const elapsedMs = parseSoccerInputTime(value)
+    const elapsedMs = parseSoccerClockFields(minutes, seconds)
     if (elapsedMs === null) {
-      setError('Enter time as minutes and seconds, for example 45:30.')
+      setError('Enter whole minutes and seconds from 0 to 59.')
       return
     }
     onApply(adjustSoccerClock(state, elapsedMs, options))
   }
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium text-content">
-        Corrected match time
-        <input value={value} onChange={event => setValue(event.target.value)} inputMode="numeric" placeholder="MM:SS" className="input-field mt-1 text-center text-xl tabular-nums" />
-      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="min-w-0 text-sm font-medium text-content">
+          Minutes
+          <input value={minutes} onChange={event => setMinutes(event.target.value)} inputMode="numeric" pattern="[0-9]*" className="input-field mt-1 w-full text-center text-xl tabular-nums" />
+        </label>
+        <label className="min-w-0 text-sm font-medium text-content">
+          Seconds
+          <input value={seconds} onChange={event => setSeconds(event.target.value)} inputMode="numeric" pattern="[0-9]*" maxLength={2} className="input-field mt-1 w-full text-center text-xl tabular-nums" />
+        </label>
+      </div>
       {projection.currentRules.clockDisplay === 'per_period' && (
         <p className="text-xs text-content-muted">
           Enter cumulative match time. The tracker currently displays {displayValue?.primary ?? '00:00'} for this period.

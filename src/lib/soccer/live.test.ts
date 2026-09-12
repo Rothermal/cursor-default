@@ -3,7 +3,7 @@ import type { GameState, SportConfig } from '../../types'
 import { updateGameEvent } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState, gameReducer } from '../gameReducer'
-import { prepareSoccerKickoff } from './kickoff'
+import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import {
   adjustSoccerClock,
   applySoccerLineupTransition,

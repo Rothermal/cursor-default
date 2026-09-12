@@ -15,7 +15,7 @@ export type SoccerKickoffResult =
 export interface SoccerKickoffOptions {
   recorderUserId: string | null
   occurredAt?: string
-  eventIds?: [string, string, string]
+  eventIds?: [string, string]
 }
 
 export function prepareSoccerKickoff(
@@ -64,7 +64,7 @@ export function prepareSoccerKickoff(
     initialized.state.eventStream?.events ?? [],
     options.recorderUserId
   )
-  const ids = options.eventIds ?? [createSoccerUuid(), createSoccerUuid(), createSoccerUuid()]
+  const ids = options.eventIds ?? [createSoccerUuid(), createSoccerUuid()]
   const period = { id: firstPeriod.id, order: firstPeriod.order }
   const appended = addGameEvents(
     initialized.state,
@@ -90,16 +90,6 @@ export function prepareSoccerKickoff(
         payload: { periodId: firstPeriod.id },
         recorderUserId: options.recorderUserId,
         sequence: firstSequence + 1,
-        period,
-        elapsedMs: 0,
-        occurredAt,
-      }),
-      createSoccerEvent({
-        id: ids[2],
-        eventType: 'soccer.clock_started',
-        payload: { anchorElapsedMs: 0 },
-        recorderUserId: options.recorderUserId,
-        sequence: firstSequence + 2,
         period,
         elapsedMs: 0,
         occurredAt,
