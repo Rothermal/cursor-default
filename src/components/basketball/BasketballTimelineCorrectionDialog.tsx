@@ -117,7 +117,7 @@ export default function BasketballTimelineCorrectionDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/45 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-overlay/[0.45] sm:items-center sm:p-4"
       onClick={onClose}
     >
       <section
@@ -125,16 +125,16 @@ export default function BasketballTimelineCorrectionDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-timeline-correction-title"
-        className="flex max-h-[92vh] w-full flex-col rounded-t-lg bg-white shadow-2xl sm:max-w-lg sm:rounded-lg sm:border sm:border-slate-200"
+        className="flex max-h-[92vh] w-full flex-col rounded-t-lg bg-surface shadow-2xl sm:max-w-lg sm:rounded-lg sm:border sm:border-line"
         onClick={event => event.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
-            <h2 id="basketball-timeline-correction-title" className="text-base font-bold text-slate-900">
+            <h2 id="basketball-timeline-correction-title" className="text-base font-bold text-content">
               {title}
             </h2>
             {displayPreview && (
-              <p className="mt-0.5 truncate text-sm font-medium text-slate-600">
+              <p className="mt-0.5 truncate text-sm font-medium text-content-muted">
                 {displayPreview.eventLabel}
               </p>
             )}
@@ -143,7 +143,7 @@ export default function BasketballTimelineCorrectionDialog({
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line text-content-muted"
             aria-label="Close correction review"
             title="Close"
           >
@@ -153,21 +153,21 @@ export default function BasketballTimelineCorrectionDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {intent.kind === 'restore' && restoreOptions.length > 0 && (
-            <fieldset className="mb-4 border-y border-slate-200 py-3">
-              <legend className="text-xs font-semibold uppercase text-slate-500">Related removed events</legend>
-              <p className="mt-1 text-xs text-slate-500">Nothing extra is restored unless selected.</p>
+            <fieldset className="mb-4 border-y border-line py-3">
+              <legend className="text-xs font-semibold uppercase text-content-muted">Related removed events</legend>
+              <p className="mt-1 text-xs text-content-muted">Nothing extra is restored unless selected.</p>
               <div className="mt-2 space-y-1">
                 {restoreOptions.map(option => (
-                  <label key={option.eventId} className="flex min-h-11 items-center gap-3 py-1 text-sm font-medium text-slate-800">
+                  <label key={option.eventId} className="flex min-h-11 items-center gap-3 py-1 text-sm font-medium text-content">
                     <input
                       type="checkbox"
                       checked={selectedDependentIds.includes(option.eventId)}
                       onChange={event => setSelectedDependentIds(current => event.target.checked
                         ? [...current, option.eventId]
                         : current.filter(id => id !== option.eventId))}
-                      className="h-5 w-5 rounded border-slate-300 text-blue-600"
+                      className="h-5 w-5 shrink-0 rounded border-line-strong text-accent accent-accent"
                     />
-                    <span>{option.label}</span>
+                    <span className="min-w-0 break-words">{option.label}</span>
                   </label>
                 ))}
               </div>
@@ -175,18 +175,18 @@ export default function BasketballTimelineCorrectionDialog({
           )}
 
           {preview === null ? (
-            <p role="alert" className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-900">
+            <p role="alert" className="flex gap-2 rounded-md border border-warning-line bg-warning px-3 py-3 text-sm font-medium text-warning-content">
               <AlertTriangle className="mt-0.5 shrink-0" size={17} aria-hidden />
-              <span>{previewError}</span>
+              <span className="min-w-0 break-words">{previewError}</span>
             </p>
           ) : (
             <>
-              <h3 className="text-xs font-semibold uppercase text-slate-500">Match effects</h3>
-              <ul className="mt-2 space-y-2 text-sm text-slate-700">
+              <h3 className="text-xs font-semibold uppercase text-content-muted">Match effects</h3>
+              <ul className="mt-2 space-y-2 text-sm text-content">
                 {preview.consequenceLines.map(line => (
                   <li key={line} className="flex gap-2">
-                    <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                    <span>{line}</span>
+                    <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-content-subtle" />
+                    <span className="min-w-0 break-words">{line}</span>
                   </li>
                 ))}
               </ul>
@@ -194,20 +194,20 @@ export default function BasketballTimelineCorrectionDialog({
           )}
 
           {applyError && (
-            <p role="alert" className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+            <p role="alert" className="mt-4 break-words rounded-md border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">
               {applyError}
             </p>
           )}
         </div>
 
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-white px-4 py-3">
+        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-line bg-surface px-4 py-3">
           <button type="button" onClick={onClose} className="btn-secondary min-h-11">Cancel</button>
           <button
             type="button"
             disabled={!preview}
             onClick={apply}
-            className={`flex min-h-11 items-center justify-center gap-2 rounded-md text-sm font-bold text-white disabled:opacity-40 ${
-              intent.kind === 'remove' ? 'bg-rose-700' : 'bg-blue-700'
+            className={`flex min-h-11 items-center justify-center gap-2 rounded-md text-sm font-bold disabled:bg-control-disabled disabled:text-content-disabled ${
+              intent.kind === 'remove' ? 'bg-danger-action text-danger-action-content' : 'bg-accent text-accent-content'
             }`}
           >
             {intent.kind === 'remove' ? <Trash2 size={17} aria-hidden /> : <RotateCcw size={17} aria-hidden />}

@@ -340,6 +340,14 @@ team branding remains separate. See
 Tracker host, player/stat controls, court, Timeline, and Summary remain pending;
 this batch does not enable the production Dark selector.
 
+The event-review dialog batch covers BasketballShotDetailDialog,
+BasketballEventDetailDialog, and BasketballTimelineCorrectionDialog, including
+read-only detail, revision/removal status, diagnostics, dependent restore choices,
+and confirmation/error states. See
+[event-review dialog verification](REGRESSION_THM_4_EVENT_REVIEW_DIALOGS.md).
+This does not convert the Timeline host or historical edit forms, nor change
+correction rules, authority, or publication behavior.
+
 - Convert setup, player setup, checkout, tracker, Timeline, lineups, clock,
   administrative dialogs, finalization/reopen, Summary, and recovery/conflict UI.
 - Audit BasketballCourt background, lines, made/miss markers, overlap counts,

@@ -5,6 +5,9 @@ const liveEntryDialogs = ['Reopen', 'Timeout', 'Ejection', 'LateParticipant', 'S
   .map(name => `src/components/basketball/Basketball${name}Dialog.tsx`)
 
 const surfaces = [
+  'src/components/basketball/BasketballEventDetailDialog.tsx',
+  'src/components/basketball/BasketballShotDetailDialog.tsx',
+  'src/components/basketball/BasketballTimelineCorrectionDialog.tsx',
   'src/components/Scoreboard.tsx',
   'src/components/RecentEventsPopup.tsx',
   'src/components/basketball/BasketballRecentEventsPopup.tsx',
@@ -91,6 +94,94 @@ const fixedColor = /(?:bg|text|border|divide|ring|from|via|to|fill|stroke|placeh
 const colorTransition = /\btransition(?:-all|-colors)?(?=[\s'"\x60]|$)/
 
 describe('Converted application surface color ownership', () => {
+  it.each([
+    ['Revised', ['bg-info', 'text-info-content']],
+    ['Removed', ['bg-surface-muted', 'text-content']],
+  ] as const)('preserves the shot %s badge colors', (label, tokens) => {
+    const source = readFileSync('src/components/basketball/BasketballShotDetailDialog.tsx', 'utf8')
+    const badges = [...source.matchAll(/<span className="([^"]*)">(Revised|Removed)<\/span>/g)]
+      .filter(row => row[2] === label && row[1].split(/\s+/).includes('rounded'))
+    expect(badges).toHaveLength(1)
+    for (const token of tokens) expect(badges[0][1].split(/\s+/)).toContain(token)
+  })
+  it('strikes through only the removed shot relationship label', () => {
+    const source = readFileSync('src/components/basketball/BasketballShotDetailDialog.tsx', 'utf8')
+    const labels = [...source.matchAll(/<span className=\{`([^]*?)`\}>\s*\{relationship.label\}/g)]
+    expect(labels).toHaveLength(1)
+    const branches = labels[0][1].match(/relationship\.removed\s*\?\s*'([^']*)'\s*:\s*'([^']*)'/)
+    expect(branches).not.toBeNull()
+    expect(branches![1].split(/\s+/)).toContain('line-through')
+    expect(branches![2].split(/\s+/)).not.toContain('line-through')
+  })
+  it.each([
+    ['BasketballEventDetailDialog', '{review.periodLabel}'],
+    ['BasketballEventDetailDialog', '{review.title}'],
+    ['BasketballEventDetailDialog', '{captureLabel ?? formatRecordedAt(review.event.occurredAt)}'],
+    ['BasketballEventDetailDialog', '{detailValue(review, participantLabel)}'],
+    ['BasketballShotDetailDialog', '{detail.locationLabel}'],
+  ])('wraps %s detail text %s', (name, expression) => {
+    const source = readFileSync(`src/components/basketball/${name}.tsx`, 'utf8')
+    const rows = [...source.matchAll(/<(p|h2)\b([^>]*)>([^]*?)<\/\1>/g)]
+      .filter(row => row[3].trim() === expression)
+    expect(rows).toHaveLength(1)
+    expect(rows[0][2].match(/className="([^"]*)"/)?.[1].split(/\s+/)).toContain('break-words')
+  })
+  it('wraps shot period/time metadata and related-event labels', () => {
+    const source = readFileSync('src/components/basketball/BasketballShotDetailDialog.tsx', 'utf8')
+    const metadata = [...source.matchAll(/<p className="([^"]*)">([^]*?)<\/p>/g)]
+      .filter(row => row[2].includes('showCaptureSequence ? detail.sequenceLabel'))
+    expect(metadata).toHaveLength(1)
+    expect(metadata[0][1].split(/\s+/)).toContain('break-words')
+    const labels = [...source.matchAll(/<span className=\{`([^]*?)`\}>\s*\{relationship.label\}/g)]
+    expect(labels).toHaveLength(1)
+    for (const token of ['min-w-0', 'break-words']) expect(labels[0][1].split(/\s+/)).toContain(token)
+  })
+  it.each([
+    ['BasketballEventDetailDialog', 'Close event detail'],
+    ['BasketballShotDetailDialog', 'Close shot detail'],
+    ['BasketballTimelineCorrectionDialog', 'Close correction review'],
+  ])('keeps %s overlay and close control bounded', (name, label) => {
+    const source = readFileSync(`src/components/basketball/${name}.tsx`, 'utf8')
+    const overlays = [...source.matchAll(/className="([^"]*fixed inset-0[^"]*)"/g)]
+    expect(overlays).toHaveLength(1)
+    expect(overlays[0][1].split(/\s+/)).toContain('bg-overlay/[0.45]')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)]
+      .filter(([button]) => button.includes(`aria-label="${label}"`))
+    expect(buttons).toHaveLength(1)
+    const classes = buttons[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+    for (const token of ['h-10', 'w-10', 'shrink-0']) expect(classes).toContain(token)
+    for (const tag of ['header', 'footer']) {
+      const rows = [...source.matchAll(new RegExp(`<${tag} className="([^"]*)"`, 'g'))]
+      expect(rows).toHaveLength(1)
+      expect(rows[0][1].split(/\s+/)).toContain('shrink-0')
+    }
+  })
+  it.each(['BasketballEventDetailDialog', 'BasketballShotDetailDialog'])('wraps each %s diagnostic text next to its icon', name => {
+    const source = readFileSync(`src/components/basketball/${name}.tsx`, 'utf8')
+    const rows = [...source.matchAll(/<span className="([^"]*)">\{warning\}<\/span>/g)]
+    expect(rows).toHaveLength(1)
+    for (const token of ['min-w-0', 'break-words']) expect(rows[0][1].split(/\s+/)).toContain(token)
+  })
+  it('keeps correction confirmation colors distinct and disabled states explicit', () => {
+    const source = readFileSync('src/components/basketball/BasketballTimelineCorrectionDialog.tsx', 'utf8')
+    const buttons = [...source.matchAll(/<button\b[^]*?<\/button>/g)].filter(([button]) => button.includes('onClick={apply}'))
+    expect(buttons).toHaveLength(1)
+    for (const token of ['disabled:bg-control-disabled', 'disabled:text-content-disabled', 'bg-danger-action text-danger-action-content', 'bg-accent text-accent-content']) expect(buttons[0][0]).toContain(token)
+    const inputs = [...source.matchAll(/<input\b[^]*?\/>/g)]
+      .filter(([input]) => input.includes('checked={selectedDependentIds.includes(option.eventId)}'))
+    expect(inputs).toHaveLength(1)
+    const classes = inputs[0][0].match(/className="([^"]*)"/)?.[1].split(/\s+/)
+    for (const token of ['h-5', 'w-5', 'shrink-0', 'accent-accent']) expect(classes).toContain(token)
+    for (const value of ['option.label', 'previewError', 'line']) {
+      const escaped = value.replace('.', '\\.')
+      const rows = [...source.matchAll(new RegExp(`<span className="([^"]*)">\\{${escaped}\\}</span>`, 'g'))]
+      expect(rows).toHaveLength(1)
+      for (const token of ['min-w-0', 'break-words']) expect(rows[0][1].split(/\s+/)).toContain(token)
+    }
+    const alerts = [...source.matchAll(/<p role="alert" className="([^"]*)">\s*\{applyError\}/g)]
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0][1].split(/\s+/)).toContain('break-words')
+  })
   it('wraps the scoreboard tournament name in its own paragraph', () => {
     const source = readFileSync('src/components/Scoreboard.tsx', 'utf8')
     const rows = [...source.matchAll(/<p className="([^"]*)">\s*\{gameInfo\.tournamentName\}\s*<\/p>/g)]
@@ -367,6 +458,11 @@ describe('Converted application surface color ownership', () => {
     }
     expect(source).not.toMatch(rawColor)
     expect(source).not.toMatch(fixedColor)
+    if (path === 'src/components/basketball/BasketballEventDetailDialog.tsx') {
+      // Domain prose, not a Tailwind transition utility. Keep this exception exact.
+      expect(source.split("return 'Lineup transition'")).toHaveLength(2)
+      source = source.replace("return 'Lineup transition'", '')
+    }
     expect(source).not.toMatch(colorTransition)
   })
   it.each(['transition', 'transition-all', 'transition-colors', 'hover:transition-all', 'className="transition"', "'transition-colors'", '`transition-all`'])('rejects color transition %s', value => {

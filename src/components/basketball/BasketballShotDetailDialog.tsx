@@ -32,7 +32,7 @@ export default function BasketballShotDetailDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex justify-center bg-black/45 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[60] flex justify-center bg-overlay/[0.45] sm:items-center sm:p-4"
       onClick={onClose}
     >
       <section
@@ -41,26 +41,26 @@ export default function BasketballShotDetailDialog({
         aria-modal="true"
         aria-labelledby="basketball-shot-detail-title"
         tabIndex={-1}
-        className="flex h-full w-full flex-col bg-white shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-slate-200"
+        className="flex h-full w-full flex-col bg-surface shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-lg sm:border sm:border-line"
         onClick={event => event.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase text-slate-500">{detail.ordinalLabel}</p>
-            <h2 id="basketball-shot-detail-title" className="truncate text-lg font-bold text-slate-900">
+            <p className="text-xs font-semibold uppercase text-content-muted">{detail.ordinalLabel}</p>
+            <h2 id="basketball-shot-detail-title" className="truncate text-lg font-bold text-content">
               {detail.heading}
             </h2>
             {(detail.revised || detail.removed) && (
               <div className="mt-1 flex items-center gap-1.5">
                 {detail.revised && (
-                  <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Revised</span>
+                  <span className="rounded bg-info px-1.5 py-0.5 text-[10px] font-bold text-info-content">Revised</span>
                 )}
                 {detail.removed && (
-                  <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">Removed</span>
+                  <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-bold text-content">Removed</span>
                 )}
               </div>
             )}
-            <p className="mt-0.5 text-sm text-slate-600">
+            <p className="mt-0.5 break-words text-sm text-content-muted">
               {[
                 detail.periodLabel,
                 showCaptureSequence ? detail.sequenceLabel : formatRecordedAt(detail.occurredAt),
@@ -71,7 +71,7 @@ export default function BasketballShotDetailDialog({
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 active:scale-95"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line text-content-muted active:scale-95"
             aria-label="Close shot detail"
             title="Close"
           >
@@ -80,38 +80,38 @@ export default function BasketballShotDetailDialog({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 border-b border-slate-200">
+          <div className="grid grid-cols-2 border-b border-line">
             <SummaryCell label="Shooter" value={detail.shooterLabel} />
             <SummaryCell label="Team" value={detail.teamLabel} />
             <SummaryCell label="Result" value={detail.resultLabel} emphasized />
             <SummaryCell label="Value" value={detail.valueLabel} emphasized />
           </div>
 
-          <section className="border-b border-slate-200 px-4 py-4" aria-labelledby="shot-location-title">
-            <h3 id="shot-location-title" className="text-xs font-semibold uppercase text-slate-500">Court location</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-800">{detail.locationLabel}</p>
+          <section className="border-b border-line px-4 py-4" aria-labelledby="shot-location-title">
+            <h3 id="shot-location-title" className="text-xs font-semibold uppercase text-content-muted">Court location</h3>
+            <p className="mt-1 break-words text-sm font-semibold text-content">{detail.locationLabel}</p>
           </section>
 
-          <section className="border-b border-slate-200 px-4 py-4" aria-labelledby="shot-relationships-title">
+          <section className="border-b border-line px-4 py-4" aria-labelledby="shot-relationships-title">
             <div className="flex items-center justify-between gap-3">
-              <h3 id="shot-relationships-title" className="text-xs font-semibold uppercase text-slate-500">
+              <h3 id="shot-relationships-title" className="text-xs font-semibold uppercase text-content-muted">
                 Related events
               </h3>
               {detail.relationships.length > 0 && (
-                <span className="text-xs font-semibold text-slate-500">{detail.relationships.length}</span>
+                <span className="text-xs font-semibold text-content-muted">{detail.relationships.length}</span>
               )}
             </div>
             {detail.relationships.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No linked assist, rebound, or block.</p>
+              <p className="mt-2 text-sm text-content-muted">No linked assist, rebound, or block.</p>
             ) : (
-              <ul className="mt-2 divide-y divide-slate-100">
+              <ul className="mt-2 divide-y divide-line">
                 {detail.relationships.map(relationship => (
                   <li key={relationship.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <span className={relationship.removed ? 'text-slate-400 line-through' : 'font-medium text-slate-800'}>
+                    <span className={`min-w-0 break-words ${relationship.removed ? 'text-content-subtle line-through' : 'font-medium text-content'}`}>
                       {relationship.label}
                     </span>
                     {relationship.removed && (
-                      <span className="text-xs font-semibold text-slate-500">Removed</span>
+                      <span className="text-xs font-semibold text-content-muted">Removed</span>
                     )}
                   </li>
                 ))}
@@ -120,35 +120,35 @@ export default function BasketballShotDetailDialog({
           </section>
 
           {detail.warnings.length > 0 && (
-            <section className="border-b border-amber-200 bg-amber-50 px-4 py-3" aria-label="Shot diagnostics">
+            <section className="border-b border-warning-line bg-warning px-4 py-3" aria-label="Shot diagnostics">
               {detail.warnings.map(warning => (
-                <p key={warning} className="flex gap-2 text-sm font-medium text-amber-900">
+                <p key={warning} className="flex gap-2 text-sm font-medium text-warning-content">
                   <CircleAlert className="mt-0.5 shrink-0" size={16} aria-hidden />
-                  <span>{warning}</span>
+                  <span className="min-w-0 break-words">{warning}</span>
                 </p>
               ))}
             </section>
           )}
 
           <details className="px-4 py-4">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Details</summary>
-            <dl className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+            <summary className="cursor-pointer text-sm font-semibold text-content">Details</summary>
+            <dl className="mt-3 divide-y divide-line border-y border-line">
               {detail.technical.map(item => (
                 <div key={item.label} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2 text-xs">
-                  <dt className="font-semibold text-slate-500">{item.label}</dt>
-                  <dd className="break-all text-slate-700">{formatTechnicalValue(item.value)}</dd>
+                  <dt className="font-semibold text-content-muted">{item.label}</dt>
+                  <dd className="break-all text-content">{formatTechnicalValue(item.value)}</dd>
                 </div>
               ))}
             </dl>
           </details>
         </div>
 
-        <footer className="flex gap-2 border-t border-slate-200 bg-white px-4 py-3">
+        <footer className="flex shrink-0 gap-2 border-t border-line bg-surface px-4 py-3">
           {onEdit && (
             <button
               type="button"
               onClick={onEdit}
-              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 text-sm font-bold text-blue-800"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-info-line bg-info text-sm font-bold text-info-content"
             >
               <Pencil size={17} aria-hidden />
               Edit
@@ -160,8 +160,8 @@ export default function BasketballShotDetailDialog({
               onClick={onRestore ?? onRemove}
               className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border text-sm font-bold ${
                 onRestore
-                  ? 'border-blue-200 bg-blue-50 text-blue-800'
-                  : 'border-rose-200 bg-rose-50 text-rose-800'
+                  ? 'border-info-line bg-info text-info-content'
+                  : 'border-danger-line bg-danger text-danger-content'
               }`}
             >
               {onRestore ? <RotateCcw size={17} aria-hidden /> : <Trash2 size={17} aria-hidden />}
@@ -187,9 +187,9 @@ function SummaryCell({
   emphasized?: boolean
 }) {
   return (
-    <div className="min-w-0 border-b border-r border-slate-100 px-4 py-3 last:border-r-0">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className={`mt-1 break-words text-sm ${emphasized ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
+    <div className="min-w-0 border-b border-r border-line px-4 py-3 last:border-r-0">
+      <p className="text-xs font-semibold uppercase text-content-muted">{label}</p>
+      <p className={`mt-1 break-words text-sm ${emphasized ? 'font-bold text-content' : 'font-semibold text-content'}`}>
         {value}
       </p>
     </div>
