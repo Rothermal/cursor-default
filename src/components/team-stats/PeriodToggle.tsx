@@ -18,7 +18,6 @@ export default function PeriodToggle({
   currentPeriod,
   onPeriodChange,
   onAddOvertime,
-  sportTheme,
   addOvertimeLabel,
 }: PeriodToggleProps) {
   const compact = periods >= 6
@@ -34,12 +33,12 @@ export default function PeriodToggle({
             type="button"
             onClick={() => onPeriodChange(p)}
             className={`
-              rounded-lg font-semibold transition-all active:scale-95
+              max-w-full break-words rounded-lg font-semibold transition-transform active:scale-95
               border
               ${compact ? 'px-2 py-1.5 text-[10px] leading-tight' : 'px-3 py-2 text-xs'}
               ${active
-                ? `${sportTheme.bg} text-white border-transparent shadow-sm`
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                ? 'bg-accent text-accent-content border-transparent shadow-sm'
+                : 'bg-surface text-content-muted border-line hover:bg-control-hover'
               }
             `}
           >
@@ -51,8 +50,8 @@ export default function PeriodToggle({
         type="button"
         onClick={onAddOvertime}
         className={`
-          rounded-lg px-3 py-2 text-xs font-semibold border border-dashed transition-all active:scale-95
-          ${sportTheme.border} ${sportTheme.text} bg-white hover:bg-slate-50
+          max-w-full break-words rounded-lg px-3 py-2 text-xs font-semibold border border-dashed transition-transform active:scale-95
+          border-line-strong text-content bg-control hover:bg-control-hover
         `}
       >
         {addOvertimeLabel}

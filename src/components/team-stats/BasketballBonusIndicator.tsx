@@ -49,14 +49,14 @@ export default function BasketballBonusIndicator({
     <div className="space-y-2 mb-2">
       {status === 'double_bonus' && (
         <div
-          className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 shadow-md"
+          className="rounded-xl border border-danger-line bg-danger px-3 py-2.5 shadow-md"
           role="status"
         >
-          <p className="text-sm font-bold text-red-800">
+          <p className="text-sm font-bold text-danger-content">
             🔴 {!hasOneAndOne ? 'BONUS' : 'DOUBLE BONUS'}
-            <span className="font-semibold text-red-700/90"> ({foulCount}{getOrdinalSuffix(foulCount)} foul)</span>
+            <span className="font-semibold text-danger-content"> ({foulCount}{getOrdinalSuffix(foulCount)} foul)</span>
           </p>
-          <p className="text-xs text-red-700/90 mt-0.5">
+          <p className="text-xs text-danger-content mt-0.5">
             Next foul: opponent shoots 2 free throws
           </p>
         </div>
@@ -64,21 +64,21 @@ export default function BasketballBonusIndicator({
 
       {status === 'one_and_one' && (
         <div
-          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 shadow-md"
+          className="rounded-xl border border-warning-line bg-warning px-3 py-2.5 shadow-md"
           role="status"
         >
-          <p className="text-sm font-bold text-amber-900">
+          <p className="text-sm font-bold text-warning-content">
             ⚠️ 1-AND-1
-            <span className="font-semibold text-amber-800/90"> ({foulCount}{getOrdinalSuffix(foulCount)} foul)</span>
+            <span className="font-semibold text-warning-content"> ({foulCount}{getOrdinalSuffix(foulCount)} foul)</span>
           </p>
-          <p className="text-xs text-amber-800/90 mt-0.5">
+          <p className="text-xs text-warning-content mt-0.5">
             Next foul: opponent shoots 1-and-1
           </p>
         </div>
       )}
 
       {hint && (
-        <p className="text-[11px] text-slate-500 text-center px-1">
+        <p className="text-[11px] text-content-muted text-center px-1">
           ℹ️ {hint}
         </p>
       )}

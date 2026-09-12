@@ -40,37 +40,37 @@ export default function BasketballRecentEventsPopup({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 pb-3 pt-16 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/40 px-3 pb-3 pt-16 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="basketball-recent-events-title"
-        className="w-full max-w-lg overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-xl"
         onClick={event => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
-            <h2 id="basketball-recent-events-title" className="text-base font-bold text-slate-800">
+            <h2 id="basketball-recent-events-title" className="text-base font-bold text-content">
               Recent events
             </h2>
-            <p className="text-xs text-slate-500">Newest event first. Lifecycle boundaries cannot be undone here.</p>
+            <p className="text-xs text-content-muted">Newest event first. Lifecycle boundaries cannot be undone here.</p>
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 active:scale-95 transition-transform"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-content-muted active:scale-95 transition-transform"
             aria-label="Close recent events"
           >
             <X size={18} aria-hidden />
           </button>
         </div>
 
-        <div className="max-h-[55vh] overflow-y-auto px-3 py-2">
+        <div className="min-h-0 max-h-[55vh] overflow-y-auto px-3 py-2">
           {errorMessage && (
-            <p role="alert" className="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+            <p role="alert" className="mb-2 break-words rounded-lg border border-danger-line bg-danger px-3 py-2 text-sm font-semibold text-danger-content">
               {errorMessage}
             </p>
           )}
@@ -78,13 +78,13 @@ export default function BasketballRecentEventsPopup({
             <button
               type="button"
               onClick={onRestore}
-              className="mb-2 w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-800 active:scale-[0.99] transition-transform"
+              className="mb-2 w-full rounded-lg border border-success-line bg-success px-3 py-2.5 text-sm font-semibold text-success-content active:scale-[0.99] transition-transform"
             >
               Restore last undone
             </button>
           )}
           {recent.length === 0 ? (
-            <p className="px-2 py-6 text-center text-sm text-slate-500">
+            <p className="px-2 py-6 text-center text-sm text-content-muted">
               No tracked events yet.
             </p>
           ) : (
@@ -98,15 +98,15 @@ export default function BasketballRecentEventsPopup({
                     key={unit.id}
                     className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
                       canUndo
-                        ? 'border-blue-200 bg-blue-50'
+                        ? 'border-info-line bg-info'
                         : isTop && unit.kind === 'boundary'
-                          ? 'border-amber-200 bg-amber-50'
-                          : 'border-slate-200 bg-white'
+                          ? 'border-warning-line bg-warning'
+                          : 'border-line bg-surface'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800">{unit.who}</p>
-                      <p className="truncate text-sm text-slate-600">{unit.what}</p>
+                      <p className="truncate text-sm font-semibold text-content">{unit.who}</p>
+                      <p className="truncate text-sm text-content-muted">{unit.what}</p>
                     </div>
                     <button
                       type="button"
@@ -114,8 +114,8 @@ export default function BasketballRecentEventsPopup({
                       disabled={!canUndo && !openTimeline}
                       className={`h-10 shrink-0 rounded-lg px-3 text-sm font-semibold transition-transform ${
                         canUndo || openTimeline
-                          ? 'bg-blue-600 text-white active:scale-95'
-                          : 'border border-slate-200 bg-slate-50 text-slate-400'
+                          ? 'bg-accent text-accent-content active:scale-95'
+                          : 'border border-line bg-control-disabled text-content-disabled'
                       }`}
                       aria-label={canUndo
                         ? `Undo ${unit.who} ${unit.what}`
