@@ -393,27 +393,27 @@ export default function SoccerShotCaptureDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-overlay/[0.5] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="soccer-capture-title"
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-white sm:max-w-lg sm:rounded-lg"
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg"
         onClick={event => event.stopPropagation()}
       >
-        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
+        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
-            <h2 id="soccer-capture-title" className="truncate font-bold text-slate-900" title={teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}>{teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}</h2>
-            <p className="text-xs text-slate-500">{location ? `${Math.round(location.x * 100)}, ${Math.round(location.y * 100)}` : 'Location unknown'}</p>
+            <h2 id="soccer-capture-title" className="truncate font-bold text-content" title={teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}>{teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}</h2>
+            <p className="text-xs text-content-muted">{location ? `${Math.round(location.x * 100)}, ${Math.round(location.y * 100)}` : 'Location unknown'}</p>
           </div>
-          <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button>
+          <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button>
         </header>
 
         <div className="space-y-5 p-4">
           {mode !== 'live' && (
             <>
               <FieldGroup label="Side">
-                <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                <div className="grid grid-cols-2 rounded-md bg-control p-1">
                   <ChoiceButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => { setTeamSide('tracked'); if (teamSide !== 'tracked') setSourceEventId('') }} compact />
                   <ChoiceButton active={teamSide === 'opponent'} label={opponentTeamLabel} onClick={() => { setTeamSide('opponent'); if (teamSide !== 'opponent') setSourceEventId('') }} compact />
                 </div>
@@ -432,10 +432,10 @@ export default function SoccerShotCaptureDialog({
                   >
                     {periodTimings.map(item => <option key={item.period.id} value={item.period.id}>{item.label}</option>)}
                   </select>
-                  <label className="text-[11px] font-bold uppercase text-slate-500">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => { setPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000); setSourceEventId('') }} className="input-field mt-1" /></label>
-                  <label className="text-[11px] font-bold uppercase text-slate-500">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => { setPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000); setSourceEventId('') }} className="input-field mt-1" /></label>
+                  <label className="text-[11px] font-bold uppercase text-content-muted">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={event => { setPeriodElapsedMs(Math.max(0, Number(event.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000); setSourceEventId('') }} className="input-field mt-1" /></label>
+                  <label className="text-[11px] font-bold uppercase text-content-muted">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={event => { setPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(event.target.value) || 0)) * 1_000); setSourceEventId('') }} className="input-field mt-1" /></label>
                 </div>
-                {timingInvalid && <p className="mt-2 text-xs font-medium text-amber-700">Choose a time inside the recorded period.</p>}
+                {timingInvalid && <p className="mt-2 text-xs font-medium text-warning-content">Choose a time inside the recorded period.</p>}
               </FieldGroup>
             </>
           )}
@@ -456,9 +456,9 @@ export default function SoccerShotCaptureDialog({
           </FieldGroup>
 
           {outcome === 'goal' && mode !== 'edit' && (
-            <label className="flex min-h-11 items-center justify-between border-y border-slate-200 py-2 text-sm font-semibold text-slate-700">
+            <label className="flex min-h-11 items-center justify-between border-y border-line py-2 text-sm font-semibold text-content">
               Own goal
-              <input type="checkbox" checked={ownGoal} onChange={event => setOwnGoal(event.target.checked)} className="h-5 w-5 accent-emerald-700" />
+              <input type="checkbox" checked={ownGoal} onChange={event => setOwnGoal(event.target.checked)} className="bg-surface h-5 w-5 accent-accent" />
             </label>
           )}
 
@@ -471,7 +471,7 @@ export default function SoccerShotCaptureDialog({
                 </select>
               ) : (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+                  <div className="grid grid-cols-2 rounded-md bg-control p-1">
                     <ChoiceButton active={opponentShooterMode === 'unknown'} label="Player / unknown" onClick={() => setOpponentShooterMode('unknown')} compact />
                     <ChoiceButton active={opponentShooterMode === 'team'} label="Team" onClick={() => setOpponentShooterMode('team')} compact />
                   </div>
@@ -549,7 +549,7 @@ export default function SoccerShotCaptureDialog({
                 <option value="">Select goalkeeper</option>
                 {selectableGoalkeepers.map(participant => <option key={participant.participantId} value={participant.participantId}>{participantLabel(participant)}</option>)}
               </select>
-              {!trackedGoalkeeperId && <p role="alert" className="mt-2 text-xs font-medium text-amber-700">A tracked goalkeeper is required for this own goal.</p>}
+              {!trackedGoalkeeperId && <p role="alert" className="mt-2 text-xs font-medium text-warning-content">A tracked goalkeeper is required for this own goal.</p>}
             </FieldGroup>
           )}
 
@@ -564,7 +564,7 @@ export default function SoccerShotCaptureDialog({
                 <OpponentInput value={opponentCreatorLabel} onChange={setOpponentCreatorLabel} recent={recentOpponentLabels} placeholder="None" />
               )}
               {outcome === 'goal' && !showSecondary && (
-                <button type="button" onClick={() => setShowSecondary(true)} className="mt-2 min-h-9 text-xs font-bold text-emerald-700 flex items-center gap-1"><Plus size={15} /> Secondary assist</button>
+                <button type="button" onClick={() => setShowSecondary(true)} className="mt-2 min-h-9 text-xs font-bold text-success-content flex items-center gap-1"><Plus size={15} /> Secondary assist</button>
               )}
               {outcome === 'goal' && showSecondary && (
                 <div className="mt-2">
@@ -611,12 +611,12 @@ export default function SoccerShotCaptureDialog({
           )}
 
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setLocationEditorOpen(value => !value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 flex items-center justify-center gap-2"><MapPin size={16} /> {locationEditorOpen ? 'Hide field' : 'Set location'}</button>
-            <button type="button" onClick={() => setLocation(null)} className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 flex items-center justify-center gap-2"><MapPinOff size={16} /> Location unknown</button>
+            <button type="button" onClick={() => setLocationEditorOpen(value => !value)} className="min-h-10 rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-content flex items-center justify-center gap-2"><MapPin size={16} /> {locationEditorOpen ? 'Hide field' : 'Set location'}</button>
+            <button type="button" onClick={() => setLocation(null)} className="min-h-10 rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-content flex items-center justify-center gap-2"><MapPinOff size={16} /> Location unknown</button>
           </div>
 
           {situation === 'penalty' && !ownGoal && (
-            <button type="button" onClick={() => setLocation(penaltyMark(captureDirection))} className="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 flex items-center justify-center gap-2"><MapPin size={16} /> Use penalty mark</button>
+            <button type="button" onClick={() => setLocation(penaltyMark(captureDirection))} className="min-h-10 w-full rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-content flex items-center justify-center gap-2"><MapPin size={16} /> Use penalty mark</button>
           )}
 
           {locationEditorOpen && (
@@ -634,9 +634,9 @@ export default function SoccerShotCaptureDialog({
               }}
             />
           )}
-          {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && <p className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>}
 
-          <button type="button" onClick={save} disabled={saveDisabled} className="min-h-12 w-full rounded-md bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-40">
+          <button type="button" onClick={save} disabled={saveDisabled} className="min-h-12 w-full rounded-md bg-success px-4 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">
             {mode === 'edit'
               ? 'Save Correction'
               : ownGoal
@@ -653,11 +653,11 @@ export default function SoccerShotCaptureDialog({
 }
 
 function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
-  return <div><p className="mb-2 text-xs font-bold uppercase text-slate-500">{label}</p>{children}</div>
+  return <div><p className="mb-2 text-xs font-bold uppercase text-content-muted">{label}</p>{children}</div>
 }
 
 function ChoiceButton({ active, label, onClick, compact = false }: { active: boolean; label: string; onClick: () => void; compact?: boolean }) {
-  return <button type="button" onClick={onClick} className={`${compact ? 'min-h-8' : 'min-h-11'} rounded-md px-2 text-xs font-bold ${active ? 'bg-emerald-700 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}>{label}</button>
+  return <button type="button" onClick={onClick} className={`${compact ? 'min-h-8' : 'min-h-11'} rounded-md px-2 text-xs font-bold ${active ? 'bg-accent text-accent-content' : 'border border-line-strong bg-surface text-content'}`}>{label}</button>
 }
 
 function OpponentInput({ value, onChange, recent, placeholder }: { value: string; onChange: (value: string) => void; recent: string[]; placeholder: string }) {

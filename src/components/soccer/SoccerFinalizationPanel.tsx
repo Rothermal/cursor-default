@@ -151,14 +151,14 @@ export default function SoccerFinalizationPanel({
 
   return (
     <>
-      <section className="border-y border-slate-200 bg-white px-4 py-4">
+      <section className="border-y border-line bg-surface px-4 py-4">
         <div className="flex items-start gap-3">
-          <LockKeyhole size={20} className="mt-0.5 shrink-0 text-emerald-700" />
+          <LockKeyhole size={20} className="mt-0.5 shrink-0 text-success-content" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-slate-900">
+            <p className="text-sm font-bold text-content">
               {readiness?.gameStatus === 'final' ? 'Canonical Result' : 'Cloud Finalization'}
             </p>
-            <p className="mt-0.5 truncate text-xs text-slate-500">
+            <p className="mt-0.5 truncate text-xs text-content-muted">
               {loading
                 ? 'Checking primary recorder...'
                 : readiness?.primaryDisplayName
@@ -169,7 +169,7 @@ export default function SoccerFinalizationPanel({
         </div>
 
         {readiness?.nonPrimaryAttentionCount ? (
-          <div className="mt-3 flex items-start gap-2 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="mt-3 flex items-start gap-2 bg-warning px-3 py-2 text-xs text-warning-content">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             <span>
               {readiness.nonPrimaryAttentionCount}{' '}
@@ -179,7 +179,7 @@ export default function SoccerFinalizationPanel({
         ) : null}
 
         {error && (
-          <p className="mt-3 border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="mt-3 border border-danger-line bg-danger px-3 py-2 text-xs text-danger-content">
             {error}
           </p>
         )}
@@ -191,7 +191,7 @@ export default function SoccerFinalizationPanel({
                 type="button"
                 onClick={() => { void openConflicts() }}
                 disabled={busy}
-                className="min-h-11 border border-amber-300 bg-amber-50 px-3 text-sm font-bold text-amber-800 disabled:opacity-50"
+                className="min-h-11 border border-warning-line bg-warning px-3 text-sm font-bold text-warning-content disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 Review {readiness.primaryConflictCount}{' '}
                 {readiness.primaryConflictCount === 1 ? 'Conflict' : 'Conflicts'}
@@ -206,7 +206,7 @@ export default function SoccerFinalizationPanel({
                 !readiness.primaryEnded ||
                 readiness.primaryConflictCount > 0
               }
-              className="min-h-11 bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-40"
+              className="min-h-11 bg-success px-3 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled"
             >
               {busy ? 'Preparing...' : 'Finalize and Lock'}
             </button>
@@ -218,7 +218,7 @@ export default function SoccerFinalizationPanel({
             type="button"
             onClick={() => setReopenOpen(true)}
             disabled={busy}
-            className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 disabled:opacity-50"
+            className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 border border-line-strong bg-surface px-3 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled"
           >
             <RotateCcw size={17} /> Reopen Cloud Game
           </button>
@@ -227,31 +227,31 @@ export default function SoccerFinalizationPanel({
 
       {reopenOpen && (
         <div
-          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 sm:items-center"
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-overlay/[0.5] sm:items-center"
           onClick={() => setReopenOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="soccer-cloud-reopen-title"
-            className="w-full bg-white p-4 sm:max-w-md"
+            className="w-full bg-surface p-4 sm:max-w-md"
             onClick={event => event.stopPropagation()}
           >
             <div className="flex items-center gap-3">
-              <h2 id="soccer-cloud-reopen-title" className="min-w-0 flex-1 font-bold text-slate-900">
+              <h2 id="soccer-cloud-reopen-title" className="min-w-0 flex-1 font-bold text-content">
                 Reopen Cloud Game
               </h2>
               <button
                 type="button"
                 onClick={() => setReopenOpen(false)}
-                className="grid h-9 w-9 place-items-center text-slate-500"
+                className="grid h-9 w-9 place-items-center text-content-muted"
                 aria-label="Close"
                 title="Close"
               >
                 <X size={20} />
               </button>
             </div>
-            <label className="mt-4 block text-xs font-bold text-slate-600" htmlFor="soccer-cloud-reopen-reason">
+            <label className="mt-4 block text-xs font-bold text-content-muted" htmlFor="soccer-cloud-reopen-reason">
               Reason
             </label>
             <textarea
@@ -259,14 +259,14 @@ export default function SoccerFinalizationPanel({
               value={reopenReason}
               onChange={event => setReopenReason(event.target.value)}
               rows={3}
-              className="mt-1 w-full resize-none border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              className="bg-surface mt-1 w-full resize-none border border-line-strong px-3 py-2 text-sm outline-none focus:border-success-line"
               autoFocus
             />
             <button
               type="button"
               onClick={() => { void handleReopen() }}
               disabled={busy || reopenReason.trim().length < 3}
-              className="mt-3 min-h-11 w-full bg-slate-800 px-3 text-sm font-bold text-white disabled:opacity-40"
+              className="mt-3 min-h-11 w-full bg-control-hover px-3 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled"
             >
               {busy ? 'Reopening...' : 'Reopen Game'}
             </button>
@@ -302,29 +302,29 @@ function PrimaryConflictDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 sm:items-center"
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-overlay/[0.5] sm:items-center"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="soccer-primary-conflict-title"
-        className="max-h-[94vh] w-full overflow-y-auto bg-white sm:max-w-2xl"
+        className="max-h-[94vh] w-full overflow-y-auto bg-surface sm:max-w-2xl"
         onClick={event => event.stopPropagation()}
       >
-        <header className="sticky top-0 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
+        <header className="sticky top-0 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
-            <h2 id="soccer-primary-conflict-title" className="font-bold text-slate-900">
+            <h2 id="soccer-primary-conflict-title" className="font-bold text-content">
               Primary Stream Conflict
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-content-muted">
               {remaining} remaining | {conflict.recorderDisplayName}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center text-slate-500"
+            className="grid h-9 w-9 place-items-center text-content-muted"
             aria-label="Close"
             title="Close"
           >
@@ -366,31 +366,31 @@ function ConflictVersion({
   onChoose: () => void
 }) {
   return (
-    <section className="border border-slate-200 bg-slate-50 p-3">
-      <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+    <section className="border border-line bg-canvas p-3">
+      <h3 className="text-sm font-bold text-content">{title}</h3>
       <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-slate-500">Type</dt>
-        <dd className="truncate font-semibold text-slate-800">
+        <dt className="text-content-muted">Type</dt>
+        <dd className="truncate font-semibold text-content">
           {event.eventType.replace('soccer.', '').replace(/_/g, ' ')}
         </dd>
-        <dt className="text-slate-500">Revision</dt>
+        <dt className="text-content-muted">Revision</dt>
         <dd>{event.revision}</dd>
-        <dt className="text-slate-500">Time</dt>
+        <dt className="text-content-muted">Time</dt>
         <dd>
           {event.period.id}{' '}
           {event.elapsedMs === null ? '' : formatSoccerDuration(event.elapsedMs)}
         </dd>
-        <dt className="text-slate-500">State</dt>
+        <dt className="text-content-muted">State</dt>
         <dd>{event.deletedAt ? 'Removed' : 'Active'}</dd>
       </dl>
-      <pre className="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words border-t border-slate-200 pt-3 text-[11px] text-slate-600">
+      <pre className="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words border-t border-line pt-3 text-[11px] text-content-muted">
         {JSON.stringify(event.payload, null, 2)}
       </pre>
       <button
         type="button"
         onClick={onChoose}
         disabled={disabled}
-        className="mt-3 min-h-11 w-full bg-slate-800 px-3 text-sm font-bold text-white disabled:opacity-40"
+        className="mt-3 min-h-11 w-full bg-control-hover px-3 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled"
       >
         {action}
       </button>

@@ -445,15 +445,12 @@ describe('Converted application surface color ownership', () => {
   it.each(surfaces)('%s uses semantic utility colors', path => {
     let source = readFileSync(path, 'utf8')
     if (path === 'src/components/soccer/SoccerFormationEditor.tsx') {
-      // Fixed field artwork, not application surfaces. Keep the exception exact.
+      // Pitch artwork now has dedicated tokens rather than raw-color exceptions.
       for (const [literal, count] of [
-        ['border-emerald-800 bg-emerald-600', 1],
-        ['border-white/80', 4],
-        ['border-white bg-white text-slate-900', 1],
-        ['border-dashed border-white/90 bg-emerald-800/80 text-white', 1],
+        ['border-pitch-line bg-pitch-surface', 1],
+        ['border-pitch-line', 5],
       ] as const) {
         expect(source.split(literal)).toHaveLength(count + 1)
-        source = source.split(literal).join('')
       }
     }
     expect(source).not.toMatch(rawColor)

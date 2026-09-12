@@ -535,7 +535,7 @@ function Toggle({ label, checked, disabled, onChange }: {
         checked={checked}
         disabled={disabled}
         onChange={event => onChange(event.target.checked)}
-        className="h-5 w-5 accent-accent"
+        className="bg-surface h-5 w-5 accent-accent"
       />
     </label>
   )

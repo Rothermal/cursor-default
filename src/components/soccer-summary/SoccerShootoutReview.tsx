@@ -40,16 +40,16 @@ export default function SoccerShootoutReview({
 
   return (
     <main className="mx-auto max-w-2xl pb-10">
-      <section className="border-b border-slate-200 bg-white px-4 py-5">
+      <section className="border-b border-line bg-surface px-4 py-5">
         <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3 text-center">
           <ShootoutScore name={trackedName} score={review.score.tracked} />
-          <div className="pb-1 text-xs font-bold uppercase text-slate-400">
+          <div className="pb-1 text-xs font-bold uppercase text-content-subtle">
             Shootout
           </div>
           <ShootoutScore name={opponentName} score={review.score.opponent} />
         </div>
-        <p className="mt-3 text-center text-sm font-bold text-slate-700">{status}</p>
-        <div className="mt-4 grid grid-cols-2 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center">
+        <p className="mt-3 text-center text-sm font-bold text-content">{status}</p>
+        <div className="mt-4 grid grid-cols-2 divide-x divide-line border-y border-line py-3 text-center">
           <Progress
             label={trackedName}
             value={review.initialProgress.tracked}
@@ -61,20 +61,20 @@ export default function SoccerShootoutReview({
             total={review.initialKicksPerSide}
           />
         </div>
-        <p className="mt-2 text-center text-xs text-slate-500">
+        <p className="mt-2 text-center text-xs text-content-muted">
           {sideName(review.firstKickingSide, trackedName, opponentName)} kicked first
         </p>
       </section>
 
-      <section className="border-b border-slate-200 bg-slate-50 px-4 py-5">
+      <section className="border-b border-line bg-canvas px-4 py-5">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Rounds</h2>
-          <span className="text-xs text-slate-500">
+          <h2 className="text-sm font-bold uppercase text-content-muted">Rounds</h2>
+          <span className="text-xs text-content-muted">
             {review.attempts.tracked}-{review.attempts.opponent} official attempts
           </span>
         </div>
-        <div className="border-y border-slate-200 bg-white">
-          <div className="grid grid-cols-[5.5rem_1fr_1fr] border-b border-slate-200 px-2 py-2 text-[11px] font-bold uppercase text-slate-500">
+        <div className="border-y border-line bg-surface">
+          <div className="grid grid-cols-[5.5rem_1fr_1fr] border-b border-line px-2 py-2 text-[11px] font-bold uppercase text-content-muted">
             <span>Round</span>
             <span className="text-center">{trackedName}</span>
             <span className="text-center">{opponentName}</span>
@@ -82,12 +82,12 @@ export default function SoccerShootoutReview({
           {review.rounds.map(round => (
             <div
               key={round.round}
-              className="grid min-h-20 grid-cols-[5.5rem_1fr_1fr] border-b border-slate-200 px-2 py-3 last:border-b-0"
+              className="grid min-h-20 grid-cols-[5.5rem_1fr_1fr] border-b border-line px-2 py-3 last:border-b-0"
             >
               <div className="pr-2">
-                <p className="text-xs font-bold text-slate-700">{round.label}</p>
+                <p className="text-xs font-bold text-content">{round.label}</p>
                 {round.suddenDeath && (
-                  <p className="mt-1 text-[10px] font-semibold uppercase text-amber-700">
+                  <p className="mt-1 text-[10px] font-semibold uppercase text-warning-content">
                     Sudden death
                   </p>
                 )}
@@ -105,20 +105,20 @@ export default function SoccerShootoutReview({
             </div>
           ))}
           {review.rounds.length === 0 && (
-            <p className="py-8 text-center text-sm text-slate-500">
+            <p className="py-8 text-center text-sm text-content-muted">
               No shootout kicks recorded.
             </p>
           )}
         </div>
       </section>
 
-      <section className="border-b border-slate-200 bg-white px-4 py-5">
-        <h2 className="text-sm font-bold uppercase text-slate-500">
+      <section className="border-b border-line bg-surface px-4 py-5">
+        <h2 className="text-sm font-bold uppercase text-content-muted">
           Kicker Summary
         </h2>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[34rem] border-y border-slate-200 text-sm">
-            <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
+          <table className="w-full min-w-[34rem] border-y border-line text-sm">
+            <thead className="bg-canvas text-[10px] uppercase text-content-muted">
               <tr>
                 <th className="px-2 py-2 text-left">Kicker</th>
                 <th className="px-2 py-2 text-center">Att</th>
@@ -130,7 +130,7 @@ export default function SoccerShootoutReview({
                 <th className="px-2 py-2 text-center">Forfeit</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-line">
               {review.kickers.map(kicker => (
                 <KickerRow
                   key={`${kicker.teamSide}:${kicker.key}`}
@@ -143,21 +143,21 @@ export default function SoccerShootoutReview({
         </div>
       </section>
 
-      <section className="bg-white px-4 py-5">
-        <h2 className="text-sm font-bold uppercase text-slate-500">
+      <section className="bg-surface px-4 py-5">
+        <h2 className="text-sm font-bold uppercase text-content-muted">
           Goalkeeper Summary
         </h2>
-        <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">
+        <div className="mt-3 divide-y divide-line border-y border-line">
           {review.goalkeepers.map(goalkeeper => (
             <div
               key={`${goalkeeper.teamSide}:${goalkeeper.key}`}
               className="grid min-h-12 grid-cols-[1fr_auto_auto] items-center gap-4 py-2"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-slate-800">
+                <p className="truncate text-sm font-bold text-content">
                   {goalkeeper.label}
                 </p>
-                <p className="text-[11px] font-semibold uppercase text-slate-500">
+                <p className="text-[11px] font-semibold uppercase text-content-muted">
                   {goalkeeper.teamSide === 'tracked' ? trackedName : opponentName}
                 </p>
               </div>
@@ -166,7 +166,7 @@ export default function SoccerShootoutReview({
             </div>
           ))}
           {review.goalkeepers.length === 0 && (
-            <p className="py-6 text-center text-sm text-slate-500">
+            <p className="py-6 text-center text-sm text-content-muted">
               No goalkeeper attempts recorded.
             </p>
           )}
@@ -188,8 +188,8 @@ export default function SoccerShootoutReview({
 function ShootoutScore({ name, score }: { name: string; score: number }) {
   return (
     <div className="min-w-0">
-      <p className="truncate text-xs font-semibold text-slate-500">{name}</p>
-      <p className="mt-1 text-4xl font-bold tabular-nums text-slate-900">{score}</p>
+      <p className="truncate text-xs font-semibold text-content-muted">{name}</p>
+      <p className="mt-1 text-4xl font-bold tabular-nums text-content">{score}</p>
     </div>
   )
 }
@@ -205,8 +205,8 @@ function Progress({
 }) {
   return (
     <div className="min-w-0 px-3">
-      <p className="truncate text-xs font-semibold text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-bold tabular-nums text-slate-800">
+      <p className="truncate text-xs font-semibold text-content-muted">{label}</p>
+      <p className="mt-1 text-sm font-bold tabular-nums text-content">
         {value} / {total}
       </p>
     </div>
@@ -223,7 +223,7 @@ function AttemptStack({
   onSelect: (attempt: SoccerShootoutAttemptReview) => void
 }) {
   if (attempts.length === 0) {
-    return <div className="grid place-items-center text-sm text-slate-300">-</div>
+    return <div className="grid place-items-center text-sm text-content-subtle">-</div>
   }
   return (
     <div className="flex flex-col items-center gap-1 px-1">
@@ -256,8 +256,8 @@ function KickerRow({
   return (
     <tr>
       <td className="max-w-48 px-2 py-2">
-        <p className="truncate font-semibold text-slate-800">{kicker.label}</p>
-        <p className="text-[10px] font-bold uppercase text-slate-400">
+        <p className="truncate font-semibold text-content">{kicker.label}</p>
+        <p className="text-[10px] font-bold uppercase text-content-subtle">
           {sideLabel}
         </p>
       </td>
@@ -270,7 +270,7 @@ function KickerRow({
         kicker.retakes,
         kicker.forfeits,
       ].map((value, index) => (
-        <td key={index} className="px-2 py-2 text-center tabular-nums text-slate-700">
+        <td key={index} className="px-2 py-2 text-center tabular-nums text-content">
           {value}
         </td>
       ))}
@@ -281,8 +281,8 @@ function KickerRow({
 function SummaryValue({ label, value }: { label: string; value: number }) {
   return (
     <div className="w-12 text-center">
-      <p className="text-base font-bold tabular-nums text-slate-800">{value}</p>
-      <p className="text-[10px] font-semibold uppercase text-slate-400">{label}</p>
+      <p className="text-base font-bold tabular-nums text-content">{value}</p>
+      <p className="text-[10px] font-semibold uppercase text-content-subtle">{label}</p>
     </div>
   )
 }
@@ -300,20 +300,20 @@ function AttemptDetail({
 }) {
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/[0.45] sm:items-center"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Shootout attempt detail"
-        className="w-full rounded-t-lg bg-white p-4 sm:max-w-md sm:rounded-lg"
+        className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold text-slate-900">{attempt.outcomeLabel}</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="font-bold text-content">{attempt.outcomeLabel}</h2>
+            <p className="text-xs text-content-muted">
               {attempt.suddenDeath ? 'Sudden death' : `Round ${attempt.round}`}
               {attempt.advances ? ` - official kick ${attempt.kickNumber}` : ''}
             </p>
@@ -321,14 +321,14 @@ function AttemptDetail({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center text-slate-500"
+            className="grid h-9 w-9 place-items-center text-content-muted"
             aria-label="Close"
             title="Close"
           >
             <X size={20} />
           </button>
         </div>
-        <dl className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+        <dl className="mt-4 divide-y divide-line border-y border-line">
           <DetailRow
             label="Side"
             value={sideName(attempt.teamSide, trackedName, opponentName)}
@@ -340,7 +340,7 @@ function AttemptDetail({
             value={attempt.event ? String(attempt.event.revision) : 'Unavailable'}
           />
         </dl>
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-content-muted">
           Shootout corrections continue through the owned local tracker.
         </p>
       </div>
@@ -351,8 +351,8 @@ function AttemptDetail({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[6rem_1fr] gap-3 py-2 text-sm">
-      <dt className="font-semibold text-slate-500">{label}</dt>
-      <dd className="text-right font-bold text-slate-800">{value}</dd>
+      <dt className="font-semibold text-content-muted">{label}</dt>
+      <dd className="text-right font-bold text-content">{value}</dd>
     </div>
   )
 }
@@ -370,12 +370,12 @@ function OutcomeIcon({ outcome }: { outcome: SoccerShootoutAttemptReview['outcom
 }
 
 function outcomeTone(outcome: SoccerShootoutAttemptReview['outcome']): string {
-  if (outcome === 'scored') return 'border-emerald-300 bg-emerald-50 text-emerald-800'
-  if (outcome === 'saved') return 'border-blue-300 bg-blue-50 text-blue-800'
-  if (outcome === 'retake') return 'border-violet-300 bg-violet-50 text-violet-800'
-  if (outcome === 'forfeited') return 'border-red-300 bg-red-50 text-red-800'
-  if (outcome === 'woodwork') return 'border-amber-300 bg-amber-50 text-amber-800'
-  return 'border-slate-300 bg-white text-slate-700'
+  if (outcome === 'scored') return 'border-success-line bg-success text-success-content'
+  if (outcome === 'saved') return 'border-info-line bg-info text-info-content'
+  if (outcome === 'retake') return 'border-info-line bg-info text-info-content'
+  if (outcome === 'forfeited') return 'border-danger-line bg-danger text-danger-content'
+  if (outcome === 'woodwork') return 'border-warning-line bg-warning text-warning-content'
+  return 'border-line-strong bg-surface text-content'
 }
 
 function sideName(

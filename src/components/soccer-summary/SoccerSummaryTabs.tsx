@@ -34,7 +34,7 @@ export default function SoccerSummaryTabs({
   )
   return (
     <nav
-      className="sticky top-0 z-30 border-b border-slate-200 bg-white"
+      className="sticky top-0 z-30 border-b border-line bg-surface"
       aria-label="Summary sections"
     >
       <div className="mx-auto flex h-12 max-w-2xl items-stretch overflow-x-auto px-4">
@@ -45,8 +45,8 @@ export default function SoccerSummaryTabs({
             onClick={() => onChange(tab.id)}
             className={`shrink-0 border-b-2 px-3 text-sm font-bold ${
               activeTab === tab.id
-                ? 'border-emerald-700 text-emerald-800'
-                : 'border-transparent text-slate-500'
+                ? 'border-success-line text-success-content'
+                : 'border-transparent text-content-muted'
             }`}
             aria-current={activeTab === tab.id ? 'page' : undefined}
           >

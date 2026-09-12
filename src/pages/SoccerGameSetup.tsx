@@ -358,13 +358,13 @@ export default function SoccerGameSetup() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-emerald-700 text-white px-4 py-4">
+    <div className="min-h-screen bg-canvas">
+      <header className="bg-control text-content px-4 py-4">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(sportDashboardPath('soccer'))}
-            className="h-9 w-9 grid place-items-center rounded-md bg-white/15 hover:bg-white/20"
+            className="h-9 w-9 grid place-items-center rounded-md bg-surface hover:bg-surface"
             aria-label="Back to soccer dashboard"
             title="Back"
           >
@@ -372,19 +372,19 @@ export default function SoccerGameSetup() {
           </button>
           <div>
             <h1 className="text-lg font-bold">Soccer Match Setup</h1>
-            <p className="text-sm text-emerald-100">Match and competition rules</p>
+            <p className="text-sm text-success-content">Match and competition rules</p>
           </div>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 space-y-6">
         {(formError || teamsError || parkingError) && (
-          <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
             {formError ?? teamsError ?? parkingError}
           </div>
         )}
         {requestedCloudSourceBlocked && (
-          <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div role="status" className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
             {availability.releaseStage === 'unreleased'
               ? 'Cloud Soccer match creation is coming soon. This setup remains local.'
               : 'Enable Soccer in Settings to start from a cloud team. This setup remains local.'}
@@ -392,7 +392,7 @@ export default function SoccerGameSetup() {
         )}
 
         <section className="space-y-3">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Team Source</h2>
+          <h2 className="text-sm font-bold uppercase text-content-muted">Team Source</h2>
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="Team source">
             <ModeButton
               active={teamSource === 'local'}
@@ -412,7 +412,7 @@ export default function SoccerGameSetup() {
             />
           </div>
           {teamSource === 'cloud' ? (
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-content">
               Soccer team
               <select
                 value={selectedTeamId}
@@ -443,12 +443,12 @@ export default function SoccerGameSetup() {
           <TextField label="Team nickname" value={teamNickname} onChange={setTeamNickname} maxLength={100} />
         </section>
 
-        <section className="border-t border-slate-200 pt-5 space-y-3">
-          <h2 className="text-sm font-bold uppercase text-slate-500">Match</h2>
+        <section className="border-t border-line pt-5 space-y-3">
+          <h2 className="text-sm font-bold uppercase text-content-muted">Match</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             <TextField label="Opponent" value={opponentName} onChange={setOpponentName} required />
             <TextField label="Opponent nickname" value={opponentNickname} onChange={setOpponentNickname} maxLength={100} />
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-content">
               Date
               <input type="date" value={date} onChange={event => setDate(event.target.value)} className="input-field mt-1" />
             </label>
@@ -475,29 +475,29 @@ export default function SoccerGameSetup() {
           />
         </section>
 
-        <section className="border-t border-slate-200 pt-5 space-y-4">
+        <section className="border-t border-line pt-5 space-y-4">
           <div>
-            <h2 className="text-sm font-bold uppercase text-slate-500">Competition Rules</h2>
-            <p className="mt-1 text-xs text-slate-500" aria-live="polite">
+            <h2 className="text-sm font-bold uppercase text-content-muted">Competition Rules</h2>
+            <p className="mt-1 text-xs text-content-muted" aria-live="polite">
               {formatSourceSummary(effectiveHierarchy.sources)}
             </p>
           </div>
 
           {preservedSnapshot && (
-            <div role="status" className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <div role="status" className="rounded-md border border-info-line bg-info px-3 py-2 text-sm text-info-content">
               This setup's saved rule snapshot is retained. Editing a rule or choosing Inherit
               creates a new snapshot from current defaults.
             </div>
           )}
 
           {teamSource === 'cloud' && cloudPrerequisitesLoading && !cloudCapabilityError && (
-            <div role="status" className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <div role="status" className="rounded-md border border-info-line bg-info px-3 py-2 text-sm text-info-content">
               Checking cloud support and loading team defaults...
             </div>
           )}
 
           {teamSource === 'cloud' && cloudCapabilityError && (
-            <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 space-y-2">
+            <div role="alert" className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content space-y-2">
               <p>{cloudCapabilityError}</p>
               <div className="flex flex-wrap gap-3">
                 <button
@@ -528,7 +528,7 @@ export default function SoccerGameSetup() {
               teamSettings.status === 'cached' ||
               teamSettings.status === 'backend_update_required' ||
               teamSettings.status === 'error') && (
-                <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <div role="status" className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">
                   {teamSettings.error === SPORT_SETTINGS_STORAGE_ERROR
                     ? 'Team defaults loaded, but they could not be cached on this device. They remain available for this session.'
                     : teamSettings.error ??
@@ -539,7 +539,7 @@ export default function SoccerGameSetup() {
               )}
 
           {effectiveHierarchy.diagnostics.length > 0 && (
-            <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
               {effectiveHierarchy.diagnostics.map(item => item.message).join(' ')}
             </div>
           )}
@@ -559,7 +559,7 @@ export default function SoccerGameSetup() {
           disabled={teamSource === 'cloud' && (
             cloudPrerequisitesLoading || capabilityState.status !== 'ready'
           )}
-          className="btn-primary w-full disabled:opacity-50"
+          className="btn-primary w-full disabled:bg-control-disabled disabled:text-content-disabled"
         >
           {teamSource === 'cloud' && cloudPrerequisitesLoading
             ? 'Preparing Cloud Setup...'
@@ -584,8 +584,8 @@ function ModeButton({ active, onClick, icon, label, disabled = false }: {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`h-10 rounded-md border text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40 ${
-        active ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600'
+      className={`h-10 rounded-md border text-sm font-semibold flex items-center justify-center gap-2 disabled:bg-control-disabled disabled:text-content-disabled ${
+        active ? 'border-success-line bg-success text-success-content' : 'border-line bg-surface text-content-muted'
       }`}
     >
       {icon}{label}
@@ -601,7 +601,7 @@ function TextField({ label, value, onChange, required = false, maxLength }: {
   maxLength?: number
 }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label className="block text-sm font-medium text-content">
       {label}{required ? ' *' : ''}
       <input
         value={value}
@@ -621,10 +621,10 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
 }) {
   return (
     <fieldset>
-      <legend className="text-sm font-medium text-slate-700 mb-1">{label}</legend>
-      <div className="grid gap-1 rounded-md bg-slate-200 p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+      <legend className="text-sm font-medium text-content mb-1">{label}</legend>
+      <div className="grid gap-1 rounded-md bg-control p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
         {options.map(option => (
-          <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`min-h-9 rounded text-xs font-semibold px-2 ${value === option.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>
+          <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`min-h-9 rounded text-xs font-semibold px-2 ${value === option.value ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>
             {option.label}
           </button>
         ))}

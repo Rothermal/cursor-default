@@ -171,10 +171,10 @@ export default function SoccerTimeline({
   return (
     <div className={busy ? 'space-y-5 pointer-events-none opacity-60' : 'space-y-5'} aria-busy={busy}>
       {!inspection.complete && (
-        <section className="border border-red-200 bg-red-50 rounded-md px-3 py-3 space-y-2">
-          <h2 className="text-sm font-bold text-red-800">Match timeline needs correction</h2>
+        <section className="border border-danger-line bg-danger rounded-md px-3 py-3 space-y-2">
+          <h2 className="text-sm font-bold text-danger-content">Match timeline needs correction</h2>
           {inspection.diagnostics.map((item, index) => (
-            <p key={`${item.eventId ?? 'stream'}-${index}`} className="text-xs text-red-700">
+            <p key={`${item.eventId ?? 'stream'}-${index}`} className="text-xs text-danger-content">
               {item.message}
             </p>
           ))}
@@ -184,15 +184,15 @@ export default function SoccerTimeline({
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold uppercase text-slate-500">Timeline</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-sm font-bold uppercase text-content-muted">Timeline</h2>
+            <p className="text-xs text-content-subtle">
               {presentation === 'review' ? 'Oldest first by period' : 'Newest first'}
             </p>
           </div>
-          {allowAddEvent && !readOnly && <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-40"><Plus size={15} /> Add Event</button>}
+          {allowAddEvent && !readOnly && <button type="button" onClick={() => setAddOpen(true)} disabled={!inspection.complete} className="min-h-9 rounded-md bg-success px-3 text-xs font-bold text-content flex items-center gap-1.5 disabled:bg-control-disabled disabled:text-content-disabled"><Plus size={15} /> Add Event</button>}
         </div>
         {timelineError && (
-          <p role="alert" className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p role="alert" className="border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">
             {timelineError}
           </p>
         )}
@@ -212,7 +212,7 @@ export default function SoccerTimeline({
           </>
         ) : (
           <>
-            <label className="block text-xs font-bold uppercase text-slate-500">
+            <label className="block text-xs font-bold uppercase text-content-muted">
               Event family
               <select
                 value={liveFilter}
@@ -226,7 +226,7 @@ export default function SoccerTimeline({
                 ))}
               </select>
             </label>
-            <div className="divide-y divide-slate-200 border-y border-slate-200">
+            <div className="divide-y divide-line border-y border-line">
               {active.map(event => (
                 <HistoryRow
                   lineupReview={lineupReview}
@@ -237,7 +237,7 @@ export default function SoccerTimeline({
                   onDelete={readOnly ? undefined : () => setDeleting(event)}
                 />
               ))}
-              {active.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No events in this view.</p>}
+              {active.length === 0 && <p className="py-8 text-center text-sm text-content-muted">No events in this view.</p>}
             </div>
           </>
         )}
@@ -245,7 +245,7 @@ export default function SoccerTimeline({
 
       {removedCount > 0 && (
         <section>
-          <button type="button" onClick={() => setRemovedOpen(value => !value)} className="flex min-h-10 w-full items-center justify-between border-y border-slate-200 text-sm font-bold text-slate-600">
+          <button type="button" onClick={() => setRemovedOpen(value => !value)} className="flex min-h-10 w-full items-center justify-between border-y border-line text-sm font-bold text-content-muted">
             <span>Removed Events ({removedCount})</span>
             {removedOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
           </button>
@@ -259,7 +259,7 @@ export default function SoccerTimeline({
                 onRestore={restoreEvent}
               />
             ) : (
-              <div className="divide-y divide-slate-200 border-b border-slate-200 opacity-70">
+              <div className="divide-y divide-line border-b border-line opacity-70">
                 {deleted.map(event => (
                   <HistoryRow
                     lineupReview={lineupReview}
@@ -274,7 +274,7 @@ export default function SoccerTimeline({
                     }
                   />
                 ))}
-                {deleted.length === 0 && <p className="py-5 text-center text-xs text-slate-500">No removed events in this filter.</p>}
+                {deleted.length === 0 && <p className="py-5 text-center text-xs text-content-muted">No removed events in this filter.</p>}
               </div>
             )
           )}
@@ -300,9 +300,9 @@ export default function SoccerTimeline({
       )}
 
       {addOpen && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 sm:items-center" onClick={() => setAddOpen(false)}>
-          <div className="w-full rounded-t-lg bg-white p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-slate-800">Add Event</h2><button type="button" onClick={() => setAddOpen(false)} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></div>
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={() => setAddOpen(false)}>
+          <div className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-content">Add Event</h2><button type="button" onClick={() => setAddOpen(false)} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
             <div className="grid grid-cols-2 gap-2">
               {([
                 ['shot', 'Shot'],
@@ -310,7 +310,7 @@ export default function SoccerTimeline({
                 ['foul', 'Foul'],
                 ['card', 'Card'],
                 ['team_event', 'Restart'],
-              ] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => addEvent(kind)} className="min-h-12 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700">{label}</button>)}
+              ] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => addEvent(kind)} className="min-h-12 rounded-md border border-line bg-surface px-3 text-sm font-bold text-content">{label}</button>)}
             </div>
           </div>
         </div>
@@ -416,8 +416,8 @@ function TimelineFilterChips({
           onClick={() => onChange(item.id)}
           className={`min-h-9 shrink-0 border px-3 text-xs font-bold ${
             filter === item.id
-              ? 'border-emerald-700 bg-emerald-700 text-white'
-              : 'border-slate-300 bg-white text-slate-600'
+              ? 'border-success-line bg-accent text-accent-content'
+              : 'border-line-strong bg-surface text-content-muted'
           }`}
           aria-pressed={filter === item.id}
         >
@@ -447,7 +447,7 @@ function ReviewSections({
 }) {
   if (sections.length === 0) {
     return (
-      <p className="border-y border-slate-200 bg-white py-8 text-center text-sm text-slate-500">
+      <p className="border-y border-line bg-surface py-8 text-center text-sm text-content-muted">
         No {removed ? 'removed ' : ''}events in this view.
       </p>
     )
@@ -456,10 +456,10 @@ function ReviewSections({
     <div className={removed ? 'opacity-70' : ''}>
       {sections.map(section => (
         <section key={section.periodId}>
-          <h3 className="border-y border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-600">
+          <h3 className="border-y border-line bg-surface-muted px-3 py-2 text-xs font-bold uppercase text-content-muted">
             {section.label}
           </h3>
-          <div className="divide-y divide-slate-200 bg-white">
+          <div className="divide-y divide-line bg-surface">
             {section.rows.map(row => (
               <HistoryRow
                 lineupReview={lineupReview}
@@ -507,22 +507,22 @@ function HistoryRow({
     <div className="min-h-16 px-3 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-800">{eventTitle(event)}</p>
-          <p className={lineupDetail ? 'text-xs text-slate-500' : 'truncate text-xs text-slate-500'}>{lineupDetail ?? eventDetail(event)}</p>
-          {contextDetail && <p className="truncate text-[11px] text-slate-500">{contextDetail}</p>}
+          <p className="truncate text-sm font-semibold text-content">{eventTitle(event)}</p>
+          <p className={lineupDetail ? 'text-xs text-content-muted' : 'truncate text-xs text-content-muted'}>{lineupDetail ?? eventDetail(event)}</p>
+          {contextDetail && <p className="truncate text-[11px] text-content-muted">{contextDetail}</p>}
           {!review && (
-            <p className="mt-0.5 text-[11px] text-slate-400">
+            <p className="mt-0.5 text-[11px] text-content-subtle">
               {timeLabel} · rev {event.revision}
             </p>
           )}
           {review && (
-            <p className="mt-0.5 text-[11px] text-slate-400">{timeLabel}</p>
+            <p className="mt-0.5 text-[11px] text-content-subtle">{timeLabel}</p>
           )}
           {review && event.revision > 1 && (
             <button
               type="button"
               onClick={() => setMetadataOpen(value => !value)}
-              className="mt-1 text-[11px] font-bold text-emerald-700"
+              className="mt-1 text-[11px] font-bold text-success-content"
               aria-expanded={metadataOpen}
             >
               {metadataOpen ? 'Hide correction details' : 'Corrected'}
@@ -531,17 +531,17 @@ function HistoryRow({
         </div>
         <div className="flex shrink-0 gap-1">
           {deleted ? (
-            onRestore && <button type="button" onClick={onRestore} disabled={lineupLocked} className="disabled:opacity-40 grid h-9 w-9 place-items-center text-blue-600" aria-label={`Restore ${eventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
+            onRestore && <button type="button" onClick={onRestore} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-info-content" aria-label={`Restore ${eventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
           ) : (
             <>
-              {onEdit && <button type="button" onClick={onEdit} disabled={lineupLocked} className="disabled:opacity-40 grid h-9 w-9 place-items-center text-slate-600" aria-label={`Correct ${eventTitle(event)}`} title="Correct"><Pencil size={17} /></button>}
-              {onDelete && <button type="button" onClick={onDelete} disabled={lineupLocked} className="disabled:opacity-40 grid h-9 w-9 place-items-center text-red-600" aria-label={`Remove ${eventTitle(event)}`} title="Remove"><Trash2 size={17} /></button>}
+              {onEdit && <button type="button" onClick={onEdit} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-content-muted" aria-label={`Correct ${eventTitle(event)}`} title="Correct"><Pencil size={17} /></button>}
+              {onDelete && <button type="button" onClick={onDelete} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-danger-content" aria-label={`Remove ${eventTitle(event)}`} title="Remove"><Trash2 size={17} /></button>}
             </>
           )}
         </div>
       </div>
       {review && event.revision > 1 && metadataOpen && (
-        <div className="mt-2 border-l-2 border-emerald-200 pl-3 text-[11px] text-slate-500">
+        <div className="mt-2 border-l-2 border-success-line pl-3 text-[11px] text-content-muted">
           <p>Current revision {event.revision}</p>
           <p>Updated {formatEventTimestamp(event.updatedAt)}</p>
           {deleted && event.deletedAt && (
@@ -629,8 +629,8 @@ function SoccerEventCorrectionDialog({ event, state, presentation, onSave, onClo
           trackedSideLabel,
           opponentSideLabel
         )}
-        {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
-        <button type="button" onClick={save} className="w-full rounded-md bg-emerald-700 px-4 py-3 text-sm font-bold text-white">Save Correction</button>
+        {error && <p className="text-sm text-danger-content bg-danger border border-danger-line rounded-md px-3 py-2">{error}</p>}
+        <button type="button" onClick={save} className="w-full rounded-md bg-success px-4 py-3 text-sm font-bold text-content">Save Correction</button>
       </div>
     </Dialog>
   )
@@ -654,14 +654,14 @@ function renderEventEditor(
           {participants.map(participant => {
             const starter = payload.starters.find(item => item.participantId === participant.participantId)
             return (
-              <div key={participant.participantId} className="border border-slate-200 rounded-md px-3 py-2 space-y-2">
-                <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+              <div key={participant.participantId} className="border border-line rounded-md px-3 py-2 space-y-2">
+                <label className="flex items-center gap-3 text-sm font-medium text-content">
                   <input type="checkbox" checked={Boolean(starter)} onChange={change => {
                     const starters = change.target.checked
                       ? [...payload.starters, { participantId: participant.participantId, role: participant.role }]
                       : payload.starters.filter(item => item.participantId !== participant.participantId)
                     setPayload({ starters })
-                  }} className="h-4 w-4 accent-emerald-600" />
+                  }} className="bg-surface h-4 w-4 accent-accent" />
                   {participant.number ? `#${participant.number} ` : ''}{participant.displayName}
                 </label>
                 {starter && <RoleEditor role={starter.role} onChange={role => setPayload({ starters: payload.starters.map(item => item.participantId === participant.participantId ? { ...item, role } : item) })} />}
@@ -704,43 +704,43 @@ function renderEventEditor(
       return (
         <div className="space-y-3">
           {payload.changes.map((change, index) => (
-            <div key={index} className="border border-slate-200 rounded-md p-3 space-y-2">
+            <div key={index} className="border border-line rounded-md p-3 space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <ParticipantEditor label="Player out" value={change.playerOutParticipantId ?? ''} participants={participants} allowEmpty onChange={playerOutParticipantId => setPayload({ ...payload, changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, playerOutParticipantId: playerOutParticipantId || null } : item) })} />
                 <ParticipantEditor label="Player in" value={change.playerInParticipantId ?? ''} participants={participants} allowEmpty onChange={playerInParticipantId => setPayload({ ...payload, changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, playerInParticipantId: playerInParticipantId || null, playerInRole: playerInParticipantId ? item.playerInRole ?? defaultRole() : null } : item) })} />
               </div>
               {change.playerInParticipantId && <RoleEditor role={change.playerInRole ?? defaultRole()} onChange={playerInRole => setPayload({ ...payload, changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, playerInRole } : item) })} />}
-              {payload.changes.length > 1 && <button type="button" onClick={() => setPayload({ ...payload, changes: payload.changes.filter((_, itemIndex) => itemIndex !== index) })} className="text-xs font-semibold text-red-600">Remove change</button>}
+              {payload.changes.length > 1 && <button type="button" onClick={() => setPayload({ ...payload, changes: payload.changes.filter((_, itemIndex) => itemIndex !== index) })} className="text-xs font-semibold text-danger-content">Remove change</button>}
             </div>
           ))}
           <button type="button" onClick={() => setPayload({ ...payload, changes: [...payload.changes, { playerOutParticipantId: null, playerInParticipantId: null, playerInRole: null }] })} className="btn-secondary w-full">Add change</button>
-          <label className="flex items-center justify-between text-sm font-medium text-slate-700">Halftime window<input type="checkbox" checked={payload.halftime} onChange={change => setPayload({ ...payload, halftime: change.target.checked })} className="h-5 w-5 accent-emerald-600" /></label>
+          <label className="flex items-center justify-between text-sm font-medium text-content">Halftime window<input type="checkbox" checked={payload.halftime} onChange={change => setPayload({ ...payload, halftime: change.target.checked })} className="bg-surface h-5 w-5 accent-accent" /></label>
         </div>
       )
     }
     case 'soccer.role_changed': {
       const payload = event.payload
-      return <div className="space-y-3">{payload.changes.map((change, index) => <div key={index} className="border border-slate-200 rounded-md p-3 space-y-2"><ParticipantEditor label="Participant" value={change.participantId} participants={participants} onChange={participantId => setPayload({ changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, participantId } : item) })} /><RoleEditor role={change.role} onChange={role => setPayload({ changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, role } : item) })} /></div>)}</div>
+      return <div className="space-y-3">{payload.changes.map((change, index) => <div key={index} className="border border-line rounded-md p-3 space-y-2"><ParticipantEditor label="Participant" value={change.participantId} participants={participants} onChange={participantId => setPayload({ changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, participantId } : item) })} /><RoleEditor role={change.role} onChange={role => setPayload({ changes: payload.changes.map((item, itemIndex) => itemIndex === index ? { ...item, role } : item) })} /></div>)}</div>
     }
     case 'soccer.attacking_direction_changed': {
       const payload = event.payload
-      return <label className="block text-sm font-medium text-slate-700">Direction<select value={payload.direction} onChange={change => setPayload({ direction: change.target.value as 'left_to_right' | 'right_to_left' })} className="input-field mt-1"><option value="left_to_right">Left to right</option><option value="right_to_left">Right to left</option></select></label>
+      return <label className="block text-sm font-medium text-content">Direction<select value={payload.direction} onChange={change => setPayload({ direction: change.target.value as 'left_to_right' | 'right_to_left' })} className="input-field mt-1"><option value="left_to_right">Left to right</option><option value="right_to_left">Right to left</option></select></label>
     }
     case 'soccer.match_roster_added': {
       const payload = event.payload
-      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">Name<input value={payload.participant.displayName} onChange={change => setPayload({ ...payload, participant: { ...payload.participant, displayName: change.target.value } })} className="input-field mt-1" /></label><label className="block text-sm font-medium text-slate-700">Number<input value={payload.participant.number ?? ''} onChange={change => setPayload({ ...payload, participant: { ...payload.participant, number: change.target.value || null } })} className="input-field mt-1" /></label><RoleEditor role={payload.participant.initialRole} onChange={initialRole => setPayload({ ...payload, participant: { ...payload.participant, initialRole } })} /><label className="block text-sm font-medium text-slate-700">Destination<select value={payload.destination} onChange={change => setPayload({ ...payload, destination: change.target.value as 'bench' | 'on_field' })} className="input-field mt-1"><option value="bench">Bench</option><option value="on_field">On field</option></select></label></div>
+      return <div className="space-y-3"><label className="block text-sm font-medium text-content">Name<input value={payload.participant.displayName} onChange={change => setPayload({ ...payload, participant: { ...payload.participant, displayName: change.target.value } })} className="input-field mt-1" /></label><label className="block text-sm font-medium text-content">Number<input value={payload.participant.number ?? ''} onChange={change => setPayload({ ...payload, participant: { ...payload.participant, number: change.target.value || null } })} className="input-field mt-1" /></label><RoleEditor role={payload.participant.initialRole} onChange={initialRole => setPayload({ ...payload, participant: { ...payload.participant, initialRole } })} /><label className="block text-sm font-medium text-content">Destination<select value={payload.destination} onChange={change => setPayload({ ...payload, destination: change.target.value as 'bench' | 'on_field' })} className="input-field mt-1"><option value="bench">Bench</option><option value="on_field">On field</option></select></label></div>
     }
     case 'soccer.participant_resolved': {
       const payload = event.payload
-      return <div className="space-y-3"><ParticipantEditor label="Anonymous participant" value={payload.participantId} participants={participants.filter(item => item.participantId === payload.participantId || !item.participantId)} onChange={participantId => setPayload({ ...payload, participantId })} /><label className="block text-sm font-medium text-slate-700">Roster player<select value={payload.playerId} onChange={change => { const player = state.players.find(item => item.id === change.target.value); if (player) setPayload({ ...payload, playerId: player.id, displayName: player.name, number: player.number || null }) }} className="input-field mt-1">{state.players.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label></div>
+      return <div className="space-y-3"><ParticipantEditor label="Anonymous participant" value={payload.participantId} participants={participants.filter(item => item.participantId === payload.participantId || !item.participantId)} onChange={participantId => setPayload({ ...payload, participantId })} /><label className="block text-sm font-medium text-content">Roster player<select value={payload.playerId} onChange={change => { const player = state.players.find(item => item.id === change.target.value); if (player) setPayload({ ...payload, playerId: player.id, displayName: player.name, number: player.number || null }) }} className="input-field mt-1">{state.players.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label></div>
     }
     case 'soccer.match_ended': {
       const payload = event.payload
-      return <label className="block text-sm font-medium text-slate-700">Reason<select value={payload.reason} onChange={change => setPayload({ reason: change.target.value as 'completed' | 'suspended' | 'abandoned' })} className="input-field mt-1"><option value="completed">Completed</option><option value="suspended">Suspended</option><option value="abandoned">Abandoned</option></select></label>
+      return <label className="block text-sm font-medium text-content">Reason<select value={payload.reason} onChange={change => setPayload({ reason: change.target.value as 'completed' | 'suspended' | 'abandoned' })} className="input-field mt-1"><option value="completed">Completed</option><option value="suspended">Suspended</option><option value="abandoned">Abandoned</option></select></label>
     }
     case 'soccer.match_reopened': {
       const payload = event.payload
-      return <label className="block text-sm font-medium text-slate-700">Reason<input value={payload.reason ?? ''} onChange={change => setPayload({ reason: change.target.value || null })} className="input-field mt-1" /></label>
+      return <label className="block text-sm font-medium text-content">Reason<input value={payload.reason ?? ''} onChange={change => setPayload({ reason: change.target.value || null })} className="input-field mt-1" /></label>
     }
     case 'soccer.shootout_started': {
       const payload = event.payload
@@ -749,48 +749,48 @@ function renderEventEditor(
         participant.role.group === 'goalkeeper' &&
         payload.trackedEligibleParticipantIds.includes(participant.participantId)
       )
-      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">First side<select value={payload.firstKickingSide} onChange={change => setPayload({ ...payload, firstKickingSide: change.target.value as 'tracked' | 'opponent' })} className="input-field mt-1"><option value="tracked">{trackedSideLabel}</option><option value="opponent">{opponentSideLabel}</option></select></label><NumberEditor label="Opponent eligible" value={payload.opponentEligibleCount} onChange={opponentEligibleCount => setPayload({ ...payload, opponentEligibleCount })} /><div className="divide-y divide-slate-200 border-y border-slate-200">{accounted.map(id => { const participant = participants.find(item => item.participantId === id); const checked = payload.trackedEligibleParticipantIds.includes(id); return <label key={id} className="flex min-h-10 items-center gap-3 text-sm text-slate-700"><input type="checkbox" checked={checked} onChange={() => setPayload({ ...payload, trackedEligibleParticipantIds: checked ? payload.trackedEligibleParticipantIds.filter(item => item !== id) : [...payload.trackedEligibleParticipantIds, id], trackedExcludedParticipantIds: checked ? [...payload.trackedExcludedParticipantIds, id] : payload.trackedExcludedParticipantIds.filter(item => item !== id) })} className="h-5 w-5 accent-emerald-700" />{participant?.displayName ?? id}</label> })}</div><ParticipantEditor label="Tracked goalkeeper" value={payload.trackedGoalkeeperParticipantId} participants={eligibleGoalkeepers} onChange={trackedGoalkeeperParticipantId => setPayload({ ...payload, trackedGoalkeeperParticipantId })} /></div>
+      return <div className="space-y-3"><label className="block text-sm font-medium text-content">First side<select value={payload.firstKickingSide} onChange={change => setPayload({ ...payload, firstKickingSide: change.target.value as 'tracked' | 'opponent' })} className="input-field mt-1"><option value="tracked">{trackedSideLabel}</option><option value="opponent">{opponentSideLabel}</option></select></label><NumberEditor label="Opponent eligible" value={payload.opponentEligibleCount} onChange={opponentEligibleCount => setPayload({ ...payload, opponentEligibleCount })} /><div className="divide-y divide-line border-y border-line">{accounted.map(id => { const participant = participants.find(item => item.participantId === id); const checked = payload.trackedEligibleParticipantIds.includes(id); return <label key={id} className="flex min-h-10 items-center gap-3 text-sm text-content"><input type="checkbox" checked={checked} onChange={() => setPayload({ ...payload, trackedEligibleParticipantIds: checked ? payload.trackedEligibleParticipantIds.filter(item => item !== id) : [...payload.trackedEligibleParticipantIds, id], trackedExcludedParticipantIds: checked ? [...payload.trackedExcludedParticipantIds, id] : payload.trackedExcludedParticipantIds.filter(item => item !== id) })} className="bg-surface h-5 w-5 accent-accent" />{participant?.displayName ?? id}</label> })}</div><ParticipantEditor label="Tracked goalkeeper" value={payload.trackedGoalkeeperParticipantId} participants={eligibleGoalkeepers} onChange={trackedGoalkeeperParticipantId => setPayload({ ...payload, trackedGoalkeeperParticipantId })} /></div>
     }
     case 'soccer.shootout_eligibility_changed': {
       const payload = event.payload
       const accounted = [...new Set([...payload.trackedEligibleParticipantIds, ...payload.trackedExcludedParticipantIds])]
-      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">Reason<select value={payload.reason} onChange={change => setPayload({ ...payload, reason: change.target.value as typeof payload.reason })} className="input-field mt-1"><option value="equalization">Equalization</option><option value="sent_off">Sent off</option><option value="unable_to_continue">Unable to continue</option><option value="goalkeeper_replacement">Goalkeeper replacement</option></select></label><NumberEditor label="Opponent eligible" value={payload.opponentEligibleCount} onChange={opponentEligibleCount => setPayload({ ...payload, opponentEligibleCount })} /><div className="divide-y divide-slate-200 border-y border-slate-200">{accounted.map(id => { const participant = participants.find(item => item.participantId === id); const checked = payload.trackedEligibleParticipantIds.includes(id); return <label key={id} className="flex min-h-10 items-center gap-3 text-sm text-slate-700"><input type="checkbox" checked={checked} onChange={() => setPayload({ ...payload, trackedEligibleParticipantIds: checked ? payload.trackedEligibleParticipantIds.filter(item => item !== id) : [...payload.trackedEligibleParticipantIds, id], trackedExcludedParticipantIds: checked ? [...payload.trackedExcludedParticipantIds, id] : payload.trackedExcludedParticipantIds.filter(item => item !== id) })} className="h-5 w-5 accent-emerald-700" />{participant?.displayName ?? id}</label> })}</div></div>
+      return <div className="space-y-3"><label className="block text-sm font-medium text-content">Reason<select value={payload.reason} onChange={change => setPayload({ ...payload, reason: change.target.value as typeof payload.reason })} className="input-field mt-1"><option value="equalization">Equalization</option><option value="sent_off">Sent off</option><option value="unable_to_continue">Unable to continue</option><option value="goalkeeper_replacement">Goalkeeper replacement</option></select></label><NumberEditor label="Opponent eligible" value={payload.opponentEligibleCount} onChange={opponentEligibleCount => setPayload({ ...payload, opponentEligibleCount })} /><div className="divide-y divide-line border-y border-line">{accounted.map(id => { const participant = participants.find(item => item.participantId === id); const checked = payload.trackedEligibleParticipantIds.includes(id); return <label key={id} className="flex min-h-10 items-center gap-3 text-sm text-content"><input type="checkbox" checked={checked} onChange={() => setPayload({ ...payload, trackedEligibleParticipantIds: checked ? payload.trackedEligibleParticipantIds.filter(item => item !== id) : [...payload.trackedEligibleParticipantIds, id], trackedExcludedParticipantIds: checked ? [...payload.trackedExcludedParticipantIds, id] : payload.trackedExcludedParticipantIds.filter(item => item !== id) })} className="bg-surface h-5 w-5 accent-accent" />{participant?.displayName ?? id}</label> })}</div></div>
     }
     case 'soccer.shootout_goalkeeper_changed': {
       const payload = event.payload
       const incoming = event.actors.find(actor => actor.role === 'goalkeeper_in')
-      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">Reason<select value={payload.reason} onChange={change => setPayload({ reason: change.target.value as typeof payload.reason })} className="input-field mt-1"><option value="tactical">Tactical</option><option value="unable_to_continue">Unable to continue</option><option value="sent_off">Sent off</option></select></label><label className="block text-sm font-medium text-slate-700">Incoming goalkeeper<input value={incoming?.label ?? ''} onChange={change => setEvent(current => ({ ...current, actors: current.actors.map(actor => actor.role === 'goalkeeper_in' ? { ...actor, label: change.target.value } : actor) } as SoccerMatchEvent))} className="input-field mt-1" /></label></div>
+      return <div className="space-y-3"><label className="block text-sm font-medium text-content">Reason<select value={payload.reason} onChange={change => setPayload({ reason: change.target.value as typeof payload.reason })} className="input-field mt-1"><option value="tactical">Tactical</option><option value="unable_to_continue">Unable to continue</option><option value="sent_off">Sent off</option></select></label><label className="block text-sm font-medium text-content">Incoming goalkeeper<input value={incoming?.label ?? ''} onChange={change => setEvent(current => ({ ...current, actors: current.actors.map(actor => actor.role === 'goalkeeper_in' ? { ...actor, label: change.target.value } : actor) } as SoccerMatchEvent))} className="input-field mt-1" /></label></div>
     }
     case 'soccer.shootout_kick': {
       const payload = event.payload
-      return <div className="space-y-3"><label className="block text-sm font-medium text-slate-700">Outcome<select value={payload.outcome} onChange={change => setPayload({ ...payload, outcome: change.target.value as typeof payload.outcome })} className="input-field mt-1"><option value="scored">Scored</option><option value="saved">Saved</option><option value="missed">Missed</option><option value="woodwork">Woodwork</option><option value="retake">Retake</option><option value="forfeited">Forfeited</option></select></label>{payload.anonymousKickerSlot !== null && <NumberEditor label="Anonymous slot" value={payload.anonymousKickerSlot} onChange={anonymousKickerSlot => setPayload({ ...payload, anonymousKickerSlot })} />}</div>
+      return <div className="space-y-3"><label className="block text-sm font-medium text-content">Outcome<select value={payload.outcome} onChange={change => setPayload({ ...payload, outcome: change.target.value as typeof payload.outcome })} className="input-field mt-1"><option value="scored">Scored</option><option value="saved">Saved</option><option value="missed">Missed</option><option value="woodwork">Woodwork</option><option value="retake">Retake</option><option value="forfeited">Forfeited</option></select></label>{payload.anonymousKickerSlot !== null && <NumberEditor label="Anonymous slot" value={payload.anonymousKickerSlot} onChange={anonymousKickerSlot => setPayload({ ...payload, anonymousKickerSlot })} />}</div>
     }
     case 'soccer.card': {
       const payload = event.payload
-      return <div className="space-y-3"><div><p className="text-sm font-medium text-slate-700">Sanction</p><p className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm capitalize text-slate-700">{payload.sanction.replace(/_/g, ' ')}</p><p className="mt-1 text-xs text-slate-500">Remove and record a replacement card to change its sanction.</p></div><label className="block text-sm font-medium text-slate-700">Note<input value={payload.note ?? ''} onChange={change => setPayload({ ...payload, note: change.target.value || null })} className="input-field mt-1" /></label></div>
+      return <div className="space-y-3"><div><p className="text-sm font-medium text-content">Sanction</p><p className="mt-1 rounded-md border border-line bg-canvas px-3 py-2 text-sm capitalize text-content">{payload.sanction.replace(/_/g, ' ')}</p><p className="mt-1 text-xs text-content-muted">Remove and record a replacement card to change its sanction.</p></div><label className="block text-sm font-medium text-content">Note<input value={payload.note ?? ''} onChange={change => setPayload({ ...payload, note: change.target.value || null })} className="input-field mt-1" /></label></div>
     }
   }
 }
 
 function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
-  return <div className="fixed inset-0 z-50 bg-black/45 flex items-end sm:items-center justify-center" onClick={onClose}><div role="dialog" aria-modal="true" aria-label={title} className="bg-white w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-lg sm:rounded-lg shadow-xl" onClick={event => event.stopPropagation()}><header className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 z-10"><h2 className="font-bold text-slate-800 flex-1">{title}</h2><button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button></header><div className="p-4">{children}</div></div></div>
+  return <div className="fixed inset-0 z-50 bg-overlay/[0.45] flex items-end sm:items-center justify-center" onClick={onClose}><div role="dialog" aria-modal="true" aria-label={title} className="bg-surface w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-lg sm:rounded-lg shadow-xl" onClick={event => event.stopPropagation()}><header className="sticky top-0 bg-surface border-b border-line px-4 py-3 flex items-center gap-3 z-10"><h2 className="font-bold text-content flex-1">{title}</h2><button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></header><div className="p-4">{children}</div></div></div>
 }
 
 function RoleEditor({ role, onChange }: { role: SoccerRole; onChange: (role: SoccerRole) => void }) {
-  return <div className="grid grid-cols-2 gap-2"><label className="block text-xs font-medium text-slate-600">Role<select value={role.group} onChange={change => { const group = change.target.value as SoccerRoleGroup; onChange({ group, label: group === 'custom' ? role.label ?? 'Custom' : null }) }} className="input-field mt-1 py-2 text-sm">{ROLE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{role.group === 'custom' ? <label className="block text-xs font-medium text-slate-600">Label<input value={role.label ?? ''} onChange={change => onChange({ group: 'custom', label: change.target.value })} className="input-field mt-1 py-2 text-sm" /></label> : <span />}</div>
+  return <div className="grid grid-cols-2 gap-2"><label className="block text-xs font-medium text-content-muted">Role<select value={role.group} onChange={change => { const group = change.target.value as SoccerRoleGroup; onChange({ group, label: group === 'custom' ? role.label ?? 'Custom' : null }) }} className="input-field mt-1 py-2 text-sm">{ROLE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{role.group === 'custom' ? <label className="block text-xs font-medium text-content-muted">Label<input value={role.label ?? ''} onChange={change => onChange({ group: 'custom', label: change.target.value })} className="input-field mt-1 py-2 text-sm" /></label> : <span />}</div>
 }
 
 function ParticipantEditor({ label, value, participants, allowEmpty = false, onChange }: { label: string; value: string; participants: Array<{ participantId: string; displayName: string; number: string | null }>; allowEmpty?: boolean; onChange: (value: string) => void }) {
-  return <label className="block text-xs font-medium text-slate-600">{label}<select value={value} onChange={change => onChange(change.target.value)} className="input-field mt-1 py-2 text-sm">{allowEmpty && <option value="">None</option>}{participants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participant.number ? `#${participant.number} ` : ''}{participant.displayName}</option>)}</select></label>
+  return <label className="block text-xs font-medium text-content-muted">{label}<select value={value} onChange={change => onChange(change.target.value)} className="input-field mt-1 py-2 text-sm">{allowEmpty && <option value="">None</option>}{participants.map(participant => <option key={participant.participantId} value={participant.participantId}>{participant.number ? `#${participant.number} ` : ''}{participant.displayName}</option>)}</select></label>
 }
 
 function SegmentEditor({ value, segments, onChange }: { value: string; segments: Array<{ id: string; label: string }>; onChange: (value: string) => void }) {
-  return <label className="block text-sm font-medium text-slate-700">Period<select value={value} onChange={change => onChange(change.target.value)} className="input-field mt-1">{segments.map(segment => <option key={segment.id} value={segment.id}>{segment.label}</option>)}</select></label>
+  return <label className="block text-sm font-medium text-content">Period<select value={value} onChange={change => onChange(change.target.value)} className="input-field mt-1">{segments.map(segment => <option key={segment.id} value={segment.id}>{segment.label}</option>)}</select></label>
 }
 
 function TimeEditor({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   const [draft, setDraft] = useState(formatSoccerInputTime(value))
-  return <label className="block text-xs font-medium text-slate-600">{label}<input value={draft} onChange={change => setDraft(change.target.value)} onBlur={() => { const parsed = parseSoccerInputTime(draft); if (parsed !== null) onChange(parsed); else setDraft(formatSoccerInputTime(value)) }} className="input-field mt-1 text-center tabular-nums" inputMode="numeric" /></label>
+  return <label className="block text-xs font-medium text-content-muted">{label}<input value={draft} onChange={change => setDraft(change.target.value)} onBlur={() => { const parsed = parseSoccerInputTime(draft); if (parsed !== null) onChange(parsed); else setDraft(formatSoccerInputTime(value)) }} className="input-field mt-1 text-center tabular-nums" inputMode="numeric" /></label>
 }
 
 function RulesEditor({ rules, onChange }: { rules: SoccerMatchRules; onChange: (rules: SoccerMatchRules) => void }) {
@@ -798,15 +798,15 @@ function RulesEditor({ rules, onChange }: { rules: SoccerMatchRules; onChange: (
 }
 
 function NumberEditor({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return <label className="block text-xs font-medium text-slate-600">{label}<input type="number" min={1} value={value} onChange={change => onChange(Math.max(1, Number(change.target.value) || 1))} className="input-field mt-1 px-2" /></label>
+  return <label className="block text-xs font-medium text-content-muted">{label}<input type="number" min={1} value={value} onChange={change => onChange(Math.max(1, Number(change.target.value) || 1))} className="input-field mt-1 px-2" /></label>
 }
 
 function NullableEditor({ label, value, onChange }: { label: string; value: number | null; onChange: (value: number | null) => void }) {
-  return <label className="block text-xs font-medium text-slate-600">{label}<input type="number" min={0} value={value ?? ''} placeholder="Any" onChange={change => onChange(change.target.value === '' ? null : Math.max(0, Number(change.target.value) || 0))} className="input-field mt-1 px-2" /></label>
+  return <label className="block text-xs font-medium text-content-muted">{label}<input type="number" min={0} value={value ?? ''} placeholder="Any" onChange={change => onChange(change.target.value === '' ? null : Math.max(0, Number(change.target.value) || 0))} className="input-field mt-1 px-2" /></label>
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <label className="flex items-center justify-between text-sm font-medium text-slate-700 min-h-10">{label}<input type="checkbox" checked={checked} onChange={change => onChange(change.target.checked)} className="h-5 w-5 accent-emerald-600" /></label>
+  return <label className="flex items-center justify-between text-sm font-medium text-content min-h-10">{label}<input type="checkbox" checked={checked} onChange={change => onChange(change.target.checked)} className="bg-surface h-5 w-5 accent-accent" /></label>
 }
 
 function eventTitle(event: GameEvent): string {

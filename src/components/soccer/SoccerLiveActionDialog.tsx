@@ -132,12 +132,12 @@ function ClockCorrectionForm({ state, options, onApply }: FormProps) {
   }
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium text-slate-700">
+      <label className="block text-sm font-medium text-content">
         Corrected match time
         <input value={value} onChange={event => setValue(event.target.value)} inputMode="numeric" placeholder="MM:SS" className="input-field mt-1 text-center text-xl tabular-nums" />
       </label>
       {projection.currentRules.clockDisplay === 'per_period' && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-content-muted">
           Enter cumulative match time. The tracker currently displays {displayValue?.primary ?? '00:00'} for this period.
         </p>
       )}
@@ -185,13 +185,13 @@ function ParticipantForm({ state, options, onApply }: FormProps) {
   return (
     <div className="space-y-4">
       {availablePlayers.length > 0 && (
-        <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+        <div className="grid grid-cols-2 rounded-md bg-control p-1">
           <ModeButton active={source === 'roster'} label="Roster player" onClick={() => setSource('roster')} />
           <ModeButton active={source === 'anonymous'} label="Game only" onClick={() => setSource('anonymous')} />
         </div>
       )}
       {source === 'roster' ? (
-        <label className="block text-sm font-medium text-slate-700">
+        <label className="block text-sm font-medium text-content">
           Player
           <select value={playerId} onChange={event => setPlayerId(event.target.value)} className="input-field mt-1">
             {availablePlayers.map(player => <option key={player.id} value={player.id}>{player.number ? `#${player.number} ` : ''}{player.name}</option>)}
@@ -199,11 +199,11 @@ function ParticipantForm({ state, options, onApply }: FormProps) {
         </label>
       ) : (
         <div className="grid grid-cols-[5rem_1fr] gap-2">
-          <label className="block text-sm font-medium text-slate-700">Number<input value={number} onChange={event => setNumber(event.target.value)} className="input-field mt-1" /></label>
-          <label className="block text-sm font-medium text-slate-700">Name<input value={name} onChange={event => setName(event.target.value)} className="input-field mt-1" /></label>
+          <label className="block text-sm font-medium text-content">Number<input value={number} onChange={event => setNumber(event.target.value)} className="input-field mt-1" /></label>
+          <label className="block text-sm font-medium text-content">Name<input value={name} onChange={event => setName(event.target.value)} className="input-field mt-1" /></label>
         </div>
       )}
-      <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+      <div className="grid grid-cols-2 rounded-md bg-control p-1">
         <ModeButton active={destination === 'bench'} label="Add to bench" onClick={() => setDestination('bench')} />
         <ModeButton active={destination === 'on_field'} label="Enter field" onClick={() => setDestination('on_field')} />
       </div>
@@ -278,7 +278,7 @@ function ResolveParticipantForm({ state, options, initialParticipantId, onApply 
   return (
     <div className="space-y-4">
       <ParticipantSelect label="Game-only participant" value={participantId} participants={anonymous} onChange={setParticipantId} />
-      <label className="block text-sm font-medium text-slate-700">
+      <label className="block text-sm font-medium text-content">
         Roster player
         <select value={playerId} onChange={event => setPlayerId(event.target.value)} className="input-field mt-1">
           {players.map(player => <option key={player.id} value={player.id}>{player.number ? `#${player.number} ` : ''}{player.name}</option>)}
@@ -300,15 +300,15 @@ function EndMatchForm({ state, options, onApply }: FormProps) {
   return (
     <div className="space-y-4">
       <fieldset>
-        <legend className="text-sm font-medium text-slate-700 mb-2">Result</legend>
+        <legend className="text-sm font-medium text-content mb-2">Result</legend>
         <div className="space-y-2">
           {([
             ['completed', 'Completed'],
             ['suspended', 'Suspended'],
             ['abandoned', 'Abandoned'],
           ] as const).map(([value, label]) => (
-            <label key={value} className={`flex items-center gap-3 border border-slate-200 rounded-md px-3 py-3 text-sm font-medium text-slate-700 ${(value === 'completed' && !canComplete) || (value === 'suspended' && !canSuspend) ? 'opacity-45' : ''}`}>
-              <input type="radio" name="end-reason" checked={reason === value} disabled={(value === 'completed' && !canComplete) || (value === 'suspended' && !canSuspend)} onChange={() => setReason(value)} className="h-4 w-4 accent-emerald-600" />
+            <label key={value} className={`flex items-center gap-3 border border-line rounded-md px-3 py-3 text-sm font-medium text-content ${(value === 'completed' && !canComplete) || (value === 'suspended' && !canSuspend) ? 'opacity-45' : ''}`}>
+              <input type="radio" name="end-reason" checked={reason === value} disabled={(value === 'completed' && !canComplete) || (value === 'suspended' && !canSuspend)} onChange={() => setReason(value)} className="bg-surface h-4 w-4 accent-accent" />
               {label}
             </label>
           ))}
@@ -321,11 +321,11 @@ function EndMatchForm({ state, options, onApply }: FormProps) {
 
 function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} className="bg-white w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-lg sm:rounded-lg shadow-xl" onClick={event => event.stopPropagation()}>
-        <header className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 z-10">
-          <h2 className="font-bold text-slate-800 flex-1">{title}</h2>
-          <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button>
+    <div className="fixed inset-0 z-50 bg-overlay/[0.45] flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={title} className="bg-surface w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-lg sm:rounded-lg shadow-xl" onClick={event => event.stopPropagation()}>
+        <header className="sticky top-0 bg-surface border-b border-line px-4 py-3 flex items-center gap-3 z-10">
+          <h2 className="font-bold text-content flex-1">{title}</h2>
+          <button type="button" onClick={onClose} className="h-9 w-9 grid place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button>
         </header>
         <div className="p-4">{children}</div>
       </div>
@@ -353,7 +353,7 @@ function ParticipantSelect({ label, value, participants, emptyLabel, onChange }:
   onChange: (value: string) => void
 }) {
   return (
-    <label className="block text-xs font-medium text-slate-600">
+    <label className="block text-xs font-medium text-content-muted">
       {label}
       <select value={value} onChange={event => onChange(event.target.value)} className="input-field mt-1 py-2 px-2 text-sm">
         {emptyLabel && <option value="">{emptyLabel}</option>}
@@ -370,7 +370,7 @@ function ParticipantSelect({ label, value, participants, emptyLabel, onChange }:
 function RoleFields({ role, onChange }: { role: SoccerRole; onChange: (role: SoccerRole) => void }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <label className="block text-xs font-medium text-slate-600">
+      <label className="block text-xs font-medium text-content-muted">
         Role
         <select value={role.group} onChange={event => {
           const group = event.target.value as SoccerRoleGroup
@@ -380,7 +380,7 @@ function RoleFields({ role, onChange }: { role: SoccerRole; onChange: (role: Soc
         </select>
       </label>
       {role.group === 'custom' ? (
-        <label className="block text-xs font-medium text-slate-600">
+        <label className="block text-xs font-medium text-content-muted">
           Label
           <input value={role.label ?? ''} onChange={event => onChange({ group: 'custom', label: event.target.value })} className="input-field mt-1 py-2 px-2 text-sm" />
         </label>
@@ -391,27 +391,27 @@ function RoleFields({ role, onChange }: { role: SoccerRole; onChange: (role: Soc
 
 
 function SubmitButton({ label, onClick, danger = false }: { label: string; onClick: () => void; danger?: boolean }) {
-  return <button type="button" onClick={onClick} className={`w-full rounded-md px-4 py-3 text-sm font-bold text-white ${danger ? 'bg-red-600' : 'bg-emerald-700'}`}>{label}</button>
+  return <button type="button" onClick={onClick} className={`w-full rounded-md px-4 py-3 text-sm font-bold text-content ${danger ? 'bg-danger' : 'bg-success'}`}>{label}</button>
 }
 
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
+  return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-semibold ${active ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>{label}</button>
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <label className="flex items-center justify-between text-sm font-medium text-slate-700 min-h-10">{label}<input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} className="h-5 w-5 accent-emerald-600" /></label>
+  return <label className="flex items-center justify-between text-sm font-medium text-content min-h-10">{label}<input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} className="bg-surface h-5 w-5 accent-accent" /></label>
 }
 
 function NumberField({ label, value, min, onChange }: { label: string; value: number; min: number; onChange: (value: number) => void }) {
-  return <label className="block text-xs font-medium text-slate-600">{label}<input type="number" min={min} value={value} onChange={event => onChange(Math.max(min, Number(event.target.value) || min))} className="input-field mt-1 px-2" /></label>
+  return <label className="block text-xs font-medium text-content-muted">{label}<input type="number" min={min} value={value} onChange={event => onChange(Math.max(min, Number(event.target.value) || min))} className="input-field mt-1 px-2" /></label>
 }
 
 function NullableField({ label, value, onChange }: { label: string; value: number | null; onChange: (value: number | null) => void }) {
-  return <label className="block text-xs font-medium text-slate-600">{label}<input type="number" min={0} value={value ?? ''} placeholder="Any" onChange={event => onChange(event.target.value === '' ? null : Math.max(0, Number(event.target.value) || 0))} className="input-field mt-1 px-2" /></label>
+  return <label className="block text-xs font-medium text-content-muted">{label}<input type="number" min={0} value={value ?? ''} placeholder="Any" onChange={event => onChange(event.target.value === '' ? null : Math.max(0, Number(event.target.value) || 0))} className="input-field mt-1 px-2" /></label>
 }
 
 function FormError({ message }: { message: string | null }) {
-  return message ? <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{message}</p> : null
+  return message ? <p className="text-sm text-danger-content bg-danger border border-danger-line rounded-md px-3 py-2">{message}</p> : null
 }
 
 function defaultRole(): SoccerRole {

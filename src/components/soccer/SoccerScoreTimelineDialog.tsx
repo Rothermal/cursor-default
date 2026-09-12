@@ -58,14 +58,14 @@ export default function SoccerScoreTimelineDialog({
 
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-labelledby="soccer-score-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-white sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
-        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.5] sm:items-center" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-labelledby="soccer-score-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
+        <header className="sticky top-0 z-10 flex min-h-14 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="min-w-0 flex-1">
-            <h2 id="soccer-score-title" className="font-bold text-slate-900">Scoring Timeline</h2>
-            <p className="text-xs text-slate-500">{trackedLabel} {state.homeTeamScore ?? 0} - {state.opponentScore} {opponentLabel}</p>
+            <h2 id="soccer-score-title" className="font-bold text-content">Scoring Timeline</h2>
+            <p className="text-xs text-content-muted">{trackedLabel} {state.homeTeamScore ?? 0} - {state.opponentScore} {opponentLabel}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button>
         </header>
 
         <div className="space-y-4 p-4">
@@ -83,11 +83,11 @@ export default function SoccerScoreTimelineDialog({
           ) : (
             <>
               {correctionsLocked ? (
-                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Remove the shootout events before correcting the normal match score.</p>
+                <p className="rounded-md border border-warning-line bg-warning px-3 py-2 text-sm text-warning-content">Remove the shootout events before correcting the normal match score.</p>
               ) : readOnly ? null : (
-                <button type="button" onClick={() => setEditing('new')} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white"><Plus size={17} /> Add Score Adjustment</button>
+                <button type="button" onClick={() => setEditing('new')} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-success px-3 text-sm font-bold text-content"><Plus size={17} /> Add Score Adjustment</button>
               )}
-              <div className="divide-y divide-slate-200 border-y border-slate-200">
+              <div className="divide-y divide-line border-y border-line">
                 {scoringEvents.map(event => (
                   <ScoringRow
                     key={event.id}
@@ -104,7 +104,7 @@ export default function SoccerScoreTimelineDialog({
                     }}
                   />
                 ))}
-                {scoringEvents.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No scoring events yet.</p>}
+                {scoringEvents.length === 0 && <p className="py-8 text-center text-sm text-content-muted">No scoring events yet.</p>}
               </div>
             </>
           )}
@@ -159,34 +159,34 @@ function ScoreAdjustmentForm({ state, event, recorderUserId, busy, onApply, onCa
   return (
     <div className="space-y-4">
       <div>
-        <p className="mb-2 text-xs font-bold uppercase text-slate-500">Side</p>
-        <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+        <p className="mb-2 text-xs font-bold uppercase text-content-muted">Side</p>
+        <div className="grid grid-cols-2 rounded-md bg-control p-1">
           <ModeButton active={teamSide === 'tracked'} label={trackedLabel} onClick={() => setTeamSide('tracked')} />
           <ModeButton active={teamSide === 'opponent'} label={opponentLabel} onClick={() => setTeamSide('opponent')} />
         </div>
       </div>
       <div>
-        <p className="mb-2 text-xs font-bold uppercase text-slate-500">Adjustment</p>
-        <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+        <p className="mb-2 text-xs font-bold uppercase text-content-muted">Adjustment</p>
+        <div className="grid grid-cols-2 rounded-md bg-control p-1">
           <ModeButton active={delta === 1} label="+1 Goal" onClick={() => setDelta(1)} />
           <ModeButton active={delta === -1} label="-1 Goal" onClick={() => setDelta(-1)} />
         </div>
       </div>
-      <label className="block text-xs font-bold uppercase text-slate-500">Reason<input value={reason} onChange={change => setReason(change.target.value)} placeholder="Required correction reason" className="input-field mt-2 normal-case" /></label>
+      <label className="block text-xs font-bold uppercase text-content-muted">Reason<input value={reason} onChange={change => setReason(change.target.value)} placeholder="Required correction reason" className="input-field mt-2 normal-case" /></label>
       <div>
-        <p className="mb-2 text-xs font-bold uppercase text-slate-500">Match time</p>
+        <p className="mb-2 text-xs font-bold uppercase text-content-muted">Match time</p>
         <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem] gap-2">
           <select value={timing?.period.id ?? ''} onChange={change => { const next = timings.find(item => item.period.id === change.target.value); setPeriodId(change.target.value); setPeriodElapsedMs(next ? next.endElapsedMs - next.startElapsedMs : 0) }} className="input-field">
             {timings.map(item => <option key={item.period.id} value={item.period.id}>{item.label}</option>)}
           </select>
-          <label className="text-[11px] font-bold uppercase text-slate-500">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={change => setPeriodElapsedMs(Math.max(0, Number(change.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000)} className="input-field mt-1" /></label>
-          <label className="text-[11px] font-bold uppercase text-slate-500">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={change => setPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(change.target.value) || 0)) * 1_000)} className="input-field mt-1" /></label>
+          <label className="text-[11px] font-bold uppercase text-content-muted">Min<input type="number" min="0" value={Math.floor(periodElapsedMs / 60_000)} onChange={change => setPeriodElapsedMs(Math.max(0, Number(change.target.value) || 0) * 60_000 + Math.floor(periodElapsedMs / 1_000) % 60 * 1_000)} className="input-field mt-1" /></label>
+          <label className="text-[11px] font-bold uppercase text-content-muted">Sec<input type="number" min="0" max="59" value={Math.floor(periodElapsedMs / 1_000) % 60} onChange={change => setPeriodElapsedMs(Math.floor(periodElapsedMs / 60_000) * 60_000 + Math.min(59, Math.max(0, Number(change.target.value) || 0)) * 1_000)} className="input-field mt-1" /></label>
         </div>
       </div>
-      {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={onCancel} className="min-h-11 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700">Cancel</button>
-        <button type="button" onClick={save} disabled={disabled} className="min-h-11 rounded-md bg-emerald-700 text-sm font-bold text-white disabled:opacity-40">{event ? 'Save Correction' : 'Add Adjustment'}</button>
+        <button type="button" onClick={onCancel} className="min-h-11 rounded-md border border-line-strong bg-surface text-sm font-bold text-content">Cancel</button>
+        <button type="button" onClick={save} disabled={disabled} className="min-h-11 rounded-md bg-success text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">{event ? 'Save Correction' : 'Add Adjustment'}</button>
       </div>
     </div>
   )
@@ -203,19 +203,19 @@ function ScoringRow({ event, timeLabel, editable, sideLabel, onEdit }: { event: 
     : 1
   return (
     <div className="flex min-h-16 items-center gap-3 py-3">
-      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-md text-sm font-black ${event.teamSide === 'tracked' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-800'}`}>{delta > 0 ? `+${delta}` : delta}</div>
+      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-md text-sm font-black ${event.teamSide === 'tracked' ? 'bg-success text-success-content' : 'bg-control text-content'}`}>{delta > 0 ? `+${delta}` : delta}</div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-800">{sideLabel} score</p>
-        <p className="truncate text-xs text-slate-500">{detail}</p>
-        <p className="mt-0.5 text-[11px] text-slate-400">{timeLabel} · rev {event.revision}</p>
+        <p className="truncate text-sm font-semibold text-content">{sideLabel} score</p>
+        <p className="truncate text-xs text-content-muted">{detail}</p>
+        <p className="mt-0.5 text-[11px] text-content-subtle">{timeLabel} · rev {event.revision}</p>
       </div>
-      {editable && <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-slate-600" aria-label="Correct scoring event" title="Correct"><Pencil size={17} /></button>}
+      {editable && <button type="button" onClick={onEdit} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Correct scoring event" title="Correct"><Pencil size={17} /></button>}
     </div>
   )
 }
 
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} title={label} className={`min-h-9 min-w-0 truncate rounded px-2 text-xs font-semibold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
+  return <button type="button" onClick={onClick} title={label} className={`min-h-9 min-w-0 truncate rounded px-2 text-xs font-semibold ${active ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>{label}</button>
 }
 
 function actorLabel(event: GameEvent, role: string): string {

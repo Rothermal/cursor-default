@@ -30,13 +30,13 @@ export default function SoccerSummaryHeader({
         : 'Canonical Final'
 
   return (
-    <header className="bg-emerald-900 text-white">
+    <header className="bg-control text-content">
       <div className="mx-auto max-w-2xl px-3 pb-5 pt-3">
         <div className="flex min-h-10 items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-md hover:bg-white/10"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-md hover:bg-surface"
             aria-label="Back"
             title="Back"
           >
@@ -44,13 +44,13 @@ export default function SoccerSummaryHeader({
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-sm font-bold">Match Summary</h1>
-            <p className="truncate text-xs text-emerald-100">{status}</p>
+            <p className="truncate text-xs text-success-content">{status}</p>
           </div>
           {onOpenRecorders && (
             <button
               type="button"
               onClick={onOpenRecorders}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-md hover:bg-white/10"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-md hover:bg-surface"
               aria-label="Recorder streams"
               title="Recorder streams"
             >
@@ -61,7 +61,7 @@ export default function SoccerSummaryHeader({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-md hover:bg-white/10 disabled:opacity-50"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-md hover:bg-surface disabled:bg-control-disabled disabled:text-content-disabled"
             aria-label="Refresh summary"
             title="Refresh summary"
           >
@@ -71,7 +71,7 @@ export default function SoccerSummaryHeader({
 
         <div className="mt-4 grid grid-cols-[minmax(0,1fr)_7rem_minmax(0,1fr)] items-end gap-2 text-center">
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-emerald-100" title={teamName}>
+            <p className="truncate text-xs font-semibold text-success-content" title={teamName}>
               {teamName}
             </p>
             <p className="mt-1 text-4xl font-bold tabular-nums">
@@ -80,17 +80,17 @@ export default function SoccerSummaryHeader({
           </div>
           <div className="pb-1">
             <p className="text-sm font-bold">{result.resultLabel}</p>
-            <p className="mt-0.5 min-h-4 text-xs text-emerald-100">
+            <p className="mt-0.5 min-h-4 text-xs text-success-content">
               {result.decisionLabel ?? result.matchStateLabel}
             </p>
             {result.decisionLabel === 'Pens' && result.shootoutScore && (
-              <p className="mt-1 text-xs font-semibold tabular-nums text-emerald-100">
+              <p className="mt-1 text-xs font-semibold tabular-nums text-success-content">
                 {result.shootoutScore.tracked}-{result.shootoutScore.opponent} pens
               </p>
             )}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-emerald-100" title={opponentName}>
+            <p className="truncate text-xs font-semibold text-success-content" title={opponentName}>
               {opponentName}
             </p>
             <p className="mt-1 text-4xl font-bold tabular-nums">

@@ -78,34 +78,34 @@ export default function SoccerShootoutSetupDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-labelledby="shootout-setup-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-white sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
-        <header className="sticky top-0 z-10 flex min-h-14 items-center border-b border-slate-200 bg-white px-4">
-          <h2 id="shootout-setup-title" className="flex-1 font-bold text-slate-900">Start Shootout</h2>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-slate-500" aria-label="Close" title="Close"><X size={20} /></button>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-labelledby="shootout-setup-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-surface sm:max-w-lg sm:rounded-lg" onClick={event => event.stopPropagation()}>
+        <header className="sticky top-0 z-10 flex min-h-14 items-center border-b border-line bg-surface px-4">
+          <h2 id="shootout-setup-title" className="flex-1 font-bold text-content">Start Shootout</h2>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button>
         </header>
         <div className="space-y-5 p-4">
           <Field label="First kicking side">
-            <div className="grid grid-cols-2 rounded-md bg-slate-200 p-1">
+            <div className="grid grid-cols-2 rounded-md bg-control p-1">
               <Choice active={firstSide === 'tracked'} label={trackedLabel} onClick={() => setFirstSide('tracked')} />
               <Choice active={firstSide === 'opponent'} label={opponentLabel} onClick={() => setFirstSide('opponent')} />
             </div>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Kicks per side"><div className="input-field bg-slate-50 text-center font-bold">{projection.currentRules.shootoutInitialKicksPerSide}</div></Field>
+            <Field label="Kicks per side"><div className="input-field bg-canvas text-center font-bold">{projection.currentRules.shootoutInitialKicksPerSide}</div></Field>
             <Field label="Opponent eligible">
               <input type="number" min="1" max={finalIds.length} value={opponentCount} onChange={event => setOpponentCount(Math.min(finalIds.length, Math.max(1, Number(event.target.value) || 1)))} className="input-field text-center" />
             </Field>
           </div>
 
           <Field label={`Tracked eligibility (${eligibleIds.length}/${opponentCount})`}>
-            <div className="divide-y divide-slate-200 border-y border-slate-200">
+            <div className="divide-y divide-line border-y border-line">
               {participants.map(participant => (
-                <label key={participant.participantId} className="flex min-h-11 items-center gap-3 py-2 text-sm font-medium text-slate-700">
-                  <input type="checkbox" checked={eligibleIds.includes(participant.participantId)} onChange={() => toggleEligible(participant.participantId)} className="h-5 w-5 accent-emerald-700" />
+                <label key={participant.participantId} className="flex min-h-11 items-center gap-3 py-2 text-sm font-medium text-content">
+                  <input type="checkbox" checked={eligibleIds.includes(participant.participantId)} onChange={() => toggleEligible(participant.participantId)} className="bg-surface h-5 w-5 accent-accent" />
                   <span className="min-w-0 flex-1 truncate">{participant.number ? `#${participant.number} ` : ''}{participant.displayName}</span>
-                  <span className="text-xs capitalize text-slate-400">{participant.role.label ?? participant.role.group}</span>
+                  <span className="text-xs capitalize text-content-subtle">{participant.role.label ?? participant.role.group}</span>
                 </label>
               ))}
             </div>
@@ -121,8 +121,8 @@ export default function SoccerShootoutSetupDialog({
             <input value={opponentGoalkeeper} onChange={event => setOpponentGoalkeeper(event.target.value)} placeholder="Unknown or goalkeeper name" className="input-field" />
           </Field>
 
-          {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-          <button type="button" onClick={submit} disabled={busy || !valid} className="min-h-12 w-full rounded-md bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-40">Start Shootout</button>
+          {error && <p className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>}
+          <button type="button" onClick={submit} disabled={busy || !valid} className="min-h-12 w-full rounded-md bg-success px-4 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">Start Shootout</button>
         </div>
       </div>
     </div>
@@ -130,9 +130,9 @@ export default function SoccerShootoutSetupDialog({
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <section><h3 className="mb-2 text-xs font-bold uppercase text-slate-500">{label}</h3>{children}</section>
+  return <section><h3 className="mb-2 text-xs font-bold uppercase text-content-muted">{label}</h3>{children}</section>
 }
 
 function Choice({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-bold ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>{label}</button>
+  return <button type="button" onClick={onClick} className={`h-9 rounded text-xs font-bold ${active ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>{label}</button>
 }
