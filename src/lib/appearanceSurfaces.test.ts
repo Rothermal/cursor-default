@@ -480,8 +480,9 @@ describe('Converted application surface color ownership', () => {
     for (const color of ['#4285F4', '#34A853', '#FBBC05', '#EA4335']) expect(auth).toContain(color)
     expect(auth).toContain('bg-surface')
   })
-  it('keeps appearance controls out of the production Settings panel', () => {
-    expect(readFileSync('src/pages/Admin.tsx', 'utf8')).not.toContain('setTheme')
-    expect(readFileSync('vite.config.ts', 'utf8')).toContain('data-appearance-preview="${command === \'serve\'}"')
+  it('routes the appearance control only to App settings with the shared release gate', () => {
+    expect(readFileSync('src/pages/Admin.tsx', 'utf8')).toContain("{settingsSection === 'app' && <AppearanceSettings />}")
+    expect(readFileSync('src/components/settings/AppearanceSettings.tsx', 'utf8')).toContain("dataset.appearancePreview !== 'true'")
+    expect(readFileSync('vite.config.ts', 'utf8')).toContain('data-appearance-preview="${command === \'serve\' || APPEARANCE_RELEASE_ENABLED}"')
   })
 })

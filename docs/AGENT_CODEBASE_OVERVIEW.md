@@ -6,6 +6,13 @@ Single entry point for AI agents and new contributors. Read this first (~5 min),
 
 ## 1. At a glance
 
+Appearance is device-local: Settings -> App uses `AppearanceContext` and the
+pre-React `public/appearance.js` runtime. `public/appearance.css` owns semantic
+Light/Dark tokens. `appearanceReleasePolicy.ts` is the single production rollback
+switch; never put theme state into games, sync or team settings. THM-6 is enabled
+for the approved single-user rollout; post-deployment checks are recorded in
+`REGRESSION_THM_6_APPEARANCE_RELEASE.md`.
+
 - **StatKeeper** — mobile-first PWA for live sports stat tracking (parents/coaches at games)
 - **Stack:** React 18 + TypeScript + Vite + Tailwind + HashRouter + Supabase (optional)
 - **Primary sport:** Basketball (fully built); 4 others configured but disabled in [`src/config/sports.ts`](../src/config/sports.ts)

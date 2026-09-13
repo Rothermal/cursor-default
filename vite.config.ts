@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { PWA_MAX_PRECACHE_ASSET_BYTES } from './src/lib/pwaBuildPolicy'
+import { APPEARANCE_RELEASE_ENABLED } from './src/lib/appearanceReleasePolicy'
 
 export default defineConfig(({ command }) => ({
   test: {
@@ -14,7 +15,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     {
       name: 'appearance-preview-gate',
-      transformIndexHtml: html => html.replace('<html lang="en">', `<html lang="en" data-appearance-preview="${command === 'serve'}">`),
+      transformIndexHtml: html => html.replace('<html lang="en">', `<html lang="en" data-appearance-preview="${command === 'serve' || APPEARANCE_RELEASE_ENABLED}">`),
     },
     react(),
     VitePWA({
