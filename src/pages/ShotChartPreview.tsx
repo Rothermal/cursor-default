@@ -12,9 +12,9 @@ const SAMPLE_SHOTS: ShotRecord[] = [
 
 export default function ShotChartPreview() {
   return (
-    <div className="min-h-screen bg-slate-100 p-4">
-      <h1 className="text-sm font-medium text-slate-600 mb-3">Shot chart preview (dev)</h1>
-      <div className="max-w-md mx-auto rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+    <div className="min-h-screen bg-canvas p-4">
+      <h1 className="text-sm font-medium text-content-muted mb-3">Shot chart preview (dev)</h1>
+      <div className="max-w-md mx-auto rounded-xl bg-surface p-4 shadow-sm border border-line">
         <BasketballCourt shots={SAMPLE_SHOTS} className="w-full" />
       </div>
     </div>

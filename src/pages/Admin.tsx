@@ -17,6 +17,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import MergePlayerWizard from '../components/MergePlayerWizard'
 import AccountSettings from '../components/settings/AccountSettings'
 import AppAccessPanel from '../components/settings/AppAccessPanel'
+import AppearanceSettings from '../components/settings/AppearanceSettings'
 import SoccerSettings from '../components/settings/SoccerSettings'
 import BasketballSettings from '../components/settings/BasketballSettings'
 import AuditTrailPanel from '../components/AuditTrailPanel'
@@ -641,6 +642,8 @@ export default function Admin() {
         </nav>
 
         {settingsSection === 'account' && <AccountSettings />}
+
+        {settingsSection === 'app' && <AppearanceSettings />}
 
         {settingsSection === 'app' && (
           <section>
