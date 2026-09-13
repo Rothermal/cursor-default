@@ -105,6 +105,37 @@ verification remain implementation work.
 
 ### Verified integration points
 
+Source paths in this section are repository-relative. Bare Soccer domain filenames
+below resolve under `src/lib/soccer/`; the explicit inventory is:
+
+- Domain: `src/lib/soccer/types.ts`, `src/lib/soccer/events.ts`,
+  `src/lib/soccer/live.ts`, `src/lib/soccer/projector.ts`,
+  `src/lib/soccer/field.ts`, `src/lib/soccer/summaryField.ts`,
+  `src/lib/soccer/releaseCapabilities.ts`.
+- Event platform: `src/lib/gameEvents/cloud.ts`, `src/lib/gameEvents/registry.ts`.
+- Capture/review: `src/components/soccer/SoccerShotCaptureDialog.tsx`,
+  `src/components/soccer/SoccerField.tsx`,
+  `src/components/soccer/SoccerTimeline.tsx`,
+  `src/components/soccer-summary/SoccerFieldReview.tsx`, `src/pages/SoccerSummary.tsx`.
+
+### Open scope decision: shootout kicks
+
+The six-helper inventory below covers `soccer.shot` (including in-match penalty
+shots) and `soccer.own_goal`. It does not cover the distinct `soccer.shootout_kick`
+family. That family has `scored`, `saved`, `missed`, `woodwork`, `retake`, and
+`forfeited` outcomes in `src/lib/soccer/types.ts`, plus separate capture/revision
+helpers in `src/lib/soccer/live.ts` and a shootout workspace/review flow.
+
+The confirmed phrase "all shots" did not explicitly settle shootout inclusion.
+Do not treat its omission from the current implementation map as owner-approved
+exclusion. Recommendation: defer shootout-specific UI to a named follow-up while
+keeping the detail contract reusable, but confirm this boundary with the owner
+before finalizing writer scope. If included now, extend the helper inventory,
+reader/preservation tests, scored-only placement rules and shootout review plan;
+do not infer a located origin merely because penalty kicks use a fixed spot.
+
+### Integration table
+
 | Surface | Evidence and required work |
 | --- | --- |
 | Payload contracts | `types.ts` defines shot outcome/situation/source and empty own-goal payload; `events.ts` validators differ in unknown-key tolerance. Extend both with strict optional details without changing score semantics. |
