@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameState, SportConfig } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { endSoccerMatch, inspectSoccerHistory } from './live'
-import { prepareSoccerKickoff } from './kickoff'
+import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import type {
   SoccerRecorderProjection,
   SoccerRecorderSummary,

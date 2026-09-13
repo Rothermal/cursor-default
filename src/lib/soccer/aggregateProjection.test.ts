@@ -3,7 +3,7 @@ import { sports } from '../../config/sports'
 import type { GameState } from '../../types'
 import { createInitialState } from '../gameReducer'
 import { createSoccerCanonicalSnapshot } from './finalization'
-import { prepareSoccerKickoff } from './kickoff'
+import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import {
   endSoccerPeriod,
   endSoccerMatch,
