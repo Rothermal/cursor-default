@@ -474,7 +474,7 @@ finalize from an incomplete stream.
 
 ### S15 - Shot body part
 
-**Status:** product Q&A confirmed; architecture assessment pending; see
+**Status:** architecture assessed; implementation contract awaiting review; see
 [`PLAN_SOC_S15_S16_SHOT_DETAILS.md`](PLAN_SOC_S15_S16_SHOT_DETAILS.md)
 **Theme:** goal metadata  
 **Where:** `soccer.shot` payload today is only `outcome`, `situation`, and
@@ -501,7 +501,7 @@ or making body part required.
 
 ### S16 - Shot and goal placement
 
-**Status:** product Q&A confirmed; architecture assessment pending; see
+**Status:** architecture assessed; implementation contract awaiting review; see
 [`PLAN_SOC_S15_S16_SHOT_DETAILS.md`](PLAN_SOC_S15_S16_SHOT_DETAILS.md)
 **Theme:** shot location  
 **Where:** `GameEvent.location` is the take/origin pin only; no end or
@@ -962,7 +962,7 @@ Use these labels before turning an item into an implementation plan:
 | State | Items | Next action |
 |---|---|---|
 | Confirmed product request with open data/UX choices | `S7` | Short Q&A where choices remain, then a focused phase plan |
-| Product Q&A confirmed; architecture assessment pending | `S15`, `S16` | Follow [shot-details plan](PLAN_SOC_S15_S16_SHOT_DETAILS.md); assess contracts before implementation |
+| Architecture assessed; implementation contract awaiting review | `S15`, `S16` | Review [shot-details contract](PLAN_SOC_S15_S16_SHOT_DETAILS.md), confirm shootout scope, then build the reader/preservation foundation |
 | Implemented; deployed mobile verification pending | `S6` | Verify explicit Start and split Minutes/Seconds correction |
 | Closed as user error; optional enhancement deferred | `S9` | No coordinate repair; view flip and attacking-direction changes are distinct |
 | Implemented; migration 069 applied; deployed verification pending | `S24` | Run the focused S24A-S24D regression records, including [grouped Timeline review](REGRESSION_SOC_S24D_LINEUP_TIMELINE.md) |
