@@ -11,7 +11,7 @@ import type { SoccerCanonicalAggregateSource } from './aggregateProjection'
 import {
   createSoccerCanonicalSnapshot,
 } from './finalization'
-import { prepareSoccerKickoff } from './kickoff'
+import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import {
   endSoccerMatch,
   endSoccerPeriod,

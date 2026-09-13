@@ -4,6 +4,8 @@ A mobile-first Progressive Web App for tracking sports game statistics in real t
 
 ## Features
 
+- **Light and Dark appearance** - choose Settings -> App -> Appearance. The choice is local to this browser/device, survives sign-out, and does not change team branding or game data. Light is the default.
+
 - **Sport Selection & Dashboards** — configurable sports roster; choose a sport from `/` or `/sports`, then manage that sport's active game, parked games, teams, cloud games, and season stats from `/sport/:sportId`
 - **Seasons** — first-class entity at the top of the hierarchy; teams, games, and tournaments belong to a season; season CRUD in Settings -> Data & Sync; season picker on team creation and game setup
 - **Game Setup** — select season, pick/create team, enter opponent, tournament/league, and date

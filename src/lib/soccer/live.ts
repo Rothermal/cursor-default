@@ -166,6 +166,7 @@ export interface SoccerClockDisplayValue {
   overrun: string | null
   canonicalElapsedMs: number
   periodElapsedMs: number
+  displayZeroElapsedMs: number
 }
 
 interface EventSpec<TType extends keyof SoccerEventPayloadByType = keyof SoccerEventPayloadByType> {
@@ -698,6 +699,29 @@ export function startNextSoccerPeriod(
   ])
 }
 
+export function adjustSoccerDisplayedClock(
+  state: GameState,
+  displayedMs: number,
+  options: SoccerLiveOptions,
+  addedTime = false
+): SoccerLiveResult {
+  const display = soccerClockDisplayValue(state, options.nowMs)
+  if (!display || state.sportGameState?.sportId !== 'soccer') {
+    return failure(state, 'An initialized soccer match is required.')
+  }
+  if (!Number.isSafeInteger(displayedMs) || displayedMs < 0) {
+    return failure(state, 'Corrected clock time must be zero or greater.')
+  }
+  const countdown = state.sportGameState.projection.currentRules.clockDirection === 'count_down'
+  if (addedTime && !countdown) return failure(state, 'Added-time correction requires a countdown clock.')
+  const elapsedMs = display.displayZeroElapsedMs + (countdown && !addedTime ? -displayedMs : displayedMs)
+  const periodStartMs = display.canonicalElapsedMs - display.periodElapsedMs
+  if (!Number.isSafeInteger(elapsedMs) || elapsedMs < periodStartMs) {
+    return failure(state, 'That time would place the clock before the current period started.')
+  }
+  return adjustSoccerClock(state, elapsedMs, options)
+}
+
 export function adjustSoccerClock(
   state: GameState,
   toElapsedMs: number,
@@ -1052,6 +1076,7 @@ export function soccerClockDisplayValue(
     overrun: overrunMs > 0 ? `+${formatSoccerDuration(overrunMs)}` : null,
     canonicalElapsedMs,
     periodElapsedMs,
+    displayZeroElapsedMs: (continuous ? 0 : periodStartMs) + (countDown ? nominalMs : 0),
   }
 }
 

@@ -3,7 +3,7 @@ import type { GameState, SportConfig } from '../../types'
 import type { GameEvent } from '../gameEvents/types'
 import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { createInitialState } from '../gameReducer'
-import { prepareSoccerKickoff } from './kickoff'
+import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import {
   addSoccerMatchParticipant,
   recordSoccerShot,

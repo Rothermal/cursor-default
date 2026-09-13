@@ -95,6 +95,13 @@ export function formatSoccerInputTime(elapsedMs: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+/** Numeric-only fields allow mobile entry without a colon key. */
+export function parseSoccerClockFields(minutes: string, seconds: string): number | null {
+  if (!/^\d+$/.test(minutes) || !/^\d{1,2}$/.test(seconds)) return null
+  const elapsedMs = parseSoccerInputTime(`${minutes}:${seconds.padStart(2, '0')}`)
+  return elapsedMs !== null && Number.isSafeInteger(elapsedMs) ? elapsedMs : null
+}
+
 /** Parses `M:SS` / `MM:SS` clock input into elapsed ms; rejects invalid seconds. */
 export function parseSoccerInputTime(value: string): number | null {
   const match = value.trim().match(/^(\d+):([0-5]\d)$/)

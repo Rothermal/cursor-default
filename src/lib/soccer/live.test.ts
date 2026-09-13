@@ -3,9 +3,10 @@ import type { GameState, SportConfig } from '../../types'
 import { updateGameEvent } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { createInitialState, gameReducer } from '../gameReducer'
-import { prepareSoccerKickoff } from './kickoff'
+import { prepareRunningSoccerKickoff as prepareSoccerKickoff } from './runningKickoff.testFixture'
 import {
   adjustSoccerClock,
+  adjustSoccerDisplayedClock,
   applySoccerLineupTransition,
   previewSoccerLineupTransition,
   addSoccerMatchParticipant,
@@ -124,6 +125,68 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it.each(['continuous', 'per_period'] as const)('preserves and edits %s countdown added time', clockDisplay => {
+    const matchSetup = setup()
+    matchSetup.rulesSnapshot.clockDirection = 'count_down'
+    matchSetup.rulesSnapshot.clockDisplay = clockDisplay
+    const original = kickedOffState(matchSetup)
+    const nominalMinutes = clockDisplay === 'continuous' ? 90 : 45
+    const nowMs = kickoffAt + (nominalMinutes + 2) * 60_000
+    const before = soccerClockDisplayValue(original, nowMs)!
+    expect(before.overrun).toBe('+02:00')
+    const unchanged = adjustSoccerDisplayedClock(original, 120_000, { recorderUserId, nowMs }, true)
+    expect(unchanged.ok).toBe(true)
+    if (!unchanged.ok) return
+    expect(soccerClockDisplayValue(unchanged.state, nowMs)).toEqual(before)
+    const corrected = adjustSoccerDisplayedClock(unchanged.state, 90_000, { recorderUserId, nowMs }, true)
+    expect(corrected.ok).toBe(true)
+    if (!corrected.ok) return
+    expect(soccerClockDisplayValue(corrected.state, nowMs)?.overrun).toBe('+01:30')
+    expect(soccerClockDisplayValue(corrected.state, nowMs + 1_000)?.overrun).toBe('+01:31')
+  })
+  it.each(['count_up', 'count_down'] as const)('sets the displayed time and preserves %s', direction => {
+    const matchSetup = setup()
+    matchSetup.rulesSnapshot.clockDirection = direction
+    matchSetup.rulesSnapshot.clockDisplay = 'per_period'
+    const original = kickedOffState(matchSetup)
+    const result = adjustSoccerDisplayedClock(original, 12 * 60_000 + 30_000, {
+      recorderUserId, nowMs: kickoffAt,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(soccerClockDisplayValue(result.state, kickoffAt)?.primary).toBe('12:30')
+    expect(soccerClockDisplayValue(result.state, kickoffAt + 1_000)?.primary)
+      .toBe(direction === 'count_down' ? '12:29' : '12:31')
+    expect(result.state.sportGameState?.projection.currentRules.clockDirection).toBe(direction)
+    expect(original.sportGameState?.projection.clock?.elapsedMs).toBe(0)
+  })
+
+  it.each(['continuous', 'per_period'] as const)('converts second-period %s time without changing the period', clockDisplay => {
+    const matchSetup = setup()
+    matchSetup.rulesSnapshot.clockDisplay = clockDisplay
+    const ended = endSoccerPeriod(kickedOffState(matchSetup), { recorderUserId, nowMs: kickoffAt + 45 * 60_000 })
+    if (!ended.ok) throw new Error(ended.message)
+    const next = startNextSoccerPeriod(ended.state, { recorderUserId, nowMs: kickoffAt + 50 * 60_000 })
+    if (!next.ok) throw new Error(next.message)
+    const displayedMs = (clockDisplay === 'continuous' ? 60 : 15) * 60_000
+    const result = adjustSoccerDisplayedClock(next.state, displayedMs, { recorderUserId, nowMs: kickoffAt + 50 * 60_000 })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(soccerClockDisplayValue(result.state, kickoffAt + 50 * 60_000)?.primary)
+      .toBe(clockDisplay === 'continuous' ? '60:00' : '15:00')
+    expect(result.state.sportGameState?.projection.currentPeriodId).toBe('regulation-2')
+  })
+
+  it('sets countdown zero to zero and rejects values before period start', () => {
+    const matchSetup = setup()
+    matchSetup.rulesSnapshot.clockDirection = 'count_down'
+    matchSetup.rulesSnapshot.clockDisplay = 'per_period'
+    const original = kickedOffState(matchSetup)
+    const zero = adjustSoccerDisplayedClock(original, 0, { recorderUserId, nowMs: kickoffAt })
+    expect(zero.ok).toBe(true)
+    if (zero.ok) expect(soccerClockDisplayValue(zero.state, kickoffAt)?.primary).toBe('00:00')
+    expect(adjustSoccerDisplayedClock(original, 46 * 60_000, { recorderUserId, nowMs: kickoffAt }).ok).toBe(false)
+  })
   it('supports batch entry, outgoing-only, incoming-only, and dependent removal guards', () => {
     const match = setup()
     match.rulesSnapshot.maxOnFieldPlayers = 3

@@ -1,6 +1,15 @@
 # Plan: App theming and dark mode
 
-Status: THM-1 through THM-5 implemented; THM-6 release audit and App setting pending
+Status: THM-1 through THM-6 implemented; single-user release approved; post-deployment validation pending
+
+THM-6 release decision: the owner confirmed they remain the only app user and
+approved ungating Light/Dark before real-game/cloud and installed-PWA signoff.
+The App setting is enabled for all app users, not restricted by an admin role;
+this is a single-user deployment decision, not a new permission system.
+[THM-6 verification](REGRESSION_THM_6_APPEARANCE_RELEASE.md) records automated
+evidence, rollback, and outstanding post-deployment checks. Historical gate and
+exit-check statements below describe the original delivery plan; this explicit
+approval supersedes the requirement to finish manual signoff before ungating.
 
 This roadmap makes StatKeeper themeable across authentication, administration,
 team/game management, live sport workspaces, and review destinations. Light and
@@ -395,6 +404,10 @@ are unchanged.
 ### THM-6 - Release audit and App setting
 
 Goal: expose Dark only after the complete required matrix is ready.
+
+Implemented with the single-user release exception recorded above. Settings ->
+App now exposes Light/Dark using the existing document runtime. Production and
+Settings share one rollback switch; the dev-only preview remains dev-only.
 
 - Add the Light/Dark segmented control to Settings -> App.
 - Remove the development force mechanism or keep it strictly DEV-only.
