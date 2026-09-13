@@ -25,6 +25,8 @@ import {
   recordCheckedSoccerEvent,
   recordSoccerScoreAdjustment,
   recordSoccerShootoutKick,
+  reviseSoccerShootoutKick,
+  updateSoccerHistoryEvent,
   reopenSoccerMatch,
   reviseSoccerScoreAdjustment,
   startSoccerShootout,
@@ -210,6 +212,28 @@ function activeShootoutState(): SoccerEventGameState {
 }
 
 describe('SOC-4A rules, state, and schemas', () => {
+  it('preserves shootout details during old-editor revisions and clears placement when not scored', () => {
+    const id = '50000000-0000-4000-8000-000000000011'
+    const nowMs = Date.parse('2026-07-21T12:03:10.000Z')
+    const input = { outcome: 'scored' as const, kicker: { kind: 'participant' as const, participantId: 'match-defender' },
+      goalkeeper: { kind: 'unknown' as const, label: 'Unknown' }, anonymousKickerSlot: null }
+    const recorded = recordSoccerShootoutKick(activeShootoutState(), input, { recorderUserId: 'user-1', nowMs, eventIds: [id] })
+    if (!recorded.ok) throw new Error(recorded.message)
+    const enriched = updateSoccerHistoryEvent(recorded.state, id, { payload: {
+      outcome: 'scored', anonymousKickerSlot: null, bodyPart: 'left_foot', goalPlacement: { x: 0, y: 0 },
+    } }, new Date(nowMs + 1_000).toISOString())
+    if (!enriched.ok) throw new Error(enriched.message)
+    const revised = reviseSoccerShootoutKick(enriched.state, id, 'tracked', input, new Date(nowMs + 2_000).toISOString())
+    if (!revised.ok) throw new Error(revised.message)
+    expect(revised.state.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id, payload: { outcome: 'scored', anonymousKickerSlot: null, bodyPart: 'left_foot', goalPlacement: { x: 0, y: 0 } },
+    })]))
+    const saved = reviseSoccerShootoutKick(revised.state, id, 'tracked', { ...input, outcome: 'saved' }, new Date(nowMs + 3_000).toISOString())
+    if (!saved.ok) throw new Error(saved.message)
+    expect(saved.state.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id, payload: { outcome: 'saved', anonymousKickerSlot: null, bodyPart: 'left_foot' },
+    })]))
+  })
   it('normalizes legacy v1 soccer state into current rules, setup, and capture defaults', () => {
     const legacy = structuredClone(createSoccerSportGameState(setup())) as unknown as Record<string, unknown>
     legacy.version = 1

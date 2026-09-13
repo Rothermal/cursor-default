@@ -1,4 +1,6 @@
 import type { GameState } from '../../types'
+import { isGameEventEnvelope } from '../gameEvents/envelope'
+import { isSoccerShotDetailFamily, preserveSoccerShotDetails } from './shotDetails'
 import type {
   GameEvent,
   GameEventActor,
@@ -897,6 +899,10 @@ export function updateSoccerHistoryEvent(
   changes: Partial<GameEventEditableFields>,
   now = new Date().toISOString()
 ): SoccerLiveResult {
+  const previous = state.eventStream?.events.find(event => isGameEventEnvelope(event) && event.id === eventId)
+  if (previous && isGameEventEnvelope(previous) && isSoccerShotDetailFamily(previous.eventType) && changes.payload) {
+    changes = { ...changes, payload: preserveSoccerShotDetails(previous.eventType, previous.payload, changes.payload) }
+  }
   return historyMutationResult(state, updateGameEvent(
     state,
     eventId,

@@ -1,4 +1,5 @@
 import type { GameEvent, JsonObject } from '../gameEvents/types'
+import type { SoccerShotDetails } from './shotDetails'
 
 export const SOCCER_GAME_STATE_VERSION = 3
 export const SOCCER_EVENT_SCHEMA_VERSION = 1
@@ -409,13 +410,13 @@ export interface SoccerMatchReopenedPayload extends JsonObject {
   reason: string | null
 }
 
-export type SoccerShotPayload = JsonObject & {
+export type SoccerShotPayload = JsonObject & SoccerShotDetails & {
   outcome: SoccerShotOutcome
   situation: SoccerShotSituation
   sourceEventId?: string | null
 }
 
-export type SoccerOwnGoalPayload = Record<string, never>
+export type SoccerOwnGoalPayload = JsonObject & SoccerShotDetails
 
 export interface SoccerScoreAdjustmentPayload extends JsonObject {
   delta: 1 | -1
@@ -473,7 +474,8 @@ export interface SoccerShootoutGoalkeeperChangedPayload extends JsonObject {
   reason: SoccerShootoutGoalkeeperChangeReason
 }
 
-export interface SoccerShootoutKickPayload extends JsonObject {
+export type SoccerShootoutKickPayload = JsonObject & Omit<SoccerShotDetails, 'bodyPart'> & {
+  bodyPart?: 'left_foot' | 'right_foot'
   outcome: SoccerShootoutKickOutcome
   anonymousKickerSlot: number | null
 }

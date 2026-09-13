@@ -125,6 +125,44 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it('preserves shot details through the existing editor and clears placement on non-goals', () => {
+    const input = { teamSide: 'tracked' as const, outcome: 'goal' as const, situation: 'open_play' as const,
+      location: null, shooter: { kind: 'team' as const, label: 'Team' } }
+    const recorded = recordSoccerShot(kickedOffState(), input, { recorderUserId, nowMs: kickoffAt, eventIds: [uuid(4)] })
+    if (!recorded.ok) throw new Error(recorded.message)
+    const detail = updateSoccerHistoryEvent(recorded.state, uuid(4), { payload: {
+      outcome: 'goal', situation: 'open_play', bodyPart: 'header', goalPlacement: { x: 0.2, y: 0.8 },
+    } }, new Date(kickoffAt + 1_000).toISOString())
+    if (!detail.ok) throw new Error(detail.message)
+    const moment = { period: { id: 'regulation-1', order: 1 }, elapsedMs: 0 }
+    const revised = reviseSoccerShot(detail.state, uuid(4), input, moment, new Date(kickoffAt + 2_000).toISOString())
+    if (!revised.ok) throw new Error(revised.message)
+    expect(revised.state.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: uuid(4), payload: expect.objectContaining({ bodyPart: 'header', goalPlacement: { x: 0.2, y: 0.8 } }),
+    })]))
+    const missed = reviseSoccerShot(revised.state, uuid(4), { ...input, outcome: 'off_target' }, moment, new Date(kickoffAt + 3_000).toISOString())
+    if (!missed.ok) throw new Error(missed.message)
+    expect(missed.state.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: uuid(4), payload: { outcome: 'off_target', situation: 'open_play', sourceEventId: null, bodyPart: 'header' },
+    })]))
+  })
+
+  it('preserves own-goal details through the empty-payload legacy editor path', () => {
+    const input = { teamSide: 'tracked' as const, location: null,
+      ownGoalBy: { kind: 'unknown' as const, label: 'Opponent' } }
+    const recorded = recordSoccerOwnGoal(kickedOffState(), input, { recorderUserId, nowMs: kickoffAt, eventIds: [uuid(4)] })
+    if (!recorded.ok) throw new Error(recorded.message)
+    const detail = updateSoccerHistoryEvent(recorded.state, uuid(4), { payload: {
+      bodyPart: 'right_foot', goalPlacement: { x: 0, y: 1 },
+    } }, new Date(kickoffAt + 1_000).toISOString())
+    if (!detail.ok) throw new Error(detail.message)
+    const revised = reviseSoccerOwnGoal(detail.state, uuid(4), input,
+      { period: { id: 'regulation-1', order: 1 }, elapsedMs: 0 }, new Date(kickoffAt + 2_000).toISOString())
+    if (!revised.ok) throw new Error(revised.message)
+    expect(revised.state.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: uuid(4), payload: { bodyPart: 'right_foot', goalPlacement: { x: 0, y: 1 } },
+    })]))
+  })
   it.each(['continuous', 'per_period'] as const)('preserves and edits %s countdown added time', clockDisplay => {
     const matchSetup = setup()
     matchSetup.rulesSnapshot.clockDirection = 'count_down'
