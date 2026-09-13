@@ -384,7 +384,8 @@ change this rule. The aggregate sync function also enforces this boundary for di
 
 - Development-only workspace availability is independent of the persisted Soccer toggle.
 - Regulation presets, custom segment resizing, and ordered stable segment ids.
-- Kickoff records lineup, period start, and clock start as one projected event batch.
+- S6 supersedes the original kickoff behavior: lineup and period start append in
+  one projected batch with the clock paused; explicit Start records clock start.
 - Kickoff rejects invalid goalkeeper lineups without mutating the existing state.
 - Soccer resume routing distinguishes match setup, lineup, and started-match stages.
 
@@ -448,7 +449,8 @@ The implementation must preserve these reviewed decisions:
 24. Match Roster separates selected participants from absent roster members.
 25. Exact milliseconds are stored; live review uses `MM:SS`; aggregates round minutes.
 26. Regulation and extra-time segments are ordered, configurable collections.
-27. Kickoff records lineup, period start, and clock start in one batch mutation.
+27. Superseded by S6: kickoff records lineup and period start in one batch mutation,
+    paused at zero. Clock start requires an explicit recorder action.
 28. Clock corrections apply forward and do not reorder prior events.
 29. Opening rules are immutable; mid-match changes are events.
 30. `GameState` owns a discriminated `sportGameState` container.

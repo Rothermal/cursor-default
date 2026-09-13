@@ -702,7 +702,8 @@ export function startNextSoccerPeriod(
 export function adjustSoccerDisplayedClock(
   state: GameState,
   displayedMs: number,
-  options: SoccerLiveOptions
+  options: SoccerLiveOptions,
+  addedTime = false
 ): SoccerLiveResult {
   const display = soccerClockDisplayValue(state, options.nowMs)
   if (!display || state.sportGameState?.sportId !== 'soccer') {
@@ -712,7 +713,8 @@ export function adjustSoccerDisplayedClock(
     return failure(state, 'Corrected clock time must be zero or greater.')
   }
   const countdown = state.sportGameState.projection.currentRules.clockDirection === 'count_down'
-  const elapsedMs = display.displayZeroElapsedMs + (countdown ? -displayedMs : displayedMs)
+  if (addedTime && !countdown) return failure(state, 'Added-time correction requires a countdown clock.')
+  const elapsedMs = display.displayZeroElapsedMs + (countdown && !addedTime ? -displayedMs : displayedMs)
   const periodStartMs = display.canonicalElapsedMs - display.periodElapsedMs
   if (!Number.isSafeInteger(elapsedMs) || elapsedMs < periodStartMs) {
     return failure(state, 'That time would place the clock before the current period started.')

@@ -116,7 +116,9 @@ export default function SoccerLiveActionDialog({
 
 function ClockCorrectionForm({ state, options, onApply }: FormProps) {
   const displayValue = soccerClockDisplayValue(state)
-  const [initialValue] = useState(displayValue?.primary ?? '00:00')
+  const countdown = soccerProjection(state).currentRules.clockDirection === 'count_down'
+  const [addedTime, setAddedTime] = useState(Boolean(displayValue?.overrun))
+  const [initialValue] = useState(displayValue?.overrun?.replace(/^\+/, '') ?? displayValue?.primary ?? '00:00')
   const [minutes, setMinutes] = useState(initialValue.split(':')[0])
   const [seconds, setSeconds] = useState(initialValue.split(':')[1])
   const [error, setError] = useState<string | null>(null)
@@ -126,10 +128,14 @@ function ClockCorrectionForm({ state, options, onApply }: FormProps) {
       setError('Enter whole minutes and seconds from 0 to 59.')
       return
     }
-    onApply(adjustSoccerDisplayedClock(state, elapsedMs, options))
+    onApply(adjustSoccerDisplayedClock(state, elapsedMs, options, addedTime))
   }
   return (
     <div className="space-y-4">
+      {countdown && <label className="flex items-center gap-2 text-sm font-medium text-content">
+        <input type="checkbox" checked={addedTime} onChange={event => setAddedTime(event.target.checked)} />
+        Added time (+)
+      </label>}
       <div className="grid grid-cols-2 gap-3">
         <label className="min-w-0 text-sm font-medium text-content">
           Minutes

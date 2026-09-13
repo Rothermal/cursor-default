@@ -125,6 +125,25 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it.each(['continuous', 'per_period'] as const)('preserves and edits %s countdown added time', clockDisplay => {
+    const matchSetup = setup()
+    matchSetup.rulesSnapshot.clockDirection = 'count_down'
+    matchSetup.rulesSnapshot.clockDisplay = clockDisplay
+    const original = kickedOffState(matchSetup)
+    const nominalMinutes = clockDisplay === 'continuous' ? 90 : 45
+    const nowMs = kickoffAt + (nominalMinutes + 2) * 60_000
+    const before = soccerClockDisplayValue(original, nowMs)!
+    expect(before.overrun).toBe('+02:00')
+    const unchanged = adjustSoccerDisplayedClock(original, 120_000, { recorderUserId, nowMs }, true)
+    expect(unchanged.ok).toBe(true)
+    if (!unchanged.ok) return
+    expect(soccerClockDisplayValue(unchanged.state, nowMs)).toEqual(before)
+    const corrected = adjustSoccerDisplayedClock(unchanged.state, 90_000, { recorderUserId, nowMs }, true)
+    expect(corrected.ok).toBe(true)
+    if (!corrected.ok) return
+    expect(soccerClockDisplayValue(corrected.state, nowMs)?.overrun).toBe('+01:30')
+    expect(soccerClockDisplayValue(corrected.state, nowMs + 1_000)?.overrun).toBe('+01:31')
+  })
   it.each(['count_up', 'count_down'] as const)('sets the displayed time and preserves %s', direction => {
     const matchSetup = setup()
     matchSetup.rulesSnapshot.clockDirection = direction

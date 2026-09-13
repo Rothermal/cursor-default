@@ -208,7 +208,8 @@ provide no colon even though the parser expects one.
 
 **Implemented direction:** starting the match establishes the opening lineup and
 first period with the clock paused at zero. The recorder explicitly presses
-Start, matching Basketball. Keep exact correction, but use separate minute and
+Start for the opening period, matching Basketball kickoff. Later Soccer periods
+still auto-start their clock; that residual behavior is outside S6. Keep exact correction, but use separate minute and
 second controls or another keypad-safe input that does not require typing a
 colon. Add a short path for common adjustments only after the exact path is
 reliable. Opening-lineup minutes must not accrue before the explicit start.

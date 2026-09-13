@@ -11,9 +11,14 @@ Status: implemented; deployed mobile verification pending.
   is the scoreboard's displayed time, for count-up/countdown and continuous/
   per-period display alike. Conversion to cumulative elapsed time is internal;
   direction is unchanged. Existing checked history constraints remain enforced.
-  Countdown zero targets the nominal end, not an ambiguous added-time value.
+  Countdown correction includes an Added time (+) checkbox, selected automatically
+  during overrun, with fields seeded from the overrun amount. This preserves
+  `00:00 +02:00` on an unchanged Apply and permits editing it to `00:00 +01:30`.
+  Unchecked countdown zero targets the nominal end.
   Values before the current period start are rejected without mutation.
 - Existing saved streams, later-period behavior, and historical events are unchanged.
+  Later periods still start their clock automatically; paused Basketball parity
+  applies only to kickoff in this slice.
 - No database schema change or new event type. The broader event-timing and
   running-lineup proposal remains parked in PR #410.
 
@@ -36,5 +41,5 @@ View persistence remains an optional deferred enhancement, not an open bug.
 - Correction failures remain visible and do not modify history.
 - Check mobile/desktop layout and keyboard labels before release.
 
-Automated evidence: 1,741 tests across 206 files passed; TypeScript passed.
+Automated evidence: 1,745 tests across 207 files passed; TypeScript and targeted ESLint passed.
 Real mobile keyboard and deployed UI checks have not been performed in this slice.
