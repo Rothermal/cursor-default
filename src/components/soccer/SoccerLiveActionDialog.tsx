@@ -4,11 +4,10 @@ import SoccerLineupManager from './SoccerLineupManager'
 import type { GameState } from '../../types'
 import {
   addSoccerMatchParticipant,
-  adjustSoccerClock,
+  adjustSoccerDisplayedClock,
   createSoccerUuid,
   endSoccerMatch,
   soccerLifecycleAction,
-  formatSoccerInputTime,
   parseSoccerClockFields,
   recordSoccerRulesChange,
   resolveSoccerParticipant,
@@ -116,11 +115,8 @@ export default function SoccerLiveActionDialog({
 
 
 function ClockCorrectionForm({ state, options, onApply }: FormProps) {
-  const projection = soccerProjection(state)
   const displayValue = soccerClockDisplayValue(state)
-  const [initialValue] = useState(formatSoccerInputTime(
-    displayValue?.canonicalElapsedMs ?? projection.clock.elapsedMs
-  ))
+  const [initialValue] = useState(displayValue?.primary ?? '00:00')
   const [minutes, setMinutes] = useState(initialValue.split(':')[0])
   const [seconds, setSeconds] = useState(initialValue.split(':')[1])
   const [error, setError] = useState<string | null>(null)
@@ -130,7 +126,7 @@ function ClockCorrectionForm({ state, options, onApply }: FormProps) {
       setError('Enter whole minutes and seconds from 0 to 59.')
       return
     }
-    onApply(adjustSoccerClock(state, elapsedMs, options))
+    onApply(adjustSoccerDisplayedClock(state, elapsedMs, options))
   }
   return (
     <div className="space-y-4">
@@ -144,11 +140,6 @@ function ClockCorrectionForm({ state, options, onApply }: FormProps) {
           <input value={seconds} onChange={event => setSeconds(event.target.value)} inputMode="numeric" pattern="[0-9]*" maxLength={2} className="input-field mt-1 w-full text-center text-xl tabular-nums" />
         </label>
       </div>
-      {projection.currentRules.clockDisplay === 'per_period' && (
-        <p className="text-xs text-content-muted">
-          Enter cumulative match time. The tracker currently displays {displayValue?.primary ?? '00:00'} for this period.
-        </p>
-      )}
       <FormError message={error} />
       <SubmitButton label="Apply Correction" onClick={submit} />
     </div>
