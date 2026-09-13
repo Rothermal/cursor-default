@@ -472,9 +472,10 @@ user-facing copy.
 **Not this item:** changing canonical publication rules or allowing
 finalize from an incomplete stream.
 
-### S15 - Mark a goal as a header
+### S15 - Shot body part
 
-**Status:** confirmed — new capture feature  
+**Status:** product Q&A confirmed; architecture assessment pending; see
+[`PLAN_SOC_S15_S16_SHOT_DETAILS.md`](PLAN_SOC_S15_S16_SHOT_DETAILS.md)
 **Theme:** goal metadata  
 **Where:** `soccer.shot` payload today is only `outcome`, `situation`, and
 optional `sourceEventId`; SOC-0 reserved body part under detailed goal
@@ -484,23 +485,24 @@ Owner request after first matches: the recorder needs to mark when a goal
 is a header. That is the first slice of `M5` body part, not a new event
 type.
 
-**Likely direction:** after Goal is chosen, show an optional Header chip
-(skip allowed). Store it on the existing `soccer.shot` event. Keep the
-core goal/shot totals unchanged. Own goals and non-goal shots can omit it
-until a later `M5` body-part catalog exists. Timeline and Summary should
-show Header when present.
+**Confirmed direction:** optional Left foot, Right foot, Header or Unspecified
+on all shot outcomes and own goals, in collapsed Shot details. Unspecified
+clears the optional field; legacy absence stays unspecified. Keep goal/shot
+totals unchanged. Timeline rows show a compact body-part label; event details
+and Summary share the richer presentation.
 
 **Planning note:** prefer an optional extensible value such as
-`bodyPart: 'header' | null` over a one-off `isHeader` boolean, even if the first
-UI exposes only Header. Existing schema-version-1 shots must remain valid, and
-reader support must deploy before the capture control writes the new payload.
+body-part enum over a one-off `isHeader` boolean. Existing events must remain
+valid. Own-goal payloads currently forbid every key, unlike ordinary shots;
+the focused plan records this reader-first rollout constraint explicitly.
 
-**Not this item:** foot / left-right / volley / rebound / build-up (`M5`),
-or making header a required field on every goal.
+**Not this item:** volley / rebound / build-up or other body parts (`M5`),
+or making body part required.
 
 ### S16 - Shot and goal placement
 
-**Status:** confirmed — new capture feature  
+**Status:** product Q&A confirmed; architecture assessment pending; see
+[`PLAN_SOC_S15_S16_SHOT_DETAILS.md`](PLAN_SOC_S15_S16_SHOT_DETAILS.md)
 **Theme:** shot location  
 **Where:** `GameEvent.location` is the take/origin pin only; no end or
 goal-mouth location exists
@@ -529,6 +531,13 @@ whose viewpoint left/right uses, field-flip behavior, edit/remove behavior,
 and whether normal goals only or own goals can carry placement. Treat origin
 and placement as two named coordinates; never overload `GameEvent.location`.
 As with Header, merge reader support before enabling the writer.
+
+**Confirmed Q&A supersedes the options above:** placement is optional on scored
+goals including own goals, facing the goal entered from the shooter's perspective.
+Keep it inside collapsed Shot details. Derive an approach angle toward goal center
+from located origins, independently of placement, with zero degrees straight-on.
+No extra angle entry, aggregate statistics or heatmaps. See the focused plan for
+correction behavior and geometry/compatibility assessment requirements.
 
 **Not this item:** expected-goals models, heatmaps as a separate product,
 or treating placement as a second shot event.
@@ -881,7 +890,7 @@ are not S-series polish.
 | M2 | Per-90 and per-standard-match rates | First-release aggregates are totals and read-time rates with a real denominator |
 | M3 | Season shootout leaderboards | Shootout totals stay match-scoped |
 | M4 | Full opponent roster, lineup, and minutes | Simplified opponent is an SOC-0 decision |
-| M5 | Detailed goal metadata | Header is pulled forward as `S15`. Remaining: other body parts, delivery, rebound, error, build-up. Goal-mouth / end placement is `S16`, not this row |
+| M5 | Detailed goal metadata | Header and Left/Right foot are pulled forward as `S15`. Remaining: other body parts, delivery, rebound, error, build-up. Goal-mouth / end placement is `S16`, not this row |
 | M6 | Technical actions | Dribbles, crosses, dispossessions |
 | M7 | Passing | Completion, start/end, type |
 | M8 | Advanced defending | Pressures, aerial/ground duels, dribbled past, errors |
@@ -918,9 +927,9 @@ S23 Team-level default starter and bench status
 S24 Live lineup manager and match presets [implemented; deployed verification pending]
 S6  Explicit clock start and usable sideline correction
 S9  Coordinate report closed as user error; optional persistence deferred
-S1  Faster shot and goal capture
-S15 Mark a goal as a header
+S15 Shot body part (all outcomes and own goals)
 S16 Optional goal-mouth placement after Goal
+S1  Faster shot and goal capture
 S4  Recent-events undo on Field
 S8  Lineup as a live board
 S5  Reusable opponent identities
@@ -936,8 +945,9 @@ cloud binding. `S13` and `S14` follow because they leave a match uneditable or
 unfinalizable. Owner ranking of the earlier UX was `S2` then `S3`; `S25` is the
 small follow-up that removes the now-redundant Soccer player row and establishes
 the shared actor-picker contract. `S26` separately implemented immutable live
-side labels and migration 066. `S15` and `S16` come after `S1` so
-extra goal metadata stays a skippable step, not another full attacking sheet.
+side labels and migration 066. Owner prioritization promotes `S15` and `S16`
+ahead of `S1`, independently in a collapsed optional section of the existing
+dialog. The original intent remains: metadata never blocks ordinary capture.
 `S17` / `S20` have finished restart capture and owner functional verification;
 the shared completion-loop defect found during that run was fixed by PR #373.
 `S7` can now plan the next-shot link. `S23`
@@ -951,7 +961,8 @@ Use these labels before turning an item into an implementation plan:
 
 | State | Items | Next action |
 |---|---|---|
-| Confirmed product request with open data/UX choices | `S7`, `S15`, `S16` | Short Q&A where choices remain, then a focused phase plan |
+| Confirmed product request with open data/UX choices | `S7` | Short Q&A where choices remain, then a focused phase plan |
+| Product Q&A confirmed; architecture assessment pending | `S15`, `S16` | Follow [shot-details plan](PLAN_SOC_S15_S16_SHOT_DETAILS.md); assess contracts before implementation |
 | Implemented; deployed mobile verification pending | `S6` | Verify explicit Start and split Minutes/Seconds correction |
 | Closed as user error; optional enhancement deferred | `S9` | No coordinate repair; view flip and attacking-direction changes are distinct |
 | Implemented; migration 069 applied; deployed verification pending | `S24` | Run the focused S24A-S24D regression records, including [grouped Timeline review](REGRESSION_SOC_S24D_LINEUP_TIMELINE.md) |
@@ -992,8 +1003,8 @@ exercise those constraints rather than bypass them.
   setup prefill with migration 068 applied. `S24A-S24D` implement the separate
   frozen-preset, live target-lineup, and grouped-correction workflow with
   migration 069 applied; deployed owner verification remains pending.
-- **Fast attacking capture:** `S1` shell first, then optional `S15` and `S16`
-  steps so metadata never blocks the primary save.
+- **Shot details:** `S15` and `S16` are prioritized before the independent `S1`
+  shell redesign. Optional collapsed details never block the primary save.
 - **Restarts:** `S17` + `S20` are implemented through
   `PLAN_SOC_RESTARTS.md`; run `REGRESSION_SOC_RESTARTS.md` during deployed
   testing. `S7` follows only after restart capture is stable.

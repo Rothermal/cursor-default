@@ -37,6 +37,9 @@ These implementation details require a code assessment before being finalized:
 
 - Extend existing shot/own-goal payloads with optional, strictly validated fields;
   use an extensible body-part value, not independent booleans.
+- Unspecified is a UI label for absent body-part metadata, not a stored
+  `'unspecified'` literal. Selecting it clears the field. Legacy absence has the
+  same meaning; do not infer whether the recorder deliberately skipped selection.
 - Define normalized goal-mouth coordinates explicitly: proposed x=0 left, x=1
   right, y=0 crossbar, y=1 ground, always facing the entered goal. Display flip
   changes neither stored placement nor its viewpoint.
@@ -62,9 +65,23 @@ that requires separate deployments or a guarded writer in one coherent PR after
 examining the deployed validation path. Do not assume migration-free support.
 Keep S1 capture redesign and PR #410 timing work outside this plan.
 
+Verified compatibility asymmetry: `validateShot` in `src/lib/soccer/events.ts`
+currently ignores unknown payload keys, but `validateOwnGoal` requires an empty
+object (`SoccerOwnGoalPayload = Record<string, never>`). Any new own-goal metadata
+therefore fails validation on existing readers and makes stream inspection
+incomplete; it is not merely hidden detail. Shot tolerance alone does not prove
+end-to-end field preservation. Reader-first deployment and an explicit old-client
+writer/rollout policy are prerequisites, including cached/offline clients. A server
+capability check alone does not prove every reader has upgraded. Assess the actual
+version/upgrade strategy before enabling either own-goal metadata writer.
+
+Owner prioritization supersedes the backlog's original S1-first ordering: S15/S16
+may proceed independently in the existing dialog's optional collapsed section.
+
 ## Verification requirements
 
-- Every body-part value across goal, saved, missed, blocked and own-goal paths.
+- Every body-part value across `goal`, `saved`, `blocked`, `off_target`, `woodwork`
+  and the separate `soccer.own_goal` event path.
 - Optional fields absent on old events; no inferred attribution or changed totals.
 - Placement present only on goals; outcome correction clears it atomically.
 - Shooter changes preserve details; origin/direction changes recalculate angle.
