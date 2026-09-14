@@ -63,7 +63,7 @@ function GoalMouth({ placement, onChange }: { placement: SoccerGoalPlacement | n
     onChange?.({ x: Math.max(0, Math.min(1, (clientX - b.left) / b.width)), y: Math.max(0, Math.min(1, (clientY - b.top) / b.height)) })
   }
   return <figure className="m-0 min-w-0">
-    <div className={`relative mx-6 my-6 ${onChange ? 'touch-none cursor-crosshair' : ''}`}
+    <div className={`relative ${onChange ? 'mx-6 my-6 touch-none cursor-crosshair' : 'mx-2 my-2'}`}
       onPointerDown={onChange ? event => {
         if (!event.isPrimary || event.button !== 0) return
         dragging.current = event.pointerId
@@ -76,7 +76,7 @@ function GoalMouth({ placement, onChange }: { placement: SoccerGoalPlacement | n
       {[10, 20, 30, 40, 50, 60, 70, 80, 90].map(x => <line key={x} x1={x} y1="0" x2={x} y2="34" stroke="rgb(var(--pitch-line))" strokeOpacity="0.3" strokeWidth="0.3" />)}
       {[8.5, 17, 25.5].map(y => <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="rgb(var(--pitch-line))" strokeOpacity="0.3" strokeWidth="0.3" />)}
     </svg>
-    {placement && <span data-placement-handle="true" aria-hidden="true" className={`absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center ${onChange ? 'cursor-grab' : 'pointer-events-none'}`} style={{ left: `${placement.x * 100}%`, top: `${placement.y * 100}%` }}>
+    {placement && <span data-placement-handle="true" aria-hidden="true" className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center ${onChange ? 'h-11 w-11 cursor-grab' : 'h-3 w-3 pointer-events-none'}`} style={{ left: `${placement.x * 100}%`, top: `${placement.y * 100}%` }}>
       <span className="block h-3 w-3 rounded-full border-2 border-pitch-ink bg-pitch-line" />
     </span>}
     </div>

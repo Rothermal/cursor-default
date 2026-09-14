@@ -64,9 +64,15 @@ describe('Soccer shot detail presentation', () => {
     expect(placedHtml).toContain('Shot direction: 12 degrees')
     expect(placedHtml).toContain('recorded placement')
     expect(placedHtml).toContain('data-placement-handle="true"')
+    expect(placedHtml).toContain('mx-2 my-2')
+    expect(placedHtml).not.toContain('h-11 w-11')
+    expect(placedHtml).not.toContain('touch-none')
+    expect(placedHtml).toContain('data-shot-direction="true"')
     const editorHtml = renderToStaticMarkup(createElement(SoccerShotDetailsEditor, {
       value: shotDetailDraft(placed), onChange: () => {}, goal: true, location: placed.location,
     }))
     expect(editorHtml).toContain('Shot direction: 12 degrees')
+    expect(editorHtml).toContain('mx-6 my-6 touch-none')
+    expect(editorHtml).toContain('h-11 w-11 cursor-grab')
   })
 })
