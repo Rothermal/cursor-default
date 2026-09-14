@@ -1,0 +1,76 @@
+import type { GameEventEditableFields, GameEventLocation, JsonObject } from '../gameEvents/types'
+import type { GameState } from '../../types'
+import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
+
+export type SoccerBodyPart = 'left_foot' | 'right_foot' | 'header'
+export type SoccerGoalPlacement = { x: number; y: number }
+export type SoccerShotDetails = {
+  bodyPart?: SoccerBodyPart
+  goalPlacement?: SoccerGoalPlacement
+}
+
+export function isSoccerShotDetailFamily(type: string): boolean {
+  return ['soccer.shot', 'soccer.own_goal', 'soccer.shootout_kick'].includes(type)
+}
+
+export function preserveSoccerEventDetailChanges(
+  state: GameState, eventId: string, changes: Partial<GameEventEditableFields>
+): Partial<GameEventEditableFields> {
+  const previous = state.eventStream?.events.find(event => isGameEventEnvelope(event) && event.id === eventId)
+  if (!previous || !isGameEventEnvelope(previous) || previous.sportId !== 'soccer' ||
+    !isSoccerShotDetailFamily(previous.eventType) || !changes.payload) return changes
+  return { ...changes, payload: preserveSoccerShotDetails(previous.eventType, previous.payload, changes.payload) }
+}
+
+export function soccerPlacementAllowed(type: string, payload: JsonObject): boolean {
+  return type === 'soccer.own_goal' ||
+    (type === 'soccer.shot' && payload.outcome === 'goal') ||
+    (type === 'soccer.shootout_kick' && payload.outcome === 'scored')
+}
+
+export function validateSoccerShotDetails(type: string, payload: JsonObject): boolean {
+  if (has(payload, 'bodyPart')) {
+    const allowed = type === 'soccer.shootout_kick'
+      ? ['left_foot', 'right_foot'] : ['left_foot', 'right_foot', 'header']
+    if (!allowed.includes(String(payload.bodyPart)) || typeof payload.bodyPart !== 'string') return false
+  }
+  if (has(payload, 'goalPlacement')) {
+    const p = payload.goalPlacement
+    if (!soccerPlacementAllowed(type, payload) || !isPlainObject(p) ||
+      Object.keys(p).length !== 2 || !unit(p.x) || !unit(p.y)) return false
+  }
+  return true
+}
+
+// Correction inputs may clear with null; persisted payloads represent absence by omission.
+export function preserveSoccerShotDetails(type: string, previous: JsonObject, replacement: JsonObject): JsonObject {
+  const result = structuredClone(replacement)
+  for (const key of ['bodyPart', 'goalPlacement'] as const) {
+    if (!has(replacement, key) && has(previous, key)) result[key] = structuredClone(previous[key])
+    if (result[key] === null) delete result[key]
+  }
+  if (!soccerPlacementAllowed(type, result)) delete result.goalPlacement
+  return result
+}
+
+export function soccerShotApproach(location: GameEventLocation | null): {
+  degrees: number; origin: { x: number; y: number }; goal: { x: number; y: number }
+} | null {
+  if (!location || !unit(location.x) || !unit(location.y) ||
+    !['left_to_right', 'right_to_left'].includes(location.attackingDirection)) return null
+  const goal = { x: location.attackingDirection === 'left_to_right' ? 1 : 0, y: 0.5 }
+  const longitudinal = Math.abs(goal.x - location.x) * 100
+  const lateral = Math.abs(goal.y - location.y) * 64
+  // Only coincident diagram points are undefined; a goal-line origin otherwise yields 90 degrees.
+  if (Math.hypot(longitudinal, lateral) < 1e-9) return null
+  return { degrees: Math.round(Math.atan2(lateral, longitudinal) * 180 / Math.PI),
+    origin: { x: location.x, y: location.y }, goal }
+}
+
+function unit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
+}
+
+function has(value: JsonObject, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key)
+}

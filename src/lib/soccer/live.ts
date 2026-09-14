@@ -1,4 +1,5 @@
 import type { GameState } from '../../types'
+import { preserveSoccerEventDetailChanges } from './shotDetails'
 import type {
   GameEvent,
   GameEventActor,
@@ -900,7 +901,7 @@ export function updateSoccerHistoryEvent(
   return historyMutationResult(state, updateGameEvent(
     state,
     eventId,
-    changes,
+    preserveSoccerEventDetailChanges(state, eventId, changes),
     now,
     gameEventRegistry,
     gameEventProjectors

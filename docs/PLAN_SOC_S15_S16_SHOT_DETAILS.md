@@ -1,14 +1,16 @@
 # S15/S16 - Shot Body Part and Goal Placement
 
-Status: product Q&A confirmed; code-backed architectural assessment complete;
-proposed two-release implementation contract below awaits review.
-No runtime implementation is authorized by this document alone.
+Status: reader/preservation foundation implemented; capture/review UI is next.
+Owner authorized the foundation and confirmed shootout inclusion after PR #413.
 
 ## Confirmed decisions
 
 - S15 offers one optional body-part selection on every shot outcome: Left foot,
   Right foot, Header, or Unspecified. Own goals are included. Old events remain
   unspecified; never infer that an unspecified shot used a foot.
+- Shootout kicks support Left foot / Right foot / Unspecified, never Header.
+  Goal-mouth placement is supported only for scored shootout kicks. Shootout
+  capture and review UI belong in the same writer release as ordinary shots.
 - S16 offers optional goal-mouth placement only for scored goals, including own
   goals. The view faces the goal the ball entered, from the shooter's perspective.
 - Both controls live in a collapsed Shot details section of the existing capture
@@ -118,7 +120,7 @@ below resolve under `src/lib/soccer/`; the explicit inventory is:
   `src/components/soccer/SoccerTimeline.tsx`,
   `src/components/soccer-summary/SoccerFieldReview.tsx`, `src/pages/SoccerSummary.tsx`.
 
-### Open scope decision: shootout kicks
+### Confirmed scope: shootout kicks
 
 The six-helper inventory below covers `soccer.shot` (including in-match penalty
 shots) and `soccer.own_goal`. It does not cover the distinct `soccer.shootout_kick`
@@ -126,13 +128,12 @@ family. That family has `scored`, `saved`, `missed`, `woodwork`, `retake`, and
 `forfeited` outcomes in `src/lib/soccer/types.ts`, plus separate capture/revision
 helpers in `src/lib/soccer/live.ts` and a shootout workspace/review flow.
 
-The confirmed phrase "all shots" did not explicitly settle shootout inclusion.
-Do not treat its omission from the current implementation map as owner-approved
-exclusion. Recommendation: defer shootout-specific UI to a named follow-up while
-keeping the detail contract reusable, but confirm this boundary with the owner
-before finalizing writer scope. If included now, extend the helper inventory,
-reader/preservation tests, scored-only placement rules and shootout review plan;
-do not infer a located origin merely because penalty kicks use a fixed spot.
+Owner confirmed inclusion: Left/Right foot only, and placement only when scored.
+`recordSoccerShootoutKick` and `reviseSoccerShootoutKick` extend the original
+six-helper inventory. The shared correction boundary preserves detail for all
+three event families. No located origin is inferred from the fixed penalty spot;
+unlocated shootout kicks have no approach angle. Reader tests include every
+shootout outcome, forbid Header and limit placement to scored kicks.
 
 ### Integration table
 
@@ -150,7 +151,8 @@ do not infer a located origin merely because penalty kicks use a fixed spot.
 
 ### Proposed payload contract
 
-Retain event schema version 1 with these optional fields on both event families:
+Retain event schema version 1 with these optional fields on shot/own-goal events;
+shootout kicks use the same shape except that Header is excluded:
 
 ```ts
 bodyPart?: 'left_foot' | 'right_foot' | 'header'
@@ -235,3 +237,42 @@ assessment. A backend enforcement strategy, if later selected, may require one.
 Assessment scope: local source and migration definitions reviewed; no runtime,
 database, or UI changes made. The two-release contract is the recommended next
 implementation sequence, not a claim that release gates have been satisfied.
+
+## Foundation delivery record
+
+The preceding assessment describes the pre-implementation investigation. The
+reader/preservation release now implements:
+
+- `src/lib/soccer/shotDetails.ts`: strict metadata validation, clone-safe
+  preserve/clear behavior and pure 100:64 approach geometry.
+- `types.ts` and `events.ts`: optional v1 details on ordinary shots and own goals;
+  Left/Right foot only on shootout kicks; scored-only goal placement. Old absent
+  fields and empty own goals remain valid; malformed metadata is rejected.
+- `live.ts`: `updateSoccerHistoryEvent` preserves omitted metadata centrally for
+  all existing correction helpers, treats null as explicit clear input, omits
+  cleared fields from persisted JSON and clears placement for non-scoring outcomes.
+- No production capture controls or capture-input extensions. Existing live and
+  historical capture continues emitting its existing payload shape; synthetic
+  new-metadata fixtures exercise reader compatibility and correction preservation.
+- No global event-version bump, database migration or raw historical rewrite.
+
+Verification: 1,798 tests across 210 files passed; TypeScript and targeted ESLint
+passed. Tests cover all body-part/outcome combinations, malformed coordinates,
+legacy own-goal acceptance/old-reader incompatibility, ordinary/own-goal/shootout
+editor preservation, clear semantics, JSON/cloud mapping and approach geometry.
+Live database and multi-device refresh checks remain pending before writers ship.
+
+Deferred exit coverage: the own-goal beneficiary -> stored capture direction ->
+entered-goal test moves to the writer release. Foundation tests cover canonical
+geometry at both ends, not the dialog's beneficiary selection. Writer acceptance
+must drive both own-goal beneficiary sides through the actual capture path and
+assert the stored direction and approach target, including field flip. Do not
+substitute a hand-built location test for this integration check.
+
+Review hardening: the shared preservation preparation also covers the generic
+`UPDATE_GAME_EVENT` reducer action (unused by current UI), with a regression test.
+The old-client boundary test compares a frozen empty-payload validator against
+the real serialized/deserialized event and current definition, plus a legacy control.
+
+Next: deploy this foundation, confirm participating devices have refreshed, then
+implement the combined capture/review release. No separate UI is expected yet.

@@ -1,4 +1,5 @@
 import { isPlainObject } from '../gameEvents/envelope'
+import { validateSoccerShotDetails } from './shotDetails'
 import type {
   GameEvent,
   GameEventActor,
@@ -421,14 +422,16 @@ function validateMatchReopened(payload: JsonObject): boolean {
 }
 
 function validateShot(payload: JsonObject): boolean {
-  return ['goal', 'saved', 'blocked', 'off_target', 'woodwork'].includes(String(payload.outcome)) &&
+  return validateSoccerShotDetails('soccer.shot', payload) &&
+    ['goal', 'saved', 'blocked', 'off_target', 'woodwork'].includes(String(payload.outcome)) &&
     ['open_play', 'penalty', 'direct_free_kick', 'corner_sequence', 'other_set_piece']
       .includes(String(payload.situation)) &&
     (payload.sourceEventId === undefined || payload.sourceEventId === null || isId(payload.sourceEventId))
 }
 
 function validateOwnGoal(payload: JsonObject): boolean {
-  return Object.keys(payload).length === 0
+  return Object.keys(payload).every(key => key === 'bodyPart' || key === 'goalPlacement') &&
+    validateSoccerShotDetails('soccer.own_goal', payload)
 }
 
 function validateScoreAdjustment(payload: JsonObject): boolean {
@@ -528,7 +531,8 @@ function validateShootoutGoalkeeperChanged(payload: JsonObject): boolean {
 }
 
 function validateShootoutKick(payload: JsonObject): boolean {
-  return ['scored', 'saved', 'missed', 'woodwork', 'retake', 'forfeited']
+  return validateSoccerShotDetails('soccer.shootout_kick', payload) &&
+    ['scored', 'saved', 'missed', 'woodwork', 'retake', 'forfeited']
     .includes(String(payload.outcome)) &&
     (payload.anonymousKickerSlot === null || isPositiveInteger(payload.anonymousKickerSlot))
 }
