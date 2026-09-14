@@ -6,7 +6,7 @@ all participating browsers and installed PWAs refreshed before writer enablement
 
 ## Local verification
 
-Full suite: 1,809 tests across 211 files passed. Production build (including
+Initial delivery: 1,809 tests across 211 files passed. Production build (including
 TypeScript) passed; existing asset/chunk-size build warnings remain unchanged.
 
 - Writer tests cover live/historical shot and own-goal capture, correction and
@@ -26,6 +26,23 @@ TypeScript) passed; existing asset/chunk-size build warnings remain unchanged.
 - The shared shootout editor was exercised for foot selection, no Header/no inferred
   approach, and disappearance of placement when toggled to non-scored. Full live
   shootout sequence and cloud transport were not browser-tested in this harness.
+
+## PR review hardening
+
+Review update verification: 1,813 tests across 212 files passed; TypeScript and
+targeted ESLint passed.
+
+- Added a TypeScript AST wiring guard for the dialog's selected side -> scoring
+  direction -> event location -> both capture inputs. This complements the command
+  tests and recorded browser run; it is not represented as a DOM interaction test.
+  The review's hard-coded `'tracked'` mutation fails this guard, and was restored.
+- Empty collapsed Timeline details are suppressed for legacy shots, own goals and
+  shootout kicks. Expanded review still shows unspecified/unrecorded values. Tests
+  also retain the disclosure for placement-only metadata.
+- Incident-dialog direction deduplication remains deferred: its existing logic is
+  correct, it is outside this shot-detail slice, and broader consolidation should
+  place the helper in shared field geometry rather than import shot metadata into
+  incident capture.
 
 ## Deployed owner smoke
 

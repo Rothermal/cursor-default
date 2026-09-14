@@ -43,6 +43,7 @@ export function SoccerShotDetailsEditor({ value, onChange, goal, shootout = fals
 export function SoccerShotDetailsReview({ event, collapsed = false }: { event: GameEvent; collapsed?: boolean }) {
   if (!isSoccerShotDetailFamily(event.eventType) || !validateSoccerShotDetails(event.eventType, event.payload)) return null
   const value = shotDetailDraft(event)
+  if (collapsed && !value.bodyPart && !value.goalPlacement) return null
   const content = <div className="space-y-3 py-3 text-sm text-content">
     <p>Body part: {soccerBodyPartLabel(value.bodyPart)}</p>
     {soccerPlacementAllowed(event.eventType, event.payload) && <>
