@@ -46,11 +46,35 @@ targeted ESLint passed.
 
 ## Deployed owner smoke
 
+Placement-direction follow-up: unit tests cover left/right at both entered goals,
+height independence, center fallback and coincident endpoints. Shared editor and
+review rendering tests verify the placed angle. Isolated Edge/Playwright checks
+at 390px Light and 1280px Dark passed live endpoint updates, 12px dot/44px handle,
+edge-center alignment, dragging, tap placement and clear-to-center fallback.
+Screenshots were inspected with no clipping, overflow or browser errors.
+The isolated harness used `data-shot-direction` to read the line's live `y2`
+endpoint while moving the horizontal/vertical sliders and clearing placement.
+The attribute is retained as a stable browser-regression selector.
+Follow-up verification: 1,816 tests across 212 files, production build/TypeScript
+and targeted ESLint passed. No migration or saved-event rewrite required.
+
+PR #416 review: read-only diagrams now use an 8px gutter and 12px marker box;
+only interactive capture retains the 24px gutter and 44px drag target. Rendering
+tests pin that distinction. Interactive goal-mouth surfaces intentionally reserve
+touch gestures for two-dimensional placement (`touch-none`); swiping there does
+not scroll the containing sheet. Scroll outside the goal mouth or use the sliders.
+Changing this gesture policy is deferred pending dedicated real-device testing.
+
 1. In a Soccer match, tap the pitch and save a shot without opening Shot details.
    Existing capture should remain unchanged. Add shots with Left foot, Right foot
    and Header; non-goals should not offer placement.
 2. Log a Goal, open Shot details and tap the goal mouth or use its horizontal and
    vertical sliders. Verify the saved marker and angle in Timeline and Field review.
+   Moving placement left/right should update the line immediately; height alone
+   should not. Drag the dot and try edge positions. Clear placement to return the
+   direction line to goal center.
+   On mobile, verify the sheet scrolls when swiping outside the goal mouth and
+   remains usable despite the goal-mouth drag surface reserving touch gestures.
    Use an unlocated goal too: placement is allowed, angle is unavailable.
 3. Edit the shooter and confirm details remain. Change a regular Goal to Saved:
    placement disappears but body part remains. Explicitly clear Body part and

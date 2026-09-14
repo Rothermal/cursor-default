@@ -1,6 +1,7 @@
 import type { GameEvent, GameEventEditableFields, GameEventLocation, JsonObject } from '../gameEvents/types'
 import type { GameState } from '../../types'
 import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
+import { SOCCER_DIAGRAM } from './diagramGeometry'
 
 export type SoccerBodyPart = 'left_foot' | 'right_foot' | 'header'
 export type SoccerGoalPlacement = { x: number; y: number }
@@ -89,14 +90,18 @@ export function preserveSoccerShotDetails(type: string, previous: JsonObject, re
   return result
 }
 
-export function soccerShotApproach(location: GameEventLocation | null): {
+export function soccerShotApproach(location: GameEventLocation | null, placement: SoccerGoalPlacement | null = null): {
   degrees: number; origin: { x: number; y: number }; goal: { x: number; y: number }
 } | null {
   if (!location || !unit(location.x) || !unit(location.y) ||
     !['left_to_right', 'right_to_left'].includes(location.attackingDirection)) return null
-  const goal = { x: location.attackingDirection === 'left_to_right' ? 1 : 0, y: 0.5 }
-  const longitudinal = Math.abs(goal.x - location.x) * 100
-  const lateral = Math.abs(goal.y - location.y) * 64
+  const rightward = location.attackingDirection === 'left_to_right'
+  const offset = placement && unit(placement.x)
+    ? (placement.x - 0.5) * SOCCER_DIAGRAM.goalWidth / SOCCER_DIAGRAM.width : 0
+  // Goal-mouth left/right is from the shooter facing the entered goal.
+  const goal = { x: rightward ? 1 : 0, y: 0.5 + offset * (rightward ? 1 : -1) }
+  const longitudinal = Math.abs(goal.x - location.x) * SOCCER_DIAGRAM.length
+  const lateral = Math.abs(goal.y - location.y) * SOCCER_DIAGRAM.width
   // Only coincident diagram points are undefined; a goal-line origin otherwise yields 90 degrees.
   if (Math.hypot(longitudinal, lateral) < 1e-9) return null
   return { degrees: Math.round(Math.atan2(lateral, longitudinal) * 180 / Math.PI),
