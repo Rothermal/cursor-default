@@ -3,6 +3,10 @@
 Status: architectural assessment and proposed direction; implementation scope and
 product questions are not yet approved. No runtime changes in this document.
 
+The [shared product decisions](PRODUCT_AND_INTERACTION_DECISIONS.md) carry the
+confirmed goals across sports. Basketball workspace modernization does not approve
+or implement this document's proposed timing/replay mechanism.
+
 ## Confirmed goals
 
 - Permit lineup recording without requiring the recorder's game clock to stop.
