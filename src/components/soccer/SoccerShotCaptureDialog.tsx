@@ -1,4 +1,6 @@
 import { MapPin, MapPinOff, Plus, X } from 'lucide-react'
+import { SoccerShotDetailsEditor } from './SoccerShotDetails'
+import { soccerScoringDirection, shotDetailDraft } from '../../lib/soccer/shotDetails'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { GameEventActor, GameEventLocation } from '../../lib/gameEvents/types'
 import {
@@ -102,6 +104,7 @@ export default function SoccerShotCaptureDialog({
   const [situation, setSituation] = useState<SoccerShotSituation>('open_play')
   const [sourceEventId, setSourceEventId] = useState('')
   const [ownGoal, setOwnGoal] = useState(false)
+  const [shotDetails, setShotDetails] = useState(() => shotDetailDraft())
   const [location, setLocation] = useState<GameEventLocation | null>(null)
   const [trackedShooterId, setTrackedShooterId] = useState('__team__')
   const [opponentShooterMode, setOpponentShooterMode] = useState<'unknown' | 'team'>('unknown')
@@ -202,6 +205,7 @@ export default function SoccerShotCaptureDialog({
     setSituation(shot?.payload.situation ?? 'open_play')
     setSourceEventId(shot?.payload.sourceEventId ?? '')
     setOwnGoal(Boolean(ownGoalEvent))
+    setShotDetails(shotDetailDraft(event))
     setLocation(event?.location ?? initializationDraft.location)
     setTrackedShooterId(shooter?.participantId ?? (shooter?.kind === 'team' || initializationDraft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
     setOpponentShooterMode(shooter?.kind === 'team' ? 'team' : 'unknown')
@@ -286,9 +290,7 @@ export default function SoccerShotCaptureDialog({
   const trackedDirection = moment
     ? soccerAttackingDirectionAt(state, moment)
     : projection.attackingDirection
-  const captureDirection = teamSide === 'tracked'
-    ? trackedDirection
-    : oppositeDirection(trackedDirection)
+  const captureDirection = soccerScoringDirection(teamSide, trackedDirection)
 
   const save = () => {
     if (!outcome) return
@@ -313,6 +315,7 @@ export default function SoccerShotCaptureDialog({
       const input = {
         teamSide,
         location: eventLocation,
+        ...shotDetails,
         ownGoalBy,
         goalkeeper: teamSide === 'opponent' && trackedGoalkeeperId
           ? { kind: 'participant' as const, participantId: trackedGoalkeeperId }
@@ -345,6 +348,7 @@ export default function SoccerShotCaptureDialog({
       const input = {
         teamSide,
         outcome,
+        ...shotDetails,
         situation,
         sourceEventId: sourceAllowed ? sourceEventId || null : null,
         location: eventLocation,
@@ -448,6 +452,7 @@ export default function SoccerShotCaptureDialog({
                   label={option.label}
                   onClick={() => {
                     setOutcome(option.value)
+                    if (option.value !== 'goal') setShotDetails(value => ({ ...value, goalPlacement: null }))
                     if (option.value !== 'goal') setOwnGoal(false)
                   }}
                 />
@@ -634,6 +639,8 @@ export default function SoccerShotCaptureDialog({
               }}
             />
           )}
+          <SoccerShotDetailsEditor key={draft.event?.id ?? 'capture'} value={shotDetails} onChange={setShotDetails}
+            goal={outcome === 'goal'} disabled={busy} location={location ? { ...location, attackingDirection: captureDirection } : null} />
           {error && <p className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>}
 
           <button type="button" onClick={save} disabled={saveDisabled} className="min-h-12 w-full rounded-md bg-success px-4 text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">
@@ -683,10 +690,6 @@ function opponentLabel(actor: GameEventActor | null, fallback: string): string {
 
 function penaltyMark(direction: 'left_to_right' | 'right_to_left'): GameEventLocation {
   return { x: direction === 'left_to_right' ? 0.87 : 0.13, y: 0.5, attackingDirection: direction }
-}
-
-function oppositeDirection(direction: 'left_to_right' | 'right_to_left'): 'left_to_right' | 'right_to_left' {
-  return direction === 'left_to_right' ? 'right_to_left' : 'left_to_right'
 }
 
 function actorRoleAtMoment(

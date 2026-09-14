@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { soccerScoringDirection, soccerShotApproach } from './shotDetails'
+import { soccerFieldLocation } from './field'
 import type { GameState, SportConfig } from '../../types'
 import { updateGameEvent } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
@@ -125,6 +127,62 @@ function kickedOffState(matchSetup = setup()): GameState {
 }
 
 describe('soccer live match actions', () => {
+  it.each(['tracked', 'opponent'] as const)('keeps %s own-goal beneficiary direction through flipped capture coordinates', teamSide => {
+    for (const flipped of [false, true]) {
+      const fieldLocation = soccerFieldLocation(flipped ? 0.2 : 0.8, flipped ? 0.8 : 0.2, flipped, 'left_to_right')
+      const result = recordSoccerOwnGoal(kickedOffState(), {
+        teamSide, location: { ...fieldLocation, attackingDirection: soccerScoringDirection(teamSide, 'left_to_right') },
+        ownGoalBy: teamSide === 'tracked' ? { kind: 'unknown', label: 'Opponent' } : { kind: 'participant', participantId: 'match-defender' },
+        goalkeeper: teamSide === 'opponent' ? { kind: 'participant', participantId: 'match-keeper' } : null,
+        bodyPart: 'right_foot', goalPlacement: { x: 0.25, y: 0.75 },
+      }, { recorderUserId, nowMs: kickoffAt + 1_000, eventIds: [uuid(4)] })
+      if (!result.ok) throw new Error(result.message)
+      const event = inspectSoccerHistory(result.state).activeEvents.find(event => event.id === uuid(4))!
+      expect(event.location?.attackingDirection).toBe(teamSide === 'tracked' ? 'left_to_right' : 'right_to_left')
+      expect(soccerShotApproach(event.location)?.goal.x).toBe(teamSide === 'tracked' ? 1 : 0)
+      expect(soccerShotApproach(event.location)?.degrees).toBe(teamSide === 'tracked' ? 44 : 13)
+    }
+  })
+
+  it.each([false, true])('captures and explicitly clears shot metadata (historical=%s)', historical => {
+    const input = { teamSide: 'tracked' as const, outcome: 'goal' as const, situation: 'open_play' as const,
+      location: null, shooter: { kind: 'team' as const, label: 'Team' }, bodyPart: 'header' as const,
+      goalPlacement: { x: 0.15, y: 0.7 } }
+    const moment = { period: { id: 'regulation-1', order: 1 }, elapsedMs: 0 }
+    const options = { recorderUserId, nowMs: kickoffAt + 1_000, eventIds: [uuid(4)] }
+    const recorded = historical
+      ? recordHistoricalSoccerShot(kickedOffState(), input, moment, options)
+      : recordSoccerShot(kickedOffState(), input, options)
+    if (!recorded.ok) throw new Error(recorded.message)
+    expect(inspectSoccerHistory(recorded.state).activeEvents.find(event => event.id === uuid(4))?.payload)
+      .toMatchObject({ bodyPart: 'header', goalPlacement: input.goalPlacement })
+    const cleared = reviseSoccerShot(recorded.state, uuid(4), { ...input, bodyPart: null, goalPlacement: null },
+      moment, new Date(kickoffAt + 2_000).toISOString())
+    if (!cleared.ok) throw new Error(cleared.message)
+    const payload = inspectSoccerHistory(cleared.state).activeEvents.find(event => event.id === uuid(4))?.payload
+    expect(payload).not.toHaveProperty('bodyPart')
+    expect(payload).not.toHaveProperty('goalPlacement')
+  })
+
+  it.each([false, true])('captures own-goal metadata (historical=%s)', historical => {
+    const input = { teamSide: 'tracked' as const, location: null,
+      ownGoalBy: { kind: 'unknown' as const, label: 'Opponent' }, bodyPart: 'right_foot' as const,
+      goalPlacement: { x: 0.8, y: 0.1 } }
+    const moment = { period: { id: 'regulation-1', order: 1 }, elapsedMs: 0 }
+    const options = { recorderUserId, nowMs: kickoffAt + 1_000, eventIds: [uuid(4)] }
+    const recorded = historical
+      ? recordHistoricalSoccerOwnGoal(kickedOffState(), input, moment, options)
+      : recordSoccerOwnGoal(kickedOffState(), input, options)
+    if (!recorded.ok) throw new Error(recorded.message)
+    expect(inspectSoccerHistory(recorded.state).activeEvents.find(event => event.id === uuid(4))?.payload)
+      .toEqual({ bodyPart: 'right_foot', goalPlacement: input.goalPlacement })
+    const revised = reviseSoccerOwnGoal(recorded.state, uuid(4), { ...input, bodyPart: 'left_foot', goalPlacement: null },
+      moment, new Date(kickoffAt + 2_000).toISOString())
+    if (!revised.ok) throw new Error(revised.message)
+    expect(inspectSoccerHistory(revised.state).activeEvents.find(event => event.id === uuid(4))?.payload)
+      .toEqual({ bodyPart: 'left_foot' })
+  })
+
   it('preserves shot details through the existing editor and clears placement on non-goals', () => {
     const input = { teamSide: 'tracked' as const, outcome: 'goal' as const, situation: 'open_play' as const,
       location: null, shooter: { kind: 'team' as const, label: 'Team' } }

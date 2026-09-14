@@ -1,3 +1,4 @@
+import { SoccerShotDetailsReview } from '../soccer/SoccerShotDetails'
 import {
   Check,
   CircleDot,
@@ -340,6 +341,7 @@ function AttemptDetail({
             value={attempt.event ? String(attempt.event.revision) : 'Unavailable'}
           />
         </dl>
+        {attempt.event && <SoccerShotDetailsReview event={attempt.event} />}
         <p className="mt-3 text-xs text-content-muted">
           Shootout corrections continue through the owned local tracker.
         </p>

@@ -1,6 +1,7 @@
 # S15/S16 - Shot Body Part and Goal Placement
 
-Status: reader/preservation foundation implemented; capture/review UI is next.
+Status: reader/preservation and combined capture/review UI implemented;
+deployed owner verification pending.
 Owner authorized the foundation and confirmed shootout inclusion after PR #413.
 
 ## Confirmed decisions
@@ -274,5 +275,26 @@ Review hardening: the shared preservation preparation also covers the generic
 The old-client boundary test compares a frozen empty-payload validator against
 the real serialized/deserialized event and current definition, plus a legacy control.
 
-Next: deploy this foundation, confirm participating devices have refreshed, then
-implement the combined capture/review release. No separate UI is expected yet.
+The foundation shipped in PR #414. The owner confirmed all participating browsers
+and installed PWAs refreshed before this writer release.
+
+## Combined capture/review delivery
+
+- Live and historical shots and own goals accept optional body part and scored-only
+  placement; correction supports preserving, changing and explicitly clearing both.
+- The existing capture dialog has collapsed Shot details. Own goals use the
+  beneficiary side's direction exactly once. Changing outcome clears placement.
+- Shootout quick outcome buttons remain immediate. Optional Shot details offers a
+  detailed outcome/foot/placement path; either save path uses the selected details.
+  Successful capture clears the draft. Kick correction includes the same controls.
+  Header and inferred approach/origin are never offered for shootouts.
+- Timeline (including Summary), Field review, and shootout review reuse the same
+  read-only body-part, goal-mouth and derived approach presentation. Legacy absent
+  details remain explicitly unspecified/unrecorded.
+- No migration, aggregate change, new event version, or historical rewrite.
+  Rollback must retain PR #414 readers and preservation; disable/revert only these
+  new capture controls, never downgrade stored-event readers.
+
+Verification is recorded in [REGRESSION_SOC_S15_S16_SHOT_DETAILS.md](REGRESSION_SOC_S15_S16_SHOT_DETAILS.md).
+Live database constraints and deployed cloud/PWA round trips were not exercised by
+the local harness; these remain owner smoke checks, not claimed as completed.

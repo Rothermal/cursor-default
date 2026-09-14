@@ -1,4 +1,5 @@
 import { MapPinOff, Pencil, X } from 'lucide-react'
+import { SoccerShotDetailsReview } from '../soccer/SoccerShotDetails'
 import { useEffect, useMemo, useState } from 'react'
 import SoccerField, {
   type SoccerFieldMarker,
@@ -377,6 +378,7 @@ function FieldEventSheet({
                   </button>
                 )}
               </div>
+              <SoccerShotDetailsReview event={item.event} />
             </article>
           ))}
         </div>
