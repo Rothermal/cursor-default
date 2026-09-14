@@ -534,8 +534,10 @@ As with Header, merge reader support before enabling the writer.
 
 **Confirmed Q&A supersedes the options above:** placement is optional on scored
 goals including own goals, facing the goal entered from the shooter's perspective.
-Keep it inside collapsed Shot details. Derive an approach angle toward goal center
-from located origins, independently of placement, with zero degrees straight-on.
+Keep it inside collapsed Shot details. Derive illustrative direction toward the
+recorded left/right placement, or goal center when absent, with zero degrees
+straight-on. Height stays in the goal-mouth view only. Shared diagram goal width
+and fixed-size, edge-visible placement marker follow the approved S15/S16 update.
 No extra angle entry, aggregate statistics or heatmaps. See the focused plan for
 correction behavior and geometry/compatibility assessment requirements.
 

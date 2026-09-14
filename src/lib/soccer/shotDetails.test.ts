@@ -77,6 +77,24 @@ describe('detail preservation', () => {
 
 describe('diagram-based approach angle', () => {
   const location = (x: number, y: number, attackingDirection: GameEventLocation['attackingDirection'] = 'left_to_right') => ({ x, y, attackingDirection })
+  it.each(['left_to_right', 'right_to_left'] as const)('aims toward shooter-relative placement facing %s', direction => {
+    const origin = location(direction === 'left_to_right' ? 0.8 : 0.2, 0.5, direction)
+    const left = soccerShotApproach(origin, { x: 0, y: 0 })!
+    const right = soccerShotApproach(origin, { x: 1, y: 1 })!
+    expect(left.degrees).toBe(12)
+    expect(right.degrees).toBe(12)
+    expect(left.goal.y).toBeCloseTo(direction === 'left_to_right' ? 27.8 / 64 : 36.2 / 64)
+    expect(right.goal.y).toBeCloseTo(direction === 'left_to_right' ? 36.2 / 64 : 27.8 / 64)
+    expect(soccerShotApproach(origin, { x: 0, y: 1 })).toEqual(left)
+    expect(soccerShotApproach(origin, { x: 0.5, y: 0 })?.degrees).toBe(0)
+    expect(soccerShotApproach(origin)?.goal.y).toBe(0.5)
+  })
+  it('uses the placed endpoint for coincidence and handles malformed horizontal placement safely', () => {
+    const origin = location(1, 27.8 / 64)
+    expect(soccerShotApproach(origin, { x: 0, y: 0.5 })).toBeNull()
+    expect(soccerShotApproach(origin, { x: 1, y: 0.5 })?.degrees).toBe(90)
+    expect(soccerShotApproach(location(0.8, 0.5), { x: NaN, y: 0.5 })?.goal.y).toBe(0.5)
+  })
   it('uses pitch proportions and mirrors goal ends', () => {
     expect(soccerShotApproach(location(0.5, 0.5))?.degrees).toBe(0)
     expect(soccerShotApproach(location(0.5, 0))?.degrees).toBe(33)

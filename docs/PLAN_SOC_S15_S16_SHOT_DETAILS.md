@@ -19,12 +19,17 @@ Owner authorized the foundation and confirmed shootout inclusion after PR #413.
   part is available for all outcomes; placement is available only for goals.
 - Preserve the existing pitch location as the shot origin. Goal-mouth placement
   is a separate coordinate, never a replacement for GameEvent.location.
-- Derive approach angle automatically from the origin toward the center of the
-  goal being attacked (for an own goal, the goal the ball entered). Display a
-  pitch line and angle in degrees, with zero meaning straight-on. No extra entry.
-- Approach angle is independent of placement. The pitch line ends at goal center,
-  not at the placement marker; it represents shooting position, not an exact
-  trajectory. Do not imply measured curve, deflection, elevation, or 3D flight.
+- Owner-approved follow-up after PR #415: derive illustrative shot direction from
+  origin toward recorded horizontal placement in the entered goal, falling back
+  to goal center when placement is absent. Show a line and unsigned angle in degrees.
+  This supersedes the original center-only, placement-independent decision.
+- Ignore placement height in this top-down line. Do not imply measured trajectory,
+  curve, deflection, elevation or 3D flight. No actual field-dimension setup is added.
+- Use the existing illustrative goal width (8.4 units on the 100:64 diagram), shared
+  between field goal drawing and direction geometry through `diagramGeometry.ts`.
+- Goal-mouth placement uses a fixed 12px visible dot with a 44px drag target; its
+  center is the exact selected point. A surrounding gutter keeps edge dots and
+  touch targets visible without clamping the center away from the goal boundary.
 - Unlocated goals may have placement but have no approach angle.
 - Changing Goal to a non-goal outcome clears placement but retains body part.
 - Changing shooter retains the details. Editing origin or attacking direction
@@ -184,18 +189,22 @@ known saved attackingDirection, use its canonical goal end. For historical data
 without a known direction, suppress angle until a reliable context is available;
 never silently substitute the current tracker direction.
 
-For goal center (gx, 0.5), use absolute longitudinal distance
-`abs(gx - origin.x) * 100` and lateral distance `abs(0.5 - origin.y) * 64`.
+For the endpoint (gx, gy), use absolute longitudinal distance
+`abs(gx - origin.x) * 100` and lateral distance `abs(gy - origin.y) * 64`.
+With no placement, gy=0.5. Otherwise use
+`gy = 0.5 + (placement.x - 0.5) * (8.4 / 64) * directionSign`, where the sign is
++1 for left-to-right attack and -1 for right-to-left. Thus shooter-facing left
+maps toward the top of the right-hand goal and the bottom of the left-hand goal.
 The magnitude is `atan2(lateral, longitudinal) * 180 / PI`, rounded to the nearest
 whole degree for display. The line supplies which side the shot came from; no
-signed-angle convention is needed. Center-on-goal is undefined and has no angle;
+signed-angle convention is needed. An origin coincident with the endpoint is undefined;
 an origin elsewhere on the goal line can yield 90 degrees. Use a small documented
 numeric tolerance only for coincident points. Invalid/missing coordinates yield
 no line/angle. The 100:64 ratio is a diagram estimate, not claimed match dimensions.
 
-Derive the line from origin to goal center independently of placement. Saved
-event-direction corrections update its result; view rotation only rotates the
-line. Placement remains shooter-facing even when origin or goal end changes.
+Derive the line from origin to horizontal placement (or goal center if absent).
+Placement height does not enter the calculation. Saved event-direction corrections
+update its result. Placement remains shooter-facing when origin or goal end changes.
 
 ### Two-release recommendation
 
@@ -230,8 +239,8 @@ assessment. A backend enforcement strategy, if later selected, may require one.
 - Non-goal placement is rejected on reads and cleared by valid outcome correction.
 - Each outcome includes all three body-part values plus absent details.
 - Both own-goal beneficiary sides resolve the entered goal without double inversion.
-- Angle tests cover center, mirrored diagonals, 100:64 ratio, goal-line origins,
-  unknown direction, view flip and placement independence.
+- Angle tests cover center fallback, mirrored diagonals, 100:64 ratio, goal-line
+  origins, unknown direction, view flip, left/right placement and height independence.
 - Old own-goal validation failure is documented and tested as a rollout boundary,
   never represented as successful backward compatibility.
 

@@ -3,6 +3,7 @@ import type { GameEventLocation } from '../../lib/gameEvents/types'
 import type { SoccerAttackingDirection, SoccerTeamSide } from '../../lib/soccer'
 import type { SoccerFieldReviewFamily } from '../../lib/soccer/summaryField'
 import { clusterSoccerMarkerPoints, soccerFieldLocation } from '../../lib/soccer/field'
+import { SOCCER_DIAGRAM, SOCCER_DIAGRAM_GOAL_TOP } from '../../lib/soccer/diagramGeometry'
 
 export type SoccerFieldMarkerKind =
   | 'goal' | 'saved' | 'blocked' | 'off_target' | 'woodwork' | 'own_goal'
@@ -105,7 +106,7 @@ export default function SoccerField({
           <path d="M18.5 25.9 A9.15 9.15 0 0 1 18.5 38.1" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.55" />
           <path d="M2 3.2 A1.2 1.2 0 0 1 3.2 2" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.45" />
           <path d="M2 60.8 A1.2 1.2 0 0 0 3.2 62" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.45" />
-          <rect x="0.3" y="27.8" width="1.7" height="8.4" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.5" />
+          <rect x="0.3" y={SOCCER_DIAGRAM_GOAL_TOP} width="1.7" height={SOCCER_DIAGRAM.goalWidth} fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.5" />
 
           <rect x="81.5" y="12" width="16.5" height="40" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.55" />
           <rect x="92.5" y="22.8" width="5.5" height="18.4" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.55" />
@@ -113,7 +114,7 @@ export default function SoccerField({
           <path d="M81.5 25.9 A9.15 9.15 0 0 0 81.5 38.1" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.55" />
           <path d="M98 3.2 A1.2 1.2 0 0 0 96.8 2" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.45" />
           <path d="M98 60.8 A1.2 1.2 0 0 1 96.8 62" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.45" />
-          <rect x="98" y="27.8" width="1.7" height="8.4" fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.5" />
+          <rect x="98" y={SOCCER_DIAGRAM_GOAL_TOP} width="1.7" height={SOCCER_DIAGRAM.goalWidth} fill="none" stroke="rgb(var(--pitch-line))" strokeWidth="0.5" />
 
           {clusterSoccerMarkerPoints(markers).map(cluster => cluster.length === 1 ? (
             <SoccerMarker
