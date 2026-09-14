@@ -1,5 +1,6 @@
-import type { GameEventLocation, JsonObject } from '../gameEvents/types'
-import { isPlainObject } from '../gameEvents/envelope'
+import type { GameEventEditableFields, GameEventLocation, JsonObject } from '../gameEvents/types'
+import type { GameState } from '../../types'
+import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
 
 export type SoccerBodyPart = 'left_foot' | 'right_foot' | 'header'
 export type SoccerGoalPlacement = { x: number; y: number }
@@ -10,6 +11,15 @@ export type SoccerShotDetails = {
 
 export function isSoccerShotDetailFamily(type: string): boolean {
   return ['soccer.shot', 'soccer.own_goal', 'soccer.shootout_kick'].includes(type)
+}
+
+export function preserveSoccerEventDetailChanges(
+  state: GameState, eventId: string, changes: Partial<GameEventEditableFields>
+): Partial<GameEventEditableFields> {
+  const previous = state.eventStream?.events.find(event => isGameEventEnvelope(event) && event.id === eventId)
+  if (!previous || !isGameEventEnvelope(previous) || previous.sportId !== 'soccer' ||
+    !isSoccerShotDetailFamily(previous.eventType) || !changes.payload) return changes
+  return { ...changes, payload: preserveSoccerShotDetails(previous.eventType, previous.payload, changes.payload) }
 }
 
 export function soccerPlacementAllowed(type: string, payload: JsonObject): boolean {

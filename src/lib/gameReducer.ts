@@ -1,3 +1,4 @@
+import { preserveSoccerEventDetailChanges } from './soccer/shotDetails'
 import type {
   ActionLogEntry,
   CloudSyncState,
@@ -515,7 +516,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const next = updateGameEvent(
         state,
         action.eventId,
-        action.changes,
+        preserveSoccerEventDetailChanges(state, action.eventId, action.changes),
         action.now ?? new Date().toISOString(),
         gameEventRegistry,
         gameEventProjectors

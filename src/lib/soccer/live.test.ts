@@ -134,6 +134,13 @@ describe('soccer live match actions', () => {
       outcome: 'goal', situation: 'open_play', bodyPart: 'header', goalPlacement: { x: 0.2, y: 0.8 },
     } }, new Date(kickoffAt + 1_000).toISOString())
     if (!detail.ok) throw new Error(detail.message)
+    const reducerRevision = gameReducer(detail.state, { type: 'UPDATE_GAME_EVENT', eventId: uuid(4),
+      changes: { payload: { outcome: 'goal', situation: 'open_play' } },
+      now: new Date(kickoffAt + 2_000).toISOString() })
+    expect(reducerRevision.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: uuid(4), revision: 3,
+      payload: expect.objectContaining({ bodyPart: 'header', goalPlacement: { x: 0.2, y: 0.8 } }),
+    })]))
     const moment = { period: { id: 'regulation-1', order: 1 }, elapsedMs: 0 }
     const revised = reviseSoccerShot(detail.state, uuid(4), input, moment, new Date(kickoffAt + 2_000).toISOString())
     if (!revised.ok) throw new Error(revised.message)

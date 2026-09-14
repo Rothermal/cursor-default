@@ -16,6 +16,13 @@ describe('shot detail readers', () => {
     const restored = deserializeGameEventFromCloud({ ...row, recorded_by: 'recorder' }, {})
     if (!restored.ok) throw new Error(restored.diagnostic.message)
     expect(restored.event).toEqual(event)
+    const current = soccerEventDefinitions.find(d => d.eventType === restored.event.eventType)!
+    const preFoundationOwnGoalRule = (payload: JsonObject) => Object.keys(payload).length === 0
+    expect(current.validate(restored.event).ok).toBe(true)
+    expect(preFoundationOwnGoalRule(restored.event.payload)).toBe(false)
+    const legacy = { ...restored.event, payload: {} }
+    expect(current.validate(legacy).ok).toBe(true)
+    expect(preFoundationOwnGoalRule(legacy.payload)).toBe(true)
   })
   for (const outcome of ['goal', 'saved', 'blocked', 'off_target', 'woodwork'] as const) {
     it.each(['left_foot', 'right_foot', 'header'] as const)(`reads %s on ${outcome}`, bodyPart => {
@@ -35,8 +42,6 @@ describe('shot detail readers', () => {
     const detailed = { ...event, payload: { bodyPart: 'header', goalPlacement: { x: 0, y: 1 } } }
     expect(definition.validate(detailed).ok).toBe(true)
     expect(definition.validate({ ...event, payload: { other: true } }).ok).toBe(false)
-    // Frozen pre-foundation own-goal payload rule: old clients cannot read these fields.
-    expect(Object.keys(detailed.payload).length === 0).toBe(false)
   })
   it.each(['scored', 'saved', 'missed', 'woodwork', 'retake', 'forfeited'])('limits shootout %s detail', outcome => {
     for (const bodyPart of ['left_foot', 'right_foot']) {

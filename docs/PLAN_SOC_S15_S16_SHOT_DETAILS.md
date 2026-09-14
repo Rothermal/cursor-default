@@ -262,5 +262,17 @@ legacy own-goal acceptance/old-reader incompatibility, ordinary/own-goal/shootou
 editor preservation, clear semantics, JSON/cloud mapping and approach geometry.
 Live database and multi-device refresh checks remain pending before writers ship.
 
+Deferred exit coverage: the own-goal beneficiary -> stored capture direction ->
+entered-goal test moves to the writer release. Foundation tests cover canonical
+geometry at both ends, not the dialog's beneficiary selection. Writer acceptance
+must drive both own-goal beneficiary sides through the actual capture path and
+assert the stored direction and approach target, including field flip. Do not
+substitute a hand-built location test for this integration check.
+
+Review hardening: the shared preservation preparation also covers the generic
+`UPDATE_GAME_EVENT` reducer action (unused by current UI), with a regression test.
+The old-client boundary test compares a frozen empty-payload validator against
+the real serialized/deserialized event and current definition, plus a legacy control.
+
 Next: deploy this foundation, confirm participating devices have refreshed, then
 implement the combined capture/review release. No separate UI is expected yet.
