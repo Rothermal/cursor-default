@@ -212,6 +212,24 @@ function activeShootoutState(): SoccerEventGameState {
 }
 
 describe('SOC-4A rules, state, and schemas', () => {
+  it('writes and explicitly clears shootout foot and placement details', () => {
+    const id = '50000000-0000-4000-8000-000000000011'
+    const nowMs = Date.parse('2026-07-21T12:03:10.000Z')
+    const input = { outcome: 'scored' as const, kicker: { kind: 'participant' as const, participantId: 'match-defender' },
+      goalkeeper: { kind: 'unknown' as const, label: 'Unknown' }, anonymousKickerSlot: null,
+      bodyPart: 'right_foot' as const, goalPlacement: { x: 1, y: 0 } }
+    const recorded = recordSoccerShootoutKick(activeShootoutState(), input, { recorderUserId: 'user-1', nowMs, eventIds: [id] })
+    if (!recorded.ok) throw new Error(recorded.message)
+    expect(recorded.state.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id, payload: expect.objectContaining({ bodyPart: 'right_foot', goalPlacement: { x: 1, y: 0 } }),
+    })]))
+    const revised = reviseSoccerShootoutKick(recorded.state, id, 'tracked', { ...input, bodyPart: null, goalPlacement: null }, new Date(nowMs + 1_000).toISOString())
+    if (!revised.ok) throw new Error(revised.message)
+    expect(revised.state.eventStream?.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      id, payload: { outcome: 'scored', anonymousKickerSlot: null },
+    })]))
+  })
+
   it('preserves shootout details during old-editor revisions and clears placement when not scored', () => {
     const id = '50000000-0000-4000-8000-000000000011'
     const nowMs = Date.parse('2026-07-21T12:03:10.000Z')

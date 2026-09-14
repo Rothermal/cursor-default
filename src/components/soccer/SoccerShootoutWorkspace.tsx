@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { SoccerShotDetailsEditor } from './SoccerShotDetails'
+import { shotDetailDraft, soccerBodyPartLabel, type ShotDetailDraft } from '../../lib/soccer/shotDetails'
 import { BadgeAlert, Pencil, Repeat2, Settings2 } from 'lucide-react'
 import type { GameEventActor, GameEventInspection } from '../../lib/gameEvents/types'
 import {
@@ -53,6 +55,8 @@ export default function SoccerShootoutWorkspace({
   const [opponentLabel, setOpponentLabel] = useState('')
   const [anonymousSlot, setAnonymousSlot] = useState(1)
   const [editingKick, setEditingKick] = useState<SoccerShootoutKickEvent | null>(null)
+  const [details, setDetails] = useState(() => shotDetailDraft())
+  const [detailOutcome, setDetailOutcome] = useState<SoccerShootoutKickOutcome>('scored')
   const [error, setError] = useState<string | null>(null)
   const trackedLabel = gameSideDisplayName(state.gameInfo, 'tracked')
   const opponentTeamLabel = gameSideDisplayName(state.gameInfo, 'opponent')
@@ -97,7 +101,7 @@ export default function SoccerShootoutWorkspace({
   const pendingKicker = pendingEvent?.actors.find(actor => actor.role === 'kicker') ?? null
   const usedNextSide = soccerShootoutUsedKickerKeys(shootout, nextSide)
 
-  const recordKick = (outcome: SoccerShootoutKickOutcome) => {
+  const recordKick = (outcome: SoccerShootoutKickOutcome, detail?: ShotDetailDraft) => {
     let kicker: SoccerCaptureActorSelection
     let slot: number | null = null
     if (pendingKicker) {
@@ -120,6 +124,8 @@ export default function SoccerShootoutWorkspace({
     }
     const result = recordSoccerShootoutKick(state, {
       outcome,
+      bodyPart: detail?.bodyPart === 'header' ? null : detail?.bodyPart,
+      goalPlacement: outcome === 'scored' ? detail?.goalPlacement : null,
       kicker,
       goalkeeper: goalkeeperSelection,
       anonymousKickerSlot: slot,
@@ -128,7 +134,7 @@ export default function SoccerShootoutWorkspace({
       setError(result.message)
       return
     }
-    if (onApply(result)) setError(null)
+    if (onApply(result)) { setError(null); setDetails(shotDetailDraft()); setDetailOutcome('scored') }
   }
 
   return (
@@ -159,6 +165,7 @@ export default function SoccerShootoutWorkspace({
               <button key={event.id} type="button" onClick={() => setEditingKick(event)} className={`min-w-24 rounded-md border px-3 py-2 text-left ${event.payload.outcome === 'retake' ? 'border-info-line bg-info' : 'border-line bg-surface'}`}>
                 <p className="max-w-20 truncate text-[10px] font-bold uppercase text-content-subtle" title={event.teamSide === 'tracked' ? trackedLabel : opponentTeamLabel}>{event.teamSide === 'tracked' ? trackedLabel : opponentTeamLabel} {index + 1}</p>
                 <p className="mt-0.5 text-sm font-bold capitalize text-content">{event.payload.outcome}</p>
+                {event.payload.bodyPart && <p className="mt-0.5 text-xs text-content-muted">{soccerBodyPartLabel(event.payload.bodyPart)}</p>}
                 <p className="mt-0.5 max-w-20 truncate text-[11px] text-content-muted">{event.actors.find(actor => actor.role === 'kicker')?.label ?? 'Unknown'}</p>
               </button>
             ))}
@@ -215,8 +222,12 @@ export default function SoccerShootoutWorkspace({
           )}
 
           <div className="grid grid-cols-2 gap-2">
-            {OUTCOMES.map(outcome => <button key={outcome.value} type="button" disabled={busy || goalkeeperNeedsReplacement} onClick={() => recordKick(outcome.value)} className={`min-h-12 rounded-md px-3 text-sm font-bold disabled:bg-control-disabled disabled:text-content-disabled ${outcome.tone}`}>{outcome.label}</button>)}
+            {OUTCOMES.map(outcome => <button key={outcome.value} type="button" disabled={busy || goalkeeperNeedsReplacement} onClick={() => recordKick(outcome.value, details)} className={`min-h-12 rounded-md px-3 text-sm font-bold disabled:bg-control-disabled disabled:text-content-disabled ${outcome.tone}`}>{outcome.label}</button>)}
           </div>
+          <SoccerShotDetailsEditor value={details} onChange={setDetails} goal={detailOutcome === 'scored'} shootout disabled={busy || goalkeeperNeedsReplacement}
+            outcomeControl={<label className="block text-sm text-content">Outcome<select className="input-field mt-1 w-full" value={detailOutcome} onChange={event => { const value = event.target.value as SoccerShootoutKickOutcome; setDetailOutcome(value); if (value !== 'scored') setDetails(current => ({ ...current, goalPlacement: null })) }}>{OUTCOMES.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}>
+            <button type="button" onClick={() => recordKick(detailOutcome, details)} className="min-h-12 w-full rounded-md bg-accent px-3 text-sm font-bold text-accent-content">Log kick</button>
+          </SoccerShotDetailsEditor>
         </section>
       )}
 
@@ -236,6 +247,7 @@ export default function SoccerShootoutWorkspace({
 
 function KickCorrectionDialog({ event, state, busy, onClose, onSave }: { event: SoccerShootoutKickEvent; state: GameState; busy: boolean; onClose: () => void; onSave: (result: SoccerLiveResult) => void }) {
   const [outcome, setOutcome] = useState(event.payload.outcome)
+  const [details, setDetails] = useState(() => shotDetailDraft(event))
   const [error, setError] = useState<string | null>(null)
   const kicker = event.actors.find(actor => actor.role === 'kicker')
   const goalkeeper = event.actors.find(actor => actor.role === 'goalkeeper')
@@ -243,6 +255,8 @@ function KickCorrectionDialog({ event, state, busy, onClose, onSave }: { event: 
     if (!kicker || !goalkeeper) return setError('Kick actors are unavailable.')
     const result = reviseSoccerShootoutKick(state, event.id, event.teamSide, {
       outcome,
+      bodyPart: details.bodyPart === 'header' ? null : details.bodyPart,
+      goalPlacement: outcome === 'scored' ? details.goalPlacement : null,
       kicker: selectionFromActor(kicker),
       goalkeeper: selectionFromActor(goalkeeper),
       anonymousKickerSlot: event.payload.anonymousKickerSlot,
@@ -250,7 +264,16 @@ function KickCorrectionDialog({ event, state, busy, onClose, onSave }: { event: 
     if (!result.ok) return setError(result.message)
     onSave(result)
   }
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}><div role="dialog" aria-modal="true" aria-label="Correct shootout kick" className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={click => click.stopPropagation()}><div className="mb-4 flex items-center gap-3"><Pencil size={18} /><h2 className="flex-1 font-bold text-content">Correct Kick</h2><button type="button" onClick={onClose} className="text-sm font-bold text-content-muted">Close</button></div><p className="mb-3 text-sm text-content-muted">{kicker?.label ?? 'Unknown kicker'}</p><div className="grid grid-cols-2 gap-2">{OUTCOMES.map(option => <button key={option.value} type="button" onClick={() => setOutcome(option.value)} className={`min-h-11 rounded-md px-3 text-sm font-bold ${outcome === option.value ? 'bg-accent text-accent-content' : 'border border-line-strong bg-surface text-content'}`}>{option.label}</button>)}</div>{error && <p className="mt-3 text-sm text-danger-content">{error}</p>}<button type="button" disabled={busy} onClick={submit} className="mt-4 min-h-12 w-full rounded-md bg-success text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">Save Correction</button></div></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label="Correct shootout kick" className="max-h-[90dvh] w-full overflow-y-auto rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={click => click.stopPropagation()}>
+      <div className="mb-4 flex items-center gap-3"><Pencil size={18} /><h2 className="flex-1 font-bold text-content">Correct Kick</h2><button type="button" onClick={onClose} className="text-sm font-bold text-content-muted">Close</button></div>
+      <p className="mb-3 text-sm text-content-muted">{kicker?.label ?? 'Unknown kicker'}</p>
+      <div className="grid grid-cols-2 gap-2">{OUTCOMES.map(option => <button key={option.value} type="button" disabled={busy} onClick={() => { setOutcome(option.value); if (option.value !== 'scored') setDetails(current => ({ ...current, goalPlacement: null })) }} className={`min-h-11 rounded-md px-3 text-sm font-bold ${outcome === option.value ? 'bg-accent text-accent-content' : 'border border-line-strong bg-surface text-content'}`}>{option.label}</button>)}</div>
+      <SoccerShotDetailsEditor value={details} onChange={setDetails} goal={outcome === 'scored'} shootout disabled={busy} />
+      {error && <p className="mt-3 text-sm text-danger-content">{error}</p>}
+      <button type="button" disabled={busy} onClick={submit} className="mt-4 min-h-12 w-full rounded-md bg-success text-sm font-bold text-content disabled:bg-control-disabled disabled:text-content-disabled">Save Correction</button>
+    </div>
+  </div>
 }
 
 function Score({ name, normal, shootout }: { name: string; normal: number; shootout: number }) { return <div className="min-w-0"><p className="truncate text-xs font-semibold text-content-muted">{name}</p><p className="mt-1 text-3xl font-bold tabular-nums text-content">{shootout}</p><p className="text-[11px] text-content-subtle">Normal {normal}</p></div> }

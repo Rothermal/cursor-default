@@ -1,4 +1,4 @@
-import type { GameEventEditableFields, GameEventLocation, JsonObject } from '../gameEvents/types'
+import type { GameEvent, GameEventEditableFields, GameEventLocation, JsonObject } from '../gameEvents/types'
 import type { GameState } from '../../types'
 import { isGameEventEnvelope, isPlainObject } from '../gameEvents/envelope'
 
@@ -11,6 +11,42 @@ export type SoccerShotDetails = {
 
 export function isSoccerShotDetailFamily(type: string): boolean {
   return ['soccer.shot', 'soccer.own_goal', 'soccer.shootout_kick'].includes(type)
+}
+
+export type SoccerShotDetailInput = {
+  bodyPart?: SoccerBodyPart | null
+  goalPlacement?: SoccerGoalPlacement | null
+}
+
+export interface ShotDetailDraft {
+  bodyPart: SoccerBodyPart | null
+  goalPlacement: SoccerGoalPlacement | null
+}
+
+export function shotDetailDraft(event?: GameEvent | null): ShotDetailDraft {
+  if (!event || !isSoccerShotDetailFamily(event.eventType) || !validateSoccerShotDetails(event.eventType, event.payload)) {
+    return { bodyPart: null, goalPlacement: null }
+  }
+  return {
+    bodyPart: (event.payload.bodyPart as SoccerBodyPart | undefined) ?? null,
+    goalPlacement: event.payload.goalPlacement ? structuredClone(event.payload.goalPlacement) as SoccerGoalPlacement : null,
+  }
+}
+
+export function soccerShotDetailInput(input: SoccerShotDetailInput): JsonObject {
+  const result: JsonObject = {}
+  if (input.bodyPart !== undefined) result.bodyPart = input.bodyPart
+  if (input.goalPlacement !== undefined) result.goalPlacement = input.goalPlacement
+  return result
+}
+
+export function soccerBodyPartLabel(value: unknown): string {
+  return value === 'left_foot' ? 'Left foot' : value === 'right_foot' ? 'Right foot'
+    : value === 'header' ? 'Header' : 'Unspecified'
+}
+
+export function soccerScoringDirection(side: 'tracked' | 'opponent', direction: 'left_to_right' | 'right_to_left') {
+  return side === 'tracked' ? direction : direction === 'left_to_right' ? 'right_to_left' : 'left_to_right'
 }
 
 export function preserveSoccerEventDetailChanges(

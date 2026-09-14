@@ -1,4 +1,5 @@
 import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import { SoccerShotDetailsReview } from './SoccerShotDetails'
 import { ChevronDown, ChevronUp, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import type { GameState } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
@@ -540,6 +541,7 @@ function HistoryRow({
           )}
         </div>
       </div>
+      <SoccerShotDetailsReview event={event} collapsed />
       {review && event.revision > 1 && metadataOpen && (
         <div className="mt-2 border-l-2 border-success-line pl-3 text-[11px] text-content-muted">
           <p>Current revision {event.revision}</p>
