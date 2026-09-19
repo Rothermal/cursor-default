@@ -18,15 +18,22 @@ Deployment health is determined by the latest Actions run, not this link's prese
   PWA scope and start URL are `/cursor-default/`; local development base is `/`.
   The current service-worker registration uses `prompt`, not automatic activation.
   Do not copy the older guide's `autoUpdate` example over current configuration.
-- Build identity is supplied as `VITE_APP_BUILD_ID` from the commit SHA. Verify
-  the deployed build and refresh installed PWAs deliberately before testing new behavior.
+- Build identity is supplied as `VITE_APP_BUILD_ID` from the commit SHA. Accept the
+  Update prompt before testing new behavior; refresh alone is not sufficient.
+  Alternatively, close every client in scope and reopen after the waiting worker
+  activates. Verify the displayed build identity matches the deployed commit before
+  beginning verification. If Update asks to pause a running game, complete that
+  guarded workflow; do not bypass it with a forced reload.
 
 ## Cloud configuration
 
 [.env.example](../.env.example) lists local client environment keys. The deployed
 workflow currently reads repository secrets `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY`; do not assume a local publishable-key variable is also
-configured in Actions. Never put service-role credentials or OAuth client secrets
+configured in Actions. The client resolves `VITE_SUPABASE_PUBLISHABLE_KEY` first,
+then falls back to `VITE_SUPABASE_ANON_KEY`. The current URL-plus-anon-key secret
+set is supported when populated with valid project credentials; an additional
+publishable-key secret is not required. Never put service-role credentials or OAuth client secrets
 in Vite variables. Provider configuration remains external.
 
 For an existing database, inspect applied migrations and the owning feature plan

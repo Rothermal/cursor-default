@@ -56,12 +56,19 @@ No blanket archive of BKE/SOC/THM is proposed until that reconciliation is done.
 
 ## Verification for this pass
 
-PR review follow-up restored [Operations](OPERATIONS.md) to both active entry
-points, linking deployment, historical integration context and icon regeneration.
+[Operations](OPERATIONS.md) is the active entry point for deployment, historical
+integration context and icon regeneration, linked from both documentation indexes.
 The older deployment guide's service-worker example is explicitly marked stale.
 
-Checked local Markdown targets in all 18 changed/new documents: no missing files.
+Initial reset: checked local Markdown targets in all 18 changed/new documents with
+no missing files.
 Compared all six relocated/snapshot documents with their original Git versions:
 content preserved in full, apart from explanatory banners and relative-link rebasing.
 Diff whitespace checks passed. No runtime tests or database operations were run
 because this change is documentation-only.
+
+Operations hardening: all 427 local links across the expanded 20-document scope
+resolve. The existing release guard now checks the operator-facing prompt-update,
+build-verification, toolchain and key-fallback guidance. Its 25 focused tests,
+TypeScript and targeted lint passed. No application behavior, deployment or
+database operation changed; no full runtime suite was rerun for this follow-up.
