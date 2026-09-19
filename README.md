@@ -74,6 +74,7 @@ recorded separately; passing unit tests does not certify those checks.
 
 ## Documentation
 
+- [Deployment, cloud setup and PWA icon operations](docs/OPERATIONS.md)
 - [Documentation index and active work](docs/README.md)
 - [Codebase overview for contributors and agents](docs/AGENT_CODEBASE_OVERVIEW.md)
 - [Shared product and interaction decisions](docs/PRODUCT_AND_INTERACTION_DECISIONS.md)

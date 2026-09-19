@@ -1,5 +1,10 @@
 ## StatKeeper – GitHub Pages Deployment
 
+> Current entry point: [Operations](docs/OPERATIONS.md). The configuration snippets
+> below are historical examples. In particular, current `vite.config.ts` uses
+> `registerType: 'prompt'`, not the `autoUpdate` example below. Treat the checked-in
+> workflow and Vite configuration as authoritative; do not replace them wholesale.
+
 This guide shows how to deploy StatKeeper to **GitHub Pages** as a project site at `https://username.github.io/cursor-default/` using **GitHub Actions**.
 
 Replace `username` with your actual GitHub username.

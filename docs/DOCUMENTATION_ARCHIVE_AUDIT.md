@@ -56,6 +56,10 @@ No blanket archive of BKE/SOC/THM is proposed until that reconciliation is done.
 
 ## Verification for this pass
 
+PR review follow-up restored [Operations](OPERATIONS.md) to both active entry
+points, linking deployment, historical integration context and icon regeneration.
+The older deployment guide's service-worker example is explicitly marked stale.
+
 Checked local Markdown targets in all 18 changed/new documents: no missing files.
 Compared all six relocated/snapshot documents with their original Git versions:
 content preserved in full, apart from explanatory banners and relative-link rebasing.

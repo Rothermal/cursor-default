@@ -5,11 +5,16 @@ unfinished implementation; some retain important verification or follow-up work.
 
 ## Current references
 
+- [Operations: deployment, cloud configuration and icons](OPERATIONS.md)
 - [App overview and local development](../README.md)
 - [Codebase architecture](AGENT_CODEBASE_OVERVIEW.md)
 - [Shared product and interaction decisions](PRODUCT_AND_INTERACTION_DECISIONS.md)
 - [Access matrix](ACCESS_MATRIX.md)
 - [Documentation archive audit](DOCUMENTATION_ARCHIVE_AUDIT.md)
+
+Operations links to the existing [Pages deployment guide](../GITHUB_PAGES_DEPLOY.md)
+and labels the [original integration plan](INTEGRATION_PLAN.md) as historical
+architecture, not current schema or deployment instructions.
 
 ## Active work and open follow-ups
 
