@@ -464,6 +464,7 @@ describe('Basketball release entry guards', () => {
     const css = source('src/index.css')
     const releasePlan = source('docs/PLAN_BKE_6E_RELEASE_HARDENING.md')
     const releaseMatrix = source('docs/REGRESSION_BKE_6E_RELEASE.md')
+    const operations = source('docs/OPERATIONS.md')
     const applyUpdate = between(
       status,
       'const applyUpdate = async () => {',
@@ -486,6 +487,13 @@ describe('Basketball release entry guards', () => {
     expect(css).toContain('.pwa-status-game-offset')
     expect(releasePlan).toContain('loading or refreshing is not sufficient')
     expect(releaseMatrix).toContain('refresh alone is not sufficient')
+    expect(operations).toContain('uses `prompt`, not automatic activation')
+    expect(operations).toContain('Update prompt before testing new behavior; refresh alone is not sufficient')
+    expect(operations).toContain('Verify the displayed build identity matches the deployed commit')
+    expect(operations).toContain('Node 20 and pnpm 9')
+    expect(deploy).toContain('node-version: 20')
+    expect(deploy).toContain('version: 9')
+    expect(operations).toContain('then falls back to `VITE_SUPABASE_ANON_KEY`')
     expect(applyUpdate.indexOf("prepareActiveGameMutation('reload_commit')"))
       .toBeLessThan(applyUpdate.indexOf('updateServiceWorker(true)'))
   })
