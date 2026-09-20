@@ -1,7 +1,63 @@
 # Basketball Workspace Modernization
 
-Status: interaction direction approved; implementation plan proposed for review.
-Documentation only. No tracker, clock or persistence behavior changes in this PR.
+Status: initial workspace implementation complete; PR review and owner validation pending.
+
+## Implemented workspace
+
+- Court / Lineup / Actions navigation is available for legacy and event Basketball;
+  event games retain Timeline. Actions is the compact entry for team/game controls.
+- Team-name buttons select the capture side. Chart review has its own independent
+  filter. Each court popup starts with explicit team attribution and can select an
+  individual for that event without changing the global active player/preferences.
+- Lineup cards open in-game stat controls; event participants also get their filtered
+  editable Timeline. Legacy cards do not invent on-court or bench status.
+- Manage Lineup uses the existing checked substitution sheet and still requires a
+  paused clock. Clock/substitution policy redesign remains separate.
+- Reuses existing court popup, stat buttons, Timeline/editors and substitution sheet.
+  The new roster adapter is Basketball-owned because its participant and lineup
+  semantics differ from Soccer; no speculative universal sport component was added.
+
+### Action inventory
+
+| Existing action | Destination |
+| --- | --- |
+| Located made/missed shots, assist/rebound follow-ups | Court popup, event-local actor |
+| Chart filters, marker details/edit, chart undo/clear | Court, independent review filter |
+| Individual direct shots/free throws, rebounds, assists, steals, blocks, turnovers | Lineup card -> player details |
+| Personal fouls, manual minutes where supported, Steal + Turnover | Player details, existing checked commands |
+| Team turnovers/fouls/technicals and legacy team grid | Actions, selected team |
+| Charged/neutral timeouts and official player/staff ejections | Actions |
+| Awarded free-throw trips | Actions and player details, same existing trip workflow |
+| Score adjustments, lifecycle, clock and boundary review | Existing scoreboard/header/clock controls |
+| Substitutions and late players | Manage Lineup and Add Player in Lineup |
+| Event correction/history | Global Timeline and participant-filtered Timeline in details |
+| Legacy decrement and newest-first undo | Player/team controls and existing Undo |
+| Game notes | Actions |
+
+### Validation
+
+- Existing 1,816 tests passed; four new roster tests cover legacy status, opponent
+  identity, immutable match membership and empty rosters.
+- Production build passed. Isolated browser fixtures passed at 390px and 1280px in
+  Light/Dark for legacy and event games: navigation does not mutate state, both sides
+  capture correctly, popup actor cancellation does not persist, and no horizontal
+  page overflow was detected.
+- No schema, Supabase migration, saved-game conversion or clock-policy changes.
+- PR review follow-up: legacy located shots require a tracked individual; team and
+  opponent score changes remain scoreboard adjustments. Event games still support
+  team/opponent shot attribution. Legacy opponent Add Player is disabled rather than
+  introducing unsupported opponent scoring into the aggregate model.
+- Added discriminating on-court/bench and paused/running/missing-clock control tests,
+  legacy shot-actor guards, and whole-side chart tests including opponent individuals.
+  Removed obsolete global-selection code; chart options use explicit team/player labels.
+- Second review follow-up: late-event player rows and reconciliation now preserve
+  participant sides, including repaired and recreated rows. The court derives sides
+  from match participants for older local rows without mutating saved state. Parent
+  component callback tests pin both the legacy popup restriction and submit guard,
+  and verify that event-team capture still uses the checked event path.
+- Owner checks after deployment: a clocked game using Manage Lineup, linked
+  assist/rebound preferences, park/resume and a real cloud-bound game. Existing
+  automated command/parking/cloud tests pass, but these live checks are not claimed.
 
 ## Approved outcome
 

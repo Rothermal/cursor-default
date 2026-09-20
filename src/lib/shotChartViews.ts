@@ -11,12 +11,10 @@ export type ShotChartSelection =
   | { kind: 'player'; playerId: string }
 
 /**
- * Which side a player's shots belong to. StatKeeper has one home roster of individuals
- * plus a single opponent pseudo-player, so individuals are always the home side.
+ * Missing side retains the historical tracked-roster default.
  */
 export function sideOf(player: Player): 'home' | 'opponent' {
-  if (isTeamPseudoPlayer(player)) return player.teamSide ?? 'home'
-  return 'home'
+  return player.teamSide ?? 'home'
 }
 
 /** "{view}" part of the context label (§3.3): who the chart is currently showing. */

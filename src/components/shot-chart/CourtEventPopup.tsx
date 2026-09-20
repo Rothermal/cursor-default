@@ -60,6 +60,7 @@ interface CourtEventPopupProps {
   shotType: '2pt' | '3pt'
   onShotTypeChange?: (shotType: '2pt' | '3pt') => void
   errorMessage?: string | null
+  shotDisabledMessage?: string | null
   onPick: (event: CourtEvent) => void
   /** Cancel button, tap-outside, and Escape all dismiss with no change (D8). */
   onCancel: () => void
@@ -80,6 +81,7 @@ export default function CourtEventPopup({
   shotType,
   onShotTypeChange,
   errorMessage,
+  shotDisabledMessage,
   onPick,
   onCancel,
 }: CourtEventPopupProps) {
@@ -425,20 +427,23 @@ export default function CourtEventPopup({
           </div>
         ) : (
           <>
+            {shotDisabledMessage && <p role="status" className="text-sm text-warning-content">{shotDisabledMessage}</p>}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
+                disabled={Boolean(shotDisabledMessage)}
                 onClick={continueMadeShot}
                 className="py-4 rounded-xl text-base font-bold text-success-content bg-success
-                           active:bg-success active:scale-95 transition-transform"
+                           active:bg-success active:scale-95 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 Made
               </button>
               <button
                 type="button"
+                disabled={Boolean(shotDisabledMessage)}
                 onClick={continueMissedShot}
                 className="py-4 rounded-xl text-base font-bold text-danger-content bg-danger
-                           active:bg-danger active:scale-95 transition-transform"
+                           active:bg-danger active:scale-95 transition-transform disabled:bg-control-disabled disabled:text-content-disabled"
               >
                 Missed
               </button>

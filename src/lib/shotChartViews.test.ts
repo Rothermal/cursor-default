@@ -62,6 +62,15 @@ describe('sideOf', () => {
 })
 
 describe('shotsForSelection', () => {
+  it('team filters include their individual opponents and never leak them to tracked shots', () => {
+    const opponent = player('away-7', { teamSide: 'opponent' })
+    const roster = [...players, opponent]
+    const records = [...shots, shot('away-shot', opponent.id)]
+    expect(shotsForSelection(records, roster, { kind: 'player', playerId: TEAM_PLAYER_OPP_ID }).map(s => s.id))
+      .toEqual(['s4', 'away-shot'])
+    expect(shotsForSelection(records, roster, { kind: 'player', playerId: TEAM_PLAYER_HOME_ID }).map(s => s.id))
+      .toEqual(['s1', 's2', 's3', 's5'])
+  })
   it('all → returns the input array unchanged', () => {
     expect(shotsForSelection(shots, players, { kind: 'all' })).toEqual(shots)
   })

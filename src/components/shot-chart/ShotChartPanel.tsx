@@ -45,6 +45,7 @@ import {
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
 import BasketballShotEditor from '../basketball/BasketballShotEditor'
+import { legacyBasketballShotActorError } from '../../lib/basketball/legacyCourtCapture'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from '../basketball/BasketballTimelineCorrectionDialog'
@@ -94,11 +95,12 @@ function shotLabelFromLogEntry(
  * `useGame()`; no route concerns.
  */
 interface ShotChartPanelProps {
-  /** View filter (F2): which shots the court and zone summary display. Recording always
-   *  targets the active player regardless of the view (D14). */
+  /** Display-only filter, independent of capture attribution. */
   selection: ShotChartSelection
   /** Same action as the sticky player strip; used by F6's in-popup player switch. */
   onSelectPlayer: (playerId: string) => void
+  /** Explicit workspace target; popup attribution stays local to this capture. */
+  capturePlayerId?: string | null
   /** Keeps chart review available while blocking new events for an unavailable player. */
   captureDisabled?: boolean
   captureDisabledMessage?: string
@@ -107,13 +109,26 @@ interface ShotChartPanelProps {
 export default function ShotChartPanel({
   selection,
   onSelectPlayer,
+  capturePlayerId,
   captureDisabled = false,
   captureDisabledMessage,
 }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
   const { user } = useAuth()
   const { basketballSettings } = useSettings()
-  const { sport, players, activePlayerId, shotChart, actionLog } = state
+  const { sport, activePlayerId, shotChart, actionLog } = state
+  // Older local event games may predate side metadata on the derived player rows.
+  const players = useMemo(() => {
+    if (state.sportGameState?.sportId !== 'basketball') return state.players
+    const sides = new Map(Object.values(state.sportGameState.projection.participants)
+      .map(participant => [participant.playerId, participant.teamSide]))
+    return state.players.map(player => {
+      const side = sides.get(player.id)
+      return side && !isTeamPseudoPlayer(player)
+        ? { ...player, teamSide: side === 'opponent' ? 'opponent' as const : 'home' as const }
+        : player
+    })
+  }, [state.players, state.sportGameState])
   const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)
@@ -166,7 +181,7 @@ export default function ShotChartPanel({
   const persistedCapturePlayerId = isEventBasketball
     ? basketballPlayerIdForCapturePreferences(state)
     : null
-  const effectivePlayerId =
+  const effectivePlayerId = capturePlayerId !== undefined ? capturePlayerId :
     (persistedCapturePlayerId ?? activePlayerId) &&
     players.some(p => p.id === (persistedCapturePlayerId ?? activePlayerId))
       ? persistedCapturePlayerId ?? activePlayerId
@@ -186,7 +201,7 @@ export default function ShotChartPanel({
       }
       setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt', playerId: effectivePlayerId })
       setCaptureError(null)
-      if (isEventBasketball) {
+      if (isEventBasketball && capturePlayerId === undefined) {
         const target = basketballCaptureTargetForPlayerId(state, effectivePlayerId)
         if (target.ok) {
           dispatch({
@@ -203,15 +218,15 @@ export default function ShotChartPanel({
         }
       }
     },
-    [dispatch, effectivePlayerId, isEventBasketball, state]
+    [capturePlayerId, dispatch, effectivePlayerId, isEventBasketball, state]
   )
 
   const handlePopupSelectPlayer = useCallback(
     (playerId: string) => {
-      onSelectPlayer(playerId)
+      if (capturePlayerId === undefined) onSelectPlayer(playerId)
       setPendingTap(prev => (prev ? { ...prev, playerId } : null))
       setCaptureError(null)
-      if (isEventBasketball) {
+      if (isEventBasketball && capturePlayerId === undefined) {
         const target = basketballCaptureTargetForPlayerId(state, playerId)
         if (target.ok) {
           dispatch({
@@ -227,7 +242,7 @@ export default function ShotChartPanel({
         }
       }
     },
-    [dispatch, isEventBasketball, onSelectPlayer, state]
+    [capturePlayerId, dispatch, isEventBasketball, onSelectPlayer, state]
   )
 
   const handlePopupPick = useCallback(
@@ -256,6 +271,13 @@ export default function ShotChartPanel({
         return
       }
 
+      if (event.kind === 'shot') {
+        const actorError = legacyBasketballShotActorError(players.find(player => player.id === loggingPlayerId))
+        if (actorError) {
+          setCaptureError(actorError)
+          return
+        }
+      }
       setPendingTap(null)
 
       if (event.kind === 'stat') {
@@ -297,7 +319,7 @@ export default function ShotChartPanel({
         })
       }
     },
-    [dispatch, isEventBasketball, pendingTap, state, user?.id]
+    [dispatch, isEventBasketball, pendingTap, players, state, user?.id]
   )
 
   useEffect(() => {
@@ -538,8 +560,9 @@ export default function ShotChartPanel({
           reboundPromptAfterMissEnabled={basketballSettings.capture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
           errorMessage={captureError}
+          shotDisabledMessage={isEventBasketball ? null : legacyBasketballShotActorError(pendingLoggingPlayer)}
           onShotTypeChange={shotType => {
-            if (!isEventBasketball) return
+            if (!isEventBasketball || capturePlayerId !== undefined) return
             dispatch({
               type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
               preferences: {
@@ -553,7 +576,7 @@ export default function ShotChartPanel({
           onCancel={() => {
             setPendingTap(null)
             setCaptureError(null)
-            if (isEventBasketball) {
+            if (isEventBasketball && capturePlayerId === undefined) {
               dispatch({
                 type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
                 preferences: { shotValueOverride: null },
