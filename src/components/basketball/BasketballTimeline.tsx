@@ -57,6 +57,7 @@ interface Props {
   mode?: 'tracker' | 'summary'
   editingEnabled?: boolean
   onOpenOwnedRecording?: () => void
+  participantId?: string
 }
 
 export default function BasketballTimeline({
@@ -64,6 +65,7 @@ export default function BasketballTimeline({
   mode = 'tracker',
   editingEnabled,
   onOpenOwnedRecording,
+  participantId,
 }: Props = {}) {
   const { state: contextState } = useGame()
   const state = reviewState ?? contextState
@@ -83,9 +85,9 @@ export default function BasketballTimeline({
   )
   const [filters, setFilters] = useState<BasketballTimelineFilters>(() => ({
     family: 'all',
-    periodId: review.defaultPeriodId,
+    periodId: participantId ? 'all' : review.defaultPeriodId,
     teamSide: 'all',
-    participantId: 'all',
+    participantId: participantId ?? 'all',
   }))
   const [shotDetail, setShotDetail] = useState<BasketballShotDetailModel | null>(null)
   const [correctionIntent, setCorrectionIntent] = useState<BasketballTimelineCorrectionIntent | null>(null)
@@ -248,7 +250,7 @@ export default function BasketballTimeline({
               { value: 'opponent', label: opponentSideLabel },
             ]}
           />
-          <FilterSelect
+          {!participantId && <FilterSelect
             label="Participant"
             value={filters.participantId}
             onChange={value => setFilters(current => ({ ...current, participantId: value }))}
@@ -256,7 +258,7 @@ export default function BasketballTimeline({
               { value: 'all', label: 'All participants' },
               ...review.participants.map(participant => ({ value: participant.id, label: participant.label })),
             ]}
-          />
+          />}
         </div>
       </div>
 

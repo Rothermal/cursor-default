@@ -7,7 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BadgeAlert, Clock3, Link2, List, Minus, ReceiptText, Target, Trash2, UserX } from 'lucide-react'
+import { ArrowLeft, BadgeAlert, Clock3, Link2, List, Minus, ReceiptText, Target, Trash2, UserX } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
@@ -41,16 +41,18 @@ import BasketballTimeline from '../components/basketball/BasketballTimeline'
 import BasketballRecorderStatus from '../components/basketball/BasketballRecorderStatus'
 import BasketballEnableCloudPanel from '../components/basketball/BasketballEnableCloudPanel'
 import BasketballClockStrip from '../components/basketball/BasketballClockStrip'
+import BasketballWorkspaceRoster from '../components/basketball/BasketballWorkspaceRoster'
 import EventCloudConflictDialog from '../components/game-events/EventCloudConflictDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
-import { isTeamPseudoPlayer, playersWithTeamPlaceholders } from '../lib/teamPlayers'
+import { isTeamPseudoPlayer, playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
 import type { ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameInfoPath } from '../lib/teamInfo'
 import { gameSideDisplayName } from '../lib/display'
+import { formatCompactGameStatLine } from '../lib/statDisplay'
 import { basketballSummaryPath } from '../lib/basketball/summary'
 import {
   basketballEqualPlayAuthorityTeamId,
@@ -272,24 +274,25 @@ export default function GameTracker() {
   const [syncBusy, setSyncBusy] = useState(false)
   const [cloudRecoveryError, setCloudRecoveryError] = useState<string | null>(null)
   const [deletedPlayerRecoveryOpen, setDeletedPlayerRecoveryOpen] = useState(false)
-  // Shot-chart view filter (F2): local UI state, not persisted (D16/D17). "All" changes
-  // only what the court displays; the recording target stays `activePlayerId` (D5/D14).
+  // Review filters and workspace navigation never select a live recording actor.
   const [showAllShots, setShowAllShots] = useState(false)
-  const [basketballWorkspace, setBasketballWorkspace] = useState<'track' | 'timeline'>('track')
+  const [basketballWorkspace, setBasketballWorkspace] = useState<'track' | 'lineup' | 'actions' | 'timeline'>('track')
+  const [workspaceSide, setWorkspaceSide] = useState<'tracked' | 'opponent'>('tracked')
+  const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null)
+  const [courtReviewPlayerId, setCourtReviewPlayerId] = useState('all')
   const basketballTrackTabRef = useRef<HTMLButtonElement>(null)
   const basketballTimelineTabRef = useRef<HTMLButtonElement>(null)
 
   const handleBasketballWorkspaceKeyDown = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    let nextWorkspace: 'track' | 'timeline' | null = null
-    if (event.key === 'ArrowLeft' || event.key === 'Home') nextWorkspace = 'track'
-    if (event.key === 'ArrowRight' || event.key === 'End') nextWorkspace = 'timeline'
-    if (!nextWorkspace) return
+    const tabs = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
+    const index = tabs.indexOf(event.currentTarget)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+      : event.key === 'ArrowRight' ? (index + 1) % tabs.length
+        : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : null
+    if (next === null) return
     event.preventDefault()
-    setBasketballWorkspace(nextWorkspace)
-    window.requestAnimationFrame(() => {
-      const target = nextWorkspace === 'track' ? basketballTrackTabRef.current : basketballTimelineTabRef.current
-      target?.focus()
-    })
+    tabs[next]?.click()
+    tabs[next]?.focus()
   }, [])
 
   const teamRules = useMemo(
@@ -518,9 +521,13 @@ export default function GameTracker() {
   const preferredCapturePlayerId = isBasketballEventMode
     ? basketballPlayerIdForCapturePreferences(state)
     : null
-  const activePlayer = players.find(p => p.id === (preferredCapturePlayerId ?? activePlayerId)) || players[0]
   const isBasketball = sport.id === 'basketball'
-  const shotChartSelection: ShotChartSelection = showAllShots
+  const workspaceTeamPlayer = players.find(player => player.id === (workspaceSide === 'tracked' ? TEAM_PLAYER_HOME_ID : TEAM_PLAYER_OPP_ID))
+  const workspacePlayer = detailPlayerId ? players.find(player => player.id === detailPlayerId) : workspaceTeamPlayer
+  const activePlayer = (isBasketball ? workspacePlayer : players.find(p => p.id === (preferredCapturePlayerId ?? activePlayerId))) || players[0]
+  const shotChartSelection: ShotChartSelection = isBasketball
+    ? courtReviewPlayerId === 'all' ? { kind: 'all' } : { kind: 'player', playerId: courtReviewPlayerId }
+    : showAllShots
     ? { kind: 'all' }
     : { kind: 'player', playerId: activePlayer.id }
   const showTeamStatGrid = Boolean(activePlayer.isTeamPlayer && sport.teamCategories?.length)
@@ -622,9 +629,6 @@ export default function GameTracker() {
     : activeBasketballParticipant?.disqualified
       ? `${activeBasketballParticipant.displayName} is disqualified and unavailable for new stats.`
       : undefined
-  const basketballCaptureDisabledMessage = !basketballPeriodActive
-    ? basketballLifecycleCaptureMessage(basketballSportState)
-    : unavailableMessage
   const playerStatusLabels = basketballSportState
     ? Object.fromEntries(Object.values(basketballSportState.projection.participants).flatMap(participant =>
         participant.playerId && (participant.ejected || participant.disqualified)
@@ -975,6 +979,7 @@ export default function GameTracker() {
       name: newName.trim(),
       number: newNumber.trim(),
       stats: {},
+      ...(isBasketball ? { teamSide: workspaceSide === 'opponent' ? 'opponent' as const : 'home' as const } : {}),
     }
     dispatch({ type: 'ADD_PLAYER', player })
     dispatch({ type: 'SET_ACTIVE_PLAYER', playerId: player.id })
@@ -1199,9 +1204,9 @@ export default function GameTracker() {
         />
       )}
 
-      {isBasketballEventMode && !basketballCorrectionMode && (
+      {isBasketball && !basketballCorrectionMode && (
         <div className="mx-auto w-full max-w-lg px-3 pb-2">
-          <div className="grid h-11 grid-cols-2 rounded-lg border border-line-strong bg-control p-1" role="tablist" aria-label="Basketball game workspace">
+          <div className={`grid min-h-11 ${isBasketballEventMode ? 'grid-cols-4' : 'grid-cols-3'} border-b border-line-strong bg-control p-1`} role="tablist" aria-label="Basketball game workspace">
             <button
               ref={basketballTrackTabRef}
               type="button"
@@ -1219,8 +1224,19 @@ export default function GameTracker() {
               }`}
             >
               <Target size={16} aria-hidden />
-              Track
+              Court
             </button>
+            {(['lineup', 'actions'] as const).map(view => (
+              <button key={view} type="button" role="tab" id={`basketball-${view}-tab`}
+                aria-controls={`basketball-${view}-panel`} aria-selected={basketballWorkspace === view}
+                tabIndex={basketballWorkspace === view ? 0 : -1}
+                onKeyDown={handleBasketballWorkspaceKeyDown}
+                onClick={() => { setDetailPlayerId(null); setBasketballWorkspace(view) }}
+                className={`min-w-0 rounded-md px-1 py-2 text-sm font-semibold ${basketballWorkspace === view ? 'bg-surface text-content' : 'text-content-muted'}`}>
+                {view === 'lineup' ? 'Lineup' : 'Actions'}
+              </button>
+            ))}
+            {isBasketballEventMode && (
             <button
               ref={basketballTimelineTabRef}
               type="button"
@@ -1240,6 +1256,7 @@ export default function GameTracker() {
               <List size={16} aria-hidden />
               Timeline
             </button>
+            )}
           </div>
         </div>
       )}
@@ -1251,14 +1268,14 @@ export default function GameTracker() {
           </p>
           <BasketballTimeline />
         </div>
-      ) : (!isBasketballEventMode || basketballWorkspace === 'track') ? (
+      ) : (!isBasketball || basketballWorkspace !== 'timeline') ? (
         <div
-          id={isBasketballEventMode ? 'basketball-track-panel' : undefined}
-          role={isBasketballEventMode ? 'tabpanel' : undefined}
-          aria-labelledby={isBasketballEventMode ? 'basketball-track-tab' : undefined}
+          id={isBasketball ? `basketball-${basketballWorkspace}-panel` : undefined}
+          role={isBasketball ? 'tabpanel' : undefined}
+          aria-labelledby={isBasketball ? `basketball-${basketballWorkspace}-tab` : undefined}
           className="w-full"
         >
-      <PlayerSelectorStrip
+      {!isBasketball && <PlayerSelectorStrip
         players={players}
         activePlayerId={activePlayer.id}
         onSelectPlayer={handleSelectPlayer}
@@ -1276,7 +1293,43 @@ export default function GameTracker() {
         onSelectAll={isBasketball ? () => setShowAllShots(true) : undefined}
         allActive={showAllShots}
         playerStatusLabels={playerStatusLabels}
-      />
+      />}
+
+      {isBasketball && (
+        <div className="mx-auto w-full max-w-lg px-3 py-2">
+          <div className="grid grid-cols-2 gap-2" aria-label="Team">
+            {(['tracked', 'opponent'] as const).map(side => (
+              <button type="button" key={side} aria-pressed={workspaceSide === side}
+                onClick={() => { setWorkspaceSide(side); setDetailPlayerId(null) }}
+                className={`min-h-11 min-w-0 break-words rounded-md border px-3 py-2 text-sm font-semibold ${workspaceSide === side ? 'border-accent bg-accent text-accent-content' : 'border-line bg-surface text-content'}`}>
+                {side === 'tracked' ? trackedTeamLabel : opponentTeamLabel}
+              </button>
+            ))}
+          </div>
+          {basketballWorkspace === 'lineup' && !detailPlayerId && <BasketballWorkspaceRoster
+            state={state} side={workspaceSide} canAdd={!isBasketballEventMode || basketballMatchOpen}
+            onOpen={playerId => {
+              setDetailPlayerId(playerId)
+              window.requestAnimationFrame(() => document.getElementById('basketball-player-detail-title')?.focus())
+            }} onManage={() => setRequestedLineupSide(workspaceSide)}
+            onAdd={() => { setLateParticipantReturnSide(workspaceSide); setShowAddPlayer(true) }}
+          />}
+          {basketballWorkspace === 'lineup' && detailPlayerId && (
+            <div className="py-3">
+              <button type="button" className="btn-secondary mb-2 flex min-h-11 items-center gap-2 px-3" onClick={() => {
+                const returnId = detailPlayerId
+                setDetailPlayerId(null)
+                window.requestAnimationFrame(() => document.getElementById(`basketball-roster-${returnId}`)?.focus())
+              }}>
+                <ArrowLeft size={16} aria-hidden /> Back to Lineup
+              </button>
+              <h2 id="basketball-player-detail-title" tabIndex={-1} className="break-words text-lg font-bold text-content">#{activePlayer.number || '?'} {activePlayer.name}</h2>
+              <p className="text-sm text-content-muted">{formatCompactGameStatLine(sport, activePlayer.stats)}</p>
+              {unavailableMessage && <p className="mt-2 text-sm text-warning-content">{unavailableMessage}</p>}
+            </div>
+          )}
+        </div>
+      )}
 
       {!isBasketballEventMode && showAddPlayer && (
         <div className="px-3 max-w-lg mx-auto w-full">
@@ -1309,24 +1362,26 @@ export default function GameTracker() {
         </div>
       )}
 
-      {isBasketball && (
+      {isBasketball && basketballWorkspace === 'track' && (
         <div className="px-3 py-2 max-w-lg mx-auto w-full">
+          <label className="mb-2 flex items-center gap-2 text-sm text-content-muted">
+            Shot chart
+            <select value={courtReviewPlayerId} onChange={event => setCourtReviewPlayerId(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-content">
+              <option value="all">All shots</option>
+              {players.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}
+            </select>
+          </label>
           <ShotChartPanel
             selection={shotChartSelection}
             onSelectPlayer={handleSelectPlayer}
-            captureDisabled={isBasketballEventMode && (!basketballPeriodActive || activePlayerUnavailable)}
-            captureDisabledMessage={basketballCaptureDisabledMessage}
+            capturePlayerId={workspaceTeamPlayer?.id ?? null}
+            captureDisabled={isBasketballEventMode && !basketballPeriodActive}
+            captureDisabledMessage={basketballLifecycleCaptureMessage(basketballSportState)}
           />
-          {!isBasketballEventMode && (
-            <p className="mt-2 text-[11px] text-content-subtle leading-snug px-1">
-              The court popup and the buttons below adjust the same player stats — the popup is
-              fast in-play entry (shots keep their location); the buttons are for direct entry
-              and corrections.
-            </p>
-          )}
         </div>
       )}
 
+      {(!isBasketball || basketballWorkspace === 'actions' || (basketballWorkspace === 'lineup' && detailPlayerId)) && <>
       {!isBasketballEventMode && showPeriodToggle && teamRules && (
         <div className="px-3 max-w-lg mx-auto w-full">
           <PeriodToggle
@@ -1556,7 +1611,7 @@ export default function GameTracker() {
               Steal + Turnover
             </button>
           )}
-          {isBasketballEventMode && timeoutInventory && (
+          {isBasketballEventMode && basketballWorkspace === 'actions' && timeoutInventory && (
             <section className="border-y border-info-line bg-info px-3 py-3" aria-labelledby="basketball-timeouts-title">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -1604,7 +1659,7 @@ export default function GameTracker() {
               </div>
             </section>
           )}
-          {isBasketballEventMode && (
+          {isBasketballEventMode && basketballWorkspace === 'actions' && (
             <section className="border-y border-danger-line bg-danger px-3 py-3" aria-labelledby="basketball-ejections-title">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -1703,7 +1758,7 @@ export default function GameTracker() {
               {directCaptureError ?? directDecrementError ?? administrativeCorrectionError}
             </p>
           )}
-          <div className="mt-2">
+          {(!isBasketball || basketballWorkspace === 'actions') && <div className="mt-2">
             <label className="block text-sm font-semibold text-content-subtle uppercase tracking-wide mb-2">
               Game Notes
             </label>
@@ -1717,9 +1772,13 @@ export default function GameTracker() {
                          placeholder:text-content-subtle focus:outline-none focus:ring-2 focus:ring-info-line
                          resize-none"
             />
-          </div>
+          </div>}
         </div>
       </div>
+      {isBasketballEventMode && basketballWorkspace === 'lineup' && activeBasketballParticipant && (
+        <BasketballTimeline key={activeBasketballParticipant.participantId} participantId={activeBasketballParticipant.participantId} />
+      )}
+      </>}
         </div>
       ) : (
         <BasketballTimeline />
@@ -1778,7 +1837,7 @@ export default function GameTracker() {
         <BasketballLateParticipantDialog
           trackedTeamName={trackedTeamLabel}
           opponentName={opponentTeamLabel}
-          defaultSide={basketballSportState.capturePreferences.teamSide}
+          defaultSide={lateParticipantReturnSide ?? workspaceSide}
           errorMessage={lateParticipantError}
           onAdd={handleAddBasketballParticipant}
           onClose={() => {
@@ -1824,7 +1883,7 @@ export default function GameTracker() {
           opponentName={opponentTeamLabel}
           candidates={ejectionCandidates}
           foulCandidates={ejectionFoulCandidates}
-          defaultSide={activeBasketballParticipant?.teamSide ?? basketballSportState.capturePreferences.teamSide}
+          defaultSide={activeCaptureSide}
           defaultPlayerId={activeBasketballParticipant?.playerId ?? null}
           errorMessage={ejectionError}
           onSubmit={handleEjectionCapture}
@@ -1840,7 +1899,7 @@ export default function GameTracker() {
           trackedTeamName={trackedTeamLabel}
           opponentName={opponentTeamLabel}
           inventory={timeoutInventory}
-          defaultSide={activeBasketballParticipant?.teamSide ?? basketballSportState.capturePreferences.teamSide}
+          defaultSide={activeCaptureSide}
           errorMessage={timeoutError}
           onSubmit={handleTimeoutCapture}
           onClose={() => {

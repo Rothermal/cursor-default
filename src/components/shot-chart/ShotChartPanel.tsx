@@ -94,11 +94,12 @@ function shotLabelFromLogEntry(
  * `useGame()`; no route concerns.
  */
 interface ShotChartPanelProps {
-  /** View filter (F2): which shots the court and zone summary display. Recording always
-   *  targets the active player regardless of the view (D14). */
+  /** Display-only filter, independent of capture attribution. */
   selection: ShotChartSelection
   /** Same action as the sticky player strip; used by F6's in-popup player switch. */
   onSelectPlayer: (playerId: string) => void
+  /** Explicit workspace target; popup attribution stays local to this capture. */
+  capturePlayerId?: string | null
   /** Keeps chart review available while blocking new events for an unavailable player. */
   captureDisabled?: boolean
   captureDisabledMessage?: string
@@ -107,6 +108,7 @@ interface ShotChartPanelProps {
 export default function ShotChartPanel({
   selection,
   onSelectPlayer,
+  capturePlayerId,
   captureDisabled = false,
   captureDisabledMessage,
 }: ShotChartPanelProps) {
@@ -166,7 +168,7 @@ export default function ShotChartPanel({
   const persistedCapturePlayerId = isEventBasketball
     ? basketballPlayerIdForCapturePreferences(state)
     : null
-  const effectivePlayerId =
+  const effectivePlayerId = capturePlayerId !== undefined ? capturePlayerId :
     (persistedCapturePlayerId ?? activePlayerId) &&
     players.some(p => p.id === (persistedCapturePlayerId ?? activePlayerId))
       ? persistedCapturePlayerId ?? activePlayerId
@@ -186,7 +188,7 @@ export default function ShotChartPanel({
       }
       setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt', playerId: effectivePlayerId })
       setCaptureError(null)
-      if (isEventBasketball) {
+      if (isEventBasketball && capturePlayerId === undefined) {
         const target = basketballCaptureTargetForPlayerId(state, effectivePlayerId)
         if (target.ok) {
           dispatch({
@@ -203,15 +205,15 @@ export default function ShotChartPanel({
         }
       }
     },
-    [dispatch, effectivePlayerId, isEventBasketball, state]
+    [capturePlayerId, dispatch, effectivePlayerId, isEventBasketball, state]
   )
 
   const handlePopupSelectPlayer = useCallback(
     (playerId: string) => {
-      onSelectPlayer(playerId)
+      if (capturePlayerId === undefined) onSelectPlayer(playerId)
       setPendingTap(prev => (prev ? { ...prev, playerId } : null))
       setCaptureError(null)
-      if (isEventBasketball) {
+      if (isEventBasketball && capturePlayerId === undefined) {
         const target = basketballCaptureTargetForPlayerId(state, playerId)
         if (target.ok) {
           dispatch({
@@ -227,7 +229,7 @@ export default function ShotChartPanel({
         }
       }
     },
-    [dispatch, isEventBasketball, onSelectPlayer, state]
+    [capturePlayerId, dispatch, isEventBasketball, onSelectPlayer, state]
   )
 
   const handlePopupPick = useCallback(
@@ -539,7 +541,7 @@ export default function ShotChartPanel({
           shotType={pendingTap.shotType}
           errorMessage={captureError}
           onShotTypeChange={shotType => {
-            if (!isEventBasketball) return
+            if (!isEventBasketball || capturePlayerId !== undefined) return
             dispatch({
               type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
               preferences: {
@@ -553,7 +555,7 @@ export default function ShotChartPanel({
           onCancel={() => {
             setPendingTap(null)
             setCaptureError(null)
-            if (isEventBasketball) {
+            if (isEventBasketball && capturePlayerId === undefined) {
               dispatch({
                 type: 'SET_BASKETBALL_CAPTURE_PREFERENCES',
                 preferences: { shotValueOverride: null },
