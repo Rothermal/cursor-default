@@ -614,7 +614,10 @@ export function addBasketballLateParticipant(
     return failure(state, 'invalid_participant', 'That Basketball player id is already in use.')
   }
 
-  const player: Player = { id: playerId, name: displayName, number: number ?? '', stats: {} }
+  const player: Player = {
+    id: playerId, name: displayName, number: number ?? '', stats: {},
+    teamSide: options.teamSide === 'opponent' ? 'opponent' : 'home',
+  }
   const participant: BasketballMatchParticipant = {
     id: participantId,
     playerId,

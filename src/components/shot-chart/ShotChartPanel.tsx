@@ -116,7 +116,19 @@ export default function ShotChartPanel({
   const { state, dispatch } = useGame()
   const { user } = useAuth()
   const { basketballSettings } = useSettings()
-  const { sport, players, activePlayerId, shotChart, actionLog } = state
+  const { sport, activePlayerId, shotChart, actionLog } = state
+  // Older local event games may predate side metadata on the derived player rows.
+  const players = useMemo(() => {
+    if (state.sportGameState?.sportId !== 'basketball') return state.players
+    const sides = new Map(Object.values(state.sportGameState.projection.participants)
+      .map(participant => [participant.playerId, participant.teamSide]))
+    return state.players.map(player => {
+      const side = sides.get(player.id)
+      return side && !isTeamPseudoPlayer(player)
+        ? { ...player, teamSide: side === 'opponent' ? 'opponent' as const : 'home' as const }
+        : player
+    })
+  }, [state.players, state.sportGameState])
   const [pendingTap, setPendingTap] = useState<PendingCourtTap | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [pulseShotId, setPulseShotId] = useState<string | null>(null)

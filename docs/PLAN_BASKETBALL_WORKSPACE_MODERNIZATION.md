@@ -50,6 +50,11 @@ Status: initial workspace implementation complete; PR review and owner validatio
 - Added discriminating on-court/bench and paused/running/missing-clock control tests,
   legacy shot-actor guards, and whole-side chart tests including opponent individuals.
   Removed obsolete global-selection code; chart options use explicit team/player labels.
+- Second review follow-up: late-event player rows and reconciliation now preserve
+  participant sides, including repaired and recreated rows. The court derives sides
+  from match participants for older local rows without mutating saved state. Parent
+  component callback tests pin both the legacy popup restriction and submit guard,
+  and verify that event-team capture still uses the checked event path.
 - Owner checks after deployment: a clocked game using Manage Lineup, linked
   assist/rebound preferences, park/resume and a real cloud-bound game. Existing
   automated command/parking/cloud tests pass, but these live checks are not claimed.

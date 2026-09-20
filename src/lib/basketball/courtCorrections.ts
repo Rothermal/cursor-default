@@ -1084,6 +1084,7 @@ export function reconcileBasketballPlayerRows(state: GameState): GameState {
             ...player,
             name: participant.displayName,
             number: participant.number ?? '',
+            teamSide: participant.teamSide === 'opponent' ? 'opponent' as const : 'home' as const,
             stats: structuredClone(participant.stats),
           }
         : player
@@ -1095,6 +1096,7 @@ export function reconcileBasketballPlayerRows(state: GameState): GameState {
       id: participant.playerId,
       name: participant.displayName,
       number: participant.number ?? '',
+      teamSide: participant.teamSide === 'opponent' ? 'opponent' : 'home',
       stats: structuredClone(participant.stats),
     })
     existingIds.add(participant.playerId)
