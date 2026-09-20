@@ -38,6 +38,25 @@ const surfaces = [
 ]
 
 describe('Basketball appearance completion inventory', () => {
+  it('backs the review legend dots with the court surface rather than app chrome', () => {
+    const source = readFileSync('src/components/basketball-summary/BasketballShotReview.tsx', 'utf8')
+    const tree = ts.createSourceFile('review.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const legend = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'LegendMark')
+    expect(legend).toBeDefined()
+    const backings: ts.JsxElement[] = []
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxElement(node) && node.openingElement.attributes.properties.some(attribute =>
+        ts.isJsxAttribute(attribute) && attribute.name.getText(tree) === 'className' &&
+        attribute.initializer && ts.isStringLiteral(attribute.initializer) &&
+        attribute.initializer.text.split(/\s+/).includes('bg-court-surface'))) backings.push(node)
+      ts.forEachChild(node, visit)
+    }
+    if (legend) visit(legend)
+    expect(backings).toHaveLength(1)
+    expect(backings[0].getText(tree)).toContain('rounded-full ${color}')
+    expect(backings[0].openingElement.getText(tree)).toContain('shrink-0')
+    for (const side of ['tracked', 'opponent']) expect(source).toContain(`color="bg-court-${side}"`)
+  })
   it('retains the wood court and readable artwork palette in Dark mode', () => {
     const palettes = readFileSync('public/appearance.css', 'utf8').split(/:root\[data-theme=['"]dark['"]\]/)
     expect(palettes).toHaveLength(2)

@@ -429,5 +429,12 @@ function FilterSelect({
 }
 
 function LegendMark({ color, label }: { color: string; label: string }) {
-  return <span className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${color}`} />{label}</span>
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-court-surface">
+        <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+      </span>
+      <span className="break-words">{label}</span>
+    </span>
+  )
 }
