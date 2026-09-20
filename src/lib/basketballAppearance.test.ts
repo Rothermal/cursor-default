@@ -38,6 +38,16 @@ const surfaces = [
 ]
 
 describe('Basketball appearance completion inventory', () => {
+  it('retains the wood court and readable artwork palette in Dark mode', () => {
+    const palettes = readFileSync('public/appearance.css', 'utf8').split(/:root\[data-theme=['"]dark['"]\]/)
+    expect(palettes).toHaveLength(2)
+    const court = (css: string) => Object.fromEntries([...css.matchAll(/--court-([a-z-]+):\s*([\d ]+);/g)]
+      .map(match => [match[1], match[2]]))
+    const light = court(palettes[0])
+    expect(Object.keys(light)).toHaveLength(7)
+    expect(light.surface).toBe('232 213 183')
+    expect(court(palettes[1])).toEqual(light)
+  })
   it.each(surfaces)('%s has no fixed palette or animated theme changes', path => {
     const source = readFileSync(path, 'utf8')
     expect(source).not.toMatch(/(?:bg|text|border|divide|ring|from|to|fill|stroke|accent)-(?:slate|gray|zinc|neutral|stone|red|rose|orange|amber|yellow|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|pink)-\d+/)
