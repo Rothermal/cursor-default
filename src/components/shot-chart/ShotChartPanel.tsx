@@ -45,6 +45,7 @@ import {
 } from '../../lib/basketball/timeline'
 import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
 import BasketballShotEditor from '../basketball/BasketballShotEditor'
+import { legacyBasketballShotActorError } from '../../lib/basketball/legacyCourtCapture'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from '../basketball/BasketballTimelineCorrectionDialog'
@@ -258,6 +259,13 @@ export default function ShotChartPanel({
         return
       }
 
+      if (event.kind === 'shot') {
+        const actorError = legacyBasketballShotActorError(players.find(player => player.id === loggingPlayerId))
+        if (actorError) {
+          setCaptureError(actorError)
+          return
+        }
+      }
       setPendingTap(null)
 
       if (event.kind === 'stat') {
@@ -299,7 +307,7 @@ export default function ShotChartPanel({
         })
       }
     },
-    [dispatch, isEventBasketball, pendingTap, state, user?.id]
+    [dispatch, isEventBasketball, pendingTap, players, state, user?.id]
   )
 
   useEffect(() => {
@@ -540,6 +548,7 @@ export default function ShotChartPanel({
           reboundPromptAfterMissEnabled={basketballSettings.capture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
           errorMessage={captureError}
+          shotDisabledMessage={isEventBasketball ? null : legacyBasketballShotActorError(pendingLoggingPlayer)}
           onShotTypeChange={shotType => {
             if (!isEventBasketball || capturePlayerId !== undefined) return
             dispatch({

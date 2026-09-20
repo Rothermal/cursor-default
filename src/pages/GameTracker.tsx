@@ -47,7 +47,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import PeriodToggle from '../components/team-stats/PeriodToggle'
 import BasketballBonusIndicator from '../components/team-stats/BasketballBonusIndicator'
 import { isTeamPseudoPlayer, playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID, TEAM_PLAYER_OPP_ID } from '../lib/teamPlayers'
-import type { ShotChartSelection } from '../lib/shotChartViews'
+import { shotViewLabel, type ShotChartSelection } from '../lib/shotChartViews'
 import { formatActionLogEntryLabel } from '../lib/actionLogLabels'
 import { sportDashboardPath } from '../lib/sportNavigation'
 import { gameInfoPath } from '../lib/teamInfo'
@@ -71,7 +71,6 @@ import {
   abandonBasketballMatch,
   addBasketballLateParticipant,
   basketballCaptureTargetForPlayerId,
-  basketballPlayerIdForCapturePreferences,
   completeBasketballMatch,
   endBasketballPeriod,
   hasStartedBasketballEventGame,
@@ -275,7 +274,6 @@ export default function GameTracker() {
   const [cloudRecoveryError, setCloudRecoveryError] = useState<string | null>(null)
   const [deletedPlayerRecoveryOpen, setDeletedPlayerRecoveryOpen] = useState(false)
   // Review filters and workspace navigation never select a live recording actor.
-  const [showAllShots, setShowAllShots] = useState(false)
   const [basketballWorkspace, setBasketballWorkspace] = useState<'track' | 'lineup' | 'actions' | 'timeline'>('track')
   const [workspaceSide, setWorkspaceSide] = useState<'tracked' | 'opponent'>('tracked')
   const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null)
@@ -444,7 +442,6 @@ export default function GameTracker() {
 
   const handleSelectPlayer = useCallback(
     (playerId: string) => {
-      setShowAllShots(false)
       dispatch({ type: 'SET_ACTIVE_PLAYER', playerId })
       if (isBasketballEventMode) {
         const target = basketballCaptureTargetForPlayerId(state, playerId)
@@ -518,17 +515,12 @@ export default function GameTracker() {
   const trackedTeamLabel = gameSideDisplayName(gameInfo, 'tracked')
   const opponentTeamLabel = gameSideDisplayName(gameInfo, 'opponent')
 
-  const preferredCapturePlayerId = isBasketballEventMode
-    ? basketballPlayerIdForCapturePreferences(state)
-    : null
   const isBasketball = sport.id === 'basketball'
   const workspaceTeamPlayer = players.find(player => player.id === (workspaceSide === 'tracked' ? TEAM_PLAYER_HOME_ID : TEAM_PLAYER_OPP_ID))
   const workspacePlayer = detailPlayerId ? players.find(player => player.id === detailPlayerId) : workspaceTeamPlayer
-  const activePlayer = (isBasketball ? workspacePlayer : players.find(p => p.id === (preferredCapturePlayerId ?? activePlayerId))) || players[0]
+  const activePlayer = (isBasketball ? workspacePlayer : players.find(p => p.id === activePlayerId)) || players[0]
   const shotChartSelection: ShotChartSelection = isBasketball
     ? courtReviewPlayerId === 'all' ? { kind: 'all' } : { kind: 'player', playerId: courtReviewPlayerId }
-    : showAllShots
-    ? { kind: 'all' }
     : { kind: 'player', playerId: activePlayer.id }
   const showTeamStatGrid = Boolean(activePlayer.isTeamPlayer && sport.teamCategories?.length)
   const showPeriodToggle =
@@ -1004,7 +996,6 @@ export default function GameTracker() {
     setLateParticipantError(null)
     setLifecycleError(null)
     setShowAddPlayer(false)
-    setShowAllShots(false)
     if (lateParticipantReturnSide) setRequestedLineupSide(input.teamSide)
     setLateParticipantReturnSide(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
@@ -1290,8 +1281,6 @@ export default function GameTracker() {
             : undefined
           : () => setShowAddPlayer(!showAddPlayer)}
         sticky
-        onSelectAll={isBasketball ? () => setShowAllShots(true) : undefined}
-        allActive={showAllShots}
         playerStatusLabels={playerStatusLabels}
       />}
 
@@ -1307,7 +1296,7 @@ export default function GameTracker() {
             ))}
           </div>
           {basketballWorkspace === 'lineup' && !detailPlayerId && <BasketballWorkspaceRoster
-            state={state} side={workspaceSide} canAdd={!isBasketballEventMode || basketballMatchOpen}
+            state={state} side={workspaceSide} canAdd={isBasketballEventMode ? basketballMatchOpen : workspaceSide === 'tracked'}
             onOpen={playerId => {
               setDetailPlayerId(playerId)
               window.requestAnimationFrame(() => document.getElementById('basketball-player-detail-title')?.focus())
@@ -1368,7 +1357,7 @@ export default function GameTracker() {
             Shot chart
             <select value={courtReviewPlayerId} onChange={event => setCourtReviewPlayerId(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-content">
               <option value="all">All shots</option>
-              {players.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}
+              {players.map(player => <option key={player.id} value={player.id}>{shotViewLabel({ kind: 'player', playerId: player.id }, players)}</option>)}
             </select>
           </label>
           <ShotChartPanel

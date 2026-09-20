@@ -43,6 +43,13 @@ Status: initial workspace implementation complete; PR review and owner validatio
   capture correctly, popup actor cancellation does not persist, and no horizontal
   page overflow was detected.
 - No schema, Supabase migration, saved-game conversion or clock-policy changes.
+- PR review follow-up: legacy located shots require a tracked individual; team and
+  opponent score changes remain scoreboard adjustments. Event games still support
+  team/opponent shot attribution. Legacy opponent Add Player is disabled rather than
+  introducing unsupported opponent scoring into the aggregate model.
+- Added discriminating on-court/bench and paused/running/missing-clock control tests,
+  legacy shot-actor guards, and whole-side chart tests including opponent individuals.
+  Removed obsolete global-selection code; chart options use explicit team/player labels.
 - Owner checks after deployment: a clocked game using Manage Lineup, linked
   assist/rebound preferences, park/resume and a real cloud-bound game. Existing
   automated command/parking/cloud tests pass, but these live checks are not claimed.
