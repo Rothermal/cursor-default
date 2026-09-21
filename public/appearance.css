@@ -213,13 +213,14 @@
   --stat-pink-content: 232 174 198;
   --stat-pink-badge: 232 174 198;
   --stat-pink-badge-content: 24 25 28;
-  --court-surface: 39 43 43;
-  --court-line: 161 176 170;
-  --court-hint: 202 212 207;
-  --court-made: 74 222 128;
-  --court-miss: 251 113 133;
-  --court-tracked: 147 197 253;
-  --court-opponent: 253 186 116;
+  /* Playing surfaces retain their sport palette, independently of app chrome. */
+  --court-surface: 232 213 183;
+  --court-line: 113 85 32;
+  --court-hint: 71 65 53;
+  --court-made: 21 128 61;
+  --court-miss: 185 28 28;
+  --court-tracked: 29 78 216;
+  --court-opponent: 146 64 14;
 }
 
 

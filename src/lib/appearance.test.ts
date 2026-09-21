@@ -80,6 +80,11 @@ describe('appearance bootstrap/runtime contract', () => {
         const a = tokens[foreground], b = tokens[background]
         expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${foreground}/${background}`).toBeGreaterThanOrEqual(4.5)
       }
+      // Court markers and their legend dots share the tan playing-surface backing.
+      for (const foreground of ['court-line', 'court-made', 'court-miss', 'court-tracked', 'court-opponent']) {
+        const a = tokens[foreground], b = tokens['court-surface']
+        expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${foreground}/court-surface graphics`).toBeGreaterThanOrEqual(3)
+      }
     }
   })
   it.each([null, '', '{', '{}', 'null', '[]', '{"version":2,"theme":"dark"}', '{"version":1,"theme":"system"}', '{"version":1,"theme":"dark","extra":true}'])('defaults malformed records to Light: %s', raw => {
