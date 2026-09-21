@@ -33,6 +33,8 @@ import BasketballFoulDialog, {
   type BasketballFoulDialogInput,
 } from '../components/basketball/BasketballFoulDialog'
 import BasketballFreeThrowTripDialog from '../components/basketball/BasketballFreeThrowTripDialog'
+import BasketballQuickFreeThrowDialog from '../components/basketball/BasketballQuickFreeThrowDialog'
+import { basketballActorPlayers, basketballParticipantIsLive, basketballOpenTrips, basketballTripShooter } from '../lib/basketball/liveActors'
 import BasketballEjectionDialog, {
   type BasketballEjectionDialogInput,
 } from '../components/basketball/BasketballEjectionDialog'
@@ -242,7 +244,9 @@ export default function GameTracker() {
   const [activeFreeThrowTrip, setActiveFreeThrowTrip] = useState<{
     eventId: string
     suggestedPlayerId: string | null
+    snapshot?: string
   } | null>(null)
+  const [quickFreeThrow, setQuickFreeThrow] = useState<{ side: BasketballTeamSide; playerId: string | null } | null>(null)
   const [freeThrowError, setFreeThrowError] = useState<string | null>(null)
   const [pendingFoulDecrement, setPendingFoulDecrement] = useState<{
     target: BasketballFoulDecrementTarget
@@ -567,13 +571,15 @@ export default function GameTracker() {
         }))
     : []
   const foulCandidates = basketballSportState
-    ? Object.values(basketballSportState.projection.participants)
-        .filter(participant => participant.playerId && !participant.disqualified && !participant.ejected)
-        .map(participant => ({
+    ? basketballActorPlayers(state, players, true).filter(player => !isTeamPseudoPlayer(player))
+        .flatMap(player => {
+          const participant = Object.values(basketballSportState.projection.participants).find(item => item.playerId === player.id)
+          return participant ? [{
           playerId: participant.playerId!,
           teamSide: participant.teamSide,
-          label: `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}`,
-        }))
+          label: `${participant.number ? `#${participant.number} ` : ''}${participant.displayName}${participant.position ? ` (${participant.position})` : ''}`,
+          live: basketballParticipantIsLive(state, participant),
+        }] : [] })
     : []
   const currentPeriodId = basketballSportState?.projection.currentPeriodId ?? null
   const currentBasketballSegment = basketballSportState?.projection.periods.find(
@@ -599,7 +605,7 @@ export default function GameTracker() {
     ? basketballTripStatuses.find(trip => trip.eventId === activeFreeThrowTrip.eventId) ?? null
     : null
   const freeThrowCandidates = selectedFreeThrowTrip
-    ? foulCandidates.filter(candidate => candidate.teamSide === selectedFreeThrowTrip.teamSide)
+    ? foulCandidates.filter(candidate => candidate.teamSide === selectedFreeThrowTrip.teamSide && candidate.live)
     : []
   const activeCaptureTarget = isBasketballEventMode
     ? basketballCaptureTargetForPlayerId(state, activePlayer.id)
@@ -679,6 +685,11 @@ export default function GameTracker() {
   }
 
   const handleDirectCapture = (playerId: string, statId: BasketballDirectStatId) => {
+    if (statId === 'ft' || statId === 'ft_miss') {
+      const target = basketballCaptureTargetForPlayerId(state, playerId)
+      if (target.ok) openQuickFreeThrow(target.value.teamSide, isTeamPseudoPlayer({ id: playerId }) ? null : playerId)
+      return
+    }
     clearTrackerActionErrors()
     const result = captureBasketballDirectStat(state, {
       recorderUserId: user?.id ?? null,
@@ -802,6 +813,7 @@ export default function GameTracker() {
       setActiveFreeThrowTrip({
         eventId: result.tripEventId,
         suggestedPlayerId: input.drawnBy?.kind === 'player' ? input.drawnBy.playerId : null,
+        snapshot: JSON.stringify(basketballFreeThrowTripStatuses(result.state).find(trip => trip.eventId === result.tripEventId)),
       })
     }
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
@@ -820,6 +832,11 @@ export default function GameTracker() {
 
   const handleFreeThrowAttempt = (playerId: string, made: boolean) => {
     if (!selectedFreeThrowTrip) return
+    if (!freeThrowCandidates.some(candidate => candidate.playerId === playerId) ||
+        (activeFreeThrowTrip?.snapshot && activeFreeThrowTrip.snapshot !== JSON.stringify(selectedFreeThrowTrip))) {
+      setFreeThrowError('The player or award changed. Close and reopen the free-throw trip.')
+      return
+    }
     clearTrackerActionErrors()
     const result = captureBasketballFreeThrowAttempt(state, {
       recorderUserId: user?.id ?? null,
@@ -833,6 +850,39 @@ export default function GameTracker() {
     }
     setFreeThrowError(null)
     if (result.tripComplete) setActiveFreeThrowTrip(null)
+    else {
+      const next = basketballFreeThrowTripStatuses(result.state).find(trip => trip.eventId === selectedFreeThrowTrip.eventId)
+      if (next) setActiveFreeThrowTrip({ eventId: next.eventId, suggestedPlayerId: playerId, snapshot: JSON.stringify(next) })
+    }
+    dispatch({ type: 'HYDRATE_STATE', state: result.state })
+  }
+
+  const openQuickFreeThrow = (side: BasketballTeamSide, playerId: string | null = null) => {
+    setFreeThrowError(null)
+    const trips = basketballOpenTrips(state, basketballTripStatuses, side)
+    if (trips.length === 1) {
+      setQuickFreeThrow(null)
+      setActiveFreeThrowTrip({ eventId: trips[0].eventId, suggestedPlayerId: basketballTripShooter(trips[0]) ?? playerId, snapshot: JSON.stringify(trips[0]) })
+    } else setQuickFreeThrow({ side, playerId })
+  }
+
+  const handleStandaloneFreeThrow = (playerId: string, made: boolean) => {
+    if (!quickFreeThrow) return
+    if (basketballOpenTrips(state, basketballTripStatuses, quickFreeThrow.side).length) {
+      setFreeThrowError('An awarded trip is available. Choose the award before recording.')
+      return
+    }
+    const id = playerId || (quickFreeThrow.side === 'tracked' ? TEAM_PLAYER_HOME_ID : TEAM_PLAYER_OPP_ID)
+    const target = basketballCaptureTargetForPlayerId(state, id)
+    if (!target.ok || target.value.teamSide !== quickFreeThrow.side ||
+        !basketballActorPlayers(state, players).some(player => player.id === id)) {
+      setFreeThrowError('Choose an eligible player for this team.')
+      return
+    }
+    const result = captureBasketballDirectStat(state, { recorderUserId: user?.id ?? null, playerId: id, statId: made ? 'ft' : 'ft_miss' })
+    if (!result.ok) { setFreeThrowError(result.message); return }
+    setQuickFreeThrow(null)
+    setFreeThrowError(null)
     dispatch({ type: 'HYDRATE_STATE', state: result.state })
   }
 
@@ -1364,6 +1414,10 @@ export default function GameTracker() {
             selection={shotChartSelection}
             onSelectPlayer={handleSelectPlayer}
             capturePlayerId={workspaceTeamPlayer?.id ?? null}
+            onAdministrative={isBasketballEventMode ? (kind, side) => {
+              if (kind === 'foul') openFoulDialog(side, null, 'personal', 'common')
+              else openQuickFreeThrow(side)
+            } : undefined}
             captureDisabled={isBasketballEventMode && !basketballPeriodActive}
             captureDisabledMessage={basketballLifecycleCaptureMessage(basketballSportState)}
           />
@@ -1728,7 +1782,7 @@ export default function GameTracker() {
                         type="button"
                         onClick={() => {
                           setFreeThrowError(null)
-                          setActiveFreeThrowTrip({ eventId: trip.eventId, suggestedPlayerId: lastShooter })
+                          setActiveFreeThrowTrip({ eventId: trip.eventId, suggestedPlayerId: lastShooter, snapshot: JSON.stringify(trip) })
                         }}
                         disabled={!basketballPeriodActive}
                         className="btn-secondary inline-flex min-h-10 shrink-0 items-center gap-2 px-3 py-2 text-sm disabled:bg-control-disabled disabled:text-content-disabled"
@@ -1928,6 +1982,21 @@ export default function GameTracker() {
           }}
         />
       )}
+
+      {quickFreeThrow && <BasketballQuickFreeThrowDialog
+        key={`${quickFreeThrow.side}:${quickFreeThrow.playerId ?? 'team'}`}
+        teamName={quickFreeThrow.side === 'tracked' ? trackedTeamLabel : opponentTeamLabel}
+        defaultPlayerId={quickFreeThrow.playerId}
+        candidates={foulCandidates.filter(candidate => candidate.live && candidate.teamSide === quickFreeThrow.side).map(candidate => ({ value: candidate.playerId, label: candidate.label }))}
+        trips={basketballOpenTrips(state, basketballTripStatuses, quickFreeThrow.side)}
+        error={freeThrowError}
+        onTrip={trip => {
+          setActiveFreeThrowTrip({ eventId: trip.eventId, suggestedPlayerId: basketballTripShooter(trip) ?? quickFreeThrow.playerId, snapshot: JSON.stringify(trip) })
+          setQuickFreeThrow(null)
+          setFreeThrowError(null)
+        }}
+        onRecord={handleStandaloneFreeThrow}
+        onClose={() => { setQuickFreeThrow(null); setFreeThrowError(null) }} />}
 
       {selectedFreeThrowTrip && (
         <BasketballFreeThrowTripDialog

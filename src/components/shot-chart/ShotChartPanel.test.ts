@@ -38,9 +38,9 @@ function findElement<P>(node: ReactNode, type: unknown): ReactElement<P> | undef
   if (node.type === type) return node as ReactElement<P>
   return findElement<P>(node.props.children, type)
 }
-function renderPanel(selection: { kind: 'all' } | { kind: 'player'; playerId: string } = { kind: 'all' }) {
+function renderPanel(selection: { kind: 'all' } | { kind: 'player'; playerId: string } = { kind: 'all' }, onAdministrative = vi.fn()) {
   harness.cursor = 0
-  return ShotChartPanel({ selection, capturePlayerId: TEAM_PLAYER_HOME_ID, onSelectPlayer: vi.fn() })
+  return ShotChartPanel({ selection, capturePlayerId: TEAM_PLAYER_HOME_ID, onSelectPlayer: vi.fn(), onAdministrative })
 }
 function popup() {
   const element = findElement<Parameters<typeof CourtEventPopup>[0]>(renderPanel(), CourtEventPopup)
@@ -61,6 +61,31 @@ function tapCourt() {
   court.props.onCourtTap(0, 8)
 }
 describe('ShotChartPanel legacy capture wiring', () => {
+  it('hands off administrative entry without recording or retaining the court tap', () => {
+    tapCourt()
+    const administrative = vi.fn()
+    const entry = findElement<Parameters<typeof CourtEventPopup>[0]>(renderPanel({ kind: 'all' }, administrative), CourtEventPopup)!
+    entry.props.onAdministrative?.('foul')
+    expect(administrative).toHaveBeenCalledWith('foul', 'tracked')
+    expect(harness.dispatch).not.toHaveBeenCalled()
+    expect(findElement(renderPanel(), CourtEventPopup)).toBeUndefined()
+  })
+  it('does not let the main actor picker switch away from the selected side', () => {
+    tapCourt()
+    popup().onSelectPlayer(TEAM_PLAYER_OPP_ID)
+    expect(popup().activePlayerId).toBe(TEAM_PLAYER_HOME_ID)
+  })
+  it('rechecks player availability after a popup selection', () => {
+    const started = prepareBasketballGameStart({ ...(harness.state as GameState), gameDataAuthority: 'sport_events' }, { recorderUserId: null })
+    if (!started.ok || started.state.sportGameState?.sportId !== 'basketball') throw Error('fixture failed')
+    harness.state = started.state
+    tapCourt()
+    popup().onSelectPlayer('p1')
+    Object.values(started.state.sportGameState.projection.participants)[0].ejected = true
+    popup().onPick({ kind: 'shot', made: true, shotType: '2pt' })
+    expect(harness.dispatch).not.toHaveBeenCalled()
+    expect(popup().errorMessage).toContain('no longer eligible')
+  })
   it('derives opponent sides for old local event rows without mutating saved state', () => {
     const start = prepareBasketballGameStart({ ...(harness.state as GameState), gameDataAuthority: 'sport_events' }, { recorderUserId: null })
     if (!start.ok) throw new Error(start.message)

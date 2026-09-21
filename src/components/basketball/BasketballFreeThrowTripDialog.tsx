@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Trash2, UserPlus, X } from 'lucide-react'
 import type { BasketballFreeThrowTripStatus } from '../../lib/basketball/foulFreeThrowCommands'
+import ActorSelect from '../ActorSelect'
+import { basketballTripShooter } from '../../lib/basketball/liveActors'
 
 export interface BasketballFreeThrowShooterCandidate {
   playerId: string
@@ -30,9 +32,8 @@ export default function BasketballFreeThrowTripDialog({
   onRemove,
   onClose,
 }: BasketballFreeThrowTripDialogProps) {
-  const initialPlayerId = candidates.some(candidate => candidate.playerId === suggestedPlayerId)
-    ? suggestedPlayerId!
-    : candidates[0]?.playerId ?? ''
+  const prefill = basketballTripShooter(trip) ?? suggestedPlayerId
+  const initialPlayerId = candidates.some(candidate => candidate.playerId === prefill) ? prefill! : ''
   const [playerId, setPlayerId] = useState(initialPlayerId)
   const activeAttempts = useMemo(
     () => trip.attempts.filter(attempt => !attempt.deleted),
@@ -41,7 +42,7 @@ export default function BasketballFreeThrowTripDialog({
 
   useEffect(() => {
     if (!candidates.some(candidate => candidate.playerId === playerId)) {
-      setPlayerId(candidates[0]?.playerId ?? '')
+      setPlayerId('')
     }
   }, [candidates, playerId])
 
@@ -114,13 +115,8 @@ export default function BasketballFreeThrowTripDialog({
             </p>
           )}
 
-          <label className="block text-sm font-semibold text-content">
-            Shooter
-            <select value={playerId} onChange={event => setPlayerId(event.target.value)} className="input-field mt-1" disabled={candidates.length === 0}>
-              {candidates.length === 0 && <option value="">No eligible players</option>}
-              {candidates.map(candidate => <option key={candidate.playerId} value={candidate.playerId}>{candidate.label}</option>)}
-            </select>
-          </label>
+          <ActorSelect label="Shooter" value={playerId} onChange={setPlayerId}
+            options={candidates.map(candidate => ({ value: candidate.playerId, label: candidate.label }))} />
 
           {candidates.length === 0 && trip.open && (
             <div className="space-y-2 rounded-lg border border-warning-line bg-warning px-3 py-3">

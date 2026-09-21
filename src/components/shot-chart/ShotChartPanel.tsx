@@ -46,6 +46,8 @@ import {
 import BasketballShotDetailDialog from '../basketball/BasketballShotDetailDialog'
 import BasketballShotEditor from '../basketball/BasketballShotEditor'
 import { legacyBasketballShotActorError } from '../../lib/basketball/legacyCourtCapture'
+import { basketballActorPlayers } from '../../lib/basketball/liveActors'
+import { sideOf } from '../../lib/shotChartViews'
 import BasketballTimelineCorrectionDialog, {
   type BasketballTimelineCorrectionIntent,
 } from '../basketball/BasketballTimelineCorrectionDialog'
@@ -61,6 +63,7 @@ interface PendingCourtTap {
   shotType: '2pt' | '3pt'
   /** Locked logging target; only changes via in-popup player picker (F6). */
   playerId: string
+  side: 'home' | 'opponent'
 }
 
 function popupPlayerLabel(player: Player | undefined): string {
@@ -104,6 +107,7 @@ interface ShotChartPanelProps {
   /** Keeps chart review available while blocking new events for an unavailable player. */
   captureDisabled?: boolean
   captureDisabledMessage?: string
+  onAdministrative?: (kind: 'foul' | 'free_throw', side: 'tracked' | 'opponent') => void
 }
 
 export default function ShotChartPanel({
@@ -112,6 +116,7 @@ export default function ShotChartPanel({
   capturePlayerId,
   captureDisabled = false,
   captureDisabledMessage,
+  onAdministrative,
 }: ShotChartPanelProps) {
   const { state, dispatch } = useGame()
   const { user } = useAuth()
@@ -170,14 +175,8 @@ export default function ShotChartPanel({
 
   const selectorPlayers = useMemo(() => sortTeamPlayersFirst(players), [players])
   const popupPlayers = useMemo(() => {
-    if (!isEventBasketball || state.sportGameState?.sportId !== 'basketball') return players
-    return players.filter(player => {
-      if (isTeamPseudoPlayer(player)) return true
-      const participant = Object.values(state.sportGameState!.projection.participants)
-        .find(candidate => candidate.playerId === player.id)
-      return participant && !participant.disqualified && !participant.ejected
-    })
-  }, [isEventBasketball, players, state.sportGameState])
+    return basketballActorPlayers(state, players)
+  }, [players, state])
   const persistedCapturePlayerId = isEventBasketball
     ? basketballPlayerIdForCapturePreferences(state)
     : null
@@ -199,7 +198,9 @@ export default function ShotChartPanel({
       } catch {
         /* ignore */
       }
-      setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt', playerId: effectivePlayerId })
+      const player = players.find(candidate => candidate.id === effectivePlayerId)
+      if (!player) return
+      setPendingTap({ x, y, shotType: isThreePointer(x, y) ? '3pt' : '2pt', playerId: effectivePlayerId, side: sideOf(player) })
       setCaptureError(null)
       if (isEventBasketball && capturePlayerId === undefined) {
         const target = basketballCaptureTargetForPlayerId(state, effectivePlayerId)
@@ -218,11 +219,13 @@ export default function ShotChartPanel({
         }
       }
     },
-    [capturePlayerId, dispatch, effectivePlayerId, isEventBasketball, state]
+    [capturePlayerId, dispatch, effectivePlayerId, isEventBasketball, state, players]
   )
 
   const handlePopupSelectPlayer = useCallback(
     (playerId: string) => {
+      const player = popupPlayers.find(candidate => candidate.id === playerId)
+      if (!pendingTap || !player || sideOf(player) !== pendingTap.side) return
       if (capturePlayerId === undefined) onSelectPlayer(playerId)
       setPendingTap(prev => (prev ? { ...prev, playerId } : null))
       setCaptureError(null)
@@ -242,7 +245,7 @@ export default function ShotChartPanel({
         }
       }
     },
-    [capturePlayerId, dispatch, isEventBasketball, onSelectPlayer, state]
+    [capturePlayerId, dispatch, isEventBasketball, onSelectPlayer, state, pendingTap, popupPlayers]
   )
 
   const handlePopupPick = useCallback(
@@ -250,6 +253,12 @@ export default function ShotChartPanel({
       const tap = pendingTap
       if (!tap) return
       const loggingPlayerId = tap.playerId
+      const actorIds = [loggingPlayerId, ...(event.kind === 'shot'
+        ? [event.assistPlayerId, event.rebound?.playerId].filter((id): id is string => Boolean(id)) : [])]
+      if (actorIds.some(id => !basketballActorPlayers(state, players).some(player => player.id === id))) {
+        setCaptureError('A selected player is no longer eligible. Cancel and choose an active player.')
+        return
+      }
 
       if (isEventBasketball) {
         const result = captureBasketballCourtEvent(state, {
@@ -555,7 +564,18 @@ export default function ShotChartPanel({
               : undefined
           }
           players={popupPlayers}
+          playerLabels={state.sportGameState?.sportId === 'basketball' ? Object.fromEntries(
+            Object.values(state.sportGameState.projection.participants).filter(participant => participant.playerId)
+              .map(participant => [participant.playerId!, `#${participant.number || '?'} ${participant.displayName}${participant.position ? ` (${participant.position})` : ''}`])
+          ) : undefined}
           activePlayerId={pendingTap.playerId}
+          captureSide={pendingTap.side}
+          onAdministrative={onAdministrative ? kind => {
+            const side = pendingTap.side === 'opponent' ? 'opponent' : 'tracked'
+            setPendingTap(null)
+            setCaptureError(null)
+            onAdministrative(kind, side)
+          } : undefined}
           onSelectPlayer={handlePopupSelectPlayer}
           reboundPromptAfterMissEnabled={basketballSettings.capture.reboundPromptAfterMiss}
           shotType={pendingTap.shotType}
