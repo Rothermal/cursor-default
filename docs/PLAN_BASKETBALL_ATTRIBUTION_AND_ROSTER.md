@@ -32,6 +32,14 @@ database changes have not started.
    side. Never remember the previous event's player. Events requiring an individual
    cannot save until a valid individual is selected; this does not expand which event
    families or legacy adapters support unattributed capture.
+   For event-game shots and other families that already allow team attribution,
+   Unattributed maps to `{ kind: 'team' }` on the externally selected side, preserving
+   team scoring without assigning individual credit. It does not create an
+   `{ kind: 'unknown', label }` actor. For individual-required families (including
+   awarded free throws), it is an unresolved UI selection and Save remains blocked.
+   For fouls, enable team attribution only when the existing foul/counting contract
+   supports a team offense; never reinterpret an unknown personal offender as a team
+   technical. Named unknown actors and explicit staff choices remain separate.
 5. Quick Foul entry opens the existing foul form for the externally selected team,
    initially Unattributed. The recorder selects offender and foul type as applicable,
    confirms before saving, and retains the existing linked free-throw workflow.
@@ -113,8 +121,13 @@ and documentation; no separate foundation-only PR is required.
 
 ### BAR-1: Team defaults through new-game setup
 
-1. Add a Basketball position adapter for PG, SG, SF, PF, C, custom and Unassigned.
-   Reuse the existing match custom-position length limit (80 characters), trim input,
+1. Extract the existing `POSITION_OPTIONS` catalog from
+   `src/components/basketball/BasketballLineupSheet.tsx` into a Basketball position
+   adapter shared by the lineup sheet, roster editor, setup and actor ordering.
+   Preserve PG, SG, SF, PF, C, custom and Unassigned rather than duplicating catalogs.
+   Share the existing 80-character limit with the checked validation in
+   `src/lib/basketball/lineupCommands.ts`; retain authoritative command validation.
+   Trim input,
    and preserve existing custom values. Do not interpret foreign sport-prefixed
    values as Basketball standard positions.
 2. Extend Team roster add/edit and display with position and Starter/Bench defaults.

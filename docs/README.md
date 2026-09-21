@@ -20,7 +20,7 @@ architecture, not current schema or deployment instructions.
 
 | Topic | Owner document | Status |
 | --- | --- | --- |
-| Basketball UI | [Workspace modernization](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md) | Next proposed implementation; interaction direction approved |
+| Basketball UI | [Workspace modernization](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md) | Initial workspace implementation merged in #418; owner validation pending |
 | Basketball attribution and roster | [Team defaults and event capture](PLAN_BASKETBALL_ATTRIBUTION_AND_ROSTER.md) | Q&A complete; BAR-1 roster/setup, then BAR-2 event selection and quick foul/free throws |
 | Clock and live substitutions | [Timing assessment](PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md) | Confirmed goals; implementation/schema still proposed |
 | Soccer issues | [Field-test backlog](PLAN_SOC_FIELD_TEST_BACKLOG.md) | Living issue inventory; distinguish implemented from owner-verified |

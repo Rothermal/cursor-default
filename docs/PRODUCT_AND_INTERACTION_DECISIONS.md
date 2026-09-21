@@ -14,6 +14,10 @@ not claim that every sport already implements the target. Basketball UI is next.
   never the previous event's player. If the event requires an individual, saving
   remains blocked until a valid player is selected. Sport and legacy restrictions
   still apply; the default does not grant unsupported unattributed capture.
+  Where team attribution is supported, Unattributed means credit to the selected
+  side without individual credit, not a fabricated named unknown actor. Otherwise
+  it is an unresolved selection. Sport adapters retain explicit distinctions among
+  team offenses, unknown individuals and named staff.
 - An action explicitly launched from a player's in-game detail page may prefill that
   player, subject to eligibility. Merely visiting details must not install a global
   capture target; subsequent general surface capture still starts Unattributed.
