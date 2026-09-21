@@ -290,6 +290,31 @@ describe('BKE-1C1 Basketball commands', () => {
       .toEqual(['PG', 'Point forward'])
   })
 
+  it.each([
+    { label: 'a non-roster player', positions: { 'foreign-player': 'PG' } },
+    { label: 'an over-length position', positions: { 'player-1': 'x'.repeat(81) } },
+    { label: 'an untrimmed position', positions: { 'player-1': ' PG ' } },
+  ])('rejects reviewed v2 positions with $label without changing state', ({ positions }) => {
+    const before = setupState()
+    const snapshot = structuredClone(before)
+    const result = prepareBasketballGameStart(before, {
+      recorderUserId: 'recorder-1',
+      occurredAt,
+      reviewedSetup: {
+        rulesSnapshot: structuredClone(getBasketballRulesProfile('nba', 1)!.rules),
+        rulesSource: {
+          profileId: 'nba', profileVersion: 1, personalRevision: null,
+          teamRevision: 12, hasExplicitMatchOverrides: false,
+        },
+        sourceTeamId: 'team-reviewed', sourceSeasonId: 'season-reviewed',
+        courtOrientation: 'standard',
+        playerPositions: positions as Record<string, string>,
+      },
+    })
+    expect(result).toMatchObject({ ok: false, code: 'invalid_setup', message: 'Reviewed Basketball positions are invalid.' })
+    expect(before).toEqual(snapshot)
+  })
+
   it('starts reviewed setup v2 paused with exact opening authority and no Clock Start', () => {
     const rules = upgradeBasketballRulesDraftToV3(
       getBasketballRulesProfile('nfhs', 1)!.rules,

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260921172605_basketball_roster_defaults.sql'), 'utf8').toLowerCase()
+const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/070_basketball_roster_defaults.sql'), 'utf8').toLowerCase()
 
 describe('Basketball roster-default migration contract', () => {
   it('retains authentication, app access, team role, sport and CAS checks', () => {

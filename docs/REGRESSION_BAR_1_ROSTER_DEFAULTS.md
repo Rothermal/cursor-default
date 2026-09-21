@@ -6,6 +6,9 @@ Status: local implementation verification passed; production migration and owner
 
 - Full Vitest suite: 218 files / 1,846 tests passed. Typecheck and production build
   passed; lint has no errors and the three existing context Fast Refresh warnings.
+- PR review follow-up: 228 focused tests and typecheck passed after migration naming,
+  invalid v2 position rejection coverage, and the unavailable-starter save hint.
+  The full-suite count above is the pre-review baseline, not a rerun claim.
 
 - Position/default tests cover standard/custom/unassigned values, length bounds,
   exact UUID defaults, duplicates, schema versions, cache compatibility, snapshot
@@ -20,8 +23,9 @@ Status: local implementation verification passed; production migration and owner
 
 ## Owner verification
 
-1. Apply `supabase/migrations/20260921172605_basketball_roster_defaults.sql` in the
+1. Apply `supabase/migrations/070_basketball_roster_defaults.sql` in the
    Supabase SQL editor. No separate backfill or production data cleanup is needed.
+   Highest required sequential migration for BAR-1 is `070`.
 2. As a team owner/admin, open Basketball Team Manage. Add/edit a roster player's
    position, including a multiword custom position. Save and reload. Set up to five
    default starters under shared defaults and save separately; unchecked players are
@@ -40,6 +44,8 @@ Status: local implementation verification passed; production migration and owner
 6. Remove a default starter from the active team roster. Team settings must expose
    the unavailable starter for explicit cleanup; a fresh setup must call for review,
    not invent a replacement. Retry a default save with stale/deleted/foreign-team
-   IDs and expect rejection. Refresh all active clients before editing new defaults.
+   IDs and expect rejection. Unavailable starters also block rules-only saves because
+   rules and defaults share one atomic payload; explicitly uncheck them first.
+   Refresh all active clients before editing new defaults.
 
 The application was not connected to a live Supabase test account for these checks.

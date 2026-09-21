@@ -1,4 +1,4 @@
--- BAR-1: additive team-only defaults. No historical match data is rewritten.
+-- Migration 070 / BAR-1: additive team-only defaults. No historical match data is rewritten.
 create or replace function public.save_basketball_team_settings_revisioned(
   p_team_id uuid, p_expected_revision bigint, p_settings jsonb
 )

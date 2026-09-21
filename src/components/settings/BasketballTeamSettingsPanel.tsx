@@ -48,6 +48,8 @@ export default function BasketballTeamSettingsPanel({
     basketballTeamSettingsFingerprint(team.settings)
   const sharedWritable = mayEdit &&
     (team.status === 'synced' || team.status === 'missing')
+  const hasUnavailableStarters = rosterReady &&
+    (draft.lineupDefaults?.starterPlayerIds ?? []).some(id => !roster.some(player => player.id === id))
   const resolved = useMemo(() => resolveBasketballRules(
     draft.baseProfile,
     [{ id: 'team', overrides: draft.ruleOverrides }]
@@ -231,6 +233,9 @@ export default function BasketballTeamSettingsPanel({
 
       {editorOpen && mayEdit && (
         <div className="sticky bottom-0 -mx-4 grid grid-cols-1 gap-2 border-t border-line bg-surface/95 p-4 backdrop-blur sm:grid-cols-2">
+          {hasUnavailableStarters && <p role="status" className="text-sm text-warning-content sm:col-span-2">
+            Uncheck unavailable default starters above before saving, including rules-only changes.
+          </p>}
           <button
             type="button"
             className="btn-secondary"
