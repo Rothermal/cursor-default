@@ -6,6 +6,7 @@ import type {
 } from '../sportSettingsStorage'
 import {
   BASKETBALL_SETTINGS_SCHEMA_VERSION,
+  BASKETBALL_TEAM_SETTINGS_SCHEMA_VERSION,
   DEFAULT_BASKETBALL_TEAM_SETTINGS,
   parseBasketballTeamSettings,
   type BasketballTeamSettingsV1,
@@ -35,10 +36,11 @@ export function validBasketballTeamSettingsCache(
   if (
     !record ||
     record.sportId !== 'basketball' ||
-    record.schemaVersion !== BASKETBALL_SETTINGS_SCHEMA_VERSION
+    ![BASKETBALL_SETTINGS_SCHEMA_VERSION, BASKETBALL_TEAM_SETTINGS_SCHEMA_VERSION].includes(record.schemaVersion)
   ) return null
   const parsed = parseBasketballTeamSettings(record.settings)
-  return parsed.ok ? { ...record, settings: parsed.value } : null
+  return parsed.ok && (record.schemaVersion === 2) === Boolean(parsed.value.lineupDefaults)
+    ? { ...record, settings: parsed.value } : null
 }
 
 export function parseCloudBasketballTeamSettings(
@@ -46,10 +48,11 @@ export function parseCloudBasketballTeamSettings(
 ): SportSettingsCloudRecord<BasketballTeamSettingsV1> | null {
   if (
     record.sportId !== 'basketball' ||
-    record.schemaVersion !== BASKETBALL_SETTINGS_SCHEMA_VERSION
+    ![BASKETBALL_SETTINGS_SCHEMA_VERSION, BASKETBALL_TEAM_SETTINGS_SCHEMA_VERSION].includes(record.schemaVersion)
   ) return null
   const parsed = parseBasketballTeamSettings(record.settings)
-  return parsed.ok ? { ...record, settings: parsed.value } : null
+  return parsed.ok && (record.schemaVersion === 2) === Boolean(parsed.value.lineupDefaults)
+    ? { ...record, settings: parsed.value } : null
 }
 
 export function resolveBasketballTeamSettingsCloudRecord(
@@ -76,7 +79,8 @@ export function createBasketballTeamSettingsCacheRecord(
   return {
     version: 1,
     sportId: 'basketball',
-    schemaVersion: BASKETBALL_SETTINGS_SCHEMA_VERSION,
+    schemaVersion: settings.lineupDefaults
+      ? BASKETBALL_TEAM_SETTINGS_SCHEMA_VERSION : BASKETBALL_SETTINGS_SCHEMA_VERSION,
     revision: options.revision,
     settings: structuredClone(settings),
     pending: null,

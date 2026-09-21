@@ -266,6 +266,7 @@ describe('BKE-1C1 Basketball commands', () => {
         sourceTeamId: 'team-reviewed',
         sourceSeasonId: 'season-reviewed',
         courtOrientation: 'flipped',
+        playerPositions: { 'player-1': 'PG', 'player-2': 'Point forward' },
       },
     })
 
@@ -285,6 +286,33 @@ describe('BKE-1C1 Basketball commands', () => {
     })
     expect(result.state.sportGameState.capturePreferences.courtOrientation).toBe('flipped')
     expect(result.state.basketballCourtOrientation).toBe('flipped')
+    expect(result.state.sportGameState.setup.participants.map(participant => participant.position))
+      .toEqual(['PG', 'Point forward'])
+  })
+
+  it.each<{ label: string; positions: Record<string, string> }>([
+    { label: 'a non-roster player', positions: { 'foreign-player': 'PG' } },
+    { label: 'an over-length position', positions: { 'player-1': 'x'.repeat(81) } },
+    { label: 'an untrimmed position', positions: { 'player-1': ' PG ' } },
+  ])('rejects reviewed v2 positions with $label without changing state', ({ positions }) => {
+    const before = setupState()
+    const snapshot = structuredClone(before)
+    const result = prepareBasketballGameStart(before, {
+      recorderUserId: 'recorder-1',
+      occurredAt,
+      reviewedSetup: {
+        rulesSnapshot: structuredClone(getBasketballRulesProfile('nba', 1)!.rules),
+        rulesSource: {
+          profileId: 'nba', profileVersion: 1, personalRevision: null,
+          teamRevision: 12, hasExplicitMatchOverrides: false,
+        },
+        sourceTeamId: 'team-reviewed', sourceSeasonId: 'season-reviewed',
+        courtOrientation: 'standard',
+        playerPositions: positions,
+      },
+    })
+    expect(result).toMatchObject({ ok: false, code: 'invalid_setup', message: 'Reviewed Basketball positions are invalid.' })
+    expect(before).toEqual(snapshot)
   })
 
   it('starts reviewed setup v2 paused with exact opening authority and no Clock Start', () => {

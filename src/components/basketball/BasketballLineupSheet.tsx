@@ -20,7 +20,7 @@ import type {
 } from '../../lib/basketball/types'
 import { gameSideDisplayName } from '../../lib/display'
 
-const POSITION_OPTIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const
+import { BASKETBALL_POSITION_OPTIONS as POSITION_OPTIONS, BASKETBALL_POSITION_MAX_LENGTH } from '../../lib/basketball/positions'
 
 interface BasketballRoleDraft {
   choice: '' | typeof POSITION_OPTIONS[number] | 'custom'
@@ -118,7 +118,7 @@ export default function BasketballLineupSheet({
     canOverrideEqualPlay && overrideReason.trim().length > 0 && overrideReason.trim().length <= 240
   )
   const rolesValid = Object.values(roleDrafts).every(draft =>
-    draft.choice !== 'custom' || (draft.custom.trim().length > 0 && draft.custom.trim().length <= 80)
+    draft.choice !== 'custom' || (draft.custom.trim().length > 0 && draft.custom.trim().length <= BASKETBALL_POSITION_MAX_LENGTH)
   )
 
   useEffect(() => {
@@ -553,7 +553,7 @@ function RoleRow({
               <input
                 value={draft.custom}
                 onChange={event => onChange({ ...draft, custom: event.target.value })}
-                maxLength={80}
+                maxLength={BASKETBALL_POSITION_MAX_LENGTH}
                 className="input-field mt-1 py-2 text-sm"
               />
             </label>

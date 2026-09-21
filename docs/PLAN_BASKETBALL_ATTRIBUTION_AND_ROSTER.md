@@ -1,7 +1,28 @@
 # Basketball Attribution and Roster Follow-Up
 
-Status: Product Q&A complete. Implementation plan prepared; implementation and
-database changes have not started.
+Status: Product Q&A complete. BAR-1 implemented on its feature branch; migration
+application and owner runtime validation pending. BAR-2 has not started.
+
+## BAR-1 delivery record
+
+- Shared Basketball position catalog and 80-character command limit; roster add/edit
+  supports standard, custom and Unassigned positions without changing global identity.
+- Team settings accept historical schema 1 and new schema 2 with exact starter defaults.
+  Default starters are edited separately from roster identity/position changes in Team
+  Manage. Rules/defaults saves retain each other's fields and use the existing CAS hook.
+- New coherent cloud roster loads snapshot positions and reviewed starter defaults into
+  the setup draft. Existing participants retain their choices on reconciliation; stale
+  starter identities prompt opening-lineup review. Setup position edits stay local.
+- Both clockless v2 and v3 event creation preserve reviewed positions. Only games with
+  anchored lineup tracking install the reviewed opening lineup; legacy games are unchanged.
+- Additive migration: `supabase/migrations/070_basketball_roster_defaults.sql`.
+  CLI-scaffolded, then renamed before application to preserve repository ordering.
+  Apply it before using starter-default saves.
+  It retains manager/app/sport checks and CAS, validates active roster membership, and
+  rejects old-client schema downgrades after a schema-2 save. No backfill is performed.
+- See [BAR-1 regression record](REGRESSION_BAR_1_ROSTER_DEFAULTS.md) for local verification
+  and the outstanding live checks. App-wide adoption, including Soccer's missing-role
+  semantics, remains the explicit follow-up below.
 
 ## Requested scope
 

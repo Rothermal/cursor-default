@@ -1,4 +1,5 @@
 import type { GameState, SportConfig } from '../../types'
+import { isValidBasketballPosition, normalizeBasketballPosition } from './positions'
 import { gameReducer, createInitialState } from '../gameReducer'
 import { stableJson } from '../gameEvents/stream'
 import { setBasketballEventCreationIntent } from './commands'
@@ -123,6 +124,7 @@ export interface BasketballSetupDraftParticipantV2 {
   number: string | null
   teamSide: 'tracked' | 'opponent'
   initialStatus: BasketballSetupParticipantStatus
+  position?: string | null
 }
 
 export interface BasketballSetupDraftLineupV2 {
@@ -390,6 +392,8 @@ export interface BasketballSetupTrackedRosterPlayer {
   playerId: string
   displayName: string
   number: string | null
+  position?: string | null
+  initialStatus?: 'starter' | 'bench'
 }
 
 export type BasketballSetupProgressResult =
@@ -415,7 +419,8 @@ export function reconcileBasketballSetupTrackedRoster(
       displayName: player.displayName.trim(),
       number: player.number?.trim() || null,
       teamSide: 'tracked' as const,
-      initialStatus: existing?.initialStatus ?? 'bench' as const,
+      initialStatus: existing?.initialStatus ?? player.initialStatus ?? 'bench' as const,
+      position: existing ? existing.position ?? null : normalizeBasketballPosition(player.position),
     }
   })
   const opponents = upgraded.playerSetup.participants.filter(
@@ -542,7 +547,7 @@ export function basketballVersion3StartSetupFromDraft(
       number: participant.number,
       teamSide: participant.teamSide,
       initialStatus: anchored ? participant.initialStatus : 'bench',
-      position: null,
+      position: participant.position ?? null,
       captain: false,
     })
   )
@@ -775,9 +780,12 @@ function parsePlayerSetup(value: unknown): BasketballSetupDraftPlayerProgressV2 
   const participantIds = new Set<string>()
   const playerIds = new Set<string>()
   for (const item of value.participants) {
-    if (!hasExactKeys(item, [
+    if ((!hasExactKeys(item, [
       'participantId', 'playerId', 'displayName', 'number', 'teamSide', 'initialStatus',
-    ]) ||
+    ]) && !hasExactKeys(item, [
+      'participantId', 'playerId', 'displayName', 'number', 'teamSide', 'initialStatus', 'position',
+    ])) ||
+        ('position' in item && !isValidBasketballPosition(item.position)) ||
         !isNonEmptyString(item.participantId) ||
         !isNullableNonEmptyString(item.playerId) ||
         !isNonEmptyString(item.displayName) ||
