@@ -14,6 +14,8 @@ import TeamInviteLinksPanel from '../components/TeamInviteLinksPanel'
 import AuditTrailPanel from '../components/AuditTrailPanel'
 import PlayerGuardiansDialog from '../components/PlayerGuardiansDialog'
 import BasketballTeamSettingsPanel from '../components/settings/BasketballTeamSettingsPanel'
+import BasketballPositionField from '../components/basketball/BasketballPositionField'
+import { normalizeBasketballPosition } from '../lib/basketball/positions'
 import SoccerTeamSettingsPanel from '../components/settings/SoccerTeamSettingsPanel'
 import MergePlayerWizard, { type MergePlayerOption } from '../components/MergePlayerWizard'
 import { fetchMergePlayerScope } from '../lib/mergePlayerScope'
@@ -183,6 +185,9 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
   const [newPlayerLast, setNewPlayerLast] = useState('')
   const [newPlayerNumber, setNewPlayerNumber] = useState('')
   const [newPlayerSoccerRole, setNewPlayerSoccerRole] = useState<SoccerRosterRoleGroup>('midfielder')
+  const [newBasketballPosition, setNewBasketballPosition] = useState<string | null>(null)
+  const [existingBasketballPosition, setExistingBasketballPosition] = useState<string | null>(null)
+  const [editingBasketballPosition, setEditingBasketballPosition] = useState<string | null>(null)
 
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
   const [editingTeamName, setEditingTeamName] = useState('')
@@ -236,6 +241,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     [teams, selectedTeamId]
   )
   const isSoccerTeam = selectedTeam?.seasons.sport === 'soccer'
+  const isBasketballTeam = selectedTeam?.seasons.sport === 'basketball'
   const visibleTeams = useMemo(
     () =>
       !isManagementRoute && scopedSport
@@ -875,14 +881,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     }
 
     const jerseyNumber = newPlayerNumber.trim() || null
-    const position = isSoccerTeam ? serializeSoccerRosterRole(newPlayerSoccerRole) : null
+    const position = isSoccerTeam ? serializeSoccerRosterRole(newPlayerSoccerRole) : normalizeBasketballPosition(newBasketballPosition)
     const { error: junctionError } = await supabaseClient
       .from('team_players')
       .insert({
         team_id: selectedTeamId,
         player_id: playerData.id,
         jersey_number: jerseyNumber,
-        ...(isSoccerTeam ? { position } : {}),
+        ...(isSoccerTeam || isBasketballTeam ? { position } : {}),
         is_active: true,
       })
 
@@ -909,6 +915,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setNewPlayerLast('')
     setNewPlayerNumber('')
     setNewPlayerSoccerRole('midfielder')
+    setNewBasketballPosition(null)
   }
 
   const handleAddExistingPlayer = async () => {
@@ -917,14 +924,14 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setAddingExistingPlayer(true)
 
     const jerseyNumber = existingPlayerNumber.trim() || null
-    const position = isSoccerTeam ? serializeSoccerRosterRole(existingPlayerSoccerRole) : null
+    const position = isSoccerTeam ? serializeSoccerRosterRole(existingPlayerSoccerRole) : normalizeBasketballPosition(existingBasketballPosition)
     const { error: junctionError } = await supabaseClient
       .from('team_players')
       .insert({
         team_id: selectedTeamId,
         player_id: selectedExistingPlayerId,
         jersey_number: jerseyNumber,
-        ...(isSoccerTeam ? { position } : {}),
+        ...(isSoccerTeam || isBasketballTeam ? { position } : {}),
         is_active: true,
       })
 
@@ -953,6 +960,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setSelectedExistingPlayerId('')
     setExistingPlayerNumber('')
     setExistingPlayerSoccerRole('midfielder')
+    setExistingBasketballPosition(null)
   }
 
   const handleClaimGuardian = async (playerId: string) => {
@@ -1119,6 +1127,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     setEditingPlayerNickname(player.nickname?.trim() ?? '')
     setEditingPlayerSoccerRole(parseSoccerRosterRole(player.position).group as SoccerRosterRoleGroup)
     setEditingPlayerSoccerRoleDirty(false)
+    setEditingBasketballPosition(player.position)
   }
 
   const cancelEditPlayer = () => {
@@ -1146,7 +1155,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
     const first_name = editingPlayerFirst.trim()
     const last_name = editingPlayerLast.trim() || null
     const jersey_number = editingPlayerNumber.trim() || null
-    const position = serializeSoccerRosterRole(editingPlayerSoccerRole)
+    const position = isBasketballTeam ? normalizeBasketballPosition(editingBasketballPosition) : serializeSoccerRosterRole(editingPlayerSoccerRole)
     const nickname = editingPlayerNickname.trim() || null
     const playerRes = mayEditIdentity
       ? await supabaseClient.rpc('update_player_identity', {
@@ -1161,7 +1170,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
           .from('team_players')
           .update({
             jersey_number,
-            ...(isSoccerTeam && editingPlayerSoccerRoleDirty ? { position } : {}),
+            ...((isSoccerTeam && editingPlayerSoccerRoleDirty) || isBasketballTeam ? { position } : {}),
           })
           .eq('team_id', selectedTeamId)
           .eq('player_id', editingPlayerId)
@@ -1181,7 +1190,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
               ...(mayManageRoster
                 ? {
                     jersey_number,
-                    ...(isSoccerTeam && editingPlayerSoccerRoleDirty ? { position } : {}),
+                    ...((isSoccerTeam && editingPlayerSoccerRoleDirty) || isBasketballTeam ? { position } : {}),
                   }
                 : {}),
             }
@@ -1607,6 +1616,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       className="input-field col-span-5"
                     />
                   </div>
+                  {isBasketballTeam && <BasketballPositionField value={newBasketballPosition} onChange={setNewBasketballPosition} />}
                   {isSoccerTeam && (
                     <label className="block text-xs font-semibold text-content-muted">
                       Default role
@@ -1669,6 +1679,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                       </select>
                     </label>
                   )}
+                  {isBasketballTeam && <BasketballPositionField value={existingBasketballPosition} onChange={setExistingBasketballPosition} />}
                   <button
                     type="button"
                     onClick={() => { void handleAddExistingPlayer() }}
@@ -1740,6 +1751,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                               className="input-field text-sm"
                               disabled={!mayEditIdentity}
                             />
+                            {isBasketballTeam && mayManageRoster && <BasketballPositionField value={editingBasketballPosition} onChange={setEditingBasketballPosition} disabled={savingNickname} />}
                             {isSoccerTeam && mayManageRoster && (
                               <label className="block text-xs font-semibold text-content-muted">
                                 Default role
@@ -1790,6 +1802,7 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                                     </span>
                                   )}
                                 </p>
+                                {isBasketballTeam && <p className="text-xs text-content-muted">{player.position || 'Unassigned'}</p>}
                                 {isSoccerTeam && (
                                   <p className="text-xs text-content-muted">{soccerRosterRoleLabel(player.position)}</p>
                                 )}
@@ -1922,6 +1935,8 @@ export default function TeamsPage({ mode }: { mode: TeamsPageMode }) {
                 seasonId={selectedTeam.season_id}
                 seasonName={selectedTeam.seasons.name}
                 mayEdit={mayManageRoster}
+                roster={players.map(player => ({ id: player.id, label: `#${player.jersey_number || '-'} ${playerDisplayName(player)}` }))}
+                rosterReady={rosterLoadedTeamId === selectedTeam.id}
                 onAuditChange={() => setAuditRefresh(value => value + 1)}
               />
             </section>

@@ -1,4 +1,5 @@
 import type { GameState } from '../../types'
+import { BASKETBALL_POSITION_MAX_LENGTH } from './positions'
 import { addGameEvent, addGameEvents } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
 import { isFinalBasketballCloudGame } from './cloudPolicy'
@@ -391,7 +392,7 @@ function normalizeRoleChanges(
     const participant = state.sportGameState.projection.participants[inputChange.participantId]
     const position = inputChange.position?.trim() || null
     if (!participant || participant.teamSide !== teamSide || ids.has(inputChange.participantId) ||
-        (position !== null && position.length > 80)) {
+        (position !== null && position.length > BASKETBALL_POSITION_MAX_LENGTH)) {
       return { ok: false, message: 'Basketball role change participant is unavailable.' }
     }
     ids.add(inputChange.participantId)

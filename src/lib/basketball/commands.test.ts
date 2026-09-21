@@ -266,6 +266,7 @@ describe('BKE-1C1 Basketball commands', () => {
         sourceTeamId: 'team-reviewed',
         sourceSeasonId: 'season-reviewed',
         courtOrientation: 'flipped',
+        playerPositions: { 'player-1': 'PG', 'player-2': 'Point forward' },
       },
     })
 
@@ -285,6 +286,8 @@ describe('BKE-1C1 Basketball commands', () => {
     })
     expect(result.state.sportGameState.capturePreferences.courtOrientation).toBe('flipped')
     expect(result.state.basketballCourtOrientation).toBe('flipped')
+    expect(result.state.sportGameState.setup.participants.map(participant => participant.position))
+      .toEqual(['PG', 'Point forward'])
   })
 
   it('starts reviewed setup v2 paused with exact opening authority and no Clock Start', () => {

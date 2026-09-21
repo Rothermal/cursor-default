@@ -38,6 +38,8 @@ import { loadLatestBasketballSetupAuthority } from '../lib/basketball/setupAutho
 import { basketballRuleFieldLabel } from '../lib/basketball/profileDiffPresentation'
 import BasketballSetupRulesReview from '../components/basketball/BasketballSetupRulesReview'
 import BasketballOpeningLineupSetup from '../components/basketball/BasketballOpeningLineupSetup'
+import BasketballPositionField from '../components/basketball/BasketballPositionField'
+import { normalizeBasketballPosition } from '../lib/basketball/positions'
 import type { BasketballRulesField } from '../lib/basketball/types'
 
 function generateLocalId(): string {
@@ -135,7 +137,7 @@ export default function PlayerSetup() {
       setRosterError(null)
       const { data, error } = await supabase!
         .from('team_players')
-        .select('player_id, jersey_number, players!inner(id, first_name, last_name)')
+        .select('player_id, jersey_number, position, players!inner(id, first_name, last_name)')
         .eq('team_id', rosterTeamId)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -147,7 +149,7 @@ export default function PlayerSetup() {
         return
       }
 
-      type RosterRow = { player_id: string; jersey_number: string | null; players: { id: string; first_name: string; last_name: string | null } }
+      type RosterRow = { player_id: string; jersey_number: string | null; position: string | null; players: { id: string; first_name: string; last_name: string | null } }
       let loadedPlayers = ((data ?? []) as unknown as RosterRow[]).map(row => ({
         id: row.player_id,
         name: `${row.players.first_name ?? ''} ${row.players.last_name ?? ''}`.trim(),
@@ -186,6 +188,30 @@ export default function PlayerSetup() {
         loadedPlayers = [...loadedPlayers, ...extraFromLocal]
       }
 
+      const currentDraft = loadBasketballSetupDraft(accountScope)
+      if (isBasketballEventIntent && currentDraft?.source.kind === 'team' &&
+          currentDraft.source.teamId === rosterTeamId &&
+          currentDraft.committedLocalGameId === activeLocalGameId) {
+        const defaults = currentDraft.event?.settingsAuthority.kind === 'team'
+          ? currentDraft.event.settingsAuthority.settings.lineupDefaults?.starterPlayerIds ?? [] : []
+        const rows = (data ?? []) as unknown as RosterRow[]
+        if (defaults.some(id => !rows.some(row => row.player_id === id))) {
+          setRulesNotice('Some default starters are no longer on this roster. Review the opening lineup before starting.')
+        }
+        const nextDraft = reconcileBasketballSetupTrackedRoster(currentDraft,
+          loadedPlayers.filter(player => !isTeamPseudoPlayer(player)).map(player => ({
+            playerId: player.id, displayName: player.name, number: player.number || null,
+            position: rows.find(row => row.player_id === player.id)?.position ?? null,
+            initialStatus: defaults.includes(player.id) ? 'starter' : 'bench',
+          })))
+        const saved = saveBasketballSetupDraft(nextDraft)
+        if (!saved.ok) {
+          setRosterError(saved.error)
+          setRosterLoading(false)
+          return
+        }
+        setBasketballSetupDraft(nextDraft)
+      }
       dispatch({ type: 'SET_PLAYERS', players: loadedPlayers })
       if (cloudTeamId) {
         const idMap = loadedPlayers.reduce<Record<string, string>>((map, player) => {
@@ -216,6 +242,9 @@ export default function PlayerSetup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [
     cloudTeamId,
+    accountScope,
+    activeLocalGameId,
+    isBasketballEventIntent,
     dispatch,
     canReadCloudRoster,
     rosterTeamId,
@@ -378,6 +407,11 @@ export default function PlayerSetup() {
         sourceSeasonId: preparedDraft.source.kind === 'team' ? preparedDraft.source.seasonId : null,
         courtOrientation: preparedDraft.display.defaultCourtFlipped ? 'flipped' : 'standard',
         version3Setup,
+        playerPositions: preparedDraft.version === 2 ? Object.fromEntries(
+          preparedDraft.playerSetup.participants.filter(item => item.teamSide === 'tracked' &&
+            item.playerId && individualPlayers.some(player => player.id === item.playerId))
+            .map(item => [item.playerId!, item.position ?? null])
+        ) : undefined,
       },
     })
     if (!result.ok) {
@@ -647,7 +681,19 @@ export default function PlayerSetup() {
                   `}>
                     {player.number || '—'}
                   </span>
-                  <span className="min-w-0 break-words font-medium text-content">{player.name}</span>
+                  <div className="min-w-0 space-y-2">
+                    <span className="min-w-0 break-words font-medium text-content">{player.name}</span>
+                    {isBasketballEventIntent && basketballSetupDraft && <BasketballPositionField
+                      value={basketballSetupDraft.version === 2 ? basketballSetupDraft.playerSetup.participants.find(item => item.playerId === player.id)?.position ?? null : null}
+                      onChange={position => {
+                        const next = reconcileBasketballSetupTrackedRoster(basketballSetupDraft,
+                          individualPlayers.map(item => ({ playerId: item.id, displayName: item.name, number: item.number || null })))
+                        persistBasketballSetupDraft({ ...next, playerSetup: { ...next.playerSetup,
+                          participants: next.playerSetup.participants.map(item => item.playerId === player.id
+                            ? { ...item, position: normalizeBasketballPosition(position) } : item),
+                        } })
+                      }} disabled={saving || rosterLoading || starting} />}
+                  </div>
                 </div>
                 <button
                   onClick={() => { void handleRemovePlayer(player.id) }}

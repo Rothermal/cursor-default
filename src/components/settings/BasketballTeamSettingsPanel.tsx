@@ -20,6 +20,8 @@ export default function BasketballTeamSettingsPanel({
   seasonId,
   seasonName,
   mayEdit,
+  roster,
+  rosterReady,
   onAuditChange,
 }: {
   teamId: string
@@ -27,6 +29,8 @@ export default function BasketballTeamSettingsPanel({
   seasonId: string
   seasonName: string
   mayEdit: boolean
+  roster: Array<{ id: string; label: string }>
+  rosterReady: boolean
   onAuditChange: () => void
 }) {
   const navigate = useNavigate()
@@ -157,6 +161,31 @@ export default function BasketballTeamSettingsPanel({
         Personal Basketball defaults
       </button>
 
+      <fieldset disabled={!sharedWritable || !rosterReady} className="space-y-2 border-y border-line py-3">
+        <legend className="font-semibold text-content">Default starters</legend>
+        {!rosterReady && <p role="status" className="text-sm text-content-muted">Loading roster...</p>}
+        {rosterReady && roster.map(player => <label key={player.id} className="flex min-h-10 items-center gap-2 text-sm text-content">
+          <input type="checkbox" checked={draft.lineupDefaults?.starterPlayerIds.includes(player.id) ?? false}
+            disabled={!draft.lineupDefaults?.starterPlayerIds.includes(player.id) && (draft.lineupDefaults?.starterPlayerIds.length ?? 0) >= 5}
+            onChange={event => {
+              const ids = draft.lineupDefaults?.starterPlayerIds ?? []
+              if (event.target.checked && ids.length >= 5) return
+              setDraft({ ...draft, lineupDefaults: { version: 1, starterPlayerIds: event.target.checked
+                ? [...ids, player.id] : ids.filter(id => id !== player.id) } })
+            }} />
+          <span className="min-w-0 break-words">{player.label} - {draft.lineupDefaults?.starterPlayerIds.includes(player.id) ? 'Starter' : 'Bench'}</span>
+        </label>)}
+        {rosterReady && (draft.lineupDefaults?.starterPlayerIds ?? []).filter(id => !roster.some(player => player.id === id)).map(id =>
+          <label key={id} className="flex min-h-10 items-center gap-2 text-sm text-warning-content">
+            <input type="checkbox" checked onChange={() => setDraft({ ...draft, lineupDefaults: {
+              version: 1, starterPlayerIds: draft.lineupDefaults!.starterPlayerIds.filter(value => value !== id),
+            } })} />Unavailable player
+          </label>)}
+        <p className="text-xs text-content-muted">{draft.lineupDefaults?.starterPlayerIds.length ?? 0} / 5 starters</p>
+        {mayEdit && <button type="button" className="btn-primary" disabled={!dirty || !resolved.ok}
+          onClick={requestSave}>Save Shared Defaults</button>}
+      </fieldset>
+
       {mayEdit && (
         <button
           type="button"
@@ -187,14 +216,14 @@ export default function BasketballTeamSettingsPanel({
             }
             overrideSourceLabel={dirty ? 'Unsaved team override' : 'Team override'}
             readOnly={!sharedWritable}
-            onChange={setDraft}
+            onChange={next => setDraft(current => ({ ...current, ...next }))}
           />
           {mayEdit && (
             <BasketballLegacySeasonImport
               seasonId={seasonId}
               seasonName={seasonName}
               disabled={!sharedWritable}
-              onApply={setDraft}
+              onApply={next => setDraft(current => ({ ...current, ...next }))}
             />
           )}
         </>

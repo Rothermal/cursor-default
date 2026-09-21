@@ -1,5 +1,6 @@
 import { resolveTeamStatsConfig } from '../../config/teamStatsDefaults'
 import type { GameState, Player } from '../../types'
+import { isValidBasketballPosition } from './positions'
 import { SPORT_EVENTS_AUTHORITY } from '../gameEvents/authority'
 import { isPlainObject } from '../gameEvents/envelope'
 import {
@@ -103,6 +104,7 @@ export interface BasketballReviewedStartSetup {
   sourceTeamId: string | null
   sourceSeasonId: string | null
   courtOrientation: 'standard' | 'flipped'
+  playerPositions?: Record<string, string | null>
   version3Setup?: {
     participants: BasketballMatchParticipant[]
     openingLineups: BasketballOpeningLineups | null
@@ -423,6 +425,9 @@ export function buildBasketballMatchSetup(
         'Version-2 Basketball setup cannot include opening-lineup authority.'
       )
     }
+    if (reviewedSetup?.playerPositions && Object.entries(reviewedSetup.playerPositions).some(
+      ([id, position]) => !roster.some(player => player.id === id) || !isValidBasketballPosition(position)
+    )) return commandFailure('invalid_setup', 'Reviewed Basketball positions are invalid.')
     participants = roster.map((player, index) => ({
       id: participantIds?.[index] ?? createBasketballUuid(),
       playerId: player.id,
@@ -430,7 +435,7 @@ export function buildBasketballMatchSetup(
       number: player.number.trim() || null,
       teamSide: 'tracked',
       initialStatus: 'bench',
-      position: null,
+      position: reviewedSetup?.playerPositions?.[player.id] ?? null,
       captain: false,
     }))
   }

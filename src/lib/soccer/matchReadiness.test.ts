@@ -7,12 +7,13 @@ function source(path: string): string {
 }
 
 describe('Soccer match-readiness wiring', () => {
-  it('stores team-scoped role defaults only for Soccer rosters', () => {
+  it('keeps Soccer role serialization scoped while Basketball also stores team positions', () => {
     const teams = source('src/pages/Teams.tsx')
 
     expect(teams).toContain("const isSoccerTeam = selectedTeam?.seasons.sport === 'soccer'")
-    expect(teams).toContain("...(isSoccerTeam ? { position } : {})")
-    expect(teams).toContain('isSoccerTeam && editingPlayerSoccerRoleDirty ? { position } : {}')
+    expect(teams).toContain("...(isSoccerTeam || isBasketballTeam ? { position } : {})")
+    expect(teams).toContain('(isSoccerTeam && editingPlayerSoccerRoleDirty) || isBasketballTeam ? { position } : {}')
+    expect(teams).toContain('isSoccerTeam ? serializeSoccerRosterRole(newPlayerSoccerRole)')
     expect(teams).toContain('setEditingPlayerSoccerRoleDirty(true)')
     expect(teams).toContain('existingPlayerSoccerRole')
     expect(teams).toContain('SOCCER_ROSTER_ROLE_OPTIONS.map')

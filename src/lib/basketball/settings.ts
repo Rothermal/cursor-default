@@ -1,4 +1,5 @@
 import { isPlainObject } from '../gameEvents/envelope'
+import { parseBasketballLineupDefaults, type BasketballLineupDefaults } from './lineupDefaults'
 import {
   getBasketballRulesProfile,
   normalizeBasketballRuleOverrides,
@@ -11,6 +12,7 @@ import { isBasketballMatchRulesV3 } from './rules'
 import type { BasketballRuleOverrides, BasketballRulesField } from './types'
 
 export const BASKETBALL_SETTINGS_SCHEMA_VERSION = 1
+export const BASKETBALL_TEAM_SETTINGS_SCHEMA_VERSION = 2
 export const BASKETBALL_V3_COMPATIBILITY_WARNING =
   'Version-3 clock and lineup defaults require an updated StatKeeper client. Older clients cannot start new Basketball Event games using this authority, including clockless Event games. Existing games and Legacy setup remain available.'
 
@@ -32,6 +34,7 @@ export interface BasketballPersonalSettingsV1 {
 export interface BasketballTeamSettingsV1 {
   baseProfile: BasketballRulesProfileRef
   ruleOverrides: BasketballRuleOverrides
+  lineupDefaults?: BasketballLineupDefaults
 }
 
 export type BasketballSettingsParseResult<T> =
@@ -137,10 +140,16 @@ export function parseBasketballPersonalSettings(
 export function parseBasketballTeamSettings(
   value: unknown
 ): BasketballSettingsParseResult<BasketballTeamSettingsV1> {
-  if (!hasExactKeys(value, ['baseProfile', 'ruleOverrides'])) {
-    return invalid('Team Basketball settings must contain only baseProfile and ruleOverrides.')
+  if (!hasExactKeys(value, ['baseProfile', 'ruleOverrides']) &&
+      !hasExactKeys(value, ['baseProfile', 'ruleOverrides', 'lineupDefaults'])) {
+    return invalid('Team Basketball settings contain unsupported fields.')
   }
-  return parseRuleLayer(value.baseProfile, value.ruleOverrides, 'team')
+  const rules = parseRuleLayer(value.baseProfile, value.ruleOverrides, 'team')
+  if (!rules.ok || !('lineupDefaults' in value)) return rules
+  const lineupDefaults = parseBasketballLineupDefaults(value.lineupDefaults)
+  return lineupDefaults
+    ? { ok: true, value: { ...rules.value, lineupDefaults } }
+    : invalid('Basketball starter defaults must contain at most five unique player IDs.')
 }
 
 function parseRuleLayer(
