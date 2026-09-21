@@ -290,7 +290,7 @@ describe('BKE-1C1 Basketball commands', () => {
       .toEqual(['PG', 'Point forward'])
   })
 
-  it.each([
+  it.each<{ label: string; positions: Record<string, string> }>([
     { label: 'a non-roster player', positions: { 'foreign-player': 'PG' } },
     { label: 'an over-length position', positions: { 'player-1': 'x'.repeat(81) } },
     { label: 'an untrimmed position', positions: { 'player-1': ' PG ' } },
@@ -308,7 +308,7 @@ describe('BKE-1C1 Basketball commands', () => {
         },
         sourceTeamId: 'team-reviewed', sourceSeasonId: 'season-reviewed',
         courtOrientation: 'standard',
-        playerPositions: positions as Record<string, string>,
+        playerPositions: positions,
       },
     })
     expect(result).toMatchObject({ ok: false, code: 'invalid_setup', message: 'Reviewed Basketball positions are invalid.' })
