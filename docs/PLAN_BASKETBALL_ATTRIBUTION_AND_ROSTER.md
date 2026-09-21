@@ -1,0 +1,231 @@
+# Basketball Attribution and Roster Follow-Up
+
+Status: Product Q&A complete. Implementation plan prepared; implementation and
+database changes have not started.
+
+## Requested scope
+
+- Replace Basketball's horizontal event-player picker with Soccer-style dropdown
+  presentation. Keep the selected team outside the event dialog; offer that side's
+  individuals and Unattributed rather than both teams inside the actor picker.
+- Provide quick foul and free-throw entry from event capture using existing checked
+  workflows, without inventing a location for unlocated events.
+- Expose player positions and Starter/Bench defaults consistently. Basketball's event
+  model already supports match positions and opening status; team-default persistence
+  and setup adoption require further assessment.
+- Preserve legacy restrictions: legacy located shots require a tracked individual;
+  event-game team attribution remains valid. Do not silently change aggregate scoring.
+
+## Confirmed answers
+
+1. Team-roster defaults with per-game overrides are an app-wide design decision,
+   not Basketball-only. New games copy defaults; edits during a game affect that game
+   only. Changes to defaults never rewrite existing match snapshots.
+2. One default position per player, changeable during the game. Multiple players may
+   share a position; no mandatory one-of-each lineup. Alternate-position lists are
+   outside the initial scope. Basketball positions include PG, SG, SF, PF and C;
+   other sports define their own position catalogs and eligibility rules.
+3. Actor dropdowns use sport-defined position order. Basketball orders PG, SG, SF,
+   PF, C, then unassigned; jersey number sorts within each position. Unattributed
+   is last. Existing event eligibility still controls which players are selectable.
+4. Each new event's actor dropdown starts at Unattributed for the externally selected
+   side. Never remember the previous event's player. Events requiring an individual
+   cannot save until a valid individual is selected; this does not expand which event
+   families or legacy adapters support unattributed capture.
+5. Quick Foul entry opens the existing foul form for the externally selected team,
+   initially Unattributed. The recorder selects offender and foul type as applicable,
+   confirms before saving, and retains the existing linked free-throw workflow.
+   Do not immediately append a default common foul or invent a foul location.
+6. Quick Free Throw entry continues an open awarded trip for the selected side when
+   available; if several are open, the recorder chooses the trip. Otherwise offer
+   a standalone free throw. Preserve foul/trip relationships and existing attempt
+   validation; never silently create an unrelated attempt for an open trip.
+   Valid attribution remains required according to the existing command policy.
+7. Missing roster defaults mean Unassigned position and Bench. Starters must be
+   selected explicitly; do not infer them from jersey number or roster order.
+   Preserve existing saved defaults and existing game lineups without backfilling
+   or rewriting their historical setup.
+8. Retain custom positions alongside each sport's standard catalog and Unassigned.
+   Basketball offers PG, SG, SF, PF, C, Custom and Unassigned. Actor ordering places
+   custom positions after standard positions and before Unassigned; Unattributed
+   remains last. Preserve existing custom values.
+9. Actions explicitly opened from a player's in-game detail page prefill that player,
+   subject to event eligibility. This is explicit action context, not a remembered
+   global selection; returning to general court/event capture still starts
+   Unattributed. Opening a detail page alone must not change capture attribution.
+10. Continuing a free-throw trip prefills its existing shooter when present, subject
+    to current eligibility and trip rules. This is explicit trip context, not a
+    remembered global actor. Permit shooter changes only where existing commands
+    allow them. A new standalone free throw starts Unattributed unless explicitly
+    launched from player details. An existing trip's shooter context takes precedence
+    over a player-detail prefill; do not silently replace that shooter.
+11. General live-event dropdowns show only eligible on-court/on-field participants
+    when lineup tracking is available. Do not include bench players in the normal
+    live picker. This is an app-wide direction, consistent with Soccer and intended
+    to keep larger Baseball/Football rosters manageable. Other participants remain
+    accessible through player details or correction workflows, subject to existing
+    command eligibility; those entry points do not bypass sport rules. Games without
+    lineup tracking show the eligible roster without invented lineup status.
+12. Provide an explicit Bench / staff path inside the foul form for technicals and
+    other supported off-field offenses. Normal foul-player selection remains limited
+    to eligible active players. The alternate path exposes only offender choices
+    valid for the chosen foul under existing sport commands; it does not add bench
+    players to ordinary shot or free-throw dropdowns or require staff to be roster
+    players.
+
+## Architecture assessment
+
+- `src/pages/Teams.tsx` already reads and writes `team_players.position` for Soccer.
+  Reuse that team-membership scope for Basketball positions rather than changing
+  global player identity. Preserve custom strings and avoid rewriting Soccer values.
+- Soccer starter defaults live separately in versioned team settings through
+  `src/lib/soccer/lineupDefaults.ts` and migration 068. Basketball team settings in
+  `src/lib/basketball/settings.ts` have strict parsing and their own write contract.
+  Adding Basketball starter defaults therefore needs a versioned settings upgrade,
+  not an extra unchecked JSON property or a change to Soccer's RPC contract.
+- `src/lib/basketball/setupDraft.ts` already preserves selected opening statuses,
+  but its participant contract does not carry positions and match construction writes
+  `position: null`. Update the draft parser, persistence, reconciliation and match
+  construction together; adding a roster editor alone would not deliver defaults.
+- `BasketballOpeningLineupSetup` and `BasketballLineupSheet` already own opening
+  lineup validation and match position changes. Extend those paths rather than
+  inventing a second lineup authority. Existing match participants support position,
+  Starter/Bench/DNP and repeated positions without a new event family.
+- `CourtEventPopup` currently uses player chips, including related actor prompts.
+  `ShotChartPanel` owns pending court context; `GameTracker` owns existing foul and
+  free-throw dialogs. Use explicit callbacks to hand off between them without saving
+  a shot or carrying a fictional court location into the administrative event.
+- `BasketballFreeThrowTripDialog` currently falls back to the first candidate.
+  Replace that implicit choice with explicit trip-shooter context or an empty
+  required selection. Awarded-trip commands require a resolved individual; a visual
+  Unattributed default is not permission to save a team free throw.
+- Foul commands already represent player, team and named staff offenders. Keep
+  foul-type/counting validation authoritative; a team offense is not interchangeable
+  with an unknown personal offender. Bench/staff is a selection path, not a new rule.
+- Soccer is a reference, not already fully compliant: `soccer/rosterRole.ts` currently
+  treats missing roles as Midfielder. Preserve that behavior in these Basketball
+  changes and track its explicit adoption below instead of silently changing Soccer.
+
+## Delivery plan
+
+Two cohesive implementation PRs are proposed. Each should include its focused tests
+and documentation; no separate foundation-only PR is required.
+
+### BAR-1: Team defaults through new-game setup
+
+1. Add a Basketball position adapter for PG, SG, SF, PF, C, custom and Unassigned.
+   Reuse the existing match custom-position length limit (80 characters), trim input,
+   and preserve existing custom values. Do not interpret foreign sport-prefixed
+   values as Basketball standard positions.
+2. Extend Team roster add/edit and display with position and Starter/Bench defaults.
+   Keep existing manager-only roster permissions; identity guardianship does not
+   grant permission to edit another team's defaults. Missing defaults mean Bench
+   and Unassigned. DNP remains a match decision, not a roster default.
+3. Version Basketball team settings to hold starter player IDs, following the
+   existing strict parsing, compare-and-swap and audit patterns. Old versions read
+   with empty defaults; new writes preserve rules and require current validation.
+   Keep defaults out of personal rules settings and global player identity.
+   Ship an additive migration with permission, invalid-input and stale-write tests;
+   choose the migration identifier at implementation time. Never edit an applied
+   migration or deploy SQL automatically for the owner.
+4. Preserve defaults when saving rules and preserve rules when saving defaults.
+   Audit field categories, not private roster payloads. Since positions and starter
+   defaults occupy different storage, never report a combined save as successful
+   after a partial failure: either provide separately explicit saves or one checked
+   atomic server operation. Choose the smallest fit with existing roster UI.
+5. Seed fresh matching cloud-team setup only after coherent roster/settings loading.
+   Copy positions and starter statuses into the local setup draft once; subsequent
+   reloads, roster refreshes or team switches must not overwrite explicit selections.
+   Preserve draft participants and existing games. Upgrade old drafts without guessing
+   positions or starters. Local-only players start Unassigned/Bench and remain editable.
+6. Expose position editing in setup; carry it through immutable match creation.
+   Retain the five-player/short-handed confirmation and explicit review of invalid
+   or stale defaults. Never silently choose which excess starters to drop. Opponent
+   participants use their own match defaults unless a real source roster is supported;
+   never copy tracked-team defaults onto them.
+
+BAR-1 does not change existing game snapshots, create position events for old games,
+or make legacy aggregate games claim to have tracked lineups.
+
+### BAR-2: Event attribution and quick administrative entry
+
+1. Build a small shared actor-select presentation primitive with sport-supplied
+   candidates, labels, ordering and empty-selection policy. Basketball supplies
+   eligibility and commands; do not build a universal sport event form.
+2. Replace live Basketball actor chips, including assist/rebound follow-up actors,
+   with dropdowns where an actor is selected. Keep skip/none semantics distinct from
+   team attribution. Team-name side selection stays outside the main event picker;
+   related actors use their own required side (for example a defensive rebound).
+3. Order standard positions, then custom, then Unassigned, with Unattributed last.
+   Sort custom groups deterministically by label and jersey numbers numerically
+   where possible; use display name and stable ID as tie-breakers. Missing jerseys
+   do not reorder the control while it is open. Use current match positions, not
+   mutable cloud roster defaults.
+4. For tracked lineups use current eligible on-court participants; for untracked
+   sides use eligible roster participants. Keep unknown/incomplete lineup state
+   distinct from an untracked lineup and show existing recovery guidance. Recheck
+   eligibility at submission, including substitutions, disqualification and ejection.
+   Never silently switch to the first candidate when a selection becomes invalid.
+5. General capture begins Unattributed; explicit player-detail actions may prefill
+   an eligible player. Display a required-player error for unsupported unattributed
+   families. Preserve the legacy located-shot restriction and existing read-only,
+   inactive-period, terminal and quarantined-state guards.
+6. Add Foul and Free Throw commands to court event entry with no immediate mutation.
+   Close the court sheet before opening the existing administrative dialog; cancel
+   records nothing and does not reopen stale court context. Preserve equivalent
+   player-detail and Actions entry points without duplicating write logic.
+7. Foul entry retains selected side, initially Unattributed. The Bench / staff path
+   exposes only supported offender/type combinations, named staff validation and
+   valid bench participants. Use existing checked rules for counting overrides,
+   team technicals, drawn-by actors and linked awards. Capture a tested eligibility
+   table from current commands/projector before wiring each option; do not broaden
+   rules to make the new UI save successfully.
+8. Resolve current open awarded trips on the selected side: one opens directly,
+   several require a choice, none permits standalone entry. Prefer the trip's
+   existing shooter over explicit player-detail context; without a valid prefill,
+   require a choice. Revalidate trip revision/open state before submission. Preserve
+   one-and-one completion, attempt limits, relationships, undo and correction.
+
+BAR-2 covers live capture and explicit player-detail actions. Historical correction
+forms retain historical actor eligibility; do not filter them by today's lineup.
+Legacy entry exposes only genuinely supported operations, without synthesizing an
+event trip or silently converting the game to event authority.
+
+## Verification and release
+
+- BAR-1: parser round trips, old team settings/drafts, custom positions, multi-team
+  isolation, stale roster IDs, partial saves, CAS conflicts and forbidden writes.
+  Test fresh setup, reload, explicit edits, team switching, offline fallback and
+  preservation of started/parked games. Verify immutable setup contains the defaults.
+- BAR-2: test actual parent/dialog callback wiring as well as pure sorting helpers.
+  Cover both sides, empty roster, missing positions, tracked/untracked lineups,
+  actor becoming ineligible, general versus player-detail defaults and cancel.
+  Cover assist/rebound side rules, team/staff/bench fouls, zero/one/multiple open
+  trips, shooter precedence, stale trips, one-and-one and standalone validation.
+- Preserve legacy scoring behavior and Soccer capture with focused regression tests.
+  Run typecheck, lint, affected tests and build; broaden tests for shared changes.
+- Inspect desktop/mobile in Light and Dark, long names/custom roles, large rosters,
+  keyboard selection/focus, scrolling and overlapping dialogs. No global player bar
+  returns and court capture must stay compact.
+- Apply and verify the additive migration before deploying dependent roster writes.
+  Missing server support must leave existing reads usable and new saves explicitly
+  unavailable, not silently discard defaults. Record owner runtime checks separately
+  from automated tests; no claim that local tests prove production RLS behavior.
+
+## Explicit follow-ups and non-goals
+
+- Soccer adoption: review missing-role semantics and custom team-role storage against
+  its role/projector contracts before changing them. Adopt the shared dropdown only
+  where behavior remains equivalent; retain Soccer-specific restart/card eligibility.
+- Future sports adopt the same interaction contract with their own position catalogs,
+  ordering, active-participant models and exceptions. Configured sports without a
+  finished tracker do not gain artificial lineup or event support in this work.
+- No running-clock substitution policy change, event-time redesign, formation editor,
+  automatic five-position enforcement, historical conversion or prior-value backfill.
+
+No additional product choice currently blocks BAR-1. Implementation discoveries that
+would require changing the approved eligibility or snapshot policy must come back
+for review rather than being hidden inside a shared component.
+
+The shared rule is recorded in [product decisions](PRODUCT_AND_INTERACTION_DECISIONS.md).
+Clock/live-substitution policy changes remain a separate plan.
