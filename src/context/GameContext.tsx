@@ -9,6 +9,8 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
+import { localGameDiscardError, type LocalGameDiscardOptions } from '../lib/localGameDiscard'
+import { basketballSetupAccountScope, loadBasketballSetupDraft, clearBasketballSetupDraft } from '../lib/basketball/setupDraft'
 import type {
   GameState,
   GameAction,
@@ -356,7 +358,7 @@ interface GameContextType {
   openGameSnapshot: (state: GameState) => boolean
   parkCurrentGame: () => boolean
   resumeParkedGame: (localGameId: string) => GameState | null
-  discardParkedGame: (localGameId: string) => boolean
+  discardParkedGame: (localGameId: string, options?: LocalGameDiscardOptions) => boolean
   /** Trigger an immediate cloud sync; resolves when the sync attempt finishes. */
   flushCloudSync: () => Promise<FlushCloudSyncResult>
   flushCloudGameSync: (gameId: string) => Promise<FlushCloudSyncResult>
@@ -676,23 +678,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
   )
 
   const discardParkedGame = useCallback(
-    (localGameId: string) => {
+    (localGameId: string, options?: LocalGameDiscardOptions) => {
       const record = getParkedGameRecord(localGameId, userId)
-      if (
-        record &&
-        shouldBlockDiscardUnsyncedGame(record.gameState, record.sync.dirty)
-      ) {
-        setParkingError(
-          'This parked game has unsynced cloud stats. Resume and sync it before discarding.'
-        )
+      const wasActive = getActiveLocalGameId(userId) === localGameId
+      const error = record ? localGameDiscardError({ state: record.gameState, dirty: record.sync.dirty,
+        active: wasActive, syncing: syncInFlightRef.current, options }) : 'That local game is no longer available.'
+      if (error) {
+        setParkingError(error)
         return false
       }
 
-      const wasActive = getActiveLocalGameId(userId) === localGameId
       try {
         setParkedGames(discardParkedGameStorage(localGameId, userId))
         setActiveLocalGameId(getActiveLocalGameId(userId))
+        pendingSyncRef.current = hasDirtyParkedGames(userId)
+        setPendingSyncFlag(pendingSyncRef.current)
         setParkingError(null)
+        try {
+          const scope = basketballSetupAccountScope(userId)
+          const draft = loadBasketballSetupDraft(scope)
+          if (draft?.committedLocalGameId === localGameId) clearBasketballSetupDraft(scope)
+          if (userId && record?.gameState.cloudSync.gameId === getResumeTarget(userId)) setResumeTarget(userId, null)
+        } catch {
+          setParkingError('Local game deleted, but its setup/resume shortcut could not be cleared. Review setup before creating another game.')
+        }
         if (wasActive) {
           dispatch({ type: 'RESET_GAME' })
         }
