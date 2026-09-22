@@ -15,6 +15,7 @@ export default function BasketballQuickFreeThrowDialog({ teamName, candidates, t
   onClose: () => void
 }) {
   const [playerId, setPlayerId] = useState(candidates.some(candidate => candidate.value === defaultPlayerId) ? defaultPlayerId! : '')
+  const validShooter = !!playerId && candidates.some(candidate => candidate.value === playerId)
   useEffect(() => {
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
     window.addEventListener('keydown', escape)
@@ -28,9 +29,10 @@ export default function BasketballQuickFreeThrowDialog({ teamName, candidates, t
         Award {index + 1}: attempt {trip.nextAttemptNumber} of {trip.maximumAttempts}{trip.oneAndOne ? ' (one-and-one)' : ''}
       </button>) : <>
         <ActorSelect label="Shooter" value={playerId} options={candidates} onChange={setPlayerId} />
+        {!validShooter && <p role="status" className="text-sm text-content-muted">Choose an eligible player to record a free throw.</p>}
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="btn-secondary" onClick={() => onRecord(playerId, false)}>Miss</button>
-          <button type="button" className="btn-primary" onClick={() => onRecord(playerId, true)}>Made</button>
+          <button type="button" disabled={!validShooter} className="btn-secondary" onClick={() => { if (validShooter) onRecord(playerId, false) }}>Miss</button>
+          <button type="button" disabled={!validShooter} className="btn-primary" onClick={() => { if (validShooter) onRecord(playerId, true) }}>Made</button>
         </div>
       </>}
       {error && <p role="alert" className="text-sm text-danger-content">{error}</p>}

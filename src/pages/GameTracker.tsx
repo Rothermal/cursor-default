@@ -872,7 +872,11 @@ export default function GameTracker() {
       setFreeThrowError('An awarded trip is available. Choose the award before recording.')
       return
     }
-    const id = playerId || (quickFreeThrow.side === 'tracked' ? TEAM_PLAYER_HOME_ID : TEAM_PLAYER_OPP_ID)
+    if (!playerId || isTeamPseudoPlayer({ id: playerId })) {
+      setFreeThrowError('Choose an eligible player to record a free throw.')
+      return
+    }
+    const id = playerId
     const target = basketballCaptureTargetForPlayerId(state, id)
     if (!target.ok || target.value.teamSide !== quickFreeThrow.side ||
         !basketballActorPlayers(state, players).some(player => player.id === id)) {

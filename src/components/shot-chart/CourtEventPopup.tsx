@@ -4,6 +4,7 @@ import { reboundPromptOptionsForMiss, type ReboundStatId } from '../../lib/rebou
 import { isTeamPseudoPlayer } from '../../lib/teamPlayers'
 import { sideOf } from '../../lib/shotChartViews'
 import ActorSelect from '../ActorSelect'
+import { assistCandidatesForMadeShot } from '../../lib/assistCandidates'
 
 const ARMING_DELAY_MS = 300
 const COURT_STAT_EVENTS = [
@@ -52,7 +53,7 @@ export default function CourtEventPopup({ playerLabel, playerStatLine, players, 
   const selected = players.find(player => player.id === activePlayerId)
   const side = captureSide ?? (selected ? sideOf(selected) : 'home')
   const sidePlayers = players.filter(player => sideOf(player) === side)
-  const assists = sidePlayers.filter(player => !isTeamPseudoPlayer(player) && player.id !== activePlayerId)
+  const assists = assistCandidatesForMadeShot(sidePlayers, activePlayerId)
   const rebounds = reboundPromptOptionsForMiss(players, activePlayerId)
   const options = (rows: Player[]) => rows.filter(player => !isTeamPseudoPlayer(player))
     .map(player => ({ value: player.id, label: playerLabels?.[player.id] ?? labelFor(player) }))

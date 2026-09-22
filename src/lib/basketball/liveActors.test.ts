@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createInitialState } from '../gameReducer'
 import { sports } from '../../config/sports'
 import { playersWithTeamPlaceholders, TEAM_PLAYER_HOME_ID } from '../teamPlayers'
-import { prepareBasketballGameStart } from './commands'
+import { prepareBasketballGameStart, endBasketballPeriod, startNextBasketballPeriod } from './commands'
 import { basketballActorPlayers, basketballOpenTrips, basketballParticipantIsLive, basketballTripShooter } from './liveActors'
 import { basketballFreeThrowTripStatuses, captureBasketballFoul, captureBasketballFreeThrowAttempt } from './foulFreeThrowCommands'
 import type { BasketballLineupSideProjection } from './types'
@@ -57,6 +57,20 @@ describe('Basketball live actor presentation policy', () => {
       const { state } = game()
       expect(captureBasketballFoul(state, { recorderUserId: null, teamSide: 'tracked', offender, class: foulClass, context: 'common' }).ok).toBe(true)
     }
+  })
+  it('excludes still-open previous-period awards from current entry', () => {
+    const { state } = game()
+    const foul = captureBasketballFoul(state, { recorderUserId: null, teamSide: 'opponent', offender: { kind: 'team' },
+      class: 'personal', context: 'shooting', freeThrows: { maximumAttempts: 2, oneAndOne: false, technical: false, possessionRetained: false } })
+    if (!foul.ok) throw Error(foul.message)
+    expect(basketballOpenTrips(foul.state, basketballFreeThrowTripStatuses(foul.state), 'tracked')).toHaveLength(1)
+    const ended = endBasketballPeriod(foul.state, { recorderUserId: null })
+    if (!ended.ok) throw Error(ended.message)
+    const next = startNextBasketballPeriod(ended.state, { recorderUserId: null })
+    if (!next.ok) throw Error(next.message)
+    const trips = basketballFreeThrowTripStatuses(next.state)
+    expect(trips.some(trip => trip.open)).toBe(true)
+    expect(basketballOpenTrips(next.state, trips, 'tracked')).toEqual([])
   })
   it('routes open trips by side and keeps the latest recorded shooter as explicit context', () => {
     const { state } = game()

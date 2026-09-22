@@ -20,7 +20,19 @@ remains pending. No migration is introduced by BAR-2; owner confirmed BAR-1's 07
 - Current-side/current-period open awards take precedence over standalone free throws.
   One opens directly, multiple require selection, none permits standalone entry.
   Existing trip shooter takes precedence over player-detail context. No first-player
-  fallback is used. Unsupported Unattributed submissions stay unresolved with errors.
+  fallback is used. Standalone and awarded free throws require an eligible individual:
+  Unattributed stays unresolved, with capture disabled until a valid shooter is chosen.
+  Standalone entry displays a required-player message and its parent rejects missing
+  or team-pseudo identities before reaching the command.
+
+## PR review follow-up
+
+- Restored the existing `assistCandidatesForMadeShot` policy in the production popup:
+  opponent team-pseudo shots skip assist selection; same-side individual selection
+  retains the incoming role ordering. No assist-eligibility expansion is introduced.
+- Component callback tests pin missing/stale standalone shooter blocking and both
+  team-pseudo assist paths. A lifecycle test leaves an award open, ends the period,
+  starts the next period, and proves that the old award is excluded from quick entry.
 
 ## Existing foul policy
 
@@ -33,7 +45,7 @@ drawn-by validation and team technical behavior still use the existing commands.
 
 ## Verification performed
 
-- Full Vitest suite: 219 files, 1,861 tests passed.
+- Full Vitest suite after review fixes: 220 files, 1,865 tests passed.
 - Production build/typecheck passed. Lint: no errors, three existing context Fast
   Refresh warnings. Existing build deployment-path/bundle-size warnings remain.
 - New helper tests cover position ordering, numeric jerseys, bench/boundary/ejection
