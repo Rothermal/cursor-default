@@ -79,6 +79,9 @@ export default function PlayerSetup() {
   const [basketballSetupDraft, setBasketballSetupDraft] = useState<BasketballSetupDraft | null>(
     () => loadBasketballSetupDraft(accountScope)
   )
+  const setupReviewMissing = isBasketballEventIntent && (!basketballSetupDraft?.event ||
+    basketballSetupDraft.authority !== 'sport_events' || !activeLocalGameId ||
+    basketballSetupDraft.committedLocalGameId !== activeLocalGameId)
   const rosterTeamId = resolveBasketballSetupRosterTeamId({
     cloudTeamId,
     draft: basketballSetupDraft,
@@ -104,10 +107,11 @@ export default function PlayerSetup() {
   }, [navigate, state])
 
   useEffect(() => {
+    cloudRosterLoadedRef.current = false
     setBasketballSetupDraft(loadBasketballSetupDraft(accountScope))
     setStaleAuthority(null)
     setRulesNotice(null)
-  }, [accountScope])
+  }, [accountScope, activeLocalGameId])
 
   useEffect(() => {
     if (!sport?.teamCategories?.length || !state.gameInfo) return
@@ -125,7 +129,9 @@ export default function PlayerSetup() {
     const hasRosterRows = state.players.some(
       p => p.id !== TEAM_PLAYER_HOME_ID && p.id !== TEAM_PLAYER_OPP_ID
     )
-    if (hasRosterRows) {
+    const missingDraftParticipants = !setupReviewMissing && basketballSetupDraft?.version === 2 &&
+      individualPlayers.some(player => !basketballSetupDraft.playerSetup.participants.some(item => item.playerId === player.id))
+    if (hasRosterRows && !missingDraftParticipants) {
       cloudRosterLoadedRef.current = true
       setRosterLoading(false)
       return
@@ -242,6 +248,8 @@ export default function PlayerSetup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [
     cloudTeamId,
+    basketballSetupDraft,
+    setupReviewMissing,
     accountScope,
     activeLocalGameId,
     isBasketballEventIntent,
@@ -573,7 +581,7 @@ export default function PlayerSetup() {
           <h2 className="text-lg font-semibold text-content mb-4">Add Players</h2>
         )}
 
-        {isBasketballEventIntent && basketballSetupDraft?.event &&
+        {isBasketballEventIntent && !setupReviewMissing && basketballSetupDraft?.event &&
           (!anchoredSetup || anchoredSetupStep !== 'opening_lineup') && (
           <div className="mb-5">
             <BasketballSetupRulesReview event={basketballSetupDraft.event} readOnly />
@@ -613,8 +621,12 @@ export default function PlayerSetup() {
             {rosterError}
           </div>
         )}
+        {setupReviewMissing && <section role="alert" className="mb-4 space-y-3 border-y border-warning-line bg-warning p-3 text-sm text-warning-content">
+          <p>This game's reviewed setup is unavailable. Review its rules and roster again before starting. No game has been deleted.</p>
+          <button type="button" className="btn-secondary" onClick={() => navigate('/setup?reviewCurrent=1')}>Review Game Setup</button>
+        </section>}
 
-        {anchoredSetup && anchoredSetupStep !== 'roster' && basketballSetupDraft?.version === 2 ? (
+        {!setupReviewMissing && anchoredSetup && anchoredSetupStep !== 'roster' && basketballSetupDraft?.version === 2 ? (
           <BasketballOpeningLineupSetup
             draft={basketballSetupDraft}
             busy={starting}
@@ -683,7 +695,10 @@ export default function PlayerSetup() {
                   </span>
                   <div className="min-w-0 space-y-2">
                     <span className="min-w-0 break-words font-medium text-content">{player.name}</span>
-                    {isBasketballEventIntent && basketballSetupDraft && <BasketballPositionField
+                    {isBasketballEventIntent && !setupReviewMissing && <span className="block text-xs text-content-muted">
+                      {basketballSetupDraft?.version === 2 && basketballSetupDraft.playerSetup.participants.find(item => item.playerId === player.id)?.initialStatus === 'starter' ? 'Starter' : 'Bench'}
+                    </span>}
+                    {isBasketballEventIntent && !setupReviewMissing && basketballSetupDraft && <BasketballPositionField
                       value={basketballSetupDraft.version === 2 ? basketballSetupDraft.playerSetup.participants.find(item => item.playerId === player.id)?.position ?? null : null}
                       onChange={position => {
                         const next = reconcileBasketballSetupTrackedRoster(basketballSetupDraft,
@@ -718,7 +733,7 @@ export default function PlayerSetup() {
               if (anchoredSetup) continueToOpeningLineup()
               else void handleStart()
             }}
-            disabled={!canStart || rosterLoading || saving || starting}
+            disabled={!canStart || rosterLoading || saving || starting || setupReviewMissing}
             className="btn-primary w-full"
           >
             {anchoredSetup

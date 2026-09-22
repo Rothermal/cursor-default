@@ -78,7 +78,21 @@ describe('Basketball workspace roster', () => {
     expect(html).not.toContain('On court')
     expect(html).not.toContain('Bench')
     expect(html).not.toContain('Manage Lineup')
+    expect(html).toContain('Lineup not tracked')
+    expect(html).toContain('Position not tracked')
+    expect(html).not.toContain('Position unassigned')
     expect(JSON.stringify(state)).toBe(before)
+  })
+  it('shows current positions and pending boundary review without inventing court status', () => {
+    const state = clockedFixture()
+    if (state.sportGameState?.sportId !== 'basketball') throw Error('Missing projection')
+    const projection = state.sportGameState.projection
+    const participant = Object.values(projection.participants).find(item => item.playerId === 'p1')!
+    participant.position = 'PG'
+    expect(render(state)).toContain('PG')
+    projection.lineup!.sides.tracked!.boundaryConfirmationRequired = true
+    expect(render(state)).toContain('Lineup review required')
+    expect(render(state)).not.toContain('On court')
   })
   it('shows opponent individuals independently of team pseudo-players', () => {
     const html = render(fixture(), 'opponent')

@@ -163,10 +163,10 @@ export default function BasketballTeamSettingsPanel({
         Personal Basketball defaults
       </button>
 
-      <fieldset disabled={!sharedWritable || !rosterReady} className="space-y-2 border-y border-line py-3">
+      <fieldset disabled={!sharedWritable || !rosterReady} className="border-y border-line py-3">
         <legend className="font-semibold text-content">Default starters</legend>
         {!rosterReady && <p role="status" className="text-sm text-content-muted">Loading roster...</p>}
-        {rosterReady && roster.map(player => <label key={player.id} className="flex min-h-10 items-center gap-2 text-sm text-content">
+        {rosterReady && roster.map(player => <label key={player.id} className="flex min-h-10 items-center gap-2 border-b border-line py-1 text-sm text-content">
           <input type="checkbox" checked={draft.lineupDefaults?.starterPlayerIds.includes(player.id) ?? false}
             disabled={!draft.lineupDefaults?.starterPlayerIds.includes(player.id) && (draft.lineupDefaults?.starterPlayerIds.length ?? 0) >= 5}
             onChange={event => {
@@ -175,7 +175,8 @@ export default function BasketballTeamSettingsPanel({
               setDraft({ ...draft, lineupDefaults: { version: 1, starterPlayerIds: event.target.checked
                 ? [...ids, player.id] : ids.filter(id => id !== player.id) } })
             }} />
-          <span className="min-w-0 break-words">{player.label} - {draft.lineupDefaults?.starterPlayerIds.includes(player.id) ? 'Starter' : 'Bench'}</span>
+          <span className="min-w-0 flex-1 break-words">{player.label}</span>
+          <span className="shrink-0 text-xs text-content-muted">{draft.lineupDefaults?.starterPlayerIds.includes(player.id) ? 'Starter' : 'Bench'}</span>
         </label>)}
         {rosterReady && (draft.lineupDefaults?.starterPlayerIds ?? []).filter(id => !roster.some(player => player.id === id)).map(id =>
           <label key={id} className="flex min-h-10 items-center gap-2 text-sm text-warning-content">

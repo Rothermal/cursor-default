@@ -33,11 +33,14 @@ export default function BasketballWorkspaceRoster({ state, side, canAdd, onAdd, 
       {players.map(player => {
         const participant = projection && Object.values(projection.participants).find(item => item.playerId === player.id)
         const status = participant?.ejected ? 'Ejected' : participant?.disqualified ? 'Disqualified'
-          : lineup && participant ? lineup.currentParticipantIds.includes(participant.participantId) ? 'On court' : 'Bench' : null
+          : lineup && participant ? lineup.boundaryConfirmationRequired ? 'Lineup review required'
+            : lineup.currentParticipantIds.includes(participant.participantId) ? 'On court' : 'Bench'
+            : 'Lineup not tracked'
         return <button key={player.id} id={`basketball-roster-${player.id}`} type="button" onClick={() => onOpen(player.id)}
           className="min-h-16 rounded-lg border border-line bg-surface p-3 text-left text-content">
           <span className="block break-words font-semibold">#{player.number || '?'} {player.name}</span>
           {status && <span className="block text-xs text-content-muted">{status}</span>}
+          <span className="block break-words text-xs text-content-muted">{participant?.position ?? (participant ? 'Position unassigned' : 'Position not tracked')}</span>
           {state.sport && <span className="block text-xs text-content-muted">{formatCompactGameStatLine(state.sport, player.stats)}</span>}
         </button>
       })}
