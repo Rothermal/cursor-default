@@ -79,6 +79,8 @@ describe('Basketball workspace roster', () => {
     expect(html).not.toContain('Bench')
     expect(html).not.toContain('Manage Lineup')
     expect(html).toContain('Lineup not tracked')
+    expect(html).toContain('Position not tracked')
+    expect(html).not.toContain('Position unassigned')
     expect(JSON.stringify(state)).toBe(before)
   })
   it('shows current positions and pending boundary review without inventing court status', () => {

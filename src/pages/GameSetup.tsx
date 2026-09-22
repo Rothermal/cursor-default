@@ -54,6 +54,7 @@ import {
   type TeamRole,
 } from '../lib/teamPermissions'
 import { teamDisplayName } from '../lib/display'
+import { canReviewCurrentBasketballSetup } from '../lib/basketball/setupRecovery'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -106,9 +107,7 @@ export default function GameSetup() {
   const currentUserIdRef = useRef(userId)
   currentUserIdRef.current = userId
   const accountScope = basketballSetupAccountScope(userId)
-  const reviewCurrentSetup = searchParams.get('reviewCurrent') === '1' &&
-    !requestedTeamId && !requestedSportId && isBasketballEventSetupIntent(state) &&
-    !hasStartedBasketballEventGame(state)
+  const reviewCurrentSetup = canReviewCurrentBasketballSetup(state, searchParams)
   const explicitSport = requestedSportId
     ? sports.find(item => item.id === requestedSportId) ?? null
     : null
