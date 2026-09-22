@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ShieldAlert, X } from 'lucide-react'
+import ActorSelect from '../ActorSelect'
 import type {
   BasketballFoulCaptureOptions,
   BasketballFoulDrawnBy,
@@ -17,6 +18,7 @@ export interface BasketballFoulCandidate {
   playerId: string
   teamSide: BasketballTeamSide
   label: string
+  live?: boolean
 }
 
 export type BasketballFoulDialogInput = Pick<
@@ -78,7 +80,8 @@ export default function BasketballFoulDialog({
   const defaultPlayer = candidates.find(candidate =>
     candidate.playerId === defaultPlayerId && candidate.teamSide === defaultSide
   )
-  const [teamSide, setTeamSide] = useState<BasketballTeamSide>(defaultSide)
+  const teamSide = defaultSide
+  const [benchStaff, setBenchStaff] = useState(defaultPlayer?.live === false)
   const [offenderSelection, setOffenderSelection] = useState(
     defaultPlayer ? `player:${defaultPlayer.playerId}` : 'team'
   )
@@ -97,12 +100,12 @@ export default function BasketballFoulDialog({
   const [overrideReason, setOverrideReason] = useState('')
 
   const sideCandidates = useMemo(
-    () => candidates.filter(candidate => candidate.teamSide === teamSide),
-    [candidates, teamSide]
+    () => candidates.filter(candidate => candidate.teamSide === teamSide && (benchStaff ? candidate.live === false : candidate.live !== false)),
+    [candidates, teamSide, benchStaff]
   )
   const oppositeSide: BasketballTeamSide = teamSide === 'tracked' ? 'opponent' : 'tracked'
   const drawnByCandidates = useMemo(
-    () => candidates.filter(candidate => candidate.teamSide === oppositeSide),
+    () => candidates.filter(candidate => candidate.teamSide === oppositeSide && candidate.live !== false),
     [candidates, oppositeSide]
   )
   const committingTeamName = teamSide === 'tracked' ? trackedTeamName : opponentName
@@ -116,21 +119,13 @@ export default function BasketballFoulDialog({
     return () => window.removeEventListener('keydown', handleKey)
   }, [onClose])
 
-  const chooseSide = (side: BasketballTeamSide) => {
-    setTeamSide(side)
-    const selectedPlayerId = offenderSelection.startsWith('player:')
-      ? offenderSelection.slice('player:'.length)
-      : null
-    if (!candidates.some(candidate => candidate.playerId === selectedPlayerId && candidate.teamSide === side)) {
-      setOffenderSelection('team')
-    }
-    setDrawnBySelection('none')
-    setTeamControlSide('none')
-  }
-
   const derivedTechnical = advanced ? technical : foulClass === 'technical'
-  const valid = offenderSelection !== 'staff' || staffLabel.trim().length > 0
-  const drawnByValid = drawnBySelection !== 'unknown' || unknownDrawnByLabel.trim().length > 0
+  const valid = offenderSelection === 'staff' ? benchStaff && staffLabel.trim().length > 0
+    : offenderSelection === 'team' ? !benchStaff
+    : sideCandidates.some(candidate => `player:${candidate.playerId}` === offenderSelection)
+  const drawnByValid = drawnBySelection === 'none' || (drawnBySelection === 'unknown'
+    ? unknownDrawnByLabel.trim().length > 0
+    : drawnByCandidates.some(candidate => `player:${candidate.playerId}` === drawnBySelection))
   const overrideValid = !advanced || overrideReason.trim().length > 0
 
   const submit = () => {
@@ -199,22 +194,16 @@ export default function BasketballFoulDialog({
         </header>
 
         <form className="space-y-4 px-4 py-4" onSubmit={event => { event.preventDefault(); submit() }}>
-          <div className="grid grid-cols-2 rounded-lg bg-surface-muted p-1" role="group" aria-label="Committing team">
-            {([['tracked', trackedTeamName], ['opponent', opponentName]] as const).map(([side, name]) => (
-              <button key={side} type="button" onClick={() => chooseSide(side)} aria-pressed={teamSide === side} className={`min-h-11 rounded-md px-2 py-1 text-sm font-semibold ${teamSide === side ? 'bg-surface text-content shadow-sm' : 'text-content-muted'}`}>
-                <span className="line-clamp-2 break-words">{name}</span>
-              </button>
-            ))}
-          </div>
-
-          <label className="block text-sm font-semibold text-content">
-            Foul charged to
-            <select value={offenderSelection} onChange={event => setOffenderSelection(event.target.value)} className="input-field mt-1">
-              <option value="team">{committingTeamName} team</option>
-              {sideCandidates.map(candidate => <option key={candidate.playerId} value={`player:${candidate.playerId}`}>{candidate.label}</option>)}
-              <option value="staff">Coach or staff</option>
-            </select>
+          <label className="flex min-h-10 items-center gap-2 text-sm text-content">
+            <input type="checkbox" checked={benchStaff} onChange={event => {
+              setBenchStaff(event.target.checked)
+              setOffenderSelection(event.target.checked ? '' : 'team')
+            }} />Bench / staff
           </label>
+          <ActorSelect label="Foul charged to" value={offenderSelection} onChange={setOffenderSelection}
+            options={[...sideCandidates.map(candidate => ({ value: `player:${candidate.playerId}`, label: candidate.label })),
+              ...(benchStaff ? [{ value: 'staff', label: 'Coach or staff' }] : [])]}
+            emptyOption={benchStaff ? { value: '', label: 'Choose offender' } : { value: 'team', label: 'Unattributed' }} />
 
           {offenderSelection === 'staff' && (
             <label className="block text-sm font-semibold text-content">

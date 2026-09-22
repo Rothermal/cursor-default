@@ -1,7 +1,21 @@
 # Basketball Attribution and Roster Follow-Up
 
-Status: Product Q&A complete. BAR-1 implemented on its feature branch; migration
-application and owner runtime validation pending. BAR-2 has not started.
+Status: Product Q&A complete. BAR-1 merged; owner confirmed migration 070 applied.
+BAR-2 implemented, pending PR review and owner runtime validation.
+
+## BAR-2 delivery record
+
+- Shared presentation-only `ActorSelect`; Basketball owns current-match role ordering,
+  side filtering, live eligibility and command validation. Main and assist/rebound
+  selectors no longer use player chip strips. Unattributed remains last where allowed.
+- Court Foul/Free Throw entry hands off without recording an event or retaining a
+  court location. Foul entry has an explicit Bench / staff path. Free throws resolve
+  current-side/current-period awards before standalone capture, preserve an existing
+  shooter, and reject stale award snapshots and ineligible shooters.
+- Historical correction forms retain historical eligibility. Legacy capture retains
+  supported operations; structured quick administrative entry is event-mode only.
+- No additional migration. Automated/browser verification and owner smoke checklist:
+  [BAR-2 regression record](REGRESSION_BAR_2_EVENT_ATTRIBUTION.md).
 
 ## BAR-1 delivery record
 

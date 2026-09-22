@@ -21,7 +21,7 @@ architecture, not current schema or deployment instructions.
 | Topic | Owner document | Status |
 | --- | --- | --- |
 | Basketball UI | [Workspace modernization](PLAN_BASKETBALL_WORKSPACE_MODERNIZATION.md) | Initial workspace implementation merged in #418; owner validation pending |
-| Basketball attribution and roster | [Team defaults and event capture](PLAN_BASKETBALL_ATTRIBUTION_AND_ROSTER.md) | BAR-1 implemented; migration/owner checks pending. BAR-2 event selection and quick foul/free throws next |
+| Basketball attribution and roster | [Team defaults and event capture](PLAN_BASKETBALL_ATTRIBUTION_AND_ROSTER.md) | BAR-1 merged; migration 070 applied. BAR-2 dropdowns and quick foul/free throws implemented; review/owner checks pending |
 | Clock and live substitutions | [Timing assessment](PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md) | Confirmed goals; implementation/schema still proposed |
 | Soccer issues | [Field-test backlog](PLAN_SOC_FIELD_TEST_BACKLOG.md) | Living issue inventory; distinguish implemented from owner-verified |
 | Shot metadata/direction | [S15/S16 regression](REGRESSION_SOC_S15_S16_SHOT_DETAILS.md) | Implemented; deployed checks remain separately recorded |
