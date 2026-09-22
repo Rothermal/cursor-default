@@ -106,6 +106,9 @@ export default function GameSetup() {
   const currentUserIdRef = useRef(userId)
   currentUserIdRef.current = userId
   const accountScope = basketballSetupAccountScope(userId)
+  const reviewCurrentSetup = searchParams.get('reviewCurrent') === '1' &&
+    !requestedTeamId && !requestedSportId && isBasketballEventSetupIntent(state) &&
+    !hasStartedBasketballEventGame(state)
   const explicitSport = requestedSportId
     ? sports.find(item => item.id === requestedSportId) ?? null
     : null
@@ -113,11 +116,11 @@ export default function GameSetup() {
   const sport = requestedSportId
     ? explicitSport
     : resolvedRequestedSport ?? state.sport
-  const initialBasketballRoute = Boolean(
+  const initialBasketballRoute = !reviewCurrentSetup && Boolean(
     requestedSportId === 'basketball' ||
     (!requestedSportId && !requestedTeamId && state.sport?.id === 'basketball')
   )
-  const initialBasketballDraft = initialBasketballRoute
+  const initialBasketballDraft = initialBasketballRoute && !reviewCurrentSetup
     ? loadBasketballSetupDraft(accountScope)
     : null
   const matchingInitialBasketballDraft = initialBasketballDraft &&
@@ -130,7 +133,7 @@ export default function GameSetup() {
   const isCloudFlow = Boolean(isConfigured && user && supabase)
   const [basketballAuthority, setBasketballAuthority] = useState<'legacy' | 'sport_events'>(
     matchingInitialBasketballDraft?.authority ??
-    (initialBasketballRoute && isBasketballEventSetupIntent(state) ? 'sport_events' : 'legacy')
+    ((initialBasketballRoute || reviewCurrentSetup) && isBasketballEventSetupIntent(state) ? 'sport_events' : 'legacy')
   )
   const [basketballDisplayFlipped, setBasketballDisplayFlipped] = useState(
     matchingInitialBasketballDraft?.display.defaultCourtFlipped ??
@@ -141,7 +144,7 @@ export default function GameSetup() {
   )
   const [basketballCloudIntent, setBasketballCloudIntent] = useState<'automatic' | 'local_only'>(
     matchingInitialBasketballDraft?.event?.cloudIntent ??
-      (matchingInitialBasketballDraft?.source.kind === 'team' || requestedTeamId
+      (matchingInitialBasketballDraft?.source.kind === 'team' || requestedTeamId || (reviewCurrentSetup && state.cloudSync.teamId)
         ? 'automatic'
         : 'local_only')
   )
@@ -520,7 +523,7 @@ export default function GameSetup() {
     [seasonsForNewTeam, selectedNewTeamSeasonId]
   )
 
-  const restoredBasketballDraftRef = useRef(Boolean(matchingInitialBasketballDraft))
+  const restoredBasketballDraftRef = useRef(reviewCurrentSetup || Boolean(matchingInitialBasketballDraft))
 
   useEffect(() => {
     if (!isBasketballSetup || restoredBasketballDraftRef.current) return

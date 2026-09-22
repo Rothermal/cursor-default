@@ -1,9 +1,38 @@
 # Basketball Attribution and Roster Follow-Up
 
 Status: Product Q&A complete. BAR-1 merged; owner confirmed migration 070 applied.
-BAR-2 implemented, pending PR review and owner runtime validation.
+BAR-2 merged. Post-merge setup/lineup follow-up is pending review and owner replay.
 
 ## BAR-2 delivery record
+
+### Post-merge field feedback
+
+Setup/lineup follow-up adds explicit recovery when the account's single reviewed
+draft does not belong to the active pre-start game. Start and unrelated draft
+controls stay blocked; Review Game Setup rebuilds a review from the current game's
+available identity and requires normal setup confirmation. It does not adopt another
+game's reviewed rules or delete a game. Original match overrides from a lost draft
+cannot be reconstructed; review them again. The exact user-reported navigation
+sequence and possible local/cloud duplicate identity remain unconfirmed.
+
+Existing setup roster rows lacking draft participant snapshots can now load cloud
+defaults instead of skipping roster initialization solely because names are present.
+Saved draft participant choices still take precedence. Setup shows Starter/Bench;
+live roster shows match positions and On court/Bench, boundary-review-required, or
+Lineup not tracked as appropriate. Legacy games do not gain fabricated lineup history.
+Team starter defaults use compact number/name/status rows.
+
+Verification: 221 files / 1,869 tests; build/typecheck pass; lint has only the three
+existing warnings. Actual Player Setup rendering tests cover missing/wrong-game drafts
+and matching saved position/status. Roster browser checks pass at 390/1280px in both
+themes, including detail activation and overflow. The cloud-team recovery flow still
+needs owner replay with the reported game; no Supabase migration or production data
+change is part of this fix.
+
+Deferred: explicit deletion of unsynced local copies requires a separately reviewed
+warning/export/data-loss flow and must never imply deletion of a cloud game. Existing
+discard protections are unchanged. Per-game setup-draft persistence is also a future
+hardening candidate; this recovery does not replace the account-level draft store.
 
 - Shared presentation-only `ActorSelect`; Basketball owns current-match role ordering,
   side filtering, live eligibility and command validation. Main and assist/rebound
