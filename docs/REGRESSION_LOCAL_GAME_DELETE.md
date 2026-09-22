@@ -22,11 +22,15 @@ Active-game reset, Settings bulk wipe and finalization guards are not loosened.
 
 ## Verification
 
-- 224 files / 1,885 tests pass. New tests cover ordinary blocking, explicit override,
+- 225 files / 1,889 tests pass. New tests cover ordinary blocking, explicit override,
   pre-first-upload games, active/sync rejection, Cancel/Confirm component callbacks,
   warning content and rollback when the manifest write fails.
 - Typecheck and lint pass (three existing Fast Refresh warnings).
 - No production game was deleted or cloud data modified during development.
+- PR review adds provider-callback tests with real in-memory parking/draft storage:
+  matching versus unrelated shortcuts, clearing/retaining the pending-sync flag,
+  missing-record rejection and cleanup-failure reporting. Background effects and
+  network operations are disabled in this harness; these are not multi-tab tests.
 
 ## Owner Smoke
 
