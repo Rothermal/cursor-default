@@ -1112,6 +1112,17 @@ describe('gameParking', () => {
     expect(localStorage.getItem(GAME_STORAGE_KEY)).toBeNull()
   })
 
+  it('restores the deleted record if updating the manifest fails', () => {
+    const storage = new FailNthManifestWriteStorage()
+    vi.stubGlobal('localStorage', storage)
+    const [summary] = saveActiveGameState(gameState(basketball, 'Aces', 'Bears'), 'user-1')
+    const before = localStorage.getItem(`${GAME_RECORD_KEY_PREFIX}${summary.localGameId}`)
+    storage.failOnManifestWrite(1)
+    expect(() => discardParkedGame(summary.localGameId, 'user-1')).toThrow()
+    expect(localStorage.getItem(`${GAME_RECORD_KEY_PREFIX}${summary.localGameId}`)).toBe(before)
+    expect(getActiveLocalGameId('user-1')).toBe(summary.localGameId)
+  })
+
   it('preserves skipped-final games whose fingerprint is still ahead of last sync', () => {
     const base = gameState(basketball, 'Aces', 'Bears')
     const synced = withLastSyncedGameFingerprint({

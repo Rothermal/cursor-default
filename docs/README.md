@@ -29,6 +29,7 @@ architecture, not current schema or deployment instructions.
 | Appearance release | [THM-6 regression](REGRESSION_THM_6_APPEARANCE_RELEASE.md) | Released for owner use; retain pending deployed checks |
 | Team branding | [Branding plan](PLAN_TEAM_BRANDING.md) | Approved high-level direction; detailed implementation pending |
 | Local game parking | [Parking plan](PLAN_MULTI_GAME_PARKING.md) | Shipped core; historical cleanup/storage follow-ups remain |
+| Delete local copy | [Local deletion checks](REGRESSION_LOCAL_GAME_DELETE.md) | Explicit unsynced deletion implemented for parked games; owner smoke pending |
 | Access/security expansion | [Security roadmap](PLAN_ADMIN_SECURITY_ROADMAP.md) | Implemented phases plus deferred scope; retain access matrix |
 | Older generic backlog | [Pre-reset README](archived/README_PRE_RESET.md) | Historical candidates, not verified current defects; see audit triage |
 

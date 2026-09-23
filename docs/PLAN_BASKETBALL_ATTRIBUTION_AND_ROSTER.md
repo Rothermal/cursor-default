@@ -29,9 +29,9 @@ themes, including detail activation and overflow. The cloud-team recovery flow s
 needs owner replay with the reported game; no Supabase migration or production data
 change is part of this fix.
 
-Deferred: explicit deletion of unsynced local copies requires a separately reviewed
-warning/export/data-loss flow and must never imply deletion of a cloud game. Existing
-discard protections are unchanged. Per-game setup-draft persistence is also a future
+Explicit deletion of unsynced local copies is now implemented separately with a
+warning/export alternative and unchanged default discard guards; see
+[local deletion checks](REGRESSION_LOCAL_GAME_DELETE.md). Per-game setup-draft persistence is a future
 hardening candidate; this recovery does not replace the account-level draft store.
 
 - Shared presentation-only `ActorSelect`; Basketball owns current-match role ordering,

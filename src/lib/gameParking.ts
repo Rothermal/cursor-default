@@ -895,6 +895,16 @@ export function discardParkedGame(
   ownerId: string | null
 ): ParkedGameSummary[] {
   const manifest = migrateLegacyGameStorage(ownerId)
+  const snapshot = snapshotParkingStorage(manifest)
+  try {
+    return discardParkedGameFromManifest(localGameId, ownerId, manifest)
+  } catch (error) {
+    restoreParkingStorage(snapshot)
+    throw error
+  }
+}
+
+function discardParkedGameFromManifest(localGameId: string, ownerId: string | null, manifest: ParkedGamesManifest): ParkedGameSummary[] {
   localStorage.removeItem(gameRecordKey(localGameId))
   const summaries = { ...manifest.summaries }
   delete summaries[localGameId]

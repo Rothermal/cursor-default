@@ -26,6 +26,7 @@ import {
   loadBasketballSetupDraft,
 } from '../lib/basketball/setupDraft'
 import { isBasketballEventLocalOnly } from '../lib/basketball/eventCloudPolicy'
+import { LOCAL_GAME_DELETE_WARNING } from '../lib/localGameDiscard'
 
 function activeSyncStatusLabel(status: string, lastError: string | null): string | null {
   switch (status) {
@@ -157,14 +158,10 @@ export default function SportDashboard() {
   const handleDiscardParked = (localGameId: string) => {
     setDashboardError(null)
     clearParkingError()
-    if (!window.confirm('Discard this parked game? This cannot be undone.')) {
+    if (!window.confirm(LOCAL_GAME_DELETE_WARNING)) {
       return
     }
-    if (!discardParkedGame(localGameId)) {
-      setDashboardError(
-        'This parked game has unsynced cloud stats. Resume and sync it before discarding.'
-      )
-    }
+    discardParkedGame(localGameId, { allowUnsyncedLocalDelete: true })
   }
 
   if (!sport) {
@@ -321,7 +318,7 @@ export default function SportDashboard() {
               {parkedForSport.map(game => (
                 <div
                   key={game.localGameId}
-                  className="rounded-xl border border-line bg-surface px-3 py-2 flex items-center justify-between gap-3"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 flex flex-wrap items-center justify-between gap-3"
                 >
                   <div className="min-w-0">
                     <p className="font-semibold text-content truncate">
@@ -347,7 +344,7 @@ export default function SportDashboard() {
                       onClick={() => handleDiscardParked(game.localGameId)}
                       className="bg-surface text-content-muted px-3 py-2 rounded-lg text-sm font-semibold border border-line active:scale-95 transition-transform"
                     >
-                      Discard
+                      Delete local copy
                     </button>
                   </div>
                 </div>
