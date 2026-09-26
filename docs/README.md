@@ -27,6 +27,7 @@ architecture, not current schema or deployment instructions.
 | Shot metadata/direction | [S15/S16 regression](REGRESSION_SOC_S15_S16_SHOT_DETAILS.md) | Implemented; deployed checks remain separately recorded |
 | Basketball release evidence | [BKE-6E regression](REGRESSION_BKE_6E_RELEASE.md) | Preserve pending evidence and reported issues; reconcile with owner results before archiving |
 | Appearance release | [THM-6 regression](REGRESSION_THM_6_APPEARANCE_RELEASE.md) | Released for owner use; retain pending deployed checks |
+| Football program | [FBE-0 product model](PLAN_FBE_0_FOOTBALL_PRODUCT_MODEL.md) with [FBE-1](PLAN_FBE_1_ROSTER_POSITIONS_AND_UNITS.md), [FBE-2](PLAN_FBE_2_PLAY_EVENT_MODEL.md), [FBE-3](PLAN_FBE_3_FIELD_AND_LIVE_CAPTURE.md) | FBE-0 direction approved 2026-09-26; phase Q&A before code; no code yet |
 | Team branding | [Branding plan](PLAN_TEAM_BRANDING.md) | Approved high-level direction; detailed implementation pending |
 | Local game parking | [Parking plan](PLAN_MULTI_GAME_PARKING.md) | Shipped core; historical cleanup/storage follow-ups remain |
 | Delete local copy | [Local deletion checks](REGRESSION_LOCAL_GAME_DELETE.md) | Explicit unsynced deletion implemented for parked games; owner smoke pending |
