@@ -342,10 +342,19 @@ describe('Basketball release entry guards', () => {
       "if (result.code === 'lineup_review_required') setBoundaryReviewRequest(value => value + 1)"
     )
     expect(tracker).toContain('boundaryReviewRequest={boundaryReviewRequest}')
-    expect(clockStrip.indexOf("setBoundaryReviewPurpose('end_period')")).toBeGreaterThanOrEqual(0)
-    expect(clockStrip.indexOf("setBoundaryReviewPurpose('end_period')")).toBeLessThan(
-      clockStrip.indexOf('setBoundaryReviewOpen(true)', clockStrip.indexOf("setBoundaryReviewPurpose('end_period')"))
+    const endPeriodReviewEffect = between(
+      clockStrip,
+      'if (boundaryReviewRequest === handledBoundaryReviewRequestRef.current) return',
+      '}, [boundaryReviewRequest, hasPendingSides])'
     )
+    const consumeIndex = endPeriodReviewEffect.indexOf(
+      'handledBoundaryReviewRequestRef.current = boundaryReviewRequest'
+    )
+    const purposeIndex = endPeriodReviewEffect.indexOf("setBoundaryReviewPurpose('end_period')")
+    const openIndex = endPeriodReviewEffect.indexOf('setBoundaryReviewOpen(true)')
+    expect(consumeIndex).toBeGreaterThanOrEqual(0)
+    expect(purposeIndex).toBeGreaterThan(consumeIndex)
+    expect(openIndex).toBeGreaterThan(purposeIndex)
     expect(boundaryReview).toContain('Confirm current five')
     expect(boundaryReview).toContain('Your current role cannot record this equal-play override.')
     expect(boundaryReview).toContain('Confirm current five unavailable.')
