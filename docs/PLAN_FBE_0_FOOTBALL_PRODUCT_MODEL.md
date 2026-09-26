@@ -389,7 +389,10 @@ Hockey and Baseball programs; see the "Shared cross-sport work" items in
   `src/lib/eventCloudTransportAdapters.ts`.
 
 Migration numbers are assigned at implementation time because three sport
-programs are planning in parallel.
+programs are planning in parallel. The Baseball BSB-2 migration is planned to widen the
+migration 054 publication allow-list for baseball, football and hockey together;
+football migrations must check the latest number on `stattracker` and any open
+Baseball PR first and must not add a competing allow-list change.
 
 ---
 
