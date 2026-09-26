@@ -21,7 +21,7 @@ incomplete intervals and exact derived playing time without changing clockless o
 - A supported side may have at most five on-court participants and may not have zero.
 - One through four requires a structured reason; ejection and disqualification never infer exits or
   replacements.
-- Every configured lineup boundary requires explicit review before Clock Start.
+- Every configured lineup boundary requires explicit review before Clock Start or End Period.
 - Setup remains the opening-lineup authority. Live events never rewrite immutable setup.
 - Projection derives intervals and minutes from lineup and running-clock intersections.
 - Opponent lineup authority remains optional and independent from tracked-team completeness.
@@ -235,6 +235,12 @@ command, advisory policy remains nonblocking, and the UI labels snapshotted-poli
 prescribing a replacement five. The replaced same-five command was removed so override authority and
 reason validation have one production command path. See
 [REGRESSION_BKE_6C2_BOUNDARY_EQUAL_PLAY.md](REGRESSION_BKE_6C2_BOUNDARY_EQUAL_PLAY.md).
+
+Follow-up (#353, PR #427): End Period is also gated. `endBasketballPeriod` refuses with
+`lineup_review_required` while `basketballBoundaryReviewPendingSides` reports a pending side, and the
+tracker opens the same review dialog. Without this, ending a period whose clock never started left a
+boundary that could no longer be confirmed, so Summary and anchored finalization reported it as
+unresolved permanently.
 
 ## 8. BKE-6C3: Roles and Current-Lineup Recovery
 

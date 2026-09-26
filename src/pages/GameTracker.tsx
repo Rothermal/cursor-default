@@ -222,6 +222,7 @@ export default function GameTracker() {
   const [lateParticipantError, setLateParticipantError] = useState<string | null>(null)
   const [lateParticipantReturnSide, setLateParticipantReturnSide] = useState<BasketballTeamSide | null>(null)
   const [requestedLineupSide, setRequestedLineupSide] = useState<BasketballTeamSide | null>(null)
+  const [boundaryReviewRequest, setBoundaryReviewRequest] = useState(0)
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [directCaptureError, setDirectCaptureError] = useState<string | null>(null)
   const [showScoreCorrection, setShowScoreCorrection] = useState(false)
@@ -1059,6 +1060,7 @@ export default function GameTracker() {
     const result = endBasketballPeriod(state, { recorderUserId: user?.id ?? null })
     if (!result.ok) {
       setLifecycleError(result.message)
+      if (result.code === 'lineup_review_required') setBoundaryReviewRequest(value => value + 1)
       return
     }
     setLifecycleError(null)
@@ -1240,12 +1242,16 @@ export default function GameTracker() {
           canOverrideEqualPlay={canAuthorizeBasketballEqualPlayOverride(state, equalPlayAccess)}
           requestedLineupSide={requestedLineupSide}
           onRequestedLineupOpened={() => setRequestedLineupSide(null)}
+          boundaryReviewRequest={boundaryReviewRequest}
           onAddParticipant={teamSide => {
             setLateParticipantReturnSide(teamSide)
             setLateParticipantError(null)
             setShowAddPlayer(true)
           }}
-          onState={next => dispatch({ type: 'HYDRATE_STATE', state: next })}
+          onState={next => {
+            setLifecycleError(null)
+            dispatch({ type: 'HYDRATE_STATE', state: next })
+          }}
         />
       )}
 

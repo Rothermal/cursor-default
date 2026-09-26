@@ -32,6 +32,15 @@ export function validatePendingBasketballEqualPlayOverride(
   return 'Basketball equal-play override must immediately precede its lineup confirmation.'
 }
 
+/** Sides whose period-boundary lineup still needs review; gates both Clock Start and End Period. */
+export function basketballBoundaryReviewPendingSides(
+  projection: BasketballMatchProjection
+): BasketballTeamSide[] {
+  return enabledSides(projection)
+    .filter(side => side.boundaryConfirmationRequired)
+    .map(side => side.teamSide)
+}
+
 export function basketballLineupClockStartError(
   projection: BasketballMatchProjection
 ): string | null {
