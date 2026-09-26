@@ -14,7 +14,7 @@ on 2026-09-26.
 HKY-1 exits when:
 
 - `src/lib/hockey/` owns strict, clone-safe hockey types, rules v1, and built-in profiles,
-- hockey roster positions parse/serialize with the `hockey:` prefix and sort in catalog
+- hockey roster positions parse as plain codes (C, LW, RW, D, G) and sort in catalog
   order, with custom positions and Unassigned handled per the shared roster rule,
 - a hockey setup snapshot (rules, tracked side, participants, starting goalie, opening
   five) is frozen at game start,
@@ -77,28 +77,33 @@ identical rules for the same team, clone safety.
 
 ### HKY-1B Roster positions, defaults, setup snapshot
 
-Files: `src/lib/hockey/rosterPosition.ts`, `lineupDefaults.ts`, `setup.ts`.
+Files: `src/lib/hockey/positions.ts`, `lineupDefaults.ts`, `setup.ts`.
 
-- Position catalog `center | left_wing | right_wing | defense | goalie`, stored as
-  `hockey:<value>` in `team_players.position`. Custom text is preserved and sorted after
-  standard positions; null/empty/other sports' values read as Unassigned and are never
-  rewritten until an explicit edit.
-- Actor order helper: position order, then jersey number, then name, then id, with
-  Unassigned after known positions (shared decision). Candidate to extract as XS-4 if the
-  Football program needs it at the same time.
-- Team lineup defaults v1 `{ version: 1, starterPlayerIds, startingGoaliePlayerId, backupGoaliePlayerId }`
-  parsed and normalized in memory only (no team settings write until HKY-5C).
-- Setup snapshot v1:
-  - `trackedTeam: 'home' | 'away' | 'neutral'`, `opponentLabel`,
+- Position catalog `C | LW | RW | D | G`, stored as plain codes in
+  `team_players.position` (HKY-0 §5). Standard codes normalize to upper case; custom text
+  is preserved and sorted after standard positions; blank values read as Unassigned and
+  are never rewritten until an explicit edit.
+- Actor order helper `sortHockeyActors`: position order, custom, Unassigned, then jersey
+  number, name, and id (shared decision). Candidate to extract as XS-4.
+- Team lineup defaults v1 `{ version: 1, starterPlayerIds (max 6), startingGoaliePlayerId, backupGoaliePlayerId }`
+  parsed and normalized in memory only (no team settings write until HKY-5C). A goalie
+  cannot also be a starter skater; pruning inactive players is an explicit call.
+- Setup snapshot v1 (`HockeyMatchSetup`, field names aligned with Baseball's setup):
+  - `trackedTeam: 'home' | 'away' | 'neutral'`, `opponentName`, `sourceTeamId`,
+    `sourceSeasonId`,
+  - `rulesSnapshot` (complete resolved `HockeyMatchRules`) plus `rulesSource`
+    (per-field source from the resolver),
   - `firstPeriodAttackingDirection: 'left_to_right' | 'right_to_left'` — which end the
     tracked team attacks in period 1, in canonical rink coordinates (§2.2). Home/Away
     does not imply it,
-  - `rules` (complete resolved `HockeyMatchRules`) plus `rulesSource`,
-  - `participants[]`: `{ participantId, playerId | null, kind: 'player' | 'anonymous', jersey, name, dressedAs: 'skater' | 'goalie', position }`,
-  - `openingLineup`: `{ goalieParticipantId, skaterParticipantIds[] }`, validated
-    against `skatersPerSide`; goalie required unless the profile allows starting without
-    (not in any built-in),
-  - `opponent`: `{ goalieLabel }` only.
+  - `participants[]`: `{ id, playerId | null, displayName, number, position, dressedAs: 'skater' | 'goalie' }`
+    (a null `playerId` is a local-only participant; a roster player may be dressed once),
+  - `openingLineup`: `{ goalieParticipantId, skaterParticipantIds[] }`; the goalie must be
+    dressed as a goalie and exactly `skatersPerSide` distinct skaters must start,
+  - `opponentGoalie`: `{ id, label, number }` only.
+- `prefillHockeyOpeningLineup` fills the opening lineup from team defaults only; players
+  without a default stay on the bench and nothing is inferred from roster order.
+- `hockeyTrackedAttackingDirection` implements §2.2.
 - Participants are snapshot-owned and immutable, so later roster edits never change a game
   (Soccer S22 lesson). Deselected players are pruned.
 
@@ -179,6 +184,8 @@ not supported; a recorder who stops running the clock keeps an anchored game pau
 - HKY-1A: `src/lib/hockey/types.ts`, `rules.ts`, `profiles.ts`, `settings.ts`, and
   `hockey.test.ts`. No UI, registration, or migration. Missing personal/team settings
   resolve to the default profile; malformed settings fail closed and name the layer.
+- HKY-1B: `positions.ts`, `lineupDefaults.ts`, `setup.ts`, and `setup.test.ts`. Pure
+  parsers and helpers only; nothing reads or writes team settings yet.
 
 ## 3. Owner-Confirmed Decisions
 

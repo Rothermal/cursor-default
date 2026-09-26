@@ -2,6 +2,7 @@ import type { JsonObject } from '../gameEvents/types'
 
 export const HOCKEY_RULES_SCHEMA_VERSION = 1
 export const HOCKEY_SETTINGS_SCHEMA_VERSION = 1
+export const HOCKEY_SETUP_VERSION = 1
 
 // ---------------------------------------------------------------------------
 // Rules
@@ -111,3 +112,51 @@ export interface HockeySettingsV1 {
 /** Personal-or-team authority, following Basketball rather than Soccer's layering. */
 export type HockeySettingsAuthority = 'personal' | 'team'
 export type HockeyRuleSource = 'built_in' | HockeySettingsAuthority | 'match'
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+export type HockeyTrackedTeam = 'home' | 'away' | 'neutral'
+export type HockeyAttackingDirection = 'left_to_right' | 'right_to_left'
+export type HockeyDressedAs = 'skater' | 'goalie'
+
+export interface HockeyMatchParticipant extends JsonObject {
+  /** Stable match identity used by every event. */
+  id: string
+  playerId: string | null
+  displayName: string
+  number: string | null
+  /** Snapshot of the roster default position; never written back. */
+  position: string | null
+  dressedAs: HockeyDressedAs
+}
+
+export interface HockeyOpeningLineup extends JsonObject {
+  goalieParticipantId: string
+  skaterParticipantIds: string[]
+}
+
+/** The opponent is simplified: one goalie identity, optional label and number. */
+export interface HockeyOpponentGoalie extends JsonObject {
+  id: string
+  label: string | null
+  number: string | null
+}
+
+export interface HockeyMatchSetup {
+  version: typeof HOCKEY_SETUP_VERSION
+  trackedTeam: HockeyTrackedTeam
+  opponentName: string | null
+  sourceTeamId: string | null
+  sourceSeasonId: string | null
+  rulesSnapshot: HockeyMatchRules
+  rulesSource: Record<HockeyRulesField, HockeyRuleSource>
+  /** Which end the tracked team attacks in period 1, in canonical rink coordinates. */
+  firstPeriodAttackingDirection: HockeyAttackingDirection
+  participants: HockeyMatchParticipant[]
+  openingLineup: HockeyOpeningLineup
+  opponentGoalie: HockeyOpponentGoalie
+}
+
+export type HockeySetupValidation = { ok: true } | { ok: false; message: string }

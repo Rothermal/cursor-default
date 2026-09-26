@@ -167,16 +167,17 @@ Standard catalog, in actor-order sequence:
 
 | Order | Stored value | Label | Group |
 |---|---|---|---|
-| 1 | `hockey:center` | Center (C) | Forward |
-| 2 | `hockey:left_wing` | Left Wing (LW) | Forward |
-| 3 | `hockey:right_wing` | Right Wing (RW) | Forward |
-| 4 | `hockey:defense` | Defense (D) | Defense |
-| 5 | `hockey:goalie` | Goalie (G) | Goalie |
+| 1 | `C` | Center | Forward |
+| 2 | `LW` | Left wing | Forward |
+| 3 | `RW` | Right wing | Forward |
+| 4 | `D` | Defense | Defense |
+| 5 | `G` | Goalie | Goalie |
 
-Custom positions sort after standard ones; missing/malformed values read as Unassigned
-(not coerced, per the shared rule), unlike Soccer's legacy Midfielder fallback. Storage
-uses `team_players.position` with the `hockey:` prefix, mirroring Soccer's `soccer:`
-convention in `src/lib/soccer/rosterRole.ts`.
+Custom positions sort after standard ones; missing values read as Unassigned (not
+coerced, per the shared rule), unlike Soccer's legacy Midfielder fallback. Storage uses
+plain codes in `team_players.position`, the same convention as Basketball (BAR-1),
+Baseball (BSB-1), and the Football plan. Soccer's `soccer:` prefix is the exception, and
+the team's season already fixes the sport, so no prefix is needed (XS-4).
 
 Goalie is special in hockey in a way it is not in Soccer: skater and goalie stats are
 separate stat lines, and a player is dressed as a skater or as a goalie for a game. A
