@@ -348,6 +348,24 @@ independence, primary selection and canonical publication behave as for Soccer a
 Basketball. Access follows the access matrix (viewer read-only, scorer tracks,
 owner/admin manage).
 
+Server and client allow-lists each new event sport must extend (shared with the
+Hockey and Baseball programs; see the "Shared cross-sport work" items in
+`PLAN_HKY_0_HOCKEY_PRODUCT_MODEL.md` once it lands):
+
+- `is_event_platform_sport` (migration 051),
+- the canonical publication `sport_id in (...)` check (054),
+- the aggregate `p_sport_id not in (...)` guard (060),
+- the setup snapshot version gate (069),
+- fixed per-sport wrappers like 056–061 (binder, recorders, finalization, reopen,
+  aggregates, capability handshake),
+- client: `getSportAvailabilityPolicy` in `src/lib/sportAvailability.ts` (only
+  Soccer is special-cased), `LEGACY_AGGREGATE_CLOUD_SPORT_IDS` in
+  `src/lib/sportGameState/capabilities.ts`, and the transport adapter map in
+  `src/lib/eventCloudTransportAdapters.ts`.
+
+Migration numbers are assigned at implementation time because three sport
+programs are planning in parallel.
+
 ---
 
 ## 13. Legacy football games
