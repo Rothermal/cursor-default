@@ -1,4 +1,5 @@
 import { isPlainObject } from '../gameEvents/envelope'
+import { normalizeBaseballSportGameState } from '../baseball/state'
 import { normalizeBasketballSportGameState } from '../basketball/state'
 import { normalizeSoccerSportGameState } from '../soccer/state'
 import type { SportGameState } from './types'
@@ -7,6 +8,7 @@ type SportGameStateNormalizer = (value: unknown) => SportGameState | null
 
 const SPORT_GAME_STATE_NORMALIZERS = new Map<string, SportGameStateNormalizer>([
   ['basketball', normalizeBasketballSportGameState],
+  ['baseball', normalizeBaseballSportGameState],
   ['soccer', normalizeSoccerSportGameState],
 ])
 

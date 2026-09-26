@@ -20,6 +20,7 @@ import { getBasketballRulesProfile } from './profiles'
 import {
   basketballTimeoutInventory,
   captureBasketballTimeout,
+  formatBasketballTimeoutInventory,
   previewBasketballTimeoutDecrement,
   removeBasketballTimeout,
 } from './timeoutCommands'
@@ -176,6 +177,27 @@ describe('BKE-2C4 Basketball timeouts', () => {
       ...rules,
       timeoutsPerOvertime: 1,
     }, 'overtime')).toBe(1)
+  })
+
+  it('formats remaining, exhausted, and unlimited timeout inventory labels', () => {
+    expect(formatBasketballTimeoutInventory({
+      used: 1,
+      cap: 3,
+      remaining: 2,
+      exhausted: false,
+    })).toBe('1 of 3 used - 2 remaining')
+    expect(formatBasketballTimeoutInventory({
+      used: 2,
+      cap: 2,
+      remaining: 0,
+      exhausted: true,
+    })).toBe('2 of 2 used - exhausted')
+    expect(formatBasketballTimeoutInventory({
+      used: 4,
+      cap: null,
+      remaining: null,
+      exhausted: false,
+    })).toBe('4 used - unlimited')
   })
 
   it('removes the newest matching current-period timeout and restores the exact event', () => {
