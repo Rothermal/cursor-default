@@ -18,6 +18,7 @@ export default function BasketballBoundaryReviewDialog({
   pendingSides,
   canOverrideEqualPlay,
   errorMessage,
+  purpose = 'start',
   onCommit,
   onClose,
 }: {
@@ -25,6 +26,7 @@ export default function BasketballBoundaryReviewDialog({
   pendingSides: BasketballTeamSide[]
   canOverrideEqualPlay: boolean
   errorMessage: string | null
+  purpose?: 'start' | 'end_period'
   onCommit: (input: BasketballBoundaryReviewCommit) => void
   onClose: () => void
 }) {
@@ -117,7 +119,7 @@ export default function BasketballBoundaryReviewDialog({
         <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div>
             <h2 id="basketball-boundary-title" className="text-base font-bold text-content">
-              Review lineup before Start
+              {purpose === 'end_period' ? 'Review lineup before ending the period' : 'Review lineup before Start'}
             </h2>
             <p className="text-xs text-content-muted">Confirm each required side. The clock stays paused.</p>
           </div>

@@ -45,6 +45,7 @@ import {
 } from './state'
 import { createBasketballStatEvent } from './statEvents'
 import type {
+  BasketballMatchProjection,
   BasketballMatchParticipant,
   BasketballReopenMode,
   BasketballMatchRulesV2,
@@ -75,6 +76,7 @@ export type BasketballCommandErrorCode =
   | 'nothing_to_undo'
   | 'nothing_to_clear'
   | 'restore_unavailable'
+  | 'lineup_review_required'
   | 'command_failed'
 
 export type BasketballCommandResult<T> =
@@ -676,6 +678,14 @@ export function endBasketballPeriod(
   if (context.value.sportState.projection.status !== 'in_progress') {
     return failure(state, 'invalid_period', 'Only an active Basketball period can end.')
   }
+  // A boundary left unreviewed here can no longer be confirmed once the period closes.
+  if (basketballBoundaryReviewPendingSides(context.value.sportState.projection).length > 0) {
+    return failure(
+      state,
+      'lineup_review_required',
+      'Review the lineup for this period before ending it.'
+    )
+  }
   const clock = context.value.sportState.projection.clock
   const captureCommandId = clock?.running ? createBasketballCaptureCommandId() : null
   const events: BasketballMatchEvent[] = []
@@ -723,6 +733,16 @@ export function endBasketballPeriod(
     clearBasketballUndoReceipt(state),
     events,
     'Basketball period end did not produce a complete event projection.'
+  )
+}
+
+export function basketballBoundaryReviewPendingSides(
+  projection: BasketballMatchProjection
+): BasketballTeamSide[] {
+  const sides = projection.lineup?.sides
+  if (!sides) return []
+  return (['tracked', 'opponent'] as BasketballTeamSide[]).filter(
+    side => sides[side]?.boundaryConfirmationRequired === true
   )
 }
 

@@ -716,6 +716,33 @@ describe('BKE-6A3 Basketball lineup and participation projection', () => {
     })
   })
 
+  it('requires boundary review before ending a period whose clock never started', () => {
+    const secondPeriod = nextPeriodState(anchoredState({ boundaries: true }))
+    expect(trackedLineup(secondPeriod).boundaryConfirmationRequired).toBe(true)
+    const refused = endBasketballPeriod(secondPeriod, {
+      recorderUserId,
+      occurredAt: after(8_000),
+      eventId: uuid(94),
+    })
+    expect(refused).toMatchObject({
+      ok: false,
+      code: 'lineup_review_required',
+      state: secondPeriod,
+    })
+
+    const confirmed = requireState(confirmTrackedBoundary(secondPeriod, {
+      occurredAt: after(9_000),
+      eventId: uuid(95),
+    }))
+    const ended = requireState(endBasketballPeriod(confirmed, {
+      recorderUserId,
+      occurredAt: after(10_000),
+      eventId: uuid(96),
+    }))
+    expect(basketballProjection(ended).status).toBe('period_break')
+    expect(trackedLineup(ended).boundaryConfirmationRequired).toBe(false)
+  })
+
   it('atomically changes and confirms a reviewed boundary lineup', () => {
     const secondPeriod = nextPeriodState(anchoredState({ boundaries: true }))
     expect(confirmBasketballBoundaryLineup(secondPeriod, {
