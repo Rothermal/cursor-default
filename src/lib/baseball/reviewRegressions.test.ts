@@ -20,6 +20,7 @@ import {
   startedGame,
   strikeout,
   threeUpThreeDown,
+  walk,
 } from './testFixtures'
 import type { BaseballMatchSetup } from './types'
 
@@ -260,5 +261,30 @@ describe('Baseball resolved actor stamps', () => {
     const replay = replayBaseballEvents(baseballSetup(), events)
     expect(replay.projection.battingLines.o1?.k).toBe(1)
     expect(replay.projection.warnings.some(warning => warning.role === 'batter')).toBe(true)
+  })
+})
+
+describe('Baseball replay failure isolation', () => {
+  it('returns exactly the valid prefix when a stored event fails semantic validation', () => {
+    const events = activeEvents(walk(startedGame()))
+    const validPrefix = events.slice(0, 4)
+    expect(validPrefix.map(event => event.eventType)).toEqual([
+      'baseball.game_started',
+      'baseball.pitch',
+      'baseball.pitch',
+      'baseball.pitch',
+    ])
+    const fourthBall = events[4]
+    const invalid = { ...fourthBall, payload: { ...fourthBall.payload, movements: [] } }
+    expect(gameEventRegistry.inspect(invalid).ok).toBe(true)
+
+    const failed = replayBaseballEvents(baseballSetup(), [...validPrefix, invalid])
+    const prefix = replayBaseballEvents(baseballSetup(), validPrefix)
+
+    expect(failed.diagnostics).toHaveLength(1)
+    expect(failed.diagnostics[0]).toMatchObject({ code: 'semantic_validation_failed', eventId: invalid.id })
+    expect(prefix.diagnostics).toEqual([])
+    expect(failed.projection).toEqual(prefix.projection)
+    expect(failed.projection.balls).toBe(3)
   })
 })

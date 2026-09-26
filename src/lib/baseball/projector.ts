@@ -86,13 +86,17 @@ interface ReplayOutput {
 export function replayBaseballEvents(setup: BaseballMatchSetup, events: readonly GameEvent[]): ReplayOutput {
   const replay = new BaseballReplay(setup)
   const ordered = [...events].sort(compareGameEventCaptureOrder)
-  for (const event of ordered) {
+  for (const [index, event] of ordered.entries()) {
     try {
       replay.apply(event as BaseballEvent)
     } catch (error) {
       if (!(error instanceof BaseballReplayError)) throw error
+      // The failing event may have partly mutated state before it was rejected, so
+      // rebuild the valid prefix rather than returning the partially applied replay.
+      const prefix = new BaseballReplay(setup)
+      for (const valid of ordered.slice(0, index)) prefix.apply(valid as BaseballEvent)
       return {
-        projection: replay.projection,
+        projection: prefix.projection,
         diagnostics: [
           {
             code: 'semantic_validation_failed',
