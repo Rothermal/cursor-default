@@ -354,8 +354,8 @@ owner/admin manage).
 
 Existing football games are aggregate-grid games (`capabilities.ts` allows
 legacy aggregate sync for football). They stay readable and syncable. Default
-proposal: because football is disabled by default and has no known production
-users, **new football games become event-authority only at release**, without a
+proposal: because football is disabled by default and the production database had
+zero football games on 2026-09-26 (checked by the Hockey planning thread), **new football games become event-authority only at release**, without a
 long-lived Legacy/Event setup choice like Basketball's. Historical grid games keep
 their current Summary and aggregates; `fb_*` aggregates read only event games, and
 destinations show legacy totals as a separate labelled source (the BKE-4E
@@ -420,8 +420,8 @@ For the Hockey and Baseball programs running in parallel:
 
 The plans proceed on the default in brackets until answered.
 
-1. **Legacy grid:** Are there football games you care about in the current grid
-   tracker? [Default: keep them readable; new games are event-only at release; no
+1. **Legacy grid:** Production had zero football games on 2026-09-26. Any local-only
+   grid games you care about? [Default: keep them readable; new games are event-only at release; no
    Legacy/Event picker.]
 2. **Competition level:** Which football do you actually track first: high school
    11-player, youth tackle, flag/7v7, or college/NFL-style? [Default: NFHS
