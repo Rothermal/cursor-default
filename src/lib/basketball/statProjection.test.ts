@@ -415,6 +415,20 @@ describe('BKE-1B2 Basketball stat projection', () => {
     expect(result.state.shotChart).toEqual([])
   })
 
+  it('rejects score adjustments that would project below zero', () => {
+    const adjustment = stat(1, 'basketball.score_adjustment', {
+      delta: -1,
+      reason: 'scoreboard_control',
+      note: null,
+      captureCommandId: null,
+    }, { actors: [teamActor('team')] })
+    const result = project([start(), adjustment])
+
+    expect(result.inspection.complete).toBe(false)
+    expect(result.inspection.diagnostics[0]?.message).toContain('below zero')
+    expect(result.state.homeTeamScore).toBe(0)
+  })
+
   it('downgrades stale advisory links without dropping their independent totals', () => {
     const madeShot = stat(1, 'basketball.shot', shotPayload(true, 2, 'quick_entry'), {
       actors: [playerActor('shooter', 'tracked-1', 'player-1')],
