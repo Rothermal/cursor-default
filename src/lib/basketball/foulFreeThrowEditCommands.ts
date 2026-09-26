@@ -423,7 +423,11 @@ function buildPlan(
         candidate.id === draft.period.id && candidate.order === draft.period.order
       )
     : null
-  if (!period || !prepared.state.sportGameState?.projection.startedPeriodIds.includes(period.id)) {
+  if (
+    !period ||
+    prepared.state.sportGameState?.sportId !== 'basketball' ||
+    !prepared.state.sportGameState.projection.startedPeriodIds.includes(period.id)
+  ) {
     return commandFailure('invalid_period', 'Select a Basketball period that has already started.')
   }
   if (mode === 'add') {

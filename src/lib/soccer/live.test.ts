@@ -43,7 +43,7 @@ import {
 import { resolveSoccerMatchRules } from './rules'
 import { analyzeSoccerTargetLineup, currentSoccerTargetLineup } from './targetLineup'
 import { createSoccerSportGameState, normalizeSoccerSportGameState, participantActiveMs } from './state'
-import type { SoccerMatchSetup, SoccerMatchStatus } from './types'
+import type { SoccerMatchSetup, SoccerMatchStatus, SoccerSportGameState } from './types'
 
 const soccer: SportConfig = {
   id: 'soccer',
@@ -261,7 +261,7 @@ describe('soccer live match actions', () => {
     expect(soccerClockDisplayValue(result.state, kickoffAt + 1_000)?.primary)
       .toBe(direction === 'count_down' ? '12:29' : '12:31')
     expect(result.state.sportGameState?.projection.currentRules.clockDirection).toBe(direction)
-    expect(original.sportGameState?.projection.clock?.elapsedMs).toBe(0)
+    expect((original.sportGameState as SoccerSportGameState | null)?.projection.clock?.elapsedMs).toBe(0)
   })
 
   it.each(['continuous', 'per_period'] as const)('converts second-period %s time without changing the period', clockDisplay => {
