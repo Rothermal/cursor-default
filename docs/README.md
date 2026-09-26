@@ -27,6 +27,7 @@ architecture, not current schema or deployment instructions.
 | Shot metadata/direction | [S15/S16 regression](REGRESSION_SOC_S15_S16_SHOT_DETAILS.md) | Implemented; deployed checks remain separately recorded |
 | Basketball release evidence | [BKE-6E regression](REGRESSION_BKE_6E_RELEASE.md) | Preserve pending evidence and reported issues; reconcile with owner results before archiving |
 | Appearance release | [THM-6 regression](REGRESSION_THM_6_APPEARANCE_RELEASE.md) | Released for owner use; retain pending deployed checks |
+| Hockey | [HKY-0 product model](PLAN_HKY_0_HOCKEY_PRODUCT_MODEL.md), [HKY-1 plan](PLAN_HKY_1_FOUNDATION_RULES_AND_ROSTER.md) | Proposed; owner Q&A pending before HKY-1 |
 | Team branding | [Branding plan](PLAN_TEAM_BRANDING.md) | Approved high-level direction; detailed implementation pending |
 | Local game parking | [Parking plan](PLAN_MULTI_GAME_PARKING.md) | Shipped core; historical cleanup/storage follow-ups remain |
 | Delete local copy | [Local deletion checks](REGRESSION_LOCAL_GAME_DELETE.md) | Explicit unsynced deletion implemented for parked games; owner smoke pending |
