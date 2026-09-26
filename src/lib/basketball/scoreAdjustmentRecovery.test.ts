@@ -144,12 +144,10 @@ describe('Basketball negative-score recovery helpers', () => {
 
   it('refuses recovery for unmarked games and non-adjustment diagnostics', () => {
     const legacy = legacyNegativeScoreState()
-    const unmarked: GameState = {
-      ...legacy.state,
-      gameDataAuthority: undefined,
-      eventStream: null,
-    }
+    const unmarked: GameState = { ...legacy.state, gameDataAuthority: undefined }
     expect(basketballRecoverableScoreAdjustmentId(unmarked)).toBeNull()
+    const streamless: GameState = { ...legacy.state, eventStream: null }
+    expect(basketballRecoverableScoreAdjustmentId(streamless)).toBeNull()
 
     const review = buildBasketballTimelineReview(legacy.state)
     const shotOnlyDiagnostics = review.diagnostics.map(diagnostic =>

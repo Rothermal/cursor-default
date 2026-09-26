@@ -164,7 +164,10 @@ describe('Basketball settings schema version 1', () => {
         order: index + 1,
       })
     )
-    expect(parseBasketballTeamSettings(teamLayer(tooManySegments))).toMatchObject({ ok: false })
+    expect(parseBasketballTeamSettings(teamLayer(tooManySegments))).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Version-2 regulation segments cannot exceed 20.'),
+    })
 
     const tooManyFoulWindows = structuralOverrides()
     tooManyFoulWindows.foulWindows = Array.from(
@@ -175,7 +178,10 @@ describe('Basketball settings schema version 1', () => {
         segmentIds: [tooManyFoulWindows.regulationSegments[0].id],
       })
     )
-    expect(parseBasketballTeamSettings(teamLayer(tooManyFoulWindows))).toMatchObject({ ok: false })
+    expect(parseBasketballTeamSettings(teamLayer(tooManyFoulWindows))).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Version-2 foul windows cannot exceed 20.'),
+    })
 
     const tooManyTimeoutPools = structuralOverrides()
     tooManyTimeoutPools.timeoutPools = Array.from(
@@ -187,7 +193,16 @@ describe('Basketball settings schema version 1', () => {
         carryoverToPoolId: null,
       })
     )
-    expect(parseBasketballTeamSettings(teamLayer(tooManyTimeoutPools))).toMatchObject({ ok: false })
+    expect(parseBasketballTeamSettings(teamLayer(tooManyTimeoutPools))).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Version-2 timeout pools cannot exceed 20.'),
+    })
+
+    const atLimit = perSegmentStructuralOverrides(20)
+    expect(atLimit.regulationSegments).toHaveLength(20)
+    expect(atLimit.foulWindows).toHaveLength(20)
+    expect(atLimit.timeoutPools).toHaveLength(20)
+    expect(parseBasketballTeamSettings(teamLayer(atLimit))).toMatchObject({ ok: true })
   })
 })
 
@@ -199,6 +214,42 @@ function structuralOverrides() {
     overtimeTemplate: structuredClone(profile.rules.overtimeTemplate),
     foulWindows: structuredClone(profile.rules.foulWindows),
     timeoutPools: structuredClone(profile.rules.timeoutPools),
+  }
+}
+
+function perSegmentStructuralOverrides(count: number) {
+  const base = structuralOverrides()
+  const segmentIds = Array.from({ length: count }, (_, index) => `regulation-${index + 1}`)
+  return {
+    regulationSegments: segmentIds.map((id, index) => ({
+      ...structuredClone(base.regulationSegments[0]),
+      id,
+      label: `P${index + 1}`,
+      order: index + 1,
+      foulWindowId: `foul-${index + 1}`,
+      timeoutPoolId: `timeouts-${index + 1}`,
+    })),
+    overtimeTemplate: {
+      ...structuredClone(base.overtimeTemplate),
+      foulPolicy: { mode: 'continue' as const, regulationWindowId: `foul-${count}`, window: null },
+      timeoutPolicy: {
+        ...structuredClone(base.overtimeTemplate.timeoutPolicy),
+        regulationPoolId: `timeouts-${count}`,
+      },
+    },
+    foulWindows: segmentIds.map((id, index) => ({
+      ...structuredClone(base.foulWindows[0]),
+      id: `foul-${index + 1}`,
+      label: `Period ${index + 1}`,
+      segmentIds: [id],
+    })),
+    timeoutPools: segmentIds.map((id, index) => ({
+      ...structuredClone(base.timeoutPools[0]),
+      id: `timeouts-${index + 1}`,
+      label: `Period ${index + 1}`,
+      segmentIds: [id],
+      carryoverToPoolId: null,
+    })),
   }
 }
 

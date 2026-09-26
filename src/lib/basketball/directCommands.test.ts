@@ -328,20 +328,23 @@ describe('BKE-2B Basketball direct commands', () => {
     }
     const eventCount = anchored.eventStream?.events.length ?? 0
 
-    expect(captureBasketballDirectStat(anchored, {
+    const captured = captureBasketballDirectStat(anchored, {
       recorderUserId: 'recorder-1',
       playerId: 'player-1',
       statId: 'min',
       occurredAt: '2026-08-03T12:30:00.000Z',
       eventId: '72000000-0000-4000-8000-000000000801',
-    })).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
-    expect(decrementBasketballMinutes(anchored, {
+    })
+    expect(captured).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
+    expect(captured.state.eventStream?.events).toHaveLength(eventCount)
+    const decremented = decrementBasketballMinutes(anchored, {
       recorderUserId: 'recorder-1',
       playerId: 'player-1',
       occurredAt: '2026-08-03T12:31:00.000Z',
       eventId: '72000000-0000-4000-8000-000000000802',
-    })).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
-    expect(anchored.eventStream?.events).toHaveLength(eventCount)
+    })
+    expect(decremented).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
+    expect(decremented.state.eventStream?.events).toHaveLength(eventCount)
   })
 })
 
@@ -414,8 +417,8 @@ describe('BKE-2B Basketball direct decrements', () => {
       '2026-08-03T12:04:00.000Z'
     )
     expect(decremented).toMatchObject({ ok: false, state })
-    expect(state.homeTeamScore).toBe(0)
-    expect(state.players.find(candidate => candidate.id === 'player-1')?.stats.ft).toBe(1)
+    expect(decremented.state.homeTeamScore).toBe(0)
+    expect(decremented.state.players.find(candidate => candidate.id === 'player-1')?.stats.ft).toBe(1)
   })
 
   it('does not search earlier periods for a quick grid decrement', () => {
