@@ -24,6 +24,30 @@ describe('Basketball team settings synchronization', () => {
     })
   })
 
+  it('resolves loaded cloud rows and rejects invalid ones without inventing defaults', () => {
+    const settings = defaultBasketballTeamSettings()
+    const cloud: SportSettingsCloudRecord = {
+      sportId: 'basketball',
+      schemaVersion: 1,
+      revision: 4,
+      settings,
+      updatedAt: now,
+      updatedBy: 'admin-1',
+    }
+    expect(resolveBasketballTeamSettingsCloudRecord(cloud)).toEqual({
+      status: 'loaded',
+      record: { ...cloud, settings },
+    })
+    expect(resolveBasketballTeamSettingsCloudRecord({
+      ...cloud,
+      settings: { ...settings, unknown: true },
+    })).toEqual({ status: 'invalid' })
+    expect(resolveBasketballTeamSettingsCloudRecord({
+      ...cloud,
+      sportId: 'soccer',
+    })).toEqual({ status: 'invalid' })
+  })
+
   it('accepts strict version-one Basketball cache and cloud records', () => {
     const settings = defaultBasketballTeamSettings()
     const cache = createBasketballTeamSettingsCacheRecord(settings, {

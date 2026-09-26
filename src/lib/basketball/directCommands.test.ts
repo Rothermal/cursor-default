@@ -313,6 +313,39 @@ describe('BKE-2B Basketball direct commands', () => {
       reason: 'scoreboard_control',
     })).toMatchObject({ ok: false, state: cloud, code: 'cloud_flow_unsupported' })
   })
+
+  it('rejects manual minutes when the game clock is authoritative', () => {
+    const before = startedState()
+    if (before.sportGameState?.sportId !== 'basketball') throw new Error('Expected Basketball state.')
+    const setup = before.sportGameState.setup
+    const anchoredSetup = {
+      ...setup,
+      rulesSnapshot: { ...setup.rulesSnapshot, clockModel: 'anchored' },
+    } as typeof setup
+    const anchored: GameState = {
+      ...before,
+      sportGameState: { ...before.sportGameState, setup: anchoredSetup },
+    }
+    const eventCount = anchored.eventStream?.events.length ?? 0
+
+    const captured = captureBasketballDirectStat(anchored, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      statId: 'min',
+      occurredAt: '2026-08-03T12:30:00.000Z',
+      eventId: '72000000-0000-4000-8000-000000000801',
+    })
+    expect(captured).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
+    expect(captured.state.eventStream?.events).toHaveLength(eventCount)
+    const decremented = decrementBasketballMinutes(anchored, {
+      recorderUserId: 'recorder-1',
+      playerId: 'player-1',
+      occurredAt: '2026-08-03T12:31:00.000Z',
+      eventId: '72000000-0000-4000-8000-000000000802',
+    })
+    expect(decremented).toMatchObject({ ok: false, state: anchored, code: 'command_failed' })
+    expect(decremented.state.eventStream?.events).toHaveLength(eventCount)
+  })
 })
 
 describe('BKE-2B Basketball direct decrements', () => {
@@ -358,6 +391,34 @@ describe('BKE-2B Basketball direct decrements', () => {
       recorderUserId: 'recorder-1',
       playerId: 'player-1',
     })).toMatchObject({ ok: false, state: minuteDown.state })
+  })
+
+  it('rejects decrements that would leave an existing score adjustment below zero', () => {
+    let state = capture(startedState(), 'ft', 'player-1', 1)
+    expect(state.homeTeamScore).toBe(1)
+    const adjusted = adjustBasketballScore(state, {
+      recorderUserId: 'recorder-1',
+      teamSide: 'tracked',
+      delta: -1,
+      reason: 'scoreboard_control',
+      eventId: '72000000-0000-4000-8000-000000000704',
+    })
+    expect(adjusted.ok).toBe(true)
+    if (!adjusted.ok) return
+    state = adjusted.state
+    expect(state.homeTeamScore).toBe(0)
+
+    const preview = previewBasketballDirectDecrement(state, 'player-1', 'ft')
+    expect(preview.ok).toBe(true)
+    const decremented = decrementBasketballDirectStat(
+      state,
+      'player-1',
+      'ft',
+      '2026-08-03T12:04:00.000Z'
+    )
+    expect(decremented).toMatchObject({ ok: false, state })
+    expect(decremented.state.homeTeamScore).toBe(0)
+    expect(decremented.state.players.find(candidate => candidate.id === 'player-1')?.stats.ft).toBe(1)
   })
 
   it('does not search earlier periods for a quick grid decrement', () => {
