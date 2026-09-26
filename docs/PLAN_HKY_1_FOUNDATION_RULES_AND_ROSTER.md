@@ -47,17 +47,18 @@ Files: `src/lib/hockey/types.ts`, `rules.ts`, `profiles.ts`, `settings.ts` (pars
     `clockModel` is `anchored`; exactly `null` when it is `none` (the parser rejects any
     other combination)
   - `skatersPerSide` (3..6, default 5), `minimumSkaters` (default 3)
-  - `overtime: { kind: 'none' | 'sudden_death', lengthMs, skaters, repeat: boolean, endsPolicy: 'continue_alternation' | 'same_as_last_regulation' }`
+  - `overtime`: `null` (no overtime) or `{ lengthMs, skaters, repeat: boolean, endsPolicy: 'continue_alternation' | 'same_as_last_regulation' }` (sudden death)
     (`endsPolicy` drives OT attacking direction, §2.2; every built-in profile uses
     `continue_alternation`)
-  - `shootout: { enabled, rounds, repeatShooters: 'after_all' | 'never' | 'any' }`
-  - `tiesAllowed`
+  - `shootout`: `null` (no shootout) or `{ rounds, repeatShooters: 'after_all' | 'never' | 'any' }`
+  - `tiesAllowed` (when false, the rules must include a shootout or repeating overtime)
   - `penalties: { minorMs, doubleMinorMs, majorMs, misconductMs, releaseMinorOnPowerPlayGoal, coincidentalMinors: 'substitute' | 'play_short' }`
     (read by HKY-3; frozen now so snapshots do not need a v2 immediately)
   - `trapezoid: boolean` (display only)
-- Profiles: `nhl_regular`, `nhl_playoffs`, `ncaa`, `usa_hockey_youth`,
-  `high_school_us`, `recreational`. Each is an immutable, source-linked record with
-  `profileId` and `profileVersion`, following `src/lib/basketball/profiles.ts`.
+- Profiles: `usa_hockey_youth` (default), `recreational`, `high_school_us`, `ncaa`,
+  `nhl_regular`, `nhl_playoffs`, `custom`. Each is an immutable, versioned record with a
+  governing-family label, following `src/lib/baseball/profiles.ts`. Values are tracking
+  defaults, not a rulebook transcription.
 - Strict parser rejects unknown keys and out-of-range values (fail closed like Soccer and
   Basketball settings); structured diagnostics.
 - Settings authority follows Basketball's **personal-or-team** model
@@ -172,6 +173,12 @@ not supported; a recorder who stops running the clock keeps an anchored game pau
   HKY-2 decision, because it depends on how located events store direction.
 
 ---
+
+## 2.3 Delivery record
+
+- HKY-1A: `src/lib/hockey/types.ts`, `rules.ts`, `profiles.ts`, `settings.ts`, and
+  `hockey.test.ts`. No UI, registration, or migration. Missing personal/team settings
+  resolve to the default profile; malformed settings fail closed and name the layer.
 
 ## 3. Owner-Confirmed Decisions
 
