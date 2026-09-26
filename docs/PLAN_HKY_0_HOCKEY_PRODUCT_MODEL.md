@@ -137,9 +137,11 @@ may pick the drawn variant later; v1 draws one standard rink.
 ### Direction and zones
 
 - Store `GameEventLocation { x, y, attackingDirection }` exactly as Soccer does.
-- Teams change ends **every period** (unlike Soccer halves). Rules supply the tracked
-  team's attacking direction per period; overtime follows the profile. A manual flip is
-  display-only, as in Soccer S9/S18, and persists per device.
+- Teams change ends **every period** (unlike Soccer halves). Setup freezes the tracked
+  team's period-1 direction (`firstPeriodAttackingDirection`, as in Soccer); Home/Away
+  does not imply it. Regulation periods alternate from it, and an overtime ends policy in
+  the rules decides OT. A manual flip is display-only, as in Soccer S9/S18, persists per
+  device, and never changes stored coordinates. Exact contract: HKY-1 §2.2.
 - Zones (offensive / neutral / defensive) are **derived** from x and direction at read
   time, never stored separately.
 - Faceoff capture snaps a tap to the nearest of the nine dots and stores the dot id in
@@ -199,9 +201,13 @@ supplies the default.
 
 ### Rules and profiles
 
-Precedence as in Soccer and Basketball:
-`built-in profile -> personal hockey defaults -> team overrides -> game overrides`, with
-a complete immutable `rulesSnapshot` frozen at setup.
+Hockey follows Basketball's **personal-or-team** authority
+(`resolveBasketballSettingsHierarchy`), not Soccer's four-layer chain. A team game
+resolves `built-in profile -> team settings -> game overrides`; a personal (no-team) game
+resolves `built-in profile -> personal settings -> game overrides`. A recorder's personal
+defaults never leak into a team game, so every recorder on a team gets the same rules.
+The complete resolved `rulesSnapshot` is frozen at setup. Soccer and Basketball keep
+their own different policies; this plan changes neither.
 
 Built-in profiles (source-linked, versioned, like `src/lib/basketball/profiles.ts`):
 
@@ -236,6 +242,11 @@ reasoned Set Clock, period end at zero, event time stamped from the anchored clo
 The recorder presses Start at the drop of the puck and Stop at the whistle. A clockless
 option remains (events carry period only, no elapsed time) for recorders who do not want
 to run the clock; strength and time-on-ice modules then degrade to manual entry.
+
+The choice is an explicit, immutable `clockModel: 'anchored' | 'none'` frozen at setup
+(Basketball's values), separate from the stop-time/running rule. Clockless periods end
+manually without reaching zero, clock commands are unavailable, and the model is never
+inferred from the absence of clock events. Exact lifecycle: HKY-1 §2.1.
 
 Whether to reuse the Basketball clock projection directly or extract a shared anchored
 clock is XS-6.
@@ -407,6 +418,13 @@ catalog. Standings/points tables are deferred (M1 in the Soccer backlog, shared)
   dialogs default actors to Unattributed per the shared decision, except faceoff taker,
   which defaults to the last tracked center on ice because it is almost always the same
   player within a shift (owner question Q7).
+- **Actor eligibility without shift tracking:** core hockey does not track every shift,
+  so the opening five goes stale within a minute. Ordinary actor pickers must not treat it
+  as authoritative. They offer every eligible dressed skater of the selected side
+  (excluding players removed by a game misconduct/match penalty), goalie fields offer
+  dressed goalies, penalty-box players stay selectable where the event allows, and goal
+  on-ice snapshots are labelled for quality (complete, partial, not recorded). Only the
+  Line-change module (M3) may narrow pickers to a tracked on-ice set.
 - **Tap rink ->** a compact chooser: Shot (then outcome), Faceoff (snapped dot), Hit,
   Takeaway, Giveaway. Blocked-shot blockers are picked inside the shot flow.
 - **Quick controls row** (no location): Penalty, Goalie, Timeout, Icing/Offside, Score
@@ -478,7 +496,8 @@ HKY-1A  types, rules v1, profiles, settings parsing (pure)
 HKY-1B  roster positions, Starter/Bench + goalie defaults, setup snapshot, participants
 HKY-1C  sport state, registry, projector skeleton, lifecycle + anchored clock, dev gate
 HKY-2A  rink geometry + component (read-only render, flip, dot snapping)
-HKY-2B  shot/goal capture and projection, goalie in net, goalie change/pull
+HKY-2B  shot/goal capture and projection, goalie in net, goalie change/pull;
+        actor eligibility without shift tracking (§9) is an acceptance gate
 HKY-2C  faceoff/hit/takeaway/giveaway capture; Recent Events undo on rink
 HKY-2D  team default lines (F1-F4, D1-D3) and Team Manage Lines tab
 HKY-3A  penalty events, penalty box and strength projection
@@ -520,7 +539,7 @@ generalization beyond the sports that actually use it.
 | Id | Item | Where today | Why it matters |
 |---|---|---|---|
 | XS-1 | Per-sport release policy. `getSportAvailabilityPolicy` special-cases only `soccer`; every other sport is "released" whenever the device toggle is on | `src/lib/sportAvailability.ts` | A new event sport needs `unreleased / preview / released` without another hard-coded branch. Replace with a per-sport stage table |
-| XS-2 | Server event-sport registration. Adding a sport means editing `is_event_platform_sport` (051), the publication `sport_id` check (054), the aggregate guard (060), and the setup version gate (069), plus fixed wrappers like 056-061 | `supabase/migrations/` | One reviewed "register sport" migration pattern per sport; migration numbers must be coordinated across the three programs. Allow-list widening is one shared migration for all three sports, owned by whichever reaches cloud work first |
+| XS-2 | Server event-sport registration. Adding a sport means editing `is_event_platform_sport` (051), the publication `sport_id` check (054), the aggregate guard (060), and the setup version gate (069), plus fixed wrappers like 056-061 | `supabase/migrations/` | One reviewed "register sport" migration pattern per sport; migration numbers must be coordinated across the three programs. Allow-list widening is one shared migration for all three sports, owned by whichever reaches cloud work first. Each sport still keeps its own readiness, finalization policy, and creation gate; the first sport to reach cloud is not evidence the others are ready |
 | XS-3 | Legacy vs event capability. `LEGACY_AGGREGATE_CLOUD_SPORT_IDS` includes hockey/football/baseball; event games must fail closed out of aggregate sync | `src/lib/sportGameState/capabilities.ts` | Each sport's state normalizer must be registered before its event games exist |
 | XS-4 | Roster position storage. Soccer stores `soccer:<role>` in `team_players.position`; Basketball stores free text; shared decision wants per-sport catalog + custom + Unassigned | `soccer/rosterRole.ts`, `basketball/positions.ts` | A small shared `sportPosition` helper (prefix, catalog order, custom, unassigned) used by hockey and football; baseball also needs it |
 | XS-5 | Surface location helper. `soccerFieldLocation` handles normalized x/y, attacking direction, and display flip | `src/lib/soccer/field.ts` | Rink and football field reuse it directly; baseball diamond uses fixed orientation (`attackingDirection: 'unknown'`) |
@@ -566,7 +585,14 @@ Every HKY phase plan must cover:
 - opponent lightweight identities never leak into the permanent player pool,
 - independent recorder streams never combine,
 - viewer/scorer/admin permissions match the access matrix,
-- mobile rink, dialogs, penalty box, and clock never overlap.
+- mobile rink, dialogs, penalty box, and clock never overlap,
+- actor pickers never use the stale opening five as eligibility when shifts are not
+  tracked (HKY-2 acceptance),
+- any XS extraction (clock, surface, shootout) ships with before/after Soccer and
+  Basketball behavior tests, and never enables the unapproved timing redesign in
+  [PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md](PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md),
+- legacy hockey access stays available locally and in the cloud regardless of how much
+  legacy data exists; zero cloud games never justifies removing it.
 
 ---
 

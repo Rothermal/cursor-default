@@ -40,9 +40,16 @@ Files: `src/lib/hockey/types.ts`, `rules.ts`, `profiles.ts`, `settings.ts` (pars
 
 - `HockeyMatchRules` v1 (`rulesSchemaVersion: 1`, exact keys, JSON-safe):
   - `regulation: { periods, periodLengthMs }`
-  - `clock: { display: 'count_down' | 'count_up', mode: 'stop_time' | 'running' }`
+  - `clockModel: 'anchored' | 'none'` — the timing discriminator (same values as
+    `BasketballClockModel`). It is frozen with the rest of the snapshot and is separate
+    from the stop-time/running choice below. See §2.1.
+  - `clock`: `{ display: 'count_down' | 'count_up', mode: 'stop_time' | 'running' }` when
+    `clockModel` is `anchored`; exactly `null` when it is `none` (the parser rejects any
+    other combination)
   - `skatersPerSide` (3..6, default 5), `minimumSkaters` (default 3)
-  - `overtime: { kind: 'none' | 'sudden_death', lengthMs, skaters, repeat: boolean }`
+  - `overtime: { kind: 'none' | 'sudden_death', lengthMs, skaters, repeat: boolean, endsPolicy: 'continue_alternation' | 'same_as_last_regulation' }`
+    (`endsPolicy` drives OT attacking direction, §2.2; every built-in profile uses
+    `continue_alternation`)
   - `shootout: { enabled, rounds, repeatShooters: 'after_all' | 'never' | 'any' }`
   - `tiesAllowed`
   - `penalties: { minorMs, doubleMinorMs, majorMs, misconductMs, releaseMinorOnPowerPlayGoal, coincidentalMinors: 'substitute' | 'play_short' }`
@@ -53,12 +60,19 @@ Files: `src/lib/hockey/types.ts`, `rules.ts`, `profiles.ts`, `settings.ts` (pars
   `profileId` and `profileVersion`, following `src/lib/basketball/profiles.ts`.
 - Strict parser rejects unknown keys and out-of-range values (fail closed like Soccer and
   Basketball settings); structured diagnostics.
-- Settings resolution `built-in -> personal -> team -> match` with source metadata,
-  mirroring `src/lib/soccer/settings.ts`. Only parsing/resolution in HKY-1; storage and
-  CAS writes come in HKY-5C.
+- Settings authority follows Basketball's **personal-or-team** model
+  (`resolveBasketballSettingsHierarchy` in `src/lib/basketball/settings.ts`), not Soccer's
+  four-layer chain: a team game resolves `built-in profile -> team settings -> match
+  overrides`; a personal (no-team) game resolves `built-in profile -> personal settings ->
+  match overrides`. A recorder's personal defaults never leak into a team game, so two
+  recorders on the same team get identical rules. Source metadata labels each field.
+  Only parsing/resolution in HKY-1; storage and CAS writes come in HKY-5C. Neither
+  existing sport's resolver changes.
 
-Tests: parse/serialize round-trip, unknown-key rejection, every profile valid, layered
-resolution and source labels, clone safety.
+Tests: parse/serialize round-trip, unknown-key rejection, every profile valid,
+`clockModel`/`clock` combination rejection, personal-authority and team-authority
+resolution with source labels, two recorders with different personal settings resolving
+identical rules for the same team, clone safety.
 
 ### HKY-1B Roster positions, defaults, setup snapshot
 
@@ -75,6 +89,9 @@ Files: `src/lib/hockey/rosterPosition.ts`, `lineupDefaults.ts`, `setup.ts`.
   parsed and normalized in memory only (no team settings write until HKY-5C).
 - Setup snapshot v1:
   - `trackedTeam: 'home' | 'away' | 'neutral'`, `opponentLabel`,
+  - `firstPeriodAttackingDirection: 'left_to_right' | 'right_to_left'` — which end the
+    tracked team attacks in period 1, in canonical rink coordinates (§2.2). Home/Away
+    does not imply it,
   - `rules` (complete resolved `HockeyMatchRules`) plus `rulesSource`,
   - `participants[]`: `{ participantId, playerId | null, kind: 'player' | 'anonymous', jersey, name, dressedAs: 'skater' | 'goalie', position }`,
   - `openingLineup`: `{ goalieParticipantId, skaterParticipantIds[] }`, validated
@@ -101,12 +118,13 @@ registration in `src/lib/sportGameState/state.ts` and `src/lib/gameEvents/runtim
   - `hockey.clock_started`, `hockey.clock_paused`, `hockey.clock_set` (reason required)
   - `hockey.match_ended`, `hockey.match_suspended`, `hockey.match_abandoned`,
     `hockey.match_reopened` (reason required)
-- Projector replays lifecycle and the anchored countdown clock: period order from rules,
-  overtime periods appended only when the rules allow and regulation is tied,
-  period ends at zero, clock never runs backward, elapsed values validated against anchors
-  (Basketball BKE-6A2 behavior). Clockless games carry `elapsedMs: null` and remain valid.
-- Tracked team attacking direction per period derived from rules (alternates every
-  period) and stored in projection; display flip lives in preferences.
+- Projector replays lifecycle for both clock models (§2.1): period order from rules,
+  overtime periods appended only when the rules allow and regulation is tied. For
+  anchored games the clock never runs backward and elapsed values are validated against
+  anchors (Basketball BKE-6A2 behavior). The projector reads `clockModel` from the frozen
+  rules; it never infers the model from whether clock events exist.
+- Tracked attacking direction per period is derived from the frozen setup and rules
+  (§2.2) and exposed in projection; the display flip lives in preferences only.
 - Checked commands in `live.ts` return `{ ok, state } | { ok: false, error }` and append
   atomically through `applyGameEventAppendsAndMutations`.
 - Capability: hockey event games (`sportGameState?.sportId === 'hockey'`) never enter
@@ -117,9 +135,41 @@ registration in `src/lib/sportGameState/state.ts` and `src/lib/gameEvents/runtim
   listed in the Soccer release hardening).
 
 Tests: projector replay (periods, OT only on tie, clock start/pause/set, expiration),
-checked command rejection cases, park/resume round-trip, fingerprint stability,
+clockless replay with `elapsedMs: null` on every event, clock commands rejected in
+clockless games, clockless period end at any time, anchored early end requires a reason,
+both initial attacking directions across three regulation periods and OT under each
+`endsPolicy`, checked command rejection cases, park/resume and reload round-trips for
+both clock models (direction and canonical coordinates unchanged), fingerprint stability,
 sport-state normalizer rejects malformed input, legacy hockey game untouched,
 Soccer/Basketball suites unchanged.
+
+### 2.1 Clock models
+
+`clockModel` is chosen at setup (default `anchored` per owner decision Q3), frozen in the
+rules snapshot, and cannot change after the game starts in HKY-1. A mid-game switch is
+not supported; a recorder who stops running the clock keeps an anchored game paused.
+
+| | `anchored` | `none` (clockless) |
+|---|---|---|
+| Period start | `hockey.period_started` opens the period paused at elapsed 0 | `hockey.period_started` with `elapsedMs: null` |
+| Clock commands | Start, Pause, reasoned Set Clock | Rejected with `clock_unavailable`; never offered in UI |
+| Event time | `elapsedMs` from the anchored clock at the command | `elapsedMs: null` on every event; period is the only time context |
+| Period end | Appends Pause (if running) + `hockey.period_ended` atomically. At expiration no reason is needed; ending before expiration requires a reason on the event | Manual command at any time; never requires reaching zero |
+| Park/reload | Running clock is paused through the shared active-game mutation guard (BKE-6B4) | Nothing to pause |
+| Minutes / TOI | Goalie TOI derivable | Goalie TOI and GAA suppressed, labelled unavailable |
+
+### 2.2 Attacking direction
+
+- Authority: `setup.firstPeriodAttackingDirection`. Game setup asks which end the tracked
+  team attacks in period 1 (default `left_to_right`; HKY-2 shows it on the rink drawing,
+  HKY-1's dev form uses a plain choice).
+- Regulation: odd periods use the initial direction, even periods the opposite.
+- Overtime: `continue_alternation` keeps alternating by period number (NHL: OT 1 matches
+  period 2); `same_as_last_regulation` keeps the period-3 direction for every OT period.
+- Shootout: no attacking direction (attempts are not located).
+- The display flip is a per-device preference and never changes stored coordinates or
+  projected direction. A reasoned correction for a wrongly chosen initial direction is an
+  HKY-2 decision, because it depends on how located events store direction.
 
 ---
 
@@ -128,7 +178,8 @@ Soccer/Basketball suites unchanged.
 | Decision | Choice |
 |---|---|
 | New games event-only at release (HKY-0 Q1) | Confirmed. HKY-1 only adds the dev-gated event path; the legacy path is retired for new games in HKY-6 |
-| Clock default (Q3) | Anchored countdown stop-time, clockless allowed |
+| Clock default (Q3) | `clockModel: 'anchored'` with countdown stop-time; `none` selectable at setup; frozen after start |
+| Settings authority | Personal-or-team (Basketball model), per PR #429 review |
 | Penalty rule fields frozen in rules v1 | Yes; inert until HKY-3 |
 | Lines (Q10) | Not in HKY-1; HKY-2D |
 
