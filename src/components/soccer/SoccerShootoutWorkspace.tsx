@@ -15,6 +15,7 @@ import {
   type SoccerShootoutKickEvent,
   type SoccerShootoutKickOutcome,
 } from '../../lib/soccer'
+import type { SoccerMatchProjection } from '../../lib/soccer/types'
 import type { GameState } from '../../types'
 import { gameSideDisplayName } from '../../lib/display'
 
@@ -292,7 +293,7 @@ function selectionFromGoalkeeperKey(key: string): SoccerCaptureActorSelection {
   return { kind: 'unknown', label: separator >= 0 ? key.slice(separator + 1) : 'Unknown' }
 }
 
-function goalkeeperLabel(key: string, projection: NonNullable<GameState['sportGameState']>['projection']): string {
+function goalkeeperLabel(key: string, projection: SoccerMatchProjection): string {
   if (key.startsWith('participant:')) return projection.participants[key.slice('participant:'.length)]?.displayName ?? 'Unknown'
   const separator = key.indexOf(':')
   return separator >= 0 ? key.slice(separator + 1) : 'Unknown'
