@@ -7,8 +7,9 @@ location, and an authoritative event model. BSB-0 sets the stable direction; eac
 implementation phase below receives its own detailed execution plan and Q&A review
 before code work begins, as SOC-0 and BKE-0 did.
 
-Status: proposed. Drafted without owner Q&A; the open questions in section 16 need
-answers before BSB-1 implementation starts. No runtime behavior changes here.
+Status: approved direction (owner answers recorded in section 16, 2026-09-26). BSB-1
+implementation is in progress; build-and-test-as-we-go was approved in place of a
+diamond prototype. No runtime behavior changes in this document.
 
 Companion document: [BSB-1 execution plan](PLAN_BSB_1_EVENT_FOUNDATION.md).
 
@@ -404,6 +405,8 @@ the personal -> team -> match layering used by both sports. Candidate profiles:
 | NFHS (US High School) | 7 | 9 + DH, optional EH | Starters once | Courtesy runners, run rule 10 after 5 / 15 after 3, international tiebreaker |
 | Little League Majors | 6 | Continuous or 9 | Mandatory play / re-entry | Pitch count limits and rest days, no leading off, 10-run rule after 4 |
 | Youth coach/machine pitch | 4–6 | Continuous | Free | Max runs per half, no stealing, no walks/strikeouts variants, no dropped third strike, time limit |
+| Softball fastpitch (NFHS) | 7 | 9 + DP/FLEX, optional extra player | Starters once | No leading off, courtesy runners, dropped third strike, international tiebreaker |
+| Softball slowpitch (USA/ASA-style) | 7 | 10 + extra hitters | Starters once | Starts at 1-1 count, no stealing/leading off, foul with two strikes is out (option), max runs per half, home-run limit (option) |
 | Custom | any | any | any | All options editable |
 
 Settings groups (not per-stat toggles): innings and extra innings, batting order
@@ -549,34 +552,27 @@ StatKeeper documents its own competition-neutral definitions; references inform 
 
 ---
 
-## 16. Open Questions for Mark
+## 16. Owner Decisions and Remaining Defaults
 
-Planning proceeded on the recommended default shown for each. BSB-1 implementation
-should not start until these are confirmed or changed.
+Mark answered on 2026-09-26 (he is currently the only app user):
 
-1. **Opponent detail.** Default: opponent batting-order slots with optional labels,
-   no opponent season stats. Alternative: full opponent scorebook (per-batter lines).
-2. **Softball.** Default: out of scope; the rules model leaves room for a later
-   fastpitch/slowpitch profile. Should softball be its own sport or a Baseball profile?
-3. **Primary level.** Which level will you score most (youth, high school, adult)?
-   It picks the default profile and which options ship first.
-4. **Pitch-by-pitch required?** Default: pitch tracking on by default, with a Quick PA
-   path for untracked pitches. Is PA-only scoring ever the preferred default?
-5. **Pitch location.** Default: optional per pitch, tapped on a catcher's-view zone,
-   with a preference to hide it. Do you also want pitch type (fastball, curve)?
-6. **Batted-ball location and fielder sequence.** Default: location optional; fielder
-   sequence required for outs, optional for hits. Too much for live use?
-7. **Pitcher decisions.** Default: suggested W/L/SV assigned by the recorder at
-   finalization. Or skip decisions entirely in the first release?
-8. **Earned runs.** Default: derived unearned flags plus manual override, no full
-   reconstruction. Acceptable?
-9. **Pitch counts.** Default: show per-pitcher counts with advisory profile limits and
-   warnings, no rest-day enforcement across games. Needed for your league?
-10. **Diamond interaction.** Default: tap runner chips to cycle destinations and
-    confirm, rather than drag-and-drop. Want an early clickable prototype to try on a
-    phone before BSB-3 wiring?
-11. **Continuous batting order / mandatory play** youth rules: needed in the first
-    release?
-12. **Legacy Baseball grid games.** Default: keep the generic grid as the Legacy mode
-    for existing and quick games, like Basketball's Legacy/Event split. Or retire it
-    for new games once the event tracker ships?
+1. **Opponent detail: batting-order slots**, each with optional position, name and
+   number. No full opponent scorebook, no opponent season stats.
+2. **Softball: a Baseball rule profile** (fastpitch and slowpitch), not its own sport.
+   Rules therefore need softball-relevant options (7 innings, no-leading-off, courtesy
+   runners, DP/FLEX and extra-player batting slots, slowpitch start counts). BSB-1 ships
+   the profiles; softball-only field geometry is a later BSB-3 option.
+3. **Primary level: youth and high school.** NFHS and youth profiles are the defaults
+   and ship first; MLB/NCAA remain available.
+10. **No prototype.** Build and test as we go.
+
+Remaining questions proceed on the recommended default unless Mark changes them:
+
+4. Pitch tracking on by default, Quick PA path for untracked pitches.
+5. Pitch location optional per pitch on a catcher's-view zone; no pitch type yet.
+6. Batted-ball location optional; fielder sequence required for outs, optional for hits.
+7. Pitcher decisions suggested and recorder-assigned at finalization.
+8. Derived unearned flags plus manual override; no full earned-run reconstruction.
+9. Per-pitcher pitch counts with advisory profile limits; no cross-game rest enforcement.
+11. Continuous batting order ships in BSB-1 (youth levels need it).
+12. Keep the generic grid as Legacy mode alongside the event tracker.

@@ -6,8 +6,8 @@ engine: rules, setup snapshot, participants, event definitions, the base/out/cou
 half-inning projection, derived statistics, and checked commands. It mirrors BKE-1's
 role for Basketball.
 
-Status: proposed, pending owner answers to BSB-0 section 16. No runtime behavior
-changes until implementation; nothing in BSB-1 is reachable from production UI.
+Status: in progress. Owner decisions are recorded in BSB-0 section 16. Nothing in
+BSB-1 is reachable from production UI.
 
 ---
 
