@@ -6,8 +6,8 @@ import {
   initializeGameEventStream,
 } from '../gameEvents/mutations'
 import { gameEventProjectors, gameEventRegistry } from '../gameEvents/runtime'
-import { inspectGameEventStream } from '../gameEvents/stream'
-import type { GameEvent, GameEventLocation, GameEventTeamSide } from '../gameEvents/types'
+import { inspectGameEventStream, stableJson } from '../gameEvents/stream'
+import type { GameEvent, GameEventActor, GameEventLocation, GameEventTeamSide } from '../gameEvents/types'
 import { createBaseballEvent } from './events'
 import { baseballPeriod } from './periods'
 import { replayBaseballEvents } from './projector'
@@ -37,6 +37,7 @@ export type BaseballCommandErrorCode =
   | 'not_baseball'
   | 'invalid_setup'
   | 'legacy_activity_present'
+  | 'already_initialized'
   | 'stream_not_initialized'
   | 'rejected'
 
@@ -57,9 +58,28 @@ const BASES: readonly BaseballBase[] = ['first', 'second', 'third']
 // ---------------------------------------------------------------------------
 // Game creation
 
-/** Installs Baseball setup and an empty authoritative event stream on a fresh game. */
+/**
+ * Installs Baseball setup and an empty authoritative event stream on a fresh game.
+ * Setup is immutable once the stream exists: repeating the call with an identical setup is
+ * an idempotent no-op, while any different setup (rules, participants, lineups) is
+ * rejected so existing events can never be replayed under replacement rules.
+ */
 export function initializeBaseballEventGame(state: GameState, setup: BaseballMatchSetup): BaseballCommandResult {
   if (state.sport?.id !== 'baseball') return failure(state, 'not_baseball', 'The active sport is not Baseball.')
+  if (state.eventStream) {
+    const existing = state.sportGameState
+    if (
+      existing?.sportId === 'baseball' &&
+      stableJson(existing.setup) === stableJson(setup)
+    ) {
+      return { ok: true, state, events: [] }
+    }
+    return failure(
+      state,
+      'already_initialized',
+      'This game already has a Baseball setup. Start a new game to use different rules or players.'
+    )
+  }
   if (hasLegacyAggregateActivity(state)) {
     return failure(state, 'legacy_activity_present', 'This game already has counter-based stats.')
   }
@@ -398,6 +418,7 @@ function append<TType extends BaseballEventType>(
     sequence: nextBaseballEventSequence(state.eventStream.events, context.recorderUserId),
     occurredAt: context.occurredAt,
     location,
+    actors: resolveBaseballActors(sport.setup, projection, eventType, payload),
   }) as unknown as GameEvent
 
   // Precise replay message before the generic atomic append.
@@ -419,6 +440,64 @@ function append<TType extends BaseballEventType>(
   )
   if (!result.ok) return failure(state, 'rejected', result.error.message)
   return { ok: true, state: result.state, events: [event] }
+}
+
+/**
+ * Resolves the participants behind a play at capture time so later lineup corrections
+ * cannot silently move fielding credit (BSB-1 section 3.3).
+ */
+export function resolveBaseballActors(
+  setup: BaseballMatchSetup,
+  projection: BaseballMatchProjection,
+  eventType: BaseballEventType,
+  payload: BaseballPayloadByType[BaseballEventType]
+): GameEventActor[] {
+  if (projection.status !== 'in_progress') return []
+  const isPitch = eventType === 'baseball.pitch' || eventType === 'baseball.plate_appearance'
+  if (!isPitch && eventType !== 'baseball.baserunning') return []
+  const actors: GameEventActor[] = []
+  const fieldingSide = projection.battingSide === 'tracked' ? 'opponent' : 'tracked'
+  const tracked = projection.lineups.tracked
+  if (isPitch && projection.currentBatterId) {
+    actors.push(sideActor(setup, projection, 'batter', projection.currentBatterId))
+  }
+  const pitcherId = projection.lineups[fieldingSide].pitcherId
+  if (pitcherId) actors.push(sideActor(setup, projection, 'pitcher', pitcherId))
+  if (fieldingSide === 'tracked') {
+    const positions = new Set<number>([1, 2])
+    const record = payload as { inPlay?: BaseballInPlay | null; movements?: BaseballRunnerMovement[] }
+    for (const value of record.inPlay?.fielders ?? []) positions.add(value)
+    if (record.inPlay?.errorBy != null) positions.add(record.inPlay.errorBy)
+    for (const movement of record.movements ?? []) {
+      movement.fielders.forEach(value => positions.add(value))
+      if (movement.errorBy !== null) positions.add(movement.errorBy)
+    }
+    for (const position of [...positions].sort((a, b) => a - b)) {
+      const id = tracked.defense[String(position)]
+      if (id) actors.push(sideActor(setup, projection, `fielder_${position}`, id))
+    }
+  }
+  return actors
+}
+
+function sideActor(
+  setup: BaseballMatchSetup,
+  projection: BaseballMatchProjection,
+  role: string,
+  participantId: string
+): GameEventActor {
+  const participant = setup.participants.find(entry => entry.id === participantId)
+  if (participant) {
+    return participant.playerId
+      ? { role, kind: 'player', playerId: participant.playerId, participantId }
+      : { role, kind: 'unknown', label: participant.displayName, participantId }
+  }
+  const slotIndex = setup.opponentSlots.findIndex(slot => slot.id === participantId)
+  const slot = projection.opponentSlotDetails[participantId]
+  const pitcher = projection.opponentPitchers[participantId]
+  const label =
+    slot?.label ?? pitcher?.label ?? (slotIndex >= 0 ? `Batter ${slotIndex + 1}` : 'Opponent pitcher')
+  return { role, kind: 'unknown', label, participantId }
 }
 
 function diamondLocation(value: { x: number; y: number } | null | undefined): GameEventLocation | null {

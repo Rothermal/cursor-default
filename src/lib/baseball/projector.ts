@@ -11,6 +11,7 @@ import { baseballPeriod } from './periods'
 import { createBaseballMatchProjection } from './state'
 import { baseballPlayerStatsById } from './stats'
 import type {
+  BaseballActorRole,
   BaseballBase,
   BaseballBattingLine,
   BaseballEvent,
@@ -150,6 +151,11 @@ class BaseballReplay {
   readonly projection: BaseballMatchProjection
   private readonly rules: BaseballMatchRules
   private readonly originalSlotById: Map<string, number>
+  /** True when a pending ending was reached mid-half (walk-off or bottom run rule) rather than at a half boundary. */
+  private pendingEndMidHalf = false
+  /** Participant ids stamped on the event being applied, by actor role. */
+  private stamped = new Map<string, string>()
+  private currentEventId = ''
 
   constructor(private readonly setup: BaseballMatchSetup) {
     this.projection = createBaseballMatchProjection(setup)
@@ -159,6 +165,10 @@ class BaseballReplay {
 
   apply(event: BaseballEvent): void {
     const p = this.projection
+    this.currentEventId = event.id
+    this.stamped = new Map(
+      event.actors.flatMap(actor => (actor.participantId ? [[actor.role, actor.participantId] as const] : []))
+    )
     if (event.eventType === 'baseball.game_started') {
       if (p.status !== 'pregame') fail('The game has already started.')
       this.expectPeriod(event, 1, 'top')
@@ -193,6 +203,7 @@ class BaseballReplay {
         const next = p.score[side] + event.payload.delta
         if (next < 0) fail('A score cannot become negative.')
         p.score[side] = next
+        this.reevaluateBoundaryAfterAdjustment()
         return
       }
       case 'baseball.substitution':
@@ -210,15 +221,18 @@ class BaseballReplay {
         return
       case 'baseball.pitch':
         this.expectBattingSide(event)
+        this.checkStampedBatterAndPitcher(true)
         this.applyPitch(event)
         return
       case 'baseball.plate_appearance':
         this.expectBattingSide(event)
+        this.checkStampedBatterAndPitcher(true)
         this.applyQuickPlateAppearance(event)
         return
       case 'baseball.baserunning':
         this.expectBattingSide(event)
         this.requireDefense()
+        this.checkStampedBatterAndPitcher(false)
         if (event.payload.play === 'balk' && !this.rules.balks) fail('Balks are not called under these rules.')
         this.applyMovements(event.payload.movements, null)
         this.afterPlay()
@@ -286,7 +300,13 @@ class BaseballReplay {
     line.complete = true
     p.bases = { first: null, second: null, third: null }
     this.resetCount()
+    this.pendingEndMidHalf = false
+    this.advanceAfterClosedHalf()
+  }
 
+  /** Decides, from the current score, whether a closed half ends the game or which half opens next. */
+  private advanceAfterClosedHalf(): void {
+    const p = this.projection
     const homeSide = this.homeSide()
     const awaySide = otherSide(homeSide)
     const home = p.score[homeSide]
@@ -325,22 +345,48 @@ class BaseballReplay {
       this.closeHalf()
       return
     }
-    if (p.half === 'bottom') {
-      const homeSide = this.homeSide()
-      const lead = p.score[homeSide] - p.score[otherSide(homeSide)]
-      if (lead > 0 && p.inning >= this.rules.scheduledInnings) {
-        this.currentHalfLine().complete = true
-        p.pendingEnd = 'walk_off'
-        return
-      }
-      if (lead > 0 && this.runRuleMet(p.inning, lead)) {
-        this.currentHalfLine().complete = true
-        p.pendingEnd = 'run_rule'
-        return
-      }
-    }
+    if (this.checkMidHalfEnding()) return
     const max = this.rules.maxRunsPerHalfInning
     if (max !== null && this.currentHalfLine().runs >= max) this.closeHalf()
+  }
+
+  /** Bottom-half walk-off or run rule reached before three outs. */
+  private checkMidHalfEnding(): boolean {
+    const p = this.projection
+    if (p.half !== 'bottom') return false
+    const homeSide = this.homeSide()
+    const lead = p.score[homeSide] - p.score[otherSide(homeSide)]
+    if (lead <= 0) return false
+    const pending =
+      p.inning >= this.rules.scheduledInnings ? 'walk_off' : this.runRuleMet(p.inning, lead) ? 'run_rule' : null
+    if (!pending) return false
+    this.currentHalfLine().complete = true
+    p.pendingEnd = pending
+    this.pendingEndMidHalf = true
+    return true
+  }
+
+  /**
+   * A score adjustment changes the inputs to every ending decision, so the pending ending
+   * is recomputed from the adjusted score: an ending that no longer holds resumes the
+   * interrupted half (mid-half endings) or opens the next half (boundary endings), and an
+   * adjustment that gives the home side the lead in the bottom half can end the game.
+   */
+  private reevaluateBoundaryAfterAdjustment(): void {
+    const p = this.projection
+    if (p.pendingEnd && this.pendingEndMidHalf) {
+      p.pendingEnd = null
+      this.pendingEndMidHalf = false
+      this.currentHalfLine().complete = false
+      this.checkMidHalfEnding()
+      return
+    }
+    if (p.pendingEnd) {
+      p.pendingEnd = null
+      this.advanceAfterClosedHalf()
+      return
+    }
+    this.checkMidHalfEnding()
   }
 
   private applyGameEnd(
@@ -1089,9 +1135,14 @@ class BaseballReplay {
     }
   }
 
+  /** In the batting order, on defense, or occupying a base (courtesy runners hold no slot). */
   private isActive(participantId: string): boolean {
     const lineup = this.projection.lineups.tracked
-    return lineup.battingOrder.includes(participantId) || Object.values(lineup.defense).includes(participantId)
+    return (
+      lineup.battingOrder.includes(participantId) ||
+      Object.values(lineup.defense).includes(participantId) ||
+      this.baseOf(participantId) !== null
+    )
   }
 
   private isKnownId(id: string): boolean {
@@ -1139,14 +1190,62 @@ class BaseballReplay {
   }
 
   /** Fielding credit only for the tracked defense, resolved from the current alignment. */
+  /**
+   * Fielding credit goes to the player stamped at capture; the replayed defense is the
+   * fallback for unstamped events. A disagreement is reported, never silently reattributed.
+   */
   private fielding(position: number): BaseballFieldingLine {
     const p = this.projection
     if (p.battingSide === 'tracked') return scratchFieldingLine()
-    const id = p.lineups.tracked.defense[String(position)]
+    const resolved = p.lineups.tracked.defense[String(position)] ?? null
+    const role = `fielder_${position}` as const
+    const stamped = this.stamped.get(role)
+    const known = stamped !== undefined && this.setup.participants.some(entry => entry.id === stamped)
+    if (known && stamped !== resolved) this.warnMismatch(role, stamped, resolved)
+    const id = known ? stamped : resolved
     if (!id) return scratchFieldingLine()
     p.fieldingLines[id] ??= emptyFieldingLine()
     return p.fieldingLines[id]
   }
+
+  /** Batting order and pitching changes are structural, so these lines follow the replay and only warn. */
+  private checkStampedBatterAndPitcher(includeBatter: boolean): void {
+    const pitcherId = this.fieldingLineup().pitcherId
+    const stampedPitcher = this.stamped.get('pitcher')
+    if (stampedPitcher !== undefined && stampedPitcher !== pitcherId) {
+      this.warnMismatch('pitcher', stampedPitcher, pitcherId)
+    }
+    if (!includeBatter) return
+    const batterId = this.currentBatterId()
+    const stampedBatter = this.stamped.get('batter')
+    if (stampedBatter !== undefined && stampedBatter !== batterId) {
+      this.warnMismatch('batter', stampedBatter, batterId)
+    }
+  }
+
+  private warnMismatch(role: BaseballActorRole, recorded: string, resolved: string | null): void {
+    const warnings = this.projection.warnings
+    if (warnings.some(entry => entry.eventId === this.currentEventId && entry.role === role)) return
+    warnings.push({
+      code: 'actor_mismatch',
+      eventId: this.currentEventId,
+      role,
+      recordedParticipantId: recorded,
+      resolvedParticipantId: resolved,
+      message: `This play was recorded with ${this.nameOf(recorded)} as ${roleLabel(role)}, but the lineup now shows ${resolved ? this.nameOf(resolved) : 'nobody'}.`,
+    })
+  }
+
+  private nameOf(id: string): string {
+    const participant = this.setup.participants.find(entry => entry.id === id)
+    if (participant) return participant.displayName
+    return this.projection.opponentSlotDetails[id]?.label ?? this.projection.opponentPitchers[id]?.label ?? 'an opponent'
+  }
+}
+
+function roleLabel(role: BaseballActorRole): string {
+  if (role === 'batter' || role === 'pitcher') return role
+  return `fielder ${role.slice('fielder_'.length)}`
 }
 
 function fail(message: string): never {

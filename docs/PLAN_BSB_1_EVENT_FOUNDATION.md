@@ -65,152 +65,180 @@ src/lib/baseball/
 
 ## 3. Contracts
 
+The sections below describe the shipped contract in `src/lib/baseball/types.ts` and
+`commands.ts`. The original pseudocode was replaced after review so the plan and the
+code cannot disagree.
+
 ### 3.1 Rules v1 (`rulesSchemaVersion: 1`)
 
 ```text
 BaseballMatchRules
   rulesSchemaVersion: 1
   profileId, profileVersion           source link (BKE-5A pattern)
+  variant                             'baseball' | 'softball_fastpitch' | 'softball_slowpitch'
   scheduledInnings                    positive integer
   ballsForWalk, strikesForStrikeout   defaults 4 / 3
-  twoStrikeFoulBuntIsStrikeout        boolean
-  droppedThirdStrike                  boolean
-  battingOrder: { format: 'standard' | 'designated_hitter' | 'extra_hitter'
-                  | 'continuous', extraHitters: 0..2 }
-  reentry: 'none' | 'starters_once' | 'unlimited'
-  courtesyRunners: boolean
-  stealing: boolean, leadingOff: boolean, balks: boolean
-  extraInnings: { allowed: boolean, placedRunner: null | { base: 'second' | 'first' } }
-  runRule: null | Array<{ afterInning: number, lead: number }>
-  maxRunsPerHalfInning: null | number
-  tiesAllowed: boolean
-  pitchCount: null | { warnAt: number[], limit: number | null }
+  startingBalls, startingStrikes      slowpitch leagues may start at 1-1
+  twoStrikeFoulIsOut                  slowpitch option
+  twoStrikeFoulBuntIsStrikeout, droppedThirdStrike
+  battingOrderFormat                  'standard' | 'designated_hitter' | 'extra_hitter' | 'continuous'
+  maxExtraHitters                     ignored by continuous
+  defensivePlayers                    9, or 10 for slowpitch (short fielder)
+  reentry                             'none' | 'starters_once' | 'unlimited'
+  courtesyRunners, stealing, leadingOff, balks
+  extraInningsAllowed
+  placedRunnerBase, placedRunnerFromInning     null or base + first inning it applies
+  runRules                            Array<{ afterInning, lead }> (empty = none)
+  maxRunsPerHalfInning                null | number
+  tiesAllowed
+  pitchCountWarnings: number[], pitchCountLimit: number | null
 ```
 
-Exact parsing: unknown keys, wrong types or out-of-range values fail closed with a
-diagnostic; snapshots are frozen on the game at start and never rewritten.
+`normalizeBaseballMatchRules` is an exact parser: unknown keys, wrong types or
+out-of-range values fail closed. `createBaseballMatchRules(profileId, overrides)`
+clones a frozen profile. Snapshots are frozen on the game at initialization.
 
 ### 3.2 Setup snapshot v1
 
 ```text
-BaseballSetup
-  setupSchemaVersion: 1
+BaseballMatchSetup
+  version: 1
   trackedSide: 'home' | 'away'
-  opponentName
-  rules: BaseballMatchRules
-  tracked: {
-    participants: Participant[]         stable participantId, playerId?, name, number,
-                                        position (default), bats?, throws?
-    battingOrder: participantId[]       length per rules (continuous = all listed)
-    defense: Record<Position1to9 | 'DH', participantId>
-    startingPitcher: participantId
+  opponentName, sourceTeamId, sourceSeasonId
+  rulesSnapshot: BaseballMatchRules
+  participants: Array<{ id, playerId | null, displayName, number, position, bats, throws }>
+  trackedLineup: {
+    battingOrder: participantId[]     length per format (continuous = everyone listed)
+    defense: Record<'1'..'10', participantId>   fielding number -> participant;
+                                                 the starting pitcher is defense['1']
   }
-  opponent: {
-    slots: OpponentSlot[]               slotId, order, label?, number?
-    startingPitcher: { id, label?, number? }
-  }
+  opponentSlots: Array<{ id, label, number, position, bats }>   batting-order slots only
+  opponentPitcher: { id, label, number, throws }
 ```
 
-Participants follow Soccer/Basketball: `participantId` is the stable match identity;
-`playerId` links to the roster when present. Opponent slots never map to `players`.
-Late tracked additions and opponent slot additions are commands (BSB-4 UI).
+`participant.id` is the stable match identity; `playerId` links to the roster when
+present. Opponent slots never map to `players`. `validateBaseballMatchSetup` enforces
+format rules (DH/EH/continuous lengths, unique ids, full defense).
+
+Setup is immutable once the stream exists: `initializeBaseballEventGame` accepts an
+identical setup as a no-op and rejects any other setup with `already_initialized`.
+Late tracked additions and mid-game opponent slot additions are deferred to BSB-4.
 
 ### 3.3 Event payloads
 
-As listed in BSB-0 section 6. Implementation notes:
+Nine event types, all schema version 1, all with a `captureCommandId`:
 
-- `baseball.pitch` schema v1: `{ result, pitchLocation?: {x,y}, batterHand?,
-  movements?: RunnerMovement[], inPlay?: InPlayDetail }`. `inPlay` is required iff
-  `result === 'in_play'`. Movements on a non-in-play pitch are limited to running
-  reasons (stolen base, caught stealing, wild pitch, passed ball, balk, error on
-  throw, pickoff-during-pitch) plus the batter-runner on ball four/HBP/dropped third
-  strike.
-- `baseball.plate_appearance` schema v1 (quick path): `{ result, finalCount?,
-  inPlay?, movements }`; marks the PA as `pitchesTracked: false` in projection.
-- Fielder references are position numbers; the projector resolves tracked fielders to
-  participants from the defensive alignment at that moment. Commands also stamp the
-  resolved `participantId` into actors (`fielder`, `pitcher`, `catcher`, `batter`,
-  `runner`) so later lineup corrections surface as diagnostics rather than silently
-  reattributing history.
-- `teamSide` = batting side. Lifecycle events are `neutral` (definitions opt in).
-- `period` = current half-inning, stamped by commands from projection.
-- `elapsedMs` = `null` always; validators reject numbers.
-- `location` = batted-ball spot, `attackingDirection: 'unknown'`, only allowed on
-  in-play pitches and quick PAs with `inPlay`.
+- `baseball.game_started` (neutral).
+- `baseball.pitch`: `{ result, pitchLocation | null, inPlay | null, movements }`.
+  `inPlay` is required exactly when `result === 'in_play'`. Pitch location uses the
+  catcher's view (0..1 spans the zone; values outside are balls).
+- `baseball.plate_appearance` (quick path): `{ result, inPlay | null, finalBalls |
+  null, finalStrikes | null, movements }`; the PA is recorded with an estimated pitch
+  count.
+- `baseball.baserunning`: `{ play, movements }` for steals, pickoffs, WP/PB/balk and
+  other between-pitch plays.
+- `baseball.substitution`: one of `pinch_hitter`, `pinch_runner`, `courtesy_runner`,
+  `defensive { position, incomingId, outgoingId | null }`, `position_change`,
+  `opponent_pitcher`, `opponent_slot`.
+- `baseball.half_inning_ended` (neutral; `time_limit`, `mercy` or `other` only).
+- `baseball.game_ended` / `baseball.game_reopened` (neutral).
+- `baseball.score_adjustment`: `{ delta, reason }` on the adjusted side.
+
+Runner movements are always explicit:
+`{ runnerId, from, to, reason, fielders, errorBy, earned, rbi, runCounts }`. The
+projector implies none; commands and `proposeBaseballMovements` supply defaults.
+
+Fielder references in the payload are fielding numbers. At capture, commands stamp
+envelope `actors` with the resolved identities: `batter` (pitch and quick PA),
+`pitcher`, and `fielder_{n}` for P, C and every fielding number the play references
+while the tracked side is fielding. On replay:
+
+- Fielding credit goes to the stamped participant. When the replayed lineup resolves
+  a different player (for example after an earlier lineup correction), the projection
+  records an `actor_mismatch` warning instead of silently reattributing history.
+- Batting and pitching lines follow the replayed order, because the order itself
+  drives the state machine; a stamped batter or pitcher that disagrees produces the
+  same warning.
+- Unstamped events fall back to the replayed lineup.
+
+Corrections do not cascade attribution; BSB-4 correction UI surfaces the warnings.
+
+Envelope conventions: `teamSide` is the batting side, lifecycle events are `neutral`,
+`period` is the current half-inning (`inning-{n}-top|bottom`), `elapsedMs` is always
+`null`, and `location` is the batted-ball spot with `attackingDirection: 'unknown'`.
 
 ### 3.4 Projection state
 
 ```text
-BaseballProjection
+BaseballMatchProjection
   status: 'pregame' | 'in_progress' | 'final' | 'suspended' | 'abandoned'
-  half: { inning, half: 'top' | 'bottom', periodId, battingSide }
-  outs: 0..3, count: { balls, strikes }, pitchesInPa
-  bases: { first, second, third }: RunnerRef | null
-  batter: { side, identity, battingSlot }
-  lineups: per side { battingOrder, nextSlot, defense, pitcher, used/eligible sets }
-  score: { tracked, opponent }, lineScore: per half runs/hits/errors
-  plateAppearances: ordered records (for Timeline/Summary)
-  pitcherLines, batterLines, fielderLines  (feed stats.ts)
-  canEndGame: { walkOff, runRule, maxRuns, regulationComplete } (advisory)
-  diagnostics
+  inning, half, battingSide, outs, balls, strikes, pitchesInPlateAppearance
+  currentBatterId
+  bases: { first, second, third }: { runnerId, responsiblePitcherId, reachedBy, unearned } | null
+  lineups: { tracked, opponent }: { battingOrder, nextBatterIndex, defense, pitcherId,
+                                     appearedIds, starterIds, removedIds, reenteredIds }
+  score: { tracked, opponent }, lineScore: per half { runs, hits, errors, leftOnBase, complete }
+  battingLines, pitchingLines, fieldingLines      keyed by participant or opponent slot id
+  plateAppearances                                 ordered records
+  opponentSlotDetails, opponentPitchers
+  pendingEnd: null | 'regulation' | 'walk_off' | 'run_rule'
+  result: null | { outcome, winner, note }
+  warnings: BaseballProjectionWarning[]           actor mismatches (advisory)
 ```
 
-`projection.playerStatsById` / `homeTeamScore` / `opponentScore` in the shared
-`GameEventProjection` are filled from this state for compatibility surfaces.
+The shared `GameEventProjection` receives `playerStatsById` (`bsb_*`),
+`homeTeamScore` and `opponentScore` from this state.
 
 ---
 
 ## 4. Projection Rules (state machine)
 
-1. Events replay in capture order (`sequence`, then id). Period is validated against
-   the projected current half; an event stamped for another half is a diagnostic.
-2. A pitch updates the count. Terminal counts resolve the PA (walk, strikeout).
-   A strikeout with a dropped-third-strike movement for the batter is still a K.
-3. Every movement is applied atomically for the event: validate all `from` bases are
-   occupied by the named runner (or batter), apply outs in `outNumber` order, then
-   advances from the lead runner backward; reject collisions, passing, and any
-   movement after the third out except runs that legally score before it (timing
-   play flag on the scoring movement; force-out third out never lets runs score).
-4. Forced advances on walk/HBP/catcher's interference are **implied** when omitted
-   (the batter-runner and forced runners move exactly one base); non-forced runners
-   stay unless a movement says otherwise.
-5. On the third out the half closes: left-on-base is recorded, the base state and
-   count clear, the next half opens with the next batter in the other side's order.
-   The bottom of the last scheduled inning is skipped when the home side leads.
-   Placed runners are inserted automatically in extra innings per rules.
-6. Runs: each movement to `home` scores a run for the batting side, charged to the
-   runner's `responsiblePitcher`, earned per section 7 of BSB-0 unless overridden,
-   RBI credited per scoring.ts defaults unless overridden.
-7. Substitutions update lineups immediately; a pinch runner replaces the runner's
-   identity on the base keeping `responsiblePitcher` and `reachedBy`; a pitching
-   change leaves existing runners charged to the previous pitcher (inherited runners).
-8. Eligibility: removed players cannot re-enter unless rules allow and the slot
-   matches; DH rules enforced; continuous order grows the order rather than replacing.
-9. Game end: `game_end` requires a legal ending (regulation complete, walk-off, run
-   rule, max innings with ties allowed, or an explicit reasoned suspension/abandon/
-   forfeit). After `final`, capture events are rejected; reopen is a BSB-6 concern.
-10. Incomplete streams (unknown event, failed validation) project what is valid up to
-    the failure and report diagnostics; they never fabricate state beyond it.
+1. Events replay in capture order. The period must match the projected current half.
+2. A pitch updates the count; terminal counts resolve the PA. A strikeout with a
+   dropped-third-strike movement for the batter is still a K.
+3. Every movement in an event is validated together: named runners must occupy their
+   `from` bases, no passing or collisions, forced runners must move, and nothing
+   happens after the third out except runs that legally score before it.
+4. Forced advances are never implied. Walks, HBP and catcher's interference must list
+   the batter and every forced runner; `proposeBaseballMovements` builds that list.
+5. On the third out the half closes: left-on-base is recorded, bases and count clear,
+   and the next half opens. The bottom of the last scheduled inning is skipped when
+   the home side leads. Placed runners are inserted per rules.
+6. Runs score for the batting side, charged to the runner's responsible pitcher, with
+   earned and RBI defaults per section 9 unless the movement overrides them.
+7. Substitutions update lineups immediately. A pinch or courtesy runner takes over the
+   runner's base and keeps the responsible pitcher. A player already batting, fielding
+   or on base cannot enter again.
+8. Re-entry follows `reentry`; continuous order grows rather than replaces.
+9. Ending: `pendingEnd` is set when a legal ending is reached (regulation, walk-off, run
+   rule) and blocks further play until `game_ended` is recorded. A score adjustment
+   recomputes it from the adjusted score: an ending that no longer holds resumes the
+   interrupted half or opens the next one, and an adjustment that gives the home side
+   the lead in the bottom half can create a walk-off or run-rule ending.
+10. Replay stops at the first invalid event with `semantic_validation_failed`,
+    projecting only what was valid before it.
 
 ---
 
 ## 5. Commands
 
-Each command takes current `GameState`, validates against projection, and returns
-`{ ok: true, events }` or `{ ok: false, error }` with a typed code. Examples:
+Every command takes the current `GameState` and returns
+`{ ok: true, state, events } | { ok: false, state, code, message }` where `code` is
+`not_baseball`, `invalid_setup`, `legacy_activity_present`, `already_initialized`,
+`stream_not_initialized` or `rejected`.
 
-- `recordPitch({ result, pitchLocation?, movements? })`
-- `recordBallInPlay({ battedBallType, result, location?, fielders, errorBy?, movements })`
-  — proposal helper `proposeMovements(state, result)` supplies defaults.
-- `recordQuickPlateAppearance(...)`
-- `recordBaserunning({ movements, reason })`
-- `substitute({ kind, ... })`, `changePitcher(...)`, `switchPositions(...)`
-- `endHalfInning({ reason })` (non-three-out only), `endGame({ outcome, reason })`,
-  `suspendGame`, `abandonGame`, `adjustScore({ delta, reason })`
+- `initializeBaseballEventGame(state, setup)`, `startBaseballGame`
+- `recordBaseballPitch({ result, pitchLocation?, inPlay?, location?, movements? })`
+- `recordBaseballPlateAppearance({ result, inPlay?, location?, finalBalls?, finalStrikes?, movements })`
+- `recordBaseballBaserunning({ play, movements })`
+- `substituteBaseball(side, substitution)`
+- `endBaseballHalfInning(reason, note)`, `endBaseballGame(outcome, { forfeitWinner?, note? })`,
+  `reopenBaseballGame`, `adjustBaseballScore(side, delta, reason)`
+- Helpers: `baseballMovement(...)`, `proposeBaseballMovements(projection, kind, fielders)`
 
-Commands build complete events with ids, sequence, period and actors, then validate
-the whole candidate stream with `applyGameEventAppendsAndMutations` so a command never
-leaves a half-applied state.
+Commands stamp the period and actors, pre-validate with a replay to give a precise
+message, then append through `applyGameEventAppendsAndMutations`, so a rejected command
+never leaves a half-applied state.
 
 ---
 
@@ -289,8 +317,8 @@ Changes from the plan text above:
   pitch until filled.
 - Commands always write explicit movements; the projector implies none. Walks and
   strikeouts must include the batter movement and every forced runner.
-- Actors are not stamped on events yet; identities live in the payload and
-  projection. BSB-3/4 may add actors for Timeline display.
+- Actor stamping and the mismatch-warning contract were added after review (section
+  3.3).
 - Late roster additions and adding opponent slots mid-game are deferred to BSB-4.
 
 Documented approximations (scorer can override per movement where noted):
@@ -310,3 +338,35 @@ Documented approximations (scorer can override per movement where noted):
   (two-strike fouls are unknown).
 - DH forfeiture, NFHS courtesy-runner eligibility limits and batting out of order are
   not enforced yet.
+
+### 9.1 Review follow-ups (PR #430)
+
+Mark's review found three defects, now fixed with regression tests in
+`reviewRegressions.test.ts`:
+
+- Re-initializing a started game with a different setup replayed existing events under
+  new rules. Setup is now immutable once the stream exists (section 3.2).
+- A courtesy runner already on base could replace a second runner. Being on base now
+  counts as being in the game for every substitution entry point.
+- A score adjustment could leave a stale `pendingEnd`. Endings are now recomputed from
+  the adjusted score (section 4, rule 9), including walk-off and run-rule invalidation.
+
+The review also asked for resolved actor identities (section 3.3) and a new-sport
+isolation matrix. `sportIsolation.test.ts` covers legacy Baseball on the aggregate
+route, event Baseball rejected by every cloud route, corrupt or unknown state failing
+closed, reload fingerprint stability, and mixed-sport park/export/import.
+
+Registering the engine does not make Baseball event games creatable or cloud-synced.
+Creation needs a setup UI and release gate (BSB-2/BSB-3). Cloud sync needs fixed sport
+RPC wrappers plus the capability and creation gates Soccer and Basketball use (BSB-6).
+
+### 9.2 Prerequisites before a profile is user-facing
+
+| Before exposing | Required |
+| --- | --- |
+| Any profile | Setup UI with release gate (BSB-2); tracker (BSB-3) |
+| `designated_hitter` / `extra_hitter` formats | DH forfeiture when the DH or pitcher fields; EH/DH slot eligibility checks |
+| NFHS profiles with courtesy runners | NFHS courtesy-runner eligibility (who may serve, how often, and for whom), checked against the current rule book |
+| Softball fastpitch | DP/FLEX substitution rules; re-entry per NFHS softball |
+| Softball slowpitch | Verify the 1-1 start count and two-strike foul out with a real league rule set; short-fielder position labels in the UI |
+| Any profile in competitive use | Batting-out-of-order appeal event and correction flow (BSB-4) |

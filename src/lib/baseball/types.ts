@@ -504,12 +504,32 @@ export interface BaseballMatchProjection {
   pitchingLines: Record<string, BaseballPitchingLine>
   fieldingLines: Record<string, BaseballFieldingLine>
   plateAppearances: BaseballPlateAppearanceRecord[]
-  /** A legal game ending is available and further play is blocked until it is recorded. */
   opponentSlotDetails: Record<string, BaseballOpponentSlot>
   opponentPitchers: Record<string, BaseballOpponentPitcher>
+  /** A legal game ending is available and further play is blocked until it is recorded. */
   pendingEnd: BaseballPendingEnd
   result: BaseballMatchResult | null
-  warnings: string[]
+  warnings: BaseballProjectionWarning[]
+}
+
+/**
+ * Actor roles stamped on play events at capture: `batter`, `pitcher`, and `fielder_{n}` for
+ * each fielding number the play references (plus P and C, who take part in every pitch).
+ */
+export type BaseballActorRole = 'batter' | 'pitcher' | `fielder_${number}`
+
+/**
+ * Raised when the identity stamped at capture differs from the one the replayed lineup now
+ * resolves, typically after an earlier lineup correction. Fielding credit stays with the
+ * stamped player; batter and pitcher lines follow the replayed order.
+ */
+export interface BaseballProjectionWarning {
+  code: 'actor_mismatch'
+  eventId: string
+  role: BaseballActorRole
+  recordedParticipantId: string
+  resolvedParticipantId: string | null
+  message: string
 }
 
 export interface BaseballCapturePreferences {
