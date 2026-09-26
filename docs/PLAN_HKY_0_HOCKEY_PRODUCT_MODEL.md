@@ -486,7 +486,7 @@ HKY-3B  goal strength prefill/confirmation, PP/PK totals, timeouts, icing/offsid
 HKY-3C  overtime and shootout (shared shootout core), outcomes
 HKY-4A  Timeline review and filters
 HKY-4B  revisioned corrections and recorded-later additions
-HKY-5A  server wrappers migration(s); reuse the Baseball BSB-2 allow-list widening
+HKY-5A  server wrappers migration(s); shared allow-list widening if hockey reaches cloud first
 HKY-5B  client transport, recorders, finalization/reopen UI
 HKY-5C  settings persistence and release capability handshake
 HKY-6A  Summary (overview, skaters, goalies, timeline, maps, shootout)
@@ -497,9 +497,11 @@ HKY-6C  settings UI, Team Manage, release stage, regression record
 Migration numbers are deliberately left unassigned: Football and Baseball programs will
 add migrations in parallel, so numbers are chosen when each migration PR is opened.
 Before writing any hockey migration, check the latest number on `stattracker` and any
-open Baseball/Football migration PR. The Baseball BSB-2 migration is expected to widen
-the 054 publication allow-list for baseball, football, and hockey together; hockey must
-not add a competing change to that constraint.
+open Baseball/Football migration PR, and take the next free number. Baseball has reserved
+071 for its roster and settings. Widening the event-platform allow-lists (051, 054, 060,
+069) is one shared migration for baseball, football, and hockey, written by whichever
+sport reaches cloud work first and numbered only then. It must not land before that
+sport has a finalization policy, because it opens the event-cloud paths.
 
 Estimated relative size: HKY-1..4 are smaller than SOC-1..4 because the shared engine,
 correction patterns, clock projection, and Timeline components exist. HKY-5 is much
@@ -518,7 +520,7 @@ generalization beyond the sports that actually use it.
 | Id | Item | Where today | Why it matters |
 |---|---|---|---|
 | XS-1 | Per-sport release policy. `getSportAvailabilityPolicy` special-cases only `soccer`; every other sport is "released" whenever the device toggle is on | `src/lib/sportAvailability.ts` | A new event sport needs `unreleased / preview / released` without another hard-coded branch. Replace with a per-sport stage table |
-| XS-2 | Server event-sport registration. Adding a sport means editing `is_event_platform_sport` (051), the publication `sport_id` check (054), the aggregate guard (060), and the setup version gate (069), plus fixed wrappers like 056-061 | `supabase/migrations/` | One reviewed "register sport" migration pattern per sport; migration numbers must be coordinated across the three programs. Baseball BSB-2 owns widening the 054 publication check for all three sports |
+| XS-2 | Server event-sport registration. Adding a sport means editing `is_event_platform_sport` (051), the publication `sport_id` check (054), the aggregate guard (060), and the setup version gate (069), plus fixed wrappers like 056-061 | `supabase/migrations/` | One reviewed "register sport" migration pattern per sport; migration numbers must be coordinated across the three programs. Allow-list widening is one shared migration for all three sports, owned by whichever reaches cloud work first |
 | XS-3 | Legacy vs event capability. `LEGACY_AGGREGATE_CLOUD_SPORT_IDS` includes hockey/football/baseball; event games must fail closed out of aggregate sync | `src/lib/sportGameState/capabilities.ts` | Each sport's state normalizer must be registered before its event games exist |
 | XS-4 | Roster position storage. Soccer stores `soccer:<role>` in `team_players.position`; Basketball stores free text; shared decision wants per-sport catalog + custom + Unassigned | `soccer/rosterRole.ts`, `basketball/positions.ts` | A small shared `sportPosition` helper (prefix, catalog order, custom, unassigned) used by hockey and football; baseball also needs it |
 | XS-5 | Surface location helper. `soccerFieldLocation` handles normalized x/y, attacking direction, and display flip | `src/lib/soccer/field.ts` | Rink and football field reuse it directly; baseball diamond uses fixed orientation (`attackingDirection: 'unknown'`) |
