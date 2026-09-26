@@ -430,7 +430,7 @@ Same invariants as SOC-0 section 11 and BKE-4:
 - Independent recorder streams, primary resolution and canonical publication work as
   for Basketball. No shared live stream.
 - Legacy aggregate Baseball games (generic grid, `game_stats`) remain readable and
-  keep snapshot sync; event games never dual-write legacy stats.
+  keep snapshot sync (production holds one such game as of 2026-09-26); event games never dual-write legacy stats.
 - Existing access model: owner/admin finalize and reopen, scorers track, viewers read.
 
 ---
@@ -475,23 +475,32 @@ prototype of the diamond and pitch pad before command wiring (Q10).
 ## 13. Cross-Sport Notes (for Hockey and Football planning)
 
 Shared abstractions that appeared while planning Baseball. Extract only when two real
-uses share semantics (product decisions rule).
+uses share semantics (product decisions rule). The Hockey plan
+(`PLAN_HKY_0_HOCKEY_PRODUCT_MODEL.md`, section "Shared cross-sport work") numbers these
+items XS-1..XS-11; the matching id is given in brackets so all three programs reference
+the same item. Migration numbers are left unassigned because they will collide across
+the three programs.
 
-1. **Roster positions and Starter/Bench defaults** are already the app-wide rule.
+1. **[XS-4, XS-9] Roster positions and Starter/Bench defaults** are already the app-wide rule.
    Each sport needs a namespaced `team_players.position` catalog, a team-settings
    schema bump, and setup snapshotting. Baseball adds a *batting order* default;
    Football may add depth-chart units; Hockey matches Soccer (lines are the analog).
-2. **Event platform allow-list.** Migration 054's check constraint lists
-   `('soccer', 'basketball')`, and each sport added fixed wrappers (binder, readiness,
+2. **[XS-2] Event platform allow-list.** Adding a sport means editing
+   `is_event_platform_sport` (051), the publication `sport_id` check (054, currently
+   `('soccer', 'basketball')`), the aggregate guard (060) and the setup version gate
+   (069), and each sport added fixed wrappers (binder, readiness,
    finalization, reopen, aggregates). Three new sports would triple that pattern.
    Propose one shared decision before any of BSB-6 / Hockey / Football cloud phases:
    either keep fixed per-sport wrappers (auditable, more migrations) or add a
    sport-policy table driving the private cores. Recommended: keep fixed wrappers but
    widen the allow-list in a single migration when the first new sport reaches cloud.
-3. **Clockless periods.** Baseball uses `elapsedMs: null` and sequence ordering with
+3. **[XS-3, XS-6] Clockless periods.** Baseball needs no anchored clock (XS-6), but
+   must register its state normalizer so event games fail closed out of legacy
+   aggregate sync (`LEGACY_AGGREGATE_CLOUD_SPORT_IDS` includes baseball, XS-3).
+   Baseball uses `elapsedMs: null` and sequence ordering with
    derived period advancement. Football has a clock but down/distance state; its
    projection may share Baseball's "state machine validated per event" pattern.
-4. **Location frame.** `GameEventLocation.attackingDirection` is `left_to_right |
+4. **[XS-5] Location frame.** `GameEventLocation.attackingDirection` is `left_to_right |
    right_to_left | unknown`. Baseball uses `unknown` with a documented fixed frame.
    Football (yard-line field with direction) fits the existing enum; Hockey fits it
    like Soccer.
@@ -499,13 +508,18 @@ uses share semantics (product decisions rule).
    location are both "second spatial fact in a sport-defined frame". A shared
    presentational placement pad (frame, tap, clear, keyboard alternative) could be
    extracted once both exist; semantics stay sport-owned.
-6. **Surface-first workspace.** Diamond, rink and gridiron all fit the approved
+6. **[XS-8] Opponent identities.** Baseball's opponent batting-order slots overlap
+   with reusable opponent identities (Soccer S5); a saved opponent lineup would
+   prefill slot labels.
+7. **Surface-first workspace.** Diamond, rink and gridiron all fit the approved
    "surface is primary, compact controls for unlocated facts" model and shared
    workspace/side-selection/lineup-card framing.
-7. **Rules profiles.** BKE-5A immutable source-linked profiles plus personal/team/
+8. **[XS-11] Aggregates.** `bsb_*` follows the `soc_*` / `bk_*`
+   aggregate pattern through the same private paging core.
+9. **Rules profiles.** BKE-5A immutable source-linked profiles plus personal/team/
    match layering fit every sport; the settings tables (`user_sport_settings`,
    `team_sport_settings`) need per-sport validators.
-8. **Release gating.** `src/lib/sportAvailability.ts` separates release stage from
+10. **[XS-1] Release gating.** `src/lib/sportAvailability.ts` separates release stage from
    device permission and existing-record access; each new event sport needs its own
    creation policy plus the release-entry guard tests used by Soccer and Basketball.
 
