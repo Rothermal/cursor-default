@@ -60,8 +60,8 @@ Uses the shared `GameEvent` envelope from `src/lib/gameEvents/types.ts` unchange
 | `sportId` | `football` |
 | `eventType` | `football.play`, `football.situation_set`, ... |
 | `teamSide` | For plays: the side **in possession at the snap** (`tracked` / `opponent`). Kickoffs use the kicking side. Admin events use `neutral` where the definition opts in |
-| `period` | `{ id: 'q1'..'q4' | 'ot-1'.., order }` |
-| `elapsedMs` | Null by default; optional game-clock snapshot (FBE-0 §3) |
+| `period` | `{ id: 'q1'..'q4' | 'h1'..'h2' | 'ot-1'.., order }` from the rules' period format |
+| `elapsedMs` | Game-clock elapsed time in the period when the play was saved, from the anchored clock; null only for untimed games (FBE-0 §3) |
 | `location` | Null. Authoritative spots are in the payload in yard units (§4) |
 | `actors` | Every player involved, each with a role (§6). Opponent actors are `unknown`/`team` label actors with optional jersey |
 | `payload` | Play definition (§5) |
@@ -200,7 +200,8 @@ actors to segments. The validator enforces allowed roles per kind.
 | `football.situation_set` | `{ possession: side, spot: {yard}, down: 1-4 or null, distance: number or 'goal' or null, reason: 'missed_plays' | 'correction' | 'overtime_start' | 'other', note }` | Resets the fold at its position. Neutral side |
 | `football.coin_toss` | `{ winner: side, choice: 'receive' | 'kick' | 'defer' | 'defend_goal', trackedDirection: 'left_to_right' | 'right_to_left', scope: 'game' | 'overtime' }` | Sets opening direction and suggested kickoff |
 | `football.timeout` | `{ side: 'tracked' | 'opponent' | 'official' }` | Projection counts remaining per half |
-| `football.period_start` / `football.period_end` | `{ }` | Lifecycle; halftime and quarter-end flips derive direction |
+| `football.period_start` / `football.period_end` | `{ }` | Lifecycle; halftime and period-end flips derive direction |
+| `football.clock_start` / `football.clock_pause` / `football.clock_set` | Shared anchored-clock shapes (Basketball BKE-6A2); `clock_set` requires a reason | Neutral side. Projection validates play `elapsedMs` against the clock like Basketball, but a mismatch is a warning, not a rejection, so a late-saved play is never lost |
 | `football.score_adjustment` | `{ side, delta, reason }` | Signed, reason required; same rules as Soccer |
 | `football.match_end` / reopen | Shared platform lifecycle | |
 
@@ -314,7 +315,8 @@ counters plus team totals, following the catalog in FBE-0 §8. Key rules:
 
 | Slice | Content | Exit |
 | --- | --- | --- |
-| FBE-2A | Rules/profile types and built-ins; football `sportGameState` + setup snapshot types; capability registration kept fail-closed | Types and parsers tested |
+| FBE-2A | Rules/profile types and built-ins (period format quarters/halves, period lengths by age group); football `sportGameState` + setup snapshot types; capability registration kept fail-closed | Types and parsers tested |
+| FBE-2A2 | Clock events and anchored clock projection, extracted from or shared with `src/lib/basketball/clockProjection.ts` where the semantics match; time of possession per drive | Clock replay and correction tests |
 | FBE-2B | Event definitions, validators, registry, checked append helpers | Every kind validates/rejects as specified |
 | FBE-2C | Situation fold, drives, diagnostics | Edge-case suite green |
 | FBE-2D | Stat projector, team totals, coverage, golden fixtures | Golden box scores match |

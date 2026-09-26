@@ -5,9 +5,8 @@ Soccer and Basketball: sport-specific rosters and positions, starters, a footbal
 field playfield, and an authoritative event model. FBE-0 sets direction only. Each
 phase below gets its own execution plan and owner Q&A before code work begins.
 
-Status: proposed. No runtime behavior. Open questions for the owner are collected
-in [§16](#16-open-questions-for-the-owner); the rest of the document states the
-default this plan assumes until the owner answers.
+Status: direction approved by the owner on 2026-09-26 (see [§16](#16-owner-decisions));
+phase plans still get owner Q&A before code. No runtime behavior.
 
 Companion plans:
 
@@ -107,14 +106,34 @@ Specialize: football positions and unit starters, rules profiles, setup (coin to
 direction, opening kickoff), the field surface, play entry, the drive/play
 timeline, football summary and stat catalog.
 
-### Clock is optional
+### Game clock is core
 
-A running football game clock stops and restarts on many rules; tracking it
-correctly is a separate job on most sidelines. The default is **quarter-only, no
-running clock**: each play may carry an optional recorder-entered game-clock
-snapshot (`elapsedMs` stays null otherwise). A later opt-in clock can reuse the
-shared timing direction in `PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md`. Time of
-possession is therefore not in the core catalog.
+The owner requires a game clock (decision 2026-09-26). Football games have a
+countdown clock per period; the period structure comes from the rules profile
+and is configurable per age group:
+
+- **Quarters or halves** (`periodFormat: 'quarters' | 'halves'`), with a
+  configurable length per period (e.g., 12 min NFHS, 15 min NCAA/NFL, 8–10 min
+  youth, 20–25 min halves for flag and some youth leagues).
+- Halftime between period 2 and 3 (quarters) or 1 and 2 (halves).
+- Optional overtime period length (untimed series formats use no clock).
+- Running-clock (mercy) rule as a switch the recorder can turn on mid-game.
+
+Mechanics reuse the proven Basketball anchored clock (BKE-6A2/6B3): neutral
+clock Start/Pause/Set Clock events, the clock projected from event timestamps,
+display-only ticking, and expiration as one authoritative pause. The recorder
+controls Start/Stop; the app **suggests** a stop after plays that stop the clock
+by rule (incomplete pass, out of bounds, score, change of possession, timeout,
+penalty, first down where the profile says so) and a start on the next snap or
+ready-for-play, but never runs the clock on its own. Every play stamps the
+current game clock into `elapsedMs`. A reasoned Set Clock corrects the display
+without retiming earlier plays (shared timing direction in
+`PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md`).
+
+Because every play carries a clock stamp, **time of possession** is derived
+(labelled estimated when the clock was corrected or paused unevenly). A game can
+still be switched to "untimed" at setup for a recorder who cannot run a clock;
+its plays keep `elapsedMs = null` and time-based stats are hidden.
 
 ### Personnel tracking is optional
 
@@ -175,7 +194,8 @@ Rule fields StatKeeper needs (not a rules engine; only what the projection uses)
 
 - players per side, field length (goal line to goal line) and end-zone depth,
 - first-down distance (10, or 15 for 6-player),
-- quarter count and nominal length, overtime format label,
+- period format (quarters or halves), period length, halftime position,
+  overtime period length or untimed, clock-stop suggestions, overtime format label,
 - try spot and point values per try type (kick, run, pass),
 - safety value, FG value, TD value,
 - kickoff spot and touchback spots (kickoff, punt),
@@ -189,11 +209,11 @@ Rule precedence matches Soccer and Basketball:
 
 ### Periods and overtime
 
-Periods are `q1..q4`, then `ot-1..ot-n`. StatKeeper does not enforce overtime
+Periods are `q1..q4` (or `h1..h2` for halves profiles), then `ot-1..ot-n`. StatKeeper does not enforce overtime
 formats. At an OT start the recorder picks possession and the start spot (the
 profile suggests the spot). Each OT period may contain several possessions.
-Halftime switches the tracked team's display direction; quarters 2 and 4 flip
-automatically too (teams change ends every quarter in 11-player football).
+Teams change ends after every quarter (and at halftime for halves profiles);
+the horizontal field's display direction follows automatically.
 
 ### Field direction and coordinates
 
@@ -248,7 +268,8 @@ Full definitions, payload shapes and projection rules live in
 | `football.play` | One snap or free kick: run, pass, sack, scramble, kneel, spike, punt, field goal, kickoff, onside kick, free kick after safety, try (kick / 2-pt), penalty-only (no play). Holds spots, actors, segments (fumbles, laterals, returns), penalties, and the scoring result |
 | `football.situation_set` | Recorder override of possession, spot, down and distance when the derived situation is wrong or plays were missed. Never retimes earlier plays |
 | `football.timeout` | Charged timeout for a side (or official's timeout) |
-| `football.period_start` / `football.period_end` | Quarter/OT boundaries, halftime, direction |
+| `football.period_start` / `football.period_end` | Quarter/half/OT boundaries, halftime, direction |
+| `football.clock_*` | Start, pause, set clock (shared anchored-clock pattern from Basketball) |
 | `football.coin_toss` | Winner, choice (receive/kick/defer/goal), for setup and OT |
 | `football.score_adjustment` | Signed, reason-required correction, as in Soccer/Basketball |
 | `football.match_end` / reopen family | Shared lifecycle via the event platform |
@@ -287,8 +308,8 @@ and hold, from the profile).
 **Team:** points by quarter, first downs (rush/pass/penalty), 3rd- and 4th-down
 conversions, total plays and yards, rushing/passing split, yards per play,
 turnovers, penalties and penalty yards, red-zone trips and scores, drives
-(start spot, plays, yards, result), time of possession only when a clock module
-exists.
+(start spot, plays, yards, time, result), time of possession (derived from play
+clock stamps; hidden for untimed games).
 
 **Participation:** games played (appeared as actor or unit starter), games started
 per unit. No minutes.
@@ -299,7 +320,6 @@ per unit. No minutes.
 
 Not in the core release; each needs its own plan if the owner wants it.
 
-- Running game clock and time of possession (shared timing work).
 - Per-play personnel (who was on the field) and snap counts.
 - Formation/personnel groupings (11, 12, 21 ...), shotgun/under center, motion.
 - Detailed pass charting (air yards, pressure, drops, YAC split).
@@ -313,10 +333,15 @@ Not in the core release; each needs its own plan if the owner wants it.
 
 Detailed plan: [FBE-3](PLAN_FBE_3_FIELD_AND_LIVE_CAPTURE.md).
 
-- Landscape-friendly field with end zones, yard numbers and hash marks; portrait
-  shows the field vertically so the phone can stay one-handed.
-- A persistent situation bar: possession arrow, `2nd & 7 at OPP 34`, quarter,
-  score, timeouts left.
+- The field is **always horizontal**, drawn like a broadcast play-by-play
+  tracker (CBS Sports GameTracker style): end zones left and right, the ball
+  marker on the line of scrimmage, the first-down line, and a "2nd & 7 · OPP 34"
+  tag. Offense moves left or right with real ends, flipping each quarter.
+- Portrait is the default layout: the horizontal field is a full-width strip
+  under the scorebug, with play entry and live stats below it. Rotating to
+  landscape enlarges the field for more precise spot taps.
+- A persistent scorebug: score, period, game clock, possession arrow, down &
+  distance, ball on, timeouts left.
 - Line of scrimmage and first-down line drawn on the field from projection.
 - Play entry is a short sheet: choose type -> tap the result spot -> confirm actor
   -> save. Detailed fields are expandable and never block save.
@@ -385,10 +410,10 @@ pattern). Owner question Q1 confirms this.
 
 | Phase | Purpose | Primary exit condition |
 | --- | --- | --- |
-| FBE-0 | This product model | Owner answers §16 or accepts defaults |
+| FBE-0 | This product model | Done: owner decisions recorded in §16 |
 | FBE-1 | Football position catalog, roster positions, unit starter and specialist defaults, team settings v1, Team Manage editors ([plan](PLAN_FBE_1_ROSTER_POSITIONS_AND_UNITS.md)) | Owners can set positions and unit starters; old football teams unchanged |
 | FBE-2 | Rules profiles, `football.*` event definitions, validation, situation projector, stat projector ([plan](PLAN_FBE_2_PLAY_EVENT_MODEL.md)) | Pure library: scripted real-game play logs project to the expected box score, drives and situation, with full tests; no UI |
-| FBE-3 | Football setup, field playfield, live play capture, recent plays/undo, local-only behind a dev gate ([plan](PLAN_FBE_3_FIELD_AND_LIVE_CAPTURE.md)) | A full local game can be recorded, parked and resumed on a phone |
+| FBE-3 | Football setup, field playfield, game clock, live play capture, recent plays/undo, local-only behind a dev gate ([plan](PLAN_FBE_3_FIELD_AND_LIVE_CAPTURE.md)) | A full local game can be recorded, parked and resumed on a phone |
 | FBE-4 | Play-by-play/drive Timeline, revisioned edit/remove/restore/insert-missed-play, local Summary (overview, team stats, box score, drive chart) | A recorded game can be corrected and reviewed locally |
 | FBE-5 | Cloud: football binder/transport adapter, recorders/primary, readiness/finalization/reopen, canonical `fb_*` aggregates and destinations | Two-device matrix passes; season/leaderboard/profile show football event stats |
 | FBE-6 | Personal/team settings UI, release policy (`opt_in`), capability handshake, consolidated regression, enablement | Owner-only opt-in production release, then broader rollout decision |
@@ -434,40 +459,35 @@ For the Hockey and Baseball programs running in parallel:
 
 ---
 
-## 16. Open questions for the owner
+## 16. Owner decisions
 
-The plans proceed on the default in brackets until answered.
+Answered by Mark on 2026-09-26: accept the recommended default on every question
+except the clock (4) and orientation (9).
 
-1. **Legacy grid:** Production had zero football games on 2026-09-26. Any local-only
-   grid games you care about? [Default: keep them readable; new games are event-only at release; no
-   Legacy/Event picker.]
-2. **Competition level:** Which football do you actually track first: high school
-   11-player, youth tackle, flag/7v7, or college/NFL-style? [Default: NFHS
-   11-player first; other profiles as data, flag after core.]
-3. **Detail level:** Do you want defensive tacklers on most plays, or is quick
-   capture (type, spot, ball carrier/passer/receiver) the normal case? [Default:
-   quick is normal; detailed fields optional per play.]
-4. **Clock:** Is quarter-only enough, or do you need a running game clock / time
-   of possession? [Default: quarter-only with optional clock snapshot per play.]
-5. **Opponent players:** Do you ever need opponent player stats (e.g., their QB's
-   passing), or team-level opponent totals only? [Default: team-level, optional
-   jersey number on actors.]
-6. **Personnel:** Do you need snap counts or who-was-on-the-field per play?
-   [Default: no; unit starters and "appeared" only.]
-7. **Unit starters:** Is offense + defense + specialists the right default
-   structure, or do you also want kickoff/punt/return units as full lineups?
-   [Default: offense and defense elevens plus single-player specialist roles.]
-8. **Stat conventions:** NCAA/NFHS conventions (sacks count as rushing yards)
-   unless the profile says NFL? [Default: yes.]
-9. **Portrait vs landscape:** Will you record holding the phone upright?
-   [Default: portrait-first with a vertical field; landscape supported.]
-
----
+1. **Legacy grid:** production had zero football games; new games are event-only
+   at release, old grid games stay readable, no Legacy/Event picker.
+2. **Competition level:** NFHS 11-player first; other profiles ship as data,
+   flag after the core.
+3. **Detail level:** quick capture is normal; tacklers and other detail are
+   optional per play.
+4. **Clock (changed):** a game clock is core, with quarters or halves by age group
+   and configurable period lengths (§3 "Game clock is core").
+5. **Opponent players:** team-level opponent stats, optional jersey number.
+6. **Personnel:** no per-play personnel; unit starters and "appeared" only.
+7. **Unit starters:** offense and defense starters plus single-player specialist
+   roles.
+8. **Stat conventions:** NCAA/NFHS by default (sacks count as rushing); NFL-style
+   profiles count sacks against team passing.
+9. **Orientation (changed):** the field is always horizontal, broadcast
+   GameTracker style, with offense going left or right. Portrait is the default
+   layout (horizontal field strip plus stat display); landscape enlarges the
+   field (§10, FBE-3 §4).
 
 ## 17. Non-goals
 
 - A rules engine that adjudicates penalties or enforces overtime formats.
-- Automatic clock management from play results.
+- Running the clock automatically from play results (the app suggests stops and
+  starts; the recorder confirms).
 - Every-player-every-snap personnel in core.
 - Video tagging, play diagrams, or coaching play-call libraries.
 - Opponent roster management in the first release.

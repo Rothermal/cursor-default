@@ -53,11 +53,19 @@ FBE-3 (`cloudSync.eventCloudPolicy` local-only, the BKE-5C3 pattern).
 - Field drawn from rules: `fieldLength` + two end zones; yard lines every 5, yard
   numbers every 10, hash marks every yard, goal posts. 80-yard, 6-player (40 wide)
   and flag fields render from the same geometry.
-- Portrait (default): the field runs vertically; the tracked team's attacking
-  direction is **up** for the current period by default so "forward" is always up
-  for the recorder's own offense. A display-only flip is available and persists
-  per device like Basketball's court orientation.
-- Landscape: horizontal field, same rules.
+- The field is **always horizontal** (owner decision 2026-09-26), drawn like a
+  broadcast play-by-play tracker such as CBS Sports GameTracker: end zones on the
+  left and right, team-colored end zones with names, the offense moving left or
+  right.
+- Direction is true to the game: set by the coin toss and flipped after every
+  quarter (or at halftime for halves profiles), so the screen matches what the
+  recorder sees from the sideline. A device preference "keep my team attacking
+  right" is available for recorders who prefer a fixed view.
+- Portrait (default): the horizontal field is a full-width strip below the
+  scorebug (about 40% of the screen); play entry, recent plays and live stats sit
+  below it. Portrait gives the better stat display.
+- Landscape: the field grows to fill the width for more precise spot taps; the
+  scorebug stays on top and play entry opens as a side sheet.
 - The tap target maps to a spot in the tracked frame (FBE-2 §4): the long axis
   snaps to the nearest yard; the short axis maps to `left | middle | right` using
   the hash marks.
@@ -120,11 +128,27 @@ Scoring is proposed, not asked: an end spot in the end zone offers
   the resulting spot; the app suggests the enforced spot from the catalog.
 - Penalty-only (pre-snap) is a `no_play` kind with no other fields.
 
-### Timeouts, quarters, overtime
+### Game clock
 
-- Situation bar buttons: Timeout (tracked / opponent), End quarter.
-  End of q2 proposes halftime and the second-half kickoff; End of q4 with a tie
-  offers Overtime (start spot from profile via `situation_set`) or End game.
+- The scorebug shows the countdown clock for the current period, with a large
+  Start/Stop control and a reasoned Set Clock, reusing the Basketball anchored
+  clock (BKE-6A2 projection, BKE-6B3 controls, BKE-6B4 pause-before-park guard).
+- Period structure and lengths come from the frozen rules: quarters or halves,
+  configurable minutes per period by age group, optional OT length.
+- Every saved play is stamped with the current clock. After a play that stops
+  the clock by rule (incomplete, out of bounds, score, change of possession,
+  timeout, penalty), the app suggests Stop if the clock is running; it never
+  starts or stops the clock by itself.
+- Clock reaching 0:00 pauses once and offers End period. A play already in
+  progress at 0:00 can still be saved in that period.
+- "Untimed game" at setup hides the clock for recorders who cannot run one.
+
+### Timeouts, periods, overtime
+
+- Scorebug buttons: Timeout (tracked / opponent; also stops the clock), End period.
+  The end of the first half proposes halftime and the second-half kickoff; the
+  end of regulation with a tie offers Overtime (start spot from profile via
+  `situation_set`) or End game.
 - A "Fix situation" action opens the `situation_set` form (possession, spot,
   down, distance, reason) for missed plays.
 
@@ -132,8 +156,9 @@ Scoring is proposed, not asked: an end spot in the end zone offers
 
 ## 6. Tracker layout
 
-- Sticky top: score (tracked vs opponent display names), quarter, timeouts,
-  situation (`3rd & 4 · OWN 46`).
+- Sticky top scorebug: score (tracked vs opponent display names), period, game
+  clock with Start/Stop, timeouts, possession arrow, situation (`3rd & 4 · OWN 46`).
+- Horizontal field strip directly under the scorebug (§4).
 - Main: field (Track tab) / Plays tab (drive-grouped play-by-play, FBE-4 adds
   editing) / Box tab (live team and player totals, read-only).
 - Bottom: primary "Record play" button plus the three most likely play types as
@@ -158,20 +183,20 @@ Scoring is proposed, not asked: an end spot in the end zone offers
 | Slice | Content | Exit |
 | --- | --- | --- |
 | FBE-3A | Field geometry + SVG component, tap -> spot mapping, orientation, dev preview route (`#/dev/football-field`, like the shot-chart preview) | Visual checks at 390/1280, both themes |
-| FBE-3B | Setup (info, rules review, players/units, coin toss) and atomic game start | Setup snapshot round-trips park/resume |
+| FBE-3B | Setup (info, rules review incl. period format/lengths, players/units, coin toss) and atomic game start paused at full period time | Setup snapshot round-trips park/resume |
 | FBE-3C | Play entry for scrimmage plays (run, pass, sack, misc) with checked command, situation bar, overlays, Undo | Full offensive drive recordable |
-| FBE-3D | Kicks, returns, tries, scoring prompts, penalties, fumbles/turnovers, timeouts, quarters, OT, situation fix | Full game recordable end to end |
+| FBE-3D | Game clock controls and stop suggestions, kicks, returns, tries, scoring prompts, penalties, fumbles/turnovers, timeouts, periods, OT, situation fix | Full timed game recordable end to end |
 
 Regression matrices `docs/REGRESSION_FBE_3*.md` per slice, including: one-handed
-portrait capture of a 60-play game, park/resume mid-drive, missed-play recovery
+portrait capture of a 60-play timed game, landscape spot precision, park/resume mid-drive, missed-play recovery
 with `situation_set`, flag profile hides kicks, basketball/soccer unchanged.
 
 ---
 
 ## 9. Questions to confirm in FBE-3 Q&A
 
-1. Portrait with the tracked offense always going up, or a true-to-life field that
-   flips each quarter? [Default: tracked offense up; flip is a device preference.]
+1. Decided: horizontal broadcast-style field, true-to-life direction, portrait
+   default with landscape enlarging the field.
 2. Should saving a play require the result spot, or allow "gain unknown"?
    [Default: required for scrimmage plays; kicks can save without a return spot.]
 3. Prefill the team's kicker/punter on kick plays? [Default: yes, as the
