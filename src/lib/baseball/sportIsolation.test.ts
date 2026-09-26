@@ -23,6 +23,9 @@ import {
   sportGameStateForFingerprint,
   sportSupportsEventGameState,
 } from '../sportGameState/state'
+import { prepareBasketballGameStart } from '../basketball/commands'
+import { prepareSoccerKickoff } from '../soccer/kickoff'
+import { resolveSoccerMatchRules } from '../soccer/rules'
 import { baseballSportState } from './commands'
 import { baseballSetup, startedGame, strikeout } from './testFixtures'
 
@@ -59,6 +62,50 @@ function eventBaseballGame(): GameState {
     ...strikeout(startedGame()),
     gameInfo: { teamName: 'Aces', opponentName: 'Visitors', tournamentName: '', tournamentId: null, date: '2026-09-26' },
   }
+}
+
+function eventBasketballGame(): GameState {
+  const started = prepareBasketballGameStart(
+    { ...legacyGame('basketball', 'Hoops'), gameDataAuthority: 'sport_events' },
+    {
+      recorderUserId: null,
+      occurredAt: '2026-09-26T12:00:00.000Z',
+      eventId: '72000000-0000-4000-8000-000000000001',
+      participantIds: ['72000000-0000-4000-8000-000000000101'],
+    }
+  )
+  if (!started.ok) throw new Error(started.message)
+  return started.state
+}
+
+function eventSoccerGame(): GameState {
+  const kickoff = prepareSoccerKickoff(
+    legacyGame('soccer', 'Kickers'),
+    {
+      version: 1,
+      trackedTeamDesignation: 'home',
+      firstPeriodAttackingDirection: 'left_to_right',
+      sourceTeamId: null,
+      sourceSeasonId: null,
+      rulesSnapshot: resolveSoccerMatchRules(),
+      participants: [{
+        id: '73000000-0000-4000-8000-000000000101',
+        kind: 'player',
+        playerId: 'p1',
+        displayName: 'One',
+        number: '1',
+        initialStatus: 'starter',
+        initialRole: { group: 'goalkeeper', label: null },
+      }],
+    },
+    {
+      recorderUserId: null,
+      occurredAt: '2026-09-26T12:00:00.000Z',
+      eventIds: ['73000000-0000-4000-8000-000000000001', '73000000-0000-4000-8000-000000000002'],
+    }
+  )
+  if (!kickoff.ok) throw new Error(kickoff.message)
+  return kickoff.state
 }
 
 function reload(state: GameState): GameState {
@@ -148,5 +195,37 @@ describe('Baseball event engine isolation', () => {
     expect(cloudSyncRouteForState(baseball)).toBe('unsupported')
     const basketball = records.find(record => record.gameState.sport?.id === 'basketball')!.gameState
     expect(cloudSyncRouteForState(basketball)).toBe('aggregate')
+  })
+
+  it('parks, exports and imports event-based Soccer, Basketball and Baseball together', () => {
+    const games = [eventSoccerGame(), eventBasketballGame(), eventBaseballGame()]
+    for (const game of games) {
+      expect(game.gameDataAuthority).toBe('sport_events')
+      expect(game.eventStream?.events.length).toBeGreaterThan(0)
+    }
+    const routes = Object.fromEntries(games.map(game => [game.sport!.id, cloudSyncRouteForState(game)]))
+    for (const [index, game] of games.entries()) {
+      if (index > 0) beginNewActiveParkedGame('user-1')
+      saveActiveGameState(game, 'user-1')
+      parkActiveGame('user-1')
+    }
+    const before = listParkedGameRecords('user-1').map(record => buildGameSyncFingerprint(record.gameState)).sort()
+
+    const exported = exportParkedGames('user-1')
+    localStorage.clear()
+    const result = importParkedGames(exported, 'user-1')
+
+    expect(result.imported).toBe(3)
+    expect(result.skipped).toBe(0)
+    const records = listParkedGameRecords('user-1').map(record => reload(record.gameState))
+    expect(records.map(buildGameSyncFingerprint).sort()).toEqual(before)
+    for (const record of records) {
+      const id = record.sport!.id
+      expect(record.sportGameState?.sportId).toBe(id)
+      expect(cloudSyncRouteForState(record)).toBe(routes[id])
+    }
+    expect(routes.baseball).toBe('unsupported')
+    expect(routes.soccer).toBe('soccer_events')
+    expect(routes.basketball).toBe('basketball_events')
   })
 })

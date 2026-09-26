@@ -161,7 +161,7 @@ while the tracked side is fielding. On replay:
   same warning.
 - Unstamped events fall back to the replayed lineup.
 
-Corrections do not cascade attribution; BSB-4 correction UI surfaces the warnings.
+Corrections never cascade fielding attribution. Batting and pitching lines can change after a correction, and each change carries an explicit mismatch warning. BSB-4 correction UI surfaces the warnings.
 
 Envelope conventions: `teamSide` is the batting side, lifecycle events are `neutral`,
 `period` is the current half-inning (`inning-{n}-top|bottom`), `elapsedMs` is always
