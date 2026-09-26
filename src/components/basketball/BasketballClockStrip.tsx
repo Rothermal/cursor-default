@@ -16,6 +16,7 @@ import {
   confirmBasketballBoundaryLineup,
   updateBasketballLineup,
 } from '../../lib/basketball/lineupCommands'
+import { basketballBoundaryReviewPendingSides } from '../../lib/basketball/lineupProjection'
 import { isBasketballMatchRulesV3, resolveBasketballPeriodSegment } from '../../lib/basketball/rules'
 import type { BasketballStoppageCategory, BasketballTeamSide } from '../../lib/basketball/types'
 import BasketballLineupSheet, { type BasketballLineupSheetCommit } from './BasketballLineupSheet'
@@ -40,6 +41,7 @@ export default function BasketballClockStrip({
   canOverrideEqualPlay,
   requestedLineupSide = null,
   onRequestedLineupOpened,
+  boundaryReviewRequest = 0,
   onAddParticipant,
   onState,
 }: {
@@ -49,6 +51,8 @@ export default function BasketballClockStrip({
   canOverrideEqualPlay: boolean
   requestedLineupSide?: BasketballTeamSide | null
   onRequestedLineupOpened?: () => void
+  /** Incremented by the tracker to open boundary review, for example after a blocked End Period. */
+  boundaryReviewRequest?: number
   onAddParticipant?: (teamSide: BasketballTeamSide) => void
   onState: (state: GameState) => void
 }) {
@@ -66,6 +70,7 @@ export default function BasketballClockStrip({
   const [lineupSide, setLineupSide] = useState<BasketballTeamSide | null>(null)
   const [lineupError, setLineupError] = useState<string | null>(null)
   const [boundaryReviewOpen, setBoundaryReviewOpen] = useState(false)
+  const [boundaryReviewPurpose, setBoundaryReviewPurpose] = useState<'start' | 'end_period'>('start')
   const lineupButtonRef = useRef<HTMLButtonElement>(null)
   const expirationAnnouncementRef = useRef<string | null>(null)
 
@@ -202,9 +207,7 @@ export default function BasketballClockStrip({
       })
     })
   }, [lineupSides, sportState])
-  const pendingSides = (['tracked', 'opponent'] as BasketballTeamSide[]).filter(
-    side => lineupSides?.[side]?.boundaryConfirmationRequired
-  )
+  const pendingSides = sportState ? basketballBoundaryReviewPendingSides(sportState.projection) : []
 
   useEffect(() => {
     if (!requestedLineupSide || !clock || clock.running || recoveryIssue) return
@@ -215,6 +218,20 @@ export default function BasketballClockStrip({
     setLineupSide(requestedLineupSide)
     onRequestedLineupOpened?.()
   }, [clock, lineupSides, onRequestedLineupOpened, recoveryIssue, requestedLineupSide])
+
+  const hasPendingSides = pendingSides.length > 0
+  const handledBoundaryReviewRequestRef = useRef(boundaryReviewRequest)
+  useEffect(() => {
+    if (boundaryReviewRequest === handledBoundaryReviewRequestRef.current) return
+    handledBoundaryReviewRequestRef.current = boundaryReviewRequest
+    if (!hasPendingSides) return
+    setShowSetClock(false)
+    setShowStoppage(false)
+    setLineupSide(null)
+    setLineupError(null)
+    setBoundaryReviewPurpose('end_period')
+    setBoundaryReviewOpen(true)
+  }, [boundaryReviewRequest, hasPendingSides])
 
   if (!anchored || !clock || !segment || !display || !rules || !isBasketballMatchRulesV3(rules)) {
     return null
@@ -229,6 +246,7 @@ export default function BasketballClockStrip({
 
   const handleStart = () => {
     if (pendingSides.length > 0) {
+      setBoundaryReviewPurpose('start')
       setBoundaryReviewOpen(true)
       setLineupError(null)
       setError(null)
@@ -346,14 +364,15 @@ export default function BasketballClockStrip({
       setLineupError(result.message)
       return
     }
-    const remaining = (['tracked', 'opponent'] as BasketballTeamSide[]).filter(
-      side => result.state.sportGameState?.sportId === 'basketball' &&
-        result.state.sportGameState.projection.lineup?.sides[side]?.boundaryConfirmationRequired
-    )
+    const remaining = result.state.sportGameState?.sportId === 'basketball'
+      ? basketballBoundaryReviewPendingSides(result.state.sportGameState.projection)
+      : []
     setLineupError(null)
     setNotice(remaining.length > 0
       ? 'Lineup confirmed. Review the remaining side.'
-      : 'Lineups confirmed. The clock is ready to start.')
+      : boundaryReviewPurpose === 'end_period'
+        ? 'Lineups confirmed. You can end the period now.'
+        : 'Lineups confirmed. The clock is ready to start.')
     setBoundaryReviewOpen(remaining.length > 0)
     commitClock(result.state)
   }
@@ -443,7 +462,7 @@ export default function BasketballClockStrip({
           <button
             type="button"
             className="btn-primary mt-2 w-full"
-            onClick={() => { setBoundaryReviewOpen(true); setLineupError(null) }}
+            onClick={() => { setBoundaryReviewPurpose('start'); setBoundaryReviewOpen(true); setLineupError(null) }}
           >
             Review lineup
           </button>
@@ -527,6 +546,7 @@ export default function BasketballClockStrip({
           pendingSides={pendingSides}
           canOverrideEqualPlay={canOverrideEqualPlay}
           errorMessage={lineupError}
+          purpose={boundaryReviewPurpose}
           onCommit={handleBoundaryCommit}
           onClose={() => { setBoundaryReviewOpen(false); setLineupError(null) }}
         />

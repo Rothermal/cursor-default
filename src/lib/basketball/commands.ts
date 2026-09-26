@@ -29,6 +29,7 @@ import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballClockEvent } from './clockEvents'
 import { basketballClockMomentAt, basketballClockRecoveryIssue } from './clockProjection'
 import { createBasketballLifecycleEvent } from './events'
+import { basketballBoundaryReviewPendingSides } from './lineupProjection'
 import { createBasketballUuid } from './id'
 import {
   createBasketballMatchRules,
@@ -75,6 +76,7 @@ export type BasketballCommandErrorCode =
   | 'nothing_to_undo'
   | 'nothing_to_clear'
   | 'restore_unavailable'
+  | 'lineup_review_required'
   | 'command_failed'
 
 export type BasketballCommandResult<T> =
@@ -675,6 +677,14 @@ export function endBasketballPeriod(
   if (!context.ok) return { ...context, state }
   if (context.value.sportState.projection.status !== 'in_progress') {
     return failure(state, 'invalid_period', 'Only an active Basketball period can end.')
+  }
+  // A boundary left unreviewed here can no longer be confirmed once the period closes.
+  if (basketballBoundaryReviewPendingSides(context.value.sportState.projection).length > 0) {
+    return failure(
+      state,
+      'lineup_review_required',
+      'Review the lineup for this period before ending it.'
+    )
   }
   const clock = context.value.sportState.projection.clock
   const captureCommandId = clock?.running ? createBasketballCaptureCommandId() : null

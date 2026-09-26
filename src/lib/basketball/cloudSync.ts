@@ -108,11 +108,18 @@ export function basketballCloudParticipants(
   )
   return Object.values(sportState.projection.participants).map(participant => {
     const origin = setupById.get(participant.participantId)
+    // Basketball late adds are free-text and mint a local player id that is
+    // never on team_players; sending it as source_player_id makes every bind
+    // fail with "Participant source player is not on the source team". If late
+    // adds ever offer roster players (#428), revisit this predicate so their
+    // roster link is kept.
     return {
       client_participant_id: participant.participantId,
       client_player_id: participant.playerId,
       source_player_id:
-        sportState.setup.sourceTeamId && participant.teamSide === 'tracked'
+        sportState.setup.sourceTeamId &&
+        participant.teamSide === 'tracked' &&
+        origin !== undefined
           ? participant.playerId
           : null,
       kind: participant.playerId ? 'player' : 'anonymous',
