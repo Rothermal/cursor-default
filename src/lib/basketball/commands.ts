@@ -29,6 +29,7 @@ import { isFinalBasketballCloudGame } from './cloudPolicy'
 import { createBasketballClockEvent } from './clockEvents'
 import { basketballClockMomentAt, basketballClockRecoveryIssue } from './clockProjection'
 import { createBasketballLifecycleEvent } from './events'
+import { basketballBoundaryReviewPendingSides } from './lineupProjection'
 import { createBasketballUuid } from './id'
 import {
   createBasketballMatchRules,
@@ -45,7 +46,6 @@ import {
 } from './state'
 import { createBasketballStatEvent } from './statEvents'
 import type {
-  BasketballMatchProjection,
   BasketballMatchParticipant,
   BasketballReopenMode,
   BasketballMatchRulesV2,
@@ -733,16 +733,6 @@ export function endBasketballPeriod(
     clearBasketballUndoReceipt(state),
     events,
     'Basketball period end did not produce a complete event projection.'
-  )
-}
-
-export function basketballBoundaryReviewPendingSides(
-  projection: BasketballMatchProjection
-): BasketballTeamSide[] {
-  const sides = projection.lineup?.sides
-  if (!sides) return []
-  return (['tracked', 'opponent'] as BasketballTeamSide[]).filter(
-    side => sides[side]?.boundaryConfirmationRequired === true
   )
 }
 

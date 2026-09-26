@@ -16,6 +16,7 @@ import {
   confirmBasketballBoundaryLineup,
   updateBasketballLineup,
 } from '../../lib/basketball/lineupCommands'
+import { basketballBoundaryReviewPendingSides } from '../../lib/basketball/lineupProjection'
 import { isBasketballMatchRulesV3, resolveBasketballPeriodSegment } from '../../lib/basketball/rules'
 import type { BasketballStoppageCategory, BasketballTeamSide } from '../../lib/basketball/types'
 import BasketballLineupSheet, { type BasketballLineupSheetCommit } from './BasketballLineupSheet'
@@ -206,9 +207,7 @@ export default function BasketballClockStrip({
       })
     })
   }, [lineupSides, sportState])
-  const pendingSides = (['tracked', 'opponent'] as BasketballTeamSide[]).filter(
-    side => lineupSides?.[side]?.boundaryConfirmationRequired
-  )
+  const pendingSides = sportState ? basketballBoundaryReviewPendingSides(sportState.projection) : []
 
   useEffect(() => {
     if (!requestedLineupSide || !clock || clock.running || recoveryIssue) return
@@ -365,10 +364,9 @@ export default function BasketballClockStrip({
       setLineupError(result.message)
       return
     }
-    const remaining = (['tracked', 'opponent'] as BasketballTeamSide[]).filter(
-      side => result.state.sportGameState?.sportId === 'basketball' &&
-        result.state.sportGameState.projection.lineup?.sides[side]?.boundaryConfirmationRequired
-    )
+    const remaining = result.state.sportGameState?.sportId === 'basketball'
+      ? basketballBoundaryReviewPendingSides(result.state.sportGameState.projection)
+      : []
     setLineupError(null)
     setNotice(remaining.length > 0
       ? 'Lineup confirmed. Review the remaining side.'
