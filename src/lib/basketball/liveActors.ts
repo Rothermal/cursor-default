@@ -48,5 +48,6 @@ export function basketballTripShooter(trip: BasketballFreeThrowTripStatus): stri
 
 export function basketballOpenTrips(state: GameState, trips: BasketballFreeThrowTripStatus[], side: 'tracked' | 'opponent') {
   return trips.filter(trip => trip.open && trip.teamSide === side &&
-    trip.periodId === state.sportGameState?.projection.currentPeriodId)
+    state.sportGameState?.sportId === 'basketball' &&
+    trip.periodId === state.sportGameState.projection.currentPeriodId)
 }

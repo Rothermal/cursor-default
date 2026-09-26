@@ -6,8 +6,10 @@ engine: rules, setup snapshot, participants, event definitions, the base/out/cou
 half-inning projection, derived statistics, and checked commands. It mirrors BKE-1's
 role for Basketball.
 
-Status: in progress. Owner decisions are recorded in BSB-0 section 16. Nothing in
-BSB-1 is reachable from production UI.
+Status: BSB-1A-C engine implemented (2026-09-26) in `src/lib/baseball/`, registered
+with the shared event runtime and sport-state dispatch. Nothing in BSB-1 is reachable
+from production UI; legacy Baseball grid games are unchanged. See section 9 for the
+delivery record and documented approximations.
 
 ---
 
@@ -255,3 +257,56 @@ leaves a half-applied state.
   uses first (BSB-0 Q3) and keep Custom exact rather than guessing.
 - **Performance.** Replay of a ~300-pitch game on every append must stay fast;
   incremental projection may be needed if profiling shows it. Measure in BSB-1B.
+
+---
+
+## 9. Delivery Record (2026-09-26)
+
+Implemented in `src/lib/baseball/`: `types`, `positions`, `profiles` (7 profiles:
+NFHS baseball default, youth, MLB, NCAA, NFHS softball fastpitch, slowpitch, custom),
+`rules` (exact parser), `periods`, `state` (setup validation and sport-state
+normalizer), `events` (9 event types), `projector` (replay state machine), `stats`
+(`bsb_*` ids and rate helpers) and `commands` (checked commands plus
+`proposeBaseballMovements`). `gameEvents/runtime.ts` and `sportGameState/state.ts`
+register Baseball; event games are fail-closed out of legacy aggregate sync by the
+existing `isAggregateCloudSyncEligible` guard. `baseball.test.ts` covers profiles,
+setup formats, counts, walks/strikeouts, forced runners, hits, double plays, third-out
+timing, steals/WP/PB/CS, errors and unearned runs, half-inning rotation, walk-off,
+run rule, max runs, placed runner, time limit, suspend/reopen, score adjustment,
+pinch hitter/runner, re-entry, pitching changes with inherited runners, opponent
+slots, courtesy runners, and a full 7-inning replay from the raw stream.
+
+Verification: typecheck clean; lint 0 errors and the 3 known warnings; 226 files /
+1,923 tests pass; production build passes.
+
+Changes from the plan text above:
+
+- Max runs per half-inning ends the half automatically after the event that reaches
+  the cap (runs on that play count). `baseball.half_inning_ended` is only for
+  `time_limit`, `mercy` or `other` endings.
+- A defensive substitution carries `outgoingId` so a new fielder can take a vacated
+  batting slot (after a pinch hitter or runner). A vacant position blocks the next
+  pitch until filled.
+- Commands always write explicit movements; the projector implies none. Walks and
+  strikeouts must include the batter movement and every forced runner.
+- Actors are not stamped on events yet; identities live in the payload and
+  projection. BSB-3/4 may add actors for Timeline display.
+- Late roster additions and adding opponent slots mid-game are deferred to BSB-4.
+
+Documented approximations (scorer can override per movement where noted):
+
+- Force-out detection for the third-out rule uses the base state at the start of the
+  play; a batter out listed earlier on the same play removes the force. A batter
+  credited with a hit is treated as having reached first. `runCounts` overrides.
+- RBI default: runs scoring on `on_play`, `forced` or `awarded` movements without an
+  error, except ground-ball double plays and non-third-base runners on a batter's
+  error. `rbi` overrides.
+- Earned runs: unearned when the runner reached on an error, catcher's interference
+  or as a placed runner, or scored on an error or passed ball. `earned` overrides.
+  No full inning reconstruction.
+- On a fielder's choice the replacing runner keeps the batter's pitcher of record
+  rather than inheriting the retired runner's pitcher.
+- Quick plate appearances derive pitch counts from the final count as a lower bound
+  (two-strike fouls are unknown).
+- DH forfeiture, NFHS courtesy-runner eligibility limits and batting out of order are
+  not enforced yet.
