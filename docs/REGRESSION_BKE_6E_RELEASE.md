@@ -342,6 +342,7 @@ history or revoke grants used by existing games.
 | E02 | Inspect Players, Timeline, Shot Chart, Overview, and Team Stats | Exact participation, stint/role history, active corrections, score, and quality disclosures share one authority | E3 owner smoke | Not run |
 | E03 | Open Leaderboard, Team, Season, Tournament, Player, and Career destinations | Canonical and Legacy sources do not collide; exact seconds/DNP/plus-minus provenance remains truthful | E3 owner smoke | Not run |
 | E04 | Inspect incomplete tracked/opponent lineup authority | Valid facts remain visible while dependent comparative plus-minus is suppressed | E3 owner smoke | Not run |
+| E05 | In a cloud-bound team Event game, add a tracked player mid-game with Add Player, record a stat, sync, then open Team and Season destinations | The game binds and syncs; the late player has no roster link, so their stats appear as an unresolved contribution and the scope quality reads partial (#425; roster late adds tracked in #428) | E3 owner smoke | Not run |
 
 ## F. Compatibility and Adjacent Sports
 
