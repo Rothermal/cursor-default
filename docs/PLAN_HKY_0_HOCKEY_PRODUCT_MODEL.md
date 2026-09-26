@@ -5,8 +5,8 @@ and Basketball. HKY-0 sets the direction for the whole hockey program. Each phas
 gets its own detailed execution plan and owner Q&A before code work begins, exactly as
 the SOC and BKE programs did.
 
-Status: proposed. Drafted without owner input; the open questions in §17 need answers
-before HKY-1 implementation starts. No runtime behavior changes in this document.
+Status: approved. The owner accepted every recommended default in §17 on 2026-09-26;
+HKY-1 may proceed. No runtime behavior changes in this document.
 
 Related plans:
 
@@ -576,20 +576,20 @@ Every HKY phase plan must cover:
 
 ---
 
-## 17. Open Questions for the Owner
+## 17. Resolved Owner Decisions
 
-HKY-1 can start with the recommended default for each; answers only change details.
+The owner accepted every recommendation on 2026-09-26.
 
-| # | Question | Recommended default |
+| # | Question | Decision |
 |---|---|---|
-| Q1 | Should new hockey games be event-only at release, with the generic stat grid kept just for opening old hockey games? | Yes (no cloud hockey data exists) |
-| Q2 | Which competition level matters first: youth (USA Hockey), high school, college, adult rec, or NHL-style? | USA Hockey youth + adult rec, with NHL as a built-in profile |
-| Q3 | Do you want the recorder to run the game clock (Start at the drop, Stop at the whistle), or record period-only times most of the time? | Anchored clock on by default, clockless allowed |
-| Q4 | Is plus/minus important enough to prompt for on-ice skaters on each goal? | Yes, as an optional prompt that prefills the last set |
-| Q5 | Do you want line-change tracking (time on ice) in the first release, or later as a module? | Later (module M3) |
-| Q6 | Should faceoffs be core in the first release? They are frequent (50-70 per game) | Yes, with a two-tap flow |
-| Q7 | For faceoffs only, may the taker default to the last tracked center instead of Unattributed? | Yes (exception to the shared Unattributed default) |
-| Q8 | Is strength (PP/SH) auto-derived from penalties acceptable, with the recorder confirming on each goal? | Yes |
-| Q9 | How do your leagues treat ties and shootouts? | Profile-driven; ties allowed in rec/youth |
-| Q10 | Should team default lines (F1-F4, D1-D3) be in the first release or just Starter/Bench? | Starter/Bench + starting goalie first; lines in HKY-2 with line-change quick swap later |
-| Q11 | Any stats you track today on paper that are missing here? | none assumed |
+| Q1 | New hockey games event-only at release? | Yes. The generic stat grid stays only for opening existing hockey games |
+| Q2 | First competition level? | USA Hockey youth and adult rec, with NHL as a built-in profile |
+| Q3 | Recorder runs the game clock? | Anchored clock on by default; clockless games allowed |
+| Q4 | Prompt for on-ice skaters on each goal (plus/minus)? | Yes, optional prompt prefilled from the last set |
+| Q5 | Line changes / time on ice in the first release? | No; later as module M3 |
+| Q6 | Faceoffs core in the first release? | Yes, two-tap flow |
+| Q7 | Faceoff taker defaults to the last tracked center? | Yes, a deliberate exception to the shared Unattributed default |
+| Q8 | Strength derived from penalties, confirmed on each goal? | Yes |
+| Q9 | Ties and shootouts? | Profile-driven; ties allowed in rec/youth profiles |
+| Q10 | Team default lines in the first phase? | No. Starter/Bench plus starting goalie in HKY-1; lines in HKY-2D |
+| Q11 | Stats tracked on paper that are missing? | None identified; revisit after first live games |

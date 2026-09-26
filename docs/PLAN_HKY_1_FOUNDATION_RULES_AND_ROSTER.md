@@ -4,8 +4,8 @@ Execution plan for the first hockey implementation phase defined in
 [HKY-0](PLAN_HKY_0_HOCKEY_PRODUCT_MODEL.md). HKY-1 builds the hockey domain behind a
 development-only gate. It adds no production UI, no cloud writes, and no migration.
 
-Status: proposed, awaiting owner answers to HKY-0 §17. Every decision below uses the
-HKY-0 recommended default; a different answer changes the listed item only.
+Status: approved for implementation. The owner accepted every HKY-0 §17 recommendation
+on 2026-09-26.
 
 ---
 
@@ -123,14 +123,14 @@ Soccer/Basketball suites unchanged.
 
 ---
 
-## 3. Decisions Made Without Owner Input
+## 3. Owner-Confirmed Decisions
 
-| Decision | Choice | Changes if owner says otherwise |
-|---|---|---|
-| New games event-only at release (HKY-0 Q1) | Assumed; HKY-1 does not remove the legacy path, only adds the dev-gated event path | Add a Legacy/Event setup toggle like BKE-5C2 in HKY-6 |
-| Clock default (Q3) | Anchored countdown stop-time, clockless allowed | Default flips to clockless; projector unchanged |
-| Penalty rule fields frozen in rules v1 | Yes | None (fields are inert until HKY-3) |
-| Lines | Not in HKY-1 (HKY-2D) | Move earlier if Q10 wants lines first |
+| Decision | Choice |
+|---|---|
+| New games event-only at release (HKY-0 Q1) | Confirmed. HKY-1 only adds the dev-gated event path; the legacy path is retired for new games in HKY-6 |
+| Clock default (Q3) | Anchored countdown stop-time, clockless allowed |
+| Penalty rule fields frozen in rules v1 | Yes; inert until HKY-3 |
+| Lines (Q10) | Not in HKY-1; HKY-2D |
 
 ---
 
