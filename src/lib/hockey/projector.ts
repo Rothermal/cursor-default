@@ -387,7 +387,7 @@ class HockeyReplay {
     const regulationDone = p.periods.some(
       period => period.kind === 'regulation' && period.number === rules.regulation.periods && period.endedEventId
     )
-    // A tie that the rules do not allow still needs a shootout (HKY-4), so it is not complete.
+    // A tie that the rules do not allow still needs a shootout (HKY-3C), so it is not complete.
     p.canEndWithoutReason = regulationDone && next === null && (!tied || rules.tiesAllowed)
   }
 }

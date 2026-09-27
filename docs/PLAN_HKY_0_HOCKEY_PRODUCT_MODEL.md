@@ -483,7 +483,7 @@ setup-snapshot version gate (069).
 |---|---|---|
 | HKY-0 | This product model plus owner Q&A | Answers to §17 recorded; HKY-1 plan approved |
 | HKY-1 | Hockey domain foundation: types, rules v1 + profiles, setup snapshot, participants, roster positions, team Starter/Bench and starting-goalie defaults, sport-state union, event registry and projector skeleton, lifecycle and clock events, dev-only gate ([plan](PLAN_HKY_1_FOUNDATION_RULES_AND_ROSTER.md)) | A local dev-only hockey game can be set up, started, park/resumed, with period/clock replay tested; no UI release |
-| HKY-2 | Rink surface and core capture: rink SVG, direction per period, shots/goals/assists/goalie links, faceoffs, hits/takeaways/giveaways, goalie changes and empty net, score adjustments, Recent Events undo | A local hockey game's scoring and shot/faceoff stats can be tracked end-to-end on the rink |
+| HKY-2 | Rink surface and core capture ([plan](PLAN_HKY_2_RINK_AND_CORE_CAPTURE.md)): rink SVG, direction per period, shots/goals/assists/goalie links, faceoffs, hits/takeaways/giveaways, goalie changes and empty net, score adjustments, Recent Events undo | A local hockey game's scoring and shot/faceoff stats can be tracked end-to-end on the rink |
 | HKY-3 | Penalties and strength: penalty events, penalty box, strength projection, PP/SH/EN classification, timeouts, icing/offside, overtime, shootout, structured outcomes | Complete core catalog tracked locally, including OT and shootout |
 | HKY-4 | Timeline and corrections: revisioned edit/remove/restore for every family, recorded-later additions, dependency-aware corrections (assist/goalie/strength links), lineup/on-ice correction | Every recorded event is reviewable and correctable locally |
 | HKY-5 | Cloud lifecycle: fixed hockey wrappers over event-platform cores (bind, recorders, primary, finalization policy, reopen, canonical read), transport routing, settings persistence, release capability handshake | Hockey games sync, finalize, and reopen canonically behind the gate |
@@ -500,7 +500,7 @@ HKY-2A  rink geometry + component (read-only render, flip, dot snapping)
 HKY-2B  shot/goal capture and projection, goalie in net, goalie change/pull;
         actor eligibility without shift tracking (§9) is an acceptance gate
 HKY-2C  faceoff/hit/takeaway/giveaway capture; Recent Events undo on rink
-HKY-2D  team default lines (F1-F4, D1-D3) and Team Manage Lines tab
+HKY-2D  team default lines: moved to HKY-5C/6C (HKY-2 plan §7 Q3)
 HKY-3A  penalty events, penalty box and strength projection
 HKY-3B  goal strength prefill/confirmation, PP/PK totals, timeouts, icing/offside
 HKY-3C  overtime and shootout (shared shootout core), outcomes
@@ -624,5 +624,5 @@ The owner accepted every recommendation on 2026-09-26.
 | Q7 | Faceoff taker defaults to the last tracked center? | Yes, a deliberate exception to the shared Unattributed default |
 | Q8 | Strength derived from penalties, confirmed on each goal? | Yes |
 | Q9 | Ties and shootouts? | Profile-driven; ties allowed in rec/youth profiles |
-| Q10 | Team default lines in the first phase? | No. Starter/Bench plus starting goalie in HKY-1; lines in HKY-2D |
+| Q10 | Team default lines in the first phase? | No. Starter/Bench plus starting goalie in HKY-1; lines in HKY-2D, since moved to HKY-5C/6C (HKY-2 plan §7 Q3) |
 | Q11 | Stats tracked on paper that are missing? | None identified; revisit after first live games |
