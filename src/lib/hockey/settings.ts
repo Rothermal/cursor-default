@@ -59,8 +59,13 @@ export function parseHockeySettings(value: unknown): HockeySettingsParseResult {
     typeof base.profileVersion !== 'number' ||
     !findHockeyRulesProfile(base.profileId, base.profileVersion)
   ) return { ok: false, error: 'unknown base profile' }
+  if (!isPlainObject(value.ruleOverrides)) return { ok: false, error: 'rule overrides must be an object' }
   const overrides = normalizeHockeyRuleOverrides(value.ruleOverrides)
   if (!overrides) return { ok: false, error: 'rule overrides contain unsupported fields' }
+  // Saved overrides must produce valid rules on their own base profile.
+  const profile = findHockeyRulesProfile(base.profileId, base.profileVersion)!
+  const error = validateHockeyMatchRules(applyHockeyRuleOverrides(profile.rules, overrides))
+  if (error) return { ok: false, error: `rule overrides are invalid: ${error}` }
   return {
     ok: true,
     value: {
@@ -71,7 +76,7 @@ export function parseHockeySettings(value: unknown): HockeySettingsParseResult {
   }
 }
 
-/** Accepts only known rule fields; values are validated when the layers are combined. */
+/** Accepts only known rule fields; callers validate the values against a base (see above). */
 export function normalizeHockeyRuleOverrides(value: unknown): HockeyRuleOverrides | null {
   if (value === null || value === undefined) return {}
   if (!isPlainObject(value)) return null
@@ -114,7 +119,7 @@ export function resolveHockeySettingsHierarchy({
     parsed.value.baseProfile.profileVersion
   )!
 
-  const rules = structuredClone(profile.rules) as HockeyMatchRules
+  let rules = structuredClone(profile.rules) as HockeyMatchRules
   const sourceByField = Object.fromEntries(
     HOCKEY_RULES_FIELDS.map(field => [field, 'built_in'])
   ) as Record<HockeyRulesField, HockeyRuleSource>
@@ -124,10 +129,9 @@ export function resolveHockeySettingsHierarchy({
     { id: 'match', overrides: match },
   ]
   for (const layer of layers) {
+    rules = applyHockeyRuleOverrides(rules, layer.overrides)
     for (const field of HOCKEY_RULES_FIELDS) {
-      if (!Object.prototype.hasOwnProperty.call(layer.overrides, field)) continue
-      ;(rules as Record<string, unknown>)[field] = structuredClone(layer.overrides[field])
-      sourceByField[field] = layer.id
+      if (Object.prototype.hasOwnProperty.call(layer.overrides, field)) sourceByField[field] = layer.id
     }
     const error = validateHockeyMatchRules(rules)
     if (error) return { ok: false, layer: layer.id, message: error }
@@ -142,4 +146,15 @@ export function resolveHockeySettingsHierarchy({
       customized: HOCKEY_RULES_FIELDS.some(field => sourceByField[field] !== 'built_in'),
     },
   }
+}
+
+/** Returns a clone of `rules` with each overridden field replaced (nested objects are atomic). */
+function applyHockeyRuleOverrides(rules: HockeyMatchRules, overrides: HockeyRuleOverrides): HockeyMatchRules {
+  const next = structuredClone(rules) as HockeyMatchRules
+  for (const field of HOCKEY_RULES_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(overrides, field)) {
+      ;(next as Record<string, unknown>)[field] = structuredClone(overrides[field])
+    }
+  }
+  return next
 }

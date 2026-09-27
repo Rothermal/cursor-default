@@ -132,6 +132,34 @@ describe('hockey settings', () => {
     expect(parseHockeySettings(settings({ profileId: 'ncaa' } as never)).ok).toBe(false)
   })
 
+  it('validates saved override values against the base profile', () => {
+    const invalid: unknown[] = [
+      { skatersPerSide: 99 },
+      { clockModel: 'none' },
+      { clock: null },
+      { regulation: { periods: 0, periodLengthMs: 'bad', unexpected: true } },
+      { regulation: { periods: 3, periodLengthMs: 15 * MINUTE_MS, unexpected: true } },
+      { penalties: { ...createHockeyMatchRules().penalties, minorMs: '2' } },
+      { tiesAllowed: false },
+      { overtime: { lengthMs: 5 * MINUTE_MS, skaters: 3, repeat: false } },
+    ]
+    for (const ruleOverrides of invalid) {
+      const result = parseHockeySettings({ ...defaultHockeySettings(), ruleOverrides })
+      expect(result.ok, JSON.stringify(ruleOverrides)).toBe(false)
+    }
+    expect(parseHockeySettings({ ...defaultHockeySettings(), ruleOverrides: null }).ok).toBe(false)
+    // A ruleset only valid on another base fails on this one.
+    expect(parseHockeySettings(settings({ shootout: null }, 'nhl_regular')).ok).toBe(false)
+    expect(parseHockeySettings(settings({ shootout: null }, 'usa_hockey_youth')).ok).toBe(true)
+  })
+
+  it('accepts a consistent clockless override pair and returns a clone', () => {
+    const input = settings({ clockModel: 'none', clock: null })
+    const result = parseHockeySettings(input)
+    expect(result).toEqual({ ok: true, value: input })
+    if (result.ok) expect(result.value.ruleOverrides).not.toBe(input.ruleOverrides)
+  })
+
   it('resolves a personal game as built-in -> personal -> match with sources', () => {
     const result = resolveHockeySettingsHierarchy({
       authority: 'personal',
