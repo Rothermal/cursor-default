@@ -64,7 +64,7 @@ stateful**:
   against rushing in NFHS/NCAA but against team passing in the NFL).
 
 So the football event model is **one compound `football.play` event per snap**,
-with ordered segments inside it, plus a small set of non-play administrative
+with ordered ball-carrier legs (carries) inside it, plus a small set of non-play administrative
 events. Details are in [FBE-2](PLAN_FBE_2_PLAY_EVENT_MODEL.md). This mirrors how
 every football stat crew, from high-school books to NFL play-by-play, records the
 game: a play-by-play log is the source; everything else is derived.
@@ -272,7 +272,7 @@ Full definitions, payload shapes and projection rules live in
 
 | Event type | Purpose |
 | --- | --- |
-| `football.play` | One snap or free kick: run, pass, sack, scramble, kneel, spike, punt, field goal, kickoff, onside kick, free kick after safety, try (kick / 2-pt), penalty-only (no play). Holds spots, actors, segments (fumbles, laterals, returns), penalties, and the scoring result |
+| `football.play` | One snap or free kick: run, pass, sack, scramble, kneel, spike, punt, field goal, kickoff, onside kick, free kick after safety, try (kick / 2-pt), penalty-only (no play). Holds the snap, keyed carries (runs, receptions, laterals, fumble recoveries, returns), the enforced next snap, actors, penalties and the scoring result |
 | `football.situation_set` | Recorder override of possession, spot, down and distance when the derived situation is wrong or plays were missed. Never retimes earlier plays |
 | `football.timeout` | Charged timeout for a side (or official's timeout) |
 | `football.period_start` / `football.period_end` | Quarter/half/OT boundaries, halftime, direction |
