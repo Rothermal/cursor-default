@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../types'
 import type { GameEvent } from '../gameEvents/types'
+import { createInitialState, gameReducer } from '../gameReducer'
 import { buildGameSyncFingerprint } from '../gameSyncFingerprint'
 import { createHockeyEvent } from './events'
 import {
@@ -79,6 +80,34 @@ describe('hockey game creation', () => {
 
     const other = initializeHockeyEventGame({ ...freshHockeyGame(), sport: null }, hockeySetup())
     expect(other.ok ? null : other.code).toBe('not_hockey')
+  })
+
+  it('rejects malformed labels and rules without touching the game', () => {
+    const base = freshHockeyGame()
+    const cases: HockeyMatchSetup[] = [
+      { ...hockeySetup(), opponentName: 'x'.repeat(81) },
+      { ...hockeySetup(), opponentGoalie: { id: 'opp-goalie', label: '', number: null } },
+      { ...hockeySetup(), rulesSnapshot: { ...hockeySetup().rulesSnapshot, clockModel: 'none' } },
+      { ...hockeySetup(), rulesSnapshot: { ...hockeySetup().rulesSnapshot, skatersPerSide: 9 } },
+    ]
+    for (const setup of cases) {
+      const result = initializeHockeyEventGame(base, setup)
+      expect(result.ok ? null : result.code).toBe('invalid_setup')
+      expect(result.state).toBe(base)
+    }
+  })
+
+  it('round-trips every accepted setup through hydration', () => {
+    for (const setup of [
+      hockeySetup(),
+      hockeySetup({ rules: CLOCKLESS }),
+      hockeySetup({ profile: 'nhl_regular', direction: 'right_to_left' }),
+      { ...hockeySetup(), opponentName: 'x'.repeat(80) },
+    ]) {
+      const state = expectOk(startHockeyGame(expectOk(initializeHockeyEventGame(freshHockeyGame(), setup)), ctx(0)))
+      const hydrated = gameReducer(createInitialState(), { type: 'HYDRATE_STATE', state })
+      expect(hockeySportState(hydrated)?.setup).toEqual(setup)
+    }
   })
 
   it('records the opening lineup and opens period 1 paused at zero in one command', () => {

@@ -111,11 +111,11 @@ function HockeySetupForm() {
       </p>
       <label className="block text-sm font-medium text-content">
         Team
-        <input className="input-field mt-1" value={teamName} onChange={event => setTeamName(event.target.value)} />
+        <input className="input-field mt-1" maxLength={80} value={teamName} onChange={event => setTeamName(event.target.value)} />
       </label>
       <label className="block text-sm font-medium text-content">
         Opponent
-        <input className="input-field mt-1" value={opponentName} onChange={event => setOpponentName(event.target.value)} />
+        <input className="input-field mt-1" maxLength={80} value={opponentName} onChange={event => setOpponentName(event.target.value)} />
       </label>
       <label className="block text-sm font-medium text-content">
         Rules

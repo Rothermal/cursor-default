@@ -5,7 +5,7 @@ behavior change, so there is no owner deployment step.
 
 ## Automated and local checks
 
-- Full Vitest suite: 235 files / 2,035 tests passed. `pnpm typecheck` and
+- Full Vitest suite: 235 files / 2,037 tests passed. `pnpm typecheck` and
   `pnpm build` passed. `pnpm lint` has 0 errors and the three existing context Fast
   Refresh warnings.
 - `src/lib/hockey/hockey.test.ts` and `setup.test.ts` (HKY-1A/1B) cover rules,
@@ -13,6 +13,8 @@ behavior change, so there is no owner deployment step.
   attacking-direction helper.
 - `src/lib/hockey/live.test.ts` (HKY-1C) covers:
   - stream initialization, idempotency, and rejection of a changed setup or counter stats;
+  - the full setup normalizer at initialization, so malformed labels or rules are rejected
+    and every accepted setup survives hydration (PR #433 review);
   - the atomic opening lineup plus period 1 start;
   - clock start, pause and set, including expiration, backward time and stale elapsed values;
   - early period end needing a reason on an anchored clock;

@@ -13,7 +13,7 @@ import type { GameEvent, GameEventPeriod } from '../gameEvents/types'
 import { createHockeyEvent, isHockeyReason } from './events'
 import { hockeyPeriod } from './periods'
 import { hockeyActivePeriod, hockeyClockMomentAt, lastHockeyPeriod, replayHockeyEvents } from './projector'
-import { validateHockeyMatchSetup } from './setup'
+import { normalizeHockeyMatchSetup, validateHockeyMatchSetup } from './setup'
 import { createHockeySportGameState } from './state'
 import type {
   HockeyEventType,
@@ -72,15 +72,27 @@ export function initializeHockeyEventGame(state: GameState, setup: HockeyMatchSe
   if (hasLegacyAggregateActivity(state)) {
     return failure(state, 'legacy_activity_present', 'This game already has counter-based stats.')
   }
-  const validation = validateHockeyMatchSetup(setup)
-  if (!validation.ok) return failure(state, 'invalid_setup', validation.message)
+  // The full normalizer is the same gate hydration applies, so an accepted setup always survives reload.
+  const normalized = normalizeHockeyMatchSetup(setup)
+  if (!normalized) return failure(state, 'invalid_setup', invalidSetupMessage(setup))
   const initialized = initializeGameEventStream(
-    { ...state, sportGameState: createHockeySportGameState(setup) },
+    { ...state, sportGameState: createHockeySportGameState(normalized) },
     gameEventRegistry,
     gameEventProjectors
   )
   if (!initialized.ok) return failure(state, 'invalid_setup', initialized.error.message)
   return { ok: true, state: initialized.state, events: [] }
+}
+
+/** Keeps the specific lineup message when the structure allows checking it. */
+function invalidSetupMessage(setup: HockeyMatchSetup): string {
+  try {
+    const validation = validateHockeyMatchSetup(setup)
+    if (!validation.ok) return validation.message
+  } catch {
+    // Structurally malformed setup; fall through to the general message.
+  }
+  return 'The Hockey setup has invalid rules, names or fields.'
 }
 
 // ---------------------------------------------------------------------------
