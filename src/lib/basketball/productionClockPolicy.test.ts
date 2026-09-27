@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../types'
+import type { BasketballSportGameState } from './types'
 import { createInitialState } from '../gameReducer'
 import {
   basketballWorkflowActionKind,
@@ -26,10 +27,10 @@ describe('BKE-6B1 production clock policy', () => {
     expect(shouldInterceptRunningBasketballClock({
       ...state,
       sportGameState: {
-        ...state.sportGameState!,
+        ...(state.sportGameState as BasketballSportGameState),
         projection: {
-          ...state.sportGameState!.projection,
-          clock: { ...state.sportGameState!.projection.clock!, running: false },
+          ...(state.sportGameState as BasketballSportGameState).projection,
+          clock: { ...(state.sportGameState as BasketballSportGameState).projection.clock!, running: false },
         },
       },
     } as GameState, 'park_commit')).toBe(false)
