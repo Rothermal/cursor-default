@@ -64,6 +64,9 @@ describe('hockey rink geometry', () => {
     // 0.03 across is 2.55 ft; 0.03 along is 6 ft. The across-axis dot is nearer.
     const between = { x: HOCKEY_FACEOFF_DOTS.left_end_upper.x + 0.03, y: HOCKEY_FACEOFF_DOTS.left_end_upper.y + 0.03 }
     expect(nearestHockeyFaceoffDot(between).id).toBe('left_end_upper')
+    // Discriminating point: 884 sq ft to the neutral dot vs 1,600 to center, while
+    // unscaled normalized distance would pick center.
+    expect(nearestHockeyFaceoffDot({ x: 0.3, y: 0.5 }).id).toBe('left_neutral_upper')
   })
 
   it('breaks exact ties toward the earlier dot id', () => {
