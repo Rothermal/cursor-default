@@ -105,7 +105,8 @@ another one:
 | --- | --- | --- |
 | `snap` | Line of scrimmage or kick spot | Gains, FG distance |
 | Carry `endSpot` values; the last one is the **dead-ball spot** | Where each ball carrier's run ended; the last carry ends the action | Player yardage, scoring |
-| `nextSnap` | Enforced spot for the next snap, after penalty enforcement or a touchback | Next situation only |
+| `nextSnap` | Enforced spot for the **immediately following** play (the next scrimmage snap, or the try after a touchdown), after penalty enforcement or a touchback | Next situation only |
+| `deferredKickoffSpot` | Enforced spot for the **next kickoff**, when a penalty on a touchdown or try is enforced on that kickoff | Carried in projection state across the try; consumed once by the next kickoff |
 
 Example: a run from 20 to 30 followed by a 15-yard dead-ball foul by the defense.
 The run carry ends at 30, so the rusher gets 10 yards. `nextSnap` is 45, so the
@@ -140,10 +141,15 @@ interface FootballPlayPayloadV1 {
   // kicks that end without a carry (touchback, fair catch, no_good) and no_play.
   carries: FootballCarryV1[]
 
-  // Enforced next-snap spot. Null = derive it from the dead-ball spot and the
-  // rules (touchback spots, try spot, kickoff spot). Required when an accepted
-  // penalty moves the ball.
+  // Enforced spot for the immediately following play. Null = derive it from the
+  // dead-ball spot and the rules (touchback spots, try spot, kickoff spot).
+  // Required when an accepted penalty moves the ball for that play.
   nextSnap: { yard: number } | null
+
+  // Enforced spot for the next kickoff when a penalty is enforced there instead of
+  // on the following play (a foul on a touchdown or try enforced on the kickoff).
+  // Allowed only on touchdown and try plays. Never moves the try.
+  deferredKickoffSpot: { yard: number } | null
 
   scoring: null | {
     type: 'touchdown' | 'field_goal' | 'safety' | 'try_success' | 'defensive_try'
@@ -249,7 +255,7 @@ makes one carry, and fumble/lateral/return details add carries.
 
 `projectFootballSituation(rules, setup, events) -> { beforePlay[id], afterPlay[id], drives[], current, warnings }`
 
-State: `{ period, possession, spot, down, distance | 'goal', lineToGain, tryPending, kickoffPending, timeoutsLeft{tracked,opponent}, score }`.
+State: `{ period, possession, spot, down, distance | 'goal', lineToGain, tryPending, kickoffPending, pendingKickoffSpot, timeoutsLeft{tracked,opponent}, score }`.
 
 ### 7.1 Periods from the frozen format
 
@@ -277,17 +283,29 @@ compares against literal ids.
 3. **Scoring** comes from `payload.scoring`. It must agree with the carries: a
    touchdown requires the last carry to have `endedBy: 'touchdown'` for the
    scoring side, and a safety requires `endedBy: 'safety'` in the defending end
-   zone. Scoring uses the dead-ball spot. Penalty enforcement after a score moves
-   only `nextSnap` (the try or kickoff spot), never the scoring endpoint.
+   zone. Scoring uses the dead-ball spot. Penalty enforcement after a score never
+   moves the scoring endpoint: enforcement on the try uses `nextSnap`, and
+   enforcement on the kickoff uses `deferredKickoffSpot`.
 4. **Penalties:** accepted penalties apply their flags. `nextSnap`, when present,
    is the enforced spot; when absent, the next spot is derived from the dead-ball
    spot. Penalty yards come from the recorded `yards` when present, otherwise from
    the distance between the base spot and `nextSnap`. Declined and offsetting
    penalties are counted but move nothing.
 5. **Next situation:**
-   - after a TD, `tryPending` for the scoring side at `nextSnap` or `rules.trySpot`;
-   - after a successful try or FG, `kickoffPending` for the scoring side;
-   - after a safety, a free kick is pending for the side that gave up the safety;
+   - after a TD, `tryPending` for the scoring side at `nextSnap` or `rules.trySpot`.
+     A `deferredKickoffSpot` on the TD play is stored in `pendingKickoffSpot`; it
+     does not change the try;
+   - a try play may also set `deferredKickoffSpot` (a foul on the try enforced on
+     the kickoff). It replaces any earlier pending spot, because the recorder
+     confirms the final resulting spot, and raises a `deferred_restart_replaced`
+     warning when one was already pending;
+   - after a try, a successful FG or a safety, `kickoffPending` (a free kick after
+     a safety) for the kicking side at `pendingKickoffSpot` or the rules' kickoff spot;
+   - the next kickoff or free kick **consumes** `pendingKickoffSpot` exactly once and
+     clears it. A kickoff `snap` that differs from the pending spot saves with an
+     `unexpected_sequence` warning. The halftime or end-of-game boundary clears an
+     unconsumed pending spot with a `deferred_restart_dropped` warning (the
+     second-half kickoff comes from the coin toss);
    - possession change: 1st & 10 (or goal) for the new offense at the next spot;
    - the offense keeps the ball: a next spot at or past `lineToGain`, or an
      automatic first down, gives a 1st down; `replayDown` repeats the down;
@@ -312,10 +330,10 @@ are never returned as shared diagnostics.
 | Recoverable warning (play saves; totals stay official) | Fatal diagnostic (append rejected) |
 | --- | --- |
 | `situation_mismatch`: declared down/distance differs from the derived value | Payload fails strict parsing, unknown keys, bad enums |
-| `unexpected_sequence`: try without `tryPending`, a kickoff not after a score or half, or a scrimmage play while a kickoff is pending | Spot outside field bounds, or a non-integer yard |
+| `unexpected_sequence`: try without `tryPending`, a kickoff not after a score or half, a kickoff `snap` different from the pending kickoff spot, or a scrimmage play while a kickoff is pending; also `deferred_restart_replaced` and `deferred_restart_dropped` (§7.2) | Spot outside field bounds, or a non-integer yard |
 | `first_down_override_conflict`: the override contradicts the spots | Carry keys not contiguous, a keyed role pointing at a missing carry, or an actor on the wrong side |
 | `clock_stamp_mismatch`: play `elapsedMs` is inconsistent with the anchored clock | Tracked player actor who is not a match participant; opponent `player` actor |
-| `unknown_yardage`: a carry with a null start or end spot | Scoring that contradicts its own carries (§7.2 step 3) |
+| `unknown_yardage`: a carry with a null start or end spot | Scoring that contradicts its own carries (§7.2 step 3), or `deferredKickoffSpot` on a play that is neither a touchdown nor a try |
 | `possession_gap`: the play's side differs from derived possession with no `situation_set` | Kind forbidden by the rules (e.g. kicks in a flag profile) |
 
 Warnings appear in the UI as "check this play" and never block capture. A stream
@@ -395,8 +413,12 @@ is dropped, and only the penalty and the next situation remain. Key rules:
 - Unit tests for every kind, carry kind and penalty status.
 - **Spot separation fixtures:** a run from 20 to 30 plus a 15-yard dead-ball foul
   gives the rusher 10 yards, the defense 15 penalty yards and a next snap at 45; a
-  touchdown followed by a penalty enforced on the try or kickoff keeps the scoring
-  endpoint and moves only `nextSnap`; a holding foul with `negatesPlay: true` drops
+  touchdown with a penalty enforced **on the try** keeps the scoring endpoint and
+  moves the try via `nextSnap`; a touchdown with a penalty enforced **on the
+  kickoff** keeps both the scoring endpoint and the normal try spot, carries
+  `deferredKickoffSpot` through the try and applies it to the kickoff exactly once,
+  including after park/resume and full replay between the try and the kickoff; a
+  foul on the try enforced on the kickoff does the same; a holding foul with `negatesPlay: true` drops
   all play stats.
 - **Multi-carry fixture:** an interception return that ends in a fumble recovered
   and returned by the passing team (three carries, two sides) credits each leg to
