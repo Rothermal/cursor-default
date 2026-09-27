@@ -91,9 +91,10 @@ Files: `src/lib/hockey/captureEvents.ts`, `captureProjection.ts`, `stats.ts`,
   - `penaltyShot`: boolean,
   - `strength`: `ev | pp | sh`, or null. The field is frozen now so HKY-3B does not need
     schema version 2. HKY-2 always writes null, and HKY-3B adds prefill and confirmation,
-  - `onIce`, for goals only:
+  - `onIce`, for goals only, the tracked side's players (see the on-ice prompt below):
     - `status`: `complete | partial | not_recorded`,
-    - `trackedParticipantIds`: at most `skatersPerSide + 1` ids, goalie included,
+    - `skaterParticipantIds`: skaters only,
+    - `goalie`: a participant id, `'empty_net'`, or null when unknown,
   - `captureCommandId`,
   - actors:
     - `shooter` (optional; absent means Team, unattributed; this also covers a goal
@@ -130,10 +131,9 @@ Files: `src/lib/hockey/captureEvents.ts`, `captureProjection.ts`, `stats.ts`,
 - **Score** is goals plus adjustments. Adjustments never create player goals. A negative
   side score rejects the event.
 - **Sudden-death overtime (Q4), only when the rules say so.**
-  - Rules v1 gains `overtime.suddenDeath: boolean`. No production hockey games exist and
-    the HKY-1 preview is development-only, so the field is added to v1 rather than
-    starting v2. Every built-in profile sets it to true, and a Custom or match override
-    can turn it off.
+  - Rules v1 gains `overtime.suddenDeath: boolean`. It is added to v1 rather than
+    starting v2 because the old shape stays readable (below). Every built-in profile
+    sets it to true, and a Custom or match override can turn it off.
   - With `suddenDeath: true`, a goal in an overtime period sets `decidedInPeriodId`.
   - Replay then accepts only `clock_paused`, `period_ended`, `match_ended`, suspend,
     abandon, reopen and score adjustments.
@@ -142,6 +142,32 @@ Files: `src/lib/hockey/captureEvents.ts`, `captureProjection.ts`, `stats.ts`,
     usual period end and tie logic applies.
   - The existing between-periods logic already reads the real score, so an untied
     regulation ends without overtime.
+- **Reading pre-HKY-2 rules (compatibility contract).** HKY-1 snapshots store an
+  overtime object with exactly `lengthMs`, `skaters`, `repeat` and `endsPolicy`, and
+  local HKY-1 games (NHL, high-school and NCAA profiles) must keep loading.
+  - `validateHockeyMatchRules` accepts exactly two overtime key sets: the HKY-1 four
+    keys, or those four plus `suddenDeath` (a boolean). Any other key, a missing key, or
+    a non-boolean `suddenDeath` is still rejected, so unknown-key rejection is kept.
+  - Reads never rewrite. `normalizeHockeyMatchRules` returns the stored shape as-is, so
+    hydration, parking, export and import keep the four-key snapshot byte-for-byte and
+    the game fingerprint does not change. Setup is immutable once the stream exists, so
+    nothing later adds the key to an old game either.
+  - Behavior comes from one accessor, `hockeyOvertimeSuddenDeath(rules)`. It returns the
+    stored boolean, or true for the four-key shape. True is the implied HKY-1 behavior:
+    every HKY-1 profile was designed as sudden death, and HKY-1 had no goal events, so
+    no old game can replay differently. The projector and commands read only the
+    accessor, never the raw field.
+  - New writes are always five keys: profiles, the settings hierarchy (overrides replace
+    the whole `overtime` field, so a stored four-key override is resolved through the
+    same reader) and setup commits.
+  - No database migration is needed; this is a local snapshot contract.
+  - Tests use literal pre-HKY-2 fixtures checked into `src/lib/hockey/fixtures/`, a
+    four-key NHL game and a four-key high-school game with lifecycle and clock events,
+    written out by hand rather than built with the profile constructor, so a profile
+    change cannot silently regenerate them. They cover hydration, park and resume,
+    parked import, an unchanged fingerprint, and sudden-death behavior in overtime.
+    A snapshot with a sixth overtime key, and one with a string `suddenDeath`, are
+    rejected.
 - **Stats.** Per-period score and shots on goal come from the same replay. The projector
   fills `playerStatsById` from a new `hky_*` catalog in `stats.ts`:
 
@@ -175,11 +201,44 @@ checks the registry, runs a candidate replay and appends atomically.
 
 **Goal on-ice prompt (Q4 in HKY-0):**
 
-- The goal dialog shows an optional multi-select.
-- It is prefilled from the previous goal's set, or from the opening lineup for the first
-  goal of the game. The prefill is labelled as a guess.
-- Saving without touching it stores `not_recorded`. `complete` needs exactly
-  `skatersPerSide` skaters plus the goalie. Anything else is `partial`.
+- The goal dialog shows an optional on-ice section for the tracked side. Skaters are a
+  multi-select; the goalie is one choice of a dressed goalie or **Net empty**.
+- It is prefilled from the previous goal's set, or from the opening lineup for the
+  first goal of the game. The goalie choice is prefilled from the projected tracked
+  goalie in net. The prefill is labelled as a guess.
+- The status is set by the recorder, not by counting against a regulation number,
+  because the right number changes with reduced-skater overtime (the NHL profile has 5
+  in regulation and 3 in overtime), a pulled goalie, and later penalties.
+  - `not_recorded`: the section was left untouched. Nothing is stored.
+  - `complete`: the recorder ticked **This is everyone on the ice**. The command
+    accepts it only when the set is structurally possible: no duplicates, every id a
+    dressed tracked participant, skaters at least `minimumSkaters`, and at most the
+    period's skater count (`skaters` from overtime settings in an overtime period,
+    otherwise `skatersPerSide`) with a goalie in net, or one more than that when the
+    net is empty. The goalie choice must be made.
+  - `partial`: anything else the recorder entered without that tick, including an
+    unknown goalie. It has no count rules beyond no duplicates and dressed participants.
+- An empty net is a recorded fact, not missing data. The payload keeps it apart from an
+  unknown goalie:
+  - `onIce.skaterParticipantIds`: the skaters,
+  - `onIce.goalie`: a goalie participant id, `'empty_net'`, or null when unknown. A
+    `complete` set never has null.
+- The skater bound above is only a sanity check. Penalties are not modelled until
+  HKY-3, so a short-handed complete set (for example 4 skaters and a goalie in
+  regulation) is accepted as long as it is at least `minimumSkaters`.
+- Future strength handling (HKY-3B) never rewrites a saved status. It may add an
+  advisory diagnostic when a complete set disagrees with the projected manpower, and
+  plus/minus (HKY-3B) counts only complete sets. A saved goal is never reclassified
+  retroactively.
+- Tests cover:
+  - a regulation 5 skaters plus goalie complete set,
+  - an NHL overtime 3 skaters plus goalie complete set,
+  - goalie pulled: 6 skaters with an empty net is complete, and the next goal after
+    the goalie returns prefills the goalie again,
+  - a genuinely partial set (3 skaters, goalie unknown, no tick),
+  - `complete` rejected for 2 skaters, for 7 skaters with a goalie, for a duplicate,
+    for a non-dressed id and for a null goalie,
+  - an untouched section stored as `not_recorded`.
 
 Tests:
 - every outcome's derived counts, assists rules, blocker side,
@@ -290,11 +349,14 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
 ## 3. Data and compatibility rules
 
 - No migration. Everything stays local, and event hockey keeps reaching no cloud route.
-- No change to setup v1. Rules v1 gains only `overtime.suddenDeath` (Q4), which is safe
-  because no production hockey game exists yet. HKY-2 otherwise adds event types, and
+- No change to setup v1. Rules v1 gains only `overtime.suddenDeath` (Q4). The HKY-1
+  four-key overtime shape stays readable, is never rewritten, and behaves as sudden
+  death (see the compatibility contract in HKY-2B). HKY-2 otherwise adds event types, and
   every payload field that later phases need (strength, on-ice) is present from the
   start as nullable.
-- Games created in HKY-1 replay unchanged: they contain only lifecycle and clock events.
+- Games created in HKY-1 load and replay unchanged, with the same fingerprint: their
+  rules keep the four-key overtime shape and they contain only lifecycle and clock
+  events. Literal pre-HKY-2 fixtures prove it.
 - Legacy hockey stat-grid games, Soccer and Basketball are untouched.
 - Every accepted command still round-trips through `HYDRATE_STATE`, the HKY-1 review
   lesson.
