@@ -500,7 +500,7 @@ HKY-2A  rink geometry + component (read-only render, flip, dot snapping)
 HKY-2B  shot/goal capture and projection, goalie in net, goalie change/pull;
         actor eligibility without shift tracking (§9) is an acceptance gate
 HKY-2C  faceoff/hit/takeaway/giveaway capture; Recent Events undo on rink
-HKY-2D  team default lines (F1-F4, D1-D3) and Team Manage Lines tab
+HKY-2D  team default lines: moved to HKY-5C/6C (HKY-2 plan §7 Q3)
 HKY-3A  penalty events, penalty box and strength projection
 HKY-3B  goal strength prefill/confirmation, PP/PK totals, timeouts, icing/offside
 HKY-3C  overtime and shootout (shared shootout core), outcomes
@@ -624,5 +624,5 @@ The owner accepted every recommendation on 2026-09-26.
 | Q7 | Faceoff taker defaults to the last tracked center? | Yes, a deliberate exception to the shared Unattributed default |
 | Q8 | Strength derived from penalties, confirmed on each goal? | Yes |
 | Q9 | Ties and shootouts? | Profile-driven; ties allowed in rec/youth profiles |
-| Q10 | Team default lines in the first phase? | No. Starter/Bench plus starting goalie in HKY-1; lines in HKY-2D |
+| Q10 | Team default lines in the first phase? | No. Starter/Bench plus starting goalie in HKY-1; lines in HKY-2D, since moved to HKY-5C/6C (HKY-2 plan §7 Q3) |
 | Q11 | Stats tracked on paper that are missing? | None identified; revisit after first live games |

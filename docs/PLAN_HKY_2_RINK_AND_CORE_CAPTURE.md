@@ -5,8 +5,7 @@ Execution plan for the second hockey phase defined in
 ([plan and delivery record](PLAN_HKY_1_FOUNDATION_RULES_AND_ROSTER.md)): rules, setup,
 the sport state, the lifecycle and clock events, and the development-only preview.
 
-Status: proposed. The open questions in §7 have recommended defaults; the owner confirms
-or changes them before HKY-2A starts.
+Status: approved for implementation. The owner answered every §7 question on 2026-09-27.
 
 ---
 
@@ -22,13 +21,12 @@ HKY-2 exits when a local hockey event game can be tracked end-to-end on the rink
 - signed, reasoned score adjustments,
 - a live score, shots by side and period, and per-player totals,
 - Recent Events with newest-only Undo on the rink,
-- the owner can try it on a phone (§7 Q2 decides whether that is a production opt-in or
-  development-only).
+- the owner can try it on a phone through a default-off production toggle (§7 Q2).
 
 Not in HKY-2: penalties and strength (HKY-3A/3B), timeouts and icing/offside (HKY-3B),
 shootout and structured outcomes (HKY-3C), Timeline edit/remove/restore and
 recorded-later additions (HKY-4), cloud (HKY-5), Summary and aggregates (HKY-6), team line
-defaults (§7 Q3).
+defaults (moved to HKY-5C/6C, §7 Q3).
 
 ---
 
@@ -66,16 +64,15 @@ shared surface-location helper (XS-5).
   - an attack-direction arrow for the tracked team,
   - markers passed in as props, and a tap callback in display coordinates,
   - the flip reads `capturePreferences.rinkFlipped` and never changes stored coordinates.
-- **Phone layout (Q1):** in portrait the rink is drawn vertically, with the tracked team's
-  current attacking end at the top. This is a display rotation, like the flip: taps
-  convert back to canonical coordinates, and the stored `attackingDirection` is
-  unchanged. In landscape the rink is horizontal.
+- **Phone layout (Q1):** the rink is always horizontal, as Soccer's pitch is. It spans
+  the full width and stays on screen above the quick row. Faceoff snapping and dialog
+  confirmation make up for the short height in portrait.
 
 Tests:
 - geometry constants,
 - dot snapping from every quadrant, ties broken by dot id order,
 - zone derivation for both directions and both sides,
-- display-to-canonical round trips for flip and rotation combined,
+- display-to-canonical round trips with the flip on and off,
 - `soccerFieldLocation` output unchanged after the extraction.
 
 ### HKY-2B Shots, goals, goalies, score adjustments
@@ -132,11 +129,17 @@ Files: `src/lib/hockey/captureEvents.ts`, `captureProjection.ts`, `stats.ts`,
   `actor_mismatch`, because HKY-4 corrections may legitimately edit the goalie.
 - **Score** is goals plus adjustments. Adjustments never create player goals. A negative
   side score rejects the event.
-- **Overtime is sudden death (Q4).**
-  - A goal in an overtime period sets `decidedInPeriodId`.
+- **Sudden-death overtime (Q4), only when the rules say so.**
+  - Rules v1 gains `overtime.suddenDeath: boolean`. No production hockey games exist and
+    the HKY-1 preview is development-only, so the field is added to v1 rather than
+    starting v2. Every built-in profile sets it to true, and a Custom or match override
+    can turn it off.
+  - With `suddenDeath: true`, a goal in an overtime period sets `decidedInPeriodId`.
   - Replay then accepts only `clock_paused`, `period_ended`, `match_ended`, suspend,
     abandon, reopen and score adjustments.
   - The UI offers one-tap End game.
+  - With `suddenDeath: false`, the overtime period plays to its full length and the
+    usual period end and tie logic applies.
   - The existing between-periods logic already reads the real score, so an untied
     regulation ends without overtime.
 - **Stats.** Per-period score and shots on goal come from the same replay. The projector
@@ -183,7 +186,8 @@ Tests:
 - stamped goalie and empty-net prefill, and a pulled goalie followed by an empty-net goal,
 - opponent goalie introduction,
 - a score adjustment that would go negative is rejected,
-- overtime sudden death, both clock models, and valid-prefix replay after a bad event,
+- overtime with sudden death on and off, both clock models, and valid-prefix replay
+  after a bad event,
 - actor eligibility,
 - setup-only fingerprints.
 
@@ -250,13 +254,12 @@ Tests:
 - restore receipt lifecycle across reload,
 - capture-unit grouping.
 
-### HKY-2D Team default lines (moved, Q3)
+### HKY-2D Team default lines (moved to HKY-5C/6C, Q3)
 
 HKY-0 placed team lines (F1-F4, D1-D3) and a Team Manage Lines tab here. No hockey team
 settings can be saved until the hockey settings migration in HKY-5C, and nothing in
-HKY-2 to HKY-4 reads lines. The recommendation is to move this slice to HKY-5C/6C, where
-the lines shape, settings storage and the Team Manage tab land together. If the owner
-keeps it here, it can only ship as a pure parser with no editor.
+HKY-2 to HKY-4 reads lines, so the lines shape, settings storage and the Team Manage tab
+land together in HKY-5C/6C.
 
 ### HKY-2E Owner tracker and setup (Q2)
 
@@ -275,7 +278,7 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
   - roster: a read-only cloud team roster when a team is chosen, or quick local entries,
   - dressed-as per participant, the opening goalie, and the opening skaters picked by
     the recorder (no team defaults exist yet).
-- **Release stage (Q2):** production gets a per-sport `hockeyEvent` stage in
+- **Release stage (Q2, approved):** production gets a per-sport `hockeyEvent` stage in
   `sportAvailability.ts`. This is the first step of XS-1. It is `opt_in` with a device
   toggle defaulting off, like Basketball BKE-5D, and local-only: event hockey still has
   no cloud route. Development keeps the preview without the toggle.
@@ -287,8 +290,10 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
 ## 3. Data and compatibility rules
 
 - No migration. Everything stays local, and event hockey keeps reaching no cloud route.
-- No change to setup v1 or rules v1. HKY-2 adds event types only, and every new payload
-  field that later phases need (strength, on-ice) is present from the start as nullable.
+- No change to setup v1. Rules v1 gains only `overtime.suddenDeath` (Q4), which is safe
+  because no production hockey game exists yet. HKY-2 otherwise adds event types, and
+  every payload field that later phases need (strength, on-ice) is present from the
+  start as nullable.
 - Games created in HKY-1 replay unchanged: they contain only lifecycle and clock events.
 - Legacy hockey stat-grid games, Soccer and Basketball are untouched.
 - Every accepted command still round-trips through `HYDRATE_STATE`, the HKY-1 review
@@ -300,7 +305,7 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
 
 | Id | In HKY-2 |
 |---|---|
-| XS-1 | First per-sport stage entry (`hockeyEvent`) if Q2 is yes; the table shape is kept small enough for Football and Baseball to add rows |
+| XS-1 | First per-sport stage entry (`hockeyEvent`, Q2); the table shape is kept small enough for Football and Baseball to add rows |
 | XS-5 | `surfaceLocation` extracted from Soccer with a wrapper; Football can reuse it |
 | XS-6 | Not extracted. HKY-1 wrote a small hockey clock projection rather than importing Basketball's; both now exist, and the extraction stays deferred until Football needs a third |
 | XS-8 | A match-scoped recent opponent labels row only; no shared opponent identity model |
@@ -316,10 +321,11 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
   reload mid-period with the clock running,
 - both clock models, and both initial directions with the flip on and off,
   checking that stored coordinates are identical,
-- an overtime goal ending the game, and an untied regulation ending without overtime,
+- an overtime goal ending the game under sudden death, a full-length overtime without it,
+  and an untied regulation ending without overtime,
 - HKY-1 games still load, legacy hockey games are unchanged, and Soccer and Basketball
   event games park together with hockey,
-- with Q2 yes, the production toggle is off by default, and with it off the setup route
+- the production toggle is off by default, and with it off the setup route
   shows the notice,
 - `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 
@@ -332,14 +338,14 @@ HKY-1 `HockeyEventPreview` live panel), `src/lib/sportAvailability.ts`.
 
 ---
 
-## 7. Open Questions (recommended defaults)
+## 7. Owner Decisions (2026-09-27)
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
-| Q1 | Rink orientation on a phone held upright? | Vertical in portrait with the tracked team attacking up; horizontal in landscape. A horizontal rink in portrait is about 150 px tall on a phone, too small to place shots |
-| Q2 | Let you try hockey on your phone before the full release? | Yes: an owner-only, default-off device toggle in production at the end of HKY-2, local-only with no cloud. Without it, hockey is testable only in a development build until HKY-6 |
-| Q3 | Move team default lines out of HKY-2? | Yes, to HKY-5C/6C with settings storage; nothing reads lines before then |
-| Q4 | What happens after an overtime goal? | Sudden death: further play events are blocked and one tap ends the game. No automatic ending, so a mistaken goal can be undone first |
-| Q5 | Plus/minus before strength exists? | Capture on-ice sets now; show plus/minus from HKY-3B, when power-play goals can be excluded correctly |
-| Q6 | Opponent shooters and goalies? | Jersey or name labels, with chips for labels already used in this game; no opponent roster |
-| Q7 | Must shots be placed on the rink? | No. Rink taps store a location; the quick-row Shot and Goal buttons record without one, as in Soccer |
+| Q1 | Rink orientation on a phone held upright? | Horizontal, like Soccer (the owner's choice over the vertical recommendation) |
+| Q2 | Let the owner try hockey on a phone before the full release? | Yes: an owner-only, default-off device toggle in production at the end of HKY-2, local-only with no cloud |
+| Q3 | Move team default lines out of HKY-2? | Yes, to HKY-5C/6C with settings storage |
+| Q4 | What happens after an overtime goal? | Only when the rules use sudden death: further play is blocked and one tap ends the game, with no automatic ending so a mistaken goal can be undone. Adds `overtime.suddenDeath` to rules v1 |
+| Q5 | Plus/minus before strength exists? | Yes: capture on-ice sets now, show plus/minus from HKY-3B |
+| Q6 | Opponent shooters and goalies? | Yes: jersey or name labels with chips for labels used this game |
+| Q7 | Must shots be placed on the rink? | No: rink taps store a location, and quick Shot and Goal buttons record without one |

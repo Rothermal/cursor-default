@@ -216,7 +216,7 @@ not supported; a recorder who stops running the clock keeps an anchored game pau
 | Clock default (Q3) | `clockModel: 'anchored'` with countdown stop-time; `none` selectable at setup; frozen after start |
 | Settings authority | Personal-or-team (Basketball model), per PR #429 review |
 | Penalty rule fields frozen in rules v1 | Yes; inert until HKY-3 |
-| Lines (Q10) | Not in HKY-1; HKY-2D |
+| Lines (Q10) | Not in HKY-1; moved from HKY-2D to HKY-5C/6C (HKY-2 plan §7 Q3) |
 
 ---
 
