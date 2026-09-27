@@ -198,7 +198,7 @@ not supported; a recorder who stops running the clock keeps an anchored game pau
     other than the expiration pause once the clock passes the period length.
   - `canEndWithoutReason` is true once regulation is done, no period may follow, and a
     tie is allowed. A tie the rules forbid (NHL regular season after overtime) needs a
-    reason until the HKY-4 shootout exists.
+    reason until the HKY-3C shootout exists.
   - Suspend, abandon and period end pause a running clock in the same command. Reopen
     continues the suspended period, paused.
   - The shared active-game guard in `GameContext` pauses a running Hockey clock before
