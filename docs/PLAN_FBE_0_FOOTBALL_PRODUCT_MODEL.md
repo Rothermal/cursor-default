@@ -204,8 +204,15 @@ Rule fields StatKeeper needs (not a rules engine; only what the projection uses)
 - flag-mode switches: kicking disabled, "tackle" labelled as "flag pull",
   no-run-zone warnings (display only).
 
-Rule precedence matches Soccer and Basketball:
-`built-in profile -> personal -> team -> match snapshot`, frozen at game start.
+Football uses Basketball's **personal-or-team** authority
+(`resolveBasketballSettingsHierarchy` in `src/lib/basketball/settings.ts`), the
+same model the Hockey plan chose, not Soccer's four-layer chain. A team game
+resolves `built-in profile -> team settings -> match overrides`. A personal
+(no-team) game resolves `built-in profile -> personal settings -> match overrides`.
+A recorder's personal defaults never leak into a team game, so two recorders with
+different personal settings get identical rules for the same team. The complete
+resolved rules snapshot is frozen at game start. Existing Soccer and Basketball
+resolvers are unchanged.
 
 ### Periods and overtime
 
@@ -357,7 +364,9 @@ Detailed plan: [FBE-3](PLAN_FBE_3_FIELD_AND_LIVE_CAPTURE.md).
 Personal and team football settings reuse `user_sport_settings` /
 `team_sport_settings` (migration 048) with a strict football validator, revision
 CAS writes and metadata-only audit, as Soccer (SOC-6D) and Basketball (BKE-5B) do.
-Team settings carry rules profile + overrides + unit starter defaults.
+Team settings carry rules profile + overrides + unit starter defaults. The
+resolver follows the personal-or-team authority in §5; a test proves two recorders
+with different personal settings resolve identical rules for one team game.
 Device-only preferences (field orientation, detailed-by-default toggle) stay out
 of fingerprints and cloud payloads.
 
@@ -447,6 +456,10 @@ For the Hockey and Baseball programs running in parallel:
   "named lineup groups, each an ordered list of player ids, with sport-owned
   validation" inside versioned team sport settings. Do not force it into
   Soccer's single starter list.
+- **Recoverable warnings:** the shared engine treats projector diagnostics as
+  fatal. Recorder mismatches that must not block capture belong in a sport-owned
+  `projection.warnings` list (Basketball `relationshipWarnings`, Baseball and
+  Football `warnings`), never in shared diagnostics (FBE-2 §7.3).
 - **Compound events with derived game situation:** Football (down/distance/spot/
   possession) and Baseball (count/outs/base runners/batting order) both record one
   compound event per play and derive a "situation" the UI uses to prefill the
@@ -457,9 +470,10 @@ For the Hockey and Baseball programs running in parallel:
   direction) fits Soccer and Hockey directly. Football keeps its authoritative
   spots in yard units in the payload and leaves envelope `location` null (FBE-2
   §4). Baseball will likely do the same for pitch location and batted-ball spots.
-- **Rules profiles and settings:** the built-in profile -> personal -> team ->
-  match hierarchy, migration 048 tables and revision CAS are sport-neutral and
-  should be reused as-is.
+- **Rules profiles and settings:** migration 048 tables and revision CAS are
+  sport-neutral and reused as-is. Authority differs by sport: Soccer layers
+  personal -> team -> match, while Basketball, Hockey and Football use
+  personal-or-team -> match.
 - **Cloud and aggregates:** each sport adds fixed RPC wrappers over the shared
   private event-platform cores and its own aggregate prefix.
 

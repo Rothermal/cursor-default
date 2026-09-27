@@ -98,6 +98,19 @@ works for 80-yard and flag fields by rules.
 
 ## 5. `football.play` payload (schema version 1)
 
+A play records three different spots, and nothing is allowed to stand in for
+another one:
+
+| Spot | Meaning | Used for |
+| --- | --- | --- |
+| `snap` | Line of scrimmage or kick spot | Gains, FG distance |
+| Carry `endSpot` values; the last one is the **dead-ball spot** | Where each ball carrier's run ended; the last carry ends the action | Player yardage, scoring |
+| `nextSnap` | Enforced spot for the next snap, after penalty enforcement or a touchback | Next situation only |
+
+Example: a run from 20 to 30 followed by a 15-yard dead-ball foul by the defense.
+The run carry ends at 30, so the rusher gets 10 yards. `nextSnap` is 45, so the
+defense is charged 15 penalty yards, and the next snap is 1st & 10 at the 45.
+
 ```ts
 interface FootballPlayPayloadV1 {
   kind:
@@ -109,26 +122,28 @@ interface FootballPlayPayloadV1 {
   // Situation as the recorder confirmed it at the snap. Null = accept derived.
   declaredSituation: { down: 1|2|3|4; distance: number | 'goal' } | null
 
-  // Kind-specific primary result
   pass?: {
     result: 'complete' | 'incomplete' | 'intercepted'
     target: { lane: Lane | null; depth: 'behind' | 'short' | 'deep' | null } | null
     catchSpot?: { yard: number } | null      // enables air yards / YAC later
-    brokenUpBy?: 'recorded' | 'none' | 'unknown'
+    brokenUp: 'recorded' | 'none' | 'unknown'
   }
   kick?: {
-    result:                         // per kind
+    result:
       | 'good' | 'no_good' | 'blocked'                       // FG / try_kick
       | 'returned' | 'fair_catch' | 'touchback' | 'out_of_bounds'
       | 'downed' | 'muffed' | 'recovered_by_kicking_team'    // punts/kickoffs
-    kickEndSpot?: { yard: number } | null    // where the kick landed/was fielded
+    kickEndSpot: { yard: number } | null     // where the kick landed or was fielded
   }
 
-  // Ordered in-play possession segments after the initial action.
-  segments: FootballPlaySegment[]
+  // Ordered ball-carrier legs. Empty for incomplete passes, spikes,
+  // kicks that end without a carry (touchback, fair catch, no_good) and no_play.
+  carries: FootballCarryV1[]
 
-  end: { yard: number; lane?: Lane | null } // dead-ball spot of the final segment
-  outOfBounds: boolean | null
+  // Enforced next-snap spot. Null = derive it from the dead-ball spot and the
+  // rules (touchback spots, try spot, kickoff spot). Required when an accepted
+  // penalty moves the ball.
+  nextSnap: { yard: number } | null
 
   scoring: null | {
     type: 'touchdown' | 'field_goal' | 'safety' | 'try_success' | 'defensive_try'
@@ -140,56 +155,79 @@ interface FootballPlayPayloadV1 {
   note: string | null
 }
 
-type FootballPlaySegment =
-  | { type: 'fumble'; fumbleSpot: { yard: number } | null; forcedBy: 'recorded' | 'none' | 'unknown';
-      recoveredBy: 'offense' | 'defense' | 'out_of_bounds'; recoverySpot: { yard: number } | null }
-  | { type: 'lateral'; spot: { yard: number } | null }
-  | { type: 'return'; kind: 'interception' | 'fumble' | 'kick' | 'punt' | 'blocked_kick';
-      startSpot: { yard: number } | null }
+interface FootballCarryV1 {
+  key: string                       // 'c0', 'c1', ... contiguous, unique within the play
+  side: 'tracked' | 'opponent'      // team in possession during this leg
+  kind:
+    | 'rush' | 'scramble' | 'sack' | 'kneel' | 'reception'
+    | 'lateral' | 'fumble_recovery'
+    | 'interception_return' | 'kick_return' | 'punt_return' | 'blocked_kick_return'
+  startSpot: { yard: number } | null   // null = unknown (e.g. recovery point not seen)
+  endSpot: { yard: number; lane?: Lane | null } | null
+  endedBy:
+    | 'tackled' | 'out_of_bounds' | 'touchdown' | 'fumble' | 'lateral'
+    | 'downed' | 'touchback' | 'safety' | 'kneel' | 'unknown'
+  fumble?: {                        // only when endedBy = 'fumble'
+    forced: 'recorded' | 'none' | 'unknown'
+    outcome: 'recovered' | 'out_of_bounds' | 'out_of_end_zone'
+  }
+}
 
 interface FootballPenaltyV1 {
   code: string                      // catalog id, e.g. 'false_start', 'holding_off', 'dpi', 'custom'
   label: string | null              // required for 'custom'
   against: 'tracked' | 'opponent'
   status: 'accepted' | 'declined' | 'offsetting'
-  yards: number | null              // recorded yardage actually walked off (null for spot fouls entered via result spot)
   timing: 'pre_snap' | 'live_ball' | 'dead_ball_after'
+  enforcement: 'previous_spot' | 'spot_of_foul' | 'end_of_run' | 'succeeding_spot' | 'dead_ball_spot' | null
+  yards: number | null              // yards walked off as recorded; null when not recorded
+  negatesPlay: boolean              // saved at capture from the catalog default or the recorder's choice
   automaticFirstDown: boolean
   lossOfDown: boolean
   replayDown: boolean
 }
 ```
 
-Actors live in the envelope `actors[]` with these roles:
+`negatesPlay` and every other catalog-derived flag are copied into the event when
+the play is saved. Replay never reads the live catalog, so later catalog changes
+cannot change historical games.
 
-| Role | Used by |
+### Actor attribution
+
+Actors live in the envelope `actors[]`. Roles that belong to a carry carry its
+key as a suffix, so each actor maps to exactly one carry, side and endpoint.
+Identity is never inferred from array order.
+
+| Role | Meaning |
 | --- | --- |
-| `passer`, `target`, `receiver` | pass (target = intended receiver; receiver only on completions) |
-| `rusher` | run, scramble, kneel, sack victim uses `passer` |
-| `tackler` (solo) or `tackler_assist` (repeatable; two or more share the tackle) | any live-ball play |
-| `sacker` / `sacker_half` | sack |
-| `pass_defender`, `interceptor` | pass |
-| `fumbler`, `forced_by`, `recovered_by` | fumble segments (indexed by segment order through a `segment` suffix, e.g. `recovered_by:0`) |
-| `returner` | return segments, kickoff/punt returns |
-| `kicker`, `punter`, `holder`, `long_snapper` | kicks |
-| `blocker` | blocked kicks |
+| `passer`, `target` | pass (target = intended receiver) |
+| `carrier:<key>` | ball carrier for that carry; for a `reception` carry this is the receiver; for `sack` it is the passer |
+| `tackler:<key>`, `tackler_assist:<key>` | who stopped that carry (solo or shared) |
+| `forced_by:<key>` | forced the fumble that ended that carry |
+| `sacker`, `sacker_half` | sack credit |
+| `pass_defender`, `interceptor` | pass; `interceptor` must also be `carrier` of the `interception_return` carry |
+| `kicker`, `punter`, `holder`, `long_snapper`, `blocker` | kicks |
 | `penalized:<n>` | offender for penalty index n (optional) |
-| `scorer` | who crossed the goal line / kicked the FG (derived when unambiguous; stored when not) |
 
-Segment-indexed roles keep one actors list (engine requirement) while tying
-actors to segments. The validator enforces allowed roles per kind.
+A carry with no `carrier:<key>` actor is Unattributed. Its yards count toward
+the side's team totals and no player gets them. The validator rejects a keyed
+role whose key has no matching carry, and rejects actors on a carry from the
+wrong side's roster.
 
 ### Minimum valid plays (quick capture)
 
 | Kind | Required | Everything else |
 | --- | --- | --- |
-| run | snap, end | rusher optional (Unattributed allowed) |
-| pass | snap, pass.result, end (defaults to snap on incomplete) | passer/target optional |
-| sack | snap, end | passer optional |
-| punt / kickoff | snap, kick.result, end | kicker/returner optional |
+| run / scramble / kneel | snap, one carry with an end spot | carrier optional |
+| pass | snap, pass.result; a `reception` carry when complete | passer/target/receiver optional |
+| sack | snap, one `sack` carry | passer optional |
+| punt / kickoff | snap, kick.result; a return carry when returned | kicker/returner optional |
 | field_goal / try_kick | snap, kick.result | kicker optional |
-| try_run / try_pass | snap, success flag via `scoring` | actors optional |
-| no_play | at least one penalty | end = snap +/- yards |
+| try_run / try_pass | snap, `scoring` or explicit failure | actors optional |
+| no_play | at least one penalty and `nextSnap` | |
+
+The FBE-3 entry sheet builds carries for the recorder: one tap for a simple run
+makes one carry, and fumble/lateral/return details add carries.
 
 ---
 
@@ -198,10 +236,10 @@ actors to segments. The validator enforces allowed roles per kind.
 | Type | Payload (v1) | Notes |
 | --- | --- | --- |
 | `football.situation_set` | `{ possession: side, spot: {yard}, down: 1-4 or null, distance: number or 'goal' or null, reason: 'missed_plays' | 'correction' | 'overtime_start' | 'other', note }` | Resets the fold at its position. Neutral side |
-| `football.coin_toss` | `{ winner: side, choice: 'receive' | 'kick' | 'defer' | 'defend_goal', trackedDirection: 'left_to_right' | 'right_to_left', scope: 'game' | 'overtime' }` | Sets opening direction and suggested kickoff |
+| `football.coin_toss` | `{ winner: side, choice: 'receive' | 'kick' | 'defer' | 'defend_goal', trackedDirection: 'left_to_right' | 'right_to_left', openingKickingSide: side, secondHalfKickingSide: side, scope: 'game' | 'overtime' }` | Both kicking sides are recorded explicitly, because the choice alone does not fix them after a defer or goal choice |
 | `football.timeout` | `{ side: 'tracked' | 'opponent' | 'official' }` | Projection counts remaining per half |
-| `football.period_start` / `football.period_end` | `{ }` | Lifecycle; halftime and period-end flips derive direction |
-| `football.clock_start` / `football.clock_pause` / `football.clock_set` | Shared anchored-clock shapes (Basketball BKE-6A2); `clock_set` requires a reason | Neutral side. Projection validates play `elapsedMs` against the clock like Basketball, but a mismatch is a warning, not a rejection, so a late-saved play is never lost |
+| `football.period_start` / `football.period_end` | `{ }` | Lifecycle; period ids come from the frozen period format (§7.1) |
+| `football.clock_start` / `football.clock_pause` / `football.clock_set` | Shared anchored-clock shapes (Basketball BKE-6A2); `clock_set` requires a reason | Neutral side. A play-stamp mismatch is a football warning, not a rejection (§7.3) |
 | `football.score_adjustment` | `{ side, delta, reason }` | Signed, reason required; same rules as Soccer |
 | `football.match_end` / reopen | Shared platform lifecycle | |
 
@@ -209,41 +247,81 @@ actors to segments. The validator enforces allowed roles per kind.
 
 ## 7. Situation projection
 
-`projectFootballSituation(rules, setup, events) -> { beforePlay[id], afterPlay[id], drives[], current, diagnostics }`
+`projectFootballSituation(rules, setup, events) -> { beforePlay[id], afterPlay[id], drives[], current, warnings }`
 
 State: `{ period, possession, spot, down, distance | 'goal', lineToGain, tryPending, kickoffPending, timeoutsLeft{tracked,opponent}, score }`.
 
-Fold per play (after applying any `situation_set`):
+### 7.1 Periods from the frozen format
+
+The frozen rules produce an ordered `regulationPeriodIds` list:
+`['q1','q2','q3','q4']` for quarters or `['h1','h2']` for halves. Nothing
+compares against literal ids.
+
+- **Opening period** = `regulationPeriodIds[0]`; setup appends its `period_start`.
+- **Halftime** = the end of `regulationPeriodIds[length / 2 - 1]` (q2 or h1).
+  Halftime resets timeouts and sets `kickoffPending` for the coin toss's
+  `secondHalfKickingSide`.
+- **Direction flips** at the end of every regulation period for quarters and at
+  halftime for halves.
+- **Overtime** periods `ot-1..` follow the last regulation period. Each one starts
+  with a `situation_set` or an overtime-scope coin toss.
+
+### 7.2 Fold per play (after applying any `situation_set`)
 
 1. **Before-snap situation** = current state. If `declaredSituation` differs,
-   record a `situation_mismatch` diagnostic (warning, not failure) and use the
-   declared down/distance for this play's stats (3rd-down conversions etc.).
-2. **Possession changes** from the last `fumble`/`return` segment or kick result.
-3. **Scoring** from `payload.scoring`, validated against `end.yard` (a TD requires
-   the end spot in the scoring side's attacking end zone unless a penalty explains
-   it; a safety requires the offense downed in its own end zone). Mismatch is a
-   `semantic_validation_failed` diagnostic.
-4. **Penalties:** accepted penalties apply their flags; the recorded `end` spot
-   is already the enforced spot. Declined/offsetting penalties keep stats but not
-   yardage. `replayDown` repeats the down from `end`; `automaticFirstDown` resets.
+   record a `situation_mismatch` warning. The play's down-based stats (such as
+   3rd-down conversions) use the declared down and distance.
+2. **Dead-ball spot** = the last carry's `endSpot`. For a play with no carries it
+   is the snap, or the kick result spot for kicks. **Possession** after the
+   action = the last carry's side, or the kick result.
+3. **Scoring** comes from `payload.scoring`. It must agree with the carries: a
+   touchdown requires the last carry to have `endedBy: 'touchdown'` for the
+   scoring side, and a safety requires `endedBy: 'safety'` in the defending end
+   zone. Scoring uses the dead-ball spot. Penalty enforcement after a score moves
+   only `nextSnap` (the try or kickoff spot), never the scoring endpoint.
+4. **Penalties:** accepted penalties apply their flags. `nextSnap`, when present,
+   is the enforced spot; when absent, the next spot is derived from the dead-ball
+   spot. Penalty yards come from the recorded `yards` when present, otherwise from
+   the distance between the base spot and `nextSnap`. Declined and offsetting
+   penalties are counted but move nothing.
 5. **Next situation:**
-   - after TD -> `tryPending` for scorer's side at `rules.trySpot`;
-   - after try or FG good -> `kickoffPending` for the scoring side (NFHS/NCAA/NFL);
-   - after safety -> free kick pending for the side that was scored upon;
-   - possession change -> 1st & 10 (or goal) for the new offense at `end`;
-   - offense keeps ball: gain reaches `lineToGain` -> 1st down; else down + 1;
-     after 4th down without a first down -> turnover on downs;
+   - after a TD, `tryPending` for the scoring side at `nextSnap` or `rules.trySpot`;
+   - after a successful try or FG, `kickoffPending` for the scoring side;
+   - after a safety, a free kick is pending for the side that gave up the safety;
+   - possession change: 1st & 10 (or goal) for the new offense at the next spot;
+   - the offense keeps the ball: a next spot at or past `lineToGain`, or an
+     automatic first down, gives a 1st down; `replayDown` repeats the down;
+     otherwise down + 1 (+1 more for `lossOfDown`); after 4th down without a first
+     down, turnover on downs;
    - `firstDownOverride` wins when present.
 6. **Drives:** a drive starts at the first scrimmage snap after a possession change
    and ends with its result (TD, FG, missed FG, punt, turnover, downs, safety,
    end of half, end of game).
-7. **Periods:** `period_end` of q2 clears downs and sets `kickoffPending` for the
-   team that did not kick to open the game (from the coin toss choice, unless
-   overridden). OT starts require a `situation_set` or coin toss.
 
-The fold is deterministic and total: an unknown or inconsistent input produces a
-diagnostic and the best-effort next state, never an exception. The UI surfaces
-diagnostics as "check this play" without blocking capture.
+### 7.3 Football warnings versus fatal diagnostics
+
+The shared engine treats any projector diagnostic as fatal:
+`src/lib/gameEvents/projection.ts` marks the projection incomplete, and
+`mutations.ts` rejects the append, including an atomic append-plus-mutate.
+Football does not relax that. It uses the sport projection warning pattern
+instead: recoverable issues live in
+`sportGameState.projection.warnings: FootballProjectionWarning[]`, like
+Basketball's `relationshipWarnings` and Baseball's projection `warnings`, and
+are never returned as shared diagnostics.
+
+| Recoverable warning (play saves; totals stay official) | Fatal diagnostic (append rejected) |
+| --- | --- |
+| `situation_mismatch`: declared down/distance differs from the derived value | Payload fails strict parsing, unknown keys, bad enums |
+| `unexpected_sequence`: try without `tryPending`, a kickoff not after a score or half, or a scrimmage play while a kickoff is pending | Spot outside field bounds, or a non-integer yard |
+| `first_down_override_conflict`: the override contradicts the spots | Carry keys not contiguous, a keyed role pointing at a missing carry, or an actor on the wrong side |
+| `clock_stamp_mismatch`: play `elapsedMs` is inconsistent with the anchored clock | Tracked player actor who is not a match participant; opponent `player` actor |
+| `unknown_yardage`: a carry with a null start or end spot | Scoring that contradicts its own carries (§7.2 step 3) |
+| `possession_gap`: the play's side differs from derived possession with no `situation_set` | Kind forbidden by the rules (e.g. kicks in a flag profile) |
+
+Warnings appear in the UI as "check this play" and never block capture. A stream
+with fatal diagnostics (possible only through import or recovery, since the
+append path rejects them) is quarantined like Soccer and Basketball. Its totals
+are suppressed and never published or aggregated.
 
 ### Why not derive situation purely from `declaredSituation`?
 
@@ -256,54 +334,86 @@ official down-based stats right even when the derivation disagrees.
 ## 8. Stat projection
 
 Walks plays with their before/after situations and emits per-actor `fb_*`
-counters plus team totals, following the catalog in FBE-0 §8. Key rules:
+counters plus team totals, following the catalog in FBE-0 §8. When an accepted
+penalty has `negatesPlay: true`, every carry, pass and tackle stat on that play
+is dropped, and only the penalty and the next situation remain. Key rules:
 
-- Gain = `end.yard - snap.yard` in the offense's direction, credited to the
-  rusher/passer/receiver of the **initial** action only; return segments credit
-  returners; fumble/lateral splits follow the NCAA manual (yardage to the
-  fumble/lateral spot to the first carrier, remainder to the next).
-- Sacks: passer gets a sack taken and sack yards; yards count as rushing or team
-  passing per `rules.sackYardage`.
-- Receptions/targets only when a target actor or `pass.result = complete` exists.
-  Targets are "recorded targets", never inferred.
-- Tackles: `tackler` = solo (1.0 total), `tackler_assist` = 0.5 total with
-  `fb_tkl_ast`; TFL when the tackle ends behind the snap on a run/sack/scramble.
-- Accepted penalties that negate the play (live-ball fouls where the recorded end
-  spot is enforcement from the previous spot and `replayDown`) remove play stats
-  except the penalty. A per-penalty `negatesPlay` default comes from the catalog
-  and is recorder-overridable in FBE-3.
-- Kicking: FG distance = (`L` - snap.yard for tracked; snap.yard for opponent) +
-  `E` + `rules.fgSnapHoldAllowance` (7 default).
-- Punting net = gross - return yards (touchback: 20 yards off per profile).
-- Coverage counters (`plays_with_tackler_recorded`, etc.) feed "recorded coverage"
-  labels.
+- **Carry yards** = `endSpot - startSpot` in the carrying side's direction,
+  credited to that carry's `carrier:<key>`. The first carry's start is the snap
+  unless recorded. This is the NCAA split for laterals and fumbles: each carrier
+  gets the yards of their own leg.
+- **Rushing** comes from `rush`, `scramble` and `kneel` carries, plus `sack`
+  carries when `rules.sackYardage = 'rushing'`.
+- **Passing yards** on a completion = the `reception` carry's yards measured from
+  the snap (catch plus run after catch). The receiver gets the same number as
+  receiving yards. With `team_passing` accounting, sack yards count against team
+  passing.
+- **Returns:** interception, fumble, kick and punt return carries credit their
+  carrier's return yards.
+- **Unknown yardage:** a carry with a null start or end spot still counts its
+  attempt, reception or return, but contributes no yards. It increments an
+  `unknown_yards` coverage counter so summaries can label totals as incomplete.
+  Unattributed carries count toward team totals only.
+- **Penalty yards** are charged to the penalized side's team totals and never
+  change player yardage.
+- **Sacks:** the passer gets a sack taken and the sack yards. `sacker` gets 1.0 and
+  `sacker_half` gets 0.5.
+- **Receptions and targets** are counted only when recorded. Targets are
+  "recorded targets", never inferred.
+- **Tackles:** `tackler:<key>` counts 1.0 as a solo tackle, and
+  `tackler_assist:<key>` counts 0.5 with `fb_tkl_ast`. A tackle for loss is a
+  tackle on a carry that ends behind the snap.
+- **Kicking:** FG distance = (`L` - snap.yard for tracked; snap.yard for opponent)
+  + `E` + `rules.fgSnapHoldAllowance` (7 default).
+- **Punting:** net = gross - return yards, with the touchback deduction from the
+  profile.
+- **Coverage counters** (`plays_with_tackler_recorded`, `unknown_yards`, etc.)
+  feed the "recorded coverage" labels.
 
 ---
 
 ## 9. Validation
 
-- Strict payload parsing per schema version; unknown keys rejected; round-trip
-  preserved by the engine for future versions.
-- Spots are integers within field bounds; lanes enumerated.
-- Actor roles allowed per kind; required roles per kind (none in quick mode);
-  tracked `player` actors must be match participants; opponent actors must be
+- Strict payload parsing per schema version; unknown keys rejected; the engine
+  preserves round-trips for future versions.
+- Spots are integers within field bounds; lanes are enumerated.
+- Actor roles are allowed per kind, keyed roles must reference existing carries,
+  tracked `player` actors must be match participants, and opponent actors must be
   label actors.
-- Scoring/end-spot consistency, possession consistency, try only when
-  `tryPending`, kickoff kinds only when `kickoffPending` or after a `situation_set`
-  (warnings, not failures, so a recorder can always continue).
-- Rules gates: flag profiles reject kick kinds; 6-player uses 15-yard
+- Everything in the fatal column of §7.3 rejects; everything in the warning column
+  saves with a warning.
+- Rules gates: flag profiles reject kick kinds, and 6-player uses a 15-yard
   first-down distance.
+- Registering football event definitions does not make cloud transport or
+  production game creation available. Those stay behind the FBE-5/FBE-6 gates and
+  the shared allow-list migration (FBE-0 §12).
 
 ---
 
 ## 10. Tests
 
-- Unit tests for every kind, segment and penalty status.
+- Unit tests for every kind, carry kind and penalty status.
+- **Spot separation fixtures:** a run from 20 to 30 plus a 15-yard dead-ball foul
+  gives the rusher 10 yards, the defense 15 penalty yards and a next snap at 45; a
+  touchdown followed by a penalty enforced on the try or kickoff keeps the scoring
+  endpoint and moves only `nextSnap`; a holding foul with `negatesPlay: true` drops
+  all play stats.
+- **Multi-carry fixture:** an interception return that ends in a fumble recovered
+  and returned by the passing team (three carries, two sides) credits each leg to
+  its own keyed carrier, including an Unattributed leg and an unknown-spot leg.
+- **Warning versus fatal:** a situation mismatch saves with a warning and official
+  totals; a structurally invalid play is rejected by append and by atomic
+  append-plus-mutate; Soccer and Basketball rejection tests are unchanged.
+- **Period format:** a four-quarter game and a two-half game each verify the
+  opening period id, the halftime transition, the timeout reset and the
+  second-half kickoff side.
+- Carry over the transactional invalid-replay and immutable-setup tests from the
+  Baseball foundation (#430) and the explicit anchored/untimed lifecycle cases from
+  the Hockey plan (#429).
 - Golden fixtures: two or three complete public high-school box scores and one
   NCAA game transcribed to play logs; projection must match the published team
   totals, passing/rushing/receiving leaders and scoring summary exactly.
-- Property tests: flipping display direction and re-numbering quarters never
-  changes stats; removing a play and restoring it yields the identical projection.
+- Property tests: flipping display direction never changes stats; removing a play and restoring it yields the identical projection.
 - Situation edge cases: pick-six, fumble out of the end zone (touchback), safety
   after a sack, muffed punt recovered by kicking team, onside kick, offsetting
   penalties, penalty on a try, defensive 2-pt return, turnover on downs, missed
@@ -318,7 +428,7 @@ counters plus team totals, following the catalog in FBE-0 §8. Key rules:
 | FBE-2A | Rules/profile types and built-ins (period format quarters/halves, period lengths by age group); football `sportGameState` + setup snapshot types; capability registration kept fail-closed | Types and parsers tested |
 | FBE-2A2 | Clock events and anchored clock projection, extracted from or shared with `src/lib/basketball/clockProjection.ts` where the semantics match; time of possession per drive | Clock replay and correction tests |
 | FBE-2B | Event definitions, validators, registry, checked append helpers | Every kind validates/rejects as specified |
-| FBE-2C | Situation fold, drives, diagnostics | Edge-case suite green |
+| FBE-2C | Situation fold, period format lifecycle, drives, football warnings versus fatal diagnostics | Edge-case suite green |
 | FBE-2D | Stat projector, team totals, coverage, golden fixtures | Golden box scores match |
 
 No migrations in FBE-2. Football cloud storage uses the shared constraint
@@ -331,6 +441,7 @@ No migrations in FBE-2. Football cloud storage uses the shared constraint
 1. Integer yards only (no half-yard spots)? [Default: yes.]
 2. Penalty catalog scope: ~25 common fouls plus Custom? [Default: yes.]
 3. Should `negatesPlay` be a catalog default the recorder can flip, or always
-   asked? [Default: catalog default, flip in details.]
+   asked? [Default: catalog default, flip in details; the chosen value is always
+   saved on the event.]
 4. FG snap/hold allowance of 7 yards (NCAA/NFL convention) for all profiles?
    [Default: 7 for 11-player, profile-configurable.]

@@ -41,8 +41,12 @@ FBE-3 (`cloudSync.eventCloudPolicy` local-only, the BKE-5C3 pattern).
    with position; Offense and Defense starter columns and specialist roles
    prefilled from FBE-1 defaults; late players can be added during the game.
 4. **Coin toss:** who won, their choice, which goal the tracked team defends first
-   (sets display direction), who kicks off. Appends `football.coin_toss` and the
-   q1 `period_start`, then presents the opening kickoff as the pending play.
+   (sets display direction), who kicks off, and who kicks off the second half.
+   The second-half kicker is prefilled from the choice when that settles it
+   (receive or kick) and asked explicitly after a defer or goal choice. Appends
+   `football.coin_toss` and the `period_start` for the first period of the frozen
+   format (`q1` or `h1`, FBE-2 §7.1), then presents the opening kickoff as the
+   pending play.
 
 ---
 
