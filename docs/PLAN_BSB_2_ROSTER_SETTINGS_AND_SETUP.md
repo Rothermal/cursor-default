@@ -1,6 +1,6 @@
 # Plan: BSB-2 Baseball Roster Positions, Team Defaults and Game Setup
 
-Status: approved to start by Mark (2026-09-27, "Start BSB-2"). Builds on the merged
+Status: implemented (BSB-2A, 2B, 2C); migration 071 awaits owner apply. Approved to start by Mark (2026-09-27, "Start BSB-2"). Builds on the merged
 BSB-1 engine ([plan](PLAN_BSB_1_EVENT_FOUNDATION.md)). Product model:
 [BSB-0](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md) sections 5, 9 and 12.
 
@@ -149,3 +149,15 @@ The setup screen keeps an in-memory draft and produces the BSB-1 setup v1:
   shows the RPC error plainly if it is missing, and reads still work.
 - **Roster churn.** Default lineup ids can go stale when players leave; the panel flags
   them and the server rejects saving inactive players (Basketball 070 pattern).
+
+---
+
+## 7. Delivery Record
+
+- BSB-2A/2B: `BaseballPositionField`, Team Manage position editing, `baseball/settings.ts`,
+  `teamSettingsSync.ts`, the sport-neutral `useSportTeamSettings` hook,
+  `BaseballTeamSettingsPanel`, and migration 071.
+- BSB-2C: `isBaseballEventPreviewAvailable`, `baseball/setupBuilder.ts`,
+  `pages/BaseballEventSetup.tsx` (local players or a cloud team prefilled once from
+  defaults) and `pages/BaseballEventGame.tsx` (frozen setup review and Start).
+- Verification: [REGRESSION_BSB_2_ROSTER_SETTINGS_AND_SETUP.md](REGRESSION_BSB_2_ROSTER_SETTINGS_AND_SETUP.md).
