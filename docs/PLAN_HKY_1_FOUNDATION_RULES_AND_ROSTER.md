@@ -115,8 +115,8 @@ validation (goalie count, skater count, duplicates, dressed-as consistency), clo
 Files: `src/lib/hockey/state.ts`, `events.ts`, `projector.ts`, `live.ts`, plus
 registration in `src/lib/sportGameState/state.ts` and `src/lib/gameEvents/runtime.ts`.
 
-- `HockeySportGameState` `{ sportId: 'hockey', version: 1, setup, projection, preferences }`
-  with a strict normalizer registered alongside Basketball and Soccer; fingerprint
+- `HockeySportGameState` `{ sportId: 'hockey', version: 1, setup, projection, capturePreferences }`
+  (the field name matches the other sports' state), with a strict normalizer registered alongside Basketball and Soccer; fingerprint
   inclusion follows Soccer (preferences such as rink flip stay out of fingerprints).
 - Event definitions, all `schemaVersion: 1`, `teamSide` per definition opt-in:
   - `hockey.opening_lineup`
@@ -130,7 +130,7 @@ registration in `src/lib/sportGameState/state.ts` and `src/lib/gameEvents/runtim
   anchors (Basketball BKE-6A2 behavior). The projector reads `clockModel` from the frozen
   rules; it never infers the model from whether clock events exist.
 - Tracked attacking direction per period is derived from the frozen setup and rules
-  (§2.2) and exposed in projection; the display flip lives in preferences only.
+  (§2.2) and exposed in projection; the display flip lives in `capturePreferences` only.
 - Checked commands in `live.ts` return `{ ok, state } | { ok: false, error }` and append
   atomically through `applyGameEventAppendsAndMutations`.
 - Capability: hockey event games (`sportGameState?.sportId === 'hockey'`) never enter
@@ -186,6 +186,27 @@ not supported; a recorder who stops running the clock keeps an anchored game pau
   resolve to the default profile; malformed settings fail closed and name the layer.
 - HKY-1B: `positions.ts`, `lineupDefaults.ts`, `setup.ts`, and `setup.test.ts`. Pure
   parsers and helpers only; nothing reads or writes team settings yet.
+- HKY-1C: `periods.ts`, `events.ts`, `state.ts`, `projector.ts`, `live.ts`, registered in
+  `sportGameState/state.ts` and `gameEvents/runtime.ts`. Details as built:
+  - Period ids are `regulation-{n}` (order n) and `overtime-{n}` (order 100 + n).
+  - Every event is `neutral`, has no location or actors, and carries `elapsedMs` only
+    when the game is anchored and a period is active (period start is 0). Events outside
+    a period, and every clockless event, carry `null`.
+  - The opening lineup event must equal the frozen setup lineup; `startHockeyGame`
+    appends it with the period 1 start in one command.
+  - Replay rejects a running clock moving backward, stale elapsed values, and any event
+    other than the expiration pause once the clock passes the period length.
+  - `canEndWithoutReason` is true once regulation is done, no period may follow, and a
+    tie is allowed. A tie the rules forbid (NHL regular season after overtime) needs a
+    reason until the HKY-4 shootout exists.
+  - Suspend, abandon and period end pause a running clock in the same command. Reopen
+    continues the suspended period, paused.
+  - The shared active-game guard in `GameContext` pauses a running Hockey clock before
+    park, replace, resume or reload, as it does for Basketball.
+  - Dev gate: `isHockeyEventPreviewAvailable()` in `sportAvailability.ts`. `/setup?sport=hockey&events=1`
+    renders `HockeyEventPreview` only in development. `/game` always routes a Hockey
+    event game to that page, which shows a not-available notice in production.
+  - Tests: `live.test.ts`, `sportIsolation.test.ts`, `previewGate.test.ts`.
 
 ## 3. Owner-Confirmed Decisions
 
