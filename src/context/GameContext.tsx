@@ -45,6 +45,10 @@ import {
   type BasketballWorkflowAction,
 } from '../lib/basketball/productionClockPolicy'
 import {
+  pauseRunningHockeyClockForWorkflow,
+  shouldInterceptRunningHockeyClock,
+} from '../lib/hockey/live'
+import {
   eventConflictRecoveryFingerprint,
   resolveEventConflictInState,
 } from '../lib/gameEvents/eventConflictResolution'
@@ -493,18 +497,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
       )
       if (!hasActiveGame) return true
 
-      const runningClock = shouldInterceptRunningBasketballClock(current, action)
+      const runningBasketballClock = shouldInterceptRunningBasketballClock(current, action)
+      const runningHockeyClock = shouldInterceptRunningHockeyClock(current, action)
+      const runningClock = runningBasketballClock || runningHockeyClock
       if (action === 'reload_commit' && !runningClock) return true
 
-      const message = runningClock
+      const message = runningBasketballClock
         ? 'The Basketball clock is running. Pause and continue?'
-        : workflowConfirmationMessage(action)
+        : runningHockeyClock
+          ? 'The Hockey clock is running. Pause and continue?'
+          : workflowConfirmationMessage(action)
       if (!window.confirm(message)) return false
       if (!runningClock) return true
 
-      const paused = pauseRunningBasketballClockForWorkflow(current, action, {
-        recorderUserId: userId,
-      })
+      const paused = runningHockeyClock
+        ? pauseRunningHockeyClockForWorkflow(current, action, { recorderUserId: userId })
+        : pauseRunningBasketballClockForWorkflow(current, action, {
+          recorderUserId: userId,
+        })
       if (!paused.ok) {
         setParkingError(paused.message)
         return false
@@ -526,6 +536,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const blockUnpreparedRunningClock = useCallback(
     (action: BasketballWorkflowAction) => {
+      if (shouldInterceptRunningHockeyClock(stateRef.current, action)) {
+        setParkingError('Pause the running Hockey clock before parking or opening another game.')
+        return true
+      }
       if (!shouldInterceptRunningBasketballClock(stateRef.current, action)) return false
       setParkingError('Pause the running Basketball clock before parking or opening another game.')
       return true

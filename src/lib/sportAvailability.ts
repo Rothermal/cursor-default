@@ -30,6 +30,14 @@ interface BasketballEventCreationPolicyOptions {
   releaseStage?: BasketballEventReleaseStage
 }
 
+/**
+ * HKY-1: the Hockey event workspace is a development preview. Production builds keep
+ * the legacy Hockey stat grid; HKY-6 owns the release decision.
+ */
+export function isHockeyEventPreviewAvailable(development: boolean = DEVELOPMENT_BUILD): boolean {
+  return development
+}
+
 export function getSportAvailabilityPolicy(
   sportId: string,
   enabledInSettings: boolean,

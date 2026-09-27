@@ -1,4 +1,4 @@
-import type { JsonObject } from '../gameEvents/types'
+import type { GameEvent, JsonObject } from '../gameEvents/types'
 
 export const HOCKEY_RULES_SCHEMA_VERSION = 1
 export const HOCKEY_SETTINGS_SCHEMA_VERSION = 1
@@ -160,3 +160,144 @@ export interface HockeyMatchSetup {
 }
 
 export type HockeySetupValidation = { ok: true } | { ok: false; message: string }
+
+// ---------------------------------------------------------------------------
+// Events (HKY-1C)
+// ---------------------------------------------------------------------------
+
+export const HOCKEY_EVENT_SCHEMA_VERSION = 1
+export const HOCKEY_GAME_STATE_VERSION = 1
+
+export type HockeyPeriodKind = 'regulation' | 'overtime'
+
+export interface HockeyPeriodRef {
+  kind: HockeyPeriodKind
+  number: number
+}
+
+export type HockeyClockPauseSource = 'manual' | 'expiration'
+
+interface HockeyCapturePayload extends JsonObject {
+  /** Groups events appended by one command; null for single-event commands. */
+  captureCommandId: string | null
+}
+
+export interface HockeyOpeningLineupPayload extends HockeyCapturePayload {
+  goalieParticipantId: string
+  skaterParticipantIds: string[]
+  opponentGoalieId: string
+}
+
+export interface HockeyPeriodStartedPayload extends HockeyCapturePayload {
+  kind: HockeyPeriodKind
+  number: number
+}
+
+export interface HockeyPeriodEndedPayload extends HockeyCapturePayload {
+  /** Required when an anchored period ends before its clock expires. */
+  reason: string | null
+}
+
+export interface HockeyClockStartedPayload extends HockeyCapturePayload {
+  anchorElapsedMs: number
+}
+
+export interface HockeyClockPausedPayload extends HockeyCapturePayload {
+  elapsedMs: number
+  source: HockeyClockPauseSource
+}
+
+export interface HockeyClockSetPayload extends HockeyCapturePayload {
+  fromElapsedMs: number
+  toElapsedMs: number
+  reason: string
+}
+
+export interface HockeyMatchEndedPayload extends HockeyCapturePayload {
+  /** Required when the match ends before its rules say it is complete. */
+  reason: string | null
+}
+
+export interface HockeyReasonPayload extends HockeyCapturePayload {
+  reason: string
+}
+
+export interface HockeyPayloadByType {
+  'hockey.opening_lineup': HockeyOpeningLineupPayload
+  'hockey.period_started': HockeyPeriodStartedPayload
+  'hockey.period_ended': HockeyPeriodEndedPayload
+  'hockey.clock_started': HockeyClockStartedPayload
+  'hockey.clock_paused': HockeyClockPausedPayload
+  'hockey.clock_set': HockeyClockSetPayload
+  'hockey.match_ended': HockeyMatchEndedPayload
+  'hockey.match_suspended': HockeyReasonPayload
+  'hockey.match_abandoned': HockeyReasonPayload
+  'hockey.match_reopened': HockeyReasonPayload
+}
+
+export type HockeyEventType = keyof HockeyPayloadByType
+
+export type HockeyEvent<TType extends HockeyEventType = HockeyEventType> = {
+  [K in TType]: GameEvent<HockeyPayloadByType[K], K, 'hockey', 'neutral'>
+}[TType]
+
+// ---------------------------------------------------------------------------
+// Projection and sport state
+// ---------------------------------------------------------------------------
+
+export type HockeyMatchStatus = 'pregame' | 'in_progress' | 'ended' | 'suspended' | 'abandoned'
+
+export interface HockeyPeriodRecord {
+  id: string
+  order: number
+  kind: HockeyPeriodKind
+  number: number
+  durationMs: number
+  trackedAttackingDirection: HockeyAttackingDirection | null
+  startedEventId: string
+  endedEventId: string | null
+  /** Clock position at the end of an anchored period; null for clockless games. */
+  endedAtElapsedMs: number | null
+  earlyEndReason: string | null
+}
+
+/** Anchored clock state; `elapsedMs` counts up from the start of the active period. */
+export interface HockeyClockProjection {
+  periodId: string | null
+  running: boolean
+  elapsedMs: number
+  anchorElapsedMs: number | null
+  anchorOccurredAt: string | null
+  expired: boolean
+}
+
+export interface HockeyMatchProjection {
+  status: HockeyMatchStatus
+  /** Reason recorded with the latest end, suspension, abandonment or reopen. */
+  statusReason: string | null
+  lineupRecorded: boolean
+  periods: HockeyPeriodRecord[]
+  activePeriodId: string | null
+  /** The period that may start next, when no period is active. */
+  nextPeriod: HockeyPeriodRef | null
+  /** True when ending the match now needs no reason. */
+  canEndWithoutReason: boolean
+  /** Null when the frozen rules use `clockModel: 'none'`. */
+  clock: HockeyClockProjection | null
+  score: { tracked: number; opponent: number }
+  /** Direction for the active period, or the most recent one. */
+  trackedAttackingDirection: HockeyAttackingDirection | null
+}
+
+/** Device display choices; never part of fingerprints or cloud payloads. */
+export interface HockeyPreferences {
+  rinkFlipped: boolean
+}
+
+export interface HockeySportGameState {
+  sportId: 'hockey'
+  version: typeof HOCKEY_GAME_STATE_VERSION
+  setup: HockeyMatchSetup
+  projection: HockeyMatchProjection
+  capturePreferences: HockeyPreferences
+}
