@@ -9,6 +9,7 @@ import {
   History,
   Map,
   MoreHorizontal,
+  Undo2,
   Pause,
   Play,
   Repeat2,
@@ -42,6 +43,8 @@ import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspac
 import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
 import SoccerQuickShotSheet from '../components/soccer/SoccerQuickShotSheet'
+import SoccerRecentEventsSheet from '../components/soccer/SoccerRecentEventsSheet'
+import { soccerLineupManagerBlocked } from '../lib/soccer/lineupManager'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from '../components/soccer/SoccerShotCaptureDialog'
@@ -64,6 +67,7 @@ import {
   soccerLivePenaltyFoul,
   soccerPeriodTimings,
   soccerLastTrackedShooterId,
+  soccerRecentUndoCandidates,
   soccerShotSourceLine,
   suggestSoccerShotSource,
   soccerTeamEventReviewPresentation,
@@ -126,6 +130,7 @@ export default function SoccerGameTracker() {
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
   const [quickShotDraft, setQuickShotDraft] = useState<SoccerCaptureDraft | null>(null)
   const [quickShotKey, setQuickShotKey] = useState(0)
+  const [recentEventsOpen, setRecentEventsOpen] = useState(false)
   const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
   const [restartArmed, setRestartArmed] = useState(false)
   const [penaltyPrompt, setPenaltyPrompt] = useState<SoccerPenaltyKickPrompt | null>(null)
@@ -368,6 +373,13 @@ export default function SoccerGameTracker() {
     }
     if (isIncidentEvent(event)) openIncident(incidentKind(event), event.location, 'edit', event)
   }
+
+  const lineupBlockedReason = soccerLineupManagerBlocked(state, false)
+    ? projection.clock.running
+      ? 'Pause the clock to undo.'
+      : 'Use Timeline to undo this lineup change.'
+    : null
+  const recentUndo = soccerRecentUndoCandidates(inspection.activeEvents, { lineupBlockedReason })
 
   const applyResult = (result: SoccerLiveResult): boolean => {
     if (applyingRef.current) return false
@@ -773,7 +785,7 @@ export default function SoccerGameTracker() {
               )}
 
               {!ended && (
-                <div className="grid grid-cols-[minmax(0,1fr)_3rem] gap-2" role="group" aria-label="Field match actions">
+                <div className="grid grid-cols-[minmax(0,1fr)_3rem_3rem] gap-2" role="group" aria-label="Field match actions">
                   <button
                     type="button"
                     onClick={() => openDialog('substitution')}
@@ -782,6 +794,19 @@ export default function SoccerGameTracker() {
                   >
                     <Repeat2 size={18} />
                     <span className="text-center leading-tight">{projection.clock.running ? 'Pause clock to manage lineup' : 'Manage Lineup'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRestartArmed(false)
+                      setRecentEventsOpen(true)
+                    }}
+                    disabled={!healthy || isApplying || cloudFinal || !recentUndo.target}
+                    className="grid min-h-12 w-12 place-items-center rounded-md border border-line-strong bg-surface text-content disabled:bg-control-disabled disabled:text-content-disabled"
+                    aria-label="Undo recent event"
+                    title="Undo recent event"
+                  >
+                    <Undo2 size={20} />
                   </button>
                   <button
                     type="button"
@@ -906,6 +931,20 @@ export default function SoccerGameTracker() {
           setDialogKind(null)
           setDialogParticipantId(null)
         }}
+      />
+
+      <SoccerRecentEventsSheet
+        open={recentEventsOpen && !cloudFinal}
+        state={state}
+        inspection={inspection}
+        busy={isApplying}
+        lineupBlockedReason={lineupBlockedReason}
+        onApply={applyResult}
+        onOpenTimeline={() => {
+          setRecentEventsOpen(false)
+          setMainTab('timeline')
+        }}
+        onClose={() => setRecentEventsOpen(false)}
       />
 
       <SoccerQuickShotSheet

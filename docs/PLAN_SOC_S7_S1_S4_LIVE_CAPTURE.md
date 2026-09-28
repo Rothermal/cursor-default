@@ -1,8 +1,8 @@
 # Soccer Live Capture Plan: S7, S1, S4
 
 Status: approved (plan PR #436 merged 2026-09-28; owner accepted every
-recommended answer in [Section 6](#6-owner-questions)). S7 (S7A, S7B) and
-S1 are implemented; S4 is not started. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
+recommended answer in [Section 6](#6-owner-questions)). All slices are
+implemented: S7 (S7A, S7B), S1, and S4. Deployed owner verification remains. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
 this file is the execution plan for `S7`, `S1`, and `S4`.
 
 **Goal:** Make the three most common sideline gestures short: a shot after a
@@ -326,6 +326,40 @@ both themes. No slice needs a Supabase migration.
   Save recorded the assist; Quick Goal then More details opened the full dialog
   with Goal and the shooter selected; opponent Saved then Save recorded; the
   corner chip showed "Corner sequence · From corner, 0:02" and cleared.
+
+### 5.4 S4 delivery record
+
+- `src/lib/soccer/recentUndo.ts` owns `soccerRecentUndoCandidates`: active
+  events newest first by `sequence`, up to five, ending at the first stop-line
+  event. The target is the top row only when it is undoable; lineup targets
+  (substitution window, lineup transition, role change) carry a blocked
+  reason when the lineup manager's lock applies ("Pause the clock to undo."
+  while running).
+- Undoable families: shot, own goal, score adjustment, defensive action, foul,
+  card, restart, substitution window, lineup transition, role change.
+  Everything else is a stop line, including kickoff, period and clock events,
+  rules and direction, match end/reopen, shootout events, and roster
+  add/resolve (identity changes stay in Timeline).
+- The Field match-action row gains an Undo icon button between Manage Lineup
+  and More match actions. It is disabled with nothing to undo (including when
+  the newest event is a stop line), an unhealthy history, while applying, or
+  cloud final.
+- `SoccerRecentEventsSheet` lists the rows with the shared S7B labels and match
+  time; only the top row has Undo. Undo and Restore call the checked
+  `deleteSoccerHistoryEvent` / `restoreSoccerHistoryEvent` and apply through
+  the tracker's `applyResult`. A rejected or incomplete-history result is shown
+  inline with an Open Timeline link and is not applied. Restore is offered
+  until the sheet closes; any capture requires closing it.
+- Consequence of the approved stop lines: pausing the clock ends Undo's reach,
+  so a shot recorded before a pause is corrected from Timeline.
+- Tests: `recentUndo.test.ts` (families, stop lines, sequence order, cap,
+  lineup reason), an engine undo-then-restore test in `soc4.test.ts`, and
+  wiring checks in `shotCaptureWiring.test.ts`.
+- Browser check at 390px in light and dark: Undo disabled before any capture;
+  after an off-target shot and a goal the sheet listed both above the "Clock
+  started" stop line; Undo removed the goal (score 1 to 0) and offered Restore;
+  Restore returned the score to 1. The running-clock lineup case is covered by
+  unit tests only.
 
 ## 6. Owner questions
 

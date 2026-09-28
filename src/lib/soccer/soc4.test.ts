@@ -21,7 +21,9 @@ import {
   type SoccerGameState,
 } from './gameState'
 import {
+  deleteSoccerHistoryEvent,
   endSoccerMatch,
+  restoreSoccerHistoryEvent,
   inspectSoccerHistory,
   recordCheckedSoccerEvent,
   recordSoccerScoreAdjustment,
@@ -36,6 +38,7 @@ import {
 } from './live'
 import { suggestSoccerShotSource } from './capture'
 import { buildSoccerShotInput, soccerLastTrackedShooterId, soccerQuickShotSelection } from './shotInput'
+import { soccerRecentUndoCandidates } from './recentUndo'
 import { resolveSoccerMatchRules, type SoccerMatchRulesOverride } from './rules'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import { SOCCER_GAME_STATE_VERSION } from './types'
@@ -403,6 +406,41 @@ describe('SOC-4A normal-match projection', () => {
       ['goalkeeper', 'match-keeper'],
     ])
     expect(saved.state.sportGameState!.projection.sideTotals.opponent.shotsOnTarget).toBe(1)
+  })
+
+  it('undoes the newest recorded event and restores it for Field Undo', () => {
+    const kickedOff = append(initializedState(), kickoffEvents())
+    const corner = recordCheckedSoccerEvent(kickedOff, {
+      eventType: 'soccer.team_event',
+      payload: { kind: 'corner' },
+    }, { recorderUserId: 'user-1', eventIds: ['50000000-0000-4000-8000-000000000031'] })
+    expect(corner.ok).toBe(true)
+    if (!corner.ok) return
+    const shot = recordSoccerShot(corner.state, {
+      teamSide: 'tracked',
+      outcome: 'goal',
+      situation: 'corner_sequence',
+      sourceEventId: '50000000-0000-4000-8000-000000000031',
+      location: null,
+      shooter: { kind: 'participant', participantId: 'match-defender' },
+    }, { recorderUserId: 'user-1', eventIds: ['50000000-0000-4000-8000-000000000032'] })
+    expect(shot.ok).toBe(true)
+    if (!shot.ok) return
+    const lineupBlockedReason = null
+    const first = soccerRecentUndoCandidates(shot.inspection.activeEvents, { lineupBlockedReason })
+    expect(first.target?.id).toBe('50000000-0000-4000-8000-000000000032')
+
+    const undoShot = deleteSoccerHistoryEvent(shot.state, first.target!.id)
+    expect(undoShot.ok && undoShot.inspection.complete).toBe(true)
+    if (!undoShot.ok) return
+    expect(undoShot.state.sportGameState!.projection.sideTotals.tracked.score).toBe(0)
+    const second = soccerRecentUndoCandidates(undoShot.inspection.activeEvents, { lineupBlockedReason })
+    expect(second.target?.id).toBe('50000000-0000-4000-8000-000000000031')
+
+    const restored = restoreSoccerHistoryEvent(undoShot.state, first.target!.id)
+    expect(restored.ok && restored.inspection.complete).toBe(true)
+    if (!restored.ok) return
+    expect(restored.state.sportGameState!.projection.sideTotals.tracked.score).toBe(1)
   })
 
   it('derives defensive, foul, discipline, team, penalty, and linked-block totals', () => {
