@@ -1,7 +1,7 @@
 # Soccer Live Capture Plan: S7, S1, S4
 
-Status: proposed plan awaiting owner answers in [Section 6](#6-owner-questions).
-No code has changed. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
+Status: approved 2026-09-28; the owner accepted every recommendation in
+[Section 6](#6-owner-questions). Implementation proceeds slice by slice. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
 this file is the execution plan for `S7`, `S1`, and `S4`.
 
 **Goal:** Make the three most common sideline gestures short: a shot after a
@@ -228,7 +228,9 @@ both themes. No slice needs a Supabase migration.
 
 ## 6. Owner questions
 
-Recommended answers are marked. Silence means the recommendation is used.
+Owner decision 2026-09-28: all recommended answers accepted (Q1 yes, Q2 no
+preselected shooter with last shooter highlighted, Q3 yes, Q4 yes when paused,
+Q5 yes until the next capture).
 
 - **Q1 Penalty prompt.** After a penalty foul, show a one-shot
   "Log penalty kick" button? **Yes (recommended)** / No, just default the

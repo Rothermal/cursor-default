@@ -25,7 +25,7 @@ architecture, not current schema or deployment instructions.
 | Clock and live substitutions | [Timing assessment](PLAN_EVENT_TIMING_AND_LIVE_LINEUPS.md) | Confirmed goals; implementation/schema still proposed |
 | Baseball program | [BSB-0 product model](PLAN_BSB_0_BASEBALL_PRODUCT_MODEL.md), [BSB-1 foundation](PLAN_BSB_1_EVENT_FOUNDATION.md) | Direction approved; BSB-1 engine implemented (no UI yet); BSB-2 setup next |
 | Soccer issues | [Field-test backlog](PLAN_SOC_FIELD_TEST_BACKLOG.md) | Living issue inventory; distinguish implemented from owner-verified |
-| Soccer live capture | [S7/S1/S4 plan](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md) | Proposed; owner questions open |
+| Soccer live capture | [S7/S1/S4 plan](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md) | Approved 2026-09-28; implementation in slices |
 | Shot metadata/direction | [S15/S16 regression](REGRESSION_SOC_S15_S16_SHOT_DETAILS.md) | Implemented; deployed checks remain separately recorded |
 | Basketball release evidence | [BKE-6E regression](REGRESSION_BKE_6E_RELEASE.md) | Preserve pending evidence and reported issues; reconcile with owner results before archiving |
 | Appearance release | [THM-6 regression](REGRESSION_THM_6_APPEARANCE_RELEASE.md) | Released for owner use; retain pending deployed checks |
