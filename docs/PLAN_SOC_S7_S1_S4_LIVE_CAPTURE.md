@@ -1,8 +1,8 @@
 # Soccer Live Capture Plan: S7, S1, S4
 
 Status: approved (plan PR #436 merged 2026-09-28; owner accepted every
-recommended answer in [Section 6](#6-owner-questions)). S7A is implemented;
-S7B, S1, and S4 are not started. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
+recommended answer in [Section 6](#6-owner-questions)). S7 (S7A, S7B) and
+S1 are implemented; S4 is not started. Do not implement from `PLAN_SOC_FIELD_TEST_BACKLOG.md`;
 this file is the execution plan for `S7`, `S1`, and `S4`.
 
 **Goal:** Make the three most common sideline gestures short: a shot after a
@@ -265,6 +265,67 @@ both themes. No slice needs a Supabase migration.
 - Browser check at 390px in light and dark: corner -> Field shot opened with
   Corner sequence and the corner selected; opponent penalty foul -> prompt ->
   shot sheet opened with Penalty, the foul, and the penalty-mark location.
+
+### 5.2 S7B delivery record
+
+- `src/lib/soccer/eventLabels.ts` owns `soccerEventTitle`,
+  `soccerEventDetail`, `soccerShotSourceLine`, and `soccerRestartLedToLine`.
+  Timeline no longer keeps private copies.
+- Source lines read `From corner, taker #7 Ava, 23:10`, `From penalty foul on
+  #9 Mia, 41:02`, or `From free kick foul`; the taker, fouled player, or time
+  is omitted when not recorded. Times are period-local. A source that is not
+  active reads `Linked restart removed` in the danger color.
+- Restart rows list every active linked shot as `Led to: Goal (header) #9 Mia,
+  23:14`, joined with `;`.
+- `soccerSummaryTimelineReview` rows carry `nestedUnderEventId`; a linked shot
+  moves directly under its restart when both are in the same section and
+  filter, with an L-shaped connector. Nested rows hide the visible source line
+  (kept for screen readers) and the restart omits them from `Led to`. Live
+  Timeline keeps newest-first order with both text lines.
+- Summary Field detail appends the source line to the situation; the live
+  Field overlap sheet shows it under the marker label. No pitch connector.
+- Tests: label and nesting cases in `summaryTimeline.test.ts`, linked detail in
+  `summaryField.test.ts`, and wiring checks in `matchReadiness.test.ts`.
+- Browser check at 390px in light and dark: corner then goal showed `From
+  corner, 0:02` and `Led to: Goal Dee, 0:04` in live Timeline, and the shot
+  nested under the corner in Summary Timeline.
+
+### 5.3 S1 delivery record
+
+- `src/lib/soccer/shotInput.ts` owns `buildSoccerShotInput`, the one place a
+  shot form selection becomes `recordSoccerShot` / `reviseSoccerShot` input.
+  The full dialog's shot branch and the compact sheet both call it;
+  `soccerQuickShotSelection` fills the fields the compact sheet does not show
+  with the full dialog's live defaults. It also holds the creator/source rules,
+  the penalty mark, `soccerQuickShotSavesOnShooter`, and
+  `soccerLastTrackedShooterId`.
+- `SoccerQuickShotSheet` opens for live Field shot taps, Quick Goal, and the
+  penalty prompt. Edits, historical adds, Timeline, and the score history keep
+  the full dialog. The tracker remounts the sheet per draft.
+- Tracked flow: outcome and shooter in either order; Blocked, Off target, and
+  Woodwork save on the second tap; Goal and Saved show "Assisted by" chips
+  (on-field teammates except the shooter) with Skip and Save, unless the
+  situation is Penalty or Direct free kick. Opponent flow: outcome, then Save,
+  with the on-field tracked goalkeeper and Unknown opponent shooter.
+- The S7 situation/source chip shows the source line with a clear button that
+  returns to Open play. "More details" hands outcome, situation, source,
+  shooter, assist, and location to the full dialog through new
+  `SoccerCaptureDraft.shooterId` / `primaryCreatorId`, read only for new shots.
+- Last shooter: derived from the newest active tracked shot rather than
+  component memory, so Undo and corrections move the ring back and it survives
+  a reload. No shooter is preselected.
+- Chips are 44px, outcomes wrap to two rows, and nothing scrolls sideways at
+  390px.
+- Tests: `shotInput.test.ts` (compact and full-dialog choices build equal
+  inputs, creator/source/keeper rules, save-on-shooter matrix), an engine test
+  in `soc4.test.ts` recording compact goal-with-assist and opponent save, and
+  wiring checks in `shotCaptureWiring.test.ts`. There are no DOM render tests
+  in this repo, so tap counts were checked in the browser instead.
+- Browser check at 390px in light and dark: Off target then shooter saved in
+  two taps; the last shooter was ringed; Goal then shooter then assist then
+  Save recorded the assist; Quick Goal then More details opened the full dialog
+  with Goal and the shooter selected; opponent Saved then Save recorded; the
+  corner chip showed "Corner sequence · From corner, 0:02" and cleared.
 
 ## 6. Owner questions
 

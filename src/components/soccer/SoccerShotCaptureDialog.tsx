@@ -9,13 +9,17 @@ import {
   recordHistoricalSoccerShot,
   recordSoccerOwnGoal,
   recordSoccerShot,
+  buildSoccerShotInput,
   resolveSoccerCaptureSaveOperation,
   reviseSoccerOwnGoal,
   reviseSoccerShot,
   soccerAttackingDirectionAt,
   soccerParticipantRoleAt,
   soccerParticipantWasOnFieldAt,
+  soccerPenaltyMark,
   soccerPeriodTimings,
+  soccerShotCreatorsAllowed,
+  soccerShotSourceAllowed,
   soccerShotSourceCandidates,
   sortSoccerActorParticipants,
   type SoccerCaptureActorSelection,
@@ -42,6 +46,9 @@ export interface SoccerCaptureDraft {
   /** Live restart default from `suggestSoccerShotSource` or the penalty prompt. */
   situation?: SoccerShotSituation
   sourceEventId?: string | null
+  /** Compact-sheet hand-off: tracked shooter id (`__team__` for Team) and assist. */
+  shooterId?: string
+  primaryCreatorId?: string | null
   preferTeamAttribution?: boolean
   mode?: 'live' | 'historical' | 'edit'
   event?: SoccerShotEvent | SoccerOwnGoalEvent
@@ -212,12 +219,13 @@ export default function SoccerShotCaptureDialog({
     setOwnGoal(Boolean(ownGoalEvent))
     setShotDetails(shotDetailDraft(event))
     setLocation(event?.location ?? initializationDraft.location ?? (draftSituation === 'penalty'
-      ? penaltyMark(soccerScoringDirection(initializationDraft.teamSide, trackedAttackingDirection))
+      ? soccerPenaltyMark(soccerScoringDirection(initializationDraft.teamSide, trackedAttackingDirection))
       : null))
-    setTrackedShooterId(shooter?.participantId ?? (shooter?.kind === 'team' || initializationDraft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
+    const draftShooterId = event ? undefined : initializationDraft.shooterId
+    setTrackedShooterId(shooter?.participantId ?? draftShooterId ?? (shooter?.kind === 'team' || initializationDraft.preferTeamAttribution ? '__team__' : defaultParticipantId || '__team__'))
     setOpponentShooterMode(shooter?.kind === 'team' ? 'team' : 'unknown')
     setOpponentShooterLabel(opponentLabel(shooter, 'Unknown opponent'))
-    setPrimaryCreatorId(primary?.participantId ?? '')
+    setPrimaryCreatorId(primary?.participantId ?? (event ? null : initializationDraft.primaryCreatorId) ?? '')
     setSecondaryCreatorId(secondary?.participantId ?? '')
     setOpponentCreatorLabel(opponentLabel(primary, ''))
     setOpponentSecondaryLabel(opponentLabel(secondary, ''))
@@ -263,10 +271,8 @@ export default function SoccerShotCaptureDialog({
 
   if (!draft || !projection) return null
 
-  const creatorsAllowed = !ownGoal && situation !== 'penalty' && situation !== 'direct_free_kick'
-  const sourceAllowed = situation === 'penalty' ||
-    situation === 'direct_free_kick' ||
-    situation === 'corner_sequence'
+  const creatorsAllowed = soccerShotCreatorsAllowed(situation, ownGoal)
+  const sourceAllowed = soccerShotSourceAllowed(situation)
   const sourceCandidates = moment
     ? soccerShotSourceCandidates(inspectSoccerHistory(state).activeEvents as SoccerMatchEvent[], {
         teamSide,
@@ -338,51 +344,28 @@ export default function SoccerShotCaptureDialog({
         result = recordSoccerOwnGoal(state, input, options)
       }
     } else {
-      const shooter: SoccerCaptureActorSelection = teamSide === 'tracked'
-        ? trackedShooterId === '__team__'
-          ? { kind: 'team', label: trackedLabel }
-          : { kind: 'participant', participantId: trackedShooterId }
-        : opponentShooterMode === 'team'
-          ? { kind: 'team', label: opponentTeamLabel }
-          : { kind: 'unknown', label: opponentShooterLabel || 'Unknown opponent' }
-      const goalkeeperSelection = teamSide === 'opponent'
-        ? trackedGoalkeeperId && (outcome === 'goal' || outcome === 'saved' || situation === 'penalty')
-          ? { kind: 'participant' as const, participantId: trackedGoalkeeperId }
-          : null
-        : opponentGoalkeeperLabel.trim() && (outcome === 'goal' || outcome === 'saved' || situation === 'penalty')
-          ? { kind: 'unknown' as const, label: opponentGoalkeeperLabel }
-          : null
-      const input = {
+      const input = buildSoccerShotInput({
         teamSide,
         outcome,
-        ...shotDetails,
         situation,
-        sourceEventId: sourceAllowed ? sourceEventId || null : null,
+        sourceEventId,
         location: eventLocation,
-        shooter,
-        primaryCreator: creatorsAllowed
-          ? teamSide === 'tracked'
-            ? primaryCreatorId ? { kind: 'participant', participantId: primaryCreatorId } : null
-            : opponentCreatorLabel.trim() ? { kind: 'unknown', label: opponentCreatorLabel } : null
-          : null,
-        secondaryCreator: creatorsAllowed && outcome === 'goal' && showSecondary
-          ? teamSide === 'tracked'
-            ? secondaryCreatorId ? { kind: 'participant', participantId: secondaryCreatorId } : null
-            : opponentSecondaryLabel.trim() ? { kind: 'unknown', label: opponentSecondaryLabel } : null
-          : null,
-        goalkeeper: goalkeeperSelection,
-        blocker: outcome === 'blocked'
-          ? teamSide === 'opponent'
-            ? trackedBlockerId === '__team__'
-              ? { kind: 'team', label: trackedLabel }
-              : trackedBlockerId === '__unknown__'
-                ? { kind: 'unknown', label: 'Unknown tracked blocker' }
-                : { kind: 'participant', participantId: trackedBlockerId }
-            : opponentBlockerLabel.trim()
-              ? { kind: 'unknown', label: opponentBlockerLabel }
-              : null
-          : null,
-      } satisfies Parameters<typeof recordSoccerShot>[1]
+        shotDetails,
+        trackedLabel,
+        opponentTeamLabel,
+        trackedShooterId,
+        opponentShooterMode,
+        opponentShooterLabel,
+        primaryCreatorId,
+        secondaryCreatorId,
+        opponentCreatorLabel,
+        opponentSecondaryLabel,
+        showSecondary,
+        trackedBlockerId,
+        opponentBlockerLabel,
+        opponentGoalkeeperLabel,
+        trackedGoalkeeperId,
+      })
       if (operation.operation === 'revise') {
         if (!draft.event || !moment) return setError('The event correction context is unavailable.')
         result = reviseSoccerShot(state, draft.event.id, input, moment)
@@ -524,7 +507,7 @@ export default function SoccerShotCaptureDialog({
                       }
                     )[0]?.eventId ?? '')
                   }
-                  if (next === 'penalty' && location === null) setLocation(penaltyMark(captureDirection))
+                  if (next === 'penalty' && location === null) setLocation(soccerPenaltyMark(captureDirection))
                   if (next === 'penalty' || next === 'direct_free_kick') {
                     setPrimaryCreatorId('')
                     setSecondaryCreatorId('')
@@ -628,7 +611,7 @@ export default function SoccerShotCaptureDialog({
           </div>
 
           {situation === 'penalty' && !ownGoal && (
-            <button type="button" onClick={() => setLocation(penaltyMark(captureDirection))} className="min-h-10 w-full rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-content flex items-center justify-center gap-2"><MapPin size={16} /> Use penalty mark</button>
+            <button type="button" onClick={() => setLocation(soccerPenaltyMark(captureDirection))} className="min-h-10 w-full rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-content flex items-center justify-center gap-2"><MapPin size={16} /> Use penalty mark</button>
           )}
 
           {locationEditorOpen && (
@@ -693,10 +676,6 @@ function opponentLabel(actor: GameEventActor | null, fallback: string): string {
   return actor && !actor.participantId && actor.kind !== 'team' && actor.label
     ? actor.label
     : fallback
-}
-
-function penaltyMark(direction: 'left_to_right' | 'right_to_left'): GameEventLocation {
-  return { x: direction === 'left_to_right' ? 0.87 : 0.13, y: 0.5, attackingDirection: direction }
 }
 
 function actorRoleAtMoment(

@@ -2,6 +2,7 @@ import type { GameState } from '../../types'
 import { compareGameEvents } from '../gameEvents'
 import type { GameEvent, GameEventInspection } from '../gameEvents/types'
 import { formatSoccerDuration, soccerPeriodTimings } from './live'
+import { soccerShotSourceEventId } from './eventLabels'
 import { isSoccerScoringEvent } from './timeline'
 
 export type SoccerSummaryTimelineFilter =
@@ -32,6 +33,8 @@ export interface SoccerSummaryTimelineRow {
   event: GameEvent
   timeLabel: string
   corrected: boolean
+  /** Restart this shot is nested under in the same section, or null. */
+  nestedUnderEventId: string | null
 }
 
 export interface SoccerSummaryTimelineSection {
@@ -75,6 +78,7 @@ export function soccerSummaryTimelineReview(
           event,
           timeLabel: summaryEventTimeLabel(event, starts.get(event.period.id)),
           corrected: event.revision > 1,
+          nestedUnderEventId: null,
         })),
       labels
     )
@@ -180,10 +184,42 @@ function groupTimelineRows(
     }
     section.rows.push(row)
   }
+  for (const section of sections.values()) {
+    section.rows = nestLinkedShotRows(section.rows)
+  }
   return [...sections.values()].sort(
     (left, right) =>
       left.periodOrder - right.periodOrder ||
       left.periodId.localeCompare(right.periodId)
+  )
+}
+
+/**
+ * Moves each linked shot directly under its restart row when both are in the
+ * section, so shots from one set piece read together even when other rows
+ * share the same minute.
+ */
+function nestLinkedShotRows(
+  rows: SoccerSummaryTimelineRow[]
+): SoccerSummaryTimelineRow[] {
+  const positions = new Map(rows.map((row, index) => [row.event.id, index]))
+  const children = new Map<string, SoccerSummaryTimelineRow[]>()
+  const nested = new Set<string>()
+  rows.forEach((row, index) => {
+    const sourceId = soccerShotSourceEventId(row.event)
+    const sourceIndex = sourceId ? positions.get(sourceId) : undefined
+    if (!sourceId || sourceIndex === undefined || sourceIndex >= index) return
+    if (soccerShotSourceEventId(rows[sourceIndex].event)) return
+    children.set(sourceId, [
+      ...(children.get(sourceId) ?? []),
+      { ...row, nestedUnderEventId: sourceId },
+    ])
+    nested.add(row.event.id)
+  })
+  return rows.flatMap(row =>
+    nested.has(row.event.id)
+      ? []
+      : [row, ...(children.get(row.event.id) ?? [])]
   )
 }
 

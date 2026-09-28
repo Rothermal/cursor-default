@@ -55,6 +55,29 @@ describe('soccer summary field review', () => {
     )).toEqual([])
   })
 
+  it('shows the restart source line in linked shot detail', () => {
+    const corner = event('corner', 'soccer.team_event', 2, { kind: 'corner' }, {
+      actors: [playerActor('taker', 'participant-a', '#7 Ava')],
+    })
+    const header = event('header', 'soccer.shot', 3, {
+      outcome: 'goal',
+      situation: 'corner_sequence',
+      sourceEventId: 'corner',
+    })
+    const filters = {
+      orientation: 'normalized',
+      side: 'all',
+      families: ALL_FAMILIES,
+      participant: 'all',
+      period: 'full_match',
+    } as const
+    const linked = soccerSummaryFieldReview(state(), inspection([corner, header]), filters)
+    expect(linked.events.find(item => item.event.id === 'header')?.detail)
+      .toBe('corner sequence - From corner, taker #7 Ava, 2:00')
+    const orphan = soccerSummaryFieldReview(state(), inspection([header]), filters)
+    expect(orphan.events[0].detail).toBe('corner sequence - Linked restart removed')
+  })
+
   it('combines side, participant, family, and aggregate period filters', () => {
     const events = fixtureEvents()
     const review = soccerSummaryFieldReview(state(), inspection(events), {

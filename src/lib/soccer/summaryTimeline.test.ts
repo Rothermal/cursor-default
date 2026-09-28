@@ -11,6 +11,11 @@ import {
   type SoccerSummaryTimelineFilter,
 } from './summaryTimeline'
 import { soccerTeamEventReviewPresentation } from './timeline'
+import {
+  soccerRestartLedToLine,
+  soccerShotSourceLine,
+} from './eventLabels'
+import { soccerPeriodTimings } from './live'
 
 const EVENT_TYPES = [
   'soccer.opening_lineup',
@@ -163,6 +168,64 @@ describe('soccer summary timeline', () => {
     })
   })
 
+  it('nests linked shots directly under their restart row', () => {
+    const corner = withData(event(1, 'soccer.team_event', 'regulation-1', 1, 23 * 60_000 + 10_000), {
+      payload: { kind: 'corner' },
+      actors: [{ role: 'taker', kind: 'unknown', participantId: 'p7', label: '#7 Ava' }],
+    })
+    const clearance = withData(event(2, 'soccer.defensive_action', 'regulation-1', 1, 23 * 60_000 + 12_000), {
+      teamSide: 'opponent',
+      payload: { action: 'clearance' },
+    })
+    const unrelated = withData(event(3, 'soccer.shot', 'regulation-1', 1, 23 * 60_000 + 13_000), {
+      payload: { outcome: 'blocked', situation: 'open_play' },
+    })
+    const header = withData(event(4, 'soccer.shot', 'regulation-1', 1, 23 * 60_000 + 14_000), {
+      payload: { outcome: 'goal', situation: 'corner_sequence', sourceEventId: 'event-1', bodyPart: 'header' },
+      actors: [{ role: 'shooter', kind: 'unknown', participantId: 'p9', label: '#9 Mia' }],
+    })
+    const review = soccerSummaryTimelineReview(
+      state(),
+      inspection([corner, clearance, unrelated, header]),
+      'all'
+    )
+    expect(review.activeSections[0].rows.map(row => [row.event.id, row.nestedUnderEventId]))
+      .toEqual([
+        ['event-1', null],
+        ['event-4', 'event-1'],
+        ['event-2', null],
+        ['event-3', null],
+      ])
+
+    const timings = soccerPeriodTimings(state())
+    const active = [corner, clearance, unrelated, header]
+    expect(soccerShotSourceLine(header, active, timings)).toBe('From corner, taker #7 Ava, 23:10')
+    expect(soccerRestartLedToLine(corner, active, timings)).toBe('Led to: Goal (header) #9 Mia, 23:14')
+    expect(soccerRestartLedToLine(corner, active, timings, new Set(['event-4']))).toBeNull()
+    expect(soccerShotSourceLine(unrelated, active, timings)).toBeNull()
+    expect(soccerShotSourceLine(header, [clearance, header], timings)).toBe('Linked restart removed')
+  })
+
+  it('labels penalty and free kick foul sources by the fouled player', () => {
+    const penalty = withData(event(1, 'soccer.foul', 'regulation-2', 2, 45 * 60_000 + 41 * 60_000 + 2_000), {
+      teamSide: 'opponent',
+      payload: { restart: 'penalty', sanction: 'none' },
+      actors: [{ role: 'fouled', kind: 'unknown', participantId: 'p9', label: '#9 Mia' }],
+    })
+    const kick = withData(event(2, 'soccer.shot', 'regulation-2', 2, 45 * 60_000 + 41 * 60_000 + 40_000), {
+      payload: { outcome: 'saved', situation: 'penalty', sourceEventId: 'event-1' },
+    })
+    const freeKick = withData(event(3, 'soccer.foul', 'regulation-2', 2, null), {
+      teamSide: 'opponent',
+      payload: { restart: 'direct_free_kick', sanction: 'none' },
+    })
+    const timings = soccerPeriodTimings(state())
+    expect(soccerShotSourceLine(kick, [penalty, kick], timings)).toBe('From penalty foul on #9 Mia, 41:02')
+    expect(soccerRestartLedToLine(penalty, [penalty, kick], timings)).toBe('Led to: Saved, 41:40')
+    const freeKickShot = withData(kick, { payload: { outcome: 'goal', situation: 'direct_free_kick', sourceEventId: 'event-3' } })
+    expect(soccerShotSourceLine(freeKickShot, [freeKick, freeKickShot], timings)).toBe('From free kick foul')
+  })
+
   it('keeps shootout lifecycle context without listing attempts', () => {
     const review = soccerSummaryTimelineReview(
       state(),
@@ -228,6 +291,10 @@ function event(
     updatedAt: timestamp,
     deletedAt: null,
   }
+}
+
+function withData(base: GameEvent, data: Partial<GameEvent>): GameEvent {
+  return { ...base, ...data } as GameEvent
 }
 
 function inspection(

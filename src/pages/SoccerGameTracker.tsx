@@ -41,6 +41,7 @@ import SoccerShootoutSetupDialog from '../components/soccer/SoccerShootoutSetupD
 import SoccerShootoutWorkspace from '../components/soccer/SoccerShootoutWorkspace'
 import SoccerCloudConflictDialog from '../components/soccer/SoccerCloudConflictDialog'
 import SoccerRecorderDialog from '../components/soccer/SoccerRecorderDialog'
+import SoccerQuickShotSheet from '../components/soccer/SoccerQuickShotSheet'
 import SoccerShotCaptureDialog, {
   type SoccerCaptureDraft,
 } from '../components/soccer/SoccerShotCaptureDialog'
@@ -62,6 +63,8 @@ import {
   soccerFieldReviewEvents,
   soccerLivePenaltyFoul,
   soccerPeriodTimings,
+  soccerLastTrackedShooterId,
+  soccerShotSourceLine,
   suggestSoccerShotSource,
   soccerTeamEventReviewPresentation,
   suggestSoccerRestartKind,
@@ -121,6 +124,8 @@ export default function SoccerGameTracker() {
   const [error, setError] = useState<string | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [captureDraft, setCaptureDraft] = useState<SoccerCaptureDraft | null>(null)
+  const [quickShotDraft, setQuickShotDraft] = useState<SoccerCaptureDraft | null>(null)
+  const [quickShotKey, setQuickShotKey] = useState(0)
   const [incidentDraft, setIncidentDraft] = useState<SoccerIncidentDraft | null>(null)
   const [restartArmed, setRestartArmed] = useState(false)
   const [penaltyPrompt, setPenaltyPrompt] = useState<SoccerPenaltyKickPrompt | null>(null)
@@ -419,6 +424,11 @@ export default function SoccerGameTracker() {
     }
   }
 
+  const openQuickShot = (draft: SoccerCaptureDraft) => {
+    setQuickShotKey(value => value + 1)
+    setQuickShotDraft({ ...draft, mode: 'live' })
+  }
+
   const applyIncidentResult = (result: SoccerLiveResult): boolean => {
     const applied = applyResult(result)
     if (applied && result.ok && incidentDraft?.mode === 'live') {
@@ -434,7 +444,7 @@ export default function SoccerGameTracker() {
       return
     }
     setRestartArmed(false)
-    setCaptureDraft({
+    openQuickShot({
       teamSide: penaltyPrompt.teamSide,
       location: null,
       situation: 'penalty',
@@ -693,7 +703,7 @@ export default function SoccerGameTracker() {
                     return
                   }
                   if (capturePreferences.captureMode === 'shot') {
-                    setCaptureDraft(liveShotDraft(capturePreferences.teamSide, location))
+                    openQuickShot(liveShotDraft(capturePreferences.teamSide, location))
                   } else {
                     openIncident(capturePreferences.captureMode, location)
                   }
@@ -712,7 +722,7 @@ export default function SoccerGameTracker() {
                   disabled={!fieldCaptureEnabled}
                   onClick={() => {
                     setRestartArmed(false)
-                    setCaptureDraft(liveShotDraft(capturePreferences.teamSide, null, 'goal'))
+                    openQuickShot(liveShotDraft(capturePreferences.teamSide, null, 'goal'))
                   }}
                 />
                 <QuickCaptureButton
@@ -898,6 +908,21 @@ export default function SoccerGameTracker() {
         }}
       />
 
+      <SoccerQuickShotSheet
+        key={quickShotKey}
+        draft={quickShotDraft}
+        state={state}
+        recorderUserId={user?.id ?? null}
+        busy={isApplying}
+        lastShooterId={soccerLastTrackedShooterId(inspection.activeEvents)}
+        onApply={applyResult}
+        onClose={() => setQuickShotDraft(null)}
+        onMoreDetails={draft => {
+          setQuickShotDraft(null)
+          setCaptureDraft(draft)
+        }}
+      />
+
       <SoccerShotCaptureDialog
         draft={captureDraft}
         state={state}
@@ -940,6 +965,7 @@ export default function SoccerGameTracker() {
       {clusterEventIds && (
         <ClusterSheet
           events={inspection.activeEvents.filter(event => clusterEventIds.includes(event.id))}
+          sourceLine={event => soccerShotSourceLine(event, inspection.activeEvents, soccerPeriodTimings(state))}
           onSelect={event => {
             setClusterEventIds(null)
             editFieldEvent(event)
@@ -1198,13 +1224,13 @@ function incidentKind(event: SoccerIncidentEvent): SoccerIncidentKind {
   return event.eventType === 'soccer.foul' ? 'foul' : 'card'
 }
 
-function ClusterSheet({ events, onSelect, onClose }: { events: GameEvent[]; onSelect: (event: GameEvent) => void; onClose: () => void }) {
+function ClusterSheet({ events, sourceLine, onSelect, onClose }: { events: GameEvent[]; sourceLine: (event: GameEvent) => string | null; onSelect: (event: GameEvent) => void; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/[0.45] sm:items-center" onClick={onClose}>
       <div className="w-full rounded-t-lg bg-surface p-4 sm:max-w-md sm:rounded-lg" onClick={event => event.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-content">Events at this location</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center text-content-muted" aria-label="Close" title="Close"><X size={20} /></button></div>
         <div className="divide-y divide-line border-y border-line">
-          {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="truncate text-sm font-semibold text-content">{markerLabel(event)}</span><span className="text-xs font-bold text-success-content">Edit</span></button>)}
+          {events.map(event => <button key={event.id} type="button" onClick={() => onSelect(event)} className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-content">{markerLabel(event)}</span>{sourceLine(event) && <span className="block truncate text-xs text-content-muted">{sourceLine(event)}</span>}</span><span className="text-xs font-bold text-success-content">Edit</span></button>)}
         </div>
       </div>
     </div>

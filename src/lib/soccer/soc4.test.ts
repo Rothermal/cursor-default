@@ -35,6 +35,7 @@ import {
   startSoccerShootout,
 } from './live'
 import { suggestSoccerShotSource } from './capture'
+import { buildSoccerShotInput, soccerLastTrackedShooterId, soccerQuickShotSelection } from './shotInput'
 import { resolveSoccerMatchRules, type SoccerMatchRulesOverride } from './rules'
 import { createSoccerSportGameState, normalizeSoccerSportGameState } from './state'
 import { SOCCER_GAME_STATE_VERSION } from './types'
@@ -356,6 +357,52 @@ describe('SOC-4A normal-match projection', () => {
     expect(penaltyKick.ok && penaltyKick.inspection.complete).toBe(true)
     if (!penaltyKick.ok) return
     expect(penaltyKick.state.sportGameState!.projection.sideTotals.tracked.penaltyAttempts).toBe(1)
+  })
+
+  it('records compact-sheet shots through the shared builder', () => {
+    const kickedOff = append(initializedState(), kickoffEvents())
+    const quick = (
+      teamSide: 'tracked' | 'opponent',
+      outcome: 'goal' | 'saved',
+      shooterId: string,
+      primaryCreatorId: string | null
+    ) => buildSoccerShotInput(soccerQuickShotSelection({
+      teamSide,
+      outcome,
+      situation: 'open_play',
+      sourceEventId: null,
+      location: null,
+      trackedLabel: 'Aces',
+      opponentTeamLabel: 'Bears',
+      shooterId,
+      primaryCreatorId,
+      trackedGoalkeeperId: 'match-keeper',
+    }))
+    const goal = recordSoccerShot(kickedOff, quick('tracked', 'goal', 'match-defender', 'match-keeper'), {
+      recorderUserId: 'user-1',
+      eventIds: ['50000000-0000-4000-8000-000000000021'],
+    })
+    expect(goal.ok && goal.inspection.complete).toBe(true)
+    if (!goal.ok) return
+    const recordedGoal = goal.inspection.activeEvents[goal.inspection.activeEvents.length - 1]
+    expect(recordedGoal.actors.map(actor => [actor.role, actor.participantId ?? actor.label])).toEqual([
+      ['shooter', 'match-defender'],
+      ['creator_primary', 'match-keeper'],
+    ])
+    expect(soccerLastTrackedShooterId(goal.inspection.activeEvents)).toBe('match-defender')
+
+    const saved = recordSoccerShot(goal.state, quick('opponent', 'saved', '__team__', null), {
+      recorderUserId: 'user-1',
+      eventIds: ['50000000-0000-4000-8000-000000000022'],
+    })
+    expect(saved.ok && saved.inspection.complete).toBe(true)
+    if (!saved.ok) return
+    const recordedSave = saved.inspection.activeEvents[saved.inspection.activeEvents.length - 1]
+    expect(recordedSave.actors.map(actor => [actor.role, actor.participantId ?? actor.label])).toEqual([
+      ['shooter', 'Unknown opponent'],
+      ['goalkeeper', 'match-keeper'],
+    ])
+    expect(saved.state.sportGameState!.projection.sideTotals.opponent.shotsOnTarget).toBe(1)
   })
 
   it('derives defensive, foul, discipline, team, penalty, and linked-block totals', () => {
