@@ -224,7 +224,7 @@ sync.
 
 ### S7 - Offer the last restart as the next shot source
 
-**Status:** S7A live defaults and penalty prompt implemented; S7B presentation pending; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md). `sourceEventId` is sufficient; no chain schema
+**Status:** S7A live defaults and penalty prompt plus S7B link presentation implemented; see [`PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md`](PLAN_SOC_S7_S1_S4_LIVE_CAPTURE.md). `sourceEventId` is sufficient; no chain schema
 **Theme:** set-piece linking  
 **Where:** `sourceEventId` on attacking events; live Goal/Shot sheets
 

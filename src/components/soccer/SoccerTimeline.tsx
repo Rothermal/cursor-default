@@ -20,16 +20,21 @@ import {
   isSoccerLocatedEditableEvent,
   parseSoccerInputTime,
   restoreSoccerHistoryEvent,
+  SOCCER_LINKED_RESTART_REMOVED,
   SOCCER_SUMMARY_TIMELINE_FILTERS,
+  soccerEventDetail,
   soccerEventMatchesTimelineFilter,
   soccerEventTimeLabel,
+  soccerEventTitle,
+  soccerRestartLedToLine,
+  soccerShotSourceLine,
   soccerPeriodTimings,
-  soccerTeamEventReviewPresentation,
   soccerSummaryTimelineReview,
   updateSoccerHistoryEvent,
   type SoccerLiveResult,
   type SoccerMatchEvent,
   type SoccerMatchRules,
+  type SoccerPeriodTiming,
   type SoccerRole,
   type SoccerRoleGroup,
   type SoccerScoreAdjustmentEvent,
@@ -55,6 +60,13 @@ interface SoccerTimelineProps {
   allowAddEvent?: boolean
   readOnly?: boolean
   presentation?: 'live' | 'review'
+}
+
+interface SoccerTimelineLinks {
+  activeEvents: readonly GameEvent[]
+  timings: readonly SoccerPeriodTiming[]
+  /** Linked shots already nested under their restart row. */
+  nestedEventIds: ReadonlySet<string>
 }
 
 const ROLE_OPTIONS: Array<{ value: SoccerRoleGroup; label: string }> = [
@@ -126,6 +138,21 @@ export default function SoccerTimeline({
   const removedCount = presentation === 'review'
     ? allEventsReview?.removedCount ?? 0
     : inspection.deletedEvents.length
+
+  const liveLinks = useMemo<SoccerTimelineLinks>(() => ({
+    activeEvents: inspection.activeEvents,
+    timings,
+    nestedEventIds: new Set(),
+  }), [inspection.activeEvents, timings])
+  const reviewLinks = useMemo<SoccerTimelineLinks>(() => ({
+    activeEvents: inspection.activeEvents,
+    timings,
+    nestedEventIds: new Set(
+      (review?.activeSections ?? []).flatMap(section =>
+        section.rows.filter(row => row.nestedUnderEventId).map(row => row.event.id)
+      )
+    ),
+  }), [inspection.activeEvents, review, timings])
 
   const lineupDetails = useMemo(() => soccerLineupHistoryDetails(state, inspection), [state, inspection])
   const lineupReview = { details: lineupDetails, locked: soccerLineupManagerBlocked(state, busy) }
@@ -205,6 +232,7 @@ export default function SoccerTimeline({
             />
             <ReviewSections
               lineupReview={lineupReview}
+              links={reviewLinks}
               sections={review?.activeSections ?? []}
               readOnly={readOnly}
               onEdit={editEvent}
@@ -234,6 +262,7 @@ export default function SoccerTimeline({
                   key={event.id}
                   event={event}
                   timeLabel={soccerEventTimeLabel(event, timings)}
+                  links={liveLinks}
                   onEdit={readOnly ? undefined : () => editEvent(event)}
                   onDelete={readOnly ? undefined : () => setDeleting(event)}
                 />
@@ -254,6 +283,7 @@ export default function SoccerTimeline({
             presentation === 'review' ? (
               <ReviewSections
                 lineupReview={lineupReview}
+                links={reviewLinks}
                 sections={review?.removedSections ?? []}
                 readOnly={readOnly}
                 removed
@@ -267,6 +297,7 @@ export default function SoccerTimeline({
                     key={event.id}
                     event={event}
                     timeLabel={soccerEventTimeLabel(event, timings)}
+                    links={liveLinks}
                     deleted
                     onRestore={
                       readOnly
@@ -431,6 +462,7 @@ function TimelineFilterChips({
 
 function ReviewSections({
   lineupReview,
+  links,
   sections,
   readOnly,
   removed = false,
@@ -439,6 +471,7 @@ function ReviewSections({
   onRestore,
 }: {
   lineupReview: { details: Record<string, string>; locked: boolean }
+  links: SoccerTimelineLinks
   sections: SoccerSummaryTimelineSection[]
   readOnly: boolean
   removed?: boolean
@@ -467,6 +500,8 @@ function ReviewSections({
                 key={row.event.id}
                 event={row.event}
                 timeLabel={row.timeLabel}
+                links={links}
+                nested={row.nestedUnderEventId !== null}
                 deleted={removed}
                 review
                 onEdit={!readOnly && onEdit ? () => onEdit(row.event) : undefined}
@@ -485,6 +520,8 @@ function HistoryRow({
   lineupReview,
   event,
   timeLabel,
+  links,
+  nested = false,
   deleted = false,
   review = false,
   onEdit,
@@ -494,6 +531,8 @@ function HistoryRow({
   lineupReview: { details: Record<string, string>; locked: boolean }
   event: GameEvent
   timeLabel: string
+  links: SoccerTimelineLinks
+  nested?: boolean
   deleted?: boolean
   review?: boolean
   onEdit?: () => void
@@ -502,14 +541,20 @@ function HistoryRow({
 }) {
   const [metadataOpen, setMetadataOpen] = useState(false)
   const contextDetail = eventContextDetail(event)
+  const linkedSourceLine = soccerShotSourceLine(event, links.activeEvents, links.timings)
+  const sourceLine = nested ? null : linkedSourceLine
+  const ledToLine = soccerRestartLedToLine(event, links.activeEvents, links.timings, links.nestedEventIds)
   const lineupDetail = lineupReview.details[event.id]
   const lineupLocked = event.eventType === 'soccer.lineup_transition' && lineupReview.locked
   return (
-    <div className="min-h-16 px-3 py-3">
+    <div className={nested ? 'min-h-16 py-3 pl-8 pr-3 relative before:absolute before:left-4 before:top-0 before:h-1/2 before:w-3 before:border-b-2 before:border-l-2 before:border-line-strong before:content-[\'\']' : 'min-h-16 px-3 py-3'}>
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-content">{eventTitle(event)}</p>
-          <p className={lineupDetail ? 'text-xs text-content-muted' : 'truncate text-xs text-content-muted'}>{lineupDetail ?? eventDetail(event)}</p>
+          <p className="truncate text-sm font-semibold text-content">{soccerEventTitle(event)}</p>
+          <p className={lineupDetail ? 'text-xs text-content-muted' : 'truncate text-xs text-content-muted'}>{lineupDetail ?? soccerEventDetail(event)}</p>
+          {nested && linkedSourceLine && <p className="sr-only">{linkedSourceLine}</p>}
+          {sourceLine && <p className={sourceLine === SOCCER_LINKED_RESTART_REMOVED ? 'text-[11px] font-semibold text-danger-content' : 'text-[11px] text-content-muted'}>{sourceLine}</p>}
+          {ledToLine && <p className="text-[11px] text-content-muted">{ledToLine}</p>}
           {contextDetail && <p className="truncate text-[11px] text-content-muted">{contextDetail}</p>}
           {!review && (
             <p className="mt-0.5 text-[11px] text-content-subtle">
@@ -532,11 +577,11 @@ function HistoryRow({
         </div>
         <div className="flex shrink-0 gap-1">
           {deleted ? (
-            onRestore && <button type="button" onClick={onRestore} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-info-content" aria-label={`Restore ${eventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
+            onRestore && <button type="button" onClick={onRestore} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-info-content" aria-label={`Restore ${soccerEventTitle(event)}`} title="Restore"><RotateCcw size={17} /></button>
           ) : (
             <>
-              {onEdit && <button type="button" onClick={onEdit} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-content-muted" aria-label={`Correct ${eventTitle(event)}`} title="Correct"><Pencil size={17} /></button>}
-              {onDelete && <button type="button" onClick={onDelete} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-danger-content" aria-label={`Remove ${eventTitle(event)}`} title="Remove"><Trash2 size={17} /></button>}
+              {onEdit && <button type="button" onClick={onEdit} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-content-muted" aria-label={`Correct ${soccerEventTitle(event)}`} title="Correct"><Pencil size={17} /></button>}
+              {onDelete && <button type="button" onClick={onDelete} disabled={lineupLocked} className="disabled:bg-control-disabled disabled:text-content-disabled grid h-9 w-9 place-items-center text-danger-content" aria-label={`Remove ${soccerEventTitle(event)}`} title="Remove"><Trash2 size={17} /></button>}
             </>
           )}
         </div>
@@ -562,9 +607,6 @@ function formatEventTimestamp(value: string): string {
 
 function eventContextDetail(event: GameEvent): string | null {
   const payload = event.payload as Record<string, unknown>
-  if (event.eventType === 'soccer.shot' && typeof payload.sourceEventId === 'string') {
-    return `Linked restart: ${payload.sourceEventId.slice(0, 8)}`
-  }
   if (event.eventType === 'soccer.foul' || event.eventType === 'soccer.card') {
     const resolution = payload.lineupResolution as { exit?: unknown; replacementChanges?: unknown[] } | null
     if (!resolution || typeof resolution.exit !== 'string') return null
@@ -619,7 +661,7 @@ function SoccerEventCorrectionDialog({ event, state, presentation, onSave, onClo
   }
 
   return (
-    <Dialog title={`Correct ${eventTitle(event)}`} onClose={onClose}>
+    <Dialog title={`Correct ${soccerEventTitle(event)}`} onClose={onClose}>
       <div className="space-y-4">
         {renderEventEditor(
           draft,
@@ -809,84 +851,6 @@ function NullableEditor({ label, value, onChange }: { label: string; value: numb
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return <label className="flex items-center justify-between text-sm font-medium text-content min-h-10">{label}<input type="checkbox" checked={checked} onChange={change => onChange(change.target.checked)} className="bg-surface h-5 w-5 accent-accent" /></label>
-}
-
-function eventTitle(event: GameEvent): string {
-  if (event.eventType === 'soccer.team_event') {
-    return soccerTeamEventReviewPresentation(event).kindLabel
-  }
-  return ({
-    'soccer.opening_lineup': 'Opening lineup',
-    'soccer.period_started': 'Period started',
-    'soccer.period_ended': 'Period ended',
-    'soccer.clock_started': 'Clock started',
-    'soccer.clock_paused': 'Clock paused',
-    'soccer.clock_adjusted': 'Clock corrected',
-    'soccer.match_rules_changed': 'Rules changed',
-    'soccer.substitution_window': 'Substitution window',
-    'soccer.lineup_transition': 'Lineup change',
-    'soccer.role_changed': 'Roles changed',
-    'soccer.attacking_direction_changed': 'Direction changed',
-    'soccer.match_roster_added': 'Participant added',
-    'soccer.participant_resolved': 'Participant resolved',
-    'soccer.match_ended': 'Match ended',
-    'soccer.match_reopened': 'Match reopened',
-    'soccer.shot': 'Shot',
-    'soccer.own_goal': 'Own goal',
-    'soccer.score_adjustment': 'Score adjustment',
-    'soccer.defensive_action': 'Defensive action',
-    'soccer.foul': 'Foul',
-    'soccer.card': 'Card',
-    'soccer.shootout_started': 'Shootout started',
-    'soccer.shootout_eligibility_changed': 'Shootout eligibility',
-    'soccer.shootout_goalkeeper_changed': 'Shootout goalkeeper',
-    'soccer.shootout_kick': 'Shootout kick',
-  } as Record<string, string>)[event.eventType] ?? event.eventType
-}
-
-function eventDetail(event: GameEvent): string {
-  const payload = event.payload as Record<string, unknown>
-  switch (event.eventType) {
-    case 'soccer.opening_lineup': return `${Array.isArray(payload.starters) ? payload.starters.length : 0} starters`
-    case 'soccer.period_started':
-    case 'soccer.period_ended': return String(payload.periodId ?? event.period.id)
-    case 'soccer.substitution_window': return `${Array.isArray(payload.changes) ? payload.changes.length : 0} change(s)`
-    case 'soccer.role_changed': return `${Array.isArray(payload.changes) ? payload.changes.length : 0} role(s)`
-    case 'soccer.attacking_direction_changed': return payload.direction === 'left_to_right' ? 'Left to right' : 'Right to left'
-    case 'soccer.match_roster_added': return String((payload.participant as { displayName?: unknown } | undefined)?.displayName ?? 'Participant')
-    case 'soccer.participant_resolved': return String(payload.displayName ?? 'Roster player')
-    case 'soccer.match_ended': return String(payload.reason ?? 'Ended')
-    case 'soccer.match_reopened': return String(payload.reason ?? 'Reopened')
-    case 'soccer.shot': {
-      const shooter = event.actors.find(actor => actor.role === 'shooter')
-      return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} · ${String(payload.outcome ?? 'shot').replace('_', ' ')} · ${shooter?.label ?? 'Team'}`
-    }
-    case 'soccer.own_goal': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} benefits · ${event.actors.find(actor => actor.role === 'own_goal_by')?.label ?? 'Unknown'}`
-    case 'soccer.score_adjustment': return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} ${Number(payload.delta) > 0 ? '+' : ''}${String(payload.delta ?? '')} · ${String(payload.reason ?? 'No reason')}`
-    case 'soccer.defensive_action': {
-      const actor = event.actors.find(item => item.role === 'defender')
-      const outcome = payload.action === 'tackle' ? ` ${String(payload.tackleOutcome ?? '')}` : ''
-      return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} / ${String(payload.action ?? 'defense').replace(/_/g, ' ')}${outcome} / ${actor?.label ?? 'Team'}`
-    }
-    case 'soccer.foul': {
-      const actor = event.actors.find(item => item.role === 'committed_by')
-      const sanction = payload.sanction === 'none' ? '' : ` / ${String(payload.sanction).replace(/_/g, ' ')}`
-      return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} / ${actor?.label ?? 'Team'} / ${String(payload.restart ?? 'none').replace(/_/g, ' ')}${sanction}`
-    }
-    case 'soccer.card': {
-      const actor = event.actors.find(item => item.role === 'recipient')
-      return `${event.teamSide === 'tracked' ? 'Tracked' : 'Opponent'} / ${String(payload.sanction ?? 'card').replace(/_/g, ' ')} / ${actor?.label ?? 'Team'} / ${String(payload.reason ?? '').replace(/_/g, ' ')}`
-    }
-    case 'soccer.team_event': {
-      const presentation = soccerTeamEventReviewPresentation(event)
-      return `${presentation.sideLabel} / ${presentation.actorLabel}`
-    }
-    case 'soccer.shootout_started': return `${String(payload.firstKickingSide)} first / ${String(payload.initialKicksPerSide)} kicks / ${String(payload.opponentEligibleCount)} eligible`
-    case 'soccer.shootout_eligibility_changed': return `${String(payload.reason).replace(/_/g, ' ')} / ${Array.isArray(payload.trackedEligibleParticipantIds) ? payload.trackedEligibleParticipantIds.length : 0} each`
-    case 'soccer.shootout_goalkeeper_changed': return `${event.teamSide} / ${event.actors.find(actor => actor.role === 'goalkeeper_in')?.label ?? 'Unknown'} / ${String(payload.reason).replace(/_/g, ' ')}`
-    case 'soccer.shootout_kick': return `${event.teamSide} / ${event.actors.find(actor => actor.role === 'kicker')?.label ?? 'Unknown'} / ${String(payload.outcome)}`
-    default: return event.period.id
-  }
 }
 
 function defaultRole(): SoccerRole {
