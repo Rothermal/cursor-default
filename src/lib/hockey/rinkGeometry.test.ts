@@ -139,4 +139,13 @@ describe('HockeyRink component', () => {
     expect(html).toContain('aria-label="Opponent goal"')
     expect(html).toContain('role="button"')
   })
+
+  it('makes each faceoff dot a keyboard tap target only when asked and capture is enabled', () => {
+    expect(render()).not.toContain('data-faceoff-target')
+    const html = render({ onFaceoffDot: () => {} })
+    expect(html.match(/data-faceoff-target=/g)).toHaveLength(9)
+    expect(html).toContain('aria-label="Faceoff at the left end upper dot"')
+    expect(html.match(/tabindex="0"/g)).toHaveLength(9)
+    expect(render({ onFaceoffDot: () => {}, disabled: true })).not.toContain('data-faceoff-target')
+  })
 })

@@ -26,6 +26,7 @@ import {
   hockeyRecentEvents,
   hockeyShotMarkers,
   hockeyZone,
+  HOCKEY_FACEOFF_DOTS,
   nearestHockeyFaceoffDot,
   recentHockeyOpponentLabels,
   recordHockeyFaceoff,
@@ -450,6 +451,11 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
           disabled={!canCapture}
           markers={[...hockeyShotMarkers(sport.setup, streamEvents), ...hockeyPlayMarkers(sport.setup, streamEvents)]}
           highlightDotId={faceoffDot}
+          onFaceoffDot={dotId => {
+            setLastTap({ ...HOCKEY_FACEOFF_DOTS[dotId], attackingDirection: direction })
+            setTap(null)
+            setFaceoffDot(dotId)
+          }}
           onFlip={() => dispatch({ type: 'HYDRATE_STATE', state: setHockeyRinkFlipped(state, !flipped) })}
           onLocation={location => {
             setLastTap(location)
@@ -479,6 +485,10 @@ function HockeyLivePanel({ sport }: { sport: HockeySportGameState }) {
             recentOpponentLabels={recentLabels}
             onRecord={recordFaceoff}
             onCancel={() => setFaceoffDot(null)}
+            onOther={() => {
+              setTap({ ...HOCKEY_FACEOFF_DOTS[faceoffDot], attackingDirection: direction })
+              setFaceoffDot(null)
+            }}
           />
         )}
         {canCapture && (

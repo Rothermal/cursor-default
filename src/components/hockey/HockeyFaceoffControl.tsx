@@ -17,11 +17,13 @@ interface HockeyFaceoffControlProps {
   /** Returns an error message, or null once the faceoff is recorded. */
   onRecord: (input: { winner: HockeySide; takerParticipantId: string | null; opponentTakerLabel: string | null }) => string | null
   onCancel: () => void
+  /** Opens the generic chooser at this dot instead, for a shot or play recorded there. */
+  onOther?: () => void
 }
 
 /**
- * The second tap of a faceoff (HKY-2C): the snapped dot is ringed on the rink, and Won or
- * Lost records it with the preselected taker. A chip changes the taker without a dialog.
+ * A faceoff (HKY-2C): after a dot tap, the dot is ringed on the rink and Won or Lost records
+ * it with the preselected taker, so a faceoff takes two taps. A chip changes the taker.
  */
 export default function HockeyFaceoffControl({
   sport,
@@ -30,6 +32,7 @@ export default function HockeyFaceoffControl({
   recentOpponentLabels,
   onRecord,
   onCancel,
+  onOther,
 }: HockeyFaceoffControlProps) {
   const [taker, setTaker] = useState<string | null>(() => hockeyFaceoffTakerDefault(sport.setup, sport.projection))
   const [opponentTaker, setOpponentTaker] = useState<string | null>(null)
@@ -75,6 +78,11 @@ export default function HockeyFaceoffControl({
         <button type="button" className="btn-secondary" onClick={() => record('opponent')}>Lost</button>
         <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
       </div>
+      {onOther && (
+        <button type="button" className="min-h-9 text-sm font-semibold text-accent underline" onClick={onOther}>
+          Record something else at this dot
+        </button>
+      )}
       {error && (
         <p role="alert" className="rounded-md border border-danger-line bg-danger px-3 py-2 text-sm text-danger-content">{error}</p>
       )}

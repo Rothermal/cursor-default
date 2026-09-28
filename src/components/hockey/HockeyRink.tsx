@@ -41,6 +41,11 @@ interface HockeyRinkProps {
   markers?: HockeyRinkMarker[]
   /** Rings the faceoff dot a tap snapped to (HKY-2C). */
   highlightDotId?: HockeyFaceoffDotId | null
+  /**
+   * When set, each faceoff dot is its own tap target (HKY-2C), so a faceoff takes a dot
+   * tap plus Won or Lost. Taps elsewhere still go to `onLocation`.
+   */
+  onFaceoffDot?: (dotId: HockeyFaceoffDotId) => void
   onFlip: () => void
   onLocation: (location: GameEventLocation) => void
   onMarker?: (markerId: string) => void
@@ -71,6 +76,7 @@ export default function HockeyRink({
   trapezoid,
   markers = [],
   highlightDotId = null,
+  onFaceoffDot,
   onFlip,
   onLocation,
   onMarker,
@@ -179,6 +185,10 @@ export default function HockeyRink({
             )
           })}
 
+          {onFaceoffDot && !disabled && HOCKEY_FACEOFF_DOT_IDS.map(id => (
+            <FaceoffDotTarget key={`target-${id}`} dotId={id} onSelect={() => onFaceoffDot(id)} />
+          ))}
+
           {highlightDotId && (
             <circle
               data-highlight-dot={highlightDotId}
@@ -206,6 +216,37 @@ export default function HockeyRink({
         )}
       </div>
     </div>
+  )
+}
+
+/** Tap radius around a dot, in feet: wider than the painted dot so a thumb can hit it. */
+const FACEOFF_DOT_TARGET_RADIUS_FT = 5
+
+function FaceoffDotTarget({ dotId, onSelect }: { dotId: HockeyFaceoffDotId; onSelect: () => void }) {
+  const dot = HOCKEY_FACEOFF_DOTS[dotId]
+  return (
+    <circle
+      role="button"
+      tabIndex={0}
+      aria-label={`Faceoff at the ${dotId.replace(/_/g, ' ')} dot`}
+      data-faceoff-target={dotId}
+      cx={dot.x * L}
+      cy={dot.y * W}
+      r={FACEOFF_DOT_TARGET_RADIUS_FT}
+      fill="transparent"
+      className="cursor-pointer outline-none focus-visible:stroke-[rgb(var(--rink-tracked))]"
+      strokeWidth="0.8"
+      onClick={event => {
+        event.stopPropagation()
+        onSelect()
+      }}
+      onKeyDown={event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        event.stopPropagation()
+        onSelect()
+      }}
+    />
   )
 }
 

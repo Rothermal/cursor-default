@@ -495,8 +495,14 @@ Deviations from the plan above:
     fingerprints, survives reload and park, and is dropped if malformed. Any new event
     clears it.
 - The preview adds:
-  - A tap chooser (Shot, Faceoff, Hit, Takeaway, Giveaway).
-  - A two-tap faceoff control that rings the snapped dot and offers taker chips.
+  - Each faceoff dot is its own tap target, 5 ft in radius and keyboard-focusable. Tapping
+    it rings the dot and opens the faceoff control, so a faceoff takes two taps: the dot,
+    then Won or Lost. Taker chips are optional. "Record something else at this dot" opens
+    the chooser there instead.
+  - A tap anywhere else opens the chooser (Shot, Faceoff, Hit, Takeaway, Giveaway). Its
+    Faceoff option snaps to the nearest dot and takes a third tap.
+  - A browser check at 390 px counted the path: dot tap, then Won, recorded the faceoff in
+    two taps. A slot tap still opened the chooser, and the flipped view worked the same.
   - A play dialog, a quick Play button with no location, rink markers for located plays,
     and Recent Events with Undo and Restore.
   - A C position for its first preview skater, so the taker default has a centre to pick.
